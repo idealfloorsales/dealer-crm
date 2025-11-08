@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Каталог Товаров</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <nav>
+        <a href="/" class="nav-link">Учет Дилеров</a>
+        <a href="/products.html" class="nav-link active">Каталог Товаров</a>
+        <a href="/report.html" class="nav-link">Отчет по товарам</a>
+    </nav>
+
+    <h1>Каталог Товаров</h1>
+    
+    <div class="toolbar">
+        <input type="text" id="search-bar" class="search-bar" placeholder="Поиск по Артикулу или Названию...">
+        <button id="open-add-product-btn" class="btn-primary">Добавить новый товар</button>
+    </div>
+
+    <table id="products-table">
+        <thead>
+            <tr>
+                <th data-sort="sku">Артикул (SKU)</th>
+                <th data-sort="name">Название</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody id="product-list-body"></tbody>
+    </table>
+
+    <div id="add-product-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>Добавить товар</h2>
+            <form id="add-product-form">
+                <label for="add_sku">Артикул (SKU):</label>
+                <input type="text" id="add_sku" required>
+                <label for="add_name">Название:</label>
+                <input type="text" id="add_name" required>
+                <button type="submit">Добавить</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="edit-product-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>Редактировать товар</h2>
+            <form id="edit-product-form">
+                <input type="hidden" id="edit_product_id">
+                <label for="edit_sku">Артикул (SKU):</label>
+                <input type="text" id="edit_sku" required>
+                <label for="edit_name">Название:</label>
+                <input type="text" id="edit_name" required>
+                <button type="submit">Сохранить</button>
+            </form>
+        </div>
+    </div>
+    
+    <script src="products.js"></script>
+</body>
+</html>

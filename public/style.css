@@ -1,0 +1,409 @@
+/* style.css */
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    background-color: #f4f7f6;
+}
+
+h1, h2 {
+    color: #333;
+    border-bottom: 2px solid #007bff;
+    padding-bottom: 5px;
+}
+
+/* --- Навигация --- */
+nav {
+    background-color: #333;
+    padding: 10px 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+nav a.nav-link {
+    color: white;
+    text-decoration: none;
+    font-size: 1.2em;
+    font-weight: bold;
+    padding: 10px 15px;
+    border-radius: 4px;
+}
+nav a.nav-link:hover {
+    background-color: #555;
+}
+nav a.nav-link.active {
+    background-color: #007bff;
+}
+
+/* --- Кнопка "Добавить" --- */
+#open-add-modal-btn {
+    padding: 12px 20px;
+    font-size: 16px;
+    margin-bottom: 15px;
+}
+
+/* --- Формы в Модальных окнах --- */
+#add-dealer-form, #edit-dealer-form, #add-product-form, #edit-product-form {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: 1fr;
+}
+
+/* Общие стили для полей ввода */
+input[type="text"],
+input[type="file"],
+textarea,
+select {
+    width: 100%;
+    padding: 10px;
+    box-sizing: border-box; 
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    margin-top: 5px;
+}
+
+label {
+    font-weight: bold;
+    color: #555;
+    margin-top: 5px;
+    display: block;
+}
+
+/* (ИЗМЕНЕНО) Общие стили кнопок (для <button> и <a>) */
+button,
+a.btn-primary,
+a.btn-danger {
+    padding: 10px 15px;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-top: 10px;
+    text-decoration: none;
+    display: inline-block;
+}
+button:hover,
+a.btn-primary:hover,
+a.btn-danger:hover {
+    opacity: 0.9;
+}
+button[type="submit"] {
+    background-color: #007bff;
+    font-size: 16px;
+}
+button[type="submit"]:hover {
+    background-color: #0056b3;
+}
+.btn-danger,
+a.btn-danger {
+    background-color: #dc3545;
+}
+.btn-danger:hover,
+a.btn-danger:hover {
+    background-color: #c82333;
+    color: white;
+}
+.btn-primary,
+a.btn-primary {
+    background-color: #007bff;
+}
+.btn-primary:hover,
+a.btn-primary:hover {
+     background-color: #0056b3;
+     color: white;
+}
+
+
+/* --- Стили для фильтров --- */
+.filter-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    background-color: #fff;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    margin-bottom: 20px;
+}
+.filter-group {
+    display: flex;
+    flex-direction: column;
+}
+.filter-group label {
+    font-weight: bold;
+    font-size: 0.9em;
+    color: #555;
+    margin-bottom: 0;
+    margin-top: 0;
+}
+.filter-group select {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    min-width: 200px;
+    margin-top: 5px;
+}
+
+/* --- Общие Стили для Таблиц --- */
+#dealer-table, #products-table, #report-table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: #fff;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+#dealer-table th, #dealer-table td,
+#products-table th, #products-table td,
+#report-table th, #report-table td {
+    padding: 12px 15px;
+    border-bottom: 1px solid #ddd;
+    text-align: left;
+}
+
+#dealer-table th, #products-table th, #report-table th {
+    background-color: #f4f7f6;
+    color: #333;
+    font-weight: bold;
+    position: relative;
+}
+
+#dealer-table tbody tr:hover,
+#products-table tbody tr:hover,
+#report-table tbody tr:hover {
+    background-color: #f9f9f9;
+}
+
+/* --- Общие Стили для Сортировки --- */
+#dealer-table th[data-sort],
+#products-table th[data-sort] {
+    cursor: pointer;
+}
+#dealer-table th[data-sort]:hover,
+#products-table th[data-sort]:hover {
+    background-color: #e9ecef;
+}
+#dealer-table th[data-sort]::after,
+#products-table th[data-sort]::after {
+    content: ' ';
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    margin-top: -7px;
+    border: 5px solid transparent;
+    opacity: 0.3;
+}
+#dealer-table th[data-sort].sort-asc::after,
+#products-table th[data-sort].sort-asc::after {
+    border-bottom-color: #333;
+    opacity: 1;
+}
+#dealer-table th[data-sort].sort-desc::after,
+#products-table th[data-sort].sort-desc::after {
+    border-top-color: #333;
+    opacity: 1;
+}
+/* --- Конец Сортировки --- */
+
+
+/* Стили для таблицы Дилеров */
+#dealer-table .table-photo {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 4px;
+    border: 1px solid #eee;
+}
+#dealer-table .no-photo {
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #eee;
+    color: #aaa;
+    font-size: 12px;
+    border-radius: 4px;
+}
+#dealer-table td a {
+    text-decoration: none;
+    color: #0056b3;
+    font-weight: bold;
+}
+#dealer-table td a:hover {
+    text-decoration: underline;
+}
+
+/* Стили для таблицы Товаров */
+#products-table td.sku-cell {
+    font-family: monospace;
+    font-weight: bold;
+    color: #0056b3;
+}
+
+/* Общие стили кнопок "Действия" в таблицах */
+.actions-cell {
+    display: flex;
+    gap: 5px;
+}
+.actions-cell .edit-btn {
+    padding: 5px 10px;
+    color: #333;
+    font-weight: bold;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 0;
+    background-color: #ffc107;
+}
+.actions-cell .delete-btn {
+    padding: 5px 10px;
+    color: white;
+    font-weight: bold;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 0;
+    background-color: #dc3545;
+}
+
+
+/* --- Стили Модального Окна (Общие) --- */
+.modal {
+    display: none; 
+    position: fixed; 
+    z-index: 100; 
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto; 
+    background-color: rgba(0,0,0,0.4); 
+}
+.modal-content {
+    background-color: #fefefe;
+    margin: 5% auto; 
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%;
+    max-width: 600px;
+    border-radius: 8px;
+    position: relative;
+}
+.close-btn {
+    color: #aaa;
+    position: absolute;
+    top: 10px;
+    right: 25px;
+    font-size: 28px;
+    font-weight: bold;
+}
+.close-btn:hover,
+.close-btn:focus {
+    color: black;
+    text-decoration: none;
+    cursor: pointer;
+}
+.preview-img {
+    max-width: 150px;
+    height: auto;
+    display: block;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+}
+
+/* --- Чек-лист товаров --- */
+.product-checklist {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 10px;
+    background-color: #f9f9f9;
+}
+.checklist-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 5px;
+}
+.checklist-item input[type="checkbox"] {
+    width: auto;
+    margin-top: 0;
+    margin-right: 10px;
+}
+.checklist-item label {
+    font-weight: normal;
+    color: #333;
+    margin-top: 0;
+}
+
+
+/* --- Стили для dealer.html (Страница "Подробно") --- */
+.details-container {
+    max-width: 900px;
+    margin: 20px auto; 
+    background-color: #fff;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+.details-container img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+    margin-top: 15px;
+}
+.details-container p {
+    font-size: 1.1em;
+    line-height: 1.6;
+    margin: 10px 0;
+    word-wrap: break-word;
+}
+.products-display {
+    background-color: #f9f9f9;
+    border: 1px solid #eee;
+    padding: 15px;
+    border-radius: 4px;
+    white-space: pre-wrap; 
+    font-family: monospace;
+    word-wrap: break-word;
+}
+/* Стили для списка товаров на странице дилера */
+.products-list-detailed {
+    list-style-type: disc;
+    padding-left: 20px;
+}
+.products-list-detailed li {
+    margin-bottom: 5px;
+}
+
+a.back-link {
+    display: inline-block;
+    margin-top: 20px;
+    color: #007bff;
+    text-decoration: none;
+    font-weight: bold;
+}
+a.back-link:hover {
+    text-decoration: underline;
+}
+.details-container .btn-danger {
+    margin-top: 20px;
+    font-size: 16px;
+}
+
+/* --- Стили для страницы Товаров --- */
+.toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+.search-bar {
+    width: 60%;
+    padding: 12px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}

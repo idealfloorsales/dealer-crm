@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Отчет по товарам</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <nav>
+        <a href="/" class="nav-link">Учет Дилеров</a>
+        <a href="/products.html" class="nav-link">Каталог Товаров</a>
+        <a href="/report.html" class="nav-link active">Отчет по товарам</a>
+    </nav>
+
+    <h1>Отчет по товарам</h1>
+
+    <div class="filter-container">
+        <div class="filter-group">
+            <label for="product-select">Выберите товар, чтобы увидеть, где он выставлен:</label>
+            <select id="product-select">
+                <option value="">-- Загрузка каталога... --</option>
+            </select>
+        </div>
+    </div>
+
+    <h2 id="report-title"></h2>
+    
+    <table id="report-table" style="display: none;">
+        <thead>
+            <tr>
+                <th>ID точки</th>
+                <th>Название точки</th>
+                <th>Город</th>
+                <th>Подробнее</th>
+            </tr>
+        </thead>
+        <tbody id="report-list-body">
+            </tbody>
+    </table>
+    <p id="report-no-data-msg"></p>
+
+    <script src="report.js"></script>
+</body>
+</html>

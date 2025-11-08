@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Учет Дилеров</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <nav>
+        <a href="/" class="nav-link active">Учет Дилеров</a>
+        <a href="/products.html" class="nav-link">Каталог Товаров</a>
+        <a href="/report.html" class="nav-link">Отчет по товарам</a>
+    </nav>
+
+    <h1>Система Учета Дилеров</h1>
+    <button id="open-add-modal-btn" class="btn-primary">Добавить нового дилера</button>
+    <hr>
+    <h2>Список дилеров</h2>
+
+    <div class="filter-container">
+        <div class="filter-group">
+            <label for="filter-city">Фильтр по городу:</label>
+            <select id="filter-city">
+                <option value="">-- Все города --</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label for="filter-price-type">Фильтр по типу цен:</label>
+            <select id="filter-price-type">
+                <option value="">-- Все типы --</option>
+            </select>
+        </div>
+    </div>
+
+    <table id="dealer-table">
+        <thead>
+            <tr>
+                <th>Фото</th>
+                <th data-sort="dealer_id">ID точки</th>
+                <th data-sort="name">Название точки</th>
+                <th data-sort="city">Город</th>
+                <th data-sort="price_type">Тип цен</th>
+                <th data-sort="organization">Организация</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody id="dealer-list-body"></tbody>
+    </table>
+
+    <div id="add-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>Добавить нового дилера</h2>
+            <form id="add-dealer-form">
+                <input type="text" id="dealer_id" placeholder="ID точки" required>
+                <input type="text" id="name" placeholder="Название точки" required>
+                <input type="text" id="organization" placeholder="Организация">
+                <input type="text" id="price_type" placeholder="Тип цен">
+                <input type="text" id="city" placeholder="Город">
+                <input type="text" id="address" placeholder="Адрес">
+                <input type="text" id="contacts" placeholder="Контакты (телефон, email)">
+                <input type="text" id="bonuses" placeholder="Бонусы">
+                <label for="photo_upload">Фото (выбрать файл):</label>
+                <input type="file" id="photo_upload" accept="image/*">
+                
+                <label>Выставленные товары:</label>
+                <div id="add-product-checklist" class="product-checklist">
+                    <p>Загрузка каталога...</p>
+                </div>
+                
+                <button type="submit">Добавить дилера</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="edit-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>Редактировать дилера</h2>
+            <form id="edit-dealer-form">
+                <input type="hidden" id="edit_db_id">
+                <input type="hidden" id="edit_photo_url_old">
+
+                <label>ID точки:</label>
+                <input type="text" id="edit_dealer_id" required>
+                <label>Название точки:</label>
+                <input type="text" id="edit_name" required>
+                <label>Организация:</label>
+                <input type="text" id="edit_organization">
+                <label>Тип цен:</label>
+                <input type="text" id="edit_price_type">
+                <label>Город:</label>
+                <input type="text" id="edit_city">
+                <label>Адрес:</label>
+                <input type="text" id="edit_address">
+                <label>Контакты:</label>
+                <input type="text" id="edit_contacts">
+                <label>Бонусы:</label>
+                <input type="text" id="edit_bonuses">
+
+                <label>Текущее фото:</label>
+                <img id="edit_photo_preview" src="" alt="Предпросмотр фото" class="preview-img">
+                <label>Заменить фото (выбрать файл):</label>
+                <input type="file" id="edit_photo_upload" accept="image/*">
+                <button type="button" id="clear-photo-btn" class="btn-danger">Удалить фото</button>
+                
+                <label>Выставленные товары:</label>
+                <div id="edit-product-checklist" class="product-checklist">
+                    <p>Загрузка каталога...</p>
+                </div>
+                
+                <button type="submit">Сохранить изменения</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
