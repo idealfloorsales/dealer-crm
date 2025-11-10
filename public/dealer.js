@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const bonusesContainer = document.getElementById('dealer-bonuses');
     const photoGalleryContainer = document.getElementById('dealer-photo-gallery'); 
     const deliveryContainer = document.getElementById('dealer-delivery'); 
+    const linksContainer = document.getElementById('dealer-links'); // (НОВОЕ)
     
     const deleteBtn = document.getElementById('delete-dealer-btn'); 
     const API_URL = '/api/dealers';
@@ -21,6 +22,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
+    // (НОВАЯ ФУНКЦИЯ) Проверяем, есть ли 'http'
+    const formatUrl = (url) => {
+        if (!url) return null;
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+            return 'https://' + url;
+        }
+        return url;
+    }
 
     // --- Функция 1: Загрузка инфо о дилере ---
     async function fetchDealerDetails() {
@@ -39,6 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <p><strong>Тип цен:</strong> ${safeText(dealer.price_type)}</p>
             `;
             
+            renderDealerLinks(dealer.website, dealer.instagram); // (НОВОЕ)
             renderDealerContacts(dealer.contacts);
             renderDealerPhotos(dealer.photos); 
             
@@ -54,6 +64,25 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
+    // --- (НОВАЯ ФУНКЦИЯ) Отрисовка Кнопок-Ссылок ---
+    function renderDealerLinks(website, instagram) {
+        let html = '';
+        const safeWebsite = formatUrl(website);
+        const safeInstagram = formatUrl(instagram);
+
+        if (safeWebsite) {
+            html += `<a href="${safeWebsite}" target="_blank" class="btn-secondary">Перейти на сайт</a>`;
+        }
+        if (safeInstagram) {
+            html += `<a href="${safeInstagram}" target="_blank" class="btn-secondary">Перейти на Инстаграм</a>`;
+        }
+        if (!safeWebsite && !safeInstagram) {
+            linksContainer.style.display = 'none'; // Скрываем блок, если ссылок нет
+        }
+        
+        linksContainer.innerHTML = html;
+    }
+
     // --- Отрисовка Галереи Фото ---
     function renderDealerPhotos(photos) {
         if (!photos || photos.length === 0) {
