@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const productsListContainer = document.getElementById('dealer-products-list');
     const contactsListContainer = document.getElementById('dealer-contacts-list'); 
     const bonusesContainer = document.getElementById('dealer-bonuses');
-    const photoGalleryContainer = document.getElementById('dealer-photo-gallery'); // (ИЗМЕНЕНО)
+    const photoGalleryContainer = document.getElementById('dealer-photo-gallery'); 
     
     const deleteBtn = document.getElementById('delete-dealer-btn'); 
     const API_URL = '/api/dealers';
@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
 
-    // --- (ИЗМЕНЕНО) Функция 1: Загрузка инфо о дилере ---
+    // --- Функция 1: Загрузка инфо о дилере ---
     async function fetchDealerDetails() {
         try {
             const response = await fetch(`${API_URL}/${dealerId}`);
@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             
             renderDealerContacts(dealer.contacts);
-            renderDealerPhotos(dealer.photos); // (НОВОЕ)
+            renderDealerPhotos(dealer.photos); 
             
             bonusesContainer.textContent = safeText(dealer.bonuses) || '<i>Нет данных о бонусах</i>';
 
@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // --- (НОВАЯ ФУНКЦИЯ) Отрисовка Галереи Фото ---
+    // --- Отрисовка Галереи Фото ---
     function renderDealerPhotos(photos) {
         if (!photos || photos.length === 0) {
             photoGalleryContainer.innerHTML = '<p><i>Нет фотографий.</i></p>';
@@ -64,12 +64,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 <a href="${photo.photo_url}" target="_blank">
                     <img src="${photo.photo_url}" alt="${safeText(photo.description)}">
                 </a>
-                <p>${safeText(photo.description)}</p>
+                <p>${safeText(photo.description) || 'Без описания'}</p>
             </div>
         `).join('');
     }
 
-    // --- Функция: Отрисовка таблицы контактов ---
+    // --- Отрисовка таблицы контактов ---
     function renderDealerContacts(contacts) {
         if (!contacts || contacts.length === 0) {
             contactsListContainer.innerHTML = '<p><i>Нет контактных лиц.</i></p>';
