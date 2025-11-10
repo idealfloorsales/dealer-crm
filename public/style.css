@@ -293,11 +293,11 @@ a.btn-primary:hover {
 }
 .modal-content {
     background-color: #fefefe;
-    margin: 3% auto; /* (ИЗМЕНЕНО) Уменьшен отступ сверху */
+    margin: 3% auto; 
     padding: 20px;
     border: 1px solid #888;
     width: 80%;
-    max-width: 700px; /* (ИЗМЕНЕНО) Увеличена ширина */
+    max-width: 700px; 
     border-radius: 8px;
     position: relative;
 }
@@ -324,7 +324,7 @@ a.btn-primary:hover {
     border: 1px solid #ddd;
 }
 
-/* --- (ИЗМЕНЕНО) Динамические списки (Контакты и Фото) --- */
+/* --- Динамические списки (Контакты и Фото) --- */
 .contact-list, .photo-list {
     display: flex;
     flex-direction: column;
@@ -333,7 +333,7 @@ a.btn-primary:hover {
     border-radius: 4px;
     padding: 10px;
     background-color: #f9f9f9;
-    max-height: 250px; /* (НОВОЕ) Ограничиваем высоту */
+    max-height: 250px; 
     overflow-y: auto;
 }
 .contact-entry {
@@ -345,7 +345,6 @@ a.btn-primary:hover {
 .contact-entry input {
     margin-top: 0;
 }
-/* (НОВОЕ) Стили для списка фото в модальном окне */
 .photo-entry {
     display: grid;
     grid-template-columns: 100px 1fr 1fr auto;
@@ -365,7 +364,6 @@ a.btn-primary:hover {
     border-radius: 4px;
     border: 1px solid #ddd;
 }
-/* (ИЗМЕНЕНО) Кнопка "X" для удаления */
 .btn-remove-entry {
     background-color: #dc3545;
     color: white;
@@ -448,7 +446,7 @@ a.btn-primary:hover {
 .products-list-detailed li {
     margin-bottom: 5px;
 }
-/* (НОВЫЕ СТИЛИ) Галерея на странице дилера */
+/* Галерея на странице дилера */
 .gallery-container {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
