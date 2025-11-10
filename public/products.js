@@ -1,7 +1,6 @@
 // products.js
 document.addEventListener('DOMContentLoaded', () => {
 
-    // (ИЗМЕНЕНО) Используем относительный путь
     const API_URL = '/api/products';
     
     const productListBody = document.getElementById('product-list-body');
@@ -63,17 +62,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         sortedProducts.forEach(product => {
             const row = productListBody.insertRow();
-            row.dataset.id = product._id; // (ИЗМЕНЕНО) MongoDB использует _id
+            const productId = product._id || product.id; // (ИЗМЕНЕНО) MongoDB _id
+            row.dataset.id = productId; 
             
             row.innerHTML = `
                 <td class="sku-cell">${safeText(product.sku)}</td>
                 <td>${safeText(product.name)}</td>
                 <td class="actions-cell">
                     <button class="edit-btn" 
-                        data-id="${product._id}" 
+                        data-id="${productId}" 
                         data-sku="${safeText(product.sku)}" 
                         data-name="${safeText(product.name)}">✏️ Ред.</button>
-                    <button class="delete-btn" data-id="${product._id}">X</button>
+                    <button class="delete-btn" data-id="${productId}">X</button>
                 </td>
             `;
         });
