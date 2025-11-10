@@ -60,7 +60,12 @@
                 <input type="text" id="price_type" placeholder="Тип цен">
                 <input type="text" id="city" placeholder="Город">
                 <input type="text" id="address" placeholder="Адрес">
-                <input type="text" id="contacts" placeholder="Контакты (телефон, email)">
+                
+                <label>Контакты:</label>
+                <div id="add-contact-list" class="contact-list">
+                    </div>
+                <button type="button" id="add-contact-btn-add-modal" class="btn-secondary">Добавить контакт</button>
+                
                 <input type="text" id="bonuses" placeholder="Бонусы">
                 <label for="photo_upload">Фото (выбрать файл):</label>
                 <input type="file" id="photo_upload" accept="image/*">
@@ -95,8 +100,12 @@
                 <input type="text" id="edit_city">
                 <label>Адрес:</label>
                 <input type="text" id="edit_address">
+                
                 <label>Контакты:</label>
-                <input type="text" id="edit_contacts">
+                <div id="edit-contact-list" class="contact-list">
+                    </div>
+                <button type="button" id="add-contact-btn-edit-modal" class="btn-secondary">Добавить контакт</button>
+                
                 <label>Бонусы:</label>
                 <input type="text" id="edit_bonuses">
 
