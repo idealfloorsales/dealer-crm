@@ -2,9 +2,11 @@
 const express = require('express');
 const mongoose = require('mongoose'); // (НОВОЕ) Используем Mongoose
 const cors = require('cors');
+const path = require('path'); // (НОВОЕ) Подключаем 'path'
 
 const app = express();
-const PORT = 3000;
+// (ИЗМЕНЕНО) Render сам назначит порт
+const PORT = process.env.PORT || 3000;
 app.use(express.json({ limit: '25mb' })); 
 app.use(cors());
 app.use(express.static('public'));
@@ -84,7 +86,6 @@ const dealerSchema = new mongoose.Schema({
     bonuses: String,
     photo_url: String,
     organization: String,
-    // (НОВОЕ) Связь "Многие-ко-Многим"
     products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }]
 });
 const Dealer = mongoose.model('Dealer', dealerSchema);
@@ -95,7 +96,6 @@ async function hardcodedImportProducts() {
         const count = await Product.countDocuments();
         if (count === 0) {
             console.log(`Таблица 'products' пуста. Начинаю "вшитый" импорт...`);
-            // insertMany - намного быстрее и надежнее
             await Product.insertMany(productsToImport, { ordered: false });
             const newCount = await Product.countDocuments();
             console.log(`Импорт завершен. В таблицу 'products' загружено ${newCount} товаров.`);
@@ -103,7 +103,12 @@ async function hardcodedImportProducts() {
             console.log("Таблица 'products' уже содержит данные. Импорт пропущен.");
         }
     } catch (error) {
-        console.warn(`Ошибка при импорте: ${error.message}`);
+        // Игнорируем ошибки дубликатов, которые могут случиться при перезапуске
+        if (error.code !== 11000) {
+           console.warn(`Ошибка при импорте: ${error.message}`);
+        } else {
+           console.log("Таблица 'products' уже содержит данные. Импорт пропущен.");
+        }
     }
 }
 
@@ -117,20 +122,21 @@ async function connectToDB() {
     try {
         await mongoose.connect(DB_CONNECTION_STRING);
         console.log("Подключено к базе данных MongoDB Atlas!");
-        // Запускаем импорт только после успешного подключения
         await hardcodedImportProducts();
     } catch (error) {
         console.error("Ошибка подключения к MongoDB:", error.message);
     }
 }
 
-
 // === (ПЕРЕПИСАННЫЕ) API ===
 
 // API для Дилеров
 app.get('/api/dealers', async (req, res) => {
     try {
-        const dealers = await Dealer.find({}, 'dealer_id name city photo_url price_type organization');
+        // (ИЗМЕНЕНО) MongoDB использует _id, но мы вернем его как 'id'
+        const dealers = await Dealer.find({}, 'dealer_id name city photo_url price_type organization')
+                                    .lean(); // .lean() делает объект простым JS-объектом
+        dealers.forEach(d => { d.id = d._id; }); // Добавляем поле 'id'
         res.json(dealers);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -147,7 +153,7 @@ app.post('/api/dealers', async (req, res) => {
     try {
         const dealer = new Dealer(req.body);
         await dealer.save();
-        res.status(201).json(dealer); // Отправляем обратно созданный объект с _id
+        res.status(201).json(dealer); 
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -170,18 +176,24 @@ app.delete('/api/dealers/:id', async (req, res) => {
 // API для СВЯЗИ Дилеров и Товаров
 app.get('/api/dealers/:id/products', async (req, res) => {
     try {
-        // Находим дилера и "заполняем" (populate) массив 'products'
         const dealer = await Dealer.findById(req.params.id).populate('products');
         if (!dealer) return res.status(404).json({ message: "Дилер не найден" });
-        res.json(dealer.products); // Возвращаем только массив товаров
+        
+        // (ИЗМЕНЕНО) Добавляем 'id' к каждому товару
+        const productsWithId = dealer.products.map(p => {
+            const product = p.toObject(); // Преобразуем Mongoose-объект
+            product.id = product._id;
+            return product;
+        });
+        res.json(productsWithId);
+        
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.put('/api/dealers/:id/products', async (req, res) => {
     try {
         const dealerId = req.params.id;
-        const productIds = req.body.productIds || []; // Ожидаем массив ID
-        // Просто обновляем массив 'products' у дилера
+        const productIds = req.body.productIds || []; 
         await Dealer.findByIdAndUpdate(dealerId, { products: productIds });
         res.status(200).json({ message: "success" });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -191,14 +203,17 @@ app.put('/api/dealers/:id/products', async (req, res) => {
 app.get('/api/products', async (req, res) => {
     try {
         const searchTerm = req.query.search || '';
-        const searchRegex = new RegExp(searchTerm, 'i'); // 'i' = нечувствительный к регистру
+        const searchRegex = new RegExp(searchTerm, 'i'); 
         const products = await Product.find({
-            $or: [ // ИЛИ
+            $or: [ 
                 { sku: { $regex: searchRegex } },
                 { name: { $regex: searchRegex } }
             ]
-        }).sort({ name: 1 }); // Сортировка по имени
+        }).sort({ name: 1 }).lean(); // .lean()
+        
+        products.forEach(p => { p.id = p._id; }); // Добавляем 'id'
         res.json(products);
+        
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -208,7 +223,7 @@ app.post('/api/products', async (req, res) => {
         await product.save();
         res.status(201).json(product);
     } catch (e) {
-        if (e.code === 11000) { // Ошибка дубликата
+        if (e.code === 11000) { 
              return res.status(409).json({ "error": "Товар с таким Артикулом (SKU) уже существует" });
         }
         res.status(500).json({ error: e.message });
@@ -231,11 +246,9 @@ app.put('/api/products/:id', async (req, res) => {
 app.delete('/api/products/:id', async (req, res) => {
     try {
         const productId = req.params.id;
-        // 1. Находим товар
         const product = await Product.findByIdAndDelete(productId);
         if (!product) return res.status(404).json({ error: "Товар не найден" });
         
-        // 2. (НОВОЕ) Удаляем этот товар из всех дилеров, у которых он был
         await Dealer.updateMany(
             { products: productId },
             { $pull: { products: productId } }
@@ -248,20 +261,20 @@ app.delete('/api/products/:id', async (req, res) => {
 // API для Отчета
 app.get('/api/products/:id/dealers', async (req, res) => {
     try {
-        // Находим всех дилеров, у которых в массиве 'products'
-        // есть ID этого товара
         const dealers = await Dealer.find(
             { products: req.params.id },
-            'dealer_id name city' // Возвращаем только эти поля
-        ).sort({ name: 1 });
+            'dealer_id name city' 
+        ).sort({ name: 1 }).lean(); // .lean()
+        
+        dealers.forEach(d => { d.id = d._id; }); // Добавляем 'id'
         res.json(dealers);
+        
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // --- Запускаем сервер ---
 app.listen(PORT, () => {
     console.log(`Сервер запущен и слушает порт ${PORT}`);
-    console.log(`Откройте http://localhost:${PORT} в вашем браузере`);
     // Подключаемся к БД ПОСЛЕ запуска сервера
     connectToDB();
 });
