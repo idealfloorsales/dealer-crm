@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const contactsListContainer = document.getElementById('dealer-contacts-list'); 
     const bonusesContainer = document.getElementById('dealer-bonuses');
     const photoGalleryContainer = document.getElementById('dealer-photo-gallery'); 
-    const deliveryContainer = document.getElementById('dealer-delivery'); // (НОВОЕ)
+    const deliveryContainer = document.getElementById('dealer-delivery'); 
     
     const deleteBtn = document.getElementById('delete-dealer-btn'); 
     const API_URL = '/api/dealers';
@@ -42,7 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderDealerContacts(dealer.contacts);
             renderDealerPhotos(dealer.photos); 
             
-            deliveryContainer.textContent = safeText(dealer.delivery) || '<i>Нет данных о доставке</i>'; // (НОВОЕ)
+            deliveryContainer.textContent = safeText(dealer.delivery) || '<i>Нет данных о доставке</i>';
             bonusesContainer.textContent = safeText(dealer.bonuses) || '<i>Нет данных о бонусах</i>';
 
             document.title = `Дилер: ${dealer.name}`;
