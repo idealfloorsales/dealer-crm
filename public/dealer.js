@@ -3,9 +3,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const detailsContainer = document.getElementById('dealer-details');
     const productsListContainer = document.getElementById('dealer-products-list');
-    const contactsListContainer = document.getElementById('dealer-contacts-list'); // (НОВОЕ)
+    const contactsListContainer = document.getElementById('dealer-contacts-list'); 
     const bonusesContainer = document.getElementById('dealer-bonuses');
-    const photoContainer = document.getElementById('dealer-photo');
+    const photoGalleryContainer = document.getElementById('dealer-photo-gallery'); // (ИЗМЕНЕНО)
     
     const deleteBtn = document.getElementById('delete-dealer-btn'); 
     const API_URL = '/api/dealers';
@@ -38,13 +38,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <p><strong>Тип цен:</strong> ${safeText(dealer.price_type)}</p>
             `;
             
-            // (НОВОЕ) Вызываем отрисовку контактов
             renderDealerContacts(dealer.contacts);
+            renderDealerPhotos(dealer.photos); // (НОВОЕ)
             
             bonusesContainer.textContent = safeText(dealer.bonuses) || '<i>Нет данных о бонусах</i>';
-            photoContainer.innerHTML = dealer.photo_url ? 
-                `<img src="${dealer.photo_url}" alt="Фото ${safeText(dealer.name)}">` : 
-                '<p><i>Нет фото</i></p>';
 
             document.title = `Дилер: ${dealer.name}`;
 
@@ -55,15 +52,31 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // --- (НОВАЯ ФУНКЦИЯ) Отрисовка таблицы контактов ---
+    // --- (НОВАЯ ФУНКЦИЯ) Отрисовка Галереи Фото ---
+    function renderDealerPhotos(photos) {
+        if (!photos || photos.length === 0) {
+            photoGalleryContainer.innerHTML = '<p><i>Нет фотографий.</i></p>';
+            return;
+        }
+        
+        photoGalleryContainer.innerHTML = photos.map(photo => `
+            <div class="gallery-item">
+                <a href="${photo.photo_url}" target="_blank">
+                    <img src="${photo.photo_url}" alt="${safeText(photo.description)}">
+                </a>
+                <p>${safeText(photo.description)}</p>
+            </div>
+        `).join('');
+    }
+
+    // --- Функция: Отрисовка таблицы контактов ---
     function renderDealerContacts(contacts) {
         if (!contacts || contacts.length === 0) {
             contactsListContainer.innerHTML = '<p><i>Нет контактных лиц.</i></p>';
             return;
         }
         
-        // Используем ту же таблицу, что и для отчетов
-        let html = '<table id="report-table" style="margin-top: -20px;"><thead><tr><th>Имя</th><th>Должность</th><th>Контакт</th></tr></thead><tbody>';
+        let html = '<table id="report-table" style="margin-top: 0;"><thead><tr><th>Имя</th><th>Должность</th><th>Контакт</th></tr></thead><tbody>';
         
         contacts.forEach(contact => {
             html += `
@@ -78,7 +91,6 @@ document.addEventListener('DOMContentLoaded', () => {
         html += '</tbody></table>';
         contactsListContainer.innerHTML = html;
     }
-
 
     // --- Функция 2: Загрузка товаров дилера ---
     async function fetchDealerProducts() {
@@ -104,7 +116,6 @@ document.addEventListener('DOMContentLoaded', () => {
             productsListContainer.innerHTML = `<p style="color: red;">${error.message}</p>`;
         }
     }
-
 
     // --- Обработчик: Удаление дилера ---
     deleteBtn.addEventListener('click', async () => {
