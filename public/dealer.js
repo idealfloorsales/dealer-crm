@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const bonusesContainer = document.getElementById('dealer-bonuses');
     const photoGalleryContainer = document.getElementById('dealer-photo-gallery'); 
     const deliveryContainer = document.getElementById('dealer-delivery'); 
-    const linksContainer = document.getElementById('dealer-links'); // (НОВОЕ)
+    const linksContainer = document.getElementById('dealer-links'); 
     
     const deleteBtn = document.getElementById('delete-dealer-btn'); 
     const API_URL = '/api/dealers';
@@ -22,7 +22,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
-    // (НОВАЯ ФУНКЦИЯ) Проверяем, есть ли 'http'
     const formatUrl = (url) => {
         if (!url) return null;
         if (!url.startsWith('http://') && !url.startsWith('https://')) {
@@ -48,7 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <p><strong>Тип цен:</strong> ${safeText(dealer.price_type)}</p>
             `;
             
-            renderDealerLinks(dealer.website, dealer.instagram); // (НОВОЕ)
+            renderDealerLinks(dealer.website, dealer.instagram); 
             renderDealerContacts(dealer.contacts);
             renderDealerPhotos(dealer.photos); 
             
@@ -64,7 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // --- (НОВАЯ ФУНКЦИЯ) Отрисовка Кнопок-Ссылок ---
+    // --- Отрисовка Кнопок-Ссылок ---
     function renderDealerLinks(website, instagram) {
         let html = '';
         const safeWebsite = formatUrl(website);
@@ -77,7 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
             html += `<a href="${safeInstagram}" target="_blank" class="btn-secondary">Перейти на Инстаграм</a>`;
         }
         if (!safeWebsite && !safeInstagram) {
-            linksContainer.style.display = 'none'; // Скрываем блок, если ссылок нет
+            linksContainer.style.display = 'none'; 
         }
         
         linksContainer.innerHTML = html;
