@@ -93,6 +93,8 @@ const dealerSchema = new mongoose.Schema({
     bonuses: String,
     photos: [photoSchema], 
     organization: String,
+    // (НОВОЕ ПОЛЕ)
+    delivery: String, 
     products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }]
 });
 const Dealer = mongoose.model('Dealer', dealerSchema);
@@ -134,19 +136,19 @@ async function connectToDB() {
 }
 
 // --- Преобразователь Объектов (Добавляет 'id') ---
-// MongoDB использует _id, но фронтенд (JS) ждет 'id'
 function convertToClient(mongoDoc) {
     const obj = mongoDoc.toObject();
     obj.id = obj._id;
-    delete obj._id; // Удаляем _id
-    delete obj.__v; // Удаляем __v
+    delete obj._id; 
+    delete obj.__v; 
     
-    // Также конвертируем вложенные товары
     if (obj.products && Array.isArray(obj.products)) {
         obj.products = obj.products.map(p => {
-            p.id = p._id;
-            delete p._id;
-            delete p.__v;
+            if (p) { // Добавлена проверка на null
+                p.id = p._id;
+                delete p._id;
+                delete p.__v;
+            }
             return p;
         });
     }
@@ -157,9 +159,8 @@ function convertToClient(mongoDoc) {
 app.get('/api/dealers', async (req, res) => {
     try {
         const dealers = await Dealer.find({}, 'dealer_id name city photos price_type organization')
-                                    .lean(); // .lean() - быстрый, простой JS-объект
+                                    .lean();
         
-        // Добавляем 'id' и 'photo_url' для списка
         const clientDealers = dealers.map(d => {
             d.id = d._id;
             if (d.photos && d.photos.length > 0) {
@@ -178,20 +179,22 @@ app.get('/api/dealers/:id', async (req, res) => {
         const dealer = await Dealer.findById(req.params.id).populate('products');
         if (!dealer) return res.status(404).json({ message: "Дилер не найден" });
         
-        res.json(convertToClient(dealer)); // Конвертируем перед отправкой
+        res.json(convertToClient(dealer)); 
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/dealers', async (req, res) => {
     try {
+        // (ИЗМЕНЕНО) 'delivery' теперь часть req.body
         const dealer = new Dealer(req.body); 
         await dealer.save();
-        res.status(201).json(convertToClient(dealer)); // Конвертируем перед отправкой
+        res.status(201).json(convertToClient(dealer)); 
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.put('/api/dealers/:id', async (req, res) => {
     try {
+        // (ИЗМЕНЕНО) 'delivery' теперь часть req.body
         const dealer = await Dealer.findByIdAndUpdate(req.params.id, req.body, { new: true });
         if (!dealer) return res.status(404).json({ message: "Дилер не найден" });
         res.json({ message: "success" });
@@ -212,7 +215,6 @@ app.get('/api/dealers/:id/products', async (req, res) => {
         const dealer = await Dealer.findById(req.params.id).populate('products');
         if (!dealer) return res.status(404).json({ message: "Дилер не найден" });
         
-        // Конвертируем только массив товаров
         const productsWithId = dealer.products.map(p => convertToClient(p));
         res.json(productsWithId);
         
@@ -240,7 +242,7 @@ app.get('/api/products', async (req, res) => {
             ]
         }).sort({ name: 1 }).lean(); 
         
-        products.forEach(p => { p.id = p._id; }); // Добавляем 'id'
+        products.forEach(p => { p.id = p._id; }); 
         res.json(products);
         
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -250,7 +252,7 @@ app.post('/api/products', async (req, res) => {
     try {
         const product = new Product(req.body);
         await product.save();
-        res.status(201).json(convertToClient(product)); // Конвертируем перед отправкой
+        res.status(201).json(convertToClient(product)); 
     } catch (e) {
         if (e.code === 11000) { 
              return res.status(409).json({ "error": "Товар с таким Артикулом (SKU) уже существует" });
@@ -263,7 +265,7 @@ app.put('/api/products/:id', async (req, res) => {
     try {
         const product = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true });
         if (!product) return res.status(404).json({ error: "Товар не найден" });
-        res.json(convertToClient(product)); // Конвертируем перед отправкой
+        res.json(convertToClient(product)); 
     } catch (e) {
         if (e.code === 11000) {
             return res.status(409).json({ "error": "Товар с таким Артикулом (SKU) уже существует" });
