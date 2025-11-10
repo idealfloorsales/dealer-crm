@@ -62,7 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         sortedProducts.forEach(product => {
             const row = productListBody.insertRow();
-            const productId = product._id || product.id; // (ИЗМЕНЕНО) MongoDB _id
+            const productId = product.id; 
             row.dataset.id = productId; 
             
             row.innerHTML = `
