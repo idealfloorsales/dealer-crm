@@ -1,8 +1,9 @@
 // script.js
 document.addEventListener('DOMContentLoaded', () => {
     
-    const API_DEALERS_URL = 'http://localhost:3000/api/dealers';
-    const API_PRODUCTS_URL = 'http://localhost:3000/api/products'; 
+    // (ИЗМЕНЕНО) Используем относительные пути
+    const API_DEALERS_URL = '/api/dealers';
+    const API_PRODUCTS_URL = '/api/products'; 
 
     let fullProductCatalog = [];
 
@@ -245,7 +246,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) throw new Error('Ошибка при создании дилера');
             
             const newDealer = await response.json();
-            const newDealerId = newDealer.id; 
+            const newDealerId = newDealer._id; // (ИЗМЕНЕНО) MongoDB использует _id
 
             const selectedProductIds = getSelectedProductIds('add-product-checklist');
 
@@ -268,7 +269,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const target = e.target;
         const editButton = target.closest('.edit-btn');
         if (editButton) {
-            const id = editButton.dataset.id;
+            const id = editButton.dataset.id; // (ИЗМЕНЕНО) Это все еще id из allDealers, он должен быть _id
             
             editProductChecklist.innerHTML = "<p>Загрузка товаров...</p>";
             
@@ -284,9 +285,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await dealerRes.json();
                 const selectedProducts = await productsRes.json(); 
                 
-                const selectedProductIds = selectedProducts.map(p => p.id);
+                const selectedProductIds = selectedProducts.map(p => p._id); // (ИЗМЕНЕНО) MongoDB использует _id
 
-                document.getElementById('edit_db_id').value = data.id;
+                document.getElementById('edit_db_id').value = data._id; // (ИЗМЕНЕНО) MongoDB использует _id
                 document.getElementById('edit_dealer_id').value = data.dealer_id;
                 document.getElementById('edit_name').value = data.name;
                 document.getElementById('edit_organization').value = data.organization;
@@ -336,7 +337,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Обработчик: Сохранение изменений (Редактирование) ---
     editForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const id = document.getElementById('edit_db_id').value;
+        const id = document.getElementById('edit_db_id').value; // Это _id
         const photoInput = document.getElementById('edit_photo_upload');
         let photoDataUrl = document.getElementById('edit_photo_url_old').value; 
 
@@ -353,61 +354,4 @@ document.addEventListener('DOMContentLoaded', () => {
             name: document.getElementById('edit_name').value,
             organization: document.getElementById('edit_organization').value,
             price_type: document.getElementById('edit_price_type').value,
-            city: document.getElementById('city').value,
-            address: document.getElementById('address').value,
-            contacts: document.getElementById('edit_contacts').value,
-            bonuses: document.getElementById('edit_bonuses').value,
-            photo_url: photoDataUrl
-        };
-        
-        const selectedProductIds = getSelectedProductIds('edit-product-checklist');
-
-        try {
-            const response = await fetch(`${API_DEALERS_URL}/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updatedData)
-            });
-            if (!response.ok) throw new Error('Ошибка при сохранении данных дилера');
-            
-            await saveDealerProductLinks(id, selectedProductIds);
-            
-            modal.style.display = 'none';
-            editForm.reset();
-            await initApp(); 
-            
-        } catch (error) {
-            console.error('Ошибка при обновлении:', error);
-            alert('Ошибка при сохранении изменений.');
-        }
-    });
-
-    // --- Обработчик: "Удалить фото" ---
-    clearPhotoBtn.addEventListener('click', () => {
-        editPhotoPreview.src = '';
-        editPhotoPreview.style.display = 'none';
-        document.getElementById('edit_photo_url_old').value = '';
-        document.getElementById('edit_photo_upload').value = null;
-    });
-
-    // --- Обработчики: Изменение фильтров ---
-    filterCity.addEventListener('change', renderDealerList);
-    filterPriceType.addEventListener('change', renderDealerList);
-
-    // --- Обработчики: СОРТИРОВКА ---
-    document.querySelectorAll('#dealer-table th[data-sort]').forEach(th => {
-        th.addEventListener('click', () => {
-            const column = th.dataset.sort;
-            if (currentSort.column === column) {
-                currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
-            } else {
-                currentSort.column = column;
-                currentSort.direction = 'asc';
-            }
-            renderDealerList(); 
-        });
-    });
-
-    // --- Инициализация ---
-    initApp();
-});
+            city:

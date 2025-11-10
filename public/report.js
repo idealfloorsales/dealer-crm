@@ -1,7 +1,8 @@
 // report.js
 document.addEventListener('DOMContentLoaded', () => {
 
-    const API_PRODUCTS_URL = 'http://localhost:3000/api/products';
+    // (ИЗМЕНЕНО) Используем относительные пути
+    const API_PRODUCTS_URL = '/api/products';
     
     const productSelect = document.getElementById('product-select');
     const reportTable = document.getElementById('report-table');
@@ -21,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
             productSelect.innerHTML = '<option value="">-- Выберите товар --</option>'; // Очистка
             
             products.forEach(product => {
-                const option = new Option(`[${product.sku}] ${product.name}`, product.id);
+                const option = new Option(`[${product.sku}] ${product.name}`, product._id); // (ИЗМЕНЕНО) MongoDB использует _id
                 productSelect.add(option);
             });
 
@@ -46,7 +47,6 @@ document.addEventListener('DOMContentLoaded', () => {
         noDataMsg.textContent = '';
 
         try {
-            // (ИЗМЕНЕНО) API URL теперь правильный
             const response = await fetch(`${API_PRODUCTS_URL}/${productId}/dealers`);
             if (!response.ok) throw new Error('Не удалось загрузить список дилеров');
             const dealers = await response.json();
@@ -65,7 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td>${safeText(dealer.name)}</td>
                     <td>${safeText(dealer.city)}</td>
                     <td>
-                        <a href="dealer.html?id=${dealer.id}" target="_blank" class="btn-primary" style="text-decoration: none; padding: 5px 10px; margin: 0;">
+                        <a href="dealer.html?id=${dealer._id}" target="_blank" class="btn-primary" style="text-decoration: none; padding: 5px 10px; margin: 0;">
                             Открыть
                         </a>
                     </td>
