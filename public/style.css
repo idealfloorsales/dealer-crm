@@ -5,10 +5,14 @@ body {
     background-color: #f4f7f6;
 }
 
-h1, h2 {
+h1, h2, h3 {
     color: #333;
     border-bottom: 2px solid #007bff;
     padding-bottom: 5px;
+}
+h3 {
+    border-bottom: 1px solid #ccc;
+    margin-top: 30px;
 }
 
 /* --- Навигация --- */
@@ -111,7 +115,6 @@ a.btn-primary:hover {
      background-color: #0056b3;
      color: white;
 }
-/* (НОВОЕ) Второстепенная кнопка (для "Добавить контакт") */
 .btn-secondary {
     background-color: #6c757d;
 }
@@ -166,6 +169,7 @@ a.btn-primary:hover {
     padding: 12px 15px;
     border-bottom: 1px solid #ddd;
     text-align: left;
+    vertical-align: middle;
 }
 
 #dealer-table th, #products-table th, #report-table th {
@@ -289,11 +293,11 @@ a.btn-primary:hover {
 }
 .modal-content {
     background-color: #fefefe;
-    margin: 5% auto; 
+    margin: 3% auto; /* (ИЗМЕНЕНО) Уменьшен отступ сверху */
     padding: 20px;
     border: 1px solid #888;
     width: 80%;
-    max-width: 600px;
+    max-width: 700px; /* (ИЗМЕНЕНО) Увеличена ширина */
     border-radius: 8px;
     position: relative;
 }
@@ -320,8 +324,8 @@ a.btn-primary:hover {
     border: 1px solid #ddd;
 }
 
-/* --- (НОВЫЕ СТИЛИ) Контакты --- */
-.contact-list {
+/* --- (ИЗМЕНЕНО) Динамические списки (Контакты и Фото) --- */
+.contact-list, .photo-list {
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -329,6 +333,8 @@ a.btn-primary:hover {
     border-radius: 4px;
     padding: 10px;
     background-color: #f9f9f9;
+    max-height: 250px; /* (НОВОЕ) Ограничиваем высоту */
+    overflow-y: auto;
 }
 .contact-entry {
     display: grid;
@@ -339,7 +345,28 @@ a.btn-primary:hover {
 .contact-entry input {
     margin-top: 0;
 }
-.btn-remove-contact {
+/* (НОВОЕ) Стили для списка фото в модальном окне */
+.photo-entry {
+    display: grid;
+    grid-template-columns: 100px 1fr 1fr auto;
+    gap: 10px;
+    align-items: center;
+}
+.photo-entry.new {
+     grid-template-columns: 1fr 1fr auto; /* Убираем превью */
+}
+.photo-entry input {
+    margin-top: 0;
+}
+.preview-thumb {
+    width: 100px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+}
+/* (ИЗМЕНЕНО) Кнопка "X" для удаления */
+.btn-remove-entry {
     background-color: #dc3545;
     color: white;
     border: none;
@@ -352,7 +379,7 @@ a.btn-primary:hover {
     margin-top: 0;
     line-height: 30px;
 }
-.btn-remove-contact:hover {
+.btn-remove-entry:hover {
     background-color: #c82333;
 }
 
@@ -421,6 +448,35 @@ a.btn-primary:hover {
 .products-list-detailed li {
     margin-bottom: 5px;
 }
+/* (НОВЫЕ СТИЛИ) Галерея на странице дилера */
+.gallery-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 15px;
+}
+.gallery-item {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    background: #fff;
+}
+.gallery-item img {
+    width: 100%;
+    height: 150px;
+    object-fit: cover;
+    border-radius: 4px 4px 0 0;
+    margin-top: 0;
+}
+.gallery-item p {
+    text-align: center;
+    padding: 10px;
+    margin: 0;
+    font-size: 0.9em;
+    font-weight: bold;
+    color: #555;
+    border-top: 1px solid #eee;
+}
+/* Конец Галереи */
 
 a.back-link {
     display: inline-block;
