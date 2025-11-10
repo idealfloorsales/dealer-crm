@@ -111,6 +111,13 @@ a.btn-primary:hover {
      background-color: #0056b3;
      color: white;
 }
+/* (НОВОЕ) Второстепенная кнопка (для "Добавить контакт") */
+.btn-secondary {
+    background-color: #6c757d;
+}
+.btn-secondary:hover {
+    background-color: #5a6268;
+}
 
 
 /* --- Стили для фильтров --- */
@@ -312,6 +319,43 @@ a.btn-primary:hover {
     border-radius: 4px;
     border: 1px solid #ddd;
 }
+
+/* --- (НОВЫЕ СТИЛИ) Контакты --- */
+.contact-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 10px;
+    background-color: #f9f9f9;
+}
+.contact-entry {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr auto;
+    gap: 10px;
+    align-items: center;
+}
+.contact-entry input {
+    margin-top: 0;
+}
+.btn-remove-contact {
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    font-weight: bold;
+    font-size: 16px;
+    padding: 0;
+    margin-top: 0;
+    line-height: 30px;
+}
+.btn-remove-contact:hover {
+    background-color: #c82333;
+}
+
 
 /* --- Чек-лист товаров --- */
 .product-checklist {
