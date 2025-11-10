@@ -1,17 +1,15 @@
 // server.js
 const express = require('express');
-const mongoose = require('mongoose'); // (НОВОЕ) Используем Mongoose
+const mongoose = require('mongoose'); // Используем Mongoose
 const cors = require('cors');
-const path = require('path'); // (НОВОЕ) Подключаем 'path'
 
 const app = express();
-// (ИЗМЕНЕНО) Render сам назначит порт
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000; // Render сам назначит порт
 app.use(express.json({ limit: '25mb' })); 
 app.use(cors());
 app.use(express.static('public'));
 
-// (НОВОЕ) Строка подключения (будет взята из Render)
+// Строка подключения (будет взята из Render)
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
 // "Вшитый" список 51 товара (правильный)
@@ -69,7 +67,7 @@ const productsToImport = [
     { sku: "RWN-36", name: "Кедр Гималайкий" }
 ];
 
-// --- (НОВОЕ) Модели Базы Данных (Схемы) ---
+// --- Модели Базы Данных (Схемы) ---
 const productSchema = new mongoose.Schema({
     sku: { type: String, required: true, unique: true },
     name: { type: String, required: true }
@@ -90,11 +88,12 @@ const dealerSchema = new mongoose.Schema({
 });
 const Dealer = mongoose.model('Dealer', dealerSchema);
 
-// --- (НОВАЯ ФУНКЦИЯ) "Вшитый" импорт для MongoDB ---
+// --- "Вшитый" импорт для MongoDB ---
 async function hardcodedImportProducts() {
     try {
         const count = await Product.countDocuments();
-        if (count === 0) {
+        // (ВОТ ЭТА ПРОВЕРКА) Он запускает импорт ТОЛЬКО если товаров = 0
+        if (count === 0) { 
             console.log(`Таблица 'products' пуста. Начинаю "вшитый" импорт...`);
             await Product.insertMany(productsToImport, { ordered: false });
             const newCount = await Product.countDocuments();
@@ -103,8 +102,7 @@ async function hardcodedImportProducts() {
             console.log("Таблица 'products' уже содержит данные. Импорт пропущен.");
         }
     } catch (error) {
-        // Игнорируем ошибки дубликатов, которые могут случиться при перезапуске
-        if (error.code !== 11000) {
+        if (error.code !== 11000) { // Игнорируем ошибки дубликатов
            console.warn(`Ошибка при импорте: ${error.message}`);
         } else {
            console.log("Таблица 'products' уже содержит данные. Импорт пропущен.");
@@ -112,7 +110,7 @@ async function hardcodedImportProducts() {
     }
 }
 
-// --- (НОВОЕ) Подключение к MongoDB ---
+// --- Подключение к MongoDB ---
 async function connectToDB() {
     if (!DB_CONNECTION_STRING) {
         console.error("Критическая ошибка: Строка подключения 'DB_CONNECTION_STRING' не найдена.");
@@ -122,30 +120,36 @@ async function connectToDB() {
     try {
         await mongoose.connect(DB_CONNECTION_STRING);
         console.log("Подключено к базе данных MongoDB Atlas!");
+        // Запускаем импорт (он сам проверит, нужно ли)
         await hardcodedImportProducts();
     } catch (error) {
         console.error("Ошибка подключения к MongoDB:", error.message);
     }
 }
 
-// === (ПЕРЕПИСАННЫЕ) API ===
-
-// API для Дилеров
+// === API для Дилеров ===
 app.get('/api/dealers', async (req, res) => {
     try {
-        // (ИЗМЕНЕНО) MongoDB использует _id, но мы вернем его как 'id'
         const dealers = await Dealer.find({}, 'dealer_id name city photo_url price_type organization')
-                                    .lean(); // .lean() делает объект простым JS-объектом
-        dealers.forEach(d => { d.id = d._id; }); // Добавляем поле 'id'
+                                    .lean();
+        dealers.forEach(d => { d.id = d._id; }); 
         res.json(dealers);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.get('/api/dealers/:id', async (req, res) => {
     try {
-        const dealer = await Dealer.findById(req.params.id);
+        const dealer = await Dealer.findById(req.params.id).populate('products'); // Заполняем товары
         if (!dealer) return res.status(404).json({ message: "Дилер не найден" });
-        res.json(dealer);
+        
+        // Преобразуем Mongoose-объекты
+        const dealerObject = dealer.toObject();
+        dealerObject.id = dealerObject._id;
+        if (dealerObject.products) {
+            dealerObject.products.forEach(p => { p.id = p._id; });
+        }
+        
+        res.json(dealerObject);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -173,15 +177,14 @@ app.delete('/api/dealers/:id', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// API для СВЯЗИ Дилеров и Товаров
+// === API для СВЯЗИ Дилеров и Товаров ===
 app.get('/api/dealers/:id/products', async (req, res) => {
     try {
         const dealer = await Dealer.findById(req.params.id).populate('products');
         if (!dealer) return res.status(404).json({ message: "Дилер не найден" });
         
-        // (ИЗМЕНЕНО) Добавляем 'id' к каждому товару
         const productsWithId = dealer.products.map(p => {
-            const product = p.toObject(); // Преобразуем Mongoose-объект
+            const product = p.toObject();
             product.id = product._id;
             return product;
         });
@@ -199,7 +202,7 @@ app.put('/api/dealers/:id/products', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// API для Товаров
+// === API для Товаров ===
 app.get('/api/products', async (req, res) => {
     try {
         const searchTerm = req.query.search || '';
@@ -209,9 +212,9 @@ app.get('/api/products', async (req, res) => {
                 { sku: { $regex: searchRegex } },
                 { name: { $regex: searchRegex } }
             ]
-        }).sort({ name: 1 }).lean(); // .lean()
+        }).sort({ name: 1 }).lean(); 
         
-        products.forEach(p => { p.id = p._id; }); // Добавляем 'id'
+        products.forEach(p => { p.id = p._id; }); 
         res.json(products);
         
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -258,15 +261,15 @@ app.delete('/api/products/:id', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// API для Отчета
+// === API для Отчета ===
 app.get('/api/products/:id/dealers', async (req, res) => {
     try {
         const dealers = await Dealer.find(
             { products: req.params.id },
             'dealer_id name city' 
-        ).sort({ name: 1 }).lean(); // .lean()
+        ).sort({ name: 1 }).lean(); 
         
-        dealers.forEach(d => { d.id = d._id; }); // Добавляем 'id'
+        dealers.forEach(d => { d.id = d._id; }); 
         res.json(dealers);
         
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -275,6 +278,5 @@ app.get('/api/products/:id/dealers', async (req, res) => {
 // --- Запускаем сервер ---
 app.listen(PORT, () => {
     console.log(`Сервер запущен и слушает порт ${PORT}`);
-    // Подключаемся к БД ПОСЛЕ запуска сервера
     connectToDB();
 });
