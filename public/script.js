@@ -201,7 +201,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Функция: Отрисовка списка дилеров ---
     function renderDealerList() {
-        // ... (код фильтрации и сортировки без изменений) ...
         const selectedCity = filterCity.value;
         const selectedPriceType = filterPriceType.value;
         const filteredDealers = allDealers.filter(dealer => {
@@ -209,6 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const priceTypeMatch = !selectedPriceType || dealer.price_type === selectedPriceType;
             return cityMatch && priceTypeMatch;
         });
+
         const sortedDealers = filteredDealers.sort((a, b) => {
             const col = currentSort.column;
             let valA = (a[col] || '').toString().toLowerCase(); 
@@ -218,14 +218,17 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (valA < valB) comparison = -1;
             return currentSort.direction === 'asc' ? comparison : -comparison;
         });
+
         document.querySelectorAll('#dealer-table th[data-sort]').forEach(th => {
             th.classList.remove('sort-asc', 'sort-desc');
             if (th.dataset.sort === currentSort.column) {
                 th.classList.add(currentSort.direction === 'asc' ? 'sort-asc' : 'sort-desc');
             }
         });
+
         dealerListBody.innerHTML = ''; 
         const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
+
         if (sortedDealers.length === 0) {
             dealerTable.style.display = 'none';
             let noDataMsg = document.getElementById('no-data-msg');
@@ -237,18 +240,22 @@ document.addEventListener('DOMContentLoaded', () => {
             noDataMsg.textContent = allDealers.length === 0 ? 'Список дилеров пока пуст. Добавьте первого!' : 'По вашим фильтрам дилеры не найдены.';
             return;
         }
+
         dealerTable.style.display = 'table';
         let noDataMsg = document.getElementById('no-data-msg');
         if (noDataMsg) noDataMsg.textContent = '';
+
         sortedDealers.forEach(dealer => {
             const row = dealerListBody.insertRow();
             const dealerId = dealer.id; 
+            
             const cellPhoto = row.insertCell();
             if (dealer.photo_url) {
                 cellPhoto.innerHTML = `<img src="${dealer.photo_url}" alt="Фото" class="table-photo">`;
             } else {
                 cellPhoto.innerHTML = `<div class="no-photo">Нет фото</div>`;
             }
+            
             row.insertCell().textContent = safeText(dealer.dealer_id);
             const cellName = row.insertCell();
             cellName.innerHTML = `<a href="dealer.html?id=${dealerId}" target="_blank">${safeText(dealer.name)}</a>`;
@@ -288,7 +295,7 @@ document.addEventListener('DOMContentLoaded', () => {
         addForm.reset();
     };
 
-    // --- (ИЗМЕНЕНО) Обработчик: Добавление нового дилера ---
+    // --- Обработчик: Добавление нового дилера ---
     addForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         
@@ -301,7 +308,7 @@ document.addEventListener('DOMContentLoaded', () => {
             price_type: document.getElementById('price_type').value,
             city: document.getElementById('city').value,
             address: document.getElementById('address').value,
-            delivery: document.getElementById('delivery').value, // (НОВОЕ)
+            delivery: document.getElementById('delivery').value, 
             contacts: collectContacts(addContactList), 
             bonuses: document.getElementById('bonuses').value,
             photos: await photosPromise 
@@ -329,7 +336,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- (ИЗМЕНЕНО) Обработчик: Клик по СПИСКУ (Редактирование) ---
+    // --- Обработчик: Клик по СПИСКУ (Редактирование) ---
     dealerListBody.addEventListener('click', async (e) => {
         const target = e.target;
         const editButton = target.closest('.edit-btn');
@@ -354,7 +361,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('edit_price_type').value = data.price_type;
                 document.getElementById('edit_city').value = data.city;
                 document.getElementById('edit_address').value = data.address;
-                document.getElementById('edit_delivery').value = data.delivery; // (НОВОЕ)
+                document.getElementById('edit_delivery').value = data.delivery; 
                 document.getElementById('edit_bonuses').value = data.bonuses;
                 
                 renderContactList(editContactList, data.contacts);
@@ -386,7 +393,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // --- (ИЗМЕНЕНО) Обработчик: Сохранение изменений (Редактирование) ---
+    // --- Обработчик: Сохранение изменений (Редактирование) ---
     editForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const id = document.getElementById('edit_db_id').value; 
@@ -400,7 +407,7 @@ document.addEventListener('DOMContentLoaded', () => {
             price_type: document.getElementById('edit_price_type').value,
             city: document.getElementById('edit_city').value,
             address: document.getElementById('edit_address').value,
-            delivery: document.getElementById('edit_delivery').value, // (НОВОЕ)
+            delivery: document.getElementById('edit_delivery').value, 
             contacts: collectContacts(editContactList),
             bonuses: document.getElementById('edit_bonuses').value,
             photos: await photosPromise 
@@ -428,7 +435,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
-    // --- (УДАЛЕН) Обработчик "Удалить фото" ---
+    // --- (УДАЛЕН) Обработчик "Удалить фото" (теперь "btn-remove-entry") ---
 
     // --- Обработчики: Изменение фильтров ---
     filterCity.addEventListener('change', renderDealerList);
