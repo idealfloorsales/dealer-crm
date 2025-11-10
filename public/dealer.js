@@ -7,8 +7,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const photoContainer = document.getElementById('dealer-photo');
     
     const deleteBtn = document.getElementById('delete-dealer-btn'); 
-    
-    // (ИЗМЕНЕНО) Используем относительный путь
     const API_URL = '/api/dealers';
 
     const params = new URLSearchParams(window.location.search);
