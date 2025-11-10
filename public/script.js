@@ -14,8 +14,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const addProductChecklist = document.getElementById('add-product-checklist'); 
     const addContactList = document.getElementById('add-contact-list'); 
     const addContactBtnAdd = document.getElementById('add-contact-btn-add-modal'); 
-    const addPhotoList = document.getElementById('add-photo-list'); // (НОВОЕ)
-    const addPhotoBtnAdd = document.getElementById('add-photo-btn-add-modal'); // (НОВОЕ)
+    const addPhotoList = document.getElementById('add-photo-list'); 
+    const addPhotoBtnAdd = document.getElementById('add-photo-btn-add-modal'); 
     
     // --- Элементы списка ---
     const dealerListBody = document.getElementById('dealer-list-body');
@@ -35,8 +35,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const editProductChecklist = document.getElementById('edit-product-checklist'); 
     const editContactList = document.getElementById('edit-contact-list'); 
     const addContactBtnEdit = document.getElementById('add-contact-btn-edit-modal'); 
-    const editPhotoList = document.getElementById('edit-photo-list'); // (НОВОЕ)
-    const addPhotoBtnEdit = document.getElementById('add-photo-btn-edit-modal'); // (НОВОЕ)
+    const editPhotoList = document.getElementById('edit-photo-list'); 
+    const addPhotoBtnEdit = document.getElementById('add-photo-btn-edit-modal'); 
 
     // --- Функция: Конвертер файла в Base64 ---
     const toBase64 = file => new Promise((resolve, reject) => {
@@ -55,23 +55,27 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log(`Загружено ${fullProductCatalog.length} товаров в каталог.`);
         } catch (error) {
             console.error("Критическая ошибка: не удалось загрузить каталог товаров.", error);
-            // ... (сообщения об ошибках) ...
+            addProductChecklist.innerHTML = "<p style='color:red'>Ошибка загрузки каталога!</p>";
+            editProductChecklist.innerHTML = "<p style='color:red'>Ошибка загрузки каталога!</p>";
         }
     }
 
     // --- Функции Управления Контактами ---
     function createContactEntryHTML(contact = {}) {
+        const safeName = contact.name || '';
+        const safePosition = contact.position || '';
+        const safeContactInfo = contact.contactInfo || '';
         return `
             <div class="contact-entry">
-                <input type="text" class="contact-name" placeholder="Имя" value="${contact.name || ''}">
-                <input type="text" class="contact-position" placeholder="Должность" value="${contact.position || ''}">
-                <input type="text" class="contact-info" placeholder="Телефон / Email" value="${contact.contactInfo || ''}">
+                <input type="text" class="contact-name" placeholder="Имя" value="${safeName}">
+                <input type="text" class="contact-position" placeholder="Должность" value="${safePosition}">
+                <input type="text" class="contact-info" placeholder="Телефон / Email" value="${safeContactInfo}">
                 <button type="button" class="btn-remove-entry">X</button>
             </div>
         `;
     }
     function renderContactList(containerElement, contacts = []) {
-        containerElement.innerHTML = (contacts.length > 0) ? contacts.map(createContactEntryHTML).join('') : createContactEntryHTML();
+        containerElement.innerHTML = (contacts && contacts.length > 0) ? contacts.map(createContactEntryHTML).join('') : createContactEntryHTML();
     }
     function addContactField(containerElement) {
         containerElement.insertAdjacentHTML('beforeend', createContactEntryHTML());
@@ -90,9 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     // --- Конец функций Контактов ---
     
-    // --- (НОВЫЕ ФУНКЦИИ) Управление Фото ---
-    
-    // Создает HTML для НОВОГО (пустого) поля загрузки фото
+    // --- Функции Управления Фото ---
     function createNewPhotoEntryHTML() {
         return `
             <div class="photo-entry new">
@@ -102,38 +104,30 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
     }
-    
-    // Отрисовывает СУЩЕСТВУЮЩИЕ фото (для режима Редактирования)
     function renderExistingPhotos(containerElement, photos = []) {
-        containerElement.innerHTML = photos.map(photo => `
+        containerElement.innerHTML = (photos && photos.length > 0) ? photos.map(photo => `
             <div class="photo-entry existing">
                 <img src="${photo.photo_url}" class="preview-thumb">
                 <input type="text" class="photo-description" value="${photo.description || ''}">
                 <button type="button" class="btn-remove-entry">X</button>
                 <input type="hidden" class="photo-url" value="${photo.photo_url}"> 
             </div>
-        `).join('');
+        `).join('') : ''; // Не показываем пустую, если нет фото
     }
-
-    // Собирает данные из полей фото (САМАЯ СЛОЖНАЯ ЧАСТЬ)
     async function collectPhotos(containerElement) {
         const photoPromises = [];
         
-        // 1. Обрабатываем существующие фото (только в режиме Редактирования)
         containerElement.querySelectorAll('.photo-entry.existing').forEach(entry => {
             const description = entry.querySelector('.photo-description').value;
             const photo_url = entry.querySelector('.photo-url').value;
-            // Это не Promise, но мы "заворачиваем" его для Promise.all
             photoPromises.push(Promise.resolve({ description, photo_url }));
         });
 
-        // 2. Обрабатываем НОВЫЕ добавленные фото
         containerElement.querySelectorAll('.photo-entry.new').forEach(entry => {
             const description = entry.querySelector('.photo-description').value;
             const file = entry.querySelector('.photo-file').files[0];
             
             if (file) {
-                // Это асинхронная операция!
                 photoPromises.push(
                     toBase64(file).then(base64Url => {
                         return { description, photo_url: base64Url };
@@ -142,7 +136,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Ждем, пока ВСЕ файлы (новые) будут сконвертированы
         return await Promise.all(photoPromises);
     }
     // --- Конец функций Фото ---
@@ -150,14 +143,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Функция: Отрисовка чек-листа товаров ---
     function renderProductChecklist(container, selectedProductIds = []) {
-        // ... (код без изменений) ...
         const selectedSet = new Set(selectedProductIds); 
         if (fullProductCatalog.length === 0) {
             container.innerHTML = "<p>Каталог пуст.</p>";
             return;
         }
         container.innerHTML = fullProductCatalog.map(product => {
-            const productId = product._id || product.id; 
+            const productId = product.id; // Сервер уже прислал 'id'
             return `
             <div class="checklist-item">
                 <input type="checkbox" 
@@ -173,7 +165,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Функция: Сбор ID из чек-листа ---
     function getSelectedProductIds(containerId) {
-        // ... (код без изменений) ...
         const container = document.getElementById(containerId);
         const checkboxes = container.querySelectorAll('input[type="checkbox"]:checked');
         return Array.from(checkboxes).map(cb => cb.value);
@@ -181,7 +172,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // --- Функция: Сохранение связей товаров с дилером ---
     async function saveDealerProductLinks(dealerId, productIds) {
-        // ... (код без изменений) ...
         try {
             await fetch(`${API_DEALERS_URL}/${dealerId}/products`, {
                 method: 'PUT',
@@ -196,7 +186,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Функция: Заполнение фильтров ---
     function populateFilters(dealers) {
-        // ... (код без изменений) ...
         const cities = [...new Set(dealers.map(d => d.city).filter(Boolean))]; 
         const priceTypes = [...new Set(dealers.map(d => d.price_type).filter(Boolean))];
         cities.sort();
@@ -211,9 +200,8 @@ document.addEventListener('DOMContentLoaded', () => {
         filterPriceType.value = currentPriceType;
     }
 
-    // --- (ИЗМЕНЕНО) Функция: Отрисовка списка дилеров ---
+    // --- Функция: Отрисовка списка дилеров ---
     function renderDealerList() {
-        // ... (код фильтрации и сортировки без изменений) ...
         const selectedCity = filterCity.value;
         const selectedPriceType = filterPriceType.value;
         const filteredDealers = allDealers.filter(dealer => {
@@ -221,6 +209,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const priceTypeMatch = !selectedPriceType || dealer.price_type === selectedPriceType;
             return cityMatch && priceTypeMatch;
         });
+
         const sortedDealers = filteredDealers.sort((a, b) => {
             const col = currentSort.column;
             let valA = (a[col] || '').toString().toLowerCase(); 
@@ -230,14 +219,17 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (valA < valB) comparison = -1;
             return currentSort.direction === 'asc' ? comparison : -comparison;
         });
+
         document.querySelectorAll('#dealer-table th[data-sort]').forEach(th => {
             th.classList.remove('sort-asc', 'sort-desc');
             if (th.dataset.sort === currentSort.column) {
                 th.classList.add(currentSort.direction === 'asc' ? 'sort-asc' : 'sort-desc');
             }
         });
+
         dealerListBody.innerHTML = ''; 
         const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
+
         if (sortedDealers.length === 0) {
             dealerTable.style.display = 'none';
             let noDataMsg = document.getElementById('no-data-msg');
@@ -249,16 +241,16 @@ document.addEventListener('DOMContentLoaded', () => {
             noDataMsg.textContent = allDealers.length === 0 ? 'Список дилеров пока пуст. Добавьте первого!' : 'По вашим фильтрам дилеры не найдены.';
             return;
         }
+
         dealerTable.style.display = 'table';
         let noDataMsg = document.getElementById('no-data-msg');
         if (noDataMsg) noDataMsg.textContent = '';
-        
+
         sortedDealers.forEach(dealer => {
             const row = dealerListBody.insertRow();
-            const dealerId = dealer._id || dealer.id; 
+            const dealerId = dealer.id; 
             
             const cellPhoto = row.insertCell();
-            // (ИЗМЕНЕНО) Показываем первое фото (photo_url прилетает из API)
             if (dealer.photo_url) {
                 cellPhoto.innerHTML = `<img src="${dealer.photo_url}" alt="Фото" class="table-photo">`;
             } else {
@@ -296,7 +288,7 @@ document.addEventListener('DOMContentLoaded', () => {
     openAddModalBtn.onclick = () => {
         renderProductChecklist(addProductChecklist);
         renderContactList(addContactList);
-        addPhotoList.innerHTML = createNewPhotoEntryHTML(); // (НОВОЕ) Отрисовываем одно пустое поле фото
+        addPhotoList.innerHTML = createNewPhotoEntryHTML(); 
         addModal.style.display = 'block';
     };
     closeAddModalBtn.onclick = () => {
@@ -304,11 +296,10 @@ document.addEventListener('DOMContentLoaded', () => {
         addForm.reset();
     };
 
-    // --- (ИЗМЕНЕНО) Обработчик: Добавление нового дилера ---
+    // --- Обработчик: Добавление нового дилера ---
     addForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         
-        // (НОВОЕ) Запускаем сбор фото (асинхронно)
         let photosPromise = collectPhotos(addPhotoList);
         
         const dealerData = {
@@ -320,7 +311,7 @@ document.addEventListener('DOMContentLoaded', () => {
             address: document.getElementById('address').value,
             contacts: collectContacts(addContactList), 
             bonuses: document.getElementById('bonuses').value,
-            photos: await photosPromise // (НОВОЕ) Ждем завершения загрузки фото
+            photos: await photosPromise 
         };
 
         try {
@@ -331,7 +322,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (!response.ok) throw new Error('Ошибка при создании дилера');
             const newDealer = await response.json();
-            const newDealerId = newDealer._id; 
+            const newDealerId = newDealer.id; 
             const selectedProductIds = getSelectedProductIds('add-product-checklist');
             if (selectedProductIds.length > 0) {
                 await saveDealerProductLinks(newDealerId, selectedProductIds);
@@ -345,30 +336,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- (ИЗМЕНЕНО) Обработчик: Клик по СПИСКУ (Редактирование) ---
+    // --- Обработчик: Клик по СПИСКУ (Редактирование) ---
     dealerListBody.addEventListener('click', async (e) => {
         const target = e.target;
         const editButton = target.closest('.edit-btn');
         if (editButton) {
-            const id = editButton.dataset.id; // Это _id
+            const id = editButton.dataset.id;
             editProductChecklist.innerHTML = "<p>Загрузка товаров...</p>";
             editContactList.innerHTML = "<p>Загрузка контактов...</p>";
-            editPhotoList.innerHTML = "<p>Загрузка фото...</p>"; // (НОВОЕ)
+            editPhotoList.innerHTML = "<p>Загрузка фото...</p>"; 
             
             try {
-                const [dealerRes, productsRes] = await Promise.all([
-                    fetch(`${API_DEALERS_URL}/${id}`),
-                    fetch(`${API_DEALERS_URL}/${id}/products`)
-                ]);
-
+                // (ИЗМЕНЕНО) Запрашиваем дилера (он уже включает товары)
+                const dealerRes = await fetch(`${API_DEALERS_URL}/${id}`);
                 if (!dealerRes.ok) throw new Error("Не удалось загрузить данные дилера");
-                if (!productsRes.ok) throw new Error("Не удалось загрузить товары дилера");
                 
                 const data = await dealerRes.json();
-                const selectedProducts = await productsRes.json(); 
-                const selectedProductIds = selectedProducts.map(p => p._id || p.id); 
+                // (ИЗМЕНЕНО) Товары уже внутри 'data'
+                const selectedProducts = data.products || []; 
+                const selectedProductIds = selectedProducts.map(p => p.id); 
 
-                document.getElementById('edit_db_id').value = data._id; 
+                document.getElementById('edit_db_id').value = data.id; 
                 document.getElementById('edit_dealer_id').value = data.dealer_id;
                 document.getElementById('edit_name').value = data.name;
                 document.getElementById('edit_organization').value = data.organization;
@@ -379,7 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 renderContactList(editContactList, data.contacts);
                 renderProductChecklist(editProductChecklist, selectedProductIds);
-                renderExistingPhotos(editPhotoList, data.photos); // (НОВОЕ)
+                renderExistingPhotos(editPhotoList, data.photos); 
                 
                 modal.style.display = 'block';
                 
@@ -406,12 +394,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // --- (ИЗМЕНЕНО) Обработчик: Сохранение изменений (Редактирование) ---
+    // --- Обработчик: Сохранение изменений (Редактирование) ---
     editForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const id = document.getElementById('edit_db_id').value; // Это _id
+        const id = document.getElementById('edit_db_id').value; 
 
-        // (НОВОЕ) Запускаем сбор фото (асинхронно)
         let photosPromise = collectPhotos(editPhotoList);
 
         const updatedData = {
@@ -423,7 +410,7 @@ document.addEventListener('DOMContentLoaded', () => {
             address: document.getElementById('edit_address').value,
             contacts: collectContacts(editContactList),
             bonuses: document.getElementById('edit_bonuses').value,
-            photos: await photosPromise // (НОВОЕ) Ждем завершения
+            photos: await photosPromise 
         };
         
         const selectedProductIds = getSelectedProductIds('edit-product-checklist');
@@ -448,7 +435,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- (УДАЛЕНО) Обработчик: "Удалить фото" (теперь это "btn-remove-entry") ---
+    // --- (УДАЛЕНО) Обработчик "Удалить фото" (теперь "btn-remove-entry") ---
     // clearPhotoBtn.addEventListener('click', ...); // Этот код больше не нужен
 
     // --- Обработчики: Изменение фильтров ---
@@ -469,15 +456,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // --- (НОВЫЕ) Обработчики: Кнопки "Добавить контакт" ---
+    // --- Обработчики: Кнопки "Добавить" (Контакты и Фото) ---
     addContactBtnAdd.onclick = () => addContactField(addContactList);
     addContactBtnEdit.onclick = () => addContactField(editContactList);
-
-    // --- (НОВЫЕ) Обработчики: Кнопки "Добавить фото" ---
     addPhotoBtnAdd.onclick = () => addPhotoList.insertAdjacentHTML('beforeend', createNewPhotoEntryHTML());
     addPhotoBtnEdit.onclick = () => editPhotoList.insertAdjacentHTML('beforeend', createNewPhotoEntryHTML());
 
-    // --- (НОВЫЕ) Обработчики: Кнопки "Удалить" (X) для Контактов и Фото ---
+    // --- Обработчики: Кнопки "Удалить" (X) ---
     function handleListClick(e) {
         if (e.target.classList.contains('btn-remove-entry')) {
             e.target.closest('.contact-entry, .photo-entry').remove();
