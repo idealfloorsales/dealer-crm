@@ -74,7 +74,8 @@ label {
 /* Общие стили кнопок (для <button> и <a>) */
 button,
 a.btn-primary,
-a.btn-danger {
+a.btn-danger,
+a.btn-secondary {
     padding: 10px 15px;
     color: white;
     border: none;
@@ -87,7 +88,8 @@ a.btn-danger {
 }
 button:hover,
 a.btn-primary:hover,
-a.btn-danger:hover {
+a.btn-danger:hover,
+a.btn-secondary:hover {
     opacity: 0.9;
 }
 button[type="submit"] {
@@ -115,11 +117,14 @@ a.btn-primary:hover {
      background-color: #0056b3;
      color: white;
 }
-.btn-secondary {
+.btn-secondary,
+a.btn-secondary {
     background-color: #6c757d;
 }
-.btn-secondary:hover {
+.btn-secondary:hover,
+a.btn-secondary:hover {
     background-color: #5a6268;
+    color: white;
 }
 
 
@@ -352,7 +357,7 @@ a.btn-primary:hover {
     align-items: center;
 }
 .photo-entry.new {
-     grid-template-columns: 1fr 1fr auto; /* Убираем превью */
+     grid-template-columns: 1fr 1fr auto;
 }
 .photo-entry input {
     margin-top: 0;
@@ -474,7 +479,20 @@ a.btn-primary:hover {
     color: #555;
     border-top: 1px solid #eee;
 }
-/* Конец Галереи */
+/* (НОВОЕ) Контейнер для ссылок */
+.dealer-links-container {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 20px;
+}
+.dealer-links-container a {
+    margin-top: 0; 
+}
+
 
 a.back-link {
     display: inline-block;
