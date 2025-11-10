@@ -1,7 +1,6 @@
 // report.js
 document.addEventListener('DOMContentLoaded', () => {
 
-    // (ИЗМЕНЕНО) Используем относительные пути
     const API_PRODUCTS_URL = '/api/products';
     
     const productSelect = document.getElementById('product-select');
@@ -22,7 +21,8 @@ document.addEventListener('DOMContentLoaded', () => {
             productSelect.innerHTML = '<option value="">-- Выберите товар --</option>'; // Очистка
             
             products.forEach(product => {
-                const option = new Option(`[${product.sku}] ${product.name}`, product._id); // (ИЗМЕНЕНО) MongoDB использует _id
+                const productId = product._id || product.id; // (ИЗМЕНЕНО) MongoDB _id
+                const option = new Option(`[${product.sku}] ${product.name}`, productId);
                 productSelect.add(option);
             });
 
@@ -59,13 +59,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
             reportListBody.innerHTML = ''; // Очистка
             dealers.forEach(dealer => {
+                const dealerId = dealer._id || dealer.id; // (ИЗМЕНЕНО) MongoDB _id
                 const row = reportListBody.insertRow();
                 row.innerHTML = `
                     <td>${safeText(dealer.dealer_id)}</td>
                     <td>${safeText(dealer.name)}</td>
                     <td>${safeText(dealer.city)}</td>
                     <td>
-                        <a href="dealer.html?id=${dealer._id}" target="_blank" class="btn-primary" style="text-decoration: none; padding: 5px 10px; margin: 0;">
+                        <a href="dealer.html?id=${dealerId}" target="_blank" class="btn-primary" style="text-decoration: none; padding: 5px 10px; margin: 0;">
                             Открыть
                         </a>
                     </td>
