@@ -1,8 +1,7 @@
 // server.js
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
+const mongoose = require('mongoose'); // (НОВОЕ) Используем Mongoose
 const cors = require('cors');
-const path = require('path'); // (НОВОЕ) Подключаем 'path'
 
 const app = express();
 const PORT = 3000;
@@ -10,11 +9,8 @@ app.use(express.json({ limit: '25mb' }));
 app.use(cors());
 app.use(express.static('public'));
 
-// (ИЗМЕНЕНО) Указываем путь к базе данных
-// process.env.DATA_DIR - это папка, которую нам даст Render
-// Если ее нет (на localhost), используется текущая папка '.'
-const dbPath = path.resolve(process.env.DATA_DIR || '.', 'dealers.db');
-console.log(`Путь к базе данных: ${dbPath}`);
+// (НОВОЕ) Строка подключения (будет взята из Render)
+const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
 // "Вшитый" список 51 товара (правильный)
 const productsToImport = [
@@ -71,249 +67,201 @@ const productsToImport = [
     { sku: "RWN-36", name: "Кедр Гималайкий" }
 ];
 
-// --- Подключение к Базе Данных (ИЗМЕНЕНО) ---
-const db = new sqlite3.Database(dbPath, (err) => {
-    if (err) {
-        console.error("Ошибка при подключении к БД:", err.message);
-    } else {
-        console.log('Подключено к базе данных SQLite.');
-        db.run("PRAGMA foreign_keys = ON;"); 
-
-        // Принудительная очистка таблиц при каждом запуске
-        // (Мы оставим это, чтобы при каждом "перезапуске" на Render база очищалась)
-        // (Если вы хотите, чтобы данные СОХРАНЯЛИСЬ между перезапусками, 
-        //  мы УБЕРЕМ этот блок, но только ПОСЛЕ первого успешного запуска)
-        console.log("Принудительная очистка старых таблиц...");
-        db.serialize(() => {
-            db.run(`DROP TABLE IF EXISTS dealer_products_link`);
-            db.run(`DROP TABLE IF EXISTS products`);
-            db.run(`DROP TABLE IF EXISTS dealers`);
-
-            console.log("Очистка завершена. Создание новых таблиц...");
-
-            db.run(`CREATE TABLE IF NOT EXISTS dealers (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                dealer_id TEXT, name TEXT, price_type TEXT, city TEXT,
-                address TEXT, contacts TEXT, bonuses TEXT, photo_url TEXT,
-                organization TEXT
-            )`, (err) => {
-                if (err) console.error("Ошибка при создании таблицы 'dealers':", err.message);
-            });
-
-            db.run(`CREATE TABLE IF NOT EXISTS products (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                sku TEXT UNIQUE,
-                name TEXT
-            )`, (err) => {
-                if (err) {
-                    console.error("Ошибка при создании таблицы 'products':", err.message);
-                } else {
-                    hardcodedImportProducts();
-                }
-            });
-            
-            db.run(`CREATE TABLE IF NOT EXISTS dealer_products_link (
-                dealer_id INTEGER,
-                product_id INTEGER,
-                FOREIGN KEY(dealer_id) REFERENCES dealers(id) ON DELETE CASCADE,
-                FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE CASCADE,
-                PRIMARY KEY (dealer_id, product_id)
-            )`, (err) => {
-                 if (err) console.error("Ошибка при создании таблицы 'dealer_products_link':", err.message);
-            });
-        });
-    }
+// --- (НОВОЕ) Модели Базы Данных (Схемы) ---
+const productSchema = new mongoose.Schema({
+    sku: { type: String, required: true, unique: true },
+    name: { type: String, required: true }
 });
+const Product = mongoose.model('Product', productSchema);
 
-// --- "Вшитый" импорт ---
-function hardcodedImportProducts() {
-    console.log(`Начинаю "вшитый" импорт...`);
-    const sql = `INSERT INTO products (sku, name) VALUES (?, ?)`;
-    
-    db.serialize(() => {
-        db.run("BEGIN TRANSACTION");
-        productsToImport.forEach(product => {
-            db.run(sql, [product.sku, product.name], (err) => {
-                if (err && !err.message.includes('UNIQUE constraint failed')) {
-                    console.warn(`Ошибка при импорте SKU ${product.sku}: ${err.message}`);
-                }
-            });
-        });
-        db.run("COMMIT", (err) => {
-            if(!err) {
-                console.log('Импорт завершен.');
-                db.get("SELECT COUNT(*) as count FROM products", (err, row) => {
-                    if(row) console.log(`В таблицу 'products' загружено ${row.count} товаров.`);
-                });
-            } else {
-                 console.error("Ошибка при COMMIT транзакции:", err.message);
-            }
-        });
-    });
+const dealerSchema = new mongoose.Schema({
+    dealer_id: String,
+    name: String,
+    price_type: String,
+    city: String,
+    address: String,
+    contacts: String,
+    bonuses: String,
+    photo_url: String,
+    organization: String,
+    // (НОВОЕ) Связь "Многие-ко-Многим"
+    products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }]
+});
+const Dealer = mongoose.model('Dealer', dealerSchema);
+
+// --- (НОВАЯ ФУНКЦИЯ) "Вшитый" импорт для MongoDB ---
+async function hardcodedImportProducts() {
+    try {
+        const count = await Product.countDocuments();
+        if (count === 0) {
+            console.log(`Таблица 'products' пуста. Начинаю "вшитый" импорт...`);
+            // insertMany - намного быстрее и надежнее
+            await Product.insertMany(productsToImport, { ordered: false });
+            const newCount = await Product.countDocuments();
+            console.log(`Импорт завершен. В таблицу 'products' загружено ${newCount} товаров.`);
+        } else {
+            console.log("Таблица 'products' уже содержит данные. Импорт пропущен.");
+        }
+    } catch (error) {
+        console.warn(`Ошибка при импорте: ${error.message}`);
+    }
+}
+
+// --- (НОВОЕ) Подключение к MongoDB ---
+async function connectToDB() {
+    if (!DB_CONNECTION_STRING) {
+        console.error("Критическая ошибка: Строка подключения 'DB_CONNECTION_STRING' не найдена.");
+        console.error("Пожалуйста, добавьте ее в Переменные Окружения (Environment Variables) на Render.");
+        return;
+    }
+    try {
+        await mongoose.connect(DB_CONNECTION_STRING);
+        console.log("Подключено к базе данных MongoDB Atlas!");
+        // Запускаем импорт только после успешного подключения
+        await hardcodedImportProducts();
+    } catch (error) {
+        console.error("Ошибка подключения к MongoDB:", error.message);
+    }
 }
 
 
-// === API для Дилеров ===
-app.get('/api/dealers', (req, res) => {
-    const sql = "SELECT id, dealer_id, name, city, photo_url, price_type, organization FROM dealers";
-    db.all(sql, [], (err, rows) => {
-        if (err) res.status(500).json({ "error": err.message });
-        else res.json(rows);
-    });
-});
-app.get('/api/dealers/:id', (req, res) => {
-    db.get("SELECT * FROM dealers WHERE id = ?", [req.params.id], (err, row) => {
-        if (err) res.status(500).json({ "error": err.message });
-        else if (row) res.json(row);
-        else res.status(404).json({ "message": "Дилер не найден" });
-    });
-});
-app.post('/api/dealers', (req, res) => {
-    const data = req.body;
-    const sql = `INSERT INTO dealers (dealer_id, name, price_type, city, address, contacts, bonuses, photo_url, organization)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-    const params = [
-        data.dealer_id, data.name, data.price_type, data.city,
-        data.address, data.contacts, data.bonuses, data.photo_url, data.organization
-    ];
-    db.run(sql, params, function (err) {
-        if (err) res.status(500).json({ "error": err.message });
-        else res.status(201).json({ "id": this.lastID, ...data });
-    });
-});
-app.put('/api/dealers/:id', (req, res) => {
-    const data = req.body;
-    const sql = `UPDATE dealers SET
-        dealer_id = ?, name = ?, price_type = ?, city = ?, address = ?,
-        contacts = ?, bonuses = ?, photo_url = ?, organization = ?
-        WHERE id = ?`;
-    const params = [
-        data.dealer_id, data.name, data.price_type, data.city,
-        data.address, data.contacts, data.bonuses, data.photo_url,
-        data.organization, req.params.id
-    ];
-    db.run(sql, params, function (err) {
-        if (err) res.status(500).json({ "error": err.message });
-        else res.json({ "message": "success", "changes": this.changes });
-    });
-});
-app.delete('/api/dealers/:id', (req, res) => {
-    db.run("DELETE FROM dealers WHERE id = ?", [req.params.id], function (err) {
-        if (err) res.status(500).json({ "error": err.message });
-        else res.json({ "message": "deleted", "changes": this.changes });
-    });
+// === (ПЕРЕПИСАННЫЕ) API ===
+
+// API для Дилеров
+app.get('/api/dealers', async (req, res) => {
+    try {
+        const dealers = await Dealer.find({}, 'dealer_id name city photo_url price_type organization');
+        res.json(dealers);
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// === API для СВЯЗИ Дилеров и Товаров ===
-app.get('/api/dealers/:id/products', (req, res) => {
-    const sql = `SELECT p.id, p.sku, p.name 
-                 FROM products p
-                 JOIN dealer_products_link l ON p.id = l.product_id
-                 WHERE l.dealer_id = ?`;
-    db.all(sql, [req.params.id], (err, rows) => {
-        if (err) res.status(500).json({ "error": err.message });
-        else res.json(rows);
-    });
-});
-app.put('/api/dealers/:id/products', (req, res) => {
-    const dealerId = req.params.id;
-    const productIds = req.body.productIds || []; 
-    db.serialize(() => {
-        db.run("BEGIN TRANSACTION");
-        db.run("DELETE FROM dealer_products_link WHERE dealer_id = ?", [dealerId]);
-        const sql = `INSERT INTO dealer_products_link (dealer_id, product_id) VALUES (?, ?)`;
-        productIds.forEach(productId => {
-            db.run(sql, [dealerId, productId], (err) => {
-                if (err) console.warn(`Ошибка при вставке связи: ${err.message}`);
-            });
-        });
-        db.run("COMMIT", (err) => {
-            if(err) res.status(500).json({ "error": err.message });
-            else res.status(200).json({ "message": "success" });
-        });
-    });
+app.get('/api/dealers/:id', async (req, res) => {
+    try {
+        const dealer = await Dealer.findById(req.params.id);
+        if (!dealer) return res.status(404).json({ message: "Дилер не найден" });
+        res.json(dealer);
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// === API для Товаров ===
-app.get('/api/products', (req, res) => {
-    const searchTerm = req.query.search || ''; 
-    const sql = `SELECT * FROM products 
-                 WHERE sku LIKE ? OR name LIKE ?
-                 ORDER BY name ASC`;
-    const params = [`%${searchTerm}%`, `%${searchTerm}%`];
-    db.all(sql, params, (err, rows) => {
-        if (err) res.status(500).json({ "error": err.message });
-        else res.json(rows);
-    });
+app.post('/api/dealers', async (req, res) => {
+    try {
+        const dealer = new Dealer(req.body);
+        await dealer.save();
+        res.status(201).json(dealer); // Отправляем обратно созданный объект с _id
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
-app.post('/api/products', (req, res) => {
-    const { sku, name } = req.body;
-    if (!sku || !name) {
-        return res.status(400).json({ "error": "Необходим Артикул (SKU) и Название" });
+
+app.put('/api/dealers/:id', async (req, res) => {
+    try {
+        const dealer = await Dealer.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        if (!dealer) return res.status(404).json({ message: "Дилер не найден" });
+        res.json({ message: "success" });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/dealers/:id', async (req, res) => {
+    try {
+        const dealer = await Dealer.findByIdAndDelete(req.params.id);
+        if (!dealer) return res.status(404).json({ message: "Дилер не найден" });
+        res.json({ message: "deleted" });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// API для СВЯЗИ Дилеров и Товаров
+app.get('/api/dealers/:id/products', async (req, res) => {
+    try {
+        // Находим дилера и "заполняем" (populate) массив 'products'
+        const dealer = await Dealer.findById(req.params.id).populate('products');
+        if (!dealer) return res.status(404).json({ message: "Дилер не найден" });
+        res.json(dealer.products); // Возвращаем только массив товаров
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/dealers/:id/products', async (req, res) => {
+    try {
+        const dealerId = req.params.id;
+        const productIds = req.body.productIds || []; // Ожидаем массив ID
+        // Просто обновляем массив 'products' у дилера
+        await Dealer.findByIdAndUpdate(dealerId, { products: productIds });
+        res.status(200).json({ message: "success" });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// API для Товаров
+app.get('/api/products', async (req, res) => {
+    try {
+        const searchTerm = req.query.search || '';
+        const searchRegex = new RegExp(searchTerm, 'i'); // 'i' = нечувствительный к регистру
+        const products = await Product.find({
+            $or: [ // ИЛИ
+                { sku: { $regex: searchRegex } },
+                { name: { $regex: searchRegex } }
+            ]
+        }).sort({ name: 1 }); // Сортировка по имени
+        res.json(products);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/products', async (req, res) => {
+    try {
+        const product = new Product(req.body);
+        await product.save();
+        res.status(201).json(product);
+    } catch (e) {
+        if (e.code === 11000) { // Ошибка дубликата
+             return res.status(409).json({ "error": "Товар с таким Артикулом (SKU) уже существует" });
+        }
+        res.status(500).json({ error: e.message });
     }
-    const sql = `INSERT INTO products (sku, name) VALUES (?, ?)`;
-    db.run(sql, [sku, name], function (err) {
-        if (err) {
-             if (err.message.includes('UNIQUE constraint failed')) {
-                return res.status(409).json({ "error": "Товар с таким Артикулом (SKU) уже существует" });
-             }
-             res.status(500).json({ "error": err.message });
-        } else {
-             res.status(201).json({ "id": this.lastID, sku, name });
-        }
-    });
 });
-app.put('/api/products/:id', (req, res) => {
-    const { sku, name } = req.body;
-    const id = req.params.id;
-    if (!sku || !name) {
-        return res.status(400).json({ "error": "Необходим Артикул (SKU) и Название" });
+
+app.put('/api/products/:id', async (req, res) => {
+    try {
+        const product = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        if (!product) return res.status(404).json({ error: "Товар не найден" });
+        res.json({ message: "success", id: product._id, sku: product.sku, name: product.name });
+    } catch (e) {
+        if (e.code === 11000) {
+            return res.status(409).json({ "error": "Товар с таким Артикулом (SKU) уже существует" });
+        }
+        res.status(500).json({ error: e.message });
     }
-    const sql = `UPDATE products SET sku = ?, name = ? WHERE id = ?`;
-    db.run(sql, [sku, name, id], function (err) {
-        if (err) {
-            if (err.message.includes('UNIQUE constraint failed')) {
-                return res.status(409).json({ "error": "Товар с таким Артикулом (SKU) уже существует" });
-            }
-            res.status(500).json({ "error": err.message });
-        } else if (this.changes === 0) {
-            res.status(404).json({ "error": "Товар не найден" });
-        } else {
-            res.json({ message: "success", id, sku, name });
-        }
-    });
-});
-app.delete('/api/products/:id', (req, res) => {
-    const id = req.params.id;
-    const sql = `DELETE FROM products WHERE id = ?`;
-    db.run(sql, [id], function (err) {
-        if (err) {
-            res.status(500).json({ "error": err.message });
-        } else if (this.changes === 0) {
-            res.status(404).json({ "error": "Товар не найден" });
-        } else {
-            res.json({ "message": "deleted", "changes": this.changes });
-        }
-    });
 });
 
-// === API для Отчета ===
-app.get('/api/products/:id/dealers', (req, res) => {
-    const productId = req.params.id;
-    const sql = `SELECT d.id, d.dealer_id, d.name, d.city
-                 FROM dealers d
-                 JOIN dealer_products_link l ON d.id = l.dealer_id
-                 WHERE l.product_id = ?
-                 ORDER BY d.name ASC`;
-    db.all(sql, [productId], (err, rows) => {
-        if (err) res.status(500).json({ "error": err.message });
-        else res.json(rows);
-    });
+app.delete('/api/products/:id', async (req, res) => {
+    try {
+        const productId = req.params.id;
+        // 1. Находим товар
+        const product = await Product.findByIdAndDelete(productId);
+        if (!product) return res.status(404).json({ error: "Товар не найден" });
+        
+        // 2. (НОВОЕ) Удаляем этот товар из всех дилеров, у которых он был
+        await Dealer.updateMany(
+            { products: productId },
+            { $pull: { products: productId } }
+        );
+        
+        res.json({ message: "deleted" });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// API для Отчета
+app.get('/api/products/:id/dealers', async (req, res) => {
+    try {
+        // Находим всех дилеров, у которых в массиве 'products'
+        // есть ID этого товара
+        const dealers = await Dealer.find(
+            { products: req.params.id },
+            'dealer_id name city' // Возвращаем только эти поля
+        ).sort({ name: 1 });
+        res.json(dealers);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
 // --- Запускаем сервер ---
 app.listen(PORT, () => {
     console.log(`Сервер запущен и слушает порт ${PORT}`);
     console.log(`Откройте http://localhost:${PORT} в вашем браузере`);
+    // Подключаемся к БД ПОСЛЕ запуска сервера
+    connectToDB();
 });

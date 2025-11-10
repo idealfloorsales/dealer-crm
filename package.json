@@ -1,5 +1,5 @@
 {
-  "name": "dealer-app",
+  "name": "dealer-crm",
   "version": "1.0.0",
   "description": "Dealer CRM",
   "main": "server.js",
@@ -9,7 +9,7 @@
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.19.2",
-    "sqlite3": "^5.1.7"
+    "mongoose": "^8.5.1"
   },
   "engines": {
     "node": "18.x"
