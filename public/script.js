@@ -6,31 +6,35 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let fullProductCatalog = [];
 
-    // Модальное окно ДОБАВЛЕНИЯ
+    // --- Модальное окно ДОБАВЛЕНИЯ ---
     const addModal = document.getElementById('add-modal');
     const openAddModalBtn = document.getElementById('open-add-modal-btn');
     const closeAddModalBtn = addModal.querySelector('.close-btn');
     const addForm = document.getElementById('add-dealer-form');
     const addProductChecklist = document.getElementById('add-product-checklist'); 
+    const addContactList = document.getElementById('add-contact-list'); // (НОВОЕ)
+    const addContactBtnAdd = document.getElementById('add-contact-btn-add-modal'); // (НОВОЕ)
     
-    // Элементы списка
+    // --- Элементы списка ---
     const dealerListBody = document.getElementById('dealer-list-body');
     const dealerTable = document.getElementById('dealer-table');
 
-    // Элементы ФИЛЬТРОВ
+    // --- Элементы ФИЛЬТРОВ ---
     const filterCity = document.getElementById('filter-city');
     const filterPriceType = document.getElementById('filter-price-type');
 
     let allDealers = [];
     let currentSort = { column: 'name', direction: 'asc' };
 
-    // Модальное окно РЕДАКТИРОВАНИЯ
+    // --- Модальное окно РЕДАКТИРОВАНИЯ ---
     const modal = document.getElementById('edit-modal');
     const closeModalBtn = modal.querySelector('.close-btn');
     const editForm = document.getElementById('edit-dealer-form');
     const editPhotoPreview = document.getElementById('edit_photo_preview');
     const clearPhotoBtn = document.getElementById('clear-photo-btn');
     const editProductChecklist = document.getElementById('edit-product-checklist'); 
+    const editContactList = document.getElementById('edit-contact-list'); // (НОВОЕ)
+    const addContactBtnEdit = document.getElementById('add-contact-btn-edit-modal'); // (НОВОЕ)
 
     // --- Функция: Конвертер файла в Base64 ---
     const toBase64 = file => new Promise((resolve, reject) => {
@@ -42,9 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Функция: Загрузка каталога товаров в кэш ---
     async function fetchProductCatalog() {
-        if (fullProductCatalog.length > 0) {
-            return; 
-        }
+        if (fullProductCatalog.length > 0) return; 
         try {
             const response = await fetch(API_PRODUCTS_URL);
             fullProductCatalog = await response.json();
@@ -56,15 +58,59 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // --- (НОВЫЕ ФУНКЦИИ) Управление Контактами ---
+    
+    // Создает HTML для одного контакта (с данными или пустой)
+    function createContactEntryHTML(contact = { name: '', position: '', contactInfo: '' }) {
+        return `
+            <div class="contact-entry">
+                <input type="text" class="contact-name" placeholder="Имя" value="${contact.name || ''}">
+                <input type="text" class="contact-position" placeholder="Должность" value="${contact.position || ''}">
+                <input type="text" class="contact-info" placeholder="Телефон / Email" value="${contact.contactInfo || ''}">
+                <button type="button" class="btn-remove-contact">X</button>
+            </div>
+        `;
+    }
+    
+    // Отрисовывает список контактов в модальном окне
+    function renderContactList(containerElement, contacts = []) {
+        if (!contacts || contacts.length === 0) {
+            containerElement.innerHTML = createContactEntryHTML(); // Показать один пустой
+        } else {
+            containerElement.innerHTML = contacts.map(createContactEntryHTML).join('');
+        }
+    }
+    
+    // Добавляет новое пустое поле для контакта
+    function addContactField(containerElement) {
+        containerElement.insertAdjacentHTML('beforeend', createContactEntryHTML());
+    }
+    
+    // Собирает данные из полей контактов в массив
+    function collectContacts(containerElement) {
+        const contacts = [];
+        containerElement.querySelectorAll('.contact-entry').forEach(entry => {
+            const name = entry.querySelector('.contact-name').value;
+            const position = entry.querySelector('.contact-position').value;
+            const contactInfo = entry.querySelector('.contact-info').value;
+            
+            // Сохраняем, только если хотя бы одно поле заполнено
+            if (name || position || contactInfo) {
+                contacts.push({ name, position, contactInfo });
+            }
+        });
+        return contacts;
+    }
+    
+    // --- Конец функций Контактов ---
+
     // --- Функция: Отрисовка чек-листа товаров ---
     function renderProductChecklist(container, selectedProductIds = []) {
         const selectedSet = new Set(selectedProductIds); 
-        
         if (fullProductCatalog.length === 0) {
             container.innerHTML = "<p>Каталог пуст.</p>";
             return;
         }
-
         container.innerHTML = fullProductCatalog.map(product => {
             const productId = product._id || product.id; 
             return `
@@ -90,14 +136,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Функция: Сохранение связей товаров с дилером ---
     async function saveDealerProductLinks(dealerId, productIds) {
         try {
-            const response = await fetch(`${API_DEALERS_URL}/${dealerId}/products`, {
+            await fetch(`${API_DEALERS_URL}/${dealerId}/products`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ productIds })
             });
-            if (!response.ok) {
-                throw new Error('Ошибка при сохранении списка товаров дилера');
-            }
         } catch (error) {
             console.error(error);
             alert("Ошибка: Не удалось сохранить список товаров.");
@@ -122,6 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Функция: Отрисовка списка дилеров ---
     function renderDealerList() {
+        // ... (код без изменений) ...
         const selectedCity = filterCity.value;
         const selectedPriceType = filterPriceType.value;
         const filteredDealers = allDealers.filter(dealer => {
@@ -129,7 +173,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const priceTypeMatch = !selectedPriceType || dealer.price_type === selectedPriceType;
             return cityMatch && priceTypeMatch;
         });
-
         const sortedDealers = filteredDealers.sort((a, b) => {
             const col = currentSort.column;
             let valA = (a[col] || '').toString().toLowerCase(); 
@@ -139,17 +182,14 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (valA < valB) comparison = -1;
             return currentSort.direction === 'asc' ? comparison : -comparison;
         });
-
         document.querySelectorAll('#dealer-table th[data-sort]').forEach(th => {
             th.classList.remove('sort-asc', 'sort-desc');
             if (th.dataset.sort === currentSort.column) {
                 th.classList.add(currentSort.direction === 'asc' ? 'sort-asc' : 'sort-desc');
             }
         });
-
         dealerListBody.innerHTML = ''; 
         const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
-
         if (sortedDealers.length === 0) {
             dealerTable.style.display = 'none';
             let noDataMsg = document.getElementById('no-data-msg');
@@ -161,28 +201,21 @@ document.addEventListener('DOMContentLoaded', () => {
             noDataMsg.textContent = allDealers.length === 0 ? 'Список дилеров пока пуст. Добавьте первого!' : 'По вашим фильтрам дилеры не найдены.';
             return;
         }
-
         dealerTable.style.display = 'table';
         let noDataMsg = document.getElementById('no-data-msg');
         if (noDataMsg) noDataMsg.textContent = '';
-
         sortedDealers.forEach(dealer => {
             const row = dealerListBody.insertRow();
             const dealerId = dealer._id || dealer.id; 
-            
             const cellPhoto = row.insertCell();
             if (dealer.photo_url) cellPhoto.innerHTML = `<img src="${dealer.photo_url}" alt="Фото" class="table-photo">`;
             else cellPhoto.innerHTML = `<div class="no-photo">Нет фото</div>`;
-            
             row.insertCell().textContent = safeText(dealer.dealer_id);
-            
             const cellName = row.insertCell();
             cellName.innerHTML = `<a href="dealer.html?id=${dealerId}" target="_blank">${safeText(dealer.name)}</a>`;
-            
             row.insertCell().textContent = safeText(dealer.city);
             row.insertCell().textContent = safeText(dealer.price_type);
             row.insertCell().textContent = safeText(dealer.organization);
-            
             const cellActions = row.insertCell();
             cellActions.className = 'actions-cell';
             cellActions.innerHTML = `<button class="edit-btn" data-id="${dealerId}">✏️ Ред.</button>`;
@@ -192,7 +225,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Функция: Инициализация ---
     async function initApp() {
         await fetchProductCatalog(); 
-        
         try {
             const response = await fetch(API_DEALERS_URL);
             if (!response.ok) throw new Error('Network response was not ok');
@@ -205,9 +237,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- Обработчики: Модальное окно "Добавить" ---
+    // --- (ИЗМЕНЕНО) Обработчики: Модальное окно "Добавить" ---
     openAddModalBtn.onclick = () => {
         renderProductChecklist(addProductChecklist);
+        renderContactList(addContactList); // Отрисовываем один пустой контакт
         addModal.style.display = 'block';
     };
     closeAddModalBtn.onclick = () => {
@@ -215,7 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
         addForm.reset();
     };
 
-    // --- Обработчик: Добавление нового дилера ---
+    // --- (ИЗМЕНЕНО) Обработчик: Добавление нового дилера ---
     addForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const photoInput = document.getElementById('photo_upload');
@@ -233,7 +266,7 @@ document.addEventListener('DOMContentLoaded', () => {
             price_type: document.getElementById('price_type').value,
             city: document.getElementById('city').value,
             address: document.getElementById('address').value,
-            contacts: document.getElementById('contacts').value,
+            contacts: collectContacts(addContactList), // (ИЗМЕНЕНО)
             bonuses: document.getElementById('bonuses').value,
             photo_url: photoDataUrl 
         };
@@ -244,36 +277,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(dealerData)
             });
-            
             if (!response.ok) throw new Error('Ошибка при создании дилера');
-            
             const newDealer = await response.json();
             const newDealerId = newDealer._id; 
-
             const selectedProductIds = getSelectedProductIds('add-product-checklist');
-
             if (selectedProductIds.length > 0) {
                 await saveDealerProductLinks(newDealerId, selectedProductIds);
             }
-            
             addModal.style.display = 'none';
             addForm.reset();
             await initApp(); 
-            
         } catch (error) {
             console.error('Ошибка при добавлении:', error);
             alert('Ошибка при добавлении дилера.');
         }
     });
 
-    // --- Обработчик: Клик по СПИСКУ (Редактирование) ---
+    // --- (ИЗМЕНЕНО) Обработчик: Клик по СПИСКУ (Редактирование) ---
     dealerListBody.addEventListener('click', async (e) => {
         const target = e.target;
         const editButton = target.closest('.edit-btn');
         if (editButton) {
             const id = editButton.dataset.id; // Это _id
-            
             editProductChecklist.innerHTML = "<p>Загрузка товаров...</p>";
+            editContactList.innerHTML = "<p>Загрузка контактов...</p>"; // (НОВОЕ)
             
             try {
                 const [dealerRes, productsRes] = await Promise.all([
@@ -286,7 +313,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 const data = await dealerRes.json();
                 const selectedProducts = await productsRes.json(); 
-                
                 const selectedProductIds = selectedProducts.map(p => p._id || p.id); 
 
                 document.getElementById('edit_db_id').value = data._id; 
@@ -296,7 +322,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('edit_price_type').value = data.price_type;
                 document.getElementById('edit_city').value = data.city;
                 document.getElementById('edit_address').value = data.address;
-                document.getElementById('edit_contacts').value = data.contacts;
+                // document.getElementById('edit_contacts').value = data.contacts; // УДАЛЕНО
                 document.getElementById('edit_bonuses').value = data.bonuses;
                 document.getElementById('edit_photo_url_old').value = data.photo_url || '';
                 document.getElementById('edit_photo_upload').value = null;
@@ -308,6 +334,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     editPhotoPreview.src = '';
                     editPhotoPreview.style.display = 'none';
                 }
+                
+                // (НОВОЕ) Отрисовываем контакты
+                renderContactList(editContactList, data.contacts);
                 
                 renderProductChecklist(editProductChecklist, selectedProductIds);
                 
@@ -336,7 +365,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // --- (ИСПРАВЛЕНО) Обработчик: Сохранение изменений (Редактирование) ---
+    // --- (ИЗМЕНЕНО) Обработчик: Сохранение изменений (Редактирование) ---
     editForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const id = document.getElementById('edit_db_id').value; // Это _id
@@ -356,11 +385,9 @@ document.addEventListener('DOMContentLoaded', () => {
             name: document.getElementById('edit_name').value,
             organization: document.getElementById('edit_organization').value,
             price_type: document.getElementById('edit_price_type').value,
-            // (ИСПРАВЛЕНО)
             city: document.getElementById('edit_city').value,
             address: document.getElementById('edit_address').value,
-            // (КОНЕЦ ИСПРАВЛЕНИЯ)
-            contacts: document.getElementById('edit_contacts').value,
+            contacts: collectContacts(editContactList), // (ИЗМЕНЕНО)
             bonuses: document.getElementById('edit_bonuses').value,
             photo_url: photoDataUrl
         };
@@ -412,6 +439,20 @@ document.addEventListener('DOMContentLoaded', () => {
             renderDealerList(); 
         });
     });
+
+    // --- (НОВЫЕ) Обработчики: Кнопки "Добавить контакт" ---
+    addContactBtnAdd.onclick = () => addContactField(addContactList);
+    addContactBtnEdit.onclick = () => addContactField(editContactList);
+
+    // --- (НОВЫЕ) Обработчики: Кнопки "Удалить контакт" (Делегирование) ---
+    function handleContactListClick(e) {
+        if (e.target.classList.contains('btn-remove-contact')) {
+            e.target.closest('.contact-entry').remove();
+        }
+    }
+    addContactList.addEventListener('click', handleContactListClick);
+    editContactList.addEventListener('click', handleContactListClick);
+    
 
     // --- Инициализация ---
     initApp();
