@@ -67,7 +67,7 @@ label {
     display: block;
 }
 
-/* (ИЗМЕНЕНО) Общие стили кнопок (для <button> и <a>) */
+/* Общие стили кнопок (для <button> и <a>) */
 button,
 a.btn-primary,
 a.btn-danger {
