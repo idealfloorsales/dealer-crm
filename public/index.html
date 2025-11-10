@@ -20,19 +20,7 @@
     <h2>Список дилеров</h2>
 
     <div class="filter-container">
-        <div class="filter-group">
-            <label for="filter-city">Фильтр по городу:</label>
-            <select id="filter-city">
-                <option value="">-- Все города --</option>
-            </select>
         </div>
-        <div class="filter-group">
-            <label for="filter-price-type">Фильтр по типу цен:</label>
-            <select id="filter-price-type">
-                <option value="">-- Все типы --</option>
-            </select>
-        </div>
-    </div>
 
     <table id="dealer-table">
         <thead>
@@ -67,8 +55,11 @@
                 <button type="button" id="add-contact-btn-add-modal" class="btn-secondary">Добавить контакт</button>
                 
                 <input type="text" id="bonuses" placeholder="Бонусы">
-                <label for="photo_upload">Фото (выбрать файл):</label>
-                <input type="file" id="photo_upload" accept="image/*">
+
+                <label>Галерея Фото:</label>
+                <div id="add-photo-list" class="photo-list">
+                    </div>
+                <button type="button" id="add-photo-btn-add-modal" class="btn-secondary">Добавить фото</button>
                 
                 <label>Выставленные товары:</label>
                 <div id="add-product-checklist" class="product-checklist">
@@ -86,8 +77,7 @@
             <h2>Редактировать дилера</h2>
             <form id="edit-dealer-form">
                 <input type="hidden" id="edit_db_id">
-                <input type="hidden" id="edit_photo_url_old">
-
+                
                 <label>ID точки:</label>
                 <input type="text" id="edit_dealer_id" required>
                 <label>Название точки:</label>
@@ -109,11 +99,10 @@
                 <label>Бонусы:</label>
                 <input type="text" id="edit_bonuses">
 
-                <label>Текущее фото:</label>
-                <img id="edit_photo_preview" src="" alt="Предпросмотр фото" class="preview-img">
-                <label>Заменить фото (выбрать файл):</label>
-                <input type="file" id="edit_photo_upload" accept="image/*">
-                <button type="button" id="clear-photo-btn" class="btn-danger">Удалить фото</button>
+                <label>Галерея Фото:</label>
+                <div id="edit-photo-list" class="photo-list">
+                    </div>
+                <button type="button" id="add-photo-btn-edit-modal" class="btn-secondary">Добавить новое фото</button>
                 
                 <label>Выставленные товары:</label>
                 <div id="edit-product-checklist" class="product-checklist">
