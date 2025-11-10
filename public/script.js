@@ -58,7 +58,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Функция: Отрисовка чек-листа товаров ---
     function renderProductChecklist(container, selectedProductIds = []) {
-        // (ИЗМЕНЕНО) MongoDB _id - это строки, а не числа
         const selectedSet = new Set(selectedProductIds); 
         
         if (fullProductCatalog.length === 0) {
@@ -67,7 +66,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         container.innerHTML = fullProductCatalog.map(product => {
-            // (ИЗМЕНЕНО) MongoDB использует _id
             const productId = product._id || product.id; 
             return `
             <div class="checklist-item">
@@ -170,7 +168,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         sortedDealers.forEach(dealer => {
             const row = dealerListBody.insertRow();
-            // (ИЗМЕНЕНО) MongoDB использует _id, но мы добавили 'id'
             const dealerId = dealer._id || dealer.id; 
             
             const cellPhoto = row.insertCell();
@@ -251,7 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) throw new Error('Ошибка при создании дилера');
             
             const newDealer = await response.json();
-            const newDealerId = newDealer._id; // (ИЗМЕНЕНО) MongoDB использует _id
+            const newDealerId = newDealer._id; 
 
             const selectedProductIds = getSelectedProductIds('add-product-checklist');
 
@@ -290,7 +287,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await dealerRes.json();
                 const selectedProducts = await productsRes.json(); 
                 
-                const selectedProductIds = selectedProducts.map(p => p._id || p.id); // (ИЗМЕНЕНО)
+                const selectedProductIds = selectedProducts.map(p => p._id || p.id); 
 
                 document.getElementById('edit_db_id').value = data._id; 
                 document.getElementById('edit_dealer_id').value = data.dealer_id;
@@ -339,7 +336,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // --- Обработчик: Сохранение изменений (Редактирование) ---
+    // --- (ИСПРАВЛЕНО) Обработчик: Сохранение изменений (Редактирование) ---
     editForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const id = document.getElementById('edit_db_id').value; // Это _id
@@ -359,8 +356,10 @@ document.addEventListener('DOMContentLoaded', () => {
             name: document.getElementById('edit_name').value,
             organization: document.getElementById('edit_organization').value,
             price_type: document.getElementById('edit_price_type').value,
-            city: document.getElementById('city').value,
-            address: document.getElementById('address').value,
+            // (ИСПРАВЛЕНО)
+            city: document.getElementById('edit_city').value,
+            address: document.getElementById('edit_address').value,
+            // (КОНЕЦ ИСПРАВЛЕНИЯ)
             contacts: document.getElementById('edit_contacts').value,
             bonuses: document.getElementById('edit_bonuses').value,
             photo_url: photoDataUrl
