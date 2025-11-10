@@ -5,13 +5,12 @@ const cors = require('cors');
 
 const app = express();
 const PORT = process.env.PORT || 3000; 
-app.use(express.json({ limit: '50mb' })); // Лимит 50MB для фото
+app.use(express.json({ limit: '50mb' })); 
 app.use(cors());
 app.use(express.static('public'));
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// "Вшитый" список 51 товара (правильный)
 const productsToImport = [
     { sku: "CD-504", name: "Дуб Молочный" },
     { sku: "CD-505", name: "Дуб Рустик" },
@@ -81,7 +80,7 @@ const contactSchema = new mongoose.Schema({
 
 const photoSchema = new mongoose.Schema({
     description: String,
-    photo_url: String // Здесь будет Base64
+    photo_url: String
 }, { _id: false });
 
 const dealerSchema = new mongoose.Schema({
@@ -134,19 +133,43 @@ async function connectToDB() {
     }
 }
 
+// --- Преобразователь Объектов (Добавляет 'id') ---
+// MongoDB использует _id, но фронтенд (JS) ждет 'id'
+function convertToClient(mongoDoc) {
+    const obj = mongoDoc.toObject();
+    obj.id = obj._id;
+    delete obj._id; // Удаляем _id
+    delete obj.__v; // Удаляем __v
+    
+    // Также конвертируем вложенные товары
+    if (obj.products && Array.isArray(obj.products)) {
+        obj.products = obj.products.map(p => {
+            p.id = p._id;
+            delete p._id;
+            delete p.__v;
+            return p;
+        });
+    }
+    return obj;
+}
+
 // === API для Дилеров ===
 app.get('/api/dealers', async (req, res) => {
     try {
         const dealers = await Dealer.find({}, 'dealer_id name city photos price_type organization')
-                                    .lean();
-        dealers.forEach(d => { 
+                                    .lean(); // .lean() - быстрый, простой JS-объект
+        
+        // Добавляем 'id' и 'photo_url' для списка
+        const clientDealers = dealers.map(d => {
             d.id = d._id;
             if (d.photos && d.photos.length > 0) {
                 d.photo_url = d.photos[0].photo_url; 
             }
             delete d.photos; 
+            delete d._id;
+            return d;
         }); 
-        res.json(dealers);
+        res.json(clientDealers);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -155,13 +178,7 @@ app.get('/api/dealers/:id', async (req, res) => {
         const dealer = await Dealer.findById(req.params.id).populate('products');
         if (!dealer) return res.status(404).json({ message: "Дилер не найден" });
         
-        const dealerObject = dealer.toObject();
-        dealerObject.id = dealerObject._id;
-        if (dealerObject.products) {
-            dealerObject.products.forEach(p => { p.id = p._id; });
-        }
-        
-        res.json(dealerObject);
+        res.json(convertToClient(dealer)); // Конвертируем перед отправкой
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -169,7 +186,7 @@ app.post('/api/dealers', async (req, res) => {
     try {
         const dealer = new Dealer(req.body); 
         await dealer.save();
-        res.status(201).json(dealer); 
+        res.status(201).json(convertToClient(dealer)); // Конвертируем перед отправкой
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -195,11 +212,8 @@ app.get('/api/dealers/:id/products', async (req, res) => {
         const dealer = await Dealer.findById(req.params.id).populate('products');
         if (!dealer) return res.status(404).json({ message: "Дилер не найден" });
         
-        const productsWithId = dealer.products.map(p => {
-            const product = p.toObject();
-            product.id = product._id;
-            return product;
-        });
+        // Конвертируем только массив товаров
+        const productsWithId = dealer.products.map(p => convertToClient(p));
         res.json(productsWithId);
         
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -226,7 +240,7 @@ app.get('/api/products', async (req, res) => {
             ]
         }).sort({ name: 1 }).lean(); 
         
-        products.forEach(p => { p.id = p._id; }); 
+        products.forEach(p => { p.id = p._id; }); // Добавляем 'id'
         res.json(products);
         
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -236,7 +250,7 @@ app.post('/api/products', async (req, res) => {
     try {
         const product = new Product(req.body);
         await product.save();
-        res.status(201).json(product);
+        res.status(201).json(convertToClient(product)); // Конвертируем перед отправкой
     } catch (e) {
         if (e.code === 11000) { 
              return res.status(409).json({ "error": "Товар с таким Артикулом (SKU) уже существует" });
@@ -249,7 +263,7 @@ app.put('/api/products/:id', async (req, res) => {
     try {
         const product = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true });
         if (!product) return res.status(404).json({ error: "Товар не найден" });
-        res.json({ message: "success", id: product._id, sku: product.sku, name: product.name });
+        res.json(convertToClient(product)); // Конвертируем перед отправкой
     } catch (e) {
         if (e.code === 11000) {
             return res.status(409).json({ "error": "Товар с таким Артикулом (SKU) уже существует" });
@@ -292,4 +306,3 @@ app.listen(PORT, () => {
     console.log(`Сервер запущен и слушает порт ${PORT}`);
     connectToDB();
 });
-
