@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
             productSelect.innerHTML = '<option value="">-- Выберите товар --</option>'; // Очистка
             
             products.forEach(product => {
-                const productId = product._id || product.id; // (ИЗМЕНЕНО) MongoDB _id
+                const productId = product.id; 
                 const option = new Option(`[${product.sku}] ${product.name}`, productId);
                 productSelect.add(option);
             });
@@ -59,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             reportListBody.innerHTML = ''; // Очистка
             dealers.forEach(dealer => {
-                const dealerId = dealer._id || dealer.id; // (ИЗМЕНЕНО) MongoDB _id
+                const dealerId = dealer.id; 
                 const row = reportListBody.insertRow();
                 row.innerHTML = `
                     <td>${safeText(dealer.dealer_id)}</td>
