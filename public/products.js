@@ -4,6 +4,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const API_URL = '/api/products';
     
     const productListBody = document.getElementById('product-list-body');
+    const productsTable = document.getElementById('products-table');
+    const noDataMsg = document.getElementById('no-data-msg');
     const searchBar = document.getElementById('search-bar');
     
     const addModal = document.getElementById('add-product-modal');
@@ -56,9 +58,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         productListBody.innerHTML = '';
         if (sortedProducts.length === 0) {
-            productListBody.innerHTML = '<tr><td colspan="3">Товары не найдены.</td></tr>';
+            productsTable.style.display = 'none';
+            noDataMsg.style.display = 'block';
+            noDataMsg.textContent = 'Товары не найдены.';
             return;
         }
+
+        productsTable.style.display = 'table';
+        noDataMsg.style.display = 'none';
 
         sortedProducts.forEach(product => {
             const row = productListBody.insertRow();
