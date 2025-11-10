@@ -20,7 +20,19 @@
     <h2>Список дилеров</h2>
 
     <div class="filter-container">
+        <div class="filter-group">
+            <label for="filter-city">Фильтр по городу:</label>
+            <select id="filter-city">
+                <option value="">-- Все города --</option>
+            </select>
         </div>
+        <div class="filter-group">
+            <label for="filter-price-type">Фильтр по типу цен:</label>
+            <select id="filter-price-type">
+                <option value="">-- Все типы --</option>
+            </select>
+        </div>
+    </div>
 
     <table id="dealer-table">
         <thead>
@@ -36,6 +48,7 @@
         </thead>
         <tbody id="dealer-list-body"></tbody>
     </table>
+    <p id="no-data-msg"></p>
 
     <div id="add-modal" class="modal">
         <div class="modal-content">
@@ -49,7 +62,6 @@
                 <input type="text" id="city" placeholder="Город">
                 <input type="text" id="address" placeholder="Адрес">
                 <input type="text" id="delivery" placeholder="Условия доставки">
-                
                 <input type="text" id="website" placeholder="Сайт (https://...)">
                 <input type="text" id="instagram" placeholder="Инстаграм (https://...)">
 
@@ -96,7 +108,6 @@
                 <input type="text" id="edit_address">
                 <label>Условия доставки:</label>
                 <input type="text" id="edit_delivery">
-
                 <label>Сайт:</label>
                 <input type="text" id="edit_website">
                 <label>Инстаграм:</label>
