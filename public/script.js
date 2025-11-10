@@ -12,8 +12,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeAddModalBtn = addModal.querySelector('.close-btn');
     const addForm = document.getElementById('add-dealer-form');
     const addProductChecklist = document.getElementById('add-product-checklist'); 
-    const addContactList = document.getElementById('add-contact-list'); // (НОВОЕ)
-    const addContactBtnAdd = document.getElementById('add-contact-btn-add-modal'); // (НОВОЕ)
+    const addContactList = document.getElementById('add-contact-list'); 
+    const addContactBtnAdd = document.getElementById('add-contact-btn-add-modal'); 
+    const addPhotoList = document.getElementById('add-photo-list'); // (НОВОЕ)
+    const addPhotoBtnAdd = document.getElementById('add-photo-btn-add-modal'); // (НОВОЕ)
     
     // --- Элементы списка ---
     const dealerListBody = document.getElementById('dealer-list-body');
@@ -30,11 +32,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const modal = document.getElementById('edit-modal');
     const closeModalBtn = modal.querySelector('.close-btn');
     const editForm = document.getElementById('edit-dealer-form');
-    const editPhotoPreview = document.getElementById('edit_photo_preview');
-    const clearPhotoBtn = document.getElementById('clear-photo-btn');
     const editProductChecklist = document.getElementById('edit-product-checklist'); 
-    const editContactList = document.getElementById('edit-contact-list'); // (НОВОЕ)
-    const addContactBtnEdit = document.getElementById('add-contact-btn-edit-modal'); // (НОВОЕ)
+    const editContactList = document.getElementById('edit-contact-list'); 
+    const addContactBtnEdit = document.getElementById('add-contact-btn-edit-modal'); 
+    const editPhotoList = document.getElementById('edit-photo-list'); // (НОВОЕ)
+    const addPhotoBtnEdit = document.getElementById('add-photo-btn-edit-modal'); // (НОВОЕ)
 
     // --- Функция: Конвертер файла в Base64 ---
     const toBase64 = file => new Promise((resolve, reject) => {
@@ -53,59 +55,102 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log(`Загружено ${fullProductCatalog.length} товаров в каталог.`);
         } catch (error) {
             console.error("Критическая ошибка: не удалось загрузить каталог товаров.", error);
-            addProductChecklist.innerHTML = "<p style='color:red'>Ошибка загрузки каталога!</p>";
-            editProductChecklist.innerHTML = "<p style='color:red'>Ошибка загрузки каталога!</p>";
+            // ... (сообщения об ошибках) ...
         }
     }
 
-    // --- (НОВЫЕ ФУНКЦИИ) Управление Контактами ---
-    
-    // Создает HTML для одного контакта (с данными или пустой)
-    function createContactEntryHTML(contact = { name: '', position: '', contactInfo: '' }) {
+    // --- Функции Управления Контактами ---
+    function createContactEntryHTML(contact = {}) {
         return `
             <div class="contact-entry">
                 <input type="text" class="contact-name" placeholder="Имя" value="${contact.name || ''}">
                 <input type="text" class="contact-position" placeholder="Должность" value="${contact.position || ''}">
                 <input type="text" class="contact-info" placeholder="Телефон / Email" value="${contact.contactInfo || ''}">
-                <button type="button" class="btn-remove-contact">X</button>
+                <button type="button" class="btn-remove-entry">X</button>
             </div>
         `;
     }
-    
-    // Отрисовывает список контактов в модальном окне
     function renderContactList(containerElement, contacts = []) {
-        if (!contacts || contacts.length === 0) {
-            containerElement.innerHTML = createContactEntryHTML(); // Показать один пустой
-        } else {
-            containerElement.innerHTML = contacts.map(createContactEntryHTML).join('');
-        }
+        containerElement.innerHTML = (contacts.length > 0) ? contacts.map(createContactEntryHTML).join('') : createContactEntryHTML();
     }
-    
-    // Добавляет новое пустое поле для контакта
     function addContactField(containerElement) {
         containerElement.insertAdjacentHTML('beforeend', createContactEntryHTML());
     }
-    
-    // Собирает данные из полей контактов в массив
     function collectContacts(containerElement) {
         const contacts = [];
         containerElement.querySelectorAll('.contact-entry').forEach(entry => {
             const name = entry.querySelector('.contact-name').value;
             const position = entry.querySelector('.contact-position').value;
             const contactInfo = entry.querySelector('.contact-info').value;
-            
-            // Сохраняем, только если хотя бы одно поле заполнено
             if (name || position || contactInfo) {
                 contacts.push({ name, position, contactInfo });
             }
         });
         return contacts;
     }
-    
     // --- Конец функций Контактов ---
+    
+    // --- (НОВЫЕ ФУНКЦИИ) Управление Фото ---
+    
+    // Создает HTML для НОВОГО (пустого) поля загрузки фото
+    function createNewPhotoEntryHTML() {
+        return `
+            <div class="photo-entry new">
+                <input type="text" class="photo-description" placeholder="Описание (н-р, Фасад)">
+                <input type="file" class="photo-file" accept="image/*">
+                <button type="button" class="btn-remove-entry">X</button>
+            </div>
+        `;
+    }
+    
+    // Отрисовывает СУЩЕСТВУЮЩИЕ фото (для режима Редактирования)
+    function renderExistingPhotos(containerElement, photos = []) {
+        containerElement.innerHTML = photos.map(photo => `
+            <div class="photo-entry existing">
+                <img src="${photo.photo_url}" class="preview-thumb">
+                <input type="text" class="photo-description" value="${photo.description || ''}">
+                <button type="button" class="btn-remove-entry">X</button>
+                <input type="hidden" class="photo-url" value="${photo.photo_url}"> 
+            </div>
+        `).join('');
+    }
+
+    // Собирает данные из полей фото (САМАЯ СЛОЖНАЯ ЧАСТЬ)
+    async function collectPhotos(containerElement) {
+        const photoPromises = [];
+        
+        // 1. Обрабатываем существующие фото (только в режиме Редактирования)
+        containerElement.querySelectorAll('.photo-entry.existing').forEach(entry => {
+            const description = entry.querySelector('.photo-description').value;
+            const photo_url = entry.querySelector('.photo-url').value;
+            // Это не Promise, но мы "заворачиваем" его для Promise.all
+            photoPromises.push(Promise.resolve({ description, photo_url }));
+        });
+
+        // 2. Обрабатываем НОВЫЕ добавленные фото
+        containerElement.querySelectorAll('.photo-entry.new').forEach(entry => {
+            const description = entry.querySelector('.photo-description').value;
+            const file = entry.querySelector('.photo-file').files[0];
+            
+            if (file) {
+                // Это асинхронная операция!
+                photoPromises.push(
+                    toBase64(file).then(base64Url => {
+                        return { description, photo_url: base64Url };
+                    })
+                );
+            }
+        });
+
+        // Ждем, пока ВСЕ файлы (новые) будут сконвертированы
+        return await Promise.all(photoPromises);
+    }
+    // --- Конец функций Фото ---
+
 
     // --- Функция: Отрисовка чек-листа товаров ---
     function renderProductChecklist(container, selectedProductIds = []) {
+        // ... (код без изменений) ...
         const selectedSet = new Set(selectedProductIds); 
         if (fullProductCatalog.length === 0) {
             container.innerHTML = "<p>Каталог пуст.</p>";
@@ -128,6 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Функция: Сбор ID из чек-листа ---
     function getSelectedProductIds(containerId) {
+        // ... (код без изменений) ...
         const container = document.getElementById(containerId);
         const checkboxes = container.querySelectorAll('input[type="checkbox"]:checked');
         return Array.from(checkboxes).map(cb => cb.value);
@@ -135,6 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // --- Функция: Сохранение связей товаров с дилером ---
     async function saveDealerProductLinks(dealerId, productIds) {
+        // ... (код без изменений) ...
         try {
             await fetch(`${API_DEALERS_URL}/${dealerId}/products`, {
                 method: 'PUT',
@@ -149,6 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Функция: Заполнение фильтров ---
     function populateFilters(dealers) {
+        // ... (код без изменений) ...
         const cities = [...new Set(dealers.map(d => d.city).filter(Boolean))]; 
         const priceTypes = [...new Set(dealers.map(d => d.price_type).filter(Boolean))];
         cities.sort();
@@ -163,9 +211,9 @@ document.addEventListener('DOMContentLoaded', () => {
         filterPriceType.value = currentPriceType;
     }
 
-    // --- Функция: Отрисовка списка дилеров ---
+    // --- (ИЗМЕНЕНО) Функция: Отрисовка списка дилеров ---
     function renderDealerList() {
-        // ... (код без изменений) ...
+        // ... (код фильтрации и сортировки без изменений) ...
         const selectedCity = filterCity.value;
         const selectedPriceType = filterPriceType.value;
         const filteredDealers = allDealers.filter(dealer => {
@@ -204,12 +252,19 @@ document.addEventListener('DOMContentLoaded', () => {
         dealerTable.style.display = 'table';
         let noDataMsg = document.getElementById('no-data-msg');
         if (noDataMsg) noDataMsg.textContent = '';
+        
         sortedDealers.forEach(dealer => {
             const row = dealerListBody.insertRow();
             const dealerId = dealer._id || dealer.id; 
+            
             const cellPhoto = row.insertCell();
-            if (dealer.photo_url) cellPhoto.innerHTML = `<img src="${dealer.photo_url}" alt="Фото" class="table-photo">`;
-            else cellPhoto.innerHTML = `<div class="no-photo">Нет фото</div>`;
+            // (ИЗМЕНЕНО) Показываем первое фото (photo_url прилетает из API)
+            if (dealer.photo_url) {
+                cellPhoto.innerHTML = `<img src="${dealer.photo_url}" alt="Фото" class="table-photo">`;
+            } else {
+                cellPhoto.innerHTML = `<div class="no-photo">Нет фото</div>`;
+            }
+            
             row.insertCell().textContent = safeText(dealer.dealer_id);
             const cellName = row.insertCell();
             cellName.innerHTML = `<a href="dealer.html?id=${dealerId}" target="_blank">${safeText(dealer.name)}</a>`;
@@ -237,10 +292,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- (ИЗМЕНЕНО) Обработчики: Модальное окно "Добавить" ---
+    // --- Обработчики: Модальное окно "Добавить" ---
     openAddModalBtn.onclick = () => {
         renderProductChecklist(addProductChecklist);
-        renderContactList(addContactList); // Отрисовываем один пустой контакт
+        renderContactList(addContactList);
+        addPhotoList.innerHTML = createNewPhotoEntryHTML(); // (НОВОЕ) Отрисовываем одно пустое поле фото
         addModal.style.display = 'block';
     };
     closeAddModalBtn.onclick = () => {
@@ -251,13 +307,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- (ИЗМЕНЕНО) Обработчик: Добавление нового дилера ---
     addForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const photoInput = document.getElementById('photo_upload');
-        let photoDataUrl = null;
-
-        if (photoInput.files && photoInput.files[0]) {
-            try { photoDataUrl = await toBase64(photoInput.files[0]); } 
-            catch (error) { return alert("Ошибка при чтении фото."); }
-        }
+        
+        // (НОВОЕ) Запускаем сбор фото (асинхронно)
+        let photosPromise = collectPhotos(addPhotoList);
         
         const dealerData = {
             dealer_id: document.getElementById('dealer_id').value,
@@ -266,9 +318,9 @@ document.addEventListener('DOMContentLoaded', () => {
             price_type: document.getElementById('price_type').value,
             city: document.getElementById('city').value,
             address: document.getElementById('address').value,
-            contacts: collectContacts(addContactList), // (ИЗМЕНЕНО)
+            contacts: collectContacts(addContactList), 
             bonuses: document.getElementById('bonuses').value,
-            photo_url: photoDataUrl 
+            photos: await photosPromise // (НОВОЕ) Ждем завершения загрузки фото
         };
 
         try {
@@ -300,7 +352,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (editButton) {
             const id = editButton.dataset.id; // Это _id
             editProductChecklist.innerHTML = "<p>Загрузка товаров...</p>";
-            editContactList.innerHTML = "<p>Загрузка контактов...</p>"; // (НОВОЕ)
+            editContactList.innerHTML = "<p>Загрузка контактов...</p>";
+            editPhotoList.innerHTML = "<p>Загрузка фото...</p>"; // (НОВОЕ)
             
             try {
                 const [dealerRes, productsRes] = await Promise.all([
@@ -322,23 +375,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('edit_price_type').value = data.price_type;
                 document.getElementById('edit_city').value = data.city;
                 document.getElementById('edit_address').value = data.address;
-                // document.getElementById('edit_contacts').value = data.contacts; // УДАЛЕНО
                 document.getElementById('edit_bonuses').value = data.bonuses;
-                document.getElementById('edit_photo_url_old').value = data.photo_url || '';
-                document.getElementById('edit_photo_upload').value = null;
-
-                if (data.photo_url) {
-                    editPhotoPreview.src = data.photo_url;
-                    editPhotoPreview.style.display = 'block';
-                } else {
-                    editPhotoPreview.src = '';
-                    editPhotoPreview.style.display = 'none';
-                }
                 
-                // (НОВОЕ) Отрисовываем контакты
                 renderContactList(editContactList, data.contacts);
-                
                 renderProductChecklist(editProductChecklist, selectedProductIds);
+                renderExistingPhotos(editPhotoList, data.photos); // (НОВОЕ)
                 
                 modal.style.display = 'block';
                 
@@ -369,16 +410,9 @@ document.addEventListener('DOMContentLoaded', () => {
     editForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const id = document.getElementById('edit_db_id').value; // Это _id
-        const photoInput = document.getElementById('edit_photo_upload');
-        let photoDataUrl = document.getElementById('edit_photo_url_old').value; 
 
-        if (photoInput.files && photoInput.files[0]) {
-             try { photoDataUrl = await toBase64(photoInput.files[0]); } 
-             catch (error) { return alert("Ошибка при чтении нового фото."); }
-        } else if (photoDataUrl === '') {
-            photoDataUrl = null;
-        }
-        photoInput.value = null;
+        // (НОВОЕ) Запускаем сбор фото (асинхронно)
+        let photosPromise = collectPhotos(editPhotoList);
 
         const updatedData = {
             dealer_id: document.getElementById('edit_dealer_id').value,
@@ -387,9 +421,9 @@ document.addEventListener('DOMContentLoaded', () => {
             price_type: document.getElementById('edit_price_type').value,
             city: document.getElementById('edit_city').value,
             address: document.getElementById('edit_address').value,
-            contacts: collectContacts(editContactList), // (ИЗМЕНЕНО)
+            contacts: collectContacts(editContactList),
             bonuses: document.getElementById('edit_bonuses').value,
-            photo_url: photoDataUrl
+            photos: await photosPromise // (НОВОЕ) Ждем завершения
         };
         
         const selectedProductIds = getSelectedProductIds('edit-product-checklist');
@@ -414,13 +448,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- Обработчик: "Удалить фото" ---
-    clearPhotoBtn.addEventListener('click', () => {
-        editPhotoPreview.src = '';
-        editPhotoPreview.style.display = 'none';
-        document.getElementById('edit_photo_url_old').value = '';
-        document.getElementById('edit_photo_upload').value = null;
-    });
+    // --- (УДАЛЕНО) Обработчик: "Удалить фото" (теперь это "btn-remove-entry") ---
+    // clearPhotoBtn.addEventListener('click', ...); // Этот код больше не нужен
 
     // --- Обработчики: Изменение фильтров ---
     filterCity.addEventListener('change', renderDealerList);
@@ -444,14 +473,18 @@ document.addEventListener('DOMContentLoaded', () => {
     addContactBtnAdd.onclick = () => addContactField(addContactList);
     addContactBtnEdit.onclick = () => addContactField(editContactList);
 
-    // --- (НОВЫЕ) Обработчики: Кнопки "Удалить контакт" (Делегирование) ---
-    function handleContactListClick(e) {
-        if (e.target.classList.contains('btn-remove-contact')) {
-            e.target.closest('.contact-entry').remove();
+    // --- (НОВЫЕ) Обработчики: Кнопки "Добавить фото" ---
+    addPhotoBtnAdd.onclick = () => addPhotoList.insertAdjacentHTML('beforeend', createNewPhotoEntryHTML());
+    addPhotoBtnEdit.onclick = () => editPhotoList.insertAdjacentHTML('beforeend', createNewPhotoEntryHTML());
+
+    // --- (НОВЫЕ) Обработчики: Кнопки "Удалить" (X) для Контактов и Фото ---
+    function handleListClick(e) {
+        if (e.target.classList.contains('btn-remove-entry')) {
+            e.target.closest('.contact-entry, .photo-entry').remove();
         }
     }
-    addContactList.addEventListener('click', handleContactListClick);
-    editContactList.addEventListener('click', handleContactListClick);
+    addModal.addEventListener('click', handleListClick);
+    modal.addEventListener('click', handleListClick);
     
 
     // --- Инициализация ---
