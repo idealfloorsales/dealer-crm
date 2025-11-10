@@ -4,12 +4,11 @@ const mongoose = require('mongoose'); // Используем Mongoose
 const cors = require('cors');
 
 const app = express();
-const PORT = process.env.PORT || 3000; // Render сам назначит порт
+const PORT = process.env.PORT || 3000; 
 app.use(express.json({ limit: '25mb' })); 
 app.use(cors());
 app.use(express.static('public'));
 
-// Строка подключения (будет взята из Render)
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
 // "Вшитый" список 51 товара (правильный)
@@ -74,13 +73,21 @@ const productSchema = new mongoose.Schema({
 });
 const Product = mongoose.model('Product', productSchema);
 
+// (НОВАЯ) Схема для Контактов
+const contactSchema = new mongoose.Schema({
+    name: String,
+    position: String,
+    contactInfo: String
+}, { _id: false }); // Не создаем _id для sub-документов
+
 const dealerSchema = new mongoose.Schema({
     dealer_id: String,
     name: String,
     price_type: String,
     city: String,
     address: String,
-    contacts: String,
+    // (ИЗМЕНЕНО) 'contacts' теперь массив
+    contacts: [contactSchema], 
     bonuses: String,
     photo_url: String,
     organization: String,
@@ -92,7 +99,6 @@ const Dealer = mongoose.model('Dealer', dealerSchema);
 async function hardcodedImportProducts() {
     try {
         const count = await Product.countDocuments();
-        // (ВОТ ЭТА ПРОВЕРКА) Он запускает импорт ТОЛЬКО если товаров = 0
         if (count === 0) { 
             console.log(`Таблица 'products' пуста. Начинаю "вшитый" импорт...`);
             await Product.insertMany(productsToImport, { ordered: false });
@@ -102,7 +108,7 @@ async function hardcodedImportProducts() {
             console.log("Таблица 'products' уже содержит данные. Импорт пропущен.");
         }
     } catch (error) {
-        if (error.code !== 11000) { // Игнорируем ошибки дубликатов
+        if (error.code !== 11000) { 
            console.warn(`Ошибка при импорте: ${error.message}`);
         } else {
            console.log("Таблица 'products' уже содержит данные. Импорт пропущен.");
@@ -114,13 +120,11 @@ async function hardcodedImportProducts() {
 async function connectToDB() {
     if (!DB_CONNECTION_STRING) {
         console.error("Критическая ошибка: Строка подключения 'DB_CONNECTION_STRING' не найдена.");
-        console.error("Пожалуйста, добавьте ее в Переменные Окружения (Environment Variables) на Render.");
         return;
     }
     try {
         await mongoose.connect(DB_CONNECTION_STRING);
         console.log("Подключено к базе данных MongoDB Atlas!");
-        // Запускаем импорт (он сам проверит, нужно ли)
         await hardcodedImportProducts();
     } catch (error) {
         console.error("Ошибка подключения к MongoDB:", error.message);
@@ -139,10 +143,10 @@ app.get('/api/dealers', async (req, res) => {
 
 app.get('/api/dealers/:id', async (req, res) => {
     try {
-        const dealer = await Dealer.findById(req.params.id).populate('products'); // Заполняем товары
+        // (ИЗМЕНЕНО) Заполняем и 'products' и 'contacts' (хотя 'contacts' встроены)
+        const dealer = await Dealer.findById(req.params.id).populate('products');
         if (!dealer) return res.status(404).json({ message: "Дилер не найден" });
         
-        // Преобразуем Mongoose-объекты
         const dealerObject = dealer.toObject();
         dealerObject.id = dealerObject._id;
         if (dealerObject.products) {
@@ -155,7 +159,8 @@ app.get('/api/dealers/:id', async (req, res) => {
 
 app.post('/api/dealers', async (req, res) => {
     try {
-        const dealer = new Dealer(req.body);
+        // Mongoose автоматически обработает массив 'contacts' из req.body
+        const dealer = new Dealer(req.body); 
         await dealer.save();
         res.status(201).json(dealer); 
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -163,6 +168,7 @@ app.post('/api/dealers', async (req, res) => {
 
 app.put('/api/dealers/:id', async (req, res) => {
     try {
+        // Mongoose также автоматически обновит массив 'contacts'
         const dealer = await Dealer.findByIdAndUpdate(req.params.id, req.body, { new: true });
         if (!dealer) return res.status(404).json({ message: "Дилер не найден" });
         res.json({ message: "success" });
