@@ -93,7 +93,6 @@ const dealerSchema = new mongoose.Schema({
     bonuses: String,
     photos: [photoSchema], 
     organization: String,
-    // (НОВОЕ ПОЛЕ)
     delivery: String, 
     products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }]
 });
@@ -137,14 +136,15 @@ async function connectToDB() {
 
 // --- Преобразователь Объектов (Добавляет 'id') ---
 function convertToClient(mongoDoc) {
-    const obj = mongoDoc.toObject();
+    if (!mongoDoc) return null;
+    const obj = mongoDoc.toObject ? mongoDoc.toObject() : mongoDoc;
     obj.id = obj._id;
     delete obj._id; 
     delete obj.__v; 
     
     if (obj.products && Array.isArray(obj.products)) {
         obj.products = obj.products.map(p => {
-            if (p) { // Добавлена проверка на null
+            if (p) { 
                 p.id = p._id;
                 delete p._id;
                 delete p.__v;
@@ -185,7 +185,6 @@ app.get('/api/dealers/:id', async (req, res) => {
 
 app.post('/api/dealers', async (req, res) => {
     try {
-        // (ИЗМЕНЕНО) 'delivery' теперь часть req.body
         const dealer = new Dealer(req.body); 
         await dealer.save();
         res.status(201).json(convertToClient(dealer)); 
@@ -194,7 +193,6 @@ app.post('/api/dealers', async (req, res) => {
 
 app.put('/api/dealers/:id', async (req, res) => {
     try {
-        // (ИЗМЕНЕНО) 'delivery' теперь часть req.body
         const dealer = await Dealer.findByIdAndUpdate(req.params.id, req.body, { new: true });
         if (!dealer) return res.status(404).json({ message: "Дилер не найден" });
         res.json({ message: "success" });
