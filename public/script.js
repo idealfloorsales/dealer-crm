@@ -112,7 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <button type="button" class="btn-remove-entry">X</button>
                 <input type="hidden" class="photo-url" value="${photo.photo_url}"> 
             </div>
-        `).join('') : ''; // Не показываем пустую, если нет фото
+        `).join('') : ''; 
     }
     async function collectPhotos(containerElement) {
         const photoPromises = [];
@@ -140,7 +140,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     // --- Конец функций Фото ---
 
-
     // --- Функция: Отрисовка чек-листа товаров ---
     function renderProductChecklist(container, selectedProductIds = []) {
         const selectedSet = new Set(selectedProductIds); 
@@ -149,7 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         container.innerHTML = fullProductCatalog.map(product => {
-            const productId = product.id; // Сервер уже прислал 'id'
+            const productId = product.id; 
             return `
             <div class="checklist-item">
                 <input type="checkbox" 
@@ -202,6 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Функция: Отрисовка списка дилеров ---
     function renderDealerList() {
+        // ... (код фильтрации и сортировки без изменений) ...
         const selectedCity = filterCity.value;
         const selectedPriceType = filterPriceType.value;
         const filteredDealers = allDealers.filter(dealer => {
@@ -209,7 +209,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const priceTypeMatch = !selectedPriceType || dealer.price_type === selectedPriceType;
             return cityMatch && priceTypeMatch;
         });
-
         const sortedDealers = filteredDealers.sort((a, b) => {
             const col = currentSort.column;
             let valA = (a[col] || '').toString().toLowerCase(); 
@@ -219,17 +218,14 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (valA < valB) comparison = -1;
             return currentSort.direction === 'asc' ? comparison : -comparison;
         });
-
         document.querySelectorAll('#dealer-table th[data-sort]').forEach(th => {
             th.classList.remove('sort-asc', 'sort-desc');
             if (th.dataset.sort === currentSort.column) {
                 th.classList.add(currentSort.direction === 'asc' ? 'sort-asc' : 'sort-desc');
             }
         });
-
         dealerListBody.innerHTML = ''; 
         const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
-
         if (sortedDealers.length === 0) {
             dealerTable.style.display = 'none';
             let noDataMsg = document.getElementById('no-data-msg');
@@ -241,22 +237,18 @@ document.addEventListener('DOMContentLoaded', () => {
             noDataMsg.textContent = allDealers.length === 0 ? 'Список дилеров пока пуст. Добавьте первого!' : 'По вашим фильтрам дилеры не найдены.';
             return;
         }
-
         dealerTable.style.display = 'table';
         let noDataMsg = document.getElementById('no-data-msg');
         if (noDataMsg) noDataMsg.textContent = '';
-
         sortedDealers.forEach(dealer => {
             const row = dealerListBody.insertRow();
             const dealerId = dealer.id; 
-            
             const cellPhoto = row.insertCell();
             if (dealer.photo_url) {
                 cellPhoto.innerHTML = `<img src="${dealer.photo_url}" alt="Фото" class="table-photo">`;
             } else {
                 cellPhoto.innerHTML = `<div class="no-photo">Нет фото</div>`;
             }
-            
             row.insertCell().textContent = safeText(dealer.dealer_id);
             const cellName = row.insertCell();
             cellName.innerHTML = `<a href="dealer.html?id=${dealerId}" target="_blank">${safeText(dealer.name)}</a>`;
@@ -296,7 +288,7 @@ document.addEventListener('DOMContentLoaded', () => {
         addForm.reset();
     };
 
-    // --- Обработчик: Добавление нового дилера ---
+    // --- (ИЗМЕНЕНО) Обработчик: Добавление нового дилера ---
     addForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         
@@ -309,6 +301,7 @@ document.addEventListener('DOMContentLoaded', () => {
             price_type: document.getElementById('price_type').value,
             city: document.getElementById('city').value,
             address: document.getElementById('address').value,
+            delivery: document.getElementById('delivery').value, // (НОВОЕ)
             contacts: collectContacts(addContactList), 
             bonuses: document.getElementById('bonuses').value,
             photos: await photosPromise 
@@ -336,7 +329,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- Обработчик: Клик по СПИСКУ (Редактирование) ---
+    // --- (ИЗМЕНЕНО) Обработчик: Клик по СПИСКУ (Редактирование) ---
     dealerListBody.addEventListener('click', async (e) => {
         const target = e.target;
         const editButton = target.closest('.edit-btn');
@@ -347,12 +340,10 @@ document.addEventListener('DOMContentLoaded', () => {
             editPhotoList.innerHTML = "<p>Загрузка фото...</p>"; 
             
             try {
-                // (ИЗМЕНЕНО) Запрашиваем дилера (он уже включает товары)
                 const dealerRes = await fetch(`${API_DEALERS_URL}/${id}`);
                 if (!dealerRes.ok) throw new Error("Не удалось загрузить данные дилера");
                 
                 const data = await dealerRes.json();
-                // (ИЗМЕНЕНО) Товары уже внутри 'data'
                 const selectedProducts = data.products || []; 
                 const selectedProductIds = selectedProducts.map(p => p.id); 
 
@@ -363,6 +354,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('edit_price_type').value = data.price_type;
                 document.getElementById('edit_city').value = data.city;
                 document.getElementById('edit_address').value = data.address;
+                document.getElementById('edit_delivery').value = data.delivery; // (НОВОЕ)
                 document.getElementById('edit_bonuses').value = data.bonuses;
                 
                 renderContactList(editContactList, data.contacts);
@@ -394,7 +386,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // --- Обработчик: Сохранение изменений (Редактирование) ---
+    // --- (ИЗМЕНЕНО) Обработчик: Сохранение изменений (Редактирование) ---
     editForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const id = document.getElementById('edit_db_id').value; 
@@ -408,6 +400,7 @@ document.addEventListener('DOMContentLoaded', () => {
             price_type: document.getElementById('edit_price_type').value,
             city: document.getElementById('edit_city').value,
             address: document.getElementById('edit_address').value,
+            delivery: document.getElementById('edit_delivery').value, // (НОВОЕ)
             contacts: collectContacts(editContactList),
             bonuses: document.getElementById('edit_bonuses').value,
             photos: await photosPromise 
@@ -434,9 +427,8 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Ошибка при сохранении изменений.');
         }
     });
-
-    // --- (УДАЛЕНО) Обработчик "Удалить фото" (теперь "btn-remove-entry") ---
-    // clearPhotoBtn.addEventListener('click', ...); // Этот код больше не нужен
+    
+    // --- (УДАЛЕН) Обработчик "Удалить фото" ---
 
     // --- Обработчики: Изменение фильтров ---
     filterCity.addEventListener('change', renderDealerList);
@@ -471,7 +463,6 @@ document.addEventListener('DOMContentLoaded', () => {
     addModal.addEventListener('click', handleListClick);
     modal.addEventListener('click', handleListClick);
     
-
     // --- Инициализация ---
     initApp();
 });
