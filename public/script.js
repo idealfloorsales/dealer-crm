@@ -1,7 +1,6 @@
 // script.js
 document.addEventListener('DOMContentLoaded', () => {
     
-    // (ИЗМЕНЕНО) Используем относительные пути
     const API_DEALERS_URL = '/api/dealers';
     const API_PRODUCTS_URL = '/api/products'; 
 
@@ -59,24 +58,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Функция: Отрисовка чек-листа товаров ---
     function renderProductChecklist(container, selectedProductIds = []) {
-        const selectedSet = new Set(selectedProductIds.map(id => Number(id)));
+        // (ИЗМЕНЕНО) MongoDB _id - это строки, а не числа
+        const selectedSet = new Set(selectedProductIds); 
         
         if (fullProductCatalog.length === 0) {
             container.innerHTML = "<p>Каталог пуст.</p>";
             return;
         }
 
-        container.innerHTML = fullProductCatalog.map(product => `
+        container.innerHTML = fullProductCatalog.map(product => {
+            // (ИЗМЕНЕНО) MongoDB использует _id
+            const productId = product._id || product.id; 
+            return `
             <div class="checklist-item">
                 <input type="checkbox" 
-                       id="prod-${container.id}-${product.id}" 
-                       value="${product.id}"
-                       ${selectedSet.has(product.id) ? 'checked' : ''}>
-                <label for="prod-${container.id}-${product.id}">
+                       id="prod-${container.id}-${productId}" 
+                       value="${productId}"
+                       ${selectedSet.has(productId) ? 'checked' : ''}>
+                <label for="prod-${container.id}-${productId}">
                     <strong>${product.sku}</strong> - ${product.name}
                 </label>
             </div>
-        `).join('');
+        `}).join('');
     }
 
     // --- Функция: Сбор ID из чек-листа ---
@@ -167,6 +170,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         sortedDealers.forEach(dealer => {
             const row = dealerListBody.insertRow();
+            // (ИЗМЕНЕНО) MongoDB использует _id, но мы добавили 'id'
+            const dealerId = dealer._id || dealer.id; 
             
             const cellPhoto = row.insertCell();
             if (dealer.photo_url) cellPhoto.innerHTML = `<img src="${dealer.photo_url}" alt="Фото" class="table-photo">`;
@@ -175,7 +180,7 @@ document.addEventListener('DOMContentLoaded', () => {
             row.insertCell().textContent = safeText(dealer.dealer_id);
             
             const cellName = row.insertCell();
-            cellName.innerHTML = `<a href="dealer.html?id=${dealer.id}" target="_blank">${safeText(dealer.name)}</a>`;
+            cellName.innerHTML = `<a href="dealer.html?id=${dealerId}" target="_blank">${safeText(dealer.name)}</a>`;
             
             row.insertCell().textContent = safeText(dealer.city);
             row.insertCell().textContent = safeText(dealer.price_type);
@@ -183,7 +188,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const cellActions = row.insertCell();
             cellActions.className = 'actions-cell';
-            cellActions.innerHTML = `<button class="edit-btn" data-id="${dealer.id}">✏️ Ред.</button>`;
+            cellActions.innerHTML = `<button class="edit-btn" data-id="${dealerId}">✏️ Ред.</button>`;
         });
     }
 
@@ -269,7 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const target = e.target;
         const editButton = target.closest('.edit-btn');
         if (editButton) {
-            const id = editButton.dataset.id; // (ИЗМЕНЕНО) Это все еще id из allDealers, он должен быть _id
+            const id = editButton.dataset.id; // Это _id
             
             editProductChecklist.innerHTML = "<p>Загрузка товаров...</p>";
             
@@ -285,9 +290,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await dealerRes.json();
                 const selectedProducts = await productsRes.json(); 
                 
-                const selectedProductIds = selectedProducts.map(p => p._id); // (ИЗМЕНЕНО) MongoDB использует _id
+                const selectedProductIds = selectedProducts.map(p => p._id || p.id); // (ИЗМЕНЕНО)
 
-                document.getElementById('edit_db_id').value = data._id; // (ИЗМЕНЕНО) MongoDB использует _id
+                document.getElementById('edit_db_id').value = data._id; 
                 document.getElementById('edit_dealer_id').value = data.dealer_id;
                 document.getElementById('edit_name').value = data.name;
                 document.getElementById('edit_organization').value = data.organization;
@@ -354,4 +359,61 @@ document.addEventListener('DOMContentLoaded', () => {
             name: document.getElementById('edit_name').value,
             organization: document.getElementById('edit_organization').value,
             price_type: document.getElementById('edit_price_type').value,
-            city:
+            city: document.getElementById('city').value,
+            address: document.getElementById('address').value,
+            contacts: document.getElementById('edit_contacts').value,
+            bonuses: document.getElementById('edit_bonuses').value,
+            photo_url: photoDataUrl
+        };
+        
+        const selectedProductIds = getSelectedProductIds('edit-product-checklist');
+
+        try {
+            const response = await fetch(`${API_DEALERS_URL}/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatedData)
+            });
+            if (!response.ok) throw new Error('Ошибка при сохранении данных дилера');
+            
+            await saveDealerProductLinks(id, selectedProductIds);
+            
+            modal.style.display = 'none';
+            editForm.reset();
+            await initApp(); 
+            
+        } catch (error) {
+            console.error('Ошибка при обновлении:', error);
+            alert('Ошибка при сохранении изменений.');
+        }
+    });
+
+    // --- Обработчик: "Удалить фото" ---
+    clearPhotoBtn.addEventListener('click', () => {
+        editPhotoPreview.src = '';
+        editPhotoPreview.style.display = 'none';
+        document.getElementById('edit_photo_url_old').value = '';
+        document.getElementById('edit_photo_upload').value = null;
+    });
+
+    // --- Обработчики: Изменение фильтров ---
+    filterCity.addEventListener('change', renderDealerList);
+    filterPriceType.addEventListener('change', renderDealerList);
+
+    // --- Обработчики: СОРТИРОВКА ---
+    document.querySelectorAll('#dealer-table th[data-sort]').forEach(th => {
+        th.addEventListener('click', () => {
+            const column = th.dataset.sort;
+            if (currentSort.column === column) {
+                currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSort.column = column;
+                currentSort.direction = 'asc';
+            }
+            renderDealerList(); 
+        });
+    });
+
+    // --- Инициализация ---
+    initApp();
+});
