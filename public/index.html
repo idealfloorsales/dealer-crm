@@ -20,7 +20,19 @@
     <h2>Список дилеров</h2>
 
     <div class="filter-container">
+        <div class="filter-group">
+            <label for="filter-city">Фильтр по городу:</label>
+            <select id="filter-city">
+                <option value="">-- Все города --</option>
+            </select>
         </div>
+        <div class="filter-group">
+            <label for="filter-price-type">Фильтр по типу цен:</label>
+            <select id="filter-price-type">
+                <option value="">-- Все типы --</option>
+            </select>
+        </div>
+    </div>
 
     <table id="dealer-table">
         <thead>
@@ -48,7 +60,6 @@
                 <input type="text" id="price_type" placeholder="Тип цен">
                 <input type="text" id="city" placeholder="Город">
                 <input type="text" id="address" placeholder="Адрес">
-                
                 <input type="text" id="delivery" placeholder="Условия доставки">
 
                 <label>Контакты:</label>
@@ -92,7 +103,6 @@
                 <input type="text" id="edit_city">
                 <label>Адрес:</label>
                 <input type="text" id="edit_address">
-
                 <label>Условия доставки:</label>
                 <input type="text" id="edit_delivery">
                 
