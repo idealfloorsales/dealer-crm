@@ -94,10 +94,8 @@ const dealerSchema = new mongoose.Schema({
     photos: [photoSchema], 
     organization: String,
     delivery: String, 
-    // (НОВЫЕ ПОЛЯ)
     website: String,
     instagram: String,
-    
     products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }]
 });
 const Dealer = mongoose.model('Dealer', dealerSchema);
@@ -189,7 +187,6 @@ app.get('/api/dealers/:id', async (req, res) => {
 
 app.post('/api/dealers', async (req, res) => {
     try {
-        // (ИЗМЕНЕНО) 'website' и 'instagram' теперь в req.body
         const dealer = new Dealer(req.body); 
         await dealer.save();
         res.status(201).json(convertToClient(dealer)); 
@@ -198,7 +195,6 @@ app.post('/api/dealers', async (req, res) => {
 
 app.put('/api/dealers/:id', async (req, res) => {
     try {
-        // (ИЗМЕНЕНО) 'website' и 'instagram' теперь в req.body
         const dealer = await Dealer.findByIdAndUpdate(req.params.id, req.body, { new: true });
         if (!dealer) return res.status(404).json({ message: "Дилер не найден" });
         res.json({ message: "success" });
