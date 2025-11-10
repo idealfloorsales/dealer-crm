@@ -1,11 +1,12 @@
 // server.js
 const express = require('express');
-const mongoose = require('mongoose'); // Используем Mongoose
+const mongoose = require('mongoose');
 const cors = require('cors');
 
 const app = express();
 const PORT = process.env.PORT || 3000; 
-app.use(express.json({ limit: '25mb' })); 
+// (ИЗМЕНЕНО) Увеличиваем лимит до 50MB для нескольких Base64 фото
+app.use(express.json({ limit: '50mb' })); 
 app.use(cors());
 app.use(express.static('public'));
 
@@ -73,12 +74,17 @@ const productSchema = new mongoose.Schema({
 });
 const Product = mongoose.model('Product', productSchema);
 
-// (НОВАЯ) Схема для Контактов
 const contactSchema = new mongoose.Schema({
     name: String,
     position: String,
     contactInfo: String
-}, { _id: false }); // Не создаем _id для sub-документов
+}, { _id: false }); 
+
+// (НОВАЯ) Схема для Фото
+const photoSchema = new mongoose.Schema({
+    description: String,
+    photo_url: String // Здесь будет Base64
+}, { _id: false });
 
 const dealerSchema = new mongoose.Schema({
     dealer_id: String,
@@ -86,10 +92,10 @@ const dealerSchema = new mongoose.Schema({
     price_type: String,
     city: String,
     address: String,
-    // (ИЗМЕНЕНО) 'contacts' теперь массив
     contacts: [contactSchema], 
     bonuses: String,
-    photo_url: String,
+    // (ИЗМЕНЕНО) 'photo_url' заменен на 'photos'
+    photos: [photoSchema], 
     organization: String,
     products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }]
 });
@@ -134,16 +140,23 @@ async function connectToDB() {
 // === API для Дилеров ===
 app.get('/api/dealers', async (req, res) => {
     try {
-        const dealers = await Dealer.find({}, 'dealer_id name city photo_url price_type organization')
+        // (ИЗМЕНЕНО) Добавляем 'photos' в запрос
+        const dealers = await Dealer.find({}, 'dealer_id name city photos price_type organization')
                                     .lean();
-        dealers.forEach(d => { d.id = d._id; }); 
+        dealers.forEach(d => { 
+            d.id = d._id;
+            // (НОВОЕ) Отправляем только первое фото для превью в списке
+            if (d.photos && d.photos.length > 0) {
+                d.photo_url = d.photos[0].photo_url; // Отправляем как 'photo_url'
+            }
+            delete d.photos; // Удаляем массив, чтобы не перегружать список
+        }); 
         res.json(dealers);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.get('/api/dealers/:id', async (req, res) => {
     try {
-        // (ИЗМЕНЕНО) Заполняем и 'products' и 'contacts' (хотя 'contacts' встроены)
         const dealer = await Dealer.findById(req.params.id).populate('products');
         if (!dealer) return res.status(404).json({ message: "Дилер не найден" });
         
@@ -159,7 +172,7 @@ app.get('/api/dealers/:id', async (req, res) => {
 
 app.post('/api/dealers', async (req, res) => {
     try {
-        // Mongoose автоматически обработает массив 'contacts' из req.body
+        // (ИЗМЕНЕНО) 'photos' теперь часть req.body
         const dealer = new Dealer(req.body); 
         await dealer.save();
         res.status(201).json(dealer); 
@@ -168,7 +181,7 @@ app.post('/api/dealers', async (req, res) => {
 
 app.put('/api/dealers/:id', async (req, res) => {
     try {
-        // Mongoose также автоматически обновит массив 'contacts'
+        // (ИЗМЕНЕНО) Mongoose обновит 'contacts' и 'photos'
         const dealer = await Dealer.findByIdAndUpdate(req.params.id, req.body, { new: true });
         if (!dealer) return res.status(404).json({ message: "Дилер не найден" });
         res.json({ message: "success" });
@@ -184,6 +197,7 @@ app.delete('/api/dealers/:id', async (req, res) => {
 });
 
 // === API для СВЯЗИ Дилеров и Товаров ===
+// ... (Этот раздел без изменений) ...
 app.get('/api/dealers/:id/products', async (req, res) => {
     try {
         const dealer = await Dealer.findById(req.params.id).populate('products');
@@ -198,7 +212,6 @@ app.get('/api/dealers/:id/products', async (req, res) => {
         
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
-
 app.put('/api/dealers/:id/products', async (req, res) => {
     try {
         const dealerId = req.params.id;
@@ -209,6 +222,7 @@ app.put('/api/dealers/:id/products', async (req, res) => {
 });
 
 // === API для Товаров ===
+// ... (Этот раздел без изменений) ...
 app.get('/api/products', async (req, res) => {
     try {
         const searchTerm = req.query.search || '';
@@ -225,7 +239,6 @@ app.get('/api/products', async (req, res) => {
         
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
-
 app.post('/api/products', async (req, res) => {
     try {
         const product = new Product(req.body);
@@ -238,7 +251,6 @@ app.post('/api/products', async (req, res) => {
         res.status(500).json({ error: e.message });
     }
 });
-
 app.put('/api/products/:id', async (req, res) => {
     try {
         const product = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true });
@@ -251,7 +263,6 @@ app.put('/api/products/:id', async (req, res) => {
         res.status(500).json({ error: e.message });
     }
 });
-
 app.delete('/api/products/:id', async (req, res) => {
     try {
         const productId = req.params.id;
@@ -268,6 +279,7 @@ app.delete('/api/products/:id', async (req, res) => {
 });
 
 // === API для Отчета ===
+// ... (Этот раздел без изменений) ...
 app.get('/api/products/:id/dealers', async (req, res) => {
     try {
         const dealers = await Dealer.find(
