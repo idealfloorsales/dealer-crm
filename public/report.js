@@ -18,10 +18,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) throw new Error('Не удалось загрузить каталог');
             const products = await response.json();
             
-            // (ИЗМЕНЕНО) Сортируем по SKU
+            // Сервер уже сортирует, но мы перестрахуемся
             products.sort((a, b) => a.sku.localeCompare(b.sku, 'ru', { numeric: true }));
 
-            productSelect.innerHTML = '<option value="">-- Выберите товар --</option>'; // Очистка
+            productSelect.innerHTML = '<option value="">-- Выберите товар --</option>'; 
             
             products.forEach(product => {
                 const productId = product.id; 
@@ -40,14 +40,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!productId) {
             reportTitle.textContent = '';
             reportTable.style.display = 'none';
-            noDataMsg.textContent = '';
+            noDataMsg.style.display = 'none';
             return;
         }
 
         reportTitle.textContent = `Дилеры, у которых выставлен: ${productName}`;
         reportListBody.innerHTML = '<tr><td colspan="4">Загрузка...</td></tr>';
         reportTable.style.display = 'table';
-        noDataMsg.textContent = '';
+        noDataMsg.style.display = 'none';
 
         try {
             const response = await fetch(`${API_PRODUCTS_URL}/${productId}/dealers`);
@@ -56,11 +56,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (dealers.length === 0) {
                 reportTable.style.display = 'none';
+                noDataMsg.style.display = 'block';
                 noDataMsg.textContent = 'Этот товар не выставлен ни у одного дилера.';
                 return;
             }
 
-            reportListBody.innerHTML = ''; // Очистка
+            reportListBody.innerHTML = ''; 
             dealers.forEach(dealer => {
                 const dealerId = dealer.id; 
                 const row = reportListBody.insertRow();
@@ -68,9 +69,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td>${safeText(dealer.dealer_id)}</td>
                     <td>${safeText(dealer.name)}</td>
                     <td>${safeText(dealer.city)}</td>
-                    <td>
-                        <a href="dealer.html?id=${dealerId}" target="_blank" class="btn-primary" style="text-decoration: none; padding: 5px 10px; margin: 0;">
-                            Открыть
+                    <td class="actions-cell">
+                        <a href="dealer.html?id=${dealerId}" target="_blank" class="btn btn-outline-primary btn-sm" style="text-decoration: none;">
+                            <i class="bi bi-eye me-1"></i>Открыть
                         </a>
                     </td>
                 `;
@@ -79,6 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error(error);
             reportTable.style.display = 'none';
+            noDataMsg.style.display = 'block';
             noDataMsg.textContent = error.message;
         }
     }
