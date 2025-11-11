@@ -11,7 +11,6 @@ app.use(express.static('public'));
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// "Вшитый" список 74 товаров (новый)
 const productsToImport = [
     { sku: "CD-507", name: "Дуб Беленый" },
     { sku: "CD-508", name: "Дуб Пепельный" },
@@ -256,7 +255,6 @@ app.delete('/api/dealers/:id', async (req, res) => {
 // === API для СВЯЗИ Дилеров и Товаров ===
 app.get('/api/dealers/:id/products', async (req, res) => {
     try {
-        // (ИЗМЕНЕНО) Сортируем связанные товары по SKU
         const dealer = await Dealer.findById(req.params.id).populate({
             path: 'products',
             options: { sort: { 'sku': 1 } } 
@@ -288,7 +286,7 @@ app.get('/api/products', async (req, res) => {
                 { sku: { $regex: searchRegex } },
                 { name: { $regex: searchRegex } }
             ]
-        }).sort({ sku: 1 }).lean(); // (ИЗМЕНЕНО) Сортировка по SKU
+        }).sort({ sku: 1 }).lean(); 
         
         products.forEach(p => { p.id = p._id; }); 
         res.json(products);
