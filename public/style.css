@@ -223,8 +223,6 @@ a.btn-secondary:hover {
 
 
 /* --- Стили для таблицы Дилеров --- */
-
-/* (НОВОЕ) Стили для нумерации */
 .column-number {
     width: 40px;
     text-align: center !important;
@@ -235,7 +233,6 @@ a.btn-secondary:hover {
     font-weight: bold;
     color: #555;
 }
-
 #dealer-table .table-photo {
     width: 60px;
     height: 60px;
