@@ -1,43 +1,203 @@
 /* style.css */
-/* --- Стили для таблицы Дилеров --- */
-.column-number {
-    width: 40px;
-    text-align: center !important;
+
+/* --- (ИЗМЕНЕНО) Базовые стили с вашим цветом --- */
+:root {
+    --primary-color: #b9040a;   /* ВАШ НОВЫЙ ЦВЕТ */
+    --primary-hover: #a00309;   /* Чуть темнее для hover */
+    --danger-color: #dc3545;    
+    --warning-color: #ffc107;  
+    --secondary-color: #6c757d; 
+    --light-gray: #f8f9fa;
+    --medium-gray: #e9ecef;
+    --border-color: #dee2e6;
+    --text-color: #212529;
+    --shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
-.cell-number {
-    width: 40px;
-    text-align: center !important;
-    font-weight: bold;
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    margin: 0;
+    background-color: var(--light-gray);
+    color: var(--text-color);
+    line-height: 1.5;
+}
+
+/* Обертка для контента */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* (ИЗМЕНЕНО) Заголовки теперь красные */
+h1, h2, h3 {
+    color: #333;
+    border-bottom: 2px solid var(--primary-color);
+    padding-bottom: 10px;
+    margin-top: 1.5rem;
+}
+h3 {
+    border-bottom: 1px solid var(--medium-gray);
+    margin-top: 30px;
+}
+
+/* --- Навигация (Шапка) --- */
+nav.navbar-dark {
+    background-color: var(--dark-gray) !important;
+}
+nav a.nav-link {
+    color: rgba(255,255,255,0.7);
+    text-decoration: none;
+    font-size: 1.1em;
+    font-weight: 500;
+    padding: 10px 15px !important;
+    border-radius: 5px;
+    transition: background-color 0.2s, color 0.2s;
+}
+nav a.nav-link:hover {
+    color: rgba(255,255,255,1);
+}
+/* (ИЗМЕНЕНО) Активная ссылка теперь красная */
+nav a.nav-link.active {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+/* --- (ИЗМЕНЕНО) Общие стили кнопок --- */
+button,
+a.btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    margin-top: 10px;
+    text-decoration: none;
+    display: inline-block;
+    transition: opacity 0.2s, background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+
+/* (ИЗМЕНЕНО) Кнопка "Добавить" и "Сохранить" (КРАСНАЯ) */
+.btn-primary,
+#open-add-modal-btn,
+#open-add-product-btn {
+    background-color: var(--primary-color) !important;
+    border-color: var(--primary-color) !important;
+    color: white !important;
+}
+.btn-primary:hover,
+#open-add-modal-btn:hover,
+#open-add-product-btn:hover {
+     background-color: var(--primary-hover) !important;
+     border-color: var(--primary-hover) !important;
+     color: white !important;
+}
+.btn-secondary {
+    background-color: var(--secondary-color) !important;
+    border-color: var(--secondary-color) !important;
+    color: white !important;
+}
+.btn-secondary:hover {
+    background-color: #5a6268 !important;
+    color: white !important;
+}
+
+
+/* --- Формы --- */
+label {
+    font-weight: 600;
     color: #555;
+    margin-top: 5px;
+    display: block;
 }
-.table-photo {
-    width: 60px;
-    height: 60px;
-    object-fit: cover;
-    border-radius: 4px;
-    border: 1px solid #dee2e6;
+/* (ИЗМЕНЕНО) Фокус поля */
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--primary-color) !important;
+    box-shadow: 0 0 0 3px rgba(185, 4, 10, 0.25) !important;
+    outline: none;
 }
-.no-photo {
-    width: 60px;
-    height: 60px;
+.form-check-input:checked {
+    background-color: var(--primary-color) !important;
+    border-color: var(--primary-color) !important;
+}
+
+/* --- Стили для фильтров --- */
+.filter-container {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    background-color: #e9ecef;
-    color: #aaa;
-    font-size: 12px;
-    border-radius: 4px;
+    flex-wrap: wrap;
+    gap: 20px;
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    margin-bottom: 20px;
 }
-#products-table td.sku-cell {
-    font-family: monospace;
-    font-weight: bold;
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+}
+.filter-group label {
+    font-weight: 600;
+    font-size: 0.9em;
+    color: #555;
+    margin-bottom: 5px;
+    margin-top: 0;
+}
+.filter-group select {
+    padding: 8px;
+    min-width: 220px;
+}
+
+/* --- Общие Стили для Таблиц --- */
+#dealer-table, #products-table, #report-table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: #fff;
+    box-shadow: var(--shadow);
+    border-radius: 8px;
+    overflow: hidden; 
+}
+/* (ИЗМЕНЕНО) Убираем border-bottom из Bootstrap */
+#dealer-table td, #dealer-table th,
+#products-table td, #products-table th,
+#report-table td, #report-table th {
+    border-bottom: none;
+    padding: 12px 15px;
+    vertical-align: middle;
+}
+/* (НОВОЕ) Добавляем свою границу */
+#dealer-table tbody tr,
+#products-table tbody tr,
+#report-table tbody tr {
+     border-bottom: 1px solid var(--border-color);
+}
+
+#dealer-table th, #products-table th, #report-table th {
+    background-color: var(--light-gray);
+    color: #333;
+    font-weight: 600;
+    position: relative;
+}
+
+/* "Зебра" для строк */
+#dealer-table tbody tr:nth-of-type(even),
+#products-table tbody tr:nth-of-type(even),
+#report-table tbody tr:nth-of-type(even) {
+    background-color: var(--light-gray);
+}
+#dealer-table tbody tr:hover,
+#products-table tbody tr:hover,
+#report-table tbody tr:hover {
+    background-color: var(--medium-gray);
 }
 
 /* --- Стили для Сортировки --- */
 #dealer-table th[data-sort],
 #products-table th[data-sort] {
     cursor: pointer;
-    position: relative;
 }
 #dealer-table th[data-sort]:hover,
 #products-table th[data-sort]:hover {
@@ -64,37 +224,136 @@
     opacity: 1;
 }
 
+/* --- Стили для таблицы Дилеров --- */
+.column-number {
+    width: 40px;
+    text-align: center !important;
+}
+.cell-number {
+    width: 40px;
+    text-align: center !important;
+    font-weight: bold;
+    color: #555;
+}
+.table-photo {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+}
+.no-photo {
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--medium-gray);
+    color: #aaa;
+    font-size: 12px;
+    border-radius: 4px;
+}
+/* (ИЗМЕНЕНО) Ссылки в таблице */
+#dealer-table td a, #report-table td a {
+    text-decoration: none;
+    color: var(--primary-color) !important;
+    font-weight: 500;
+}
+#dealer-table td a:hover, #report-table td a:hover {
+    text-decoration: underline;
+    color: var(--primary-hover) !important;
+}
+#products-table td.sku-cell {
+    font-family: monospace;
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+/* Кнопки "Действия" в таблицах */
+.actions-cell {
+    text-align: center;
+}
+.actions-cell .dropdown-menu a {
+    color: var(--text-color) !important;
+    font-weight: 400 !important;
+}
+.actions-cell .dropdown-menu a.text-danger {
+    color: var(--danger-color) !important;
+}
+.actions-cell .dropdown-menu a:hover {
+    text-decoration: none !important;
+}
+.actions-cell .btn-light {
+    background-color: #fff !important;
+    border: 1px solid #ccc !important;
+    color: #333 !important;
+}
+.actions-cell .btn-light:hover {
+    background-color: #f0f0f0 !important;
+}
+
+
+/* --- Модальное Окно --- */
+.modal-content {
+    border: none;
+    border-radius: 0.5rem;
+}
+.modal-header {
+    background-color: var(--light-gray);
+    border-bottom: 1px solid var(--border-color);
+}
+.modal-header .modal-title {
+    color: var(--dark-gray);
+    font-weight: 500;
+}
+.modal-footer {
+     background-color: var(--light-gray);
+     border-top: 1px solid var(--border-color);
+}
+.preview-img {
+    max-width: 150px;
+    height: auto;
+    display: block;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+}
+
 /* --- Динамические списки (Контакты, Фото, Адреса) --- */
 .list-container {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--border-color);
     border-radius: 4px;
-    padding: 10px;
-    background-color: #f8f9fa;
+    padding: 15px;
+    background-color: var(--light-gray);
     max-height: 250px; 
     overflow-y: auto;
+}
+.contact-entry, .address-entry, .photo-entry {
+    align-items: center;
+}
+.btn-remove-entry {
+    padding: 0.375rem 0.75rem;
+    margin-top: 0 !important; /* Убираем отступ Bootstrap */
 }
 .preview-thumb {
     width: 100px;
     height: 60px;
     object-fit: cover;
     border-radius: 4px;
-    border: 1px solid #dee2e6;
-}
-.btn-remove-entry {
-    padding: 0.375rem 0.75rem;
+    border: 1px solid var(--border-color);
 }
 
 /* --- Чек-лист товаров --- */
 .product-checklist {
     max-height: 200px;
     overflow-y: auto;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--border-color);
     border-radius: 4px;
-    padding: 10px;
-    background-color: #f8f9fa;
+    padding: 1.25rem;
+    background-color: var(--light-gray);
     columns: 2;
     -webkit-columns: 2;
     -moz-columns: 2;
@@ -109,10 +368,32 @@
     font-weight: normal;
 }
 
+
 /* --- Стили для dealer.html (Страница "Подробно") --- */
+.details-container {
+    max-width: 900px;
+    margin: 20px auto; 
+    background-color: #fff;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border-color);
+}
+.details-container img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+    margin-top: 15px;
+}
+.details-container p {
+    font-size: 1.1em;
+    line-height: 1.6;
+    margin: 10px 0;
+    word-wrap: break-word;
+}
 .products-display {
-    background-color: #f8f9fa;
-    border: 1px solid #dee2e6;
+    background-color: var(--light-gray);
+    border: 1px solid var(--border-color);
     padding: 15px;
     border-radius: 4px;
     white-space: pre-wrap; 
@@ -133,7 +414,7 @@
     gap: 15px;
 }
 .gallery-item {
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--border-color);
     border-radius: 4px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     background: #fff;
@@ -152,7 +433,7 @@
     font-size: 0.9em;
     font-weight: 500;
     color: #555;
-    border-top: 1px solid #dee2e6;
+    border-top: 1px solid var(--border-color);
 }
 /* Контейнер для ссылок */
 .dealer-links-container {
@@ -161,9 +442,60 @@
     margin-top: 15px;
     margin-bottom: 15px;
     flex-wrap: wrap;
-    border-bottom: 1px solid #dee2e6;
+    border-bottom: 1px solid var(--medium-gray);
     padding-bottom: 20px;
 }
 .dealer-links-container a {
     margin-top: 0; 
+}
+
+
+a.back-link {
+    display: inline-block;
+    margin-top: 20px;
+    color: var(--text-color) !important;
+    text-decoration: none;
+    font-weight: 500;
+}
+a.back-link:hover {
+    text-decoration: underline;
+}
+.details-container .btn-danger {
+    margin-top: 20px;
+    font-size: 16px;
+    float: right; 
+}
+
+/* --- Стили для страницы Товаров --- */
+.toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+.search-bar {
+    width: 60%;
+    padding: 12px;
+    font-size: 16px;
+}
+@media (max-width: 768px) {
+    .toolbar {
+        flex-direction: column;
+        gap: 15px;
+    }
+    .search-bar {
+        width: 100%;
+    }
+}
+
+
+/* --- Сообщения об ошибках / Пустых данных --- */
+#no-data-msg {
+    text-align: center;
+    font-size: 1.2em;
+    color: #555;
+    padding: 30px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: var(--shadow);
 }
