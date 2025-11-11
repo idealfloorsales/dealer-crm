@@ -11,7 +11,6 @@ app.use(express.static('public'));
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// "Вшитый" список 51 товара (правильный)
 const productsToImport = [
     { sku: "CD-504", name: "Дуб Молочный" },
     { sku: "CD-505", name: "Дуб Рустик" },
