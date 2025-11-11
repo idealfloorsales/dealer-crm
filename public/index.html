@@ -20,23 +20,12 @@
     <h2>Список дилеров</h2>
 
     <div class="filter-container">
-        <div class="filter-group">
-            <label for="filter-city">Фильтр по городу:</label>
-            <select id="filter-city">
-                <option value="">-- Все города --</option>
-            </select>
         </div>
-        <div class="filter-group">
-            <label for="filter-price-type">Фильтр по типу цен:</label>
-            <select id="filter-price-type">
-                <option value="">-- Все типы --</option>
-            </select>
-        </div>
-    </div>
 
     <table id="dealer-table">
         <thead>
             <tr>
+                <th class="column-number">#</th> 
                 <th>Фото</th>
                 <th data-sort="dealer_id">ID точки</th>
                 <th data-sort="name">Название точки</th>
