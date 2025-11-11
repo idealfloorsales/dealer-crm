@@ -5,11 +5,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const API_PRODUCTS_URL = '/api/products'; 
 
     let fullProductCatalog = [];
+    let allDealers = [];
+    let currentSort = { column: 'name', direction: 'asc' };
 
-    // --- Модальное окно ДОБАВЛЕНИЯ ---
-    const addModal = document.getElementById('add-modal');
+    // --- (ИЗМЕНЕНО) Инициализация модальных окон Bootstrap ---
+    const addModalEl = document.getElementById('add-modal');
+    const addModal = new bootstrap.Modal(addModalEl);
+    const editModalEl = document.getElementById('edit-modal');
+    const editModal = new bootstrap.Modal(editModalEl);
+
+    // --- Элементы Модального окна ДОБАВЛЕНИЯ ---
     const openAddModalBtn = document.getElementById('open-add-modal-btn');
-    const closeAddModalBtn = addModal.querySelector('.close-btn');
     const addForm = document.getElementById('add-dealer-form');
     const addProductChecklist = document.getElementById('add-product-checklist'); 
     const addContactList = document.getElementById('add-contact-list'); 
@@ -28,12 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const filterCity = document.getElementById('filter-city');
     const filterPriceType = document.getElementById('filter-price-type');
 
-    let allDealers = [];
-    let currentSort = { column: 'name', direction: 'asc' };
-
-    // --- Модальное окно РЕДАКТИРОВАНИЯ ---
-    const modal = document.getElementById('edit-modal');
-    const closeModalBtn = modal.querySelector('.close-btn');
+    // --- Элементы Модального окна РЕДАКТИРОВАНИЯ ---
     const editForm = document.getElementById('edit-dealer-form');
     const editProductChecklist = document.getElementById('edit-product-checklist'); 
     const editContactList = document.getElementById('edit-contact-list'); 
@@ -51,22 +52,19 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.onerror = error => reject(error);
     });
 
-    // --- (ИЗМЕНЕНО) Функция: Загрузка каталога товаров в кэш ---
+    // --- Функция: Загрузка каталога товаров в кэш ---
     async function fetchProductCatalog() {
         if (fullProductCatalog.length > 0) return; 
         try {
             const response = await fetch(API_PRODUCTS_URL);
             if (!response.ok) throw new Error('Ошибка сети при загрузке каталога');
             fullProductCatalog = await response.json();
-            
-            // (ИЗМЕНЕНО) Гарантируем сортировку по АРТИКУЛУ
             fullProductCatalog.sort((a, b) => a.sku.localeCompare(b.sku, 'ru', { numeric: true }));
-            
             console.log(`Загружено ${fullProductCatalog.length} товаров в каталог.`);
         } catch (error) {
             console.error("Критическая ошибка: не удалось загрузить каталог товаров.", error);
-            addProductChecklist.innerHTML = `<p style='color:red'>${error.message}</p>`;
-            editProductChecklist.innerHTML = `<p style='color:red'>${error.message}</p>`;
+            addProductChecklist.innerHTML = `<p class='text-danger'>${error.message}</p>`;
+            editProductChecklist.innerHTML = `<p class='text-danger'>${error.message}</p>`;
         }
     }
 
@@ -76,11 +74,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const safePosition = contact.position || '';
         const safeContactInfo = contact.contactInfo || '';
         return `
-            <div class="contact-entry">
-                <input type="text" class="contact-name" placeholder="Имя" value="${safeName}">
-                <input type="text" class="contact-position" placeholder="Должность" value="${safePosition}">
-                <input type="text" class="contact-info" placeholder="Телефон / Email" value="${safeContactInfo}">
-                <button type="button" class="btn-remove-entry">X</button>
+            <div class="contact-entry input-group mb-2">
+                <input type="text" class="form-control contact-name" placeholder="Имя" value="${safeName}">
+                <input type="text" class="form-control contact-position" placeholder="Должность" value="${safePosition}">
+                <input type="text" class="form-control contact-info" placeholder="Телефон / Email" value="${safeContactInfo}">
+                <button type="button" class="btn btn-outline-danger btn-remove-entry">
+                    <i class="bi bi-trash"></i>
+                </button>
             </div>
         `;
     }
@@ -110,11 +110,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const safeCity = address.city || '';
         const safeAddress = address.address || '';
         return `
-            <div class="address-entry">
-                <input type="text" class="address-description" placeholder="Описание (н-р, Склад)" value="${safeDesc}">
-                <input type="text" class="address-city" placeholder="Город" value="${safeCity}">
-                <input type="text" class="address-address" placeholder="Адрес" value="${safeAddress}">
-                <button type="button" class="btn-remove-entry">X</button>
+            <div class="address-entry input-group mb-2">
+                <input type="text" class="form-control address-description" placeholder="Описание (н-р, Склад)" value="${safeDesc}">
+                <input type="text" class="form-control address-city" placeholder="Город" value="${safeCity}">
+                <input type="text" class="form-control address-address" placeholder="Адрес" value="${safeAddress}">
+                <button type="button" class="btn btn-outline-danger btn-remove-entry">
+                    <i class="bi bi-trash"></i>
+                </button>
             </div>
         `;
     }
@@ -141,19 +143,23 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Функции Управления Фото ---
     function createNewPhotoEntryHTML() {
         return `
-            <div class="photo-entry new">
-                <input type="text" class="photo-description" placeholder="Описание (н-р, Фасад)">
-                <input type="file" class="photo-file" accept="image/*">
-                <button type="button" class="btn-remove-entry">X</button>
+            <div class="photo-entry new input-group mb-2">
+                <input type="text" class="form-control photo-description" placeholder="Описание (н-р, Фасад)">
+                <input type="file" class="form-control photo-file" accept="image/*">
+                <button type="button" class="btn btn-outline-danger btn-remove-entry">
+                    <i class="bi bi-trash"></i>
+                </button>
             </div>
         `;
     }
     function renderExistingPhotos(containerElement, photos = []) {
         containerElement.innerHTML = (photos && photos.length > 0) ? photos.map(photo => `
-            <div class="photo-entry existing">
+            <div class="photo-entry existing input-group mb-2">
                 <img src="${photo.photo_url}" class="preview-thumb">
-                <input type="text" class="photo-description" value="${photo.description || ''}">
-                <button type="button" class="btn-remove-entry">X</button>
+                <input type="text" class="form-control photo-description" value="${photo.description || ''}">
+                <button type="button" class="btn btn-outline-danger btn-remove-entry">
+                    <i class="bi bi-trash"></i>
+                </button>
                 <input type="hidden" class="photo-url" value="${photo.photo_url}"> 
             </div>
         `).join('') : ''; 
@@ -194,12 +200,13 @@ document.addEventListener('DOMContentLoaded', () => {
         container.innerHTML = fullProductCatalog.map(product => {
             const productId = product.id; 
             return `
-            <div class="checklist-item">
+            <div class="checklist-item form-check">
                 <input type="checkbox" 
+                       class="form-check-input"
                        id="prod-${container.id}-${productId}" 
                        value="${productId}"
                        ${selectedSet.has(productId) ? 'checked' : ''}>
-                <label for="prod-${container.id}-${productId}">
+                <label class="form-check-label" for="prod-${container.id}-${productId}">
                     <strong>${product.sku}</strong> - ${product.name}
                 </label>
             </div>
@@ -243,7 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
         filterPriceType.value = currentPriceType;
     }
 
-    // --- Функция: Отрисовка списка дилеров ---
+    // --- (ИЗМЕНЕНО) Функция: Отрисовка списка дилеров ---
     function renderDealerList() {
         const selectedCity = filterCity.value;
         const selectedPriceType = filterPriceType.value;
@@ -255,17 +262,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const sortedDealers = filteredDealers.sort((a, b) => {
             const col = currentSort.column;
-            // (ИЗМЕНЕНО) Добавлена цифровая сортировка для 'dealer_id'
             let valA = (a[col] || '').toString(); 
             let valB = (b[col] || '').toString();
-            
             let comparison;
             if (col === 'dealer_id') {
                  comparison = valA.localeCompare(valB, undefined, { numeric: true });
             } else {
                  comparison = valA.toLowerCase().localeCompare(valB.toLowerCase(), 'ru');
             }
-            
             return currentSort.direction === 'asc' ? comparison : -comparison;
         });
 
@@ -293,26 +297,39 @@ document.addEventListener('DOMContentLoaded', () => {
             const row = dealerListBody.insertRow();
             const dealerId = dealer.id; 
             
-            const cellNum = row.insertCell();
-            cellNum.className = 'cell-number';
-            cellNum.textContent = index + 1;
-
-            const cellPhoto = row.insertCell();
-            if (dealer.photo_url) {
-                cellPhoto.innerHTML = `<img src="${dealer.photo_url}" alt="Фото" class="table-photo">`;
-            } else {
-                cellPhoto.innerHTML = `<div class="no-photo">Нет фото</div>`;
-            }
-            
-            row.insertCell().textContent = safeText(dealer.dealer_id);
-            const cellName = row.insertCell();
-            cellName.innerHTML = `<a href="dealer.html?id=${dealerId}" target="_blank">${safeText(dealer.name)}</a>`;
-            row.insertCell().textContent = safeText(dealer.city);
-            row.insertCell().textContent = safeText(dealer.price_type);
-            row.insertCell().textContent = safeText(dealer.organization);
-            const cellActions = row.insertCell();
-            cellActions.className = 'actions-cell';
-            cellActions.innerHTML = `<button class="edit-btn" data-id="${dealerId}">✏️ Ред.</button>`;
+            row.innerHTML = `
+                <td class="cell-number">${index + 1}</td>
+                <td>
+                    ${dealer.photo_url ? 
+                        `<img src="${dealer.photo_url}" alt="Фото" class="table-photo">` : 
+                        `<div class="no-photo">Нет фото</div>`
+                    }
+                </td>
+                <td>${safeText(dealer.dealer_id)}</td>
+                <td>${safeText(dealer.name)}</td>
+                <td>${safeText(dealer.city)}</td>
+                <td>${safeText(dealer.price_type)}</td>
+                <td>${safeText(dealer.organization)}</td>
+                <td class="actions-cell">
+                    <div class="dropdown">
+                        <button class="btn btn-light btn-sm" type="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-three-dots-vertical"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item btn-view" data-id="${dealerId}" href="#">
+                                <i class="bi bi-eye me-2"></i>Просмотреть
+                            </a></li>
+                            <li><a class="dropdown-item btn-edit" data-id="${dealerId}" href="#">
+                                <i class="bi bi-pencil me-2"></i>Редактировать
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger btn-delete" data-id="${dealerId}" data-name="${safeText(dealer.name)}" href="#">
+                                <i class="bi bi-trash me-2"></i>Удалить
+                            </a></li>
+                        </ul>
+                    </div>
+                </td>
+            `;
         });
     }
 
@@ -333,17 +350,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Обработчики: Модальное окно "Добавить" ---
     openAddModalBtn.onclick = () => {
+        addForm.reset();
         renderProductChecklist(addProductChecklist);
         renderContactList(addContactList);
         renderAddressList(addAddressList);
         addPhotoList.innerHTML = createNewPhotoEntryHTML(); 
-        addModal.style.display = 'block';
+        addModal.show();
     };
-    closeAddModalBtn.onclick = () => {
-        addModal.style.display = 'none';
-        addForm.reset();
-    };
-
+    
     // --- Обработчик: Добавление нового дилера ---
     addForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -379,8 +393,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (selectedProductIds.length > 0) {
                 await saveDealerProductLinks(newDealerId, selectedProductIds);
             }
-            addModal.style.display = 'none';
-            addForm.reset();
+            addModal.hide();
             await initApp(); 
         } catch (error) {
             console.error('Ошибка при добавлении:', error);
@@ -388,16 +401,28 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- Обработчик: Клик по СПИСКУ (Редактирование) ---
+    // --- (ИЗМЕНЕНО) Обработчик: Клик по СПИСКУ (Меню "...") ---
     dealerListBody.addEventListener('click', async (e) => {
         const target = e.target;
-        const editButton = target.closest('.edit-btn');
+        
+        // --- Кнопка "Просмотреть" ---
+        const viewButton = target.closest('.btn-view');
+        if (viewButton) {
+            e.preventDefault();
+            const id = viewButton.dataset.id;
+            window.open(`dealer.html?id=${id}`, '_blank');
+        }
+
+        // --- Кнопка "Редактировать" ---
+        const editButton = target.closest('.btn-edit');
         if (editButton) {
+            e.preventDefault();
             const id = editButton.dataset.id;
             editProductChecklist.innerHTML = "<p>Загрузка товаров...</p>";
             editContactList.innerHTML = "<p>Загрузка контактов...</p>";
             editPhotoList.innerHTML = "<p>Загрузка фото...</p>"; 
             editAddressList.innerHTML = "<p>Загрузка адресов...</p>";
+            editModal.show(); // Показываем модалку СРАЗУ
             
             try {
                 const dealerRes = await fetch(`${API_DEALERS_URL}/${id}`);
@@ -424,30 +449,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderProductChecklist(editProductChecklist, selectedProductIds);
                 renderExistingPhotos(editPhotoList, data.photos); 
                 
-                modal.style.display = 'block';
-                
             } catch (error) {
                 console.error("Ошибка при открытии редактора:", error);
+                editModal.hide();
                 alert("Не удалось загрузить данные для редактирования.");
+            }
+        }
+        
+        // --- Кнопка "Удалить" ---
+        const deleteButton = target.closest('.btn-delete');
+        if (deleteButton) {
+            e.preventDefault();
+            const id = deleteButton.dataset.id;
+            const name = deleteButton.dataset.name;
+            if (confirm(`Вы уверены, что хотите удалить дилера "${name}"?`)) {
+                try {
+                    await fetch(`${API_DEALERS_URL}/${id}`, { method: 'DELETE' });
+                    await initApp(); // Перезагружаем список
+                } catch (error) {
+                    alert('Ошибка при удалении дилера.');
+                }
             }
         }
     });
 
-    // --- Обработчик: Закрытие модальных окон (Оба) ---
-    closeModalBtn.onclick = () => {
-        modal.style.display = 'none';
-        editForm.reset();
-    };
-    window.onclick = (event) => {
-        if (event.target == modal) {
-            modal.style.display = 'none';
-            editForm.reset();
-        }
-        if (event.target == addModal) {
-            addModal.style.display = 'none';
-            addForm.reset();
-        }
-    };
 
     // --- Обработчик: Сохранение изменений (Редактирование) ---
     editForm.addEventListener('submit', async (e) => {
@@ -484,8 +509,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             await saveDealerProductLinks(id, selectedProductIds);
             
-            modal.style.display = 'none';
-            editForm.reset();
+            editModal.hide();
             await initApp(); 
             
         } catch (error) {
@@ -526,8 +550,8 @@ document.addEventListener('DOMContentLoaded', () => {
             e.target.closest('.contact-entry, .photo-entry, .address-entry').remove();
         }
     }
-    addModal.addEventListener('click', handleListClick);
-    modal.addEventListener('click', handleListClick);
+    addModalEl.addEventListener('click', handleListClick);
+    editModalEl.addEventListener('click', handleListClick);
     
     // --- Инициализация ---
     initApp();
