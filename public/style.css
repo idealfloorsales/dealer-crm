@@ -41,7 +41,7 @@ h3 {
     margin-top: 30px;
 }
 
-/* --- (ИСПРАВЛЕНО) Навигация (Шапка) --- */
+/* --- Навигация (Шапка) --- */
 nav.navbar {
     background-color: #ffffff !important; /* Светлый фон */
     box-shadow: var(--shadow);
@@ -53,7 +53,6 @@ nav .navbar-brand {
     font-weight: 600;
 }
 nav a.nav-link {
-    /* (ИСПРАВЛЕНО) Неактивные ссылки - темные */
     color: var(--secondary-color) !important; 
     text-decoration: none;
     font-size: 1.1em;
@@ -65,13 +64,11 @@ nav a.nav-link {
 nav a.nav-link:hover {
     color: var(--text-color) !important;
 }
-/* (ИСПРАВЛЕНО) Активная ссылка - красная */
 nav a.nav-link.active {
     background-color: var(--primary-color);
     color: white !important;
 }
 .navbar-toggler-icon {
-     /* Делаем иконку "бургера" темной */
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba(0, 0, 0, 0.55)' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
 }
 .navbar-toggler {
@@ -103,7 +100,6 @@ a.btn-danger:hover,
 a.btn-secondary:hover {
     opacity: 0.85;
 }
-/* Кнопка "Submit" (в модалках) - Красная */
 button[type="submit"] {
     background-color: var(--primary-color);
     font-size: 16px;
@@ -120,7 +116,6 @@ a.btn-danger:hover {
     background-color: #c82333;
     color: white;
 }
-/* Кнопка "Добавить" - Красная */
 .btn-primary,
 a.btn-primary,
 #open-add-modal-btn,
@@ -189,10 +184,20 @@ label {
     margin-bottom: 5px;
     margin-top: 0;
 }
-.filter-group select {
+.filter-group select,
+.filter-container input[type="text"] { /* (ИЗМЕНЕНО) */
     padding: 8px;
     min-width: 220px;
+    margin-top: 0;
+    height: 38px; /* Выравниваем высоту */
 }
+/* (НОВОЕ) Стили для поиска */
+#search-bar {
+    padding: 8px 12px !important;
+    height: 38px !important;
+    font-size: 1rem !important;
+}
+
 
 /* --- Общие Стили для Таблиц --- */
 #dealer-table, #products-table, #report-table {
@@ -374,16 +379,15 @@ label {
 .btn-remove-entry {
     padding: 0.375rem 0.75rem;
     margin-top: 0 !important; 
-    line-height: 1.5; /* Исправляем высоту кнопки */
+    line-height: 1.5; 
 }
 .preview-thumb {
     width: 100px;
-    height: 38px; /* (ИЗМЕНЕНО) Выравниваем по высоте с инпутом */
+    height: 38px; 
     object-fit: cover;
     border-radius: 4px;
     border: 1px solid var(--border-color);
 }
-/* (ИЗМЕНЕНО) Выравниваем сетку для Bootstrap */
 .contact-entry, .address-entry, .photo-entry {
     display: grid;
     gap: 10px;
@@ -528,8 +532,6 @@ a.back-link:hover {
 }
 .search-bar {
     width: 60%;
-    padding: 12px;
-    font-size: 16px;
 }
 @media (max-width: 768px) {
     .toolbar {
