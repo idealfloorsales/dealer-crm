@@ -1,16 +1,16 @@
 /* style.css */
 
-/* --- (ИЗМЕНЕНО) Базовые стили с вашим цветом --- */
+/* --- Базовые стили с вашим цветом --- */
 :root {
-    --primary-color: #b9040a;   /* ВАШ НОВЫЙ ЦВЕТ */
+    --primary-color: #b9040a;   /* ВАШ ФИРМЕННЫЙ ЦВЕТ */
     --primary-hover: #a00309;   /* Чуть темнее для hover */
     --danger-color: #dc3545;    
     --warning-color: #ffc107;  
     --secondary-color: #6c757d; 
     --light-gray: #f8f9fa;
     --medium-gray: #e9ecef;
-    --border-color: #dee2e6;
     --text-color: #212529;
+    --border-color: #dee2e6;
     --shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
@@ -29,7 +29,7 @@ body {
     padding: 20px;
 }
 
-/* (ИЗМЕНЕНО) Заголовки теперь красные */
+/* Заголовки (красные) */
 h1, h2, h3 {
     color: #333;
     border-bottom: 2px solid var(--primary-color);
@@ -41,12 +41,20 @@ h3 {
     margin-top: 30px;
 }
 
-/* --- Навигация (Шапка) --- */
-nav.navbar-dark {
-    background-color: var(--dark-gray) !important;
+/* --- (ИСПРАВЛЕНО) Навигация (Шапка) --- */
+nav.navbar {
+    background-color: #ffffff !important; /* Светлый фон */
+    box-shadow: var(--shadow);
+    padding: 10px 20px;
+    margin-bottom: 20px;
+}
+nav .navbar-brand {
+    color: var(--primary-color) !important; /* Красный бренд */
+    font-weight: 600;
 }
 nav a.nav-link {
-    color: rgba(255,255,255,0.7);
+    /* (ИСПРАВЛЕНО) Неактивные ссылки - темные */
+    color: var(--secondary-color) !important; 
     text-decoration: none;
     font-size: 1.1em;
     font-weight: 500;
@@ -55,18 +63,30 @@ nav a.nav-link {
     transition: background-color 0.2s, color 0.2s;
 }
 nav a.nav-link:hover {
-    color: rgba(255,255,255,1);
+    color: var(--text-color) !important;
 }
-/* (ИЗМЕНЕНО) Активная ссылка теперь красная */
+/* (ИСПРАВЛЕНО) Активная ссылка - красная */
 nav a.nav-link.active {
     background-color: var(--primary-color);
-    color: white;
+    color: white !important;
 }
+.navbar-toggler-icon {
+     /* Делаем иконку "бургера" темной */
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba(0, 0, 0, 0.55)' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+}
+.navbar-toggler {
+    border-color: #ccc;
+}
+/* --- Конец Навигации --- */
 
-/* --- (ИЗМЕНЕНО) Общие стили кнопок --- */
+
+/* --- Общие стили кнопок --- */
 button,
-a.btn {
+a.btn-primary,
+a.btn-danger,
+a.btn-secondary {
     padding: 0.5rem 1rem;
+    color: white;
     border: none;
     border-radius: 5px;
     cursor: pointer;
@@ -77,9 +97,32 @@ a.btn {
     display: inline-block;
     transition: opacity 0.2s, background-color 0.2s, border-color 0.2s, color 0.2s;
 }
-
-/* (ИЗМЕНЕНО) Кнопка "Добавить" и "Сохранить" (КРАСНАЯ) */
+button:hover,
+a.btn-primary:hover,
+a.btn-danger:hover,
+a.btn-secondary:hover {
+    opacity: 0.85;
+}
+/* Кнопка "Submit" (в модалках) - Красная */
+button[type="submit"] {
+    background-color: var(--primary-color);
+    font-size: 16px;
+}
+button[type="submit"]:hover {
+    background-color: var(--primary-hover); 
+}
+.btn-danger,
+a.btn-danger {
+    background-color: var(--danger-color);
+}
+.btn-danger:hover,
+a.btn-danger:hover {
+    background-color: #c82333;
+    color: white;
+}
+/* Кнопка "Добавить" - Красная */
 .btn-primary,
+a.btn-primary,
 #open-add-modal-btn,
 #open-add-product-btn {
     background-color: var(--primary-color) !important;
@@ -87,20 +130,21 @@ a.btn {
     color: white !important;
 }
 .btn-primary:hover,
+a.btn-primary:hover,
 #open-add-modal-btn:hover,
 #open-add-product-btn:hover {
      background-color: var(--primary-hover) !important;
      border-color: var(--primary-hover) !important;
-     color: white !important;
+     color: white;
 }
-.btn-secondary {
-    background-color: var(--secondary-color) !important;
-    border-color: var(--secondary-color) !important;
-    color: white !important;
+.btn-secondary,
+a.btn-secondary {
+    background-color: var(--secondary-color);
 }
-.btn-secondary:hover {
-    background-color: #5a6268 !important;
-    color: white !important;
+.btn-secondary:hover,
+a.btn-secondary:hover {
+    background-color: #5a6268;
+    color: white;
 }
 
 
@@ -111,7 +155,6 @@ label {
     margin-top: 5px;
     display: block;
 }
-/* (ИЗМЕНЕНО) Фокус поля */
 .form-control:focus,
 .form-select:focus {
     border-color: var(--primary-color) !important;
@@ -160,7 +203,6 @@ label {
     border-radius: 8px;
     overflow: hidden; 
 }
-/* (ИЗМЕНЕНО) Убираем border-bottom из Bootstrap */
 #dealer-table td, #dealer-table th,
 #products-table td, #products-table th,
 #report-table td, #report-table th {
@@ -168,7 +210,6 @@ label {
     padding: 12px 15px;
     vertical-align: middle;
 }
-/* (НОВОЕ) Добавляем свою границу */
 #dealer-table tbody tr,
 #products-table tbody tr,
 #report-table tbody tr {
@@ -253,7 +294,6 @@ label {
     font-size: 12px;
     border-radius: 4px;
 }
-/* (ИЗМЕНЕНО) Ссылки в таблице */
 #dealer-table td a, #report-table td a {
     text-decoration: none;
     color: var(--primary-color) !important;
@@ -331,19 +371,32 @@ label {
     max-height: 250px; 
     overflow-y: auto;
 }
-.contact-entry, .address-entry, .photo-entry {
-    align-items: center;
-}
 .btn-remove-entry {
     padding: 0.375rem 0.75rem;
-    margin-top: 0 !important; /* Убираем отступ Bootstrap */
+    margin-top: 0 !important; 
+    line-height: 1.5; /* Исправляем высоту кнопки */
 }
 .preview-thumb {
     width: 100px;
-    height: 60px;
+    height: 38px; /* (ИЗМЕНЕНО) Выравниваем по высоте с инпутом */
     object-fit: cover;
     border-radius: 4px;
     border: 1px solid var(--border-color);
+}
+/* (ИЗМЕНЕНО) Выравниваем сетку для Bootstrap */
+.contact-entry, .address-entry, .photo-entry {
+    display: grid;
+    gap: 10px;
+    align-items: center;
+}
+.contact-entry, .address-entry {
+    grid-template-columns: 1fr 1fr 1fr auto;
+}
+.photo-entry {
+    grid-template-columns: 100px 1fr 1fr auto;
+}
+.photo-entry.new {
+     grid-template-columns: 1fr 1fr auto;
 }
 
 /* --- Чек-лист товаров --- */
@@ -498,4 +551,72 @@ a.back-link:hover {
     background: #fff;
     border-radius: 8px;
     box-shadow: var(--shadow);
+}
+
+/* --- Адаптивность --- */
+@media (max-width: 768px) {
+    .contact-entry, .address-entry {
+        grid-template-columns: 1fr 1fr auto;
+    }
+    .contact-entry input:nth-of-type(3),
+    .address-entry input:nth-of-type(3) {
+        grid-column: 1 / span 2;
+    }
+    .btn-remove-entry {
+        grid-row: 1 / span 2;
+        grid-column: 3 / 4;
+    }
+    .photo-entry {
+        grid-template-columns: 1fr auto;
+    }
+    .photo-entry.existing {
+         grid-template-columns: 100px 1fr auto;
+    }
+    .photo-entry input[type="file"] {
+        grid-column: 1 / 1;
+    }
+}
+
+
+@media (max-width: 600px) {
+    body {
+        margin: 10px;
+    }
+    .container {
+        padding: 10px;
+    }
+    .modal-content {
+        width: 95%;
+        margin: 5% auto;
+    }
+    .contact-entry, .address-entry {
+        grid-template-columns: 1fr auto;
+    }
+    .contact-entry input:nth-of-type(2),
+    .address-entry input:nth-of-type(2) {
+        grid-column: 1 / 1;
+    }
+    .contact-entry input:nth-of-type(3),
+    .address-entry input:nth-of-type(3) {
+        grid-column: 1 / 1;
+    }
+    .btn-remove-entry {
+        grid-row: 1 / span 3;
+        grid-column: 2 / 3;
+    }
+    .photo-entry {
+        grid-template-columns: 1fr auto;
+    }
+    .photo-entry.existing {
+         grid-template-columns: 100px 1fr auto;
+    }
+    .photo-entry input[type="file"] {
+        grid-column: 1 / 1;
+    }
+    .product-checklist {
+        columns: 1; /* В одну колонку на мобильных */
+    }
+    .filter-container {
+        flex-direction: column;
+    }
 }
