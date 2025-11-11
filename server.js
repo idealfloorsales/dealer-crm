@@ -11,7 +11,6 @@ app.use(express.static('public'));
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// "Вшитый" список 51 товара (правильный)
 const productsToImport = [
     { sku: "CD-504", name: "Дуб Молочный" },
     { sku: "CD-505", name: "Дуб Рустик" },
@@ -84,19 +83,12 @@ const photoSchema = new mongoose.Schema({
     photo_url: String
 }, { _id: false });
 
-// (НОВАЯ) Схема для Доп. Адресов
-const additionalAddressSchema = new mongoose.Schema({
-    description: String,
-    city: String,
-    address: String
-}, { _id: false });
-
 const dealerSchema = new mongoose.Schema({
     dealer_id: String,
     name: String,
     price_type: String,
-    city: String, // Главный город (для фильтров)
-    address: String, // Главный адрес (для фильтров)
+    city: String,
+    address: String,
     contacts: [contactSchema], 
     bonuses: String,
     photos: [photoSchema], 
@@ -104,8 +96,6 @@ const dealerSchema = new mongoose.Schema({
     delivery: String, 
     website: String,
     instagram: String,
-    // (НОВОЕ ПОЛЕ)
-    additional_addresses: [additionalAddressSchema],
     products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }]
 });
 const Dealer = mongoose.model('Dealer', dealerSchema);
@@ -197,7 +187,6 @@ app.get('/api/dealers/:id', async (req, res) => {
 
 app.post('/api/dealers', async (req, res) => {
     try {
-        // Mongoose автоматически обработает 'additional_addresses'
         const dealer = new Dealer(req.body); 
         await dealer.save();
         res.status(201).json(convertToClient(dealer)); 
@@ -206,7 +195,6 @@ app.post('/api/dealers', async (req, res) => {
 
 app.put('/api/dealers/:id', async (req, res) => {
     try {
-        // Mongoose автоматически обработает 'additional_addresses'
         const dealer = await Dealer.findByIdAndUpdate(req.params.id, req.body, { new: true });
         if (!dealer) return res.status(404).json({ message: "Дилер не найден" });
         res.json({ message: "success" });
