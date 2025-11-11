@@ -3,22 +3,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const API_URL = '/api/products';
     
+    // --- Элементы страницы ---
     const productListBody = document.getElementById('product-list-body');
     const productsTable = document.getElementById('products-table');
     const noDataMsg = document.getElementById('no-data-msg');
     const searchBar = document.getElementById('search-bar');
     
-    const addModal = document.getElementById('add-product-modal');
+    // --- Модальное окно "Добавить" (Bootstrap) ---
+    const addModalEl = document.getElementById('add-product-modal');
+    const addModal = new bootstrap.Modal(addModalEl);
     const openAddBtn = document.getElementById('open-add-product-btn');
-    const closeAddBtn = addModal.querySelector('.close-btn');
     const addForm = document.getElementById('add-product-form');
     
-    const editModal = document.getElementById('edit-product-modal');
-    const closeEditBtn = editModal.querySelector('.close-btn');
+    // --- Модальное окно "Редактировать" (Bootstrap) ---
+    const editModalEl = document.getElementById('edit-product-modal');
+    const editModal = new bootstrap.Modal(editModalEl);
     const editForm = document.getElementById('edit-product-form');
 
     let allProducts = []; 
-    let currentSort = { column: 'name', direction: 'asc' };
+    let currentSort = { column: 'sku', direction: 'asc' }; // Сортировка по SKU
 
     // --- Функция: Загрузка товаров ---
     async function fetchProducts(searchTerm = '') {
@@ -31,7 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             console.error(error);
-            productListBody.innerHTML = `<tr><td colspan="3" style="color: red;">${error.message}</td></tr>`;
+            productListBody.innerHTML = `<tr><td colspan="3" class="text-danger">${error.message}</td></tr>`;
         }
     }
     
@@ -39,13 +42,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderProducts() {
         const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
         
+        // Сортировка (сервер уже сортирует, но это для поиска)
         const sortedProducts = allProducts.sort((a, b) => {
             const col = currentSort.column;
-            let valA = (a[col] || '').toString().toLowerCase(); 
-            let valB = (b[col] || '').toString().toLowerCase();
-            let comparison = 0;
-            if (valA > valB) comparison = 1;
-            else if (valA < valB) comparison = -1;
+            let valA = (a[col] || '').toString(); 
+            let valB = (b[col] || '').toString();
+            let comparison = valA.localeCompare(valB, 'ru', { numeric: true });
             return currentSort.direction === 'asc' ? comparison : -comparison;
         });
         
@@ -76,11 +78,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td class="sku-cell">${safeText(product.sku)}</td>
                 <td>${safeText(product.name)}</td>
                 <td class="actions-cell">
-                    <button class="edit-btn" 
-                        data-id="${productId}" 
-                        data-sku="${safeText(product.sku)}" 
-                        data-name="${safeText(product.name)}">✏️ Ред.</button>
-                    <button class="delete-btn" data-id="${productId}">X</button>
+                    <div class="dropdown">
+                        <button class="btn btn-light btn-sm" type="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-three-dots-vertical"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item btn-edit" 
+                                data-id="${productId}" 
+                                data-sku="${safeText(product.sku)}" 
+                                data-name="${safeText(product.name)}" href="#">
+                                <i class="bi bi-pencil me-2"></i>Редактировать
+                            </a></li>
+                            <li><a class="dropdown-item text-danger btn-delete" data-id="${productId}" data-name="${safeText(product.name)}" href="#">
+                                <i class="bi bi-trash me-2"></i>Удалить
+                            </a></li>
+                        </ul>
+                    </div>
                 </td>
             `;
         });
@@ -97,10 +110,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Логика модального окна "Добавить" ---
-    openAddBtn.onclick = () => addModal.style.display = 'block';
-    closeAddBtn.onclick = () => {
-        addModal.style.display = 'none';
+    openAddBtn.onclick = () => {
         addForm.reset();
+        addModal.show();
     };
     
     addForm.addEventListener('submit', async (e) => {
@@ -117,8 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
             
             if (response.ok) {
-                addModal.style.display = 'none';
-                addForm.reset();
+                addModal.hide();
                 await fetchProducts(searchBar.value); 
             } else {
                 alert(`Ошибка: ${result.error}`);
@@ -131,17 +142,22 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Логика модального окна "Редактировать" и "Удалить" ---
     productListBody.addEventListener('click', (e) => {
         const target = e.target;
-
-        if (target.classList.contains('edit-btn')) {
+        
+        // "Редактировать"
+        if (target.classList.contains('btn-edit')) {
+            e.preventDefault();
             document.getElementById('edit_product_id').value = target.dataset.id;
             document.getElementById('edit_sku').value = target.dataset.sku;
             document.getElementById('edit_name').value = target.dataset.name;
-            editModal.style.display = 'block';
+            editModal.show();
         }
         
-        if (target.classList.contains('delete-btn')) {
+        // "Удалить"
+        if (target.classList.contains('btn-delete')) {
+            e.preventDefault();
             const id = target.dataset.id;
-            if (confirm(`Вы уверены, что хотите удалить этот товар? (ID: ${id})`)) {
+            const name = target.dataset.name;
+            if (confirm(`Вы уверены, что хотите удалить товар "${name}"?`)) {
                 deleteProduct(id);
             }
         }
@@ -161,11 +177,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    closeEditBtn.onclick = () => {
-        editModal.style.display = 'none';
-        editForm.reset();
-    };
-
     editForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const id = document.getElementById('edit_product_id').value;
@@ -181,8 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
             
             if (response.ok) {
-                editModal.style.display = 'none';
-                editForm.reset();
+                editModal.hide();
                 await fetchProducts(searchBar.value);
             } else {
                 alert(`Ошибка: ${result.error}`);
@@ -205,18 +215,6 @@ document.addEventListener('DOMContentLoaded', () => {
             renderProducts(); 
         });
     });
-
-    // --- Закрытие модальных окон по клику снаружи ---
-    window.onclick = (event) => {
-        if (event.target == addModal) {
-            addModal.style.display = 'none';
-            addForm.reset();
-        }
-        if (event.target == editModal) {
-            editModal.style.display = 'none';
-            editForm.reset();
-        }
-    };
 
     // --- Первоначальная загрузка ---
     fetchProducts();
