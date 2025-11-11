@@ -58,8 +58,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(API_PRODUCTS_URL);
             if (!response.ok) throw new Error('Ошибка сети при загрузке каталога');
             fullProductCatalog = await response.json();
-            // Сортировка по имени
+            // (СОРТИРОВКА) Сервер уже сортирует, но мы делаем это еще раз
+            // для 100% гарантии алфавитного порядка.
             fullProductCatalog.sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+            
             console.log(`Загружено ${fullProductCatalog.length} товаров в каталог.`);
         } catch (error) {
             console.error("Критическая ошибка: не удалось загрузить каталог товаров.", error);
