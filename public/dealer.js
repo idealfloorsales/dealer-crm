@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const dealerId = params.get('id');
 
     if (!dealerId) {
-        detailsContainer.innerHTML = '<p style="color: red;">Ошибка: ID дилера не указан в URL.</p>';
+        detailsContainer.innerHTML = '<h2 class="text-danger">Ошибка: ID дилера не указан в URL.</h2>';
         deleteBtn.style.display = 'none'; 
         return;
     }
@@ -40,8 +40,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const dealer = await response.json();
 
             detailsContainer.innerHTML = `
-                <h2>${safeText(dealer.name)}</h2>
-                <p><strong>ID точки:</strong> ${safeText(dealer.dealer_id)}</p>
+                <h1 class="display-6">${safeText(dealer.name)}</h1>
+                <p class="lead"><strong>ID точки:</strong> ${safeText(dealer.dealer_id)}</p>
                 <p><strong>Организация:</strong> ${safeText(dealer.organization)}</p>
                 <p><strong>Главный город:</strong> ${safeText(dealer.city)}</p>
                 <p><strong>Главный адрес:</strong> ${safeText(dealer.address)}</p>
@@ -60,7 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             console.error('Ошибка:', error);
-            detailsContainer.innerHTML = `<p style="color: red;">${error.message}</p>`;
+            detailsContainer.innerHTML = `<h2 class="text-danger">${error.message}</h2>`;
             deleteBtn.style.display = 'none';
         }
     }
@@ -72,10 +72,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const safeInstagram = formatUrl(instagram);
 
         if (safeWebsite) {
-            html += `<a href="${safeWebsite}" target="_blank" class="btn-secondary">Перейти на сайт</a>`;
+            html += `<a href="${safeWebsite}" target="_blank" class="btn btn-secondary"><i class="bi bi-box-arrow-up-right me-2"></i>Перейти на сайт</a>`;
         }
         if (safeInstagram) {
-            html += `<a href="${safeInstagram}" target="_blank" class="btn-secondary">Перейти на Инстаграм</a>`;
+            html += `<a href="${safeInstagram}" target="_blank" class="btn btn-secondary"><i class="bi bi-instagram me-2"></i>Перейти на Инстаграм</a>`;
         }
         if (!safeWebsite && !safeInstagram) {
             linksContainer.style.display = 'none'; 
@@ -108,7 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
-        let html = '<table id="report-table" style="margin-top: 0;"><thead><tr><th>Имя</th><th>Должность</th><th>Контакт</th></tr></thead><tbody>';
+        let html = '<table class="table table-bordered table-striped" style="margin-top: 0;"><thead><tr><th>Имя</th><th>Должность</th><th>Контакт</th></tr></thead><tbody>';
         
         contacts.forEach(contact => {
             html += `
@@ -131,7 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
-        let html = '<table id="report-table" style="margin-top: 0;"><thead><tr><th>Описание</th><th>Город</th><th>Адрес</th></tr></thead><tbody>';
+        let html = '<table class="table table-bordered table-striped" style="margin-top: 0;"><thead><tr><th>Описание</th><th>Город</th><th>Адрес</th></tr></thead><tbody>';
         
         addresses.forEach(addr => {
             html += `
@@ -169,7 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             console.error('Ошибка:', error);
-            productsListContainer.innerHTML = `<p style="color: red;">${error.message}</p>`;
+            productsListContainer.innerHTML = `<p class="text-danger">${error.message}</p>`;
         }
     }
 
