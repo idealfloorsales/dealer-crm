@@ -96,13 +96,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 300);
     });
     
-    // --- Загрузка полного текста статьи при открытии ---
+    // --- (ИСПРАВЛЕНО) Загрузка полного текста статьи при открытии ---
     articleList.addEventListener('show.bs.collapse', async (event) => {
         const articleId = event.target.id.replace('collapse-', '');
         const contentDisplay = document.getElementById(`content-${articleId}`);
         
+        // (ИСПРАВЛЕНО) Проверяем textContent и trim()
         if (contentDisplay.textContent.trim() !== 'Загрузка...') {
-            return; 
+            return; // Уже загружено
         }
         
         try {
@@ -111,7 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const article = await response.json();
             
             const safeContent = article.content ? safeText(article.content) : '<i>Нет содержимого</i>';
-            // (ИСПРАВЛЕНО) Убираем <pre> и используем класс Bootstrap
+            // (ИСПРАВЛЕНО) Используем класс Bootstrap для форматирования
             contentDisplay.innerHTML = `<div class="products-display">${safeContent}</div>`;
         } catch (error) {
             contentDisplay.innerHTML = `<p class="text-danger">${error.message}</p>`;
