@@ -222,7 +222,20 @@ a.btn-secondary:hover {
 /* --- Конец Сортировки --- */
 
 
-/* Стили для таблицы Дилеров */
+/* --- Стили для таблицы Дилеров --- */
+
+/* (НОВОЕ) Стили для нумерации */
+.column-number {
+    width: 40px;
+    text-align: center !important;
+}
+.cell-number {
+    width: 40px;
+    text-align: center !important;
+    font-weight: bold;
+    color: #555;
+}
+
 #dealer-table .table-photo {
     width: 60px;
     height: 60px;
@@ -387,7 +400,7 @@ a.btn-secondary:hover {
 }
 
 
-/* --- (ИЗМЕНЕНО) Чек-лист товаров --- */
+/* --- Чек-лист товаров --- */
 .product-checklist {
     max-height: 200px;
     overflow-y: auto;
@@ -395,7 +408,6 @@ a.btn-secondary:hover {
     border-radius: 4px;
     padding: 10px;
     background-color: #f9f9f9;
-    /* (НОВОЕ) Добавляем 2 колонки */
     columns: 2;
     column-gap: 20px;
 }
@@ -403,7 +415,6 @@ a.btn-secondary:hover {
     display: flex;
     align-items: center;
     margin-bottom: 5px;
-    /* (НОВОЕ) Предотвращаем разрыв колонки */
     break-inside: avoid-column;
     -webkit-break-inside: avoid-column;
     page-break-inside: avoid;
