@@ -11,10 +11,8 @@ app.use(express.static('public'));
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
+// (НОВЫЙ СПИСОК) 74 товара
 const productsToImport = [
-    { sku: "CD-504", name: "Дуб Молочный" },
-    { sku: "CD-505", name: "Дуб Рустик" },
-    { sku: "CD-506", name: "Дуб Серый" },
     { sku: "CD-507", name: "Дуб Беленый" },
     { sku: "CD-508", name: "Дуб Пепельный" },
     { sku: "CD-509", name: "Дуб Северный" },
@@ -62,7 +60,35 @@ const productsToImport = [
     { sku: "RWN-31", name: "Дуб Эверест" },
     { sku: "RWN-32", name: "Дуб Альпийский" },
     { sku: "RWN-33", name: "Дуб Сахара" },
-    { sku: "RWN-36", name: "Кедр Гималайкий" }
+    { sku: "RWN-36", name: "Кедр Гималайкий" },
+    { sku: "RWN-37", name: "Дуб Ниагара" },
+    { sku: "RWN-39", name: "Дуб Сибирский" },
+    { sku: "RWЕ-41", name: "Дуб Жемчужный" }, // Опечатка в SKU? Оставляю как у вас
+    { sku: "RWE-44", name: "Орех Классик" },
+    { sku: "AS-81", name: "Дуб Карибский" },
+    { sku: "AS-82", name: "Дуб Средиземноморский" },
+    { sku: "AS-83", name: "Дуб Саргасс" },
+    { sku: "AS-84", name: "Дуб Песчаный" },
+    { sku: "AS-85", name: "Дуб Атлантик" },
+    { sku: "RPL-1", name: "Дуб Сицилия" },
+    { sku: "RPL-2", name: "Дуб Сицилия темный" },
+    { sku: "RPL-4", name: "Дуб Сицилия серый" },
+    { sku: "RPL-6", name: "Дуб Бризе" },
+    { sku: "RPL-15", name: "Дуб Фламенко" },
+    { sku: "RPL-20", name: "Дуб Милан" },
+    { sku: "RPL-21", name: "Дуб Флоренция" },
+    { sku: "RPL-22", name: "Дуб Неаполь" },
+    { sku: "RPL-23", name: "Дуб Монарх" },
+    { sku: "RPL-24", name: "Дуб Эмперадор" },
+    { sku: "RPL-25", name: "Дуб Авангард" },
+    { sku: "RPL-28", name: "Дуб Венеция" },
+    { sku: "РФС-1", name: "Расческа их фанеры старая" },
+    { sku: "РФ-2", name: "Расческа из фанеры" },
+    { sku: "С800", name: "800мм задняя стенка" },
+    { sku: "С600", name: "600мм задняя стенка" },
+    { sku: "Табличка", name: "Табличка орг.стекло" },
+    { sku: "Н800", name: "800мм наклейка" },
+    { sku: "Н600", name: "600мм наклейка" }
 ];
 
 // --- Модели Базы Данных (Схемы) ---
@@ -83,12 +109,18 @@ const photoSchema = new mongoose.Schema({
     photo_url: String
 }, { _id: false });
 
+const additionalAddressSchema = new mongoose.Schema({
+    description: String,
+    city: String,
+    address: String
+}, { _id: false });
+
 const dealerSchema = new mongoose.Schema({
     dealer_id: String,
     name: String,
     price_type: String,
-    city: String,
-    address: String,
+    city: String, 
+    address: String, 
     contacts: [contactSchema], 
     bonuses: String,
     photos: [photoSchema], 
@@ -96,28 +128,43 @@ const dealerSchema = new mongoose.Schema({
     delivery: String, 
     website: String,
     instagram: String,
+    additional_addresses: [additionalAddressSchema],
     products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }]
 });
 const Dealer = mongoose.model('Dealer', dealerSchema);
 
-// --- "Вшитый" импорт для MongoDB ---
+// --- (ИЗМЕНЕНО) "Умный" импорт/синхронизация для MongoDB ---
 async function hardcodedImportProducts() {
     try {
-        const count = await Product.countDocuments();
-        if (count === 0) { 
-            console.log(`Таблица 'products' пуста. Начинаю "вшитый" импорт...`);
-            await Product.insertMany(productsToImport, { ordered: false });
-            const newCount = await Product.countDocuments();
-            console.log(`Импорт завершен. В таблицу 'products' загружено ${newCount} товаров.`);
-        } else {
-            console.log("Таблица 'products' уже содержит данные. Импорт пропущен.");
+        console.log("Запускаю синхронизацию каталога товаров...");
+        
+        const dbProducts = await Product.find().lean();
+        const dbSkus = new Set(dbProducts.map(p => p.sku));
+        const codeSkus = new Set(productsToImport.map(p => p.sku));
+
+        // 1. Найти, что удалить из БД (товары, которых больше нет в коде)
+        const skusToDelete = [...dbSkus].filter(sku => !codeSkus.has(sku));
+        if (skusToDelete.length > 0) {
+            console.log(`Удаляю ${skusToDelete.length} устаревших товаров...`);
+            await Product.deleteMany({ sku: { $in: skusToDelete } });
+            // TODO: Также удалить эти product_id из всех дилеров
         }
+
+        // 2. Найти, что добавить в БД (новые товары из кода)
+        const productsToAdd = productsToImport.filter(p => !dbSkus.has(p.sku));
+        if (productsToAdd.length > 0) {
+            console.log(`Добавляю ${productsToAdd.length} новых товаров...`);
+            await Product.insertMany(productsToAdd, { ordered: false }).catch(e => {
+                // Игнорируем ошибки дубликатов, если они вдруг возникнут
+                if (e.code !== 11000) console.warn("Ошибка при добавлении:", e.message);
+            });
+        }
+        
+        const finalCount = await Product.countDocuments();
+        console.log(`Синхронизация завершена. В каталоге ${finalCount} товаров.`);
+
     } catch (error) {
-        if (error.code !== 11000) { 
-           console.warn(`Ошибка при импорте: ${error.message}`);
-        } else {
-           console.log("Таблица 'products' уже содержит данные. Импорт пропущен.");
-        }
+           console.warn(`Ошибка при синхронизации товаров: ${error.message}`);
     }
 }
 
@@ -130,7 +177,7 @@ async function connectToDB() {
     try {
         await mongoose.connect(DB_CONNECTION_STRING);
         console.log("Подключено к базе данных MongoDB Atlas!");
-        await hardcodedImportProducts();
+        await hardcodedImportProducts(); // Запускаем синхронизацию
     } catch (error) {
         console.error("Ошибка подключения к MongoDB:", error.message);
     }
@@ -240,7 +287,7 @@ app.get('/api/products', async (req, res) => {
                 { sku: { $regex: searchRegex } },
                 { name: { $regex: searchRegex } }
             ]
-        }).sort({ name: 1 }).lean(); 
+        }).sort({ name: 1 }).lean(); // (ИЗМЕНЕНО) Сортировка по имени прямо в базе
         
         products.forEach(p => { p.id = p._id; }); 
         res.json(products);
