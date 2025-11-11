@@ -16,6 +16,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const addContactBtnAdd = document.getElementById('add-contact-btn-add-modal'); 
     const addPhotoList = document.getElementById('add-photo-list'); 
     const addPhotoBtnAdd = document.getElementById('add-photo-btn-add-modal'); 
+    const addAddressList = document.getElementById('add-address-list'); // (НОВОЕ)
+    const addAddressBtnAdd = document.getElementById('add-address-btn-add-modal'); // (НОВОЕ)
     
     // --- Элементы списка ---
     const dealerListBody = document.getElementById('dealer-list-body');
@@ -38,6 +40,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const addContactBtnEdit = document.getElementById('add-contact-btn-edit-modal'); 
     const editPhotoList = document.getElementById('edit-photo-list'); 
     const addPhotoBtnEdit = document.getElementById('add-photo-btn-edit-modal'); 
+    const editAddressList = document.getElementById('edit-address-list'); // (НОВОЕ)
+    const addAddressBtnEdit = document.getElementById('add-address-btn-edit-modal'); // (НОВОЕ)
 
     // --- Функция: Конвертер файла в Base64 ---
     const toBase64 = file => new Promise((resolve, reject) => {
@@ -95,6 +99,40 @@ document.addEventListener('DOMContentLoaded', () => {
         return contacts;
     }
     // --- Конец функций Контактов ---
+
+    // --- (НОВЫЕ ФУНКЦИИ) Управление Доп. Адресами ---
+    function createAddressEntryHTML(address = {}) {
+        const safeDesc = address.description || '';
+        const safeCity = address.city || '';
+        const safeAddress = address.address || '';
+        return `
+            <div class="address-entry">
+                <input type="text" class="address-description" placeholder="Описание (н-р, Склад)" value="${safeDesc}">
+                <input type="text" class="address-city" placeholder="Город" value="${safeCity}">
+                <input type="text" class="address-address" placeholder="Адрес" value="${safeAddress}">
+                <button type="button" class="btn-remove-entry">X</button>
+            </div>
+        `;
+    }
+    function renderAddressList(containerElement, addresses = []) {
+        containerElement.innerHTML = (addresses && addresses.length > 0) ? addresses.map(createAddressEntryHTML).join('') : createAddressEntryHTML();
+    }
+    function addAddressField(containerElement) {
+        containerElement.insertAdjacentHTML('beforeend', createAddressEntryHTML());
+    }
+    function collectAddresses(containerElement) {
+        const addresses = [];
+        containerElement.querySelectorAll('.address-entry').forEach(entry => {
+            const description = entry.querySelector('.address-description').value;
+            const city = entry.querySelector('.address-city').value;
+            const address = entry.querySelector('.address-address').value;
+            if (description || city || address) {
+                addresses.push({ description, city, address });
+            }
+        });
+        return addresses;
+    }
+    // --- Конец функций Доп. Адресов ---
     
     // --- Функции Управления Фото ---
     function createNewPhotoEntryHTML() {
@@ -203,6 +241,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Функция: Отрисовка списка дилеров ---
     function renderDealerList() {
+        // ... (код фильтрации и сортировки без изменений) ...
         const selectedCity = filterCity.value;
         const selectedPriceType = filterPriceType.value;
         const filteredDealers = allDealers.filter(dealer => {
@@ -210,7 +249,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const priceTypeMatch = !selectedPriceType || dealer.price_type === selectedPriceType;
             return cityMatch && priceTypeMatch;
         });
-
         const sortedDealers = filteredDealers.sort((a, b) => {
             const col = currentSort.column;
             let valA = (a[col] || '').toString().toLowerCase(); 
@@ -220,38 +258,31 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (valA < valB) comparison = -1;
             return currentSort.direction === 'asc' ? comparison : -comparison;
         });
-
         document.querySelectorAll('#dealer-table th[data-sort]').forEach(th => {
             th.classList.remove('sort-asc', 'sort-desc');
             if (th.dataset.sort === currentSort.column) {
                 th.classList.add(currentSort.direction === 'asc' ? 'sort-asc' : 'sort-desc');
             }
         });
-
         dealerListBody.innerHTML = ''; 
         const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
-
         if (sortedDealers.length === 0) {
             dealerTable.style.display = 'none';
             noDataMsg.style.display = 'block';
             noDataMsg.textContent = allDealers.length === 0 ? 'Список дилеров пока пуст. Добавьте первого!' : 'По вашим фильтрам дилеры не найдены.';
             return;
         }
-
         dealerTable.style.display = 'table';
         noDataMsg.style.display = 'none';
-
         sortedDealers.forEach(dealer => {
             const row = dealerListBody.insertRow();
             const dealerId = dealer.id; 
-            
             const cellPhoto = row.insertCell();
             if (dealer.photo_url) {
                 cellPhoto.innerHTML = `<img src="${dealer.photo_url}" alt="Фото" class="table-photo">`;
             } else {
                 cellPhoto.innerHTML = `<div class="no-photo">Нет фото</div>`;
             }
-            
             row.insertCell().textContent = safeText(dealer.dealer_id);
             const cellName = row.insertCell();
             cellName.innerHTML = `<a href="dealer.html?id=${dealerId}" target="_blank">${safeText(dealer.name)}</a>`;
@@ -279,10 +310,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- Обработчики: Модальное окно "Добавить" ---
+    // --- (ИЗМЕНЕНО) Обработчики: Модальное окно "Добавить" ---
     openAddModalBtn.onclick = () => {
         renderProductChecklist(addProductChecklist);
         renderContactList(addContactList);
+        renderAddressList(addAddressList); // (НОВОЕ)
         addPhotoList.innerHTML = createNewPhotoEntryHTML(); 
         addModal.style.display = 'block';
     };
@@ -291,7 +323,7 @@ document.addEventListener('DOMContentLoaded', () => {
         addForm.reset();
     };
 
-    // --- Обработчик: Добавление нового дилера ---
+    // --- (ИЗМЕНЕНО) Обработчик: Добавление нового дилера ---
     addForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         
@@ -308,6 +340,7 @@ document.addEventListener('DOMContentLoaded', () => {
             website: document.getElementById('website').value, 
             instagram: document.getElementById('instagram').value, 
             contacts: collectContacts(addContactList), 
+            additional_addresses: collectAddresses(addAddressList), // (НОВОЕ)
             bonuses: document.getElementById('bonuses').value,
             photos: await photosPromise 
         };
@@ -334,7 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- Обработчик: Клик по СПИСКУ (Редактирование) ---
+    // --- (ИЗМЕНЕНО) Обработчик: Клик по СПИСКУ (Редактирование) ---
     dealerListBody.addEventListener('click', async (e) => {
         const target = e.target;
         const editButton = target.closest('.edit-btn');
@@ -343,6 +376,7 @@ document.addEventListener('DOMContentLoaded', () => {
             editProductChecklist.innerHTML = "<p>Загрузка товаров...</p>";
             editContactList.innerHTML = "<p>Загрузка контактов...</p>";
             editPhotoList.innerHTML = "<p>Загрузка фото...</p>"; 
+            editAddressList.innerHTML = "<p>Загрузка адресов...</p>"; // (НОВОЕ)
             
             try {
                 const dealerRes = await fetch(`${API_DEALERS_URL}/${id}`);
@@ -365,6 +399,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('edit_bonuses').value = data.bonuses;
                 
                 renderContactList(editContactList, data.contacts);
+                renderAddressList(editAddressList, data.additional_addresses); // (НОВОЕ)
                 renderProductChecklist(editProductChecklist, selectedProductIds);
                 renderExistingPhotos(editPhotoList, data.photos); 
                 
@@ -393,7 +428,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // --- Обработчик: Сохранение изменений (Редактирование) ---
+    // --- (ИЗМЕНЕНО) Обработчик: Сохранение изменений (Редактирование) ---
     editForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const id = document.getElementById('edit_db_id').value; 
@@ -411,6 +446,7 @@ document.addEventListener('DOMContentLoaded', () => {
             website: document.getElementById('edit_website').value, 
             instagram: document.getElementById('edit_instagram').value, 
             contacts: collectContacts(editContactList),
+            additional_addresses: collectAddresses(editAddressList), // (НОВОЕ)
             bonuses: document.getElementById('edit_bonuses').value,
             photos: await photosPromise 
         };
@@ -436,8 +472,6 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Ошибка при сохранении изменений.');
         }
     });
-    
-    // --- (УДАЛЕН) Обработчик "Удалить фото" ---
 
     // --- Обработчики: Изменение фильтров ---
     filterCity.addEventListener('change', renderDealerList);
@@ -457,16 +491,18 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // --- Обработчики: Кнопки "Добавить" (Контакты и Фото) ---
+    // --- (ИЗМЕНЕНО) Обработчики: Кнопки "Добавить" (Контакты, Фото, Адреса) ---
     addContactBtnAdd.onclick = () => addContactField(addContactList);
     addContactBtnEdit.onclick = () => addContactField(editContactList);
     addPhotoBtnAdd.onclick = () => addPhotoList.insertAdjacentHTML('beforeend', createNewPhotoEntryHTML());
     addPhotoBtnEdit.onclick = () => editPhotoList.insertAdjacentHTML('beforeend', createNewPhotoEntryHTML());
+    addAddressBtnAdd.onclick = () => addAddressField(addAddressList); // (НОВОЕ)
+    addAddressBtnEdit.onclick = () => addAddressField(editAddressList); // (НОВОЕ)
 
-    // --- Обработчики: Кнопки "Удалить" (X) ---
+    // --- (ИЗМЕНЕНО) Обработчики: Кнопки "Удалить" (X) ---
     function handleListClick(e) {
         if (e.target.classList.contains('btn-remove-entry')) {
-            e.target.closest('.contact-entry, .photo-entry').remove();
+            e.target.closest('.contact-entry, .photo-entry, .address-entry').remove();
         }
     }
     addModal.addEventListener('click', handleListClick);
