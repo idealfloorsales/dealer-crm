@@ -112,7 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         
         const link = document.createElement("a");
-        if (link.download !== undefined) { // Проверка, что браузер поддерживает 'download'
+        if (link.download !== undefined) { 
             const url = URL.createObjectURL(blob);
             link.setAttribute("href", url);
             link.setAttribute("download", "matrix_export.csv");
