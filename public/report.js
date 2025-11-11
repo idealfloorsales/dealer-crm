@@ -22,7 +22,6 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const { headers, matrix } = await response.json();
             
-            // Сохраняем в кэш для CSV
             matrixData = matrix;
             headerData = headers;
 
@@ -47,20 +46,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- 2. Отрисовка Матрицы ---
     function renderMatrix(headers, matrix) {
         
-        // --- Рисуем "Шапку" (Дилеры) ---
         let headerHtml = '<tr><th class="matrix-product-cell">Артикул (Товар)</th>';
         headers.forEach(dealer => {
-            // (ИЗМЕНЕНО) Делаем дилера кликабельным
             headerHtml += `<th><a href="dealer.html?id=${dealer.id}" target="_blank">${safeText(dealer.name)}</a></th>`;
         });
         headerHtml += '</tr>';
         tableHeader.innerHTML = headerHtml;
 
-        // --- Рисуем "Тело" (Товары и Галочки) ---
         let bodyHtml = '';
         matrix.forEach(productRow => {
             bodyHtml += '<tr>';
-            // (ИЗМЕНЕНО) "Замороженная" ячейка с Артикулом
             bodyHtml += `<td class="matrix-product-cell">${safeText(productRow.sku)}</td>`;
             
             productRow.dealers.forEach(dealerStatus => {
@@ -75,29 +70,37 @@ document.addEventListener('DOMContentLoaded', () => {
         tableBody.innerHTML = bodyHtml;
     }
     
-    // --- 3. (НОВОЕ) Экспорт в CSV ---
+    // --- 3. (ИСПРАВЛЕНО) Экспорт в CSV с UTF-8 BOM ---
     function exportToCSV() {
         if (!matrixData || !headerData) {
             alert("Данные еще не загружены.");
             return;
         }
 
-        let csvContent = "data:text/csv;charset=utf-8,";
+        // Функция для очистки ячейки (удаляет кавычки и запятые)
+        const cleanCell = (text) => {
+            let str = String(text || '');
+            str = str.replace(/"/g, '""'); // Экранируем кавычки
+            str = str.replace(/,/g, ';'); // Заменяем запятые на точки с запятой
+            str = str.replace(/\n/g, ' '); // Убираем переносы строк
+            return `"${str}"`;
+        };
         
-        // Строка 1: Заголовки (Артикул, Название, ...Дилеры)
+        // (ИСПРАВЛЕНО) \uFEFF - это BOM-маркер для Excel
+        let csvContent = "\uFEFF"; 
+        
+        // Строка 1: Заголовки
         let headerRow = ["Артикул", "Название"];
         headerData.forEach(dealer => {
-            // Очищаем имя дилера от кавычек
-            const cleanName = dealer.name.replace(/"/g, '""');
-            headerRow.push(`"${cleanName}"`);
+            headerRow.push(cleanCell(dealer.name));
         });
         csvContent += headerRow.join(",") + "\r\n";
 
-        // Строки 2+: Данные (SKU, Name, 1, 0, 1...)
+        // Строки 2+: Данные
         matrixData.forEach(productRow => {
             let row = [
-                `"${productRow.sku}"`,
-                `"${productRow.name.replace(/"/g, '""')}"`
+                cleanCell(productRow.sku),
+                cleanCell(productRow.name)
             ];
             productRow.dealers.forEach(dealerStatus => {
                 row.push(dealerStatus.has_product ? "1" : "0");
@@ -105,14 +108,19 @@ document.addEventListener('DOMContentLoaded', () => {
             csvContent += row.join(",") + "\r\n";
         });
 
-        // Создаем ссылку и "кликаем"
-        const encodedUri = encodeURI(csvContent);
+        // Создаем Blob (вместо data:uri) для лучшей совместимости
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        
         const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "matrix_export.csv");
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        if (link.download !== undefined) { // Проверка, что браузер поддерживает 'download'
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", "matrix_export.csv");
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
     }
     
     exportBtn.addEventListener('click', exportToCSV);
