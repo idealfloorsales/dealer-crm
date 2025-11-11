@@ -329,8 +329,8 @@ a.btn-secondary:hover {
     border: 1px solid #ddd;
 }
 
-/* --- Динамические списки (Контакты и Фото) --- */
-.contact-list, .photo-list {
+/* --- Динамические списки (Контакты, Фото, Адреса) --- */
+.contact-list, .photo-list, .address-list {
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -341,13 +341,13 @@ a.btn-secondary:hover {
     max-height: 250px; 
     overflow-y: auto;
 }
-.contact-entry {
+.contact-entry, .address-entry {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr auto;
     gap: 10px;
     align-items: center;
 }
-.contact-entry input {
+.contact-entry input, .address-entry input {
     margin-top: 0;
 }
 .photo-entry {
