@@ -3,19 +3,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const API_URL = '/api/products';
     
-    // --- Элементы страницы ---
     const productListBody = document.getElementById('product-list-body');
     const productsTable = document.getElementById('products-table');
     const noDataMsg = document.getElementById('no-data-msg');
     const searchBar = document.getElementById('search-bar');
     
-    // --- Модальное окно "Добавить" (Bootstrap) ---
     const addModalEl = document.getElementById('add-product-modal');
     const addModal = new bootstrap.Modal(addModalEl);
     const openAddBtn = document.getElementById('open-add-product-btn');
     const addForm = document.getElementById('add-product-form');
     
-    // --- Модальное окно "Редактировать" (Bootstrap) ---
     const editModalEl = document.getElementById('edit-product-modal');
     const editModal = new bootstrap.Modal(editModalEl);
     const editForm = document.getElementById('edit-product-form');
@@ -42,7 +39,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderProducts() {
         const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
         
-        // Сортировка
         const sortedProducts = allProducts.sort((a, b) => {
             const col = currentSort.column;
             let valA = (a[col] || '').toString(); 
