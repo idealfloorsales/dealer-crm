@@ -235,7 +235,7 @@ label {
     color: #333;
     font-weight: 600;
     position: relative;
-    white-space: nowrap; /* Не переносим заголовки */
+    white-space: nowrap; 
 }
 
 /* "Зебра" для строк */
@@ -349,15 +349,13 @@ label {
     background-color: #f0f0f0 !important;
 }
 
-/* --- (НОВОЕ) Стили для Матрицы Покрытия --- */
+/* --- Стили для Матрицы Покрытия --- */
 #matrix-table th {
-    /* "Замораживаем" шапку таблицы */
     position: sticky;
     top: 0;
     z-index: 10;
 }
 .matrix-product-cell {
-    /* "Замораживаем" первую колонку (Товары) */
     position: sticky;
     left: 0;
     background-color: #fff; /* Перекрываем фон "зебры" */
@@ -365,11 +363,15 @@ label {
     font-family: monospace;
     border-right: 2px solid var(--border-color) !important;
 }
-/* Выравниваем "замороженный" заголовок */
 #matrix-table thead th.matrix-product-cell {
     z-index: 20;
 }
-/* Центрируем галочки */
+#matrix-table tbody tr:nth-of-type(even) .matrix-product-cell {
+    background-color: var(--light-gray); /* Возвращаем фон "зебры" */
+}
+#matrix-table tbody tr:hover .matrix-product-cell {
+    background-color: var(--medium-gray); /* Фон при наведении */
+}
 .matrix-cell-yes, .matrix-cell-no {
     text-align: center !important;
     vertical-align: middle;
@@ -432,20 +434,34 @@ label {
     border: 1px solid var(--border-color);
 }
 .contact-entry, .address-entry, .photo-entry, .pos-entry {
-    display: grid;
+    display: flex;
+    flex-wrap: wrap; 
     gap: 10px;
     align-items: center;
+    background: #fff;
+    padding: 10px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
 }
-.contact-entry, .address-entry {
-    grid-template-columns: 1fr 1fr 1fr auto;
+.contact-entry input, 
+.address-entry input, 
+.pos-entry select, .pos-entry input {
+    flex-grow: 1; 
+    min-width: 150px; 
+    margin-top: 0;
 }
 .photo-entry {
+    display: grid;
     grid-template-columns: 100px 1fr 1fr auto;
 }
 .photo-entry.new {
      grid-template-columns: 1fr 1fr auto;
 }
+.photo-entry input {
+    margin-top: 0;
+}
 .pos-entry {
+    display: grid;
     grid-template-columns: 2fr 1fr auto;
 }
 
