@@ -8,6 +8,17 @@ document.addEventListener('DOMContentLoaded', () => {
     let allDealers = [];
     let currentSort = { column: 'name', direction: 'asc' };
 
+    // (НОВЫЙ) Список POS-материалов
+    const posMaterialsList = [
+        "Н600 - 600мм наклейка",
+        "Н800 - 800мм наклейка",
+        "РФ-2 - Расческа из фанеры",
+        "РФС-1 - Расческа их фанеры старая",
+        "С600 - 600мм задняя стенка",
+        "С800 - 800мм задняя стенка",
+        "Табличка - Табличка орг.стекло"
+    ];
+
     // --- Инициализация модальных окон Bootstrap ---
     const addModalEl = document.getElementById('add-modal');
     const addModal = new bootstrap.Modal(addModalEl);
@@ -24,16 +35,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const addPhotoBtnAdd = document.getElementById('add-photo-btn-add-modal'); 
     const addAddressList = document.getElementById('add-address-list'); 
     const addAddressBtnAdd = document.getElementById('add-address-btn-add-modal'); 
+    const addPosList = document.getElementById('add-pos-list'); // (НОВОЕ)
+    const addPosBtnAdd = document.getElementById('add-pos-btn-add-modal'); // (НОВОЕ)
     
     // --- Элементы списка ---
     const dealerListBody = document.getElementById('dealer-list-body');
     const dealerTable = document.getElementById('dealer-table');
     const noDataMsg = document.getElementById('no-data-msg');
 
-    // --- (ИЗМЕНЕНО) Элементы ФИЛЬТРОВ и ПОИСКА ---
+    // --- Элементы ФИЛЬТРОВ и ПОИСКА ---
     const filterCity = document.getElementById('filter-city');
     const filterPriceType = document.getElementById('filter-price-type');
-    const searchBar = document.getElementById('search-bar'); // (НОВОЕ)
+    const searchBar = document.getElementById('search-bar'); 
 
     // --- Элементы Модального окна РЕДАКТИРОВАНИЯ ---
     const editForm = document.getElementById('edit-dealer-form');
@@ -44,6 +57,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const addPhotoBtnEdit = document.getElementById('add-photo-btn-edit-modal'); 
     const editAddressList = document.getElementById('edit-address-list'); 
     const addAddressBtnEdit = document.getElementById('add-address-btn-edit-modal'); 
+    const editPosList = document.getElementById('edit-pos-list'); // (НОВОЕ)
+    const addPosBtnEdit = document.getElementById('add-pos-btn-edit-modal'); // (НОВОЕ)
 
     // --- Функция: Конвертер файла в Base64 ---
     const toBase64 = file => new Promise((resolve, reject) => {
@@ -140,6 +155,49 @@ document.addEventListener('DOMContentLoaded', () => {
         return addresses;
     }
     // --- Конец функций Доп. Адресов ---
+
+    // --- (НОВЫЕ ФУНКЦИИ) Управление POS-материалами ---
+    function createPosEntryHTML(pos = {}) {
+        const safeName = pos.name || '';
+        const safeQuantity = pos.quantity || 1;
+        
+        // Создаем выпадающий список
+        const options = posMaterialsList.map(name => 
+            `<option value="${name}" ${name === safeName ? 'selected' : ''}>${name}</option>`
+        ).join('');
+        
+        return `
+            <div class="pos-entry input-group mb-2">
+                <select class="form-select pos-name">
+                    <option value="">-- Выберите оборудование --</option>
+                    ${options}
+                </select>
+                <input type="number" class="form-control pos-quantity" placeholder="Кол-во" value="${safeQuantity}" min="1">
+                <button type="button" class="btn btn-outline-danger btn-remove-entry">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        `;
+    }
+    function renderPosList(containerElement, posItems = []) {
+        containerElement.innerHTML = (posItems && posItems.length > 0) ? posItems.map(createPosEntryHTML).join('') : createPosEntryHTML();
+    }
+    function addPosField(containerElement) {
+        containerElement.insertAdjacentHTML('beforeend', createPosEntryHTML());
+    }
+    function collectPos(containerElement) {
+        const posItems = [];
+        containerElement.querySelectorAll('.pos-entry').forEach(entry => {
+            const name = entry.querySelector('.pos-name').value;
+            const quantity = entry.querySelector('.pos-quantity').value;
+            // Сохраняем, только если выбрано название
+            if (name) {
+                posItems.push({ name, quantity: Number(quantity) || 1 });
+            }
+        });
+        return posItems;
+    }
+    // --- Конец функций POS ---
     
     // --- Функции Управления Фото ---
     function createNewPhotoEntryHTML() {
@@ -251,28 +309,22 @@ document.addEventListener('DOMContentLoaded', () => {
         filterPriceType.value = currentPriceType;
     }
 
-    // --- (ИЗМЕНЕНО) Функция: Отрисовка списка дилеров (с ПОИСКОМ) ---
+    // --- Функция: Отрисовка списка дилеров ---
     function renderDealerList() {
-        // 1. ПОЛУЧАЕМ ЗНАЧЕНИЯ ФИЛЬТРОВ И ПОИСКА
         const selectedCity = filterCity.value;
         const selectedPriceType = filterPriceType.value;
-        const searchTerm = searchBar.value.toLowerCase(); // (НОВОЕ)
+        const searchTerm = searchBar.value.toLowerCase(); 
 
-        // 2. ФИЛЬТРАЦИЯ
         const filteredDealers = allDealers.filter(dealer => {
             const cityMatch = !selectedCity || dealer.city === selectedCity;
             const priceTypeMatch = !selectedPriceType || dealer.price_type === selectedPriceType;
-            
-            // (НОВОЕ) Логика Поиска
             const searchMatch = !searchTerm || 
                                 (dealer.name && dealer.name.toLowerCase().includes(searchTerm)) ||
                                 (dealer.dealer_id && dealer.dealer_id.toLowerCase().includes(searchTerm)) ||
                                 (dealer.organization && dealer.organization.toLowerCase().includes(searchTerm));
-            
             return cityMatch && priceTypeMatch && searchMatch;
         });
 
-        // 3. СОРТИРОВКА
         const sortedDealers = filteredDealers.sort((a, b) => {
             const col = currentSort.column;
             let valA = (a[col] || '').toString(); 
@@ -286,7 +338,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return currentSort.direction === 'asc' ? comparison : -comparison;
         });
 
-        // 4. Обновление стрелочек
         document.querySelectorAll('#dealer-table th[data-sort]').forEach(th => {
             th.classList.remove('sort-asc', 'sort-desc');
             if (th.dataset.sort === currentSort.column) {
@@ -294,7 +345,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // 5. ОТРИСОВКА
         dealerListBody.innerHTML = ''; 
         const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
 
@@ -369,17 +419,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- Обработчики: Модальное окно "Добавить" ---
+    // --- (ИЗМЕНЕНО) Обработчики: Модальное окно "Добавить" ---
     openAddModalBtn.onclick = () => {
-        addForm.reset();
+        addForm.reset(); // Сбрасываем форму
         renderProductChecklist(addProductChecklist);
         renderContactList(addContactList);
         renderAddressList(addAddressList);
+        renderPosList(addPosList); // (НОВОЕ)
         addPhotoList.innerHTML = createNewPhotoEntryHTML(); 
         addModal.show();
     };
 
-    // --- Обработчик: Добавление нового дилера ---
+    // --- (ИЗМЕНЕНО) Обработчик: Добавление нового дилера ---
     addForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         
@@ -397,6 +448,7 @@ document.addEventListener('DOMContentLoaded', () => {
             instagram: document.getElementById('instagram').value, 
             contacts: collectContacts(addContactList), 
             additional_addresses: collectAddresses(addAddressList),
+            pos_materials: collectPos(addPosList), // (НОВОЕ)
             bonuses: document.getElementById('bonuses').value,
             photos: await photosPromise 
         };
@@ -422,13 +474,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- (НОВАЯ ФУНКЦИЯ) Открытие и загрузка модального окна "Редактировать" ---
+    // --- (ИЗМЕНЕНО) Функция: Открытие и загрузка модального окна "Редактировать" ---
     async function openEditModal(id) {
         editProductChecklist.innerHTML = "<p>Загрузка товаров...</p>";
         editContactList.innerHTML = "<p>Загрузка контактов...</p>";
         editPhotoList.innerHTML = "<p>Загрузка фото...</p>"; 
         editAddressList.innerHTML = "<p>Загрузка адресов...</p>";
-        editModal.show(); // Показываем модалку СРАЗУ
+        editPosList.innerHTML = "<p>Загрузка оборудования...</p>"; // (НОВОЕ)
+        editModal.show();
         
         try {
             const dealerRes = await fetch(`${API_DEALERS_URL}/${id}`);
@@ -452,6 +505,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             renderContactList(editContactList, data.contacts);
             renderAddressList(editAddressList, data.additional_addresses);
+            renderPosList(editPosList, data.pos_materials); // (НОВОЕ)
             renderProductChecklist(editProductChecklist, selectedProductIds);
             renderExistingPhotos(editPhotoList, data.photos); 
             
@@ -496,7 +550,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- Обработчик: Сохранение изменений (Редактирование) ---
+    // --- (ИЗМЕНЕНО) Обработчик: Сохранение изменений (Редактирование) ---
     editForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const id = document.getElementById('edit_db_id').value; 
@@ -515,6 +569,7 @@ document.addEventListener('DOMContentLoaded', () => {
             instagram: document.getElementById('edit_instagram').value, 
             contacts: collectContacts(editContactList),
             additional_addresses: collectAddresses(editAddressList),
+            pos_materials: collectPos(editPosList), // (НОВОЕ)
             bonuses: document.getElementById('edit_bonuses').value,
             photos: await photosPromise 
         };
@@ -540,10 +595,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- (ИЗМЕНЕНО) Обработчики: Фильтры и Поиск ---
+    // --- Обработчики: Фильтры и Поиск ---
     filterCity.addEventListener('change', renderDealerList);
     filterPriceType.addEventListener('change', renderDealerList);
-    // (НОВОЕ) Запускаем `renderDealerList` при каждом нажатии клавиши в поиске
     searchBar.addEventListener('input', renderDealerList);
 
     // --- Обработчики: СОРТИРОВКА ---
@@ -560,18 +614,21 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // --- Обработчики: Кнопки "Добавить" (Контакты, Фото, Адреса) ---
+    // --- (ИЗМЕНЕНО) Обработчики: Кнопки "Добавить" (Контакты, Фото, Адреса, POS) ---
     addContactBtnAdd.onclick = () => addContactField(addContactList);
     addContactBtnEdit.onclick = () => addContactField(editContactList);
     addPhotoBtnAdd.onclick = () => addPhotoList.insertAdjacentHTML('beforeend', createNewPhotoEntryHTML());
     addPhotoBtnEdit.onclick = () => editPhotoList.insertAdjacentHTML('beforeend', createNewPhotoEntryHTML());
     addAddressBtnAdd.onclick = () => addAddressField(addAddressList);
     addAddressBtnEdit.onclick = () => addAddressField(editAddressList);
+    addPosBtnAdd.onclick = () => addPosField(addPosList); // (НОВОЕ)
+    addPosBtnEdit.onclick = () => addPosField(editPosList); // (НОВОЕ)
 
-    // --- Обработчики: Кнопки "Удалить" (X) ---
+
+    // --- (ИЗМЕНЕНО) Обработчики: Кнопки "Удалить" (X) ---
     function handleListClick(e) {
         if (e.target.classList.contains('btn-remove-entry')) {
-            e.target.closest('.contact-entry, .photo-entry, .address-entry').remove();
+            e.target.closest('.contact-entry, .photo-entry, .address-entry, .pos-entry').remove();
         }
     }
     addModalEl.addEventListener('click', handleListClick);
