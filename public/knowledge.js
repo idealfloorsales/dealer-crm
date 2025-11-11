@@ -51,7 +51,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const collapseId = `collapse-${articleId}`;
             const headerId = `header-${articleId}`;
 
-            // (НОВОЕ) Форматируем дату
             const date = new Date(article.createdAt).toLocaleDateString('ru-RU', {
                 day: '2-digit', month: '2-digit', year: 'numeric'
             });
@@ -96,20 +95,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 300);
     });
     
-    // --- (НОВОЕ) Загрузка полного текста статьи при открытии ---
+    // --- (ИСПРАВЛЕНО) Загрузка полного текста статьи при открытии ---
     articleList.addEventListener('show.bs.collapse', async (event) => {
         const articleId = event.target.id.replace('collapse-', '');
         const contentDisplay = document.getElementById(`content-${articleId}`);
         
-        // Загружаем только один раз
-        if (contentDisplay.innerHTML !== 'Загрузка...') return; 
+        // (ИСПРАВЛЕНО) Проверяем textContent и trim()
+        if (contentDisplay.textContent.trim() !== 'Загрузка...') {
+            return; // Уже загружено
+        }
         
         try {
-            const response = await fetch(`${API_URL}/${articleId}`);
+            const response = await fetch(`${API_URL}/${articleId}`); 
             if (!response.ok) throw new Error('Не удалось загрузить статью');
             const article = await response.json();
-            // Используем <pre> для сохранения форматирования
-            contentDisplay.innerHTML = `<pre>${article.content ? article.content.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '<i>Нет содержимого</i>'}</pre>`;
+            // (ИСПРАВЛЕНО) Используем <pre> и safeText
+            const safeContent = article.content ? safeText(article.content) : '<i>Нет содержимого</i>';
+            contentDisplay.innerHTML = `<pre class="products-display">${safeContent}</pre>`;
         } catch (error) {
             contentDisplay.innerHTML = `<p class="text-danger">${error.message}</p>`;
         }
@@ -118,7 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Логика модального окна "Добавить" ---
     openAddBtn.onclick = () => {
         articleForm.reset();
-        document.getElementById('article_id').value = ''; // Очищаем ID
+        document.getElementById('article_id').value = ''; 
         modalTitle.textContent = 'Добавить статью';
         modal.show();
     };
@@ -130,10 +132,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Нажали "Редактировать"
         const editButton = target.closest('.btn-edit');
         if (editButton) {
-            e.stopPropagation(); // Не даем аккордеону закрыться
+            e.stopPropagation(); 
             const id = editButton.dataset.id;
             
-            // Загружаем полные данные
             try {
                 const response = await fetch(`${API_URL}/${id}`);
                 if (!response.ok) throw new Error('Не удалось загрузить статью для редактирования');
@@ -153,13 +154,13 @@ document.addEventListener('DOMContentLoaded', () => {
         // Нажали "Удалить"
         const deleteButton = target.closest('.btn-delete');
         if (deleteButton) {
-            e.stopPropagation(); // Не даем аккордеону закрыться
+            e.stopPropagation(); 
             const id = deleteButton.dataset.id;
             const name = deleteButton.dataset.name;
             if (confirm(`Вы уверены, что хотите удалить статью "${name}"?`)) {
                 try {
                     await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
-                    await fetchArticles(searchBar.value); // Обновляем список
+                    await fetchArticles(searchBar.value); 
                 } catch (error) {
                     alert('Ошибка при удалении.');
                 }
@@ -187,7 +188,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (response.ok) {
                 modal.hide();
-                await fetchArticles(searchBar.value); // Обновляем список
+                await fetchArticles(searchBar.value); 
             } else {
                  const result = await response.json();
                 alert(`Ошибка: ${result.error}`);
