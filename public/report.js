@@ -1,97 +1,122 @@
 // report.js
 document.addEventListener('DOMContentLoaded', () => {
 
-    const API_PRODUCTS_URL = '/api/products';
+    const API_URL = '/api/matrix';
     
-    const productSelect = document.getElementById('product-select');
-    const reportTable = document.getElementById('report-table');
-    const reportListBody = document.getElementById('report-list-body');
-    const reportTitle = document.getElementById('report-title');
-    const noDataMsg = document.getElementById('report-no-data-msg');
+    const tableContainer = document.getElementById('matrix-container');
+    const tableHeader = document.getElementById('matrix-header');
+    const tableBody = document.getElementById('matrix-body');
+    const loadingMsg = document.getElementById('loading-msg');
+    const exportBtn = document.getElementById('export-csv-btn');
+    
+    let matrixData = null; // Кэш для экспорта
+    let headerData = null; // Кэш для экспорта
 
     const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
 
-    // --- 1. Загрузка каталога в выпадающий список ---
-    async function populateProductSelect() {
+    // --- 1. Загрузка данных для Матрицы ---
+    async function fetchMatrix() {
         try {
-            const response = await fetch(API_PRODUCTS_URL);
-            if (!response.ok) throw new Error('Не удалось загрузить каталог');
-            const products = await response.json();
+            const response = await fetch(API_URL);
+            if (!response.ok) throw new Error('Ошибка сети при загрузке матрицы');
             
-            // Сервер уже сортирует, но мы перестрахуемся
-            products.sort((a, b) => a.sku.localeCompare(b.sku, 'ru', { numeric: true }));
+            const { headers, matrix } = await response.json();
+            
+            // Сохраняем в кэш для CSV
+            matrixData = matrix;
+            headerData = headers;
 
-            productSelect.innerHTML = '<option value="">-- Выберите товар --</option>'; 
+            if (headers.length === 0 || matrix.length === 0) {
+                loadingMsg.textContent = 'Данные отсутствуют. Сначала добавьте дилеров и товары.';
+                loadingMsg.classList.replace('alert-info', 'alert-warning');
+                return;
+            }
             
-            products.forEach(product => {
-                const productId = product.id; 
-                const option = new Option(`[${product.sku}] ${product.name}`, productId);
-                productSelect.add(option);
-            });
+            renderMatrix(headers, matrix);
+            
+            loadingMsg.style.display = 'none';
+            tableContainer.style.display = 'block';
 
         } catch (error) {
             console.error(error);
-            productSelect.innerHTML = `<option value="">${error.message}</option>`;
+            loadingMsg.textContent = `Критическая ошибка: ${error.message}`;
+            loadingMsg.classList.replace('alert-info', 'alert-danger');
         }
     }
+    
+    // --- 2. Отрисовка Матрицы ---
+    function renderMatrix(headers, matrix) {
+        
+        // --- Рисуем "Шапку" (Дилеры) ---
+        let headerHtml = '<tr><th class="matrix-product-cell">Артикул (Товар)</th>';
+        headers.forEach(dealer => {
+            // (ИЗМЕНЕНО) Делаем дилера кликабельным
+            headerHtml += `<th><a href="dealer.html?id=${dealer.id}" target="_blank">${safeText(dealer.name)}</a></th>`;
+        });
+        headerHtml += '</tr>';
+        tableHeader.innerHTML = headerHtml;
 
-    // --- 2. Загрузка дилеров для выбранного товара ---
-    async function fetchDealersForProduct(productId, productName) {
-        if (!productId) {
-            reportTitle.textContent = '';
-            reportTable.style.display = 'none';
-            noDataMsg.style.display = 'none';
+        // --- Рисуем "Тело" (Товары и Галочки) ---
+        let bodyHtml = '';
+        matrix.forEach(productRow => {
+            bodyHtml += '<tr>';
+            // (ИЗМЕНЕНО) "Замороженная" ячейка с Артикулом
+            bodyHtml += `<td class="matrix-product-cell">${safeText(productRow.sku)}</td>`;
+            
+            productRow.dealers.forEach(dealerStatus => {
+                if (dealerStatus.has_product) {
+                    bodyHtml += '<td class="matrix-cell-yes"><i class="bi bi-check-lg"></i></td>';
+                } else {
+                    bodyHtml += '<td class="matrix-cell-no"></td>';
+                }
+            });
+            bodyHtml += '</tr>';
+        });
+        tableBody.innerHTML = bodyHtml;
+    }
+    
+    // --- 3. (НОВОЕ) Экспорт в CSV ---
+    function exportToCSV() {
+        if (!matrixData || !headerData) {
+            alert("Данные еще не загружены.");
             return;
         }
 
-        reportTitle.textContent = `Дилеры, у которых выставлен: ${productName}`;
-        reportListBody.innerHTML = '<tr><td colspan="4">Загрузка...</td></tr>';
-        reportTable.style.display = 'table';
-        noDataMsg.style.display = 'none';
+        let csvContent = "data:text/csv;charset=utf-8,";
+        
+        // Строка 1: Заголовки (Артикул, Название, ...Дилеры)
+        let headerRow = ["Артикул", "Название"];
+        headerData.forEach(dealer => {
+            // Очищаем имя дилера от кавычек
+            const cleanName = dealer.name.replace(/"/g, '""');
+            headerRow.push(`"${cleanName}"`);
+        });
+        csvContent += headerRow.join(",") + "\r\n";
 
-        try {
-            const response = await fetch(`${API_PRODUCTS_URL}/${productId}/dealers`);
-            if (!response.ok) throw new Error('Не удалось загрузить список дилеров');
-            const dealers = await response.json();
-
-            if (dealers.length === 0) {
-                reportTable.style.display = 'none';
-                noDataMsg.style.display = 'block';
-                noDataMsg.textContent = 'Этот товар не выставлен ни у одного дилера.';
-                return;
-            }
-
-            reportListBody.innerHTML = ''; 
-            dealers.forEach(dealer => {
-                const dealerId = dealer.id; 
-                const row = reportListBody.insertRow();
-                row.innerHTML = `
-                    <td>${safeText(dealer.dealer_id)}</td>
-                    <td>${safeText(dealer.name)}</td>
-                    <td>${safeText(dealer.city)}</td>
-                    <td class="actions-cell">
-                        <a href="dealer.html?id=${dealerId}" target="_blank" class="btn btn-outline-primary btn-sm" style="text-decoration: none;">
-                            <i class="bi bi-eye me-1"></i>Открыть
-                        </a>
-                    </td>
-                `;
+        // Строки 2+: Данные (SKU, Name, 1, 0, 1...)
+        matrixData.forEach(productRow => {
+            let row = [
+                `"${productRow.sku}"`,
+                `"${productRow.name.replace(/"/g, '""')}"`
+            ];
+            productRow.dealers.forEach(dealerStatus => {
+                row.push(dealerStatus.has_product ? "1" : "0");
             });
+            csvContent += row.join(",") + "\r\n";
+        });
 
-        } catch (error) {
-            console.error(error);
-            reportTable.style.display = 'none';
-            noDataMsg.style.display = 'block';
-            noDataMsg.textContent = error.message;
-        }
+        // Создаем ссылку и "кликаем"
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "matrix_export.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     }
-
-    // --- 3. Обработчик событий ---
-    productSelect.addEventListener('change', (e) => {
-        const selectedId = e.target.value;
-        const selectedText = e.target.options[e.target.selectedIndex].text;
-        fetchDealersForProduct(selectedId, selectedText);
-    });
+    
+    exportBtn.addEventListener('click', exportToCSV);
 
     // --- Инициализация ---
-    populateProductSelect();
+    fetchMatrix();
 });
