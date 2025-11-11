@@ -119,7 +119,8 @@ a.btn-danger:hover {
 .btn-primary,
 a.btn-primary,
 #open-add-modal-btn,
-#open-add-product-btn {
+#open-add-product-btn,
+#open-add-article-btn {
     background-color: var(--primary-color) !important;
     border-color: var(--primary-color) !important;
     color: white !important;
@@ -127,7 +128,8 @@ a.btn-primary,
 .btn-primary:hover,
 a.btn-primary:hover,
 #open-add-modal-btn:hover,
-#open-add-product-btn:hover {
+#open-add-product-btn:hover,
+#open-add-article-btn:hover {
      background-color: var(--primary-hover) !important;
      border-color: var(--primary-hover) !important;
      color: white;
@@ -185,13 +187,12 @@ label {
     margin-top: 0;
 }
 .filter-group select,
-.filter-container input[type="text"] { /* (ИЗМЕНЕНО) */
+.filter-container input[type="text"] {
     padding: 8px;
     min-width: 220px;
     margin-top: 0;
-    height: 38px; /* Выравниваем высоту */
+    height: 38px; 
 }
-/* (НОВОЕ) Стили для поиска */
 #search-bar {
     padding: 8px 12px !important;
     height: 38px !important;
@@ -542,6 +543,57 @@ a.back-link:hover {
         width: 100%;
     }
 }
+
+/* --- (НОВОЕ) Стили для Базы Знаний --- */
+.knowledge-list {
+    list-style: none;
+    padding-left: 0;
+}
+.knowledge-item {
+    background: #fff;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    margin-bottom: 15px;
+    transition: box-shadow 0.2s;
+}
+.knowledge-item:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+.knowledge-item-header {
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+}
+.knowledge-item-header h2 {
+    margin: 0;
+    padding: 0;
+    border: none;
+    font-size: 1.3rem;
+    color: var(--primary-color);
+}
+.knowledge-item-content {
+    padding: 0 20px 20px 20px;
+    border-top: 1px solid var(--border-color);
+}
+/* Форматирование текста в Базе Знаний */
+.knowledge-content-display {
+    white-space: pre-wrap; /* Сохраняем переносы строк */
+    font-family: inherit;
+    font-size: 1rem;
+    line-height: 1.6;
+    color: var(--text-color);
+    background: var(--light-gray);
+    padding: 15px;
+    border-radius: 5px;
+}
+#knowledge-article-content {
+    min-height: 300px;
+    font-family: monospace;
+}
+/* Конец Базы Знаний */
 
 
 /* --- Сообщения об ошибках / Пустых данных --- */
