@@ -405,13 +405,17 @@ a.btn-secondary:hover {
     border-radius: 4px;
     padding: 10px;
     background-color: #f9f9f9;
+    /* (ИЗМЕНЕНО) 2 колонки */
     columns: 2;
+    -webkit-columns: 2;
+    -moz-columns: 2;
     column-gap: 20px;
 }
 .checklist-item {
     display: flex;
     align-items: center;
     margin-bottom: 5px;
+    /* (ИЗМЕНЕНО) Предотвращаем разрыв */
     break-inside: avoid-column;
     -webkit-break-inside: avoid-column;
     page-break-inside: avoid;
