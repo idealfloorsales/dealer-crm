@@ -35,8 +35,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const addPhotoBtnAdd = document.getElementById('add-photo-btn-add-modal'); 
     const addAddressList = document.getElementById('add-address-list'); 
     const addAddressBtnAdd = document.getElementById('add-address-btn-add-modal'); 
-    const addPosList = document.getElementById('add-pos-list'); // (НОВОЕ)
-    const addPosBtnAdd = document.getElementById('add-pos-btn-add-modal'); // (НОВОЕ)
+    const addPosList = document.getElementById('add-pos-list'); 
+    const addPosBtnAdd = document.getElementById('add-pos-btn-add-modal'); 
     
     // --- Элементы списка ---
     const dealerListBody = document.getElementById('dealer-list-body');
@@ -57,8 +57,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const addPhotoBtnEdit = document.getElementById('add-photo-btn-edit-modal'); 
     const editAddressList = document.getElementById('edit-address-list'); 
     const addAddressBtnEdit = document.getElementById('add-address-btn-edit-modal'); 
-    const editPosList = document.getElementById('edit-pos-list'); // (НОВОЕ)
-    const addPosBtnEdit = document.getElementById('add-pos-btn-edit-modal'); // (НОВОЕ)
+    const editPosList = document.getElementById('edit-pos-list'); 
+    const addPosBtnEdit = document.getElementById('add-pos-btn-edit-modal'); 
 
     // --- Функция: Конвертер файла в Base64 ---
     const toBase64 = file => new Promise((resolve, reject) => {
@@ -75,6 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(API_PRODUCTS_URL);
             if (!response.ok) throw new Error('Ошибка сети при загрузке каталога');
             fullProductCatalog = await response.json();
+            // Сортировка по SKU
             fullProductCatalog.sort((a, b) => a.sku.localeCompare(b.sku, 'ru', { numeric: true }));
             console.log(`Загружено ${fullProductCatalog.length} товаров в каталог.`);
         } catch (error) {
@@ -156,12 +157,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     // --- Конец функций Доп. Адресов ---
 
-    // --- (НОВЫЕ ФУНКЦИИ) Управление POS-материалами ---
+    // --- Функции Управления POS-материалами ---
     function createPosEntryHTML(pos = {}) {
         const safeName = pos.name || '';
         const safeQuantity = pos.quantity || 1;
         
-        // Создаем выпадающий список
         const options = posMaterialsList.map(name => 
             `<option value="${name}" ${name === safeName ? 'selected' : ''}>${name}</option>`
         ).join('');
@@ -190,7 +190,6 @@ document.addEventListener('DOMContentLoaded', () => {
         containerElement.querySelectorAll('.pos-entry').forEach(entry => {
             const name = entry.querySelector('.pos-name').value;
             const quantity = entry.querySelector('.pos-quantity').value;
-            // Сохраняем, только если выбрано название
             if (name) {
                 posItems.push({ name, quantity: Number(quantity) || 1 });
             }
@@ -419,18 +418,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- (ИЗМЕНЕНО) Обработчики: Модальное окно "Добавить" ---
+    // --- Обработчики: Модальное окно "Добавить" ---
     openAddModalBtn.onclick = () => {
-        addForm.reset(); // Сбрасываем форму
+        addForm.reset();
         renderProductChecklist(addProductChecklist);
         renderContactList(addContactList);
         renderAddressList(addAddressList);
-        renderPosList(addPosList); // (НОВОЕ)
+        renderPosList(addPosList); 
         addPhotoList.innerHTML = createNewPhotoEntryHTML(); 
         addModal.show();
     };
 
-    // --- (ИЗМЕНЕНО) Обработчик: Добавление нового дилера ---
+    // --- Обработчик: Добавление нового дилера ---
     addForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         
@@ -448,7 +447,7 @@ document.addEventListener('DOMContentLoaded', () => {
             instagram: document.getElementById('instagram').value, 
             contacts: collectContacts(addContactList), 
             additional_addresses: collectAddresses(addAddressList),
-            pos_materials: collectPos(addPosList), // (НОВОЕ)
+            pos_materials: collectPos(addPosList), 
             bonuses: document.getElementById('bonuses').value,
             photos: await photosPromise 
         };
@@ -474,13 +473,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- (ИЗМЕНЕНО) Функция: Открытие и загрузка модального окна "Редактировать" ---
+    // --- Функция: Открытие и загрузка модального окна "Редактировать" ---
     async function openEditModal(id) {
         editProductChecklist.innerHTML = "<p>Загрузка товаров...</p>";
         editContactList.innerHTML = "<p>Загрузка контактов...</p>";
         editPhotoList.innerHTML = "<p>Загрузка фото...</p>"; 
         editAddressList.innerHTML = "<p>Загрузка адресов...</p>";
-        editPosList.innerHTML = "<p>Загрузка оборудования...</p>"; // (НОВОЕ)
+        editPosList.innerHTML = "<p>Загрузка оборудования...</p>";
         editModal.show();
         
         try {
@@ -505,7 +504,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             renderContactList(editContactList, data.contacts);
             renderAddressList(editAddressList, data.additional_addresses);
-            renderPosList(editPosList, data.pos_materials); // (НОВОЕ)
+            renderPosList(editPosList, data.pos_materials); 
             renderProductChecklist(editProductChecklist, selectedProductIds);
             renderExistingPhotos(editPhotoList, data.photos); 
             
@@ -550,7 +549,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- (ИЗМЕНЕНО) Обработчик: Сохранение изменений (Редактирование) ---
+    // --- Обработчик: Сохранение изменений (Редактирование) ---
     editForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const id = document.getElementById('edit_db_id').value; 
@@ -569,7 +568,7 @@ document.addEventListener('DOMContentLoaded', () => {
             instagram: document.getElementById('edit_instagram').value, 
             contacts: collectContacts(editContactList),
             additional_addresses: collectAddresses(editAddressList),
-            pos_materials: collectPos(editPosList), // (НОВОЕ)
+            pos_materials: collectPos(editPosList), 
             bonuses: document.getElementById('edit_bonuses').value,
             photos: await photosPromise 
         };
@@ -614,18 +613,18 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // --- (ИЗМЕНЕНО) Обработчики: Кнопки "Добавить" (Контакты, Фото, Адреса, POS) ---
+    // --- Обработчики: Кнопки "Добавить" (Контакты, Фото, Адреса, POS) ---
     addContactBtnAdd.onclick = () => addContactField(addContactList);
     addContactBtnEdit.onclick = () => addContactField(editContactList);
     addPhotoBtnAdd.onclick = () => addPhotoList.insertAdjacentHTML('beforeend', createNewPhotoEntryHTML());
     addPhotoBtnEdit.onclick = () => editPhotoList.insertAdjacentHTML('beforeend', createNewPhotoEntryHTML());
     addAddressBtnAdd.onclick = () => addAddressField(addAddressList);
     addAddressBtnEdit.onclick = () => addAddressField(editAddressList);
-    addPosBtnAdd.onclick = () => addPosField(addPosList); // (НОВОЕ)
-    addPosBtnEdit.onclick = () => addPosField(editPosList); // (НОВОЕ)
+    addPosBtnAdd.onclick = () => addPosField(addPosList); 
+    addPosBtnEdit.onclick = () => addPosField(editPosList); 
 
 
-    // --- (ИЗМЕНЕНО) Обработчики: Кнопки "Удалить" (X) ---
+    // --- Обработчики: Кнопки "Удалить" (X) ---
     function handleListClick(e) {
         if (e.target.classList.contains('btn-remove-entry')) {
             e.target.closest('.contact-entry, .photo-entry, .address-entry, .pos-entry').remove();
