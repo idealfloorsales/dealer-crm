@@ -20,19 +20,7 @@
     <h2>Список дилеров</h2>
 
     <div class="filter-container">
-        <div class="filter-group">
-            <label for="filter-city">Фильтр по городу:</label>
-            <select id="filter-city">
-                <option value="">-- Все города --</option>
-            </select>
         </div>
-        <div class="filter-group">
-            <label for="filter-price-type">Фильтр по типу цен:</label>
-            <select id="filter-price-type">
-                <option value="">-- Все типы --</option>
-            </select>
-        </div>
-    </div>
 
     <table id="dealer-table">
         <thead>
@@ -59,11 +47,16 @@
                 <input type="text" id="name" placeholder="Название точки" required>
                 <input type="text" id="organization" placeholder="Организация">
                 <input type="text" id="price_type" placeholder="Тип цен">
-                <input type="text" id="city" placeholder="Город">
-                <input type="text" id="address" placeholder="Адрес">
+                <input type="text" id="city" placeholder="Главный город">
+                <input type="text" id="address" placeholder="Главный адрес">
                 <input type="text" id="delivery" placeholder="Условия доставки">
                 <input type="text" id="website" placeholder="Сайт (https://...)">
                 <input type="text" id="instagram" placeholder="Инстаграм (https://...)">
+
+                <label>Дополнительные адреса:</label>
+                <div id="add-address-list" class="address-list">
+                    </div>
+                <button type="button" id="add-address-btn-add-modal" class="btn-secondary">Добавить доп. адрес</button>
 
                 <label>Контакты:</label>
                 <div id="add-contact-list" class="contact-list">
@@ -102,9 +95,9 @@
                 <input type="text" id="edit_organization">
                 <label>Тип цен:</label>
                 <input type="text" id="edit_price_type">
-                <label>Город:</label>
+                <label>Главный город:</label>
                 <input type="text" id="edit_city">
-                <label>Адрес:</label>
+                <label>Главный адрес:</label>
                 <input type="text" id="edit_address">
                 <label>Условия доставки:</label>
                 <input type="text" id="edit_delivery">
@@ -112,6 +105,11 @@
                 <input type="text" id="edit_website">
                 <label>Инстаграм:</label>
                 <input type="text" id="edit_instagram">
+                
+                <label>Дополнительные адреса:</label>
+                <div id="edit-address-list" class="address-list">
+                    </div>
+                <button type="button" id="add-address-btn-edit-modal" class="btn-secondary">Добавить доп. адрес</button>
                 
                 <label>Контакты:</label>
                 <div id="edit-contact-list" class="contact-list">
