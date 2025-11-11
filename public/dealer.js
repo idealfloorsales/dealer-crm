@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const deliveryContainer = document.getElementById('dealer-delivery'); 
     const linksContainer = document.getElementById('dealer-links'); 
     const addressesListContainer = document.getElementById('dealer-addresses-list'); 
+    const posListContainer = document.getElementById('dealer-pos-list'); // (НОВОЕ)
     
     const deleteBtn = document.getElementById('delete-dealer-btn'); 
     const editBtn = document.getElementById('edit-dealer-btn'); 
@@ -25,9 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    // (ВОТ ЭТА ФУНКЦИЯ, КОТОРУЮ МЫ ВЕРНУЛИ)
     const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
-    
     const formatUrl = (url) => {
         if (!url) return null;
         if (!url.startsWith('http://') && !url.startsWith('https://')) {
@@ -56,6 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderDealerLinks(dealer.website, dealer.instagram); 
             renderDealerContacts(dealer.contacts);
             renderDealerAddresses(dealer.additional_addresses); 
+            renderDealerPos(dealer.pos_materials); // (НОВОЕ)
             renderDealerPhotos(dealer.photos); 
             
             deliveryContainer.textContent = safeText(dealer.delivery) || '<i>Нет данных о доставке</i>';
@@ -151,6 +151,28 @@ document.addEventListener('DOMContentLoaded', () => {
         
         html += '</tbody></table>';
         addressesListContainer.innerHTML = html;
+    }
+
+    // --- (НОВАЯ ФУНКЦИЯ) Отрисовка таблицы POS ---
+    function renderDealerPos(posItems) {
+        if (!posItems || posItems.length === 0) {
+            posListContainer.innerHTML = '<p><i>Нет оборудования.</i></p>';
+            return;
+        }
+        
+        let html = '<table class="table table-bordered table-striped" style="margin-top: 0;"><thead><tr><th>Оборудование</th><th>Количество</th></tr></thead><tbody>';
+        
+        posItems.forEach(item => {
+            html += `
+                <tr>
+                    <td>${safeText(item.name)}</td>
+                    <td>${item.quantity || 1}</td>
+                </tr>
+            `;
+        });
+        
+        html += '</tbody></table>';
+        posListContainer.innerHTML = html;
     }
 
 
