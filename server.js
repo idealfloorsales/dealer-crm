@@ -133,6 +133,12 @@ const additionalAddressSchema = new mongoose.Schema({
     address: String
 }, { _id: false });
 
+// (НОВАЯ) Схема для POS-материалов
+const posMaterialSchema = new mongoose.Schema({
+    name: String, // Название (н-р, "800мм задняя стенка")
+    quantity: Number // Количество
+}, { _id: false });
+
 const dealerSchema = new mongoose.Schema({
     dealer_id: String,
     name: String,
@@ -147,6 +153,7 @@ const dealerSchema = new mongoose.Schema({
     website: String,
     instagram: String,
     additional_addresses: [additionalAddressSchema],
+    pos_materials: [posMaterialSchema], // (НОВОЕ ПОЛЕ)
     products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }]
 });
 const Dealer = mongoose.model('Dealer', dealerSchema);
@@ -155,8 +162,9 @@ const Dealer = mongoose.model('Dealer', dealerSchema);
 const knowledgeSchema = new mongoose.Schema({
     title: { type: String, required: true },
     content: String
-}, { timestamps: true }); // Добавляем дату создания/обновления
+}, { timestamps: true }); 
 const Knowledge = mongoose.model('Knowledge', knowledgeSchema);
+
 
 // --- "Умный" импорт/синхронизация для MongoDB ---
 async function hardcodedImportProducts() {
@@ -255,6 +263,7 @@ app.get('/api/dealers/:id', async (req, res) => {
 
 app.post('/api/dealers', async (req, res) => {
     try {
+        // (ИЗМЕНЕНО) Mongoose автоматически обработает 'pos_materials'
         const dealer = new Dealer(req.body); 
         await dealer.save();
         res.status(201).json(convertToClient(dealer)); 
@@ -263,6 +272,7 @@ app.post('/api/dealers', async (req, res) => {
 
 app.put('/api/dealers/:id', async (req, res) => {
     try {
+        // (ИЗМЕНЕНО) Mongoose автоматически обработает 'pos_materials'
         const dealer = await Dealer.findByIdAndUpdate(req.params.id, req.body, { new: true });
         if (!dealer) return res.status(404).json({ message: "Дилер не найден" });
         res.json({ message: "success" });
@@ -374,14 +384,14 @@ app.get('/api/products/:id/dealers', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// === (НОВОЕ) API для Базы Знаний ===
+// === API для Базы Знаний ===
 app.get('/api/knowledge', async (req, res) => {
     try {
         const searchTerm = req.query.search || '';
         const searchRegex = new RegExp(searchTerm, 'i');
         const articles = await Knowledge.find(
-            { title: { $regex: searchRegex } }, // Ищем только по заголовку
-            'title createdAt' // Отдаем только Заголовок и Дату
+            { title: { $regex: searchRegex } }, 
+            'title createdAt' 
         ).sort({ title: 1 }).lean();
         
         articles.forEach(a => { a.id = a._id; });
