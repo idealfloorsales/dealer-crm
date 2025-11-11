@@ -4,149 +4,256 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Учет Дилеров</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <nav>
-        <a href="/" class="nav-link active">Учет Дилеров</a>
-        <a href="/products.html" class="nav-link">Каталог Товаров</a>
-        <a href="/report.html" class="nav-link">Отчет по товарам</a>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">CRM Дилеров</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/">Учет Дилеров</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/products.html">Каталог Товаров</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/report.html">Отчет по товарам</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
     </nav>
 
-    <h1>Система Учета Дилеров</h1>
-    <button id="open-add-modal-btn" class="btn-primary">Добавить нового дилера</button>
-    <hr>
-    <h2>Список дилеров</h2>
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h1>Система Учета Дилеров</h1>
+            <button id="open-add-modal-btn" class="btn btn-primary btn-lg">
+                <i class="bi bi-plus-circle me-2"></i>Добавить дилера
+            </button>
+        </div>
 
-    <div class="filter-container">
-        <div class="filter-group">
-            <label for="filter-city">Фильтр по городу:</label>
-            <select id="filter-city">
-                <option value="">-- Все города --</option>
-            </select>
+        <div class="row g-3 mb-4 p-3 bg-white rounded shadow-sm border">
+            <div class="col-md-6 col-lg-4">
+                <label for="filter-city" class="form-label">Фильтр по городу:</label>
+                <select id="filter-city" class="form-select">
+                    <option value="">-- Все города --</option>
+                </select>
+            </div>
+            <div class="col-md-6 col-lg-4">
+                <label for="filter-price-type" class="form-label">Фильтр по типу цен:</label>
+                <select id="filter-price-type" class="form-select">
+                    <option value="">-- Все типы --</option>
+                </select>
+            </div>
         </div>
-        <div class="filter-group">
-            <label for="filter-price-type">Фильтр по типу цен:</label>
-            <select id="filter-price-type">
-                <option value="">-- Все типы --</option>
-            </select>
+
+        <div class="table-responsive bg-white rounded shadow-sm border">
+            <table id="dealer-table" class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="column-number">#</th> 
+                        <th>Фото</th>
+                        <th data-sort="dealer_id">ID точки</th>
+                        <th data-sort="name">Название точки</th>
+                        <th data-sort="city">Город</th>
+                        <th data-sort="price_type">Тип цен</th>
+                        <th data-sort="organization">Организация</th>
+                        <th style="width: 50px;">Действия</th>
+                    </tr>
+                </thead>
+                <tbody id="dealer-list-body"></tbody>
+            </table>
         </div>
+        <p id="no-data-msg" class="alert alert-info mt-3" style="display: none;"></p>
     </div>
 
-    <table id="dealer-table">
-        <thead>
-            <tr>
-                <th class="column-number">#</th> 
-                <th>Фото</th>
-                <th data-sort="dealer_id">ID точки</th>
-                <th data-sort="name">Название точки</th>
-                <th data-sort="city">Город</th>
-                <th data-sort="price_type">Тип цен</th>
-                <th data-sort="organization">Организация</th>
-                <th>Действия</th>
-            </tr>
-        </thead>
-        <tbody id="dealer-list-body"></tbody>
-    </table>
-    <p id="no-data-msg"></p>
 
-    <div id="add-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-btn">&times;</span>
-            <h2>Добавить нового дилера</h2>
-            <form id="add-dealer-form">
-                <input type="text" id="dealer_id" placeholder="ID точки" required>
-                <input type="text" id="name" placeholder="Название точки" required>
-                <input type="text" id="organization" placeholder="Организация">
-                <input type="text" id="price_type" placeholder="Тип цен">
-                <input type="text" id="city" placeholder="Главный город">
-                <input type="text" id="address" placeholder="Главный адрес">
-                <input type="text" id="delivery" placeholder="Условия доставки">
-                <input type="text" id="website" placeholder="Сайт (https://...)">
-                <input type="text" id="instagram" placeholder="Инстаграм (https://...)">
-
-                <label>Дополнительные адреса:</label>
-                <div id="add-address-list" class="address-list">
-                    </div>
-                <button type="button" id="add-address-btn-add-modal" class="btn-secondary">Добавить доп. адрес</button>
-
-                <label>Контакты:</label>
-                <div id="add-contact-list" class="contact-list">
-                    </div>
-                <button type="button" id="add-contact-btn-add-modal" class="btn-secondary">Добавить контакт</button>
-                
-                <input type="text" id="bonuses" placeholder="Бонусы">
-
-                <label>Галерея Фото:</label>
-                <div id="add-photo-list" class="photo-list">
-                    </div>
-                <button type="button" id="add-photo-btn-add-modal" class="btn-secondary">Добавить фото</button>
-                
-                <label>Выставленные товары:</label>
-                <div id="add-product-checklist" class="product-checklist">
-                    <p>Загрузка каталога...</p>
+    <div class="modal fade" id="add-modal" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title fs-5">Добавить нового дилера</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                
-                <button type="submit">Добавить дилера</button>
-            </form>
-        </div>
-    </div>
+                <div class="modal-body">
+                    <form id="add-dealer-form">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="dealer_id" class="form-label">ID точки *</label>
+                                <input type="text" id="dealer_id" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="name" class="form-label">Название точки *</label>
+                                <input type="text" id="name" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="organization" class="form-label">Организация</label>
+                                <input type="text" id="organization" class="form-control">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="price_type" class="form-label">Тип цен</label>
+                                <input type="text" id="price_type" class="form-control">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="city" class="form-label">Главный город</label>
+                                <input type="text" id="city" class="form-control">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="address" class="form-label">Главный адрес</label>
+                                <input type="text" id="address" class="form-control">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="delivery" class="form-label">Условия доставки</label>
+                                <input type="text" id="delivery" class="form-control">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="website" class="form-label">Сайт (https://...)</label>
+                                <input type="text" id="website" class="form-control">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="instagram" class="form-label">Инстаграм (https://...)</label>
+                                <input type="text" id="instagram" class="form-control">
+                            </div>
 
-    <div id="edit-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-btn">&times;</span>
-            <h2>Редактировать дилера</h2>
-            <form id="edit-dealer-form">
-                <input type="hidden" id="edit_db_id">
-                
-                <label>ID точки:</label>
-                <input type="text" id="edit_dealer_id" required>
-                <label>Название точки:</label>
-                <input type="text" id="edit_name" required>
-                <label>Организация:</label>
-                <input type="text" id="edit_organization">
-                <label>Тип цен:</label>
-                <input type="text" id="edit_price_type">
-                <label>Главный город:</label>
-                <input type="text" id="edit_city">
-                <label>Главный адрес:</label>
-                <input type="text" id="edit_address">
-                <label>Условия доставки:</label>
-                <input type="text" id="edit_delivery">
-                <label>Сайт:</label>
-                <input type="text" id="edit_website">
-                <label>Инстаграм:</label>
-                <input type="text" id="edit_instagram">
-                
-                <label>Дополнительные адреса:</label>
-                <div id="edit-address-list" class="address-list">
-                    </div>
-                <button type="button" id="add-address-btn-edit-modal" class="btn-secondary">Добавить доп. адрес</button>
-                
-                <label>Контакты:</label>
-                <div id="edit-contact-list" class="contact-list">
-                    </div>
-                <button type="button" id="add-contact-btn-edit-modal" class="btn-secondary">Добавить контакт</button>
-                
-                <label>Бонусы:</label>
-                <input type="text" id="edit_bonuses">
+                            <hr class="my-3">
+                            
+                            <label class="form-label">Дополнительные адреса:</label>
+                            <div id="add-address-list" class="list-container"></div>
+                            <div class="text-end">
+                                <button type="button" id="add-address-btn-add-modal" class="btn btn-secondary btn-sm">Добавить доп. адрес</button>
+                            </div>
 
-                <label>Галерея Фото:</label>
-                <div id="edit-photo-list" class="photo-list">
-                    </div>
-                <button type="button" id="add-photo-btn-edit-modal" class="btn-secondary">Добавить новое фото</button>
-                
-                <label>Выставленные товары:</label>
-                <div id="edit-product-checklist" class="product-checklist">
-                    <p>Загрузка каталога...</p>
+                            <label class="form-label">Контакты:</label>
+                            <div id="add-contact-list" class="list-container"></div>
+                            <div class="text-end">
+                                <button type="button" id="add-contact-btn-add-modal" class="btn btn-secondary btn-sm">Добавить контакт</button>
+                            </div>
+
+                            <label class="form-label">Галерея Фото:</label>
+                            <div id="add-photo-list" class="list-container"></div>
+                            <div class="text-end">
+                                <button type="button" id="add-photo-btn-add-modal" class="btn btn-secondary btn-sm">Добавить фото</button>
+                            </div>
+                            
+                            <div class="col-12">
+                                <label for="bonuses" class="form-label">Бонусы / Примечания</label>
+                                <textarea id="bonuses" class="form-control" rows="3"></textarea>
+                            </div>
+
+                            <label class="form-label">Выставленные товары:</label>
+                            <div id="add-product-checklist" class="product-checklist">
+                                <p>Загрузка каталога...</p>
+                            </div>
+                        </div>
+                    </form>
                 </div>
-                
-                <button type="submit">Сохранить изменения</button>
-            </form>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                    <button type="submit" form="add-dealer-form" class="btn btn-primary">Добавить дилера</button>
+                </div>
+            </div>
         </div>
     </div>
 
+    <div class="modal fade" id="edit-modal" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title fs-5">Редактировать дилера</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="edit-dealer-form">
+                        <input type="hidden" id="edit_db_id">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="edit_dealer_id" class="form-label">ID точки *</label>
+                                <input type="text" id="edit_dealer_id" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="edit_name" class="form-label">Название точки *</label>
+                                <input type="text" id="edit_name" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="edit_organization" class="form-label">Организация</label>
+                                <input type="text" id="edit_organization" class="form-control">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="edit_price_type" class="form-label">Тип цен</label>
+                                <input type="text" id="edit_price_type" class="form-control">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="edit_city" class="form-label">Главный город</label>
+                                <input type="text" id="edit_city" class="form-control">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="edit_address" class="form-label">Главный адрес</label>
+                                <input type="text" id="edit_address" class="form-control">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="edit_delivery" class="form-label">Условия доставки</label>
+                                <input type="text" id="edit_delivery" class="form-control">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="edit_website" class="form-label">Сайт</label>
+                                <input type="text" id="edit_website" class="form-control">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="edit_instagram" class="form-label">Инстаграм</label>
+                                <input type="text" id="edit_instagram" class="form-control">
+                            </div>
+
+                            <hr class="my-3">
+                            
+                            <label class="form-label">Дополнительные адреса:</label>
+                            <div id="edit-address-list" class="list-container"></div>
+                            <div class="text-end">
+                                <button type="button" id="add-address-btn-edit-modal" class="btn btn-secondary btn-sm">Добавить доп. адрес</button>
+                            </div>
+
+                            <label class="form-label">Контакты:</label>
+                            <div id="edit-contact-list" class="list-container"></div>
+                            <div class="text-end">
+                                <button type="button" id="add-contact-btn-edit-modal" class="btn btn-secondary btn-sm">Добавить контакт</button>
+                            </div>
+
+                            <label class="form-label">Галерея Фото:</label>
+                            <div id="edit-photo-list" class="list-container"></div>
+                            <div class="text-end">
+                                <button type="button" id="add-photo-btn-edit-modal" class="btn btn-secondary btn-sm">Добавить новое фото</button>
+                            </div>
+                            
+                            <div class="col-12">
+                                <label for="edit_bonuses" class="form-label">Бонусы / Примечания</label>
+                                <textarea id="edit_bonuses" class="form-control" rows="3"></textarea>
+                            </div>
+
+                            <label class="form-label">Выставленные товары:</label>
+                            <div id="edit-product-checklist" class="product-checklist">
+                                <p>Загрузка каталога...</p>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                    <button type="submit" form="edit-dealer-form" class="btn btn-primary">Сохранить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
