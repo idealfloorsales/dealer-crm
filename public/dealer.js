@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const photoGalleryContainer = document.getElementById('dealer-photo-gallery'); 
     const deliveryContainer = document.getElementById('dealer-delivery'); 
     const linksContainer = document.getElementById('dealer-links'); 
-    const addressesListContainer = document.getElementById('dealer-addresses-list'); // (НОВОЕ)
+    const addressesListContainer = document.getElementById('dealer-addresses-list'); 
     
     const deleteBtn = document.getElementById('delete-dealer-btn'); 
     const API_URL = '/api/dealers';
@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             renderDealerLinks(dealer.website, dealer.instagram); 
             renderDealerContacts(dealer.contacts);
-            renderDealerAddresses(dealer.additional_addresses); // (НОВОЕ)
+            renderDealerAddresses(dealer.additional_addresses); 
             renderDealerPhotos(dealer.photos); 
             
             deliveryContainer.textContent = safeText(dealer.delivery) || '<i>Нет данных о доставке</i>';
@@ -124,7 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
         contactsListContainer.innerHTML = html;
     }
     
-    // --- (НОВАЯ ФУНКЦИЯ) Отрисовка таблицы Доп. Адресов ---
+    // --- Отрисовка таблицы Доп. Адресов ---
     function renderDealerAddresses(addresses) {
         if (!addresses || addresses.length === 0) {
             addressesListContainer.innerHTML = '<p><i>Нет дополнительных адресов.</i></p>';
