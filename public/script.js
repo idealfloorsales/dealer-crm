@@ -58,6 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(API_PRODUCTS_URL);
             if (!response.ok) throw new Error('Ошибка сети при загрузке каталога');
             fullProductCatalog = await response.json();
+            // Сортировка по имени
             fullProductCatalog.sort((a, b) => a.name.localeCompare(b.name, 'ru'));
             console.log(`Загружено ${fullProductCatalog.length} товаров в каталог.`);
         } catch (error) {
@@ -240,7 +241,7 @@ document.addEventListener('DOMContentLoaded', () => {
         filterPriceType.value = currentPriceType;
     }
 
-    // --- (ИЗМЕНЕНО) Функция: Отрисовка списка дилеров ---
+    // --- Функция: Отрисовка списка дилеров ---
     function renderDealerList() {
         const selectedCity = filterCity.value;
         const selectedPriceType = filterPriceType.value;
@@ -280,11 +281,10 @@ document.addEventListener('DOMContentLoaded', () => {
         dealerTable.style.display = 'table';
         noDataMsg.style.display = 'none';
 
-        sortedDealers.forEach((dealer, index) => { // (ИЗМЕНЕНО) Добавлен 'index'
+        sortedDealers.forEach((dealer, index) => { 
             const row = dealerListBody.insertRow();
             const dealerId = dealer.id; 
             
-            // (НОВАЯ ЯЧЕЙКА)
             const cellNum = row.insertCell();
             cellNum.className = 'cell-number';
             cellNum.textContent = index + 1;
@@ -319,7 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderDealerList(); 
         } catch (error) {
             console.error('Ошибка при загрузке дилеров:', error);
-            dealerListBody.innerHTML = `<tr><td colspan="8" style="color: red; text-align: center;">Не удалось загрузить список дилеров.</td></tr>`; // (ИЗМЕНЕНО) colspan="8"
+            dealerListBody.innerHTML = `<tr><td colspan="8" style="color: red; text-align: center;">Не удалось загрузить список дилеров.</td></tr>`;
         }
     }
 
