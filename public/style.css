@@ -1,77 +1,75 @@
 /* style.css */
+
+/* --- Базовые стили --- */
+:root {
+    --primary-color: #007bff;
+    --success-color: #28a745;
+    --danger-color: #dc3545;
+    --warning-color: #ffc107;
+    --secondary-color: #6c757d;
+    --light-gray: #f8f9fa;
+    --medium-gray: #e9ecef;
+    --dark-gray: #343a40;
+    --text-color: #212529;
+    --border-color: #dee2e6;
+    --shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
 body {
-    font-family: Arial, sans-serif;
-    margin: 20px;
-    background-color: #f4f7f6;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    margin: 0;
+    background-color: var(--light-gray);
+    color: var(--text-color);
+    line-height: 1.5;
+}
+
+/* Обертка для контента */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
 }
 
 h1, h2, h3 {
     color: #333;
-    border-bottom: 2px solid #007bff;
-    padding-bottom: 5px;
+    border-bottom: 2px solid var(--primary-color);
+    padding-bottom: 10px;
+    margin-top: 1.5rem;
 }
 h3 {
-    border-bottom: 1px solid #ccc;
+    border-bottom: 1px solid var(--medium-gray);
     margin-top: 30px;
 }
 
-/* --- Навигация --- */
+/* --- (ИЗМЕНЕНО) Навигация (Шапка) --- */
 nav {
-    background-color: #333;
+    background-color: #ffffff;
     padding: 10px 20px;
     border-radius: 8px;
     margin-bottom: 20px;
+    box-shadow: var(--shadow);
+    display: flex;
+    gap: 15px;
 }
 nav a.nav-link {
-    color: white;
+    color: var(--secondary-color);
     text-decoration: none;
-    font-size: 1.2em;
-    font-weight: bold;
+    font-size: 1.1em;
+    font-weight: 500;
     padding: 10px 15px;
-    border-radius: 4px;
+    border-radius: 5px;
+    transition: background-color 0.2s, color 0.2s;
 }
 nav a.nav-link:hover {
-    background-color: #555;
+    background-color: var(--light-gray);
+    color: var(--text-color);
 }
 nav a.nav-link.active {
-    background-color: #007bff;
+    background-color: var(--primary-color);
+    color: white;
 }
 
-/* --- Кнопка "Добавить" --- */
-#open-add-modal-btn {
-    padding: 12px 20px;
-    font-size: 16px;
-    margin-bottom: 15px;
-}
-
-/* --- Формы в Модальных окнах --- */
-#add-dealer-form, #edit-dealer-form, #add-product-form, #edit-product-form {
-    display: grid;
-    gap: 10px;
-    grid-template-columns: 1fr;
-}
-
-/* Общие стили для полей ввода */
-input[type="text"],
-input[type="file"],
-textarea,
-select {
-    width: 100%;
-    padding: 10px;
-    box-sizing: border-box; 
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    margin-top: 5px;
-}
-
-label {
-    font-weight: bold;
-    color: #555;
-    margin-top: 5px;
-    display: block;
-}
-
-/* Общие стили кнопок (для <button> и <a>) */
+/* --- (ИЗМЕНЕНО) Общие стили кнопок --- */
 button,
 a.btn-primary,
 a.btn-danger,
@@ -79,47 +77,56 @@ a.btn-secondary {
     padding: 10px 15px;
     color: white;
     border: none;
-    border-radius: 4px;
+    border-radius: 5px;
     cursor: pointer;
     font-size: 14px;
+    font-weight: 500;
     margin-top: 10px;
     text-decoration: none;
     display: inline-block;
+    transition: opacity 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 button:hover,
 a.btn-primary:hover,
 a.btn-danger:hover,
 a.btn-secondary:hover {
-    opacity: 0.9;
+    opacity: 0.85;
 }
 button[type="submit"] {
-    background-color: #007bff;
+    background-color: var(--primary-color);
     font-size: 16px;
 }
 button[type="submit"]:hover {
-    background-color: #0056b3;
+    background-color: #0069d9;
 }
 .btn-danger,
 a.btn-danger {
-    background-color: #dc3545;
+    background-color: var(--danger-color);
 }
 .btn-danger:hover,
 a.btn-danger:hover {
     background-color: #c82333;
     color: white;
 }
+/* (ИЗМЕНЕНО) Зеленая кнопка "Добавить" */
 .btn-primary,
-a.btn-primary {
-    background-color: #007bff;
+a.btn-primary,
+#open-add-modal-btn,
+#open-add-product-btn {
+    background-color: var(--success-color) !important;
+    border-color: var(--success-color) !important;
 }
 .btn-primary:hover,
-a.btn-primary:hover {
-     background-color: #0056b3;
+a.btn-primary:hover,
+#open-add-modal-btn:hover,
+#open-add-product-btn:hover {
+     background-color: #218838 !important;
      color: white;
 }
 .btn-secondary,
 a.btn-secondary {
-    background-color: #6c757d;
+    background-color: var(--secondary-color);
 }
 .btn-secondary:hover,
 a.btn-secondary:hover {
@@ -127,6 +134,32 @@ a.btn-secondary:hover {
     color: white;
 }
 
+/* --- Формы --- */
+label {
+    font-weight: 600;
+    color: #555;
+    margin-top: 5px;
+    display: block;
+}
+input[type="text"],
+input[type="file"],
+textarea,
+select {
+    width: 100%;
+    padding: 10px;
+    box-sizing: border-box; 
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    margin-top: 5px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+input[type="text"]:focus,
+textarea:focus,
+select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+    outline: none;
+}
 
 /* --- Стили для фильтров --- */
 .filter-container {
@@ -134,9 +167,9 @@ a.btn-secondary:hover {
     flex-wrap: wrap;
     gap: 20px;
     background-color: #fff;
-    padding: 15px;
+    padding: 20px;
     border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    box-shadow: var(--shadow);
     margin-bottom: 20px;
 }
 .filter-group {
@@ -144,7 +177,7 @@ a.btn-secondary:hover {
     flex-direction: column;
 }
 .filter-group label {
-    font-weight: bold;
+    font-weight: 600;
     font-size: 0.9em;
     color: #555;
     margin-bottom: 0;
@@ -152,52 +185,56 @@ a.btn-secondary:hover {
 }
 .filter-group select {
     padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    min-width: 200px;
+    min-width: 220px;
     margin-top: 5px;
 }
 
-/* --- Общие Стили для Таблиц --- */
+/* --- (ИЗМЕНЕНО) Общие Стили для Таблиц --- */
 #dealer-table, #products-table, #report-table {
     width: 100%;
     border-collapse: collapse;
     background-color: #fff;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    box-shadow: var(--shadow);
     border-radius: 8px;
-    overflow: hidden;
+    overflow: hidden; /* Важно для скругления углов */
 }
 
 #dealer-table th, #dealer-table td,
 #products-table th, #products-table td,
 #report-table th, #report-table td {
     padding: 12px 15px;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--border-color);
     text-align: left;
     vertical-align: middle;
 }
 
 #dealer-table th, #products-table th, #report-table th {
-    background-color: #f4f7f6;
+    background-color: var(--light-gray);
     color: #333;
-    font-weight: bold;
+    font-weight: 600;
     position: relative;
 }
 
+/* (НОВОЕ) "Зебра" для строк */
+#dealer-table tbody tr:nth-of-type(even),
+#products-table tbody tr:nth-of-type(even),
+#report-table tbody tr:nth-of-type(even) {
+    background-color: var(--light-gray);
+}
 #dealer-table tbody tr:hover,
 #products-table tbody tr:hover,
 #report-table tbody tr:hover {
-    background-color: #f9f9f9;
+    background-color: var(--medium-gray);
 }
 
-/* --- Общие Стили для Сортировки --- */
+/* --- Стили для Сортировки --- */
 #dealer-table th[data-sort],
 #products-table th[data-sort] {
     cursor: pointer;
 }
 #dealer-table th[data-sort]:hover,
 #products-table th[data-sort]:hover {
-    background-color: #e9ecef;
+    background-color: #dde1e5;
 }
 #dealer-table th[data-sort]::after,
 #products-table th[data-sort]::after {
@@ -219,8 +256,6 @@ a.btn-secondary:hover {
     border-top-color: #333;
     opacity: 1;
 }
-/* --- Конец Сортировки --- */
-
 
 /* --- Стили для таблицы Дилеров --- */
 .column-number {
@@ -238,7 +273,7 @@ a.btn-secondary:hover {
     height: 60px;
     object-fit: cover;
     border-radius: 4px;
-    border: 1px solid #eee;
+    border: 1px solid var(--border-color);
 }
 #dealer-table .no-photo {
     width: 60px;
@@ -246,55 +281,50 @@ a.btn-secondary:hover {
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: #eee;
+    background-color: var(--medium-gray);
     color: #aaa;
     font-size: 12px;
     border-radius: 4px;
 }
 #dealer-table td a {
     text-decoration: none;
-    color: #0056b3;
-    font-weight: bold;
+    color: var(--primary-color);
+    font-weight: 500;
 }
 #dealer-table td a:hover {
     text-decoration: underline;
 }
-
-/* Стили для таблицы Товаров */
 #products-table td.sku-cell {
     font-family: monospace;
     font-weight: bold;
-    color: #0056b3;
+    color: var(--primary-color);
 }
 
-/* Общие стили кнопок "Действия" в таблицах */
+/* Кнопки "Действия" в таблицах */
 .actions-cell {
     display: flex;
     gap: 5px;
+    white-space: nowrap;
 }
-.actions-cell .edit-btn {
-    padding: 5px 10px;
-    color: #333;
-    font-weight: bold;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    margin-top: 0;
-    background-color: #ffc107;
-}
+.actions-cell .edit-btn,
 .actions-cell .delete-btn {
     padding: 5px 10px;
-    color: white;
-    font-weight: bold;
+    font-weight: 500;
     border: none;
     border-radius: 4px;
     cursor: pointer;
     margin-top: 0;
-    background-color: #dc3545;
+}
+.actions-cell .edit-btn {
+    color: #212529;
+    background-color: var(--warning-color);
+}
+.actions-cell .delete-btn {
+    color: white;
+    background-color: var(--danger-color);
 }
 
-
-/* --- Стили Модального Окна (Общие) --- */
+/* --- (ИЗМЕНЕНО) Модальное Окно --- */
 .modal {
     display: none; 
     position: fixed; 
@@ -304,24 +334,30 @@ a.btn-secondary:hover {
     width: 100%;
     height: 100%;
     overflow: auto; 
-    background-color: rgba(0,0,0,0.4); 
+    background-color: rgba(0,0,0,0.5); 
 }
 .modal-content {
     background-color: #fefefe;
     margin: 3% auto; 
-    padding: 20px;
+    padding: 20px 30px;
     border: 1px solid #888;
     width: 80%;
     max-width: 700px; 
     border-radius: 8px;
     position: relative;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+.modal-content h2 {
+    text-align: center;
+    margin-top: 0;
+    padding-bottom: 15px;
 }
 .close-btn {
     color: #aaa;
     position: absolute;
     top: 10px;
     right: 25px;
-    font-size: 28px;
+    font-size: 32px;
     font-weight: bold;
 }
 .close-btn:hover,
@@ -336,7 +372,7 @@ a.btn-secondary:hover {
     display: block;
     margin-bottom: 10px;
     border-radius: 4px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color);
 }
 
 /* --- Динамические списки (Контакты, Фото, Адреса) --- */
@@ -344,10 +380,10 @@ a.btn-secondary:hover {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border-color);
     border-radius: 4px;
     padding: 10px;
-    background-color: #f9f9f9;
+    background-color: var(--light-gray);
     max-height: 250px; 
     overflow-y: auto;
 }
@@ -377,10 +413,10 @@ a.btn-secondary:hover {
     height: 60px;
     object-fit: cover;
     border-radius: 4px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color);
 }
 .btn-remove-entry {
-    background-color: #dc3545;
+    background-color: var(--danger-color);
     color: white;
     border: none;
     border-radius: 50%;
@@ -401,11 +437,10 @@ a.btn-secondary:hover {
 .product-checklist {
     max-height: 200px;
     overflow-y: auto;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border-color);
     border-radius: 4px;
     padding: 10px;
-    background-color: #f9f9f9;
-    /* (ИЗМЕНЕНО) 2 колонки */
+    background-color: var(--light-gray);
     columns: 2;
     -webkit-columns: 2;
     -moz-columns: 2;
@@ -415,7 +450,6 @@ a.btn-secondary:hover {
     display: flex;
     align-items: center;
     margin-bottom: 5px;
-    /* (ИЗМЕНЕНО) Предотвращаем разрыв */
     break-inside: avoid-column;
     -webkit-break-inside: avoid-column;
     page-break-inside: avoid;
@@ -439,7 +473,7 @@ a.btn-secondary:hover {
     background-color: #fff;
     padding: 30px;
     border-radius: 8px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    box-shadow: var(--shadow);
 }
 .details-container img {
     max-width: 100%;
@@ -454,15 +488,14 @@ a.btn-secondary:hover {
     word-wrap: break-word;
 }
 .products-display {
-    background-color: #f9f9f9;
-    border: 1px solid #eee;
+    background-color: var(--light-gray);
+    border: 1px solid var(--border-color);
     padding: 15px;
     border-radius: 4px;
     white-space: pre-wrap; 
     font-family: monospace;
     word-wrap: break-word;
 }
-/* Стили для списка товаров на странице дилера */
 .products-list-detailed {
     list-style-type: disc;
     padding-left: 20px;
@@ -477,7 +510,7 @@ a.btn-secondary:hover {
     gap: 15px;
 }
 .gallery-item {
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color);
     border-radius: 4px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     background: #fff;
@@ -496,7 +529,7 @@ a.btn-secondary:hover {
     font-size: 0.9em;
     font-weight: bold;
     color: #555;
-    border-top: 1px solid #eee;
+    border-top: 1px solid var(--border-color);
 }
 /* Контейнер для ссылок */
 .dealer-links-container {
@@ -505,7 +538,7 @@ a.btn-secondary:hover {
     margin-top: 15px;
     margin-bottom: 15px;
     flex-wrap: wrap;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--medium-gray);
     padding-bottom: 20px;
 }
 .dealer-links-container a {
@@ -516,9 +549,9 @@ a.btn-secondary:hover {
 a.back-link {
     display: inline-block;
     margin-top: 20px;
-    color: #007bff;
+    color: var(--primary-color);
     text-decoration: none;
-    font-weight: bold;
+    font-weight: 500;
 }
 a.back-link:hover {
     text-decoration: underline;
@@ -526,6 +559,7 @@ a.back-link:hover {
 .details-container .btn-danger {
     margin-top: 20px;
     font-size: 16px;
+    float: right; /* Отодвигаем кнопку "Удалить" */
 }
 
 /* --- Стили для страницы Товаров --- */
@@ -539,6 +573,49 @@ a.back-link:hover {
     width: 60%;
     padding: 12px;
     font-size: 16px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+}
+
+/* --- Сообщения об ошибках / Пустых данных --- */
+#no-data-msg {
+    text-align: center;
+    font-size: 1.2em;
+    color: #555;
+    padding: 30px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+}
+
+/* Адаптивность для модальных окон */
+@media (max-width: 600px) {
+    body {
+        margin: 10px;
+    }
+    .modal-content {
+        width: 95%;
+        margin: 5% auto;
+    }
+    .contact-entry, .address-entry {
+        grid-template-columns: 1fr auto; /* Меняем сетку на мобильных */
+    }
+    .contact-entry input:nth-of-type(3),
+    .address-entry input:nth-of-type(3) {
+        grid-column: 1 / 1;
+    }
+    .btn-remove-entry {
+        grid-row: 1 / span 2;
+        grid-column: 2 / 2;
+    }
+    .photo-entry {
+        grid-template-columns: 1fr auto;
+    }
+    .photo-entry.existing {
+         grid-template-columns: 100px 1fr auto;
+    }
+    .photo-entry input[type="file"] {
+        grid-column: 1 / 1;
+    }
+    .product-checklist {
+        columns: 1; /* В одну колонку на мобильных */
+    }
 }
