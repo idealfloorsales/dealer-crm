@@ -2,43 +2,34 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const basicAuth = require('express-basic-auth'); // (НОВЫЙ ИНСТРУМЕНТ)
+const basicAuth = require('express-basic-auth'); 
 
 const app = express();
 const PORT = process.env.PORT || 3000; 
 app.use(express.json({ limit: '50mb' })); 
 app.use(cors());
 
-// --- (НОВОЕ) НАСТРОЙКИ БЕЗОПАСНОСТИ ---
-// 1. Берем логин и пароль из "Environment Variables" на Render
+// --- НАСТРОЙКИ БЕЗОПАСНОСТИ ---
 const ADMIN_USER = process.env.ADMIN_USER;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
-// 2. Проверяем, что они заданы
 if (!ADMIN_USER || !ADMIN_PASSWORD) {
     console.error("Критическая ошибка: ADMIN_USER или ADMIN_PASSWORD не установлены!");
-    console.error("Пожалуйста, добавьте их в 'Environment Variables' на Render.");
-    // (Примечание: на Render это вызовет "Deploy Failed", что хорошо)
     process.exit(1); 
 }
 
-// 3. Создаем "защитника"
 app.use(basicAuth({
-    users: { [ADMIN_USER]: ADMIN_PASSWORD }, // { 'admin': 'mypassword123' }
-    challenge: true, // Показывает всплывающее окно
+    users: { [ADMIN_USER]: ADMIN_PASSWORD }, 
+    challenge: true, 
     unauthorizedResponse: 'Доступ запрещен. Обновите страницу и попробуйте снова.'
 }));
 // --- КОНЕЦ БЛОКА БЕЗОПАСНОСТИ ---
 
-
-// (ВАЖНО) Эта строка должна идти ПОСЛЕ блока безопасности
 app.use(express.static('public'));
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// (Весь остальной код базы данных и API остается без изменений)
-
-// "Вшитый" список 51 товара
+// "Вшитый" список 74 товаров
 const productsToImport = [
     { sku: "CD-507", name: "Дуб Беленый" },
     { sku: "CD-508", name: "Дуб Пепельный" },
@@ -87,7 +78,35 @@ const productsToImport = [
     { sku: "RWN-31", name: "Дуб Эверест" },
     { sku: "RWN-32", name: "Дуб Альпийский" },
     { sku: "RWN-33", name: "Дуб Сахара" },
-    { sku: "RWN-36", name: "Кедр Гималайкий" }
+    { sku: "RWN-36", name: "Кедр Гималайкий" },
+    { sku: "RWN-37", name: "Дуб Ниагара" },
+    { sku: "RWN-39", name: "Дуб Сибирский" },
+    { sku: "RWЕ-41", name: "Дуб Жемчужный" }, 
+    { sku: "RWE-44", name: "Орех Классик" },
+    { sku: "AS-81", name: "Дуб Карибский" },
+    { sku: "AS-82", name: "Дуб Средиземноморский" },
+    { sku: "AS-83", name: "Дуб Саргасс" },
+    { sku: "AS-84", name: "Дуб Песчаный" },
+    { sku: "AS-85", name: "Дуб Атлантик" },
+    { sku: "RPL-1", name: "Дуб Сицилия" },
+    { sku: "RPL-2", name: "Дуб Сицилия темный" },
+    { sku: "RPL-4", name: "Дуб Сицилия серый" },
+    { sku: "RPL-6", name: "Дуб Бризе" },
+    { sku: "RPL-15", name: "Дуб Фламенко" },
+    { sku: "RPL-20", name: "Дуб Милан" },
+    { sku: "RPL-21", name: "Дуб Флоренция" },
+    { sku: "RPL-22", name: "Дуб Неаполь" },
+    { sku: "RPL-23", name: "Дуб Монарх" },
+    { sku: "RPL-24", name: "Дуб Эмперадор" },
+    { sku: "RPL-25", name: "Дуб Авангард" },
+    { sku: "RPL-28", name: "Дуб Венеция" },
+    { sku: "РФС-1", name: "Расческа их фанеры старая" },
+    { sku: "РФ-2", name: "Расческа из фанеры" },
+    { sku: "С800", name: "800мм задняя стенка" },
+    { sku: "С600", name: "600мм задняя стенка" },
+    { sku: "Табличка", name: "Табличка орг.стекло" },
+    { sku: "Н800", name: "800мм наклейка" },
+    { sku: "Н600", name: "600мм наклейка" }
 ];
 
 // --- Модели Базы Данных (Схемы) ---
@@ -132,29 +151,41 @@ const dealerSchema = new mongoose.Schema({
 });
 const Dealer = mongoose.model('Dealer', dealerSchema);
 
+// (НОВАЯ) Схема для Базы Знаний
+const knowledgeSchema = new mongoose.Schema({
+    title: { type: String, required: true },
+    content: String
+}, { timestamps: true }); // Добавляем дату создания/обновления
+const Knowledge = mongoose.model('Knowledge', knowledgeSchema);
+
 // --- "Умный" импорт/синхронизация для MongoDB ---
 async function hardcodedImportProducts() {
     try {
-        const count = await Product.countDocuments();
-        if (count < 51) { // (ИЗМЕНЕНО) Запускаем, если товаров < 51 (на случай сбоя)
-            console.log(`В каталоге ${count} товаров. Начинаю "вшитый" импорт...`);
-            // Используем 'upsert' (update + insert) для безопасного добавления
-            const operations = productsToImport.map(p => ({
-                updateOne: {
-                    filter: { sku: p.sku }, // Найти по SKU
-                    update: { $set: p },    // Обновить/Вставить
-                    upsert: true            // Создать, если не найден
-                }
-            }));
-            await Product.bulkWrite(operations);
-            
-            const newCount = await Product.countDocuments();
-            console.log(`Импорт завершен. В каталоге ${newCount} товаров.`);
-        } else {
-            console.log("Таблица 'products' уже содержит данные. Импорт пропущен.");
+        console.log("Запускаю синхронизацию каталога товаров...");
+        
+        const dbProducts = await Product.find().lean();
+        const dbSkus = new Set(dbProducts.map(p => p.sku));
+        const codeSkus = new Set(productsToImport.map(p => p.sku));
+
+        const skusToDelete = [...dbSkus].filter(sku => !codeSkus.has(sku));
+        if (skusToDelete.length > 0) {
+            console.log(`Удаляю ${skusToDelete.length} устаревших товаров...`);
+            await Product.deleteMany({ sku: { $in: skusToDelete } });
         }
+
+        const productsToAdd = productsToImport.filter(p => !dbSkus.has(p.sku));
+        if (productsToAdd.length > 0) {
+            console.log(`Добавляю ${productsToAdd.length} новых товаров...`);
+            await Product.insertMany(productsToAdd, { ordered: false }).catch(e => {
+                if (e.code !== 11000) console.warn("Ошибка при добавлении:", e.message);
+            });
+        }
+        
+        const finalCount = await Product.countDocuments();
+        console.log(`Синхронизация завершена. В каталоге ${finalCount} товаров.`);
+
     } catch (error) {
-           console.warn(`Ошибка при импорте: ${error.message}`);
+           console.warn(`Ошибка при синхронизации товаров: ${error.message}`);
     }
 }
 
@@ -340,6 +371,53 @@ app.get('/api/products/:id/dealers', async (req, res) => {
         dealers.forEach(d => { d.id = d._id; }); 
         res.json(dealers);
         
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// === (НОВОЕ) API для Базы Знаний ===
+app.get('/api/knowledge', async (req, res) => {
+    try {
+        const searchTerm = req.query.search || '';
+        const searchRegex = new RegExp(searchTerm, 'i');
+        const articles = await Knowledge.find(
+            { title: { $regex: searchRegex } }, // Ищем только по заголовку
+            'title createdAt' // Отдаем только Заголовок и Дату
+        ).sort({ title: 1 }).lean();
+        
+        articles.forEach(a => { a.id = a._id; });
+        res.json(articles);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/knowledge/:id', async (req, res) => {
+    try {
+        const article = await Knowledge.findById(req.params.id);
+        if (!article) return res.status(404).json({ message: "Статья не найдена" });
+        res.json(convertToClient(article));
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/knowledge', async (req, res) => {
+    try {
+        const article = new Knowledge(req.body);
+        await article.save();
+        res.status(201).json(convertToClient(article));
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/knowledge/:id', async (req, res) => {
+    try {
+        const article = await Knowledge.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        if (!article) return res.status(404).json({ error: "Статья не найдена" });
+        res.json(convertToClient(article));
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/knowledge/:id', async (req, res) => {
+    try {
+        const article = await Knowledge.findByIdAndDelete(req.params.id);
+        if (!article) return res.status(404).json({ error: "Статья не найдена" });
+        res.json({ message: "deleted" });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
