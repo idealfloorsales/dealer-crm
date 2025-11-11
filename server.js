@@ -11,7 +11,7 @@ app.use(express.static('public'));
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// (НОВЫЙ СПИСОК) 74 товара
+// "Вшитый" список 74 товаров (новый)
 const productsToImport = [
     { sku: "CD-507", name: "Дуб Беленый" },
     { sku: "CD-508", name: "Дуб Пепельный" },
@@ -63,7 +63,7 @@ const productsToImport = [
     { sku: "RWN-36", name: "Кедр Гималайкий" },
     { sku: "RWN-37", name: "Дуб Ниагара" },
     { sku: "RWN-39", name: "Дуб Сибирский" },
-    { sku: "RWЕ-41", name: "Дуб Жемчужный" }, // Опечатка в SKU? Оставляю как у вас
+    { sku: "RWЕ-41", name: "Дуб Жемчужный" }, 
     { sku: "RWE-44", name: "Орех Классик" },
     { sku: "AS-81", name: "Дуб Карибский" },
     { sku: "AS-82", name: "Дуб Средиземноморский" },
@@ -133,7 +133,7 @@ const dealerSchema = new mongoose.Schema({
 });
 const Dealer = mongoose.model('Dealer', dealerSchema);
 
-// --- (ИЗМЕНЕНО) "Умный" импорт/синхронизация для MongoDB ---
+// --- "Умный" импорт/синхронизация для MongoDB ---
 async function hardcodedImportProducts() {
     try {
         console.log("Запускаю синхронизацию каталога товаров...");
@@ -142,7 +142,6 @@ async function hardcodedImportProducts() {
         const dbSkus = new Set(dbProducts.map(p => p.sku));
         const codeSkus = new Set(productsToImport.map(p => p.sku));
 
-        // 1. Найти, что удалить из БД (товары, которых больше нет в коде)
         const skusToDelete = [...dbSkus].filter(sku => !codeSkus.has(sku));
         if (skusToDelete.length > 0) {
             console.log(`Удаляю ${skusToDelete.length} устаревших товаров...`);
@@ -150,12 +149,10 @@ async function hardcodedImportProducts() {
             // TODO: Также удалить эти product_id из всех дилеров
         }
 
-        // 2. Найти, что добавить в БД (новые товары из кода)
         const productsToAdd = productsToImport.filter(p => !dbSkus.has(p.sku));
         if (productsToAdd.length > 0) {
             console.log(`Добавляю ${productsToAdd.length} новых товаров...`);
             await Product.insertMany(productsToAdd, { ordered: false }).catch(e => {
-                // Игнорируем ошибки дубликатов, если они вдруг возникнут
                 if (e.code !== 11000) console.warn("Ошибка при добавлении:", e.message);
             });
         }
@@ -177,7 +174,7 @@ async function connectToDB() {
     try {
         await mongoose.connect(DB_CONNECTION_STRING);
         console.log("Подключено к базе данных MongoDB Atlas!");
-        await hardcodedImportProducts(); // Запускаем синхронизацию
+        await hardcodedImportProducts();
     } catch (error) {
         console.error("Ошибка подключения к MongoDB:", error.message);
     }
@@ -259,7 +256,11 @@ app.delete('/api/dealers/:id', async (req, res) => {
 // === API для СВЯЗИ Дилеров и Товаров ===
 app.get('/api/dealers/:id/products', async (req, res) => {
     try {
-        const dealer = await Dealer.findById(req.params.id).populate('products');
+        // (ИЗМЕНЕНО) Сортируем связанные товары по SKU
+        const dealer = await Dealer.findById(req.params.id).populate({
+            path: 'products',
+            options: { sort: { 'sku': 1 } } 
+        });
         if (!dealer) return res.status(404).json({ message: "Дилер не найден" });
         
         const productsWithId = dealer.products.map(p => convertToClient(p));
@@ -287,7 +288,7 @@ app.get('/api/products', async (req, res) => {
                 { sku: { $regex: searchRegex } },
                 { name: { $regex: searchRegex } }
             ]
-        }).sort({ name: 1 }).lean(); // (ИЗМЕНЕНО) Сортировка по имени прямо в базе
+        }).sort({ sku: 1 }).lean(); // (ИЗМЕНЕНО) Сортировка по SKU
         
         products.forEach(p => { p.id = p._id; }); 
         res.json(products);
