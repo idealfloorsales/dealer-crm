@@ -133,10 +133,9 @@ const additionalAddressSchema = new mongoose.Schema({
     address: String
 }, { _id: false });
 
-// (НОВАЯ) Схема для POS-материалов
 const posMaterialSchema = new mongoose.Schema({
-    name: String, // Название (н-р, "800мм задняя стенка")
-    quantity: Number // Количество
+    name: String,
+    quantity: Number
 }, { _id: false });
 
 const dealerSchema = new mongoose.Schema({
@@ -153,12 +152,11 @@ const dealerSchema = new mongoose.Schema({
     website: String,
     instagram: String,
     additional_addresses: [additionalAddressSchema],
-    pos_materials: [posMaterialSchema], // (НОВОЕ ПОЛЕ)
+    pos_materials: [posMaterialSchema],
     products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }]
 });
 const Dealer = mongoose.model('Dealer', dealerSchema);
 
-// (НОВАЯ) Схема для Базы Знаний
 const knowledgeSchema = new mongoose.Schema({
     title: { type: String, required: true },
     content: String
@@ -263,7 +261,6 @@ app.get('/api/dealers/:id', async (req, res) => {
 
 app.post('/api/dealers', async (req, res) => {
     try {
-        // (ИЗМЕНЕНО) Mongoose автоматически обработает 'pos_materials'
         const dealer = new Dealer(req.body); 
         await dealer.save();
         res.status(201).json(convertToClient(dealer)); 
@@ -272,7 +269,6 @@ app.post('/api/dealers', async (req, res) => {
 
 app.put('/api/dealers/:id', async (req, res) => {
     try {
-        // (ИЗМЕНЕНО) Mongoose автоматически обработает 'pos_materials'
         const dealer = await Dealer.findByIdAndUpdate(req.params.id, req.body, { new: true });
         if (!dealer) return res.status(404).json({ message: "Дилер не найден" });
         res.json({ message: "success" });
@@ -370,19 +366,56 @@ app.delete('/api/products/:id', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// === API для Отчета ===
-app.get('/api/products/:id/dealers', async (req, res) => {
+// === (ИЗМЕНЕНО) API для Отчета (теперь Матрица) ===
+app.get('/api/matrix', async (req, res) => {
     try {
-        const dealers = await Dealer.find(
-            { products: req.params.id },
-            'dealer_id name city' 
-        ).sort({ name: 1 }).lean(); 
+        // 1. Получаем ВСЕ товары (отсортированные по SKU)
+        const allProducts = await Product.find({}, 'sku name').sort({ sku: 1 }).lean();
         
-        dealers.forEach(d => { d.id = d._id; }); 
-        res.json(dealers);
+        // 2. Получаем ВСЕХ дилеров (только ID, Имя и их Товары)
+        const allDealers = await Dealer.find({}, 'name products').sort({ name: 1 }).lean();
         
-    } catch (e) { res.status(500).json({ error: e.message }); }
+        // 3. Создаем "карту" товаров дилера для быстрого поиска
+        //    (dealerId => Set[productId, productId, ...])
+        const dealerProductMap = new Map();
+        allDealers.forEach(dealer => {
+            const productSet = new Set(dealer.products.map(pId => pId.toString()));
+            dealerProductMap.set(dealer._id.toString(), productSet);
+        });
+
+        // 4. Формируем "Матрицу"
+        const matrix = [];
+        allProducts.forEach(product => {
+            const productRow = {
+                product_id: product._id,
+                sku: product.sku,
+                name: product.name,
+                dealers: [] // Сюда мы добавим статусы
+            };
+            
+            allDealers.forEach(dealer => {
+                const productSet = dealerProductMap.get(dealer._id.toString());
+                productRow.dealers.push({
+                    dealer_id: dealer._id,
+                    name: dealer.name,
+                    // Проверяем, есть ли ID товара в Set'е дилера
+                    has_product: productSet.has(product._id.toString())
+                });
+            });
+            matrix.push(productRow);
+        });
+
+        // 5. Отдельно отправляем "шапку" (всех дилеров)
+        const headers = allDealers.map(d => ({ id: d._id, name: d.name }));
+        
+        res.json({ headers, matrix });
+        
+    } catch (e) { 
+        console.error("Ошибка при создании матрицы:", e);
+        res.status(500).json({ error: e.message }); 
+    }
 });
+
 
 // === API для Базы Знаний ===
 app.get('/api/knowledge', async (req, res) => {
