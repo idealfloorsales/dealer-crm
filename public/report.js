@@ -17,6 +17,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(API_PRODUCTS_URL);
             if (!response.ok) throw new Error('Не удалось загрузить каталог');
             const products = await response.json();
+            
+            // (ИЗМЕНЕНО) Сортируем по SKU
+            products.sort((a, b) => a.sku.localeCompare(b.sku, 'ru', { numeric: true }));
 
             productSelect.innerHTML = '<option value="">-- Выберите товар --</option>'; // Очистка
             
