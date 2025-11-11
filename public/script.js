@@ -51,16 +51,16 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.onerror = error => reject(error);
     });
 
-    // --- Функция: Загрузка каталога товаров в кэш ---
+    // --- (ИЗМЕНЕНО) Функция: Загрузка каталога товаров в кэш ---
     async function fetchProductCatalog() {
         if (fullProductCatalog.length > 0) return; 
         try {
             const response = await fetch(API_PRODUCTS_URL);
             if (!response.ok) throw new Error('Ошибка сети при загрузке каталога');
             fullProductCatalog = await response.json();
-            // (СОРТИРОВКА) Сервер уже сортирует, но мы делаем это еще раз
-            // для 100% гарантии алфавитного порядка.
-            fullProductCatalog.sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+            
+            // (ИЗМЕНЕНО) Гарантируем сортировку по АРТИКУЛУ
+            fullProductCatalog.sort((a, b) => a.sku.localeCompare(b.sku, 'ru', { numeric: true }));
             
             console.log(`Загружено ${fullProductCatalog.length} товаров в каталог.`);
         } catch (error) {
@@ -255,11 +255,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const sortedDealers = filteredDealers.sort((a, b) => {
             const col = currentSort.column;
-            let valA = (a[col] || '').toString().toLowerCase(); 
-            let valB = (b[col] || '').toString().toLowerCase();
-            let comparison = 0;
-            if (valA > valB) comparison = 1;
-            else if (valA < valB) comparison = -1;
+            // (ИЗМЕНЕНО) Добавлена цифровая сортировка для 'dealer_id'
+            let valA = (a[col] || '').toString(); 
+            let valB = (b[col] || '').toString();
+            
+            let comparison;
+            if (col === 'dealer_id') {
+                 comparison = valA.localeCompare(valB, undefined, { numeric: true });
+            } else {
+                 comparison = valA.toLowerCase().localeCompare(valB.toLowerCase(), 'ru');
+            }
+            
             return currentSort.direction === 'asc' ? comparison : -comparison;
         });
 
