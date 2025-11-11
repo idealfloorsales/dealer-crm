@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Отчет по товарам</title>
+    <title>Матрица Покрытия</title>
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
@@ -27,7 +27,7 @@
                         <a class="nav-link" href="/products.html">Каталог Товаров</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link active" href="/report.html">Отчет по товарам</a>
+                        <a class="nav-link active" href="/report.html">Матрица Покрытия</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="/knowledge.html">База Знаний</a>
@@ -37,35 +37,23 @@
         </div>
     </nav>
     
-    <div class="container mt-4">
-        <h1>Отчет по товарам</h1>
-
-        <div class="filter-container">
-            <div class="filter-group w-100">
-                <label for="product-select" class="form-label">Выберите товар, чтобы увидеть, где он выставлен:</label>
-                <select id="product-select" class="form-select form-select-lg">
-                    <option value="">-- Загрузка каталога... --</option>
-                </select>
-            </div>
+    <div class="container-fluid mt-4"> <div class="d-flex justify-content-between align-items-center mb-3">
+            <h1>Матрица Покрытия</h1>
+            <button id="export-csv-btn" class="btn btn-primary btn-lg">
+                <i class="bi bi-download me-2"></i>Экспорт в CSV
+            </button>
         </div>
 
-        <h2 id="report-title" class="h4 mt-4"></h2>
+        <p id="loading-msg" class="alert alert-info">Загрузка матрицы... Это может занять до 30 секунд.</p>
         
-        <div class="table-responsive bg-white rounded shadow-sm border">
-            <table id="report-table" class="table table-hover align-middle mb-0" style="display: none;">
-                <thead class="table-light">
-                    <tr>
-                        <th>ID точки</th>
-                        <th>Название точки</th>
-                        <th>Город</th>
-                        <th>Подробнее</th>
-                    </tr>
-                </thead>
-                <tbody id="report-list-body">
+        <div id="matrix-container" class="table-responsive bg-white rounded shadow-sm border" style="display: none; max-height: 80vh;">
+            <table id="matrix-table" class="table table-hover table-bordered table-sm mb-0">
+                <thead id="matrix-header">
+                    </thead>
+                <tbody id="matrix-body">
                     </tbody>
             </table>
         </div>
-        <p id="report-no-data-msg" class="alert alert-info mt-3" style="display: none;"></p>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
