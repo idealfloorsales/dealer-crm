@@ -4,43 +4,68 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Отчет по товарам</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <nav>
-        <a href="/" class="nav-link">Учет Дилеров</a>
-        <a href="/products.html" class="nav-link">Каталог Товаров</a>
-        <a href="/report.html" class="nav-link active">Отчет по товарам</a>
-    </nav>
-
-    <h1>Отчет по товарам</h1>
-
-    <div class="filter-container">
-        <div class="filter-group">
-            <label for="product-select">Выберите товар, чтобы увидеть, где он выставлен:</label>
-            <select id="product-select">
-                <option value="">-- Загрузка каталога... --</option>
-            </select>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">CRM Дилеров</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Учет Дилеров</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/products.html">Каталог Товаров</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/report.html">Отчет по товарам</a>
+                    </li>
+                </ul>
+            </div>
         </div>
+    </nav>
+    
+    <div class="container mt-4">
+        <h1>Отчет по товарам</h1>
+
+        <div class="filter-container">
+            <div class="filter-group w-100">
+                <label for="product-select" class="form-label">Выберите товар, чтобы увидеть, где он выставлен:</label>
+                <select id="product-select" class="form-select form-select-lg">
+                    <option value="">-- Загрузка каталога... --</option>
+                </select>
+            </div>
+        </div>
+
+        <h2 id="report-title" class="h4 mt-4"></h2>
+        
+        <div class="table-responsive bg-white rounded shadow-sm border">
+            <table id="report-table" class="table table-hover align-middle mb-0" style="display: none;">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID точки</th>
+                        <th>Название точки</th>
+                        <th>Город</th>
+                        <th>Подробнее</th>
+                    </tr>
+                </thead>
+                <tbody id="report-list-body">
+                    </tbody>
+            </table>
+        </div>
+        <p id="report-no-data-msg" class="alert alert-info mt-3" style="display: none;"></p>
     </div>
 
-    <h2 id="report-title"></h2>
-    
-    <table id="report-table" style="display: none;">
-        <thead>
-            <tr>
-                <th>ID точки</th>
-                <th>Название точки</th>
-                <th>Город</th>
-                <th>Подробнее</th>
-            </tr>
-        </thead>
-        <tbody id="report-list-body">
-            </tbody>
-    </table>
-    <p id="report-no-data-msg"></p>
-
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="report.js"></script>
 </body>
 </html>
