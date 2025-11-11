@@ -11,6 +11,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const addressesListContainer = document.getElementById('dealer-addresses-list'); 
     
     const deleteBtn = document.getElementById('delete-dealer-btn'); 
+    const editBtn = document.getElementById('edit-dealer-btn'); // (НОВАЯ КНОПКА)
+    
     const API_URL = '/api/dealers';
 
     const params = new URLSearchParams(window.location.search);
@@ -19,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!dealerId) {
         detailsContainer.innerHTML = '<h2 class="text-danger">Ошибка: ID дилера не указан в URL.</h2>';
         deleteBtn.style.display = 'none'; 
+        editBtn.style.display = 'none'; // (НОВОЕ) Скрываем кнопку
         return;
     }
 
@@ -62,6 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Ошибка:', error);
             detailsContainer.innerHTML = `<h2 class="text-danger">${error.message}</h2>`;
             deleteBtn.style.display = 'none';
+            editBtn.style.display = 'none'; // (НОВОЕ) Скрываем кнопку
         }
     }
     
@@ -172,6 +176,14 @@ document.addEventListener('DOMContentLoaded', () => {
             productsListContainer.innerHTML = `<p class="text-danger">${error.message}</p>`;
         }
     }
+
+    // --- (НОВЫЙ) Обработчик: Редактирование дилера ---
+    editBtn.addEventListener('click', () => {
+        // 1. Сохраняем ID дилера в "общую" память браузера
+        localStorage.setItem('pendingEditDealerId', dealerId);
+        // 2. Отправляем пользователя на главную страницу
+        window.location.href = 'index.html';
+    });
 
     // --- Обработчик: Удаление дилера ---
     deleteBtn.addEventListener('click', async () => {
