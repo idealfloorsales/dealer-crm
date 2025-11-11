@@ -1,12 +1,12 @@
 /* style.css */
 
-/* --- Базовые стили --- */
+/* --- (ИЗМЕНЕНО) Базовые стили --- */
 :root {
-    --primary-color: #007bff;
-    --success-color: #28a745;
-    --danger-color: #dc3545;
-    --warning-color: #ffc107;
-    --secondary-color: #6c757d;
+    --primary-color: #b9040a;   /* ВАШ НОВЫЙ ЦВЕТ */
+    --success-color: #b9040a;   /* ВАШ НОВЫЙ ЦВЕТ */
+    --danger-color: #dc3545;    /* Оставим для удаления (чуть светлее) */
+    --warning-color: #ffc107;  /* Желтый (Редактировать) */
+    --secondary-color: #6c757d; /* Серый */
     --light-gray: #f8f9fa;
     --medium-gray: #e9ecef;
     --dark-gray: #343a40;
@@ -30,6 +30,7 @@ body {
     padding: 20px;
 }
 
+/* (ИЗМЕНЕНО) Заголовки теперь красные */
 h1, h2, h3 {
     color: #333;
     border-bottom: 2px solid var(--primary-color);
@@ -41,7 +42,7 @@ h3 {
     margin-top: 30px;
 }
 
-/* --- (ИЗМЕНЕНО) Навигация (Шапка) --- */
+/* --- Навигация (Шапка) --- */
 nav {
     background-color: #ffffff;
     padding: 10px 20px;
@@ -64,12 +65,13 @@ nav a.nav-link:hover {
     background-color: var(--light-gray);
     color: var(--text-color);
 }
+/* (ИЗМЕНЕНО) Активная ссылка теперь красная */
 nav a.nav-link.active {
     background-color: var(--primary-color);
     color: white;
 }
 
-/* --- (ИЗМЕНЕНО) Общие стили кнопок --- */
+/* --- Общие стили кнопок --- */
 button,
 a.btn-primary,
 a.btn-danger,
@@ -93,13 +95,15 @@ a.btn-danger:hover,
 a.btn-secondary:hover {
     opacity: 0.85;
 }
+/* (ИЗМЕНЕНО) Кнопка "Submit" (в модалках) */
 button[type="submit"] {
     background-color: var(--primary-color);
     font-size: 16px;
 }
 button[type="submit"]:hover {
-    background-color: #0069d9;
+    background-color: #a00309; /* Чуть темнее */
 }
+/* (ИЗМЕНЕНО) Кнопка "Удалить" (X) */
 .btn-danger,
 a.btn-danger {
     background-color: var(--danger-color);
@@ -109,7 +113,7 @@ a.btn-danger:hover {
     background-color: #c82333;
     color: white;
 }
-/* (ИЗМЕНЕНО) Зеленая кнопка "Добавить" */
+/* (ИЗМЕНЕНО) Кнопка "Добавить" (зеленая) */
 .btn-primary,
 a.btn-primary,
 #open-add-modal-btn,
@@ -121,7 +125,7 @@ a.btn-primary,
 a.btn-primary:hover,
 #open-add-modal-btn:hover,
 #open-add-product-btn:hover {
-     background-color: #218838 !important;
+     background-color: #9c0308 !important; /* Чуть темнее */
      color: white;
 }
 .btn-secondary,
@@ -133,6 +137,7 @@ a.btn-secondary:hover {
     background-color: #5a6268;
     color: white;
 }
+
 
 /* --- Формы --- */
 label {
@@ -153,11 +158,12 @@ select {
     margin-top: 5px;
     transition: border-color 0.2s, box-shadow 0.2s;
 }
+/* (ИЗМЕНЕНО) Фокус поля */
 input[type="text"]:focus,
 textarea:focus,
 select:focus {
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+    box-shadow: 0 0 0 2px rgba(185, 4, 10, 0.25);
     outline: none;
 }
 
@@ -189,14 +195,14 @@ select:focus {
     margin-top: 5px;
 }
 
-/* --- (ИЗМЕНЕНО) Общие Стили для Таблиц --- */
+/* --- Общие Стили для Таблиц --- */
 #dealer-table, #products-table, #report-table {
     width: 100%;
     border-collapse: collapse;
     background-color: #fff;
     box-shadow: var(--shadow);
     border-radius: 8px;
-    overflow: hidden; /* Важно для скругления углов */
+    overflow: hidden; 
 }
 
 #dealer-table th, #dealer-table td,
@@ -215,7 +221,7 @@ select:focus {
     position: relative;
 }
 
-/* (НОВОЕ) "Зебра" для строк */
+/* "Зебра" для строк */
 #dealer-table tbody tr:nth-of-type(even),
 #products-table tbody tr:nth-of-type(even),
 #report-table tbody tr:nth-of-type(even) {
@@ -286,6 +292,7 @@ select:focus {
     font-size: 12px;
     border-radius: 4px;
 }
+/* (ИЗМЕНЕНО) Ссылки в таблице */
 #dealer-table td a {
     text-decoration: none;
     color: var(--primary-color);
@@ -324,7 +331,7 @@ select:focus {
     background-color: var(--danger-color);
 }
 
-/* --- (ИЗМЕНЕНО) Модальное Окно --- */
+/* --- Модальное Окно --- */
 .modal {
     display: none; 
     position: fixed; 
@@ -527,7 +534,7 @@ select:focus {
     padding: 10px;
     margin: 0;
     font-size: 0.9em;
-    font-weight: bold;
+    font-weight: 500;
     color: #555;
     border-top: 1px solid var(--border-color);
 }
@@ -559,7 +566,7 @@ a.back-link:hover {
 .details-container .btn-danger {
     margin-top: 20px;
     font-size: 16px;
-    float: right; /* Отодвигаем кнопку "Удалить" */
+    float: right; 
 }
 
 /* --- Стили для страницы Товаров --- */
@@ -586,25 +593,56 @@ a.back-link:hover {
     box-shadow: var(--shadow);
 }
 
-/* Адаптивность для модальных окон */
+/* --- Адаптивность --- */
+@media (max-width: 768px) {
+    .contact-entry, .address-entry {
+        grid-template-columns: 1fr 1fr auto;
+    }
+    .contact-entry input:nth-of-type(3),
+    .address-entry input:nth-of-type(3) {
+        grid-column: 1 / span 2;
+    }
+    .btn-remove-entry {
+        grid-row: 1 / span 2;
+        grid-column: 3 / 4;
+    }
+    .photo-entry {
+        grid-template-columns: 1fr auto;
+    }
+    .photo-entry.existing {
+         grid-template-columns: 100px 1fr auto;
+    }
+    .photo-entry input[type="file"] {
+        grid-column: 1 / 1;
+    }
+}
+
+
 @media (max-width: 600px) {
     body {
         margin: 10px;
+    }
+    .container {
+        padding: 10px;
     }
     .modal-content {
         width: 95%;
         margin: 5% auto;
     }
     .contact-entry, .address-entry {
-        grid-template-columns: 1fr auto; /* Меняем сетку на мобильных */
+        grid-template-columns: 1fr auto;
+    }
+    .contact-entry input:nth-of-type(2),
+    .address-entry input:nth-of-type(2) {
+        grid-column: 1 / 1;
     }
     .contact-entry input:nth-of-type(3),
     .address-entry input:nth-of-type(3) {
         grid-column: 1 / 1;
     }
     .btn-remove-entry {
-        grid-row: 1 / span 2;
-        grid-column: 2 / 2;
+        grid-row: 1 / span 3;
+        grid-column: 2 / 3;
     }
     .photo-entry {
         grid-template-columns: 1fr auto;
@@ -617,5 +655,8 @@ a.back-link:hover {
     }
     .product-checklist {
         columns: 1; /* В одну колонку на мобильных */
+    }
+    .filter-container {
+        flex-direction: column;
     }
 }
