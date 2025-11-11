@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const photoGalleryContainer = document.getElementById('dealer-photo-gallery'); 
     const deliveryContainer = document.getElementById('dealer-delivery'); 
     const linksContainer = document.getElementById('dealer-links'); 
+    const addressesListContainer = document.getElementById('dealer-addresses-list'); // (НОВОЕ)
     
     const deleteBtn = document.getElementById('delete-dealer-btn'); 
     const API_URL = '/api/dealers';
@@ -42,13 +43,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 <h2>${safeText(dealer.name)}</h2>
                 <p><strong>ID точки:</strong> ${safeText(dealer.dealer_id)}</p>
                 <p><strong>Организация:</strong> ${safeText(dealer.organization)}</p>
-                <p><strong>Город:</strong> ${safeText(dealer.city)}</p>
-                <p><strong>Адрес:</strong> ${safeText(dealer.address)}</p>
+                <p><strong>Главный город:</strong> ${safeText(dealer.city)}</p>
+                <p><strong>Главный адрес:</strong> ${safeText(dealer.address)}</p>
                 <p><strong>Тип цен:</strong> ${safeText(dealer.price_type)}</p>
             `;
             
             renderDealerLinks(dealer.website, dealer.instagram); 
             renderDealerContacts(dealer.contacts);
+            renderDealerAddresses(dealer.additional_addresses); // (НОВОЕ)
             renderDealerPhotos(dealer.photos); 
             
             deliveryContainer.textContent = safeText(dealer.delivery) || '<i>Нет данных о доставке</i>';
@@ -121,6 +123,30 @@ document.addEventListener('DOMContentLoaded', () => {
         html += '</tbody></table>';
         contactsListContainer.innerHTML = html;
     }
+    
+    // --- (НОВАЯ ФУНКЦИЯ) Отрисовка таблицы Доп. Адресов ---
+    function renderDealerAddresses(addresses) {
+        if (!addresses || addresses.length === 0) {
+            addressesListContainer.innerHTML = '<p><i>Нет дополнительных адресов.</i></p>';
+            return;
+        }
+        
+        let html = '<table id="report-table" style="margin-top: 0;"><thead><tr><th>Описание</th><th>Город</th><th>Адрес</th></tr></thead><tbody>';
+        
+        addresses.forEach(addr => {
+            html += `
+                <tr>
+                    <td>${safeText(addr.description)}</td>
+                    <td>${safeText(addr.city)}</td>
+                    <td>${safeText(addr.address)}</td>
+                </tr>
+            `;
+        });
+        
+        html += '</tbody></table>';
+        addressesListContainer.innerHTML = html;
+    }
+
 
     // --- Функция 2: Загрузка товаров дилера ---
     async function fetchDealerProducts() {
