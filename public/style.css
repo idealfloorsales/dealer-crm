@@ -23,11 +23,15 @@ body {
 }
 
 /* Обертка для контента */
-.container {
+.container, .container-fluid {
     max-width: 1200px;
     margin: 0 auto;
     padding: 20px;
 }
+.container-fluid {
+    max-width: 98%;
+}
+
 
 /* Заголовки (красные) */
 h1, h2, h3 {
@@ -120,7 +124,8 @@ a.btn-danger:hover {
 a.btn-primary,
 #open-add-modal-btn,
 #open-add-product-btn,
-#open-add-article-btn {
+#open-add-article-btn,
+#export-csv-btn {
     background-color: var(--primary-color) !important;
     border-color: var(--primary-color) !important;
     color: white !important;
@@ -129,7 +134,8 @@ a.btn-primary,
 a.btn-primary:hover,
 #open-add-modal-btn:hover,
 #open-add-product-btn:hover,
-#open-add-article-btn:hover {
+#open-add-article-btn:hover,
+#export-csv-btn:hover {
      background-color: var(--primary-hover) !important;
      border-color: var(--primary-hover) !important;
      color: white;
@@ -201,7 +207,7 @@ label {
 
 
 /* --- Общие Стили для Таблиц --- */
-#dealer-table, #products-table, #report-table {
+#dealer-table, #products-table, #report-table, #matrix-table {
     width: 100%;
     border-collapse: collapse;
     background-color: #fff;
@@ -211,33 +217,38 @@ label {
 }
 #dealer-table td, #dealer-table th,
 #products-table td, #products-table th,
-#report-table td, #report-table th {
+#report-table td, #report-table th,
+#matrix-table td, #matrix-table th {
     border-bottom: none;
     padding: 12px 15px;
     vertical-align: middle;
 }
 #dealer-table tbody tr,
 #products-table tbody tr,
-#report-table tbody tr {
+#report-table tbody tr,
+#matrix-table tbody tr {
      border-bottom: 1px solid var(--border-color);
 }
 
-#dealer-table th, #products-table th, #report-table th {
+#dealer-table th, #products-table th, #report-table th, #matrix-table th {
     background-color: var(--light-gray);
     color: #333;
     font-weight: 600;
     position: relative;
+    white-space: nowrap; /* Не переносим заголовки */
 }
 
 /* "Зебра" для строк */
 #dealer-table tbody tr:nth-of-type(even),
 #products-table tbody tr:nth-of-type(even),
-#report-table tbody tr:nth-of-type(even) {
+#report-table tbody tr:nth-of-type(even),
+#matrix-table tbody tr:nth-of-type(even) {
     background-color: var(--light-gray);
 }
 #dealer-table tbody tr:hover,
 #products-table tbody tr:hover,
-#report-table tbody tr:hover {
+#report-table tbody tr:hover,
+#matrix-table tbody tr:hover {
     background-color: var(--medium-gray);
 }
 
@@ -338,6 +349,37 @@ label {
     background-color: #f0f0f0 !important;
 }
 
+/* --- (НОВОЕ) Стили для Матрицы Покрытия --- */
+#matrix-table th {
+    /* "Замораживаем" шапку таблицы */
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+.matrix-product-cell {
+    /* "Замораживаем" первую колонку (Товары) */
+    position: sticky;
+    left: 0;
+    background-color: #fff; /* Перекрываем фон "зебры" */
+    font-weight: 600;
+    font-family: monospace;
+    border-right: 2px solid var(--border-color) !important;
+}
+/* Выравниваем "замороженный" заголовок */
+#matrix-table thead th.matrix-product-cell {
+    z-index: 20;
+}
+/* Центрируем галочки */
+.matrix-cell-yes, .matrix-cell-no {
+    text-align: center !important;
+    vertical-align: middle;
+}
+.matrix-cell-yes {
+    color: var(--primary-color);
+    font-size: 1.3rem;
+    font-weight: bold;
+}
+
 
 /* --- Модальное Окно --- */
 .modal-content {
@@ -390,31 +432,21 @@ label {
     border: 1px solid var(--border-color);
 }
 .contact-entry, .address-entry, .photo-entry, .pos-entry {
-    display: flex;
-    flex-wrap: wrap; 
+    display: grid;
     gap: 10px;
     align-items: center;
-    background: #fff;
-    padding: 10px;
-    border-radius: 4px;
-    border: 1px solid var(--border-color);
 }
-.contact-entry input, 
-.address-entry input,
-.pos-entry select, .pos-entry input {
-    flex-grow: 1; 
-    min-width: 150px; 
-    margin-top: 0;
+.contact-entry, .address-entry {
+    grid-template-columns: 1fr 1fr 1fr auto;
 }
 .photo-entry {
-    display: grid;
     grid-template-columns: 100px 1fr 1fr auto;
 }
 .photo-entry.new {
      grid-template-columns: 1fr 1fr auto;
 }
-.photo-entry input {
-    margin-top: 0;
+.pos-entry {
+    grid-template-columns: 2fr 1fr auto;
 }
 
 
@@ -650,7 +682,7 @@ a.back-link:hover {
     body {
         margin: 10px;
     }
-    .container {
+    .container, .container-fluid {
         padding: 10px;
     }
     .modal-content {
@@ -675,7 +707,7 @@ a.back-link:hover {
         grid-row: 1 / span 3;
         grid-column: 2 / 3;
     }
-    .pos-entry .btn-remove-entry { /* Исправляем для POS */
+    .pos-entry .btn-remove-entry { 
          grid-row: 1 / span 2;
     }
     .photo-entry {
