@@ -17,6 +17,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     let allArticles = []; // Кэш
 
+    // (ВОЗВРАЩЕННАЯ ФУНКЦИЯ)
+    const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
+
     // --- Функция: Загрузка статей ---
     async function fetchArticles(searchTerm = '') {
         try {
@@ -35,8 +38,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // --- Функция: Отрисовка Аккордеона ---
     function renderArticles(articles) {
-        const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
-
         if (articles.length === 0) {
             articleList.innerHTML = '';
             noDataMsg.style.display = 'block';
@@ -95,23 +96,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 300);
     });
     
-    // --- (ИСПРАВЛЕНО) Загрузка полного текста статьи при открытии ---
+    // --- Загрузка полного текста статьи при открытии ---
     articleList.addEventListener('show.bs.collapse', async (event) => {
         const articleId = event.target.id.replace('collapse-', '');
         const contentDisplay = document.getElementById(`content-${articleId}`);
         
-        // (ИСПРАВЛЕНО) Проверяем textContent и trim()
         if (contentDisplay.textContent.trim() !== 'Загрузка...') {
-            return; // Уже загружено
+            return; 
         }
         
         try {
             const response = await fetch(`${API_URL}/${articleId}`); 
             if (!response.ok) throw new Error('Не удалось загрузить статью');
             const article = await response.json();
-            // (ИСПРАВЛЕНО) Используем <pre> и safeText
+            
             const safeContent = article.content ? safeText(article.content) : '<i>Нет содержимого</i>';
-            contentDisplay.innerHTML = `<pre class="products-display">${safeContent}</pre>`;
+            // (ИСПРАВЛЕНО) Убираем <pre> и используем класс Bootstrap
+            contentDisplay.innerHTML = `<div class="products-display">${safeContent}</div>`;
         } catch (error) {
             contentDisplay.innerHTML = `<p class="text-danger">${error.message}</p>`;
         }
