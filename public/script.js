@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let allDealers = [];
     let currentSort = { column: 'name', direction: 'asc' };
 
-    // --- (ИЗМЕНЕНО) Инициализация модальных окон Bootstrap ---
+    // --- Инициализация модальных окон Bootstrap ---
     const addModalEl = document.getElementById('add-modal');
     const addModal = new bootstrap.Modal(addModalEl);
     const editModalEl = document.getElementById('edit-modal');
@@ -30,9 +30,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const dealerTable = document.getElementById('dealer-table');
     const noDataMsg = document.getElementById('no-data-msg');
 
-    // --- Элементы ФИЛЬТРОВ ---
+    // --- (ИЗМЕНЕНО) Элементы ФИЛЬТРОВ и ПОИСКА ---
     const filterCity = document.getElementById('filter-city');
     const filterPriceType = document.getElementById('filter-price-type');
+    const searchBar = document.getElementById('search-bar'); // (НОВОЕ)
 
     // --- Элементы Модального окна РЕДАКТИРОВАНИЯ ---
     const editForm = document.getElementById('edit-dealer-form');
@@ -250,16 +251,28 @@ document.addEventListener('DOMContentLoaded', () => {
         filterPriceType.value = currentPriceType;
     }
 
-    // --- (ИЗМЕНЕНО) Функция: Отрисовка списка дилеров ---
+    // --- (ИЗМЕНЕНО) Функция: Отрисовка списка дилеров (с ПОИСКОМ) ---
     function renderDealerList() {
+        // 1. ПОЛУЧАЕМ ЗНАЧЕНИЯ ФИЛЬТРОВ И ПОИСКА
         const selectedCity = filterCity.value;
         const selectedPriceType = filterPriceType.value;
+        const searchTerm = searchBar.value.toLowerCase(); // (НОВОЕ)
+
+        // 2. ФИЛЬТРАЦИЯ
         const filteredDealers = allDealers.filter(dealer => {
             const cityMatch = !selectedCity || dealer.city === selectedCity;
             const priceTypeMatch = !selectedPriceType || dealer.price_type === selectedPriceType;
-            return cityMatch && priceTypeMatch;
+            
+            // (НОВОЕ) Логика Поиска
+            const searchMatch = !searchTerm || 
+                                (dealer.name && dealer.name.toLowerCase().includes(searchTerm)) ||
+                                (dealer.dealer_id && dealer.dealer_id.toLowerCase().includes(searchTerm)) ||
+                                (dealer.organization && dealer.organization.toLowerCase().includes(searchTerm));
+            
+            return cityMatch && priceTypeMatch && searchMatch;
         });
 
+        // 3. СОРТИРОВКА
         const sortedDealers = filteredDealers.sort((a, b) => {
             const col = currentSort.column;
             let valA = (a[col] || '').toString(); 
@@ -273,6 +286,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return currentSort.direction === 'asc' ? comparison : -comparison;
         });
 
+        // 4. Обновление стрелочек
         document.querySelectorAll('#dealer-table th[data-sort]').forEach(th => {
             th.classList.remove('sort-asc', 'sort-desc');
             if (th.dataset.sort === currentSort.column) {
@@ -280,6 +294,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        // 5. ОТРИСОВКА
         dealerListBody.innerHTML = ''; 
         const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
 
@@ -346,6 +361,12 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Ошибка при загрузке дилеров:', error);
             dealerListBody.innerHTML = `<tr><td colspan="8" style="color: red; text-align: center;">Не удалось загрузить список дилеров.</td></tr>`;
         }
+        
+        const pendingEditId = localStorage.getItem('pendingEditDealerId');
+        if (pendingEditId) {
+            localStorage.removeItem('pendingEditDealerId');
+            openEditModal(pendingEditId); 
+        }
     }
 
     // --- Обработчики: Модальное окно "Добавить" ---
@@ -357,7 +378,7 @@ document.addEventListener('DOMContentLoaded', () => {
         addPhotoList.innerHTML = createNewPhotoEntryHTML(); 
         addModal.show();
     };
-    
+
     // --- Обработчик: Добавление нового дилера ---
     addForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -401,11 +422,50 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- (ИЗМЕНЕНО) Обработчик: Клик по СПИСКУ (Меню "...") ---
+    // --- (НОВАЯ ФУНКЦИЯ) Открытие и загрузка модального окна "Редактировать" ---
+    async function openEditModal(id) {
+        editProductChecklist.innerHTML = "<p>Загрузка товаров...</p>";
+        editContactList.innerHTML = "<p>Загрузка контактов...</p>";
+        editPhotoList.innerHTML = "<p>Загрузка фото...</p>"; 
+        editAddressList.innerHTML = "<p>Загрузка адресов...</p>";
+        editModal.show(); // Показываем модалку СРАЗУ
+        
+        try {
+            const dealerRes = await fetch(`${API_DEALERS_URL}/${id}`);
+            if (!dealerRes.ok) throw new Error("Не удалось загрузить данные дилера");
+            
+            const data = await dealerRes.json();
+            const selectedProducts = data.products || []; 
+            const selectedProductIds = selectedProducts.map(p => p.id); 
+
+            document.getElementById('edit_db_id').value = data.id; 
+            document.getElementById('edit_dealer_id').value = data.dealer_id;
+            document.getElementById('edit_name').value = data.name;
+            document.getElementById('edit_organization').value = data.organization;
+            document.getElementById('edit_price_type').value = data.price_type;
+            document.getElementById('edit_city').value = data.city;
+            document.getElementById('edit_address').value = data.address;
+            document.getElementById('edit_delivery').value = data.delivery; 
+            document.getElementById('edit_website').value = data.website; 
+            document.getElementById('edit_instagram').value = data.instagram; 
+            document.getElementById('edit_bonuses').value = data.bonuses;
+            
+            renderContactList(editContactList, data.contacts);
+            renderAddressList(editAddressList, data.additional_addresses);
+            renderProductChecklist(editProductChecklist, selectedProductIds);
+            renderExistingPhotos(editPhotoList, data.photos); 
+            
+        } catch (error) {
+            console.error("Ошибка при открытии редактора:", error);
+            editModal.hide();
+            alert("Не удалось загрузить данные для редактирования.");
+        }
+    }
+    
+    // --- Обработчик: Клик по СПИСКУ (Меню "...") ---
     dealerListBody.addEventListener('click', async (e) => {
         const target = e.target;
         
-        // --- Кнопка "Просмотреть" ---
         const viewButton = target.closest('.btn-view');
         if (viewButton) {
             e.preventDefault();
@@ -413,50 +473,13 @@ document.addEventListener('DOMContentLoaded', () => {
             window.open(`dealer.html?id=${id}`, '_blank');
         }
 
-        // --- Кнопка "Редактировать" ---
         const editButton = target.closest('.btn-edit');
         if (editButton) {
             e.preventDefault();
             const id = editButton.dataset.id;
-            editProductChecklist.innerHTML = "<p>Загрузка товаров...</p>";
-            editContactList.innerHTML = "<p>Загрузка контактов...</p>";
-            editPhotoList.innerHTML = "<p>Загрузка фото...</p>"; 
-            editAddressList.innerHTML = "<p>Загрузка адресов...</p>";
-            editModal.show(); // Показываем модалку СРАЗУ
-            
-            try {
-                const dealerRes = await fetch(`${API_DEALERS_URL}/${id}`);
-                if (!dealerRes.ok) throw new Error("Не удалось загрузить данные дилера");
-                
-                const data = await dealerRes.json();
-                const selectedProducts = data.products || []; 
-                const selectedProductIds = selectedProducts.map(p => p.id); 
-
-                document.getElementById('edit_db_id').value = data.id; 
-                document.getElementById('edit_dealer_id').value = data.dealer_id;
-                document.getElementById('edit_name').value = data.name;
-                document.getElementById('edit_organization').value = data.organization;
-                document.getElementById('edit_price_type').value = data.price_type;
-                document.getElementById('edit_city').value = data.city;
-                document.getElementById('edit_address').value = data.address;
-                document.getElementById('edit_delivery').value = data.delivery; 
-                document.getElementById('edit_website').value = data.website; 
-                document.getElementById('edit_instagram').value = data.instagram; 
-                document.getElementById('edit_bonuses').value = data.bonuses;
-                
-                renderContactList(editContactList, data.contacts);
-                renderAddressList(editAddressList, data.additional_addresses);
-                renderProductChecklist(editProductChecklist, selectedProductIds);
-                renderExistingPhotos(editPhotoList, data.photos); 
-                
-            } catch (error) {
-                console.error("Ошибка при открытии редактора:", error);
-                editModal.hide();
-                alert("Не удалось загрузить данные для редактирования.");
-            }
+            openEditModal(id); 
         }
         
-        // --- Кнопка "Удалить" ---
         const deleteButton = target.closest('.btn-delete');
         if (deleteButton) {
             e.preventDefault();
@@ -465,14 +488,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (confirm(`Вы уверены, что хотите удалить дилера "${name}"?`)) {
                 try {
                     await fetch(`${API_DEALERS_URL}/${id}`, { method: 'DELETE' });
-                    await initApp(); // Перезагружаем список
+                    await initApp(); 
                 } catch (error) {
                     alert('Ошибка при удалении дилера.');
                 }
             }
         }
     });
-
 
     // --- Обработчик: Сохранение изменений (Редактирование) ---
     editForm.addEventListener('submit', async (e) => {
@@ -518,9 +540,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- Обработчики: Изменение фильтров ---
+    // --- (ИЗМЕНЕНО) Обработчики: Фильтры и Поиск ---
     filterCity.addEventListener('change', renderDealerList);
     filterPriceType.addEventListener('change', renderDealerList);
+    // (НОВОЕ) Запускаем `renderDealerList` при каждом нажатии клавиши в поиске
+    searchBar.addEventListener('input', renderDealerList);
 
     // --- Обработчики: СОРТИРОВКА ---
     document.querySelectorAll('#dealer-table th[data-sort]').forEach(th => {
