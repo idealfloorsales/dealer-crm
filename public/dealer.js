@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const deliveryContainer = document.getElementById('dealer-delivery'); 
     const linksContainer = document.getElementById('dealer-links'); 
     const addressesListContainer = document.getElementById('dealer-addresses-list'); 
-    const posListContainer = document.getElementById('dealer-pos-list'); // (НОВОЕ)
+    const posListContainer = document.getElementById('dealer-pos-list'); 
     
     const deleteBtn = document.getElementById('delete-dealer-btn'); 
     const editBtn = document.getElementById('edit-dealer-btn'); 
@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderDealerLinks(dealer.website, dealer.instagram); 
             renderDealerContacts(dealer.contacts);
             renderDealerAddresses(dealer.additional_addresses); 
-            renderDealerPos(dealer.pos_materials); // (НОВОЕ)
+            renderDealerPos(dealer.pos_materials); 
             renderDealerPhotos(dealer.photos); 
             
             deliveryContainer.textContent = safeText(dealer.delivery) || '<i>Нет данных о доставке</i>';
@@ -153,7 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
         addressesListContainer.innerHTML = html;
     }
 
-    // --- (НОВАЯ ФУНКЦИЯ) Отрисовка таблицы POS ---
+    // --- Отрисовка таблицы POS ---
     function renderDealerPos(posItems) {
         if (!posItems || posItems.length === 0) {
             posListContainer.innerHTML = '<p><i>Нет оборудования.</i></p>';
