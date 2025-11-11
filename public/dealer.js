@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    // (ВОЗВРАЩЕННАЯ ФУНКЦИЯ)
+    // (ВОТ ЭТА ФУНКЦИЯ, КОТОРУЮ МЫ ВЕРНУЛИ)
     const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
     
     const formatUrl = (url) => {
