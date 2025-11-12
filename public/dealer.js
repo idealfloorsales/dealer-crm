@@ -20,26 +20,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const dealerId = params.get('id');
 
     if (!dealerId) {
-        detailsContainer.innerHTML = '<h2 class="text-danger">Ошибка: ID дилера не указан в URL.</h2>';
-        deleteBtn.style.display = 'none'; 
-        editBtn.style.display = 'none'; 
+        detailsContainer.innerHTML = '<h2 class="text-danger">Ошибка: ID не указан.</h2>';
         return;
     }
 
     const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
     const formatUrl = (url) => {
         if (!url) return null;
-        if (!url.startsWith('http://') && !url.startsWith('https://')) {
-            return 'https://' + url;
-        }
+        if (!url.startsWith('http://') && !url.startsWith('https://')) return 'https://' + url;
         return url;
     }
 
-    // --- Функция 1: Загрузка инфо о дилере ---
     async function fetchDealerDetails() {
         try {
             const response = await fetch(`${API_URL}/${dealerId}`);
-            if (!response.ok) throw new Error(`Дилер с ID ${dealerId} не найден.`);
+            if (!response.ok) throw new Error(`Дилер не найден.`);
             
             const dealer = await response.json();
 
@@ -47,8 +42,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 <h1 class="display-6">${safeText(dealer.name)}</h1>
                 <p class="lead"><strong>ID точки:</strong> ${safeText(dealer.dealer_id)}</p>
                 <p><strong>Организация:</strong> ${safeText(dealer.organization)}</p>
-                <p><strong>Главный город:</strong> ${safeText(dealer.city)}</p>
-                <p><strong>Главный адрес:</strong> ${safeText(dealer.address)}</p>
+                <p><strong>Город:</strong> ${safeText(dealer.city)}</p>
+                <p><strong>Адрес:</strong> ${safeText(dealer.address)}</p>
                 <p><strong>Тип цен:</strong> ${safeText(dealer.price_type)}</p>
             `;
             
@@ -58,176 +53,106 @@ document.addEventListener('DOMContentLoaded', () => {
             renderDealerPos(dealer.pos_materials); 
             renderDealerPhotos(dealer.photos); 
             
-            deliveryContainer.textContent = safeText(dealer.delivery) || '<i>Нет данных о доставке</i>';
-            bonusesContainer.textContent = safeText(dealer.bonuses) || '<i>Нет данных о бонусах</i>';
+            deliveryContainer.textContent = safeText(dealer.delivery) || 'Нет данных';
+            bonusesContainer.textContent = safeText(dealer.bonuses) || 'Нет данных';
 
             document.title = `Дилер: ${dealer.name}`;
 
         } catch (error) {
-            console.error('Ошибка:', error);
             detailsContainer.innerHTML = `<h2 class="text-danger">${error.message}</h2>`;
-            deleteBtn.style.display = 'none';
-            editBtn.style.display = 'none';
         }
     }
     
-    // --- Отрисовка Кнопок-Ссылок ---
     function renderDealerLinks(website, instagram) {
         let html = '';
         const safeWebsite = formatUrl(website);
         const safeInstagram = formatUrl(instagram);
-
-        if (safeWebsite) {
-            html += `<a href="${safeWebsite}" target="_blank" class="btn btn-secondary"><i class="bi bi-box-arrow-up-right me-2"></i>Перейти на сайт</a>`;
-        }
-        if (safeInstagram) {
-            html += `<a href="${safeInstagram}" target="_blank" class="btn btn-secondary"><i class="bi bi-instagram me-2"></i>Перейти на Инстаграм</a>`;
-        }
-        if (!safeWebsite && !safeInstagram) {
-            linksContainer.style.display = 'none'; 
-        }
-        
-        linksContainer.innerHTML = html;
+        if (safeWebsite) html += `<a href="${safeWebsite}" target="_blank" class="btn btn-secondary me-2"><i class="bi bi-globe me-2"></i>Сайт</a>`;
+        if (safeInstagram) html += `<a href="${safeInstagram}" target="_blank" class="btn btn-secondary"><i class="bi bi-instagram me-2"></i>Instagram</a>`;
+        if (!safeWebsite && !safeInstagram) linksContainer.style.display = 'none'; 
+        else linksContainer.innerHTML = html;
     }
 
-    // --- Отрисовка Галереи Фото ---
+    // (ИЗМЕНЕНО) Галерея без описаний
     function renderDealerPhotos(photos) {
         if (!photos || photos.length === 0) {
             photoGalleryContainer.innerHTML = '<p><i>Нет фотографий.</i></p>';
             return;
         }
-        
         photoGalleryContainer.innerHTML = photos.map(photo => `
             <div class="gallery-item">
                 <a href="${photo.photo_url}" target="_blank">
-                    <img src="${photo.photo_url}" alt="${safeText(photo.description)}">
+                    <img src="${photo.photo_url}" alt="Фото">
                 </a>
-                <p>${safeText(photo.description) || 'Без описания'}</p>
             </div>
         `).join('');
     }
 
-    // --- Отрисовка таблицы контактов ---
     function renderDealerContacts(contacts) {
         if (!contacts || contacts.length === 0) {
-            contactsListContainer.innerHTML = '<p><i>Нет контактных лиц.</i></p>';
+            contactsListContainer.innerHTML = '<p><i>Нет данных.</i></p>';
             return;
         }
-        
-        let html = '<table class="table table-bordered table-striped" style="margin-top: 0;"><thead><tr><th>Имя</th><th>Должность</th><th>Контакт</th></tr></thead><tbody>';
-        
-        contacts.forEach(contact => {
-            html += `
-                <tr>
-                    <td>${safeText(contact.name)}</td>
-                    <td>${safeText(contact.position)}</td>
-                    <td>${safeText(contact.contactInfo)}</td>
-                </tr>
-            `;
+        let html = '<table class="table table-bordered table-striped" style="margin-top:0"><thead><tr><th>Имя</th><th>Должность</th><th>Контакт</th></tr></thead><tbody>';
+        contacts.forEach(c => {
+            html += `<tr><td>${safeText(c.name)}</td><td>${safeText(c.position)}</td><td>${safeText(c.contactInfo)}</td></tr>`;
         });
-        
-        html += '</tbody></table>';
-        contactsListContainer.innerHTML = html;
+        contactsListContainer.innerHTML = html + '</tbody></table>';
     }
     
-    // --- Отрисовка таблицы Доп. Адресов ---
     function renderDealerAddresses(addresses) {
         if (!addresses || addresses.length === 0) {
-            addressesListContainer.innerHTML = '<p><i>Нет дополнительных адресов.</i></p>';
+            addressesListContainer.innerHTML = '<p><i>Нет данных.</i></p>';
             return;
         }
-        
-        let html = '<table class="table table-bordered table-striped" style="margin-top: 0;"><thead><tr><th>Описание</th><th>Город</th><th>Адрес</th></tr></thead><tbody>';
-        
-        addresses.forEach(addr => {
-            html += `
-                <tr>
-                    <td>${safeText(addr.description)}</td>
-                    <td>${safeText(addr.city)}</td>
-                    <td>${safeText(addr.address)}</td>
-                </tr>
-            `;
+        let html = '<table class="table table-bordered table-striped" style="margin-top:0"><thead><tr><th>Описание</th><th>Город</th><th>Адрес</th></tr></thead><tbody>';
+        addresses.forEach(a => {
+            html += `<tr><td>${safeText(a.description)}</td><td>${safeText(a.city)}</td><td>${safeText(a.address)}</td></tr>`;
         });
-        
-        html += '</tbody></table>';
-        addressesListContainer.innerHTML = html;
+        addressesListContainer.innerHTML = html + '</tbody></table>';
     }
 
-    // --- Отрисовка таблицы POS ---
     function renderDealerPos(posItems) {
         if (!posItems || posItems.length === 0) {
             posListContainer.innerHTML = '<p><i>Нет оборудования.</i></p>';
             return;
         }
-        
-        let html = '<table class="table table-bordered table-striped" style="margin-top: 0;"><thead><tr><th>Оборудование</th><th>Количество</th></tr></thead><tbody>';
-        
+        let html = '<table class="table table-bordered table-striped" style="margin-top:0"><thead><tr><th>Оборудование</th><th>Кол-во</th></tr></thead><tbody>';
         posItems.forEach(item => {
-            html += `
-                <tr>
-                    <td>${safeText(item.name)}</td>
-                    <td>${item.quantity || 1}</td>
-                </tr>
-            `;
+            html += `<tr><td>${safeText(item.name)}</td><td>${item.quantity || 1}</td></tr>`;
         });
-        
-        html += '</tbody></table>';
-        posListContainer.innerHTML = html;
+        posListContainer.innerHTML = html + '</tbody></table>';
     }
 
-
-    // --- Функция 2: Загрузка товаров дилера ---
     async function fetchDealerProducts() {
         try {
             const response = await fetch(`${API_URL}/${dealerId}/products`);
-            if (!response.ok) throw new Error('Ошибка загрузки товаров дилера');
-
+            if (!response.ok) throw new Error('');
             const products = await response.json(); 
-
             if (products.length === 0) {
-                productsListContainer.innerHTML = '<p><i>Нет выставленных товаров.</i></p>';
+                productsListContainer.innerHTML = '<p><i>Нет товаров.</i></p>';
                 return;
             }
-            
-            productsListContainer.innerHTML = `
-                <ul class="products-list-detailed">
-                    ${products.map(p => `<li><strong>${safeText(p.sku)}</strong> - ${safeText(p.name)}</li>`).join('')}
-                </ul>
-            `;
-
+            productsListContainer.innerHTML = `<ul class="products-list-detailed">${products.map(p => `<li><strong>${safeText(p.sku)}</strong> - ${safeText(p.name)}</li>`).join('')}</ul>`;
         } catch (error) {
-            console.error('Ошибка:', error);
-            productsListContainer.innerHTML = `<p class="text-danger">${error.message}</p>`;
+            productsListContainer.innerHTML = `<p class="text-danger">Ошибка загрузки товаров.</p>`;
         }
     }
 
-    // --- Обработчик: Редактирование дилера ---
     editBtn.addEventListener('click', () => {
         localStorage.setItem('pendingEditDealerId', dealerId);
         window.location.href = 'index.html';
     });
 
-    // --- Обработчик: Удаление дилера ---
     deleteBtn.addEventListener('click', async () => {
-        if (confirm(`Вы уверены, что хотите НАВСЕГДА удалить этого дилера?\nЭто действие нельзя отменить.`)) {
+        if (confirm(`Вы уверены, что хотите удалить этого дилера?`)) {
             try {
-                const response = await fetch(`${API_URL}/${dealerId}`, {
-                    method: 'DELETE'
-                });
-                if (response.ok) {
-                    alert('Дилер успешно удален.');
-                    window.location.href = 'index.html'; 
-                } else {
-                    alert('Ошибка при удалении дилера.');
-                }
-            } catch (error) {
-                console.error('Ошибка при удалении:', error);
-                alert('Сетевая ошибка при удалении.');
-            }
+                const response = await fetch(`${API_URL}/${dealerId}`, { method: 'DELETE' });
+                if (response.ok) { window.location.href = 'index.html'; }
+            } catch (error) { alert('Ошибка при удалении.'); }
         }
     });
 
-    // --- Запускаем обе загрузки ---
     fetchDealerDetails();
     fetchDealerProducts();
 });
