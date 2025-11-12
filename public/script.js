@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const posMaterialsList = [
         "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "РФ-2 - Расческа из фанеры",
-        "РФС-1 - Расческа из фанеры старая", "С600 - 600мм задняя стенка",
+        "РФС-1 - Расческа их фанеры старая", "С600 - 600мм задняя стенка",
         "С800 - 800мм задняя стенка", "Табличка - Табличка орг.стекло"
     ];
 
@@ -23,14 +23,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const addForm = document.getElementById('add-dealer-form');
     const addProductChecklist = document.getElementById('add-product-checklist'); 
     const addContactList = document.getElementById('add-contact-list'); 
-    const addContactBtnAdd = document.getElementById('add-contact-btn-add-modal'); 
-    const addPhotoList = document.getElementById('add-photo-list'); 
-    const addPhotoBtnAdd = document.getElementById('add-photo-btn-add-modal'); 
     const addAddressList = document.getElementById('add-address-list'); 
-    const addAddressBtnAdd = document.getElementById('add-address-btn-add-modal'); 
     const addPosList = document.getElementById('add-pos-list'); 
-    const addPosBtnAdd = document.getElementById('add-pos-btn-add-modal'); 
     
+    // Фото элементы (Добавить)
+    const addPhotoInput = document.getElementById('add-photo-input');
+    const addPhotoPreviewContainer = document.getElementById('add-photo-preview-container');
+    let addPhotosData = []; // Массив для хранения Base64 новых фото
+
     const dealerListBody = document.getElementById('dealer-list-body');
     const dealerTable = document.getElementById('dealer-table');
     const noDataMsg = document.getElementById('no-data-msg');
@@ -42,13 +42,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const editForm = document.getElementById('edit-dealer-form');
     const editProductChecklist = document.getElementById('edit-product-checklist'); 
     const editContactList = document.getElementById('edit-contact-list'); 
-    const addContactBtnEdit = document.getElementById('add-contact-btn-edit-modal'); 
-    const editPhotoList = document.getElementById('edit-photo-list'); 
-    const addPhotoBtnEdit = document.getElementById('add-photo-btn-edit-modal'); 
     const editAddressList = document.getElementById('edit-address-list'); 
-    const addAddressBtnEdit = document.getElementById('add-address-btn-edit-modal'); 
     const editPosList = document.getElementById('edit-pos-list'); 
-    const addPosBtnEdit = document.getElementById('add-pos-btn-edit-modal'); 
+    
+    // Фото элементы (Редактировать)
+    const editPhotoInput = document.getElementById('edit-photo-input');
+    const editPhotoPreviewContainer = document.getElementById('edit-photo-preview-container');
+    let editPhotosData = []; // Массив для хранения ВСЕХ фото при редактировании
 
     const toBase64 = file => new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.onerror = error => reject(error);
     });
 
-    // (ИСПРАВЛЕНО) Функция безопасного текста, чтобы не ломать верстку
+    // (ИСПРАВЛЕНО) Функция безопасного текста
     const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
 
     async function fetchProductCatalog() {
@@ -66,16 +66,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(API_PRODUCTS_URL);
             if (!response.ok) throw new Error(`Ошибка: ${response.status}`);
             fullProductCatalog = await response.json();
-            // Сортировка по SKU
             fullProductCatalog.sort((a, b) => a.sku.localeCompare(b.sku, 'ru', { numeric: true }));
-            console.log(`Загружено ${fullProductCatalog.length} товаров.`);
         } catch (error) {
-            console.error("Ошибка каталога:", error);
-            addProductChecklist.innerHTML = `<p class='text-danger'>Не удалось загрузить каталог.</p>`;
-            editProductChecklist.innerHTML = `<p class='text-danger'>Не удалось загрузить каталог.</p>`;
+            addProductChecklist.innerHTML = `<p class='text-danger'>${error.message}</p>`;
+            editProductChecklist.innerHTML = `<p class='text-danger'>${error.message}</p>`;
         }
     }
 
+    // --- HTML Генераторы ---
     function createContactEntryHTML(c={}) {
         return `<div class="contact-entry input-group mb-2">
             <input type="text" class="form-control contact-name" placeholder="Имя" value="${c.name||''}">
@@ -100,21 +98,63 @@ document.addEventListener('DOMContentLoaded', () => {
             <button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button>
         </div>`;
     }
-    function createNewPhotoEntryHTML() {
-        return `<div class="photo-entry new input-group mb-2">
-            <input type="text" class="form-control photo-description" placeholder="Описание фото">
-            <input type="file" class="form-control photo-file" accept="image/*">
-            <button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button>
-        </div>`;
+
+    // --- (НОВАЯ) Логика ФОТО ---
+    
+    // Отрисовка превьюшек
+    function renderPhotoPreviews(container, photosArray) {
+        container.innerHTML = photosArray.map((p, index) => `
+            <div class="photo-preview-item">
+                <img src="${p.photo_url}">
+                <button type="button" class="btn-remove-photo" data-index="${index}">×</button>
+            </div>
+        `).join('');
     }
-    function renderExistingPhotos(container, photos=[]) {
-        container.innerHTML = (photos && photos.length > 0) ? photos.map(p => `
-            <div class="photo-entry existing input-group mb-2">
-                <img src="${p.photo_url}" class="preview-thumb">
-                <input type="text" class="form-control photo-description" value="${p.description||''}">
-                <button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button>
-                <input type="hidden" class="photo-url" value="${p.photo_url}">
-            </div>`).join('') : '';
+
+    // Обработчик выбора файлов (Add)
+    addPhotoInput.addEventListener('change', async (e) => {
+        const files = Array.from(e.target.files);
+        for (let file of files) {
+            const base64 = await toBase64(file);
+            addPhotosData.push({ photo_url: base64 }); // Просто URL, без описания
+        }
+        renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData);
+        addPhotoInput.value = ''; // Очистить инпут, чтобы можно было добавить еще
+    });
+
+    // Обработчик удаления фото (Add)
+    addPhotoPreviewContainer.addEventListener('click', (e) => {
+        if (e.target.classList.contains('btn-remove-photo')) {
+            const index = e.target.dataset.index;
+            addPhotosData.splice(index, 1);
+            renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData);
+        }
+    });
+
+    // Обработчик выбора файлов (Edit)
+    editPhotoInput.addEventListener('change', async (e) => {
+        const files = Array.from(e.target.files);
+        for (let file of files) {
+            const base64 = await toBase64(file);
+            editPhotosData.push({ photo_url: base64 });
+        }
+        renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData);
+        editPhotoInput.value = '';
+    });
+
+    // Обработчик удаления фото (Edit)
+    editPhotoPreviewContainer.addEventListener('click', (e) => {
+        if (e.target.classList.contains('btn-remove-photo')) {
+            const index = e.target.dataset.index;
+            editPhotosData.splice(index, 1);
+            renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData);
+        }
+    });
+    // --- Конец логики ФОТО ---
+
+
+    function renderList(container, data, htmlGen) {
+        container.innerHTML = (data && data.length > 0) ? data.map(htmlGen).join('') : htmlGen();
     }
 
     function collectData(container, selector, fields) {
@@ -131,33 +171,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         return data;
     }
-    
-    async function collectPhotos(container) {
-        const promises = [];
-        container.querySelectorAll('.photo-entry.existing').forEach(e => {
-            promises.push(Promise.resolve({
-                description: e.querySelector('.photo-description').value,
-                photo_url: e.querySelector('.photo-url').value
-            }));
-        });
-        container.querySelectorAll('.photo-entry.new').forEach(e => {
-            const file = e.querySelector('.photo-file').files[0];
-            const desc = e.querySelector('.photo-description').value;
-            if(file) promises.push(toBase64(file).then(url => ({ description: desc, photo_url: url })));
-        });
-        return Promise.all(promises);
-    }
 
-    function renderList(container, data, htmlGen) {
-        container.innerHTML = (data && data.length > 0) ? data.map(htmlGen).join('') : htmlGen();
-    }
-
+    // --- Работа с товарами ---
     function renderProductChecklist(container, selectedIds=[]) {
         const set = new Set(selectedIds);
-        if (fullProductCatalog.length === 0) {
-            container.innerHTML = "<p>Каталог пуст (ошибка загрузки).</p>";
-            return;
-        }
         container.innerHTML = fullProductCatalog.map(p => {
             const pid = p.id || p._id;
             return `<div class="checklist-item form-check">
@@ -175,6 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // --- Главный рендер ---
     function renderDealerList() {
         const city = filterCity.value;
         const type = filterPriceType.value;
@@ -203,7 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (filtered.length === 0) {
             dealerTable.style.display = 'none';
             noDataMsg.style.display = 'block';
-            noDataMsg.textContent = allDealers.length === 0 ? 'Список пуст.' : 'Не найдено.';
+            noDataMsg.textContent = allDealers.length === 0 ? 'Список пуст. Добавьте первого дилера!' : 'Ничего не найдено.';
             return;
         }
         dealerTable.style.display = 'table';
@@ -254,13 +272,17 @@ document.addEventListener('DOMContentLoaded', () => {
         await fetchProductCatalog();
         try {
             const response = await fetch(API_DEALERS_URL);
-            if (!response.ok) throw new Error('Ошибка загрузки');
+            if (!response.ok) throw new Error(`Ошибка сервера: ${response.status}`);
             allDealers = await response.json();
             populateFilters(allDealers);
             renderDealerList();
         } catch (error) {
-            console.error(error);
-            dealerListBody.innerHTML = `<tr><td colspan="8" class="text-danger text-center">Ошибка: ${error.message}</td></tr>`;
+            console.error('INIT ERROR:', error);
+            dealerListBody.innerHTML = '';
+            dealerTable.style.display = 'none';
+            noDataMsg.style.display = 'block';
+            noDataMsg.className = 'alert alert-danger';
+            noDataMsg.innerHTML = `<strong>Не удалось загрузить список:</strong><br>${error.message}`;
         }
 
         const pendingId = localStorage.getItem('pendingEditDealerId');
@@ -272,12 +294,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('add-contact-btn-add-modal').onclick = () => addContactList.insertAdjacentHTML('beforeend', createContactEntryHTML());
     document.getElementById('add-address-btn-add-modal').onclick = () => addAddressList.insertAdjacentHTML('beforeend', createAddressEntryHTML());
-    document.getElementById('add-photo-btn-add-modal').onclick = () => addPhotoList.insertAdjacentHTML('beforeend', createNewPhotoEntryHTML());
     document.getElementById('add-pos-btn-add-modal').onclick = () => addPosList.insertAdjacentHTML('beforeend', createPosEntryHTML());
 
     document.getElementById('add-contact-btn-edit-modal').onclick = () => editContactList.insertAdjacentHTML('beforeend', createContactEntryHTML());
     document.getElementById('add-address-btn-edit-modal').onclick = () => editAddressList.insertAdjacentHTML('beforeend', createAddressEntryHTML());
-    document.getElementById('add-photo-btn-edit-modal').onclick = () => editPhotoList.insertAdjacentHTML('beforeend', createNewPhotoEntryHTML());
     document.getElementById('add-pos-btn-edit-modal').onclick = () => editPosList.insertAdjacentHTML('beforeend', createPosEntryHTML());
 
     openAddModalBtn.onclick = () => {
@@ -286,7 +306,9 @@ document.addEventListener('DOMContentLoaded', () => {
         renderList(addContactList, [], createContactEntryHTML);
         renderList(addAddressList, [], createAddressEntryHTML);
         renderList(addPosList, [], createPosEntryHTML);
-        addPhotoList.innerHTML = createNewPhotoEntryHTML();
+        // Очищаем фото
+        addPhotosData = []; 
+        renderPhotoPreviews(addPhotoPreviewContainer, []);
         addModal.show();
     };
 
@@ -306,7 +328,7 @@ document.addEventListener('DOMContentLoaded', () => {
             contacts: collectData(addContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]),
             additional_addresses: collectData(addAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]),
             pos_materials: collectData(addPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]),
-            photos: await collectPhotos(addPhotoList)
+            photos: addPhotosData // Берем массив фото
         };
 
         try {
@@ -341,8 +363,11 @@ document.addEventListener('DOMContentLoaded', () => {
             renderList(editContactList, d.contacts, createContactEntryHTML);
             renderList(editAddressList, d.additional_addresses, createAddressEntryHTML);
             renderList(editPosList, d.pos_materials, createPosEntryHTML);
-            renderExistingPhotos(editPhotoList, d.photos);
             renderProductChecklist(editProductChecklist, (d.products||[]).map(p=>p.id));
+            
+            // Загружаем существующие фото в массив
+            editPhotosData = d.photos || [];
+            renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData);
             
             editModal.show();
         } catch(e) { alert(e.message); }
@@ -365,7 +390,7 @@ document.addEventListener('DOMContentLoaded', () => {
             contacts: collectData(editContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]),
             additional_addresses: collectData(editAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]),
             pos_materials: collectData(editPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]),
-            photos: await collectPhotos(editPhotoList)
+            photos: editPhotosData // Берем массив фото
         };
 
         try {
@@ -411,7 +436,8 @@ document.addEventListener('DOMContentLoaded', () => {
             let csv = "\uFEFFID,Название,Орг,Город,Адрес,Тип,Контакты\n";
             allDealers.forEach(d => {
                 const c = (d.contacts||[]).map(x=>x.name).join('; ');
-                csv += `"${d.dealer_id}","${d.name}","${d.organization}","${d.city}","${d.address}","${d.price_type}","${c}"\n`;
+                const clean = t => `"${String(t||'').replace(/"/g,'""')}"`;
+                csv += `${clean(d.dealer_id)},${clean(d.name)},${clean(d.organization)},${clean(d.city)},${clean(d.address)},${clean(d.price_type)},${clean(c)}\n`;
             });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'}));
