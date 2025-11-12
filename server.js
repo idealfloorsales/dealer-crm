@@ -27,7 +27,7 @@ app.use(express.static('public'));
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// --- ПОЛНЫЙ, ИСПРАВЛЕННЫЙ СПИСОК ТОВАРОВ ---
+// --- ПОЛНЫЙ СПИСОК ТОВАРОВ (74 шт., Запятые исправлены) ---
 const productsToImport = [
     { sku: "CD-507", name: "Дуб Беленый" },
     { sku: "CD-508", name: "Дуб Пепельный" },
@@ -79,7 +79,7 @@ const productsToImport = [
     { sku: "RWN-36", name: "Кедр Гималайкий" },
     { sku: "RWN-37", name: "Дуб Ниагара" },
     { sku: "RWN-39", name: "Дуб Сибирский" },
-    { sku: "RWE-41", name: "Дуб Жемчужный" },
+    { sku: "RWЕ-41", name: "Дуб Жемчужный" },
     { sku: "RWE-44", name: "Орех Классик" },
     { sku: "AS-81", name: "Дуб Карибский" },
     { sku: "AS-82", name: "Дуб Средиземноморский" },
@@ -107,7 +107,7 @@ const productsToImport = [
     { sku: "Н600", name: "600мм наклейка" }
 ];
 
-// --- Модели Базы Данных ---
+// --- Схемы MONGODB ---
 const productSchema = new mongoose.Schema({
     sku: { type: String, required: true, unique: true },
     name: { type: String, required: true }
@@ -161,7 +161,7 @@ const knowledgeSchema = new mongoose.Schema({
 }, { timestamps: true }); 
 const Knowledge = mongoose.model('Knowledge', knowledgeSchema);
 
-// --- Синхронизация товаров ---
+// --- СИНХРОНИЗАЦИЯ ТОВАРОВ ---
 async function hardcodedImportProducts() {
     try {
         console.log("Запускаю синхронизацию каталога товаров...");
