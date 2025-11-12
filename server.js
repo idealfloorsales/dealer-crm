@@ -2,19 +2,26 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+// const basicAuth = require('express-basic-auth'); // ОТКЛЮЧИЛИ
 
 const app = express();
 const PORT = process.env.PORT || 3000; 
 app.use(express.json({ limit: '50mb' })); 
 app.use(cors());
 
-// (Блок безопасности УДАЛЕН для исправления ошибки загрузки)
+// --- БЕЗОПАСНОСТЬ ОТКЛЮЧЕНА ДЛЯ ТЕСТА ---
+/*
+const ADMIN_USER = process.env.ADMIN_USER;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+app.use(basicAuth({ ... }));
+*/
+// ----------------------------------------
 
 app.use(express.static('public'));
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// --- ПОЛНЫЙ СПИСОК ТОВАРОВ (74 шт.) ---
+// --- ПОЛНЫЙ СПИСОК ТОВАРОВ (76 шт.) ---
 const productsToImport = [
     { sku: "CD-507", name: "Дуб Беленый" },
     { sku: "CD-508", name: "Дуб Пепельный" },
@@ -151,27 +158,29 @@ const Knowledge = mongoose.model('Knowledge', knowledgeSchema);
 // --- Синхронизация товаров ---
 async function hardcodedImportProducts() {
     try {
-        const count = await Product.countDocuments();
-        if (count === 0) {
-            console.log("Таблица пуста. Импортируем товары...");
-            await Product.insertMany(productsToImport, { ordered: false }).catch(e => {
-                if (e.code !== 11000) console.warn("Ошибка:", e.message);
-            });
-            console.log("Импорт завершен.");
-        } else {
-            // (Опционально) Обновление существующих, если нужно
-            const operations = productsToImport.map(p => ({
-                updateOne: {
-                    filter: { sku: p.sku },
-                    update: { $set: p },
-                    upsert: true
-                }
-            }));
-            await Product.bulkWrite(operations);
-            console.log("Каталог синхронизирован.");
+        console.log("Запускаю синхронизацию каталога товаров...");
+        const dbProducts = await Product.find().lean();
+        const dbSkus = new Set(dbProducts.map(p => p.sku));
+        const codeSkus = new Set(productsToImport.map(p => p.sku));
+
+        const skusToDelete = [...dbSkus].filter(sku => !codeSkus.has(sku));
+        if (skusToDelete.length > 0) {
+            console.log(`Удаляю ${skusToDelete.length} устаревших товаров...`);
+            await Product.deleteMany({ sku: { $in: skusToDelete } });
         }
+
+        const productsToAdd = productsToImport.filter(p => !dbSkus.has(p.sku));
+        if (productsToAdd.length > 0) {
+            console.log(`Добавляю ${productsToAdd.length} новых товаров...`);
+            await Product.insertMany(productsToAdd, { ordered: false }).catch(e => {
+                if (e.code !== 11000) console.warn("Ошибка при добавлении:", e.message);
+            });
+        }
+        
+        const finalCount = await Product.countDocuments();
+        console.log(`Синхронизация завершена. В каталоге ${finalCount} товаров.`);
     } catch (error) {
-           console.warn(`Ошибка при синхронизации: ${error.message}`);
+           console.warn(`Ошибка при синхронизации товаров: ${error.message}`);
     }
 }
 
