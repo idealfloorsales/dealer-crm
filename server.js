@@ -2,26 +2,22 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-// const basicAuth = require('express-basic-auth'); // ОТКЛЮЧИЛИ
+// УБРАЛИ: const basicAuth ...
 
 const app = express();
 const PORT = process.env.PORT || 3000; 
 app.use(express.json({ limit: '50mb' })); 
 app.use(cors());
 
-// --- БЕЗОПАСНОСТЬ ОТКЛЮЧЕНА ДЛЯ ТЕСТА ---
-/*
-const ADMIN_USER = process.env.ADMIN_USER;
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
-app.use(basicAuth({ ... }));
-*/
-// ----------------------------------------
+// --- БЕЗОПАСНОСТЬ УБРАНА (ЧТОБЫ ЗАРАБОТАЛО) ---
+// app.use(basicAuth(...));
+// ----------------------------------------------
 
 app.use(express.static('public'));
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// --- ПОЛНЫЙ СПИСОК ТОВАРОВ (76 шт.) ---
+// "Вшитый" список 74 товаров
 const productsToImport = [
     { sku: "CD-507", name: "Дуб Беленый" },
     { sku: "CD-508", name: "Дуб Пепельный" },
@@ -73,7 +69,7 @@ const productsToImport = [
     { sku: "RWN-36", name: "Кедр Гималайкий" },
     { sku: "RWN-37", name: "Дуб Ниагара" },
     { sku: "RWN-39", name: "Дуб Сибирский" },
-    { sku: "RWЕ-41", name: "Дуб Жемчужный" },
+    { sku: "RWЕ-41", name: "Дуб Жемчужный" }, 
     { sku: "RWE-44", name: "Орех Классик" },
     { sku: "AS-81", name: "Дуб Карибский" },
     { sku: "AS-82", name: "Дуб Средиземноморский" },
@@ -158,7 +154,6 @@ const Knowledge = mongoose.model('Knowledge', knowledgeSchema);
 // --- Синхронизация товаров ---
 async function hardcodedImportProducts() {
     try {
-        console.log("Запускаю синхронизацию каталога товаров...");
         const dbProducts = await Product.find().lean();
         const dbSkus = new Set(dbProducts.map(p => p.sku));
         const codeSkus = new Set(productsToImport.map(p => p.sku));
@@ -178,9 +173,9 @@ async function hardcodedImportProducts() {
         }
         
         const finalCount = await Product.countDocuments();
-        console.log(`Синхронизация завершена. В каталоге ${finalCount} товаров.`);
+        console.log(`Каталог готов. Товаров: ${finalCount}`);
     } catch (error) {
-           console.warn(`Ошибка при синхронизации товаров: ${error.message}`);
+           console.warn(`Ошибка: ${error.message}`);
     }
 }
 
