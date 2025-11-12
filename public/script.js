@@ -1,7 +1,6 @@
 // script.js
 document.addEventListener('DOMContentLoaded', () => {
     
-    // Используем относительные пути (это правильно для Render)
     const API_DEALERS_URL = '/api/dealers';
     const API_PRODUCTS_URL = '/api/products'; 
 
@@ -10,9 +9,13 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSort = { column: 'name', direction: 'asc' };
 
     const posMaterialsList = [
-        "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "РФ-2 - Расческа из фанеры",
-        "РФС-1 - Расческа их фанеры старая", "С600 - 600мм задняя стенка",
-        "С800 - 800мм задняя стенка", "Табличка - Табличка орг.стекло"
+        "Н600 - 600мм наклейка",
+        "Н800 - 800мм наклейка",
+        "РФ-2 - Расческа из фанеры",
+        "РФС-1 - Расческа их фанеры старая",
+        "С600 - 600мм задняя стенка",
+        "С800 - 800мм задняя стенка",
+        "Табличка - Табличка орг.стекло"
     ];
 
     const addModalEl = document.getElementById('add-modal');
@@ -24,25 +27,33 @@ document.addEventListener('DOMContentLoaded', () => {
     const addForm = document.getElementById('add-dealer-form');
     const addProductChecklist = document.getElementById('add-product-checklist'); 
     const addContactList = document.getElementById('add-contact-list'); 
+    const addContactBtnAdd = document.getElementById('add-contact-btn-add-modal'); 
     const addPhotoList = document.getElementById('add-photo-list'); 
+    const addPhotoBtnAdd = document.getElementById('add-photo-btn-add-modal'); 
     const addAddressList = document.getElementById('add-address-list'); 
+    const addAddressBtnAdd = document.getElementById('add-address-btn-add-modal'); 
     const addPosList = document.getElementById('add-pos-list'); 
+    const addPosBtnAdd = document.getElementById('add-pos-btn-add-modal'); 
     
     const dealerListBody = document.getElementById('dealer-list-body');
+    const dealerTable = document.getElementById('dealer-table');
     const noDataMsg = document.getElementById('no-data-msg');
     const filterCity = document.getElementById('filter-city');
     const filterPriceType = document.getElementById('filter-price-type');
     const searchBar = document.getElementById('search-bar'); 
-    const exportBtn = document.getElementById('export-dealers-btn'); // Кнопка экспорта
+    const exportBtn = document.getElementById('export-dealers-btn'); 
 
     const editForm = document.getElementById('edit-dealer-form');
     const editProductChecklist = document.getElementById('edit-product-checklist'); 
     const editContactList = document.getElementById('edit-contact-list'); 
+    const addContactBtnEdit = document.getElementById('add-contact-btn-edit-modal'); 
     const editPhotoList = document.getElementById('edit-photo-list'); 
+    const addPhotoBtnEdit = document.getElementById('add-photo-btn-edit-modal'); 
     const editAddressList = document.getElementById('edit-address-list'); 
+    const addAddressBtnEdit = document.getElementById('add-address-btn-edit-modal'); 
     const editPosList = document.getElementById('edit-pos-list'); 
+    const addPosBtnEdit = document.getElementById('add-pos-btn-edit-modal'); 
 
-    // --- Конвертер в Base64 ---
     const toBase64 = file => new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.readAsDataURL(file);
@@ -50,172 +61,235 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.onerror = error => reject(error);
     });
 
-    // --- Загрузка каталога ---
+    // (ИСПРАВЛЕНО) Добавлена пропущенная функция
+    const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
+
     async function fetchProductCatalog() {
         if (fullProductCatalog.length > 0) return; 
         try {
             const response = await fetch(API_PRODUCTS_URL);
-            if (!response.ok) throw new Error(`Ошибка товаров: ${response.status}`);
+            if (!response.ok) throw new Error('Ошибка сети при загрузке каталога');
             fullProductCatalog = await response.json();
             fullProductCatalog.sort((a, b) => a.sku.localeCompare(b.sku, 'ru', { numeric: true }));
+            console.log(`Загружено ${fullProductCatalog.length} товаров в каталог.`);
         } catch (error) {
-            console.error(error);
+            console.error("Критическая ошибка:", error);
             addProductChecklist.innerHTML = `<p class='text-danger'>${error.message}</p>`;
+            editProductChecklist.innerHTML = `<p class='text-danger'>${error.message}</p>`;
         }
     }
 
-    // --- Вспомогательные функции (HTML генераторы) ---
-    function createContactEntryHTML(c={}) {
-        return `<div class="contact-entry input-group mb-2">
-            <input type="text" class="form-control contact-name" placeholder="Имя" value="${c.name||''}">
-            <input type="text" class="form-control contact-position" placeholder="Должность" value="${c.position||''}">
-            <input type="text" class="form-control contact-info" placeholder="Телефон" value="${c.contactInfo||''}">
-            <button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button>
-        </div>`;
-    }
-    function createAddressEntryHTML(a={}) {
-        return `<div class="address-entry input-group mb-2">
-            <input type="text" class="form-control address-description" placeholder="Описание" value="${a.description||''}">
-            <input type="text" class="form-control address-city" placeholder="Город" value="${a.city||''}">
-            <input type="text" class="form-control address-address" placeholder="Адрес" value="${a.address||''}">
-            <button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button>
-        </div>`;
-    }
-    function createPosEntryHTML(p={}) {
-        const opts = posMaterialsList.map(n => `<option value="${n}" ${n===p.name?'selected':''}>${n}</option>`).join('');
-        return `<div class="pos-entry input-group mb-2">
-            <select class="form-select pos-name"><option value="">-- Выбор --</option>${opts}</select>
-            <input type="number" class="form-control pos-quantity" value="${p.quantity||1}" min="1">
-            <button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button>
-        </div>`;
-    }
-    function createNewPhotoEntryHTML() {
-        return `<div class="photo-entry new input-group mb-2">
-            <input type="text" class="form-control photo-description" placeholder="Описание фото">
-            <input type="file" class="form-control photo-file" accept="image/*">
-            <button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button>
-        </div>`;
-    }
-    function renderExistingPhotos(container, photos=[]) {
-        container.innerHTML = (photos && photos.length > 0) ? photos.map(p => `
-            <div class="photo-entry existing input-group mb-2">
-                <img src="${p.photo_url}" class="preview-thumb">
-                <input type="text" class="form-control photo-description" value="${p.description||''}">
+    function createContactEntryHTML(contact = {}) {
+        const safeName = contact.name || '';
+        const safePosition = contact.position || '';
+        const safeContactInfo = contact.contactInfo || '';
+        return `
+            <div class="contact-entry input-group mb-2">
+                <input type="text" class="form-control contact-name" placeholder="Имя" value="${safeName}">
+                <input type="text" class="form-control contact-position" placeholder="Должность" value="${safePosition}">
+                <input type="text" class="form-control contact-info" placeholder="Телефон / Email" value="${safeContactInfo}">
                 <button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button>
-                <input type="hidden" class="photo-url" value="${p.photo_url}">
-            </div>`).join('') : '';
+            </div>`;
     }
-
-    // --- Сбор данных из форм ---
-    function collectData(container, selector, fields) {
-        const data = [];
-        container.querySelectorAll(selector).forEach(entry => {
-            const item = {};
-            let hasData = false;
-            fields.forEach(f => {
-                const val = entry.querySelector(f.class).value;
-                item[f.key] = val;
-                if(val) hasData = true;
-            });
-            if(hasData) data.push(item);
+    function renderContactList(containerElement, contacts = []) {
+        containerElement.innerHTML = (contacts && contacts.length > 0) ? contacts.map(createContactEntryHTML).join('') : createContactEntryHTML();
+    }
+    function collectContacts(containerElement) {
+        const contacts = [];
+        containerElement.querySelectorAll('.contact-entry').forEach(entry => {
+            const name = entry.querySelector('.contact-name').value;
+            const position = entry.querySelector('.contact-position').value;
+            const contactInfo = entry.querySelector('.contact-info').value;
+            if (name || position || contactInfo) contacts.push({ name, position, contactInfo });
         });
-        return data;
+        return contacts;
     }
     
-    async function collectPhotos(container) {
-        const promises = [];
-        container.querySelectorAll('.photo-entry.existing').forEach(e => {
-            promises.push(Promise.resolve({
-                description: e.querySelector('.photo-description').value,
-                photo_url: e.querySelector('.photo-url').value
-            }));
+    function createAddressEntryHTML(address = {}) {
+        const safeDesc = address.description || '';
+        const safeCity = address.city || '';
+        const safeAddress = address.address || '';
+        return `
+            <div class="address-entry input-group mb-2">
+                <input type="text" class="form-control address-description" placeholder="Описание (н-р, Склад)" value="${safeDesc}">
+                <input type="text" class="form-control address-city" placeholder="Город" value="${safeCity}">
+                <input type="text" class="form-control address-address" placeholder="Адрес" value="${safeAddress}">
+                <button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button>
+            </div>`;
+    }
+    function renderAddressList(containerElement, addresses = []) {
+        containerElement.innerHTML = (addresses && addresses.length > 0) ? addresses.map(createAddressEntryHTML).join('') : createAddressEntryHTML();
+    }
+    function collectAddresses(containerElement) {
+        const addresses = [];
+        containerElement.querySelectorAll('.address-entry').forEach(entry => {
+            const description = entry.querySelector('.address-description').value;
+            const city = entry.querySelector('.address-city').value;
+            const address = entry.querySelector('.address-address').value;
+            if (description || city || address) addresses.push({ description, city, address });
         });
-        container.querySelectorAll('.photo-entry.new').forEach(e => {
-            const file = e.querySelector('.photo-file').files[0];
-            const desc = e.querySelector('.photo-description').value;
-            if(file) promises.push(toBase64(file).then(url => ({ description: desc, photo_url: url })));
-        });
-        return Promise.all(promises);
+        return addresses;
     }
 
-    function renderList(container, data, htmlGen) {
-        container.innerHTML = (data && data.length > 0) ? data.map(htmlGen).join('') : htmlGen();
+    function createPosEntryHTML(pos = {}) {
+        const safeName = pos.name || '';
+        const safeQuantity = pos.quantity || 1;
+        const options = posMaterialsList.map(name => 
+            `<option value="${name}" ${name === safeName ? 'selected' : ''}>${name}</option>`
+        ).join('');
+        return `
+            <div class="pos-entry input-group mb-2">
+                <select class="form-select pos-name"><option value="">-- Выберите --</option>${options}</select>
+                <input type="number" class="form-control pos-quantity" placeholder="Кол-во" value="${safeQuantity}" min="1">
+                <button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button>
+            </div>`;
+    }
+    function renderPosList(containerElement, posItems = []) {
+        containerElement.innerHTML = (posItems && posItems.length > 0) ? posItems.map(createPosEntryHTML).join('') : createPosEntryHTML();
+    }
+    function collectPos(containerElement) {
+        const posItems = [];
+        containerElement.querySelectorAll('.pos-entry').forEach(entry => {
+            const name = entry.querySelector('.pos-name').value;
+            const quantity = entry.querySelector('.pos-quantity').value;
+            if (name) posItems.push({ name, quantity: Number(quantity) || 1 });
+        });
+        return posItems;
+    }
+    
+    function createNewPhotoEntryHTML() {
+        return `
+            <div class="photo-entry new input-group mb-2">
+                <input type="text" class="form-control photo-description" placeholder="Описание (н-р, Фасад)">
+                <input type="file" class="form-control photo-file" accept="image/*">
+                <button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button>
+            </div>`;
+    }
+    function renderExistingPhotos(containerElement, photos = []) {
+        containerElement.innerHTML = (photos && photos.length > 0) ? photos.map(photo => `
+            <div class="photo-entry existing input-group mb-2">
+                <img src="${photo.photo_url}" class="preview-thumb">
+                <input type="text" class="form-control photo-description" value="${photo.description || ''}">
+                <button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button>
+                <input type="hidden" class="photo-url" value="${photo.photo_url}"> 
+            </div>`).join('') : ''; 
+    }
+    async function collectPhotos(containerElement) {
+        const photoPromises = [];
+        containerElement.querySelectorAll('.photo-entry.existing').forEach(entry => {
+            const description = entry.querySelector('.photo-description').value;
+            const photo_url = entry.querySelector('.photo-url').value;
+            photoPromises.push(Promise.resolve({ description, photo_url }));
+        });
+        containerElement.querySelectorAll('.photo-entry.new').forEach(entry => {
+            const description = entry.querySelector('.photo-description').value;
+            const file = entry.querySelector('.photo-file').files[0];
+            if (file) {
+                photoPromises.push(toBase64(file).then(base64Url => ({ description, photo_url: base64Url })));
+            }
+        });
+        return await Promise.all(photoPromises);
     }
 
-    // --- Работа с товарами ---
-    function renderProductChecklist(container, selectedIds=[]) {
-        const set = new Set(selectedIds);
-        container.innerHTML = fullProductCatalog.map(p => {
-            const pid = p.id || p._id;
-            return `<div class="checklist-item form-check">
-                <input type="checkbox" class="form-check-input" value="${pid}" ${set.has(pid)?'checked':''}>
-                <label class="form-check-label"><strong>${p.sku}</strong> - ${p.name}</label>
+    function renderProductChecklist(container, selectedProductIds = []) {
+        const selectedSet = new Set(selectedProductIds); 
+        if (fullProductCatalog.length === 0) {
+            container.innerHTML = "<p>Каталог пуст.</p>";
+            return;
+        }
+        container.innerHTML = fullProductCatalog.map(product => {
+            const productId = product.id; 
+            return `
+            <div class="checklist-item form-check">
+                <input type="checkbox" class="form-check-input" id="prod-${container.id}-${productId}" value="${productId}" ${selectedSet.has(productId) ? 'checked' : ''}>
+                <label class="form-check-label" for="prod-${container.id}-${productId}"><strong>${product.sku}</strong> - ${product.name}</label>
             </div>`;
         }).join('');
     }
+
     function getSelectedProductIds(containerId) {
-        return Array.from(document.getElementById(containerId).querySelectorAll('input:checked')).map(cb=>cb.value);
+        const container = document.getElementById(containerId);
+        const checkboxes = container.querySelectorAll('input[type="checkbox"]:checked');
+        return Array.from(checkboxes).map(cb => cb.value);
     }
-    async function saveProducts(dealerId, ids) {
-        await fetch(`${API_DEALERS_URL}/${dealerId}/products`, {
-            method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({productIds: ids})
-        });
+    
+    async function saveDealerProductLinks(dealerId, productIds) {
+        try {
+            await fetch(`${API_DEALERS_URL}/${dealerId}/products`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ productIds })
+            });
+        } catch (error) { console.error(error); alert("Ошибка: Не удалось сохранить список товаров."); }
     }
 
-    // --- Главный рендер ---
     function renderDealerList() {
-        const city = filterCity.value;
-        const type = filterPriceType.value;
-        const search = searchBar.value.toLowerCase();
+        const selectedCity = filterCity.value;
+        const selectedPriceType = filterPriceType.value;
+        const searchTerm = searchBar.value.toLowerCase(); 
 
-        const filtered = allDealers.filter(d => {
-            const matchCity = !city || d.city === city;
-            const matchType = !type || d.price_type === type;
-            const matchSearch = !search || 
-                (d.name && d.name.toLowerCase().includes(search)) ||
-                (d.dealer_id && d.dealer_id.toLowerCase().includes(search)) ||
-                (d.organization && d.organization.toLowerCase().includes(search));
-            return matchCity && matchType && matchSearch;
+        const filteredDealers = allDealers.filter(dealer => {
+            const cityMatch = !selectedCity || dealer.city === selectedCity;
+            const priceTypeMatch = !selectedPriceType || dealer.price_type === selectedPriceType;
+            const searchMatch = !searchTerm || 
+                                (dealer.name && dealer.name.toLowerCase().includes(searchTerm)) ||
+                                (dealer.dealer_id && dealer.dealer_id.toLowerCase().includes(searchTerm)) ||
+                                (dealer.organization && dealer.organization.toLowerCase().includes(searchTerm));
+            return cityMatch && priceTypeMatch && searchMatch;
         });
 
-        filtered.sort((a, b) => {
-            let valA = (a[currentSort.column] || '').toString();
-            let valB = (b[currentSort.column] || '').toString();
-            let res = currentSort.column === 'dealer_id' 
-                ? valA.localeCompare(valB, undefined, {numeric:true})
-                : valA.toLowerCase().localeCompare(valB.toLowerCase(), 'ru');
-            return currentSort.direction === 'asc' ? res : -res;
+        const sortedDealers = filteredDealers.sort((a, b) => {
+            const col = currentSort.column;
+            let valA = (a[col] || '').toString(); 
+            let valB = (b[col] || '').toString();
+            let comparison;
+            if (col === 'dealer_id') {
+                 comparison = valA.localeCompare(valB, undefined, { numeric: true });
+            } else {
+                 comparison = valA.toLowerCase().localeCompare(valB.toLowerCase(), 'ru');
+            }
+            return currentSort.direction === 'asc' ? comparison : -comparison;
         });
 
-        dealerListBody.innerHTML = '';
-        if (filtered.length === 0) {
+        document.querySelectorAll('#dealer-table th[data-sort]').forEach(th => {
+            th.classList.remove('sort-asc', 'sort-desc');
+            if (th.dataset.sort === currentSort.column) {
+                th.classList.add(currentSort.direction === 'asc' ? 'sort-asc' : 'sort-desc');
+            }
+        });
+
+        dealerListBody.innerHTML = ''; 
+        
+        if (sortedDealers.length === 0) {
             dealerTable.style.display = 'none';
             noDataMsg.style.display = 'block';
-            noDataMsg.textContent = allDealers.length === 0 ? 'Список пуст. Добавьте первого дилера!' : 'Ничего не найдено.';
+            noDataMsg.textContent = allDealers.length === 0 ? 'Список дилеров пока пуст.' : 'Не найдено.';
             return;
         }
+
         dealerTable.style.display = 'table';
         noDataMsg.style.display = 'none';
 
-        filtered.forEach((d, idx) => {
+        sortedDealers.forEach((dealer, index) => { 
             const row = dealerListBody.insertRow();
-            const safe = (t) => t ? t.replace(/</g,"&lt;") : '';
+            const dealerId = dealer.id; 
+            
             row.innerHTML = `
-                <td class="cell-number">${idx+1}</td>
-                <td>${d.photo_url ? `<img src="${d.photo_url}" class="table-photo">` : `<div class="no-photo">Нет</div>`}</td>
-                <td>${safe(d.dealer_id)}</td>
-                <td>${safe(d.name)}</td>
-                <td>${safe(d.city)}</td>
-                <td>${safe(d.price_type)}</td>
-                <td>${safe(d.organization)}</td>
+                <td class="cell-number">${index + 1}</td>
+                <td>${dealer.photo_url ? `<img src="${dealer.photo_url}" class="table-photo">` : `<div class="no-photo">Нет</div>`}</td>
+                <td>${safeText(dealer.dealer_id)}</td>
+                <td>${safeText(dealer.name)}</td>
+                <td>${safeText(dealer.city)}</td>
+                <td>${safeText(dealer.price_type)}</td>
+                <td>${safeText(dealer.organization)}</td>
                 <td class="actions-cell">
                     <div class="dropdown">
-                        <button class="btn btn-light btn-sm" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button>
+                        <button class="btn btn-light btn-sm" type="button" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button>
                         <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item btn-view" data-id="${d.id}" href="#"><i class="bi bi-eye me-2"></i>Просмотр</a></li>
-                            <li><a class="dropdown-item btn-edit" data-id="${d.id}" href="#"><i class="bi bi-pencil me-2"></i>Ред.</a></li>
+                            <li><a class="dropdown-item btn-view" data-id="${dealerId}" href="#"><i class="bi bi-eye me-2"></i>Просмотреть</a></li>
+                            <li><a class="dropdown-item btn-edit" data-id="${dealerId}" href="#"><i class="bi bi-pencil me-2"></i>Редактировать</a></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item text-danger btn-delete" data-id="${d.id}" data-name="${safe(d.name)}" href="#"><i class="bi bi-trash me-2"></i>Удалить</a></li>
+                            <li><a class="dropdown-item text-danger btn-delete" data-id="${dealerId}" data-name="${safeText(dealer.name)}" href="#"><i class="bi bi-trash me-2"></i>Удалить</a></li>
                         </ul>
                     </div>
                 </td>`;
@@ -226,7 +300,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const cities = [...new Set(dealers.map(d => d.city).filter(Boolean))].sort();
         const types = [...new Set(dealers.map(d => d.price_type).filter(Boolean))].sort();
         
-        // Сохраняем текущий выбор
         const selCity = filterCity.value;
         const selType = filterPriceType.value;
 
@@ -240,37 +313,23 @@ document.addEventListener('DOMContentLoaded', () => {
         filterPriceType.value = selType;
     }
 
-    // --- ИНИЦИАЛИЗАЦИЯ (Самое важное) ---
     async function initApp() {
-        await fetchProductCatalog();
+        await fetchProductCatalog(); 
         try {
-            // (ВАЖНО) Пытаемся загрузить
             const response = await fetch(API_DEALERS_URL);
-            
-            if (!response.ok) {
-                // Если ошибка (401, 500), читаем текст ошибки
-                const text = await response.text();
-                throw new Error(`Ошибка сервера (${response.status}): ${text}`);
-            }
-            
-            allDealers = await response.json();
-            populateFilters(allDealers);
-            renderDealerList();
-            
+            if (!response.ok) throw new Error('Ошибка загрузки');
+            allDealers = await response.json(); 
+            populateFilters(allDealers); 
+            renderDealerList(); 
         } catch (error) {
-            console.error('CRITICAL INIT ERROR:', error);
-            // Показываем РЕАЛЬНУЮ ошибку на экране
-            dealerListBody.innerHTML = '';
-            dealerTable.style.display = 'none';
-            noDataMsg.style.display = 'block';
-            noDataMsg.className = 'alert alert-danger';
-            noDataMsg.innerHTML = `<strong>Не удалось загрузить список:</strong><br>${error.message}`;
+            console.error(error);
+            dealerListBody.innerHTML = `<tr><td colspan="8" class="text-danger text-center">Ошибка загрузки.</td></tr>`;
         }
-
-        const pendingId = localStorage.getItem('pendingEditDealerId');
-        if (pendingId) {
+        
+        const pendingEditId = localStorage.getItem('pendingEditDealerId');
+        if (pendingEditId) {
             localStorage.removeItem('pendingEditDealerId');
-            openEditModal(pendingId);
+            openEditModal(pendingEditId); 
         }
     }
 
@@ -289,9 +348,9 @@ document.addEventListener('DOMContentLoaded', () => {
     openAddModalBtn.onclick = () => {
         addForm.reset();
         renderProductChecklist(addProductChecklist);
-        renderList(addContactList, [], createContactEntryHTML);
-        renderList(addAddressList, [], createAddressEntryHTML);
-        renderList(addPosList, [], createPosEntryHTML);
+        renderContactList(addContactList);
+        renderAddressList(addAddressList);
+        renderPosList(addPosList);
         addPhotoList.innerHTML = createNewPhotoEntryHTML();
         addModal.show();
     };
@@ -310,9 +369,9 @@ document.addEventListener('DOMContentLoaded', () => {
             website: document.getElementById('website').value,
             instagram: document.getElementById('instagram').value,
             bonuses: document.getElementById('bonuses').value,
-            contacts: collectData(addContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]),
-            additional_addresses: collectData(addAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]),
-            pos_materials: collectData(addPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]),
+            contacts: collectContacts(addContactList),
+            additional_addresses: collectAddresses(addAddressList),
+            pos_materials: collectPos(addPosList),
             photos: await collectPhotos(addPhotoList)
         };
 
@@ -321,7 +380,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!res.ok) throw new Error(await res.text());
             const newD = await res.json();
             const pIds = getSelectedProductIds('add-product-checklist');
-            if(pIds.length) await saveProducts(newD.id, pIds);
+            if(pIds.length) await saveDealerProductLinks(newD.id, pIds);
             addModal.hide();
             initApp();
         } catch (e) { alert("Ошибка: " + e.message); }
@@ -334,7 +393,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if(!res.ok) throw new Error("Ошибка загрузки дилера");
             const d = await res.json();
             
-            // Заполняем поля
             document.getElementById('edit_db_id').value = d.id;
             document.getElementById('edit_dealer_id').value = d.dealer_id;
             document.getElementById('edit_name').value = d.name;
@@ -347,9 +405,9 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('edit_instagram').value = d.instagram;
             document.getElementById('edit_bonuses').value = d.bonuses;
 
-            renderList(editContactList, d.contacts, createContactEntryHTML);
-            renderList(editAddressList, d.additional_addresses, createAddressEntryHTML);
-            renderList(editPosList, d.pos_materials, createPosEntryHTML);
+            renderContactList(editContactList, d.contacts);
+            renderAddressList(editAddressList, d.additional_addresses);
+            renderPosList(editPosList, d.pos_materials);
             renderExistingPhotos(editPhotoList, d.photos);
             renderProductChecklist(editProductChecklist, (d.products||[]).map(p=>p.id));
             
@@ -372,16 +430,16 @@ document.addEventListener('DOMContentLoaded', () => {
             website: document.getElementById('edit_website').value,
             instagram: document.getElementById('edit_instagram').value,
             bonuses: document.getElementById('edit_bonuses').value,
-            contacts: collectData(editContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]),
-            additional_addresses: collectData(editAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]),
-            pos_materials: collectData(editPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]),
+            contacts: collectContacts(editContactList),
+            additional_addresses: collectAddresses(editAddressList),
+            pos_materials: collectPos(editPosList),
             photos: await collectPhotos(editPhotoList)
         };
 
         try {
             const res = await fetch(`${API_DEALERS_URL}/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)});
             if (!res.ok) throw new Error(await res.text());
-            await saveProducts(id, getSelectedProductIds('edit-product-checklist'));
+            await saveDealerProductLinks(id, getSelectedProductIds('edit-product-checklist'));
             editModal.hide();
             initApp();
         } catch (e) { alert("Ошибка: " + e.message); }
@@ -425,7 +483,8 @@ document.addEventListener('DOMContentLoaded', () => {
             let csv = "\uFEFFID,Название,Орг,Город,Адрес,Тип,Контакты\n";
             allDealers.forEach(d => {
                 const c = (d.contacts||[]).map(x=>x.name).join('; ');
-                csv += `"${d.dealer_id}","${d.name}","${d.organization}","${d.city}","${d.address}","${d.price_type}","${c}"\n`;
+                const clean = t => `"${String(t||'').replace(/"/g,'""')}"`;
+                csv += `${clean(d.dealer_id)},${clean(d.name)},${clean(d.organization)},${clean(d.city)},${clean(d.address)},${clean(d.price_type)},${clean(c)}\n`;
             });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'}));
