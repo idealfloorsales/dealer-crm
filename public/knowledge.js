@@ -101,9 +101,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const articleId = event.target.id.replace('collapse-', '');
         const contentDisplay = document.getElementById(`content-${articleId}`);
         
-        // (ИСПРАВЛЕНО) Проверяем textContent и trim()
         if (contentDisplay.textContent.trim() !== 'Загрузка...') {
-            return; // Уже загружено
+            return; 
         }
         
         try {
@@ -112,7 +111,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const article = await response.json();
             
             const safeContent = article.content ? safeText(article.content) : '<i>Нет содержимого</i>';
-            // (ИСПРАВЛЕНО) Используем класс Bootstrap для форматирования
             contentDisplay.innerHTML = `<div class="products-display">${safeContent}</div>`;
         } catch (error) {
             contentDisplay.innerHTML = `<p class="text-danger">${error.message}</p>`;
@@ -131,7 +129,6 @@ document.addEventListener('DOMContentLoaded', () => {
     articleList.addEventListener('click', async (e) => {
         const target = e.target;
         
-        // Нажали "Редактировать"
         const editButton = target.closest('.btn-edit');
         if (editButton) {
             e.stopPropagation(); 
@@ -153,7 +150,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         
-        // Нажали "Удалить"
         const deleteButton = target.closest('.btn-delete');
         if (deleteButton) {
             e.stopPropagation(); 
