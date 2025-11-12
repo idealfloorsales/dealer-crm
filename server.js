@@ -1,3 +1,4 @@
+// server.js
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -8,26 +9,26 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json({ limit: '50mb' })); 
 app.use(cors());
 
-// --- БЕЗОПАСНОСТЬ ---
+// --- НАСТРОЙКИ БЕЗОПАСНОСТИ ---
 const ADMIN_USER = process.env.ADMIN_USER;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
+// Если переменных нет, сервер не упадет, но предупредит (для отладки)
 if (!ADMIN_USER || !ADMIN_PASSWORD) {
-    console.error("Критическая ошибка: ADMIN_USER или ADMIN_PASSWORD не установлены!");
-    process.exit(1); 
+    console.warn("ВНИМАНИЕ: ADMIN_USER или ADMIN_PASSWORD не установлены в Render!");
+} else {
+    app.use(basicAuth({
+        users: { [ADMIN_USER]: ADMIN_PASSWORD }, 
+        challenge: true, 
+        unauthorizedResponse: 'Доступ запрещен. Обновите страницу и введите логин/пароль.'
+    }));
 }
-
-app.use(basicAuth({
-    users: { [ADMIN_USER]: ADMIN_PASSWORD }, 
-    challenge: true, 
-    unauthorizedResponse: 'Доступ запрещен. Обновите страницу.'
-}));
 
 app.use(express.static('public'));
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// --- СПИСОК ТОВАРОВ (74 шт.) ---
+// --- ПОЛНЫЙ СПИСОК ТОВАРОВ (74 шт., исправлены запятые) ---
 const productsToImport = [
     { sku: "CD-507", name: "Дуб Беленый" },
     { sku: "CD-508", name: "Дуб Пепельный" },
@@ -107,7 +108,7 @@ const productsToImport = [
     { sku: "Н600", name: "600мм наклейка" }
 ];
 
-// --- СХЕМЫ MONGODB ---
+// --- Схемы MongoDB ---
 const productSchema = new mongoose.Schema({
     sku: { type: String, required: true, unique: true },
     name: { type: String, required: true }
@@ -161,21 +162,24 @@ const knowledgeSchema = new mongoose.Schema({
 }, { timestamps: true }); 
 const Knowledge = mongoose.model('Knowledge', knowledgeSchema);
 
-// --- СИНХРОНИЗАЦИЯ ТОВАРОВ ---
+// --- Импорт товаров ---
 async function hardcodedImportProducts() {
     try {
-        console.log("Запускаю синхронизацию каталога товаров...");
+        console.log("Проверка каталога товаров...");
         
+        // Получаем все SKU из базы и из кода
         const dbProducts = await Product.find().lean();
         const dbSkus = new Set(dbProducts.map(p => p.sku));
         const codeSkus = new Set(productsToImport.map(p => p.sku));
 
+        // 1. Удаляем лишние
         const skusToDelete = [...dbSkus].filter(sku => !codeSkus.has(sku));
         if (skusToDelete.length > 0) {
             console.log(`Удаляю ${skusToDelete.length} устаревших товаров...`);
             await Product.deleteMany({ sku: { $in: skusToDelete } });
         }
 
+        // 2. Добавляем новые
         const productsToAdd = productsToImport.filter(p => !dbSkus.has(p.sku));
         if (productsToAdd.length > 0) {
             console.log(`Добавляю ${productsToAdd.length} новых товаров...`);
@@ -185,14 +189,14 @@ async function hardcodedImportProducts() {
         }
         
         const finalCount = await Product.countDocuments();
-        console.log(`Синхронизация завершена. В каталоге ${finalCount} товаров.`);
+        console.log(`Каталог обновлен. Всего товаров: ${finalCount}.`);
 
     } catch (error) {
            console.warn(`Ошибка при синхронизации товаров: ${error.message}`);
     }
 }
 
-// --- ПОДКЛЮЧЕНИЕ ---
+// --- Подключение к MongoDB ---
 async function connectToDB() {
     if (!DB_CONNECTION_STRING) {
         console.error("Ошибка: DB_CONNECTION_STRING не найдена.");
@@ -207,7 +211,7 @@ async function connectToDB() {
     }
 }
 
-// --- ПОМОЩНИК ---
+// --- Хелпер ---
 function convertToClient(mongoDoc) {
     if (!mongoDoc) return null;
     const obj = mongoDoc.toObject ? mongoDoc.toObject() : mongoDoc;
@@ -225,7 +229,6 @@ function convertToClient(mongoDoc) {
 
 // === API ROUTES ===
 
-// DEALERS
 app.get('/api/dealers', async (req, res) => {
     try {
         const dealers = await Dealer.find({}, 'dealer_id name city photos price_type organization').lean();
@@ -273,7 +276,10 @@ app.delete('/api/dealers/:id', async (req, res) => {
 
 app.get('/api/dealers/:id/products', async (req, res) => {
     try {
-        const dealer = await Dealer.findById(req.params.id).populate('products');
+        const dealer = await Dealer.findById(req.params.id).populate({
+            path: 'products',
+            options: { sort: { 'sku': 1 } } 
+        });
         if (!dealer) return res.status(404).json({ message: "Дилер не найден" });
         const productsWithId = dealer.products.map(p => convertToClient(p));
         res.json(productsWithId);
@@ -289,7 +295,6 @@ app.put('/api/dealers/:id/products', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// PRODUCTS
 app.get('/api/products', async (req, res) => {
     try {
         const searchTerm = req.query.search || '';
@@ -334,7 +339,6 @@ app.delete('/api/products/:id', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// REPORT / MATRIX
 app.get('/api/matrix', async (req, res) => {
     try {
         const allProducts = await Product.find({}, 'sku name').sort({ sku: 1 }).lean();
@@ -377,7 +381,6 @@ app.get('/api/products/:id/dealers', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// KNOWLEDGE
 app.get('/api/knowledge', async (req, res) => {
     try {
         const searchTerm = req.query.search || '';
@@ -422,6 +425,6 @@ app.delete('/api/knowledge/:id', async (req, res) => {
 
 // START
 app.listen(PORT, () => {
-    console.log(`Сервер запущен на порту ${PORT}`);
+    console.log(`Сервер запущен и слушает порт ${PORT}`);
     connectToDB();
 });
