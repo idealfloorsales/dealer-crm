@@ -9,13 +9,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSort = { column: 'name', direction: 'asc' };
 
     const posMaterialsList = [
-        "Н600 - 600мм наклейка",
-        "Н800 - 800мм наклейка",
-        "РФ-2 - Расческа из фанеры",
-        "РФС-1 - Расческа их фанеры старая",
-        "С600 - 600мм задняя стенка",
-        "С800 - 800мм задняя стенка",
-        "Табличка - Табличка орг.стекло"
+        "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "РФ-2 - Расческа из фанеры",
+        "РФС-1 - Расческа из фанеры старая", "С600 - 600мм задняя стенка",
+        "С800 - 800мм задняя стенка", "Табличка - Табличка орг.стекло"
     ];
 
     const addModalEl = document.getElementById('add-modal');
@@ -61,235 +57,176 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.onerror = error => reject(error);
     });
 
-    // (ИСПРАВЛЕНО) Добавлена пропущенная функция
+    // (ИСПРАВЛЕНО) Функция безопасного текста, чтобы не ломать верстку
     const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
 
     async function fetchProductCatalog() {
         if (fullProductCatalog.length > 0) return; 
         try {
             const response = await fetch(API_PRODUCTS_URL);
-            if (!response.ok) throw new Error('Ошибка сети при загрузке каталога');
+            if (!response.ok) throw new Error(`Ошибка: ${response.status}`);
             fullProductCatalog = await response.json();
+            // Сортировка по SKU
             fullProductCatalog.sort((a, b) => a.sku.localeCompare(b.sku, 'ru', { numeric: true }));
-            console.log(`Загружено ${fullProductCatalog.length} товаров в каталог.`);
+            console.log(`Загружено ${fullProductCatalog.length} товаров.`);
         } catch (error) {
-            console.error("Критическая ошибка:", error);
-            addProductChecklist.innerHTML = `<p class='text-danger'>${error.message}</p>`;
-            editProductChecklist.innerHTML = `<p class='text-danger'>${error.message}</p>`;
+            console.error("Ошибка каталога:", error);
+            addProductChecklist.innerHTML = `<p class='text-danger'>Не удалось загрузить каталог.</p>`;
+            editProductChecklist.innerHTML = `<p class='text-danger'>Не удалось загрузить каталог.</p>`;
         }
     }
 
-    function createContactEntryHTML(contact = {}) {
-        const safeName = contact.name || '';
-        const safePosition = contact.position || '';
-        const safeContactInfo = contact.contactInfo || '';
-        return `
-            <div class="contact-entry input-group mb-2">
-                <input type="text" class="form-control contact-name" placeholder="Имя" value="${safeName}">
-                <input type="text" class="form-control contact-position" placeholder="Должность" value="${safePosition}">
-                <input type="text" class="form-control contact-info" placeholder="Телефон / Email" value="${safeContactInfo}">
-                <button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button>
-            </div>`;
+    function createContactEntryHTML(c={}) {
+        return `<div class="contact-entry input-group mb-2">
+            <input type="text" class="form-control contact-name" placeholder="Имя" value="${c.name||''}">
+            <input type="text" class="form-control contact-position" placeholder="Должность" value="${c.position||''}">
+            <input type="text" class="form-control contact-info" placeholder="Телефон" value="${c.contactInfo||''}">
+            <button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button>
+        </div>`;
     }
-    function renderContactList(containerElement, contacts = []) {
-        containerElement.innerHTML = (contacts && contacts.length > 0) ? contacts.map(createContactEntryHTML).join('') : createContactEntryHTML();
+    function createAddressEntryHTML(a={}) {
+        return `<div class="address-entry input-group mb-2">
+            <input type="text" class="form-control address-description" placeholder="Описание" value="${a.description||''}">
+            <input type="text" class="form-control address-city" placeholder="Город" value="${a.city||''}">
+            <input type="text" class="form-control address-address" placeholder="Адрес" value="${a.address||''}">
+            <button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button>
+        </div>`;
     }
-    function collectContacts(containerElement) {
-        const contacts = [];
-        containerElement.querySelectorAll('.contact-entry').forEach(entry => {
-            const name = entry.querySelector('.contact-name').value;
-            const position = entry.querySelector('.contact-position').value;
-            const contactInfo = entry.querySelector('.contact-info').value;
-            if (name || position || contactInfo) contacts.push({ name, position, contactInfo });
-        });
-        return contacts;
+    function createPosEntryHTML(p={}) {
+        const opts = posMaterialsList.map(n => `<option value="${n}" ${n===p.name?'selected':''}>${n}</option>`).join('');
+        return `<div class="pos-entry input-group mb-2">
+            <select class="form-select pos-name"><option value="">-- Выбор --</option>${opts}</select>
+            <input type="number" class="form-control pos-quantity" value="${p.quantity||1}" min="1">
+            <button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button>
+        </div>`;
     }
-    
-    function createAddressEntryHTML(address = {}) {
-        const safeDesc = address.description || '';
-        const safeCity = address.city || '';
-        const safeAddress = address.address || '';
-        return `
-            <div class="address-entry input-group mb-2">
-                <input type="text" class="form-control address-description" placeholder="Описание (н-р, Склад)" value="${safeDesc}">
-                <input type="text" class="form-control address-city" placeholder="Город" value="${safeCity}">
-                <input type="text" class="form-control address-address" placeholder="Адрес" value="${safeAddress}">
-                <button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button>
-            </div>`;
-    }
-    function renderAddressList(containerElement, addresses = []) {
-        containerElement.innerHTML = (addresses && addresses.length > 0) ? addresses.map(createAddressEntryHTML).join('') : createAddressEntryHTML();
-    }
-    function collectAddresses(containerElement) {
-        const addresses = [];
-        containerElement.querySelectorAll('.address-entry').forEach(entry => {
-            const description = entry.querySelector('.address-description').value;
-            const city = entry.querySelector('.address-city').value;
-            const address = entry.querySelector('.address-address').value;
-            if (description || city || address) addresses.push({ description, city, address });
-        });
-        return addresses;
-    }
-
-    function createPosEntryHTML(pos = {}) {
-        const safeName = pos.name || '';
-        const safeQuantity = pos.quantity || 1;
-        const options = posMaterialsList.map(name => 
-            `<option value="${name}" ${name === safeName ? 'selected' : ''}>${name}</option>`
-        ).join('');
-        return `
-            <div class="pos-entry input-group mb-2">
-                <select class="form-select pos-name"><option value="">-- Выберите --</option>${options}</select>
-                <input type="number" class="form-control pos-quantity" placeholder="Кол-во" value="${safeQuantity}" min="1">
-                <button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button>
-            </div>`;
-    }
-    function renderPosList(containerElement, posItems = []) {
-        containerElement.innerHTML = (posItems && posItems.length > 0) ? posItems.map(createPosEntryHTML).join('') : createPosEntryHTML();
-    }
-    function collectPos(containerElement) {
-        const posItems = [];
-        containerElement.querySelectorAll('.pos-entry').forEach(entry => {
-            const name = entry.querySelector('.pos-name').value;
-            const quantity = entry.querySelector('.pos-quantity').value;
-            if (name) posItems.push({ name, quantity: Number(quantity) || 1 });
-        });
-        return posItems;
-    }
-    
     function createNewPhotoEntryHTML() {
-        return `
-            <div class="photo-entry new input-group mb-2">
-                <input type="text" class="form-control photo-description" placeholder="Описание (н-р, Фасад)">
-                <input type="file" class="form-control photo-file" accept="image/*">
-                <button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button>
-            </div>`;
+        return `<div class="photo-entry new input-group mb-2">
+            <input type="text" class="form-control photo-description" placeholder="Описание фото">
+            <input type="file" class="form-control photo-file" accept="image/*">
+            <button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button>
+        </div>`;
     }
-    function renderExistingPhotos(containerElement, photos = []) {
-        containerElement.innerHTML = (photos && photos.length > 0) ? photos.map(photo => `
+    function renderExistingPhotos(container, photos=[]) {
+        container.innerHTML = (photos && photos.length > 0) ? photos.map(p => `
             <div class="photo-entry existing input-group mb-2">
-                <img src="${photo.photo_url}" class="preview-thumb">
-                <input type="text" class="form-control photo-description" value="${photo.description || ''}">
+                <img src="${p.photo_url}" class="preview-thumb">
+                <input type="text" class="form-control photo-description" value="${p.description||''}">
                 <button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button>
-                <input type="hidden" class="photo-url" value="${photo.photo_url}"> 
-            </div>`).join('') : ''; 
-    }
-    async function collectPhotos(containerElement) {
-        const photoPromises = [];
-        containerElement.querySelectorAll('.photo-entry.existing').forEach(entry => {
-            const description = entry.querySelector('.photo-description').value;
-            const photo_url = entry.querySelector('.photo-url').value;
-            photoPromises.push(Promise.resolve({ description, photo_url }));
-        });
-        containerElement.querySelectorAll('.photo-entry.new').forEach(entry => {
-            const description = entry.querySelector('.photo-description').value;
-            const file = entry.querySelector('.photo-file').files[0];
-            if (file) {
-                photoPromises.push(toBase64(file).then(base64Url => ({ description, photo_url: base64Url })));
-            }
-        });
-        return await Promise.all(photoPromises);
+                <input type="hidden" class="photo-url" value="${p.photo_url}">
+            </div>`).join('') : '';
     }
 
-    function renderProductChecklist(container, selectedProductIds = []) {
-        const selectedSet = new Set(selectedProductIds); 
+    function collectData(container, selector, fields) {
+        const data = [];
+        container.querySelectorAll(selector).forEach(entry => {
+            const item = {};
+            let hasData = false;
+            fields.forEach(f => {
+                const val = entry.querySelector(f.class).value;
+                item[f.key] = val;
+                if(val) hasData = true;
+            });
+            if(hasData) data.push(item);
+        });
+        return data;
+    }
+    
+    async function collectPhotos(container) {
+        const promises = [];
+        container.querySelectorAll('.photo-entry.existing').forEach(e => {
+            promises.push(Promise.resolve({
+                description: e.querySelector('.photo-description').value,
+                photo_url: e.querySelector('.photo-url').value
+            }));
+        });
+        container.querySelectorAll('.photo-entry.new').forEach(e => {
+            const file = e.querySelector('.photo-file').files[0];
+            const desc = e.querySelector('.photo-description').value;
+            if(file) promises.push(toBase64(file).then(url => ({ description: desc, photo_url: url })));
+        });
+        return Promise.all(promises);
+    }
+
+    function renderList(container, data, htmlGen) {
+        container.innerHTML = (data && data.length > 0) ? data.map(htmlGen).join('') : htmlGen();
+    }
+
+    function renderProductChecklist(container, selectedIds=[]) {
+        const set = new Set(selectedIds);
         if (fullProductCatalog.length === 0) {
-            container.innerHTML = "<p>Каталог пуст.</p>";
+            container.innerHTML = "<p>Каталог пуст (ошибка загрузки).</p>";
             return;
         }
-        container.innerHTML = fullProductCatalog.map(product => {
-            const productId = product.id; 
-            return `
-            <div class="checklist-item form-check">
-                <input type="checkbox" class="form-check-input" id="prod-${container.id}-${productId}" value="${productId}" ${selectedSet.has(productId) ? 'checked' : ''}>
-                <label class="form-check-label" for="prod-${container.id}-${productId}"><strong>${product.sku}</strong> - ${product.name}</label>
+        container.innerHTML = fullProductCatalog.map(p => {
+            const pid = p.id || p._id;
+            return `<div class="checklist-item form-check">
+                <input type="checkbox" class="form-check-input" id="prod-${container.id}-${pid}" value="${pid}" ${set.has(pid)?'checked':''}>
+                <label class="form-check-label" for="prod-${container.id}-${pid}"><strong>${p.sku}</strong> - ${p.name}</label>
             </div>`;
         }).join('');
     }
-
     function getSelectedProductIds(containerId) {
-        const container = document.getElementById(containerId);
-        const checkboxes = container.querySelectorAll('input[type="checkbox"]:checked');
-        return Array.from(checkboxes).map(cb => cb.value);
+        return Array.from(document.getElementById(containerId).querySelectorAll('input:checked')).map(cb=>cb.value);
     }
-    
-    async function saveDealerProductLinks(dealerId, productIds) {
-        try {
-            await fetch(`${API_DEALERS_URL}/${dealerId}/products`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ productIds })
-            });
-        } catch (error) { console.error(error); alert("Ошибка: Не удалось сохранить список товаров."); }
+    async function saveProducts(dealerId, ids) {
+        await fetch(`${API_DEALERS_URL}/${dealerId}/products`, {
+            method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({productIds: ids})
+        });
     }
 
     function renderDealerList() {
-        const selectedCity = filterCity.value;
-        const selectedPriceType = filterPriceType.value;
-        const searchTerm = searchBar.value.toLowerCase(); 
+        const city = filterCity.value;
+        const type = filterPriceType.value;
+        const search = searchBar.value.toLowerCase();
 
-        const filteredDealers = allDealers.filter(dealer => {
-            const cityMatch = !selectedCity || dealer.city === selectedCity;
-            const priceTypeMatch = !selectedPriceType || dealer.price_type === selectedPriceType;
-            const searchMatch = !searchTerm || 
-                                (dealer.name && dealer.name.toLowerCase().includes(searchTerm)) ||
-                                (dealer.dealer_id && dealer.dealer_id.toLowerCase().includes(searchTerm)) ||
-                                (dealer.organization && dealer.organization.toLowerCase().includes(searchTerm));
-            return cityMatch && priceTypeMatch && searchMatch;
+        const filtered = allDealers.filter(d => {
+            const matchCity = !city || d.city === city;
+            const matchType = !type || d.price_type === type;
+            const matchSearch = !search || 
+                (d.name && d.name.toLowerCase().includes(search)) ||
+                (d.dealer_id && d.dealer_id.toLowerCase().includes(search)) ||
+                (d.organization && d.organization.toLowerCase().includes(search));
+            return matchCity && matchType && matchSearch;
         });
 
-        const sortedDealers = filteredDealers.sort((a, b) => {
-            const col = currentSort.column;
-            let valA = (a[col] || '').toString(); 
-            let valB = (b[col] || '').toString();
-            let comparison;
-            if (col === 'dealer_id') {
-                 comparison = valA.localeCompare(valB, undefined, { numeric: true });
-            } else {
-                 comparison = valA.toLowerCase().localeCompare(valB.toLowerCase(), 'ru');
-            }
-            return currentSort.direction === 'asc' ? comparison : -comparison;
+        filtered.sort((a, b) => {
+            let valA = (a[currentSort.column] || '').toString();
+            let valB = (b[currentSort.column] || '').toString();
+            let res = currentSort.column === 'dealer_id' 
+                ? valA.localeCompare(valB, undefined, {numeric:true})
+                : valA.toLowerCase().localeCompare(valB.toLowerCase(), 'ru');
+            return currentSort.direction === 'asc' ? res : -res;
         });
 
-        document.querySelectorAll('#dealer-table th[data-sort]').forEach(th => {
-            th.classList.remove('sort-asc', 'sort-desc');
-            if (th.dataset.sort === currentSort.column) {
-                th.classList.add(currentSort.direction === 'asc' ? 'sort-asc' : 'sort-desc');
-            }
-        });
-
-        dealerListBody.innerHTML = ''; 
-        
-        if (sortedDealers.length === 0) {
+        dealerListBody.innerHTML = '';
+        if (filtered.length === 0) {
             dealerTable.style.display = 'none';
             noDataMsg.style.display = 'block';
-            noDataMsg.textContent = allDealers.length === 0 ? 'Список дилеров пока пуст.' : 'Не найдено.';
+            noDataMsg.textContent = allDealers.length === 0 ? 'Список пуст.' : 'Не найдено.';
             return;
         }
-
         dealerTable.style.display = 'table';
         noDataMsg.style.display = 'none';
 
-        sortedDealers.forEach((dealer, index) => { 
+        filtered.forEach((d, idx) => {
             const row = dealerListBody.insertRow();
-            const dealerId = dealer.id; 
-            
             row.innerHTML = `
-                <td class="cell-number">${index + 1}</td>
-                <td>${dealer.photo_url ? `<img src="${dealer.photo_url}" class="table-photo">` : `<div class="no-photo">Нет</div>`}</td>
-                <td>${safeText(dealer.dealer_id)}</td>
-                <td>${safeText(dealer.name)}</td>
-                <td>${safeText(dealer.city)}</td>
-                <td>${safeText(dealer.price_type)}</td>
-                <td>${safeText(dealer.organization)}</td>
+                <td class="cell-number">${idx+1}</td>
+                <td>${d.photo_url ? `<img src="${d.photo_url}" class="table-photo">` : `<div class="no-photo">Нет</div>`}</td>
+                <td>${safeText(d.dealer_id)}</td>
+                <td>${safeText(d.name)}</td>
+                <td>${safeText(d.city)}</td>
+                <td>${safeText(d.price_type)}</td>
+                <td>${safeText(d.organization)}</td>
                 <td class="actions-cell">
                     <div class="dropdown">
-                        <button class="btn btn-light btn-sm" type="button" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button>
+                        <button class="btn btn-light btn-sm" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button>
                         <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item btn-view" data-id="${dealerId}" href="#"><i class="bi bi-eye me-2"></i>Просмотреть</a></li>
-                            <li><a class="dropdown-item btn-edit" data-id="${dealerId}" href="#"><i class="bi bi-pencil me-2"></i>Редактировать</a></li>
+                            <li><a class="dropdown-item btn-view" data-id="${d.id}" href="#"><i class="bi bi-eye me-2"></i>Просмотр</a></li>
+                            <li><a class="dropdown-item btn-edit" data-id="${d.id}" href="#"><i class="bi bi-pencil me-2"></i>Ред.</a></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item text-danger btn-delete" data-id="${dealerId}" data-name="${safeText(dealer.name)}" href="#"><i class="bi bi-trash me-2"></i>Удалить</a></li>
+                            <li><a class="dropdown-item text-danger btn-delete" data-id="${d.id}" data-name="${safeText(d.name)}" href="#"><i class="bi bi-trash me-2"></i>Удалить</a></li>
                         </ul>
                     </div>
                 </td>`;
@@ -314,26 +251,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function initApp() {
-        await fetchProductCatalog(); 
+        await fetchProductCatalog();
         try {
             const response = await fetch(API_DEALERS_URL);
             if (!response.ok) throw new Error('Ошибка загрузки');
-            allDealers = await response.json(); 
-            populateFilters(allDealers); 
-            renderDealerList(); 
+            allDealers = await response.json();
+            populateFilters(allDealers);
+            renderDealerList();
         } catch (error) {
             console.error(error);
-            dealerListBody.innerHTML = `<tr><td colspan="8" class="text-danger text-center">Ошибка загрузки.</td></tr>`;
+            dealerListBody.innerHTML = `<tr><td colspan="8" class="text-danger text-center">Ошибка: ${error.message}</td></tr>`;
         }
-        
-        const pendingEditId = localStorage.getItem('pendingEditDealerId');
-        if (pendingEditId) {
+
+        const pendingId = localStorage.getItem('pendingEditDealerId');
+        if (pendingId) {
             localStorage.removeItem('pendingEditDealerId');
-            openEditModal(pendingEditId); 
+            openEditModal(pendingId);
         }
     }
 
-    // --- КНОПКИ ДОБАВЛЕНИЯ ПОЛЕЙ ---
     document.getElementById('add-contact-btn-add-modal').onclick = () => addContactList.insertAdjacentHTML('beforeend', createContactEntryHTML());
     document.getElementById('add-address-btn-add-modal').onclick = () => addAddressList.insertAdjacentHTML('beforeend', createAddressEntryHTML());
     document.getElementById('add-photo-btn-add-modal').onclick = () => addPhotoList.insertAdjacentHTML('beforeend', createNewPhotoEntryHTML());
@@ -344,18 +280,16 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('add-photo-btn-edit-modal').onclick = () => editPhotoList.insertAdjacentHTML('beforeend', createNewPhotoEntryHTML());
     document.getElementById('add-pos-btn-edit-modal').onclick = () => editPosList.insertAdjacentHTML('beforeend', createPosEntryHTML());
 
-    // --- ОТКРЫТИЕ МОДАЛОК ---
     openAddModalBtn.onclick = () => {
         addForm.reset();
         renderProductChecklist(addProductChecklist);
-        renderContactList(addContactList);
-        renderAddressList(addAddressList);
-        renderPosList(addPosList);
+        renderList(addContactList, [], createContactEntryHTML);
+        renderList(addAddressList, [], createAddressEntryHTML);
+        renderList(addPosList, [], createPosEntryHTML);
         addPhotoList.innerHTML = createNewPhotoEntryHTML();
         addModal.show();
     };
 
-    // --- СОХРАНЕНИЕ НОВОГО ---
     addForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const data = {
@@ -369,9 +303,9 @@ document.addEventListener('DOMContentLoaded', () => {
             website: document.getElementById('website').value,
             instagram: document.getElementById('instagram').value,
             bonuses: document.getElementById('bonuses').value,
-            contacts: collectContacts(addContactList),
-            additional_addresses: collectAddresses(addAddressList),
-            pos_materials: collectPos(addPosList),
+            contacts: collectData(addContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]),
+            additional_addresses: collectData(addAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]),
+            pos_materials: collectData(addPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]),
             photos: await collectPhotos(addPhotoList)
         };
 
@@ -380,13 +314,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!res.ok) throw new Error(await res.text());
             const newD = await res.json();
             const pIds = getSelectedProductIds('add-product-checklist');
-            if(pIds.length) await saveDealerProductLinks(newD.id, pIds);
+            if(pIds.length) await saveProducts(newD.id, pIds);
             addModal.hide();
             initApp();
         } catch (e) { alert("Ошибка: " + e.message); }
     });
 
-    // --- РЕДАКТИРОВАНИЕ ---
     async function openEditModal(id) {
         try {
             const res = await fetch(`${API_DEALERS_URL}/${id}`);
@@ -405,9 +338,9 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('edit_instagram').value = d.instagram;
             document.getElementById('edit_bonuses').value = d.bonuses;
 
-            renderContactList(editContactList, d.contacts);
-            renderAddressList(editAddressList, d.additional_addresses);
-            renderPosList(editPosList, d.pos_materials);
+            renderList(editContactList, d.contacts, createContactEntryHTML);
+            renderList(editAddressList, d.additional_addresses, createAddressEntryHTML);
+            renderList(editPosList, d.pos_materials, createPosEntryHTML);
             renderExistingPhotos(editPhotoList, d.photos);
             renderProductChecklist(editProductChecklist, (d.products||[]).map(p=>p.id));
             
@@ -415,7 +348,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(e) { alert(e.message); }
     }
 
-    // --- СОХРАНЕНИЕ ИЗМЕНЕНИЙ ---
     editForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const id = document.getElementById('edit_db_id').value;
@@ -430,22 +362,21 @@ document.addEventListener('DOMContentLoaded', () => {
             website: document.getElementById('edit_website').value,
             instagram: document.getElementById('edit_instagram').value,
             bonuses: document.getElementById('edit_bonuses').value,
-            contacts: collectContacts(editContactList),
-            additional_addresses: collectAddresses(editAddressList),
-            pos_materials: collectPos(editPosList),
+            contacts: collectData(editContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]),
+            additional_addresses: collectData(editAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]),
+            pos_materials: collectData(editPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]),
             photos: await collectPhotos(editPhotoList)
         };
 
         try {
             const res = await fetch(`${API_DEALERS_URL}/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)});
             if (!res.ok) throw new Error(await res.text());
-            await saveDealerProductLinks(id, getSelectedProductIds('edit-product-checklist'));
+            await saveProducts(id, getSelectedProductIds('edit-product-checklist'));
             editModal.hide();
             initApp();
         } catch (e) { alert("Ошибка: " + e.message); }
     });
 
-    // --- КЛИКИ В СПИСКЕ ---
     dealerListBody.addEventListener('click', (e) => {
         const t = e.target;
         if (t.closest('.btn-view')) window.open(`dealer.html?id=${t.closest('.btn-view').dataset.id}`, '_blank');
@@ -456,14 +387,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- УДАЛЕНИЕ СТРОК ---
     const removeHandler = (e) => {
         if(e.target.closest('.btn-remove-entry')) e.target.closest('.input-group').remove();
     };
     addModalEl.addEventListener('click', removeHandler);
     editModalEl.addEventListener('click', removeHandler);
 
-    // --- ФИЛЬТРЫ И СОРТИРОВКА ---
     filterCity.onchange = renderDealerList;
     filterPriceType.onchange = renderDealerList;
     searchBar.oninput = renderDealerList;
@@ -476,15 +405,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- ЭКСПОРТ ---
     if (exportBtn) {
         exportBtn.onclick = () => {
             if (!allDealers.length) return alert("Пусто.");
             let csv = "\uFEFFID,Название,Орг,Город,Адрес,Тип,Контакты\n";
             allDealers.forEach(d => {
                 const c = (d.contacts||[]).map(x=>x.name).join('; ');
-                const clean = t => `"${String(t||'').replace(/"/g,'""')}"`;
-                csv += `${clean(d.dealer_id)},${clean(d.name)},${clean(d.organization)},${clean(d.city)},${clean(d.address)},${clean(d.price_type)},${clean(c)}\n`;
+                csv += `"${d.dealer_id}","${d.name}","${d.organization}","${d.city}","${d.address}","${d.price_type}","${c}"\n`;
             });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'}));
@@ -493,6 +420,5 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    // ЗАПУСК
     initApp();
 });
