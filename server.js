@@ -9,12 +9,12 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json({ limit: '50mb' })); 
 app.use(cors());
 
-// --- НАСТРОЙКИ БЕЗОПАСНОСТИ ---
+// --- БЕЗОПАСНОСТЬ ---
 const ADMIN_USER = process.env.ADMIN_USER;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 if (!ADMIN_USER || !ADMIN_PASSWORD) {
-    console.warn("ВНИМАНИЕ: ADMIN_USER или ADMIN_PASSWORD не установлены в Render!");
+    console.warn("ВНИМАНИЕ: ADMIN_USER или ADMIN_PASSWORD не установлены!");
 } else {
     app.use(basicAuth({
         users: { [ADMIN_USER]: ADMIN_PASSWORD }, 
@@ -27,7 +27,7 @@ app.use(express.static('public'));
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// --- ПОЛНЫЙ СПИСОК ТОВАРОВ (74 шт., Запятые исправлены) ---
+// --- ПОЛНЫЙ ОБНОВЛЕННЫЙ СПИСОК ТОВАРОВ ---
 const productsToImport = [
     { sku: "CD-507", name: "Дуб Беленый" },
     { sku: "CD-508", name: "Дуб Пепельный" },
@@ -107,7 +107,7 @@ const productsToImport = [
     { sku: "Н600", name: "600мм наклейка" }
 ];
 
-// --- Схемы MONGODB ---
+// --- СХЕМЫ MONGODB ---
 const productSchema = new mongoose.Schema({
     sku: { type: String, required: true, unique: true },
     name: { type: String, required: true }
@@ -170,20 +170,25 @@ async function hardcodedImportProducts() {
         const dbSkus = new Set(dbProducts.map(p => p.sku));
         const codeSkus = new Set(productsToImport.map(p => p.sku));
 
-        // 1. Удалить лишние
+        // 1. Удаляем устаревшие
         const skusToDelete = [...dbSkus].filter(sku => !codeSkus.has(sku));
         if (skusToDelete.length > 0) {
             console.log(`Удаляю ${skusToDelete.length} устаревших товаров...`);
             await Product.deleteMany({ sku: { $in: skusToDelete } });
         }
 
-        // 2. Добавить новые
-        const productsToAdd = productsToImport.filter(p => !dbSkus.has(p.sku));
-        if (productsToAdd.length > 0) {
-            console.log(`Добавляю ${productsToAdd.length} новых товаров...`);
-            await Product.insertMany(productsToAdd, { ordered: false }).catch(e => {
-                if (e.code !== 11000) console.warn("Ошибка при добавлении:", e.message);
-            });
+        // 2. Добавляем/Обновляем новые
+        // Используем updateOne с upsert для надежности
+        const operations = productsToImport.map(p => ({
+            updateOne: {
+                filter: { sku: p.sku },
+                update: { $set: p },
+                upsert: true
+            }
+        }));
+
+        if (operations.length > 0) {
+            await Product.bulkWrite(operations);
         }
         
         const finalCount = await Product.countDocuments();
@@ -194,7 +199,7 @@ async function hardcodedImportProducts() {
     }
 }
 
-// --- Подключение к MongoDB ---
+// --- ПОДКЛЮЧЕНИЕ ---
 async function connectToDB() {
     if (!DB_CONNECTION_STRING) {
         console.error("Ошибка: DB_CONNECTION_STRING не найдена.");
