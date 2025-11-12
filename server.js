@@ -13,7 +13,6 @@ app.use(cors());
 const ADMIN_USER = process.env.ADMIN_USER;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
-// Если переменных нет, сервер не упадет, но предупредит (для отладки)
 if (!ADMIN_USER || !ADMIN_PASSWORD) {
     console.warn("ВНИМАНИЕ: ADMIN_USER или ADMIN_PASSWORD не установлены в Render!");
 } else {
@@ -28,7 +27,7 @@ app.use(express.static('public'));
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// --- ПОЛНЫЙ СПИСОК ТОВАРОВ (74 шт., исправлены запятые) ---
+// --- ПОЛНЫЙ СПИСОК ТОВАРОВ (74 шт., ИСПРАВЛЕННЫЙ) ---
 const productsToImport = [
     { sku: "CD-507", name: "Дуб Беленый" },
     { sku: "CD-508", name: "Дуб Пепельный" },
@@ -108,7 +107,7 @@ const productsToImport = [
     { sku: "Н600", name: "600мм наклейка" }
 ];
 
-// --- Схемы MongoDB ---
+// --- Модели Базы Данных ---
 const productSchema = new mongoose.Schema({
     sku: { type: String, required: true, unique: true },
     name: { type: String, required: true }
@@ -162,24 +161,23 @@ const knowledgeSchema = new mongoose.Schema({
 }, { timestamps: true }); 
 const Knowledge = mongoose.model('Knowledge', knowledgeSchema);
 
-// --- Импорт товаров ---
+// --- Синхронизация товаров ---
 async function hardcodedImportProducts() {
     try {
-        console.log("Проверка каталога товаров...");
+        console.log("Запускаю синхронизацию каталога товаров...");
         
-        // Получаем все SKU из базы и из кода
         const dbProducts = await Product.find().lean();
         const dbSkus = new Set(dbProducts.map(p => p.sku));
         const codeSkus = new Set(productsToImport.map(p => p.sku));
 
-        // 1. Удаляем лишние
+        // 1. Удалить лишние (которых нет в коде)
         const skusToDelete = [...dbSkus].filter(sku => !codeSkus.has(sku));
         if (skusToDelete.length > 0) {
             console.log(`Удаляю ${skusToDelete.length} устаревших товаров...`);
             await Product.deleteMany({ sku: { $in: skusToDelete } });
         }
 
-        // 2. Добавляем новые
+        // 2. Добавить новые (которых нет в БД)
         const productsToAdd = productsToImport.filter(p => !dbSkus.has(p.sku));
         if (productsToAdd.length > 0) {
             console.log(`Добавляю ${productsToAdd.length} новых товаров...`);
@@ -189,7 +187,7 @@ async function hardcodedImportProducts() {
         }
         
         const finalCount = await Product.countDocuments();
-        console.log(`Каталог обновлен. Всего товаров: ${finalCount}.`);
+        console.log(`Синхронизация завершена. В каталоге ${finalCount} товаров.`);
 
     } catch (error) {
            console.warn(`Ошибка при синхронизации товаров: ${error.message}`);
