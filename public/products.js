@@ -20,22 +20,17 @@ document.addEventListener('DOMContentLoaded', () => {
     let allProducts = []; 
     let currentSort = { column: 'sku', direction: 'asc' }; 
 
-    // --- Функция: Загрузка товаров ---
     async function fetchProducts(searchTerm = '') {
         try {
             const response = await fetch(`${API_URL}?search=${encodeURIComponent(searchTerm)}`);
-            if (!response.ok) throw new Error('Ошибка сети при загрузке товаров');
-            
+            if (!response.ok) throw new Error('Ошибка сети');
             allProducts = await response.json(); 
             renderProducts(); 
-
         } catch (error) {
-            console.error(error);
             productListBody.innerHTML = `<tr><td colspan="3" class="text-danger">${error.message}</td></tr>`;
         }
     }
     
-    // --- Функция: Отрисовка таблицы (с Сортировкой) ---
     function renderProducts() {
         const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
         
@@ -47,13 +42,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return currentSort.direction === 'asc' ? comparison : -comparison;
         });
         
-         document.querySelectorAll('#products-table th[data-sort]').forEach(th => {
-            th.classList.remove('sort-asc', 'sort-desc');
-            if (th.dataset.sort === currentSort.column) {
-                th.classList.add(currentSort.direction === 'asc' ? 'sort-asc' : 'sort-desc');
-            }
-        });
-
         productListBody.innerHTML = '';
         if (sortedProducts.length === 0) {
             productsTable.style.display = 'none';
@@ -61,142 +49,76 @@ document.addEventListener('DOMContentLoaded', () => {
             noDataMsg.textContent = 'Товары не найдены.';
             return;
         }
-
         productsTable.style.display = 'table';
         noDataMsg.style.display = 'none';
 
         sortedProducts.forEach(product => {
             const row = productListBody.insertRow();
-            const productId = product.id; 
-            row.dataset.id = productId; 
-            
             row.innerHTML = `
                 <td class="sku-cell">${safeText(product.sku)}</td>
                 <td>${safeText(product.name)}</td>
                 <td class="actions-cell">
                     <div class="dropdown">
-                        <button class="btn btn-light btn-sm" type="button" data-bs-toggle="dropdown">
-                            <i class="bi bi-three-dots-vertical"></i>
-                        </button>
+                        <button class="btn btn-light btn-sm" type="button" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button>
                         <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item btn-edit" 
-                                data-id="${productId}" 
-                                data-sku="${safeText(product.sku)}" 
-                                data-name="${safeText(product.name)}" href="#">
-                                <i class="bi bi-pencil me-2"></i>Редактировать
-                            </a></li>
-                            <li><a class="dropdown-item text-danger btn-delete" data-id="${productId}" data-name="${safeText(product.name)}" href="#">
-                                <i class="bi bi-trash me-2"></i>Удалить
-                            </a></li>
+                            <li><a class="dropdown-item btn-edit" data-id="${product.id}" data-sku="${safeText(product.sku)}" data-name="${safeText(product.name)}" href="#"><i class="bi bi-pencil me-2"></i>Редактировать</a></li>
+                            <li><a class="dropdown-item text-danger btn-delete" data-id="${product.id}" data-name="${safeText(product.name)}" href="#"><i class="bi bi-trash me-2"></i>Удалить</a></li>
                         </ul>
                     </div>
-                </td>
-            `;
+                </td>`;
         });
     }
 
-    // --- Поиск (с задержкой) ---
     let debounceTimer;
     searchBar.addEventListener('input', (e) => {
         clearTimeout(debounceTimer);
-        const searchTerm = e.target.value;
-        debounceTimer = setTimeout(() => {
-            fetchProducts(searchTerm);
-        }, 300);
+        debounceTimer = setTimeout(() => fetchProducts(e.target.value), 300);
     });
 
-    // --- Логика модального окна "Добавить" ---
-    openAddBtn.onclick = () => {
-        addForm.reset();
-        addModal.show();
-    };
+    openAddBtn.onclick = () => { addForm.reset(); addModal.show(); };
     
     addForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const sku = document.getElementById('add_sku').value;
-        const name = document.getElementById('add_name').value;
-        
         try {
             const response = await fetch(API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sku, name })
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sku: document.getElementById('add_sku').value, name: document.getElementById('add_name').value })
             });
-            const result = await response.json();
-            
-            if (response.ok) {
-                addModal.hide();
-                await fetchProducts(searchBar.value); 
-            } else {
-                alert(`Ошибка: ${result.error}`);
-            }
-        } catch (error) {
-            alert(`Ошибка сети: ${error.message}`);
-        }
+            if (response.ok) { addModal.hide(); await fetchProducts(searchBar.value); }
+            else { alert(`Ошибка: ${(await response.json()).error}`); }
+        } catch (error) { alert('Ошибка сети.'); }
     });
 
-    // --- Логика модального окна "Редактировать" и "Удалить" ---
     productListBody.addEventListener('click', (e) => {
-        const target = e.target;
-        
-        if (target.classList.contains('btn-edit')) {
+        if (e.target.closest('.btn-edit')) {
             e.preventDefault();
-            document.getElementById('edit_product_id').value = target.dataset.id;
-            document.getElementById('edit_sku').value = target.dataset.sku;
-            document.getElementById('edit_name').value = target.dataset.name;
+            const btn = e.target.closest('.btn-edit');
+            document.getElementById('edit_product_id').value = btn.dataset.id;
+            document.getElementById('edit_sku').value = btn.dataset.sku;
+            document.getElementById('edit_name').value = btn.dataset.name;
             editModal.show();
         }
-        
-        if (target.classList.contains('btn-delete')) {
+        if (e.target.closest('.btn-delete')) {
             e.preventDefault();
-            const id = target.dataset.id;
-            const name = target.dataset.name;
-            if (confirm(`Вы уверены, что хотите удалить товар "${name}"?`)) {
-                deleteProduct(id);
+            const btn = e.target.closest('.btn-delete');
+            if (confirm(`Удалить "${btn.dataset.name}"?`)) {
+                fetch(`${API_URL}/${btn.dataset.id}`, { method: 'DELETE' }).then(() => fetchProducts(searchBar.value));
             }
         }
     });
-    
-    async function deleteProduct(id) {
-         try {
-            const response = await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
-            if (response.ok) {
-                await fetchProducts(searchBar.value); 
-            } else {
-                const result = await response.json();
-                alert(`Ошибка удаления: ${result.error}`);
-            }
-        } catch (error) {
-             alert(`Ошибка сети: ${error.message}`);
-        }
-    }
 
     editForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const id = document.getElementById('edit_product_id').value;
-        const sku = document.getElementById('edit_sku').value;
-        const name = document.getElementById('edit_name').value;
-
         try {
-            const response = await fetch(`${API_URL}/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sku, name })
+            const response = await fetch(`${API_URL}/${document.getElementById('edit_product_id').value}`, {
+                method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sku: document.getElementById('edit_sku').value, name: document.getElementById('edit_name').value })
             });
-            const result = await response.json();
-            
-            if (response.ok) {
-                editModal.hide();
-                await fetchProducts(searchBar.value);
-            } else {
-                alert(`Ошибка: ${result.error}`);
-            }
-        } catch (error) {
-            alert(`Ошибка сети: ${error.message}`);
-        }
+            if (response.ok) { editModal.hide(); await fetchProducts(searchBar.value); }
+            else { alert('Ошибка.'); }
+        } catch (error) { alert('Ошибка сети.'); }
     });
 
-    // --- Обработчики: СОРТИРОВКА ---
     document.querySelectorAll('#products-table th[data-sort]').forEach(th => {
         th.addEventListener('click', () => {
             const column = th.dataset.sort;
@@ -210,6 +132,5 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // --- Первоначальная загрузка ---
     fetchProducts();
 });
