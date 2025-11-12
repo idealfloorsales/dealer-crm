@@ -161,3 +161,16 @@ td a:hover { text-decoration: underline; color: var(--primary-hover) !important;
     .filter-container { flex-direction: column; }
     .pos-entry { flex-direction: column; align-items: stretch; }
 }
+
+.gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+}
+.gallery-item {
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+.gallery-item:hover {
+    transform: scale(1.03);
+}
