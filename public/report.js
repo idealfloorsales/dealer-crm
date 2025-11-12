@@ -70,33 +70,29 @@ document.addEventListener('DOMContentLoaded', () => {
         tableBody.innerHTML = bodyHtml;
     }
     
-    // --- 3. (ИСПРАВЛЕНО) Экспорт в CSV с UTF-8 BOM ---
+    // --- 3. Экспорт в CSV с UTF-8 BOM ---
     function exportToCSV() {
         if (!matrixData || !headerData) {
             alert("Данные еще не загружены.");
             return;
         }
 
-        // Функция для очистки ячейки (удаляет кавычки и запятые)
         const cleanCell = (text) => {
             let str = String(text || '');
-            str = str.replace(/"/g, '""'); // Экранируем кавычки
-            str = str.replace(/,/g, ';'); // Заменяем запятые на точки с запятой
-            str = str.replace(/\n/g, ' '); // Убираем переносы строк
+            str = str.replace(/"/g, '""'); 
+            str = str.replace(/,/g, ';'); 
+            str = str.replace(/\n/g, ' '); 
             return `"${str}"`;
         };
         
-        // (ИСПРАВЛЕНО) \uFEFF - это BOM-маркер для Excel
         let csvContent = "\uFEFF"; 
         
-        // Строка 1: Заголовки
         let headerRow = ["Артикул", "Название"];
         headerData.forEach(dealer => {
             headerRow.push(cleanCell(dealer.name));
         });
         csvContent += headerRow.join(",") + "\r\n";
 
-        // Строки 2+: Данные
         matrixData.forEach(productRow => {
             let row = [
                 cleanCell(productRow.sku),
@@ -108,7 +104,6 @@ document.addEventListener('DOMContentLoaded', () => {
             csvContent += row.join(",") + "\r\n";
         });
 
-        // Создаем Blob (вместо data:uri) для лучшей совместимости
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         
         const link = document.createElement("a");
