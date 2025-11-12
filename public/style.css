@@ -98,4 +98,62 @@ td a:hover { text-decoration: underline; color: var(--primary-hover) !important;
 .checklist-item { break-inside: avoid; }
 
 /* Детали дилера */
-.details-container { max-width: 900px; margin: 20px auto; background: #fff;
+.details-container { max-width: 900px; margin: 20px auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: var(--shadow); border: 1px solid var(--border-color); }
+.products-display { background: var(--light-gray); border: 1px solid var(--border-color); padding: 15px; border-radius: 4px; white-space: pre-wrap; font-family: monospace; word-wrap: break-word; }
+.products-list-detailed { padding-left: 20px; }
+.dealer-links-container { display: flex; gap: 10px; flex-wrap: wrap; margin: 15px 0; border-bottom: 1px solid var(--medium-gray); padding-bottom: 20px; }
+.dealer-links-container a { margin-top: 0; }
+
+/* (ИЗМЕНЕНО) Галерея на странице дилера */
+/* Используем правильный класс, который генерирует JS: gallery-grid */
+.gallery-grid {
+    display: grid; 
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); 
+    gap: 10px; 
+}
+.gallery-item { 
+    border: 1px solid var(--border-color); 
+    border-radius: 4px; 
+    background: #fff; 
+    text-align: center; 
+    overflow: hidden; 
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+.gallery-item:hover { transform: scale(1.03); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.gallery-item img { 
+    width: 100%; 
+    height: 150px; /* Фиксируем высоту */
+    object-fit: cover; /* Обрезаем лишнее */
+    display: block;
+}
+/* --- */
+
+#matrix-table th { position: sticky; top: 0; z-index: 10; }
+.matrix-product-cell { position: sticky; left: 0; background: #fff; font-weight: 600; font-family: monospace; border-right: 2px solid var(--border-color) !important; z-index: 20; }
+#matrix-table thead th.matrix-product-cell { z-index: 30; }
+.matrix-cell-yes { color: var(--primary-color); font-size: 1.3rem; font-weight: bold; text-align: center; }
+
+.knowledge-item { background: #fff; border: 1px solid var(--border-color); margin-bottom: 10px; border-radius: 8px; overflow: hidden; }
+.knowledge-item-header button { font-size: 1.1rem; font-weight: 600; color: var(--primary-color); text-align: left; width: 100%; background: none; border: none; padding: 15px 20px; }
+.knowledge-item-content { padding: 0 20px 20px 20px; border-top: 1px solid var(--border-color); }
+.knowledge-content-display { white-space: pre-wrap; background: var(--light-gray); padding: 15px; border-radius: 5px; }
+
+#no-data-msg { text-align: center; font-size: 1.2em; color: #555; padding: 30px; background: #fff; border-radius: 8px; box-shadow: var(--shadow); }
+
+@media (max-width: 768px) {
+    .contact-entry, .address-entry, .pos-entry { grid-template-columns: 1fr 1fr auto; }
+    .contact-entry input:nth-of-type(3), .address-entry input:nth-of-type(3), .pos-entry input { grid-column: 1 / span 2; }
+    .btn-remove-entry { grid-row: 1 / span 2; grid-column: 3 / 4; }
+    .photo-entry { grid-template-columns: 1fr auto; }
+    .photo-entry.existing { grid-template-columns: 100px 1fr auto; }
+    .photo-entry input[type="file"] { grid-column: 1 / 1; }
+}
+@media (max-width: 600px) {
+    .product-checklist { columns: 1; }
+    .filter-container { flex-direction: column; }
+    .contact-entry, .address-entry, .pos-entry { grid-template-columns: 1fr auto; }
+    .contact-entry input, .address-entry input, .pos-entry input, .pos-entry select { grid-column: 1; }
+    .btn-remove-entry { grid-row: 1 / span 3; grid-column: 2 / 3; }
+    .pos-entry .btn-remove-entry { grid-row: 1 / span 2; }
+}
