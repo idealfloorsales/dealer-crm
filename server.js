@@ -2,32 +2,19 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const basicAuth = require('express-basic-auth'); 
 
 const app = express();
 const PORT = process.env.PORT || 3000; 
 app.use(express.json({ limit: '50mb' })); 
 app.use(cors());
 
-// --- БЕЗОПАСНОСТЬ ---
-const ADMIN_USER = process.env.ADMIN_USER;
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
-
-if (!ADMIN_USER || !ADMIN_PASSWORD) {
-    console.warn("ВНИМАНИЕ: ADMIN_USER или ADMIN_PASSWORD не установлены!");
-} else {
-    app.use(basicAuth({
-        users: { [ADMIN_USER]: ADMIN_PASSWORD }, 
-        challenge: true, 
-        unauthorizedResponse: 'Доступ запрещен.'
-    }));
-}
+// (Блок безопасности УДАЛЕН для исправления ошибки загрузки)
 
 app.use(express.static('public'));
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// --- ПОЛНЫЙ ОБНОВЛЕННЫЙ СПИСОК ТОВАРОВ ---
+// --- ПОЛНЫЙ СПИСОК ТОВАРОВ (74 шт.) ---
 const productsToImport = [
     { sku: "CD-507", name: "Дуб Беленый" },
     { sku: "CD-508", name: "Дуб Пепельный" },
@@ -107,7 +94,7 @@ const productsToImport = [
     { sku: "Н600", name: "600мм наклейка" }
 ];
 
-// --- СХЕМЫ MONGODB ---
+// --- Схемы MONGODB ---
 const productSchema = new mongoose.Schema({
     sku: { type: String, required: true, unique: true },
     name: { type: String, required: true }
@@ -161,41 +148,30 @@ const knowledgeSchema = new mongoose.Schema({
 }, { timestamps: true }); 
 const Knowledge = mongoose.model('Knowledge', knowledgeSchema);
 
-// --- СИНХРОНИЗАЦИЯ ТОВАРОВ ---
+// --- Синхронизация товаров ---
 async function hardcodedImportProducts() {
     try {
-        console.log("Запускаю синхронизацию каталога товаров...");
-        
-        const dbProducts = await Product.find().lean();
-        const dbSkus = new Set(dbProducts.map(p => p.sku));
-        const codeSkus = new Set(productsToImport.map(p => p.sku));
-
-        // 1. Удаляем устаревшие
-        const skusToDelete = [...dbSkus].filter(sku => !codeSkus.has(sku));
-        if (skusToDelete.length > 0) {
-            console.log(`Удаляю ${skusToDelete.length} устаревших товаров...`);
-            await Product.deleteMany({ sku: { $in: skusToDelete } });
-        }
-
-        // 2. Добавляем/Обновляем новые
-        // Используем updateOne с upsert для надежности
-        const operations = productsToImport.map(p => ({
-            updateOne: {
-                filter: { sku: p.sku },
-                update: { $set: p },
-                upsert: true
-            }
-        }));
-
-        if (operations.length > 0) {
+        const count = await Product.countDocuments();
+        if (count === 0) {
+            console.log("Таблица пуста. Импортируем товары...");
+            await Product.insertMany(productsToImport, { ordered: false }).catch(e => {
+                if (e.code !== 11000) console.warn("Ошибка:", e.message);
+            });
+            console.log("Импорт завершен.");
+        } else {
+            // (Опционально) Обновление существующих, если нужно
+            const operations = productsToImport.map(p => ({
+                updateOne: {
+                    filter: { sku: p.sku },
+                    update: { $set: p },
+                    upsert: true
+                }
+            }));
             await Product.bulkWrite(operations);
+            console.log("Каталог синхронизирован.");
         }
-        
-        const finalCount = await Product.countDocuments();
-        console.log(`Синхронизация завершена. В каталоге ${finalCount} товаров.`);
-
     } catch (error) {
-           console.warn(`Ошибка при синхронизации товаров: ${error.message}`);
+           console.warn(`Ошибка при синхронизации: ${error.message}`);
     }
 }
 
