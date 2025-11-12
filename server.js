@@ -2,22 +2,31 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-// УБРАЛИ: const basicAuth ...
+const basicAuth = require('express-basic-auth'); 
 
 const app = express();
 const PORT = process.env.PORT || 3000; 
 app.use(express.json({ limit: '50mb' })); 
 app.use(cors());
 
-// --- БЕЗОПАСНОСТЬ УБРАНА (ЧТОБЫ ЗАРАБОТАЛО) ---
-// app.use(basicAuth(...));
-// ----------------------------------------------
+const ADMIN_USER = process.env.ADMIN_USER;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+
+if (!ADMIN_USER || !ADMIN_PASSWORD) {
+    console.warn("ВНИМАНИЕ: ADMIN_USER или ADMIN_PASSWORD не установлены!");
+} else {
+    app.use(basicAuth({
+        users: { [ADMIN_USER]: ADMIN_PASSWORD }, 
+        challenge: true, 
+        unauthorizedResponse: 'Доступ запрещен.'
+    }));
+}
 
 app.use(express.static('public'));
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// "Вшитый" список 74 товаров
+// --- ИСПРАВЛЕННЫЙ СПИСОК (БЕЗ POS-материалов) ---
 const productsToImport = [
     { sku: "CD-507", name: "Дуб Беленый" },
     { sku: "CD-508", name: "Дуб Пепельный" },
@@ -69,7 +78,7 @@ const productsToImport = [
     { sku: "RWN-36", name: "Кедр Гималайкий" },
     { sku: "RWN-37", name: "Дуб Ниагара" },
     { sku: "RWN-39", name: "Дуб Сибирский" },
-    { sku: "RWЕ-41", name: "Дуб Жемчужный" }, 
+    { sku: "RWЕ-41", name: "Дуб Жемчужный" },
     { sku: "RWE-44", name: "Орех Классик" },
     { sku: "AS-81", name: "Дуб Карибский" },
     { sku: "AS-82", name: "Дуб Средиземноморский" },
@@ -87,17 +96,9 @@ const productsToImport = [
     { sku: "RPL-23", name: "Дуб Монарх" },
     { sku: "RPL-24", name: "Дуб Эмперадор" },
     { sku: "RPL-25", name: "Дуб Авангард" },
-    { sku: "RPL-28", name: "Дуб Венеция" },
-    { sku: "РФС-1", name: "Расческа их фанеры старая" },
-    { sku: "РФ-2", name: "Расческа из фанеры" },
-    { sku: "С800", name: "800мм задняя стенка" },
-    { sku: "С600", name: "600мм задняя стенка" },
-    { sku: "Табличка", name: "Табличка орг.стекло" },
-    { sku: "Н800", name: "800мм наклейка" },
-    { sku: "Н600", name: "600мм наклейка" }
+    { sku: "RPL-28", name: "Дуб Венеция" }
 ];
 
-// --- Схемы MONGODB ---
 const productSchema = new mongoose.Schema({
     sku: { type: String, required: true, unique: true },
     name: { type: String, required: true }
@@ -110,8 +111,8 @@ const contactSchema = new mongoose.Schema({
     contactInfo: String
 }, { _id: false }); 
 
+// (ИЗМЕНЕНО) Убрали description
 const photoSchema = new mongoose.Schema({
-    description: String,
     photo_url: String
 }, { _id: false });
 
@@ -151,35 +152,35 @@ const knowledgeSchema = new mongoose.Schema({
 }, { timestamps: true }); 
 const Knowledge = mongoose.model('Knowledge', knowledgeSchema);
 
-// --- Синхронизация товаров ---
 async function hardcodedImportProducts() {
     try {
+        console.log("Синхронизация каталога...");
+        
         const dbProducts = await Product.find().lean();
         const dbSkus = new Set(dbProducts.map(p => p.sku));
         const codeSkus = new Set(productsToImport.map(p => p.sku));
 
+        // Удаляем лишнее (в том числе POS материалы из списка товаров)
         const skusToDelete = [...dbSkus].filter(sku => !codeSkus.has(sku));
         if (skusToDelete.length > 0) {
-            console.log(`Удаляю ${skusToDelete.length} устаревших товаров...`);
+            console.log(`Удаляю ${skusToDelete.length} устаревших товаров (POS)...`);
             await Product.deleteMany({ sku: { $in: skusToDelete } });
         }
 
         const productsToAdd = productsToImport.filter(p => !dbSkus.has(p.sku));
         if (productsToAdd.length > 0) {
-            console.log(`Добавляю ${productsToAdd.length} новых товаров...`);
             await Product.insertMany(productsToAdd, { ordered: false }).catch(e => {
-                if (e.code !== 11000) console.warn("Ошибка при добавлении:", e.message);
+                if (e.code !== 11000) console.warn(e.message);
             });
         }
         
         const finalCount = await Product.countDocuments();
-        console.log(`Каталог готов. Товаров: ${finalCount}`);
+        console.log(`Каталог обновлен: ${finalCount} товаров.`);
     } catch (error) {
-           console.warn(`Ошибка: ${error.message}`);
+           console.warn(error.message);
     }
 }
 
-// --- ПОДКЛЮЧЕНИЕ ---
 async function connectToDB() {
     if (!DB_CONNECTION_STRING) {
         console.error("Ошибка: DB_CONNECTION_STRING не найдена.");
@@ -190,11 +191,10 @@ async function connectToDB() {
         console.log("Подключено к MongoDB Atlas!");
         await hardcodedImportProducts();
     } catch (error) {
-        console.error("Ошибка подключения к MongoDB:", error.message);
+        console.error("Ошибка подключения:", error.message);
     }
 }
 
-// --- Хелпер ---
 function convertToClient(mongoDoc) {
     if (!mongoDoc) return null;
     const obj = mongoDoc.toObject ? mongoDoc.toObject() : mongoDoc;
@@ -210,8 +210,7 @@ function convertToClient(mongoDoc) {
     return obj;
 }
 
-// === API ROUTES ===
-
+// API ROUTES
 app.get('/api/dealers', async (req, res) => {
     try {
         const dealers = await Dealer.find({}, 'dealer_id name city photos price_type organization').lean();
@@ -406,8 +405,7 @@ app.delete('/api/knowledge/:id', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// START
 app.listen(PORT, () => {
-    console.log(`Сервер запущен и слушает порт ${PORT}`);
+    console.log(`Сервер запущен на порту ${PORT}`);
     connectToDB();
 });
