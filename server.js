@@ -1,3 +1,4 @@
+// server.js
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -8,11 +9,12 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json({ limit: '50mb' })); 
 app.use(cors());
 
+// --- НАСТРОЙКИ БЕЗОПАСНОСТИ ---
 const ADMIN_USER = process.env.ADMIN_USER;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 if (!ADMIN_USER || !ADMIN_PASSWORD) {
-    console.warn("ВНИМАНИЕ: ADMIN_USER или ADMIN_PASSWORD не установлены!");
+    console.warn("ВНИМАНИЕ: ADMIN_USER или ADMIN_PASSWORD не установлены в Render!");
 } else {
     app.use(basicAuth({
         users: { [ADMIN_USER]: ADMIN_PASSWORD }, 
@@ -25,7 +27,7 @@ app.use(express.static('public'));
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// --- 76 ТОВАРОВ ---
+// --- СПИСОК ТОВАРОВ ---
 const productsToImport = [
     { sku: "CD-507", name: "Дуб Беленый" }, { sku: "CD-508", name: "Дуб Пепельный" },
     { sku: "CD-509", name: "Дуб Северный" }, { sku: "CD-510", name: "Дуб Сафари" },
@@ -67,53 +69,107 @@ const productsToImport = [
     { sku: "Н800", name: "800мм наклейка" }, { sku: "Н600", name: "600мм наклейка" }
 ];
 
-const productSchema = new mongoose.Schema({ sku: String, name: String });
+// --- Схемы MONGODB ---
+const productSchema = new mongoose.Schema({
+    sku: { type: String, required: true, unique: true },
+    name: { type: String, required: true }
+});
 const Product = mongoose.model('Product', productSchema);
 
-const contactSchema = new mongoose.Schema({ name: String, position: String, contactInfo: String }, { _id: false }); 
-// Фото без описания, но с датой
-const photoSchema = new mongoose.Schema({ photo_url: String, date: { type: Date, default: Date.now } }, { _id: false });
-const additionalAddressSchema = new mongoose.Schema({ description: String, city: String, address: String }, { _id: false });
-const posMaterialSchema = new mongoose.Schema({ name: String, quantity: Number }, { _id: false });
+const contactSchema = new mongoose.Schema({
+    name: String,
+    position: String,
+    contactInfo: String
+}, { _id: false }); 
+
+// (ИЗМЕНЕНО) Добавлено поле DATE
+const photoSchema = new mongoose.Schema({
+    description: String,
+    photo_url: String,
+    date: { type: Date, default: Date.now } // Авто-дата
+}, { _id: false });
+
+const additionalAddressSchema = new mongoose.Schema({
+    description: String,
+    city: String,
+    address: String
+}, { _id: false });
+
+const posMaterialSchema = new mongoose.Schema({
+    name: String,
+    quantity: Number
+}, { _id: false });
 
 const dealerSchema = new mongoose.Schema({
-    dealer_id: String, name: String, price_type: String, city: String, address: String, 
-    contacts: [contactSchema], bonuses: String, photos: [photoSchema], organization: String,
-    delivery: String, website: String, instagram: String,
+    dealer_id: String,
+    name: String,
+    price_type: String,
+    city: String, 
+    address: String, 
+    contacts: [contactSchema], 
+    bonuses: String,
+    photos: [photoSchema], 
+    organization: String,
+    delivery: String, 
+    website: String,
+    instagram: String,
     additional_addresses: [additionalAddressSchema],
     pos_materials: [posMaterialSchema],
     products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }]
 });
 const Dealer = mongoose.model('Dealer', dealerSchema);
 
-const knowledgeSchema = new mongoose.Schema({ title: String, content: String }, { timestamps: true }); 
+const knowledgeSchema = new mongoose.Schema({
+    title: { type: String, required: true },
+    content: String
+}, { timestamps: true }); 
 const Knowledge = mongoose.model('Knowledge', knowledgeSchema);
 
+// --- Синхронизация товаров ---
 async function hardcodedImportProducts() {
     try {
+        console.log("Запускаю синхронизацию каталога товаров...");
+        
         const dbProducts = await Product.find().lean();
         const dbSkus = new Set(dbProducts.map(p => p.sku));
         const codeSkus = new Set(productsToImport.map(p => p.sku));
+
         const skusToDelete = [...dbSkus].filter(sku => !codeSkus.has(sku));
-        if (skusToDelete.length > 0) await Product.deleteMany({ sku: { $in: skusToDelete } });
+        if (skusToDelete.length > 0) {
+            console.log(`Удаляю ${skusToDelete.length} устаревших товаров...`);
+            await Product.deleteMany({ sku: { $in: skusToDelete } });
+        }
+
         const productsToAdd = productsToImport.filter(p => !dbSkus.has(p.sku));
-        if (productsToAdd.length > 0) await Product.insertMany(productsToAdd, { ordered: false }).catch(e => {});
-    } catch (e) { console.warn(e.message); }
+        if (productsToAdd.length > 0) {
+            console.log(`Добавляю ${productsToAdd.length} новых товаров...`);
+            await Product.insertMany(productsToAdd, { ordered: false }).catch(e => {
+                if (e.code !== 11000) console.warn("Ошибка при добавлении:", e.message);
+            });
+        }
+        
+        const finalCount = await Product.countDocuments();
+        console.log(`Синхронизация завершена. В каталоге ${finalCount} товаров.`);
+
+    } catch (error) {
+           console.warn(`Ошибка при синхронизации товаров: ${error.message}`);
+    }
 }
 
 async function connectToDB() {
     if (!DB_CONNECTION_STRING) return console.error("No DB String");
     try {
         await mongoose.connect(DB_CONNECTION_STRING);
+        console.log("Подключено к MongoDB!");
         await hardcodedImportProducts();
-    } catch (e) { console.error(e); }
+    } catch (error) { console.error(error); }
 }
 
-function convertToClient(doc) {
-    if(!doc) return null;
-    const obj = doc.toObject ? doc.toObject() : doc;
-    obj.id = obj._id; delete obj._id; delete obj.__v;
-    if(obj.products) obj.products = obj.products.map(p => { if(p){p.id=p._id; delete p._id;} return p;});
+function convertToClient(mongoDoc) {
+    if (!mongoDoc) return null;
+    const obj = mongoDoc.toObject ? mongoDoc.toObject() : mongoDoc;
+    obj.id = obj._id; delete obj._id; delete obj.__v; 
+    if (obj.products) obj.products = obj.products.map(p => { if(p){p.id=p._id;delete p._id;} return p; });
     return obj;
 }
 
@@ -143,7 +199,7 @@ app.delete('/api/dealers/:id', async (req, res) => {
     res.json({status:'deleted'});
 });
 app.get('/api/dealers/:id/products', async (req, res) => {
-    const dealer = await Dealer.findById(req.params.id).populate({path:'products', options:{sort:{'sku':1}}});
+    const dealer = await Dealer.findById(req.params.id).populate({path:'products',options:{sort:{'sku':1}}});
     res.json(dealer.products.map(convertToClient));
 });
 app.put('/api/dealers/:id/products', async (req, res) => {
@@ -199,4 +255,4 @@ app.delete('/api/knowledge/:id', async (req, res) => {
     await Knowledge.findByIdAndDelete(req.params.id); res.json({status:'deleted'});
 });
 
-app.listen(PORT, () => { console.log('Server started'); connectToDB(); });
+app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
