@@ -19,7 +19,7 @@ if (!ADMIN_USER || !ADMIN_PASSWORD) {
     app.use(basicAuth({
         users: { [ADMIN_USER]: ADMIN_PASSWORD }, 
         challenge: true, 
-        unauthorizedResponse: 'Доступ запрещен. Обновите страницу и введите логин/пароль.'
+        unauthorizedResponse: 'Доступ запрещен.'
     }));
 }
 
@@ -27,7 +27,7 @@ app.use(express.static('public'));
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// --- ПОЛНЫЙ СПИСОК ТОВАРОВ (74 шт., ИСПРАВЛЕННЫЙ) ---
+// --- ПОЛНЫЙ, ИСПРАВЛЕННЫЙ СПИСОК ТОВАРОВ ---
 const productsToImport = [
     { sku: "CD-507", name: "Дуб Беленый" },
     { sku: "CD-508", name: "Дуб Пепельный" },
@@ -79,7 +79,7 @@ const productsToImport = [
     { sku: "RWN-36", name: "Кедр Гималайкий" },
     { sku: "RWN-37", name: "Дуб Ниагара" },
     { sku: "RWN-39", name: "Дуб Сибирский" },
-    { sku: "RWЕ-41", name: "Дуб Жемчужный" },
+    { sku: "RWE-41", name: "Дуб Жемчужный" },
     { sku: "RWE-44", name: "Орех Классик" },
     { sku: "AS-81", name: "Дуб Карибский" },
     { sku: "AS-82", name: "Дуб Средиземноморский" },
@@ -170,14 +170,14 @@ async function hardcodedImportProducts() {
         const dbSkus = new Set(dbProducts.map(p => p.sku));
         const codeSkus = new Set(productsToImport.map(p => p.sku));
 
-        // 1. Удалить лишние (которых нет в коде)
+        // 1. Удалить лишние
         const skusToDelete = [...dbSkus].filter(sku => !codeSkus.has(sku));
         if (skusToDelete.length > 0) {
             console.log(`Удаляю ${skusToDelete.length} устаревших товаров...`);
             await Product.deleteMany({ sku: { $in: skusToDelete } });
         }
 
-        // 2. Добавить новые (которых нет в БД)
+        // 2. Добавить новые
         const productsToAdd = productsToImport.filter(p => !dbSkus.has(p.sku));
         if (productsToAdd.length > 0) {
             console.log(`Добавляю ${productsToAdd.length} новых товаров...`);
