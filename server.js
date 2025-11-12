@@ -1,4 +1,3 @@
-// server.js
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -9,7 +8,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json({ limit: '50mb' })); 
 app.use(cors());
 
-// --- НАСТРОЙКИ БЕЗОПАСНОСТИ ---
+// --- БЕЗОПАСНОСТЬ ---
 const ADMIN_USER = process.env.ADMIN_USER;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
@@ -21,15 +20,14 @@ if (!ADMIN_USER || !ADMIN_PASSWORD) {
 app.use(basicAuth({
     users: { [ADMIN_USER]: ADMIN_PASSWORD }, 
     challenge: true, 
-    unauthorizedResponse: 'Доступ запрещен. Обновите страницу и попробуйте снова.'
+    unauthorizedResponse: 'Доступ запрещен. Обновите страницу.'
 }));
-// --- КОНЕЦ БЛОКА БЕЗОПАСНОСТИ ---
 
 app.use(express.static('public'));
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// "Вшитый" список 74 товаров
+// --- СПИСОК ТОВАРОВ (74 шт.) ---
 const productsToImport = [
     { sku: "CD-507", name: "Дуб Беленый" },
     { sku: "CD-508", name: "Дуб Пепельный" },
@@ -81,7 +79,7 @@ const productsToImport = [
     { sku: "RWN-36", name: "Кедр Гималайкий" },
     { sku: "RWN-37", name: "Дуб Ниагара" },
     { sku: "RWN-39", name: "Дуб Сибирский" },
-    { sku: "RWЕ-41", name: "Дуб Жемчужный" }, 
+    { sku: "RWЕ-41", name: "Дуб Жемчужный" },
     { sku: "RWE-44", name: "Орех Классик" },
     { sku: "AS-81", name: "Дуб Карибский" },
     { sku: "AS-82", name: "Дуб Средиземноморский" },
@@ -109,7 +107,7 @@ const productsToImport = [
     { sku: "Н600", name: "600мм наклейка" }
 ];
 
-// --- Модели Базы Данных (Схемы) ---
+// --- СХЕМЫ MONGODB ---
 const productSchema = new mongoose.Schema({
     sku: { type: String, required: true, unique: true },
     name: { type: String, required: true }
@@ -163,8 +161,7 @@ const knowledgeSchema = new mongoose.Schema({
 }, { timestamps: true }); 
 const Knowledge = mongoose.model('Knowledge', knowledgeSchema);
 
-
-// --- "Умный" импорт/синхронизация для MongoDB ---
+// --- СИНХРОНИЗАЦИЯ ТОВАРОВ ---
 async function hardcodedImportProducts() {
     try {
         console.log("Запускаю синхронизацию каталога товаров...");
@@ -195,55 +192,47 @@ async function hardcodedImportProducts() {
     }
 }
 
-// --- Подключение к MongoDB ---
+// --- ПОДКЛЮЧЕНИЕ ---
 async function connectToDB() {
     if (!DB_CONNECTION_STRING) {
-        console.error("Критическая ошибка: Строка подключения 'DB_CONNECTION_STRING' не найдена.");
+        console.error("Ошибка: DB_CONNECTION_STRING не найдена.");
         return;
     }
     try {
         await mongoose.connect(DB_CONNECTION_STRING);
-        console.log("Подключено к базе данных MongoDB Atlas!");
+        console.log("Подключено к MongoDB Atlas!");
         await hardcodedImportProducts();
     } catch (error) {
         console.error("Ошибка подключения к MongoDB:", error.message);
     }
 }
 
-// --- Преобразователь Объектов (Добавляет 'id') ---
+// --- ПОМОЩНИК ---
 function convertToClient(mongoDoc) {
     if (!mongoDoc) return null;
     const obj = mongoDoc.toObject ? mongoDoc.toObject() : mongoDoc;
     obj.id = obj._id;
     delete obj._id; 
     delete obj.__v; 
-    
     if (obj.products && Array.isArray(obj.products)) {
         obj.products = obj.products.map(p => {
-            if (p) { 
-                p.id = p._id;
-                delete p._id;
-                delete p.__v;
-            }
+            if (p) { p.id = p._id; delete p._id; delete p.__v; }
             return p;
         });
     }
     return obj;
 }
 
-// === API для Дилеров ===
+// === API ROUTES ===
+
+// DEALERS
 app.get('/api/dealers', async (req, res) => {
     try {
-        const dealers = await Dealer.find({}, 'dealer_id name city photos price_type organization')
-                                    .lean();
-        
+        const dealers = await Dealer.find({}, 'dealer_id name city photos price_type organization').lean();
         const clientDealers = dealers.map(d => {
             d.id = d._id;
-            if (d.photos && d.photos.length > 0) {
-                d.photo_url = d.photos[0].photo_url; 
-            }
-            delete d.photos; 
-            delete d._id;
+            if (d.photos && d.photos.length > 0) d.photo_url = d.photos[0].photo_url; 
+            delete d.photos; delete d._id;
             return d;
         }); 
         res.json(clientDealers);
@@ -254,7 +243,6 @@ app.get('/api/dealers/:id', async (req, res) => {
     try {
         const dealer = await Dealer.findById(req.params.id).populate('products');
         if (!dealer) return res.status(404).json({ message: "Дилер не найден" });
-        
         res.json(convertToClient(dealer)); 
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -283,18 +271,12 @@ app.delete('/api/dealers/:id', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// === API для СВЯЗИ Дилеров и Товаров ===
 app.get('/api/dealers/:id/products', async (req, res) => {
     try {
-        const dealer = await Dealer.findById(req.params.id).populate({
-            path: 'products',
-            options: { sort: { 'sku': 1 } } 
-        });
+        const dealer = await Dealer.findById(req.params.id).populate('products');
         if (!dealer) return res.status(404).json({ message: "Дилер не найден" });
-        
         const productsWithId = dealer.products.map(p => convertToClient(p));
         res.json(productsWithId);
-        
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -307,21 +289,16 @@ app.put('/api/dealers/:id/products', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// === API для Товаров ===
+// PRODUCTS
 app.get('/api/products', async (req, res) => {
     try {
         const searchTerm = req.query.search || '';
         const searchRegex = new RegExp(searchTerm, 'i'); 
         const products = await Product.find({
-            $or: [ 
-                { sku: { $regex: searchRegex } },
-                { name: { $regex: searchRegex } }
-            ]
+            $or: [ { sku: { $regex: searchRegex } }, { name: { $regex: searchRegex } } ]
         }).sort({ sku: 1 }).lean(); 
-        
         products.forEach(p => { p.id = p._id; }); 
         res.json(products);
-        
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -331,9 +308,7 @@ app.post('/api/products', async (req, res) => {
         await product.save();
         res.status(201).json(convertToClient(product)); 
     } catch (e) {
-        if (e.code === 11000) { 
-             return res.status(409).json({ "error": "Товар с таким Артикулом (SKU) уже существует" });
-        }
+        if (e.code === 11000) return res.status(409).json({ "error": "Дубликат SKU" });
         res.status(500).json({ error: e.message });
     }
 });
@@ -344,9 +319,7 @@ app.put('/api/products/:id', async (req, res) => {
         if (!product) return res.status(404).json({ error: "Товар не найден" });
         res.json(convertToClient(product)); 
     } catch (e) {
-        if (e.code === 11000) {
-            return res.status(409).json({ "error": "Товар с таким Артикулом (SKU) уже существует" });
-        }
+        if (e.code === 11000) return res.status(409).json({ "error": "Дубликат SKU" });
         res.status(500).json({ error: e.message });
     }
 });
@@ -356,17 +329,12 @@ app.delete('/api/products/:id', async (req, res) => {
         const productId = req.params.id;
         const product = await Product.findByIdAndDelete(productId);
         if (!product) return res.status(404).json({ error: "Товар не найден" });
-        
-        await Dealer.updateMany(
-            { products: productId },
-            { $pull: { products: productId } }
-        );
-        
+        await Dealer.updateMany({ products: productId }, { $pull: { products: productId } });
         res.json({ message: "deleted" });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// === API для Отчета ===
+// REPORT / MATRIX
 app.get('/api/matrix', async (req, res) => {
     try {
         const allProducts = await Product.find({}, 'sku name').sort({ sku: 1 }).lean();
@@ -386,7 +354,6 @@ app.get('/api/matrix', async (req, res) => {
                 name: product.name,
                 dealers: [] 
             };
-            
             allDealers.forEach(dealer => {
                 const productSet = dealerProductMap.get(dealer._id.toString());
                 productRow.dealers.push({
@@ -397,28 +364,25 @@ app.get('/api/matrix', async (req, res) => {
             });
             matrix.push(productRow);
         });
-
         const headers = allDealers.map(d => ({ id: d._id, name: d.name }));
-        
         res.json({ headers, matrix });
-        
-    } catch (e) { 
-        console.error("Ошибка при создании матрицы:", e);
-        res.status(500).json({ error: e.message }); 
-    }
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+app.get('/api/products/:id/dealers', async (req, res) => {
+    try {
+        const dealers = await Dealer.find({ products: req.params.id }, 'dealer_id name city').sort({ name: 1 }).lean(); 
+        dealers.forEach(d => { d.id = d._id; }); 
+        res.json(dealers);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
-// === API для Базы Знаний ===
+// KNOWLEDGE
 app.get('/api/knowledge', async (req, res) => {
     try {
         const searchTerm = req.query.search || '';
         const searchRegex = new RegExp(searchTerm, 'i');
-        const articles = await Knowledge.find(
-            { title: { $regex: searchRegex } }, 
-            'title createdAt' 
-        ).sort({ title: 1 }).lean();
-        
+        const articles = await Knowledge.find({ title: { $regex: searchRegex } }, 'title createdAt').sort({ title: 1 }).lean();
         articles.forEach(a => { a.id = a._id; });
         res.json(articles);
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -456,8 +420,8 @@ app.delete('/api/knowledge/:id', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// --- Запускаем сервер ---
+// START
 app.listen(PORT, () => {
-    console.log(`Сервер запущен и слушает порт ${PORT}`);
+    console.log(`Сервер запущен на порту ${PORT}`);
     connectToDB();
 });
