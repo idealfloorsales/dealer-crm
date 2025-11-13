@@ -13,9 +13,7 @@
     <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-4">
         <div class="container-fluid">
             <a class="navbar-brand" href="/">CRM Дилеров</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"><span class="navbar-toggler-icon"></span></button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav">
                     <li class="nav-item"><a class="nav-link active" href="/">Учет Дилеров</a></li>
@@ -36,19 +34,13 @@
             </div>
         </div>
 
+        <div id="dashboard-container" class="row g-3 mb-4">
+            </div>
+
         <div class="row g-3 mb-4 p-3 bg-white rounded shadow-sm border">
-            <div class="col-md-6 col-lg-4">
-                <label for="filter-city" class="form-label">Фильтр по городу:</label>
-                <select id="filter-city" class="form-select"><option value="">-- Все города --</option></select>
-            </div>
-            <div class="col-md-6 col-lg-4">
-                <label for="filter-price-type" class="form-label">Фильтр по типу цен:</label>
-                <select id="filter-price-type" class="form-select"><option value="">-- Все типы --</option></select>
-            </div>
-            <div class="col-md-12 col-lg-4">
-                <label for="search-bar" class="form-label">Поиск:</label>
-                <input type="text" id="search-bar" class="form-control" placeholder="По ID, Названию, Организации...">
-            </div>
+            <div class="col-md-6 col-lg-4"><label for="filter-city" class="form-label">Фильтр по городу:</label><select id="filter-city" class="form-select"><option value="">-- Все города --</option></select></div>
+            <div class="col-md-6 col-lg-4"><label for="filter-price-type" class="form-label">Фильтр по типу цен:</label><select id="filter-price-type" class="form-select"><option value="">-- Все типы --</option></select></div>
+            <div class="col-md-12 col-lg-4"><label for="search-bar" class="form-label">Поиск:</label><input type="text" id="search-bar" class="form-control" placeholder="По ID, Названию, Организации..."></div>
         </div>
 
         <div class="table-responsive bg-white rounded shadow-sm border">
@@ -74,10 +66,7 @@
     <div class="modal fade" id="add-modal" tabindex="-1">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h2 class="modal-title fs-5">Добавить нового дилера</h2>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
+                <div class="modal-header"><h2 class="modal-title fs-5">Добавить нового дилера</h2><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body">
                     <form id="add-dealer-form">
                         <div class="row g-3">
@@ -90,38 +79,17 @@
                             <div class="col-md-4"><label class="form-label">Условия доставки</label><input type="text" id="delivery" class="form-control"></div>
                             <div class="col-md-4"><label class="form-label">Сайт</label><input type="text" id="website" class="form-control"></div>
                             <div class="col-md-4"><label class="form-label">Инстаграм</label><input type="text" id="instagram" class="form-control"></div>
-
                             <hr class="my-3">
-                            
-                            <label class="form-label">Дополнительные адреса:</label>
-                            <div id="add-address-list" class="list-container"></div>
-                            <div class="text-end"><button type="button" id="add-address-btn-add-modal" class="btn btn-secondary btn-sm">Добавить доп. адрес</button></div>
-
-                            <label class="form-label">Контакты:</label>
-                            <div id="add-contact-list" class="list-container"></div>
-                            <div class="text-end"><button type="button" id="add-contact-btn-add-modal" class="btn btn-secondary btn-sm">Добавить контакт</button></div>
-
-                            <label class="form-label">Маркетинговое оборудование (POS):</label>
-                            <div id="add-pos-list" class="list-container"></div>
-                            <div class="text-end"><button type="button" id="add-pos-btn-add-modal" class="btn btn-secondary btn-sm">Добавить оборудование</button></div>
-
-                            <label class="form-label">Галерея Фото:</label>
-                            <div class="mb-2">
-                                <input type="file" id="add-photo-input" class="form-control" multiple accept="image/*">
-                            </div>
-                            <div id="add-photo-preview-container" class="photo-preview-grid"></div>
-                            
+                            <label class="form-label">Дополнительные адреса:</label><div id="add-address-list" class="list-container"></div><div class="text-end"><button type="button" id="add-address-btn-add-modal" class="btn btn-secondary btn-sm">Добавить доп. адрес</button></div>
+                            <label class="form-label">Контакты:</label><div id="add-contact-list" class="list-container"></div><div class="text-end"><button type="button" id="add-contact-btn-add-modal" class="btn btn-secondary btn-sm">Добавить контакт</button></div>
+                            <label class="form-label">Маркетинговое оборудование (POS):</label><div id="add-pos-list" class="list-container"></div><div class="text-end"><button type="button" id="add-pos-btn-add-modal" class="btn btn-secondary btn-sm">Добавить оборудование</button></div>
+                            <label class="form-label">Галерея Фото:</label><div class="mb-2"><input type="file" id="add-photo-input" class="form-control" multiple accept="image/*"></div><div id="add-photo-preview-container" class="photo-preview-grid"></div>
                             <div class="col-12"><label class="form-label">Бонусы / Примечания</label><textarea id="bonuses" class="form-control" rows="3"></textarea></div>
-
-                            <label class="form-label">Выставленные товары:</label>
-                            <div id="add-product-checklist" class="product-checklist"><p>Загрузка каталога...</p></div>
+                            <label class="form-label">Выставленные товары:</label><div id="add-product-checklist" class="product-checklist"><p>Загрузка каталога...</p></div>
                         </div>
                     </form>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
-                    <button type="submit" form="add-dealer-form" class="btn btn-primary">Добавить дилера</button>
-                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button><button type="submit" form="add-dealer-form" class="btn btn-primary">Добавить дилера</button></div>
             </div>
         </div>
     </div>
@@ -129,10 +97,7 @@
     <div class="modal fade" id="edit-modal" tabindex="-1">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h2 class="modal-title fs-5">Редактировать дилера</h2>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
+                <div class="modal-header"><h2 class="modal-title fs-5">Редактировать дилера</h2><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body">
                     <form id="edit-dealer-form">
                         <input type="hidden" id="edit_db_id">
@@ -146,37 +111,17 @@
                             <div class="col-md-4"><label class="form-label">Условия доставки</label><input type="text" id="edit_delivery" class="form-control"></div>
                             <div class="col-md-4"><label class="form-label">Сайт</label><input type="text" id="edit_website" class="form-control"></div>
                             <div class="col-md-4"><label class="form-label">Инстаграм</label><input type="text" id="edit_instagram" class="form-control"></div>
-
                             <hr class="my-3">
-                            
-                            <label class="form-label">Дополнительные адреса:</label>
-                            <div id="edit-address-list" class="list-container"></div>
-                            <div class="text-end"><button type="button" id="add-address-btn-edit-modal" class="btn btn-secondary btn-sm">Добавить доп. адрес</button></div>
-
-                            <label class="form-label">Контакты:</label>
-                            <div id="edit-contact-list" class="list-container"></div>
-                            <div class="text-end"><button type="button" id="add-contact-btn-edit-modal" class="btn btn-secondary btn-sm">Добавить контакт</button></div>
-                            
-                            <label class="form-label">Маркетинговое оборудование (POS):</label>
-                            <div id="edit-pos-list" class="list-container"></div>
-                            <div class="text-end"><button type="button" id="add-pos-btn-edit-modal" class="btn btn-secondary btn-sm">Добавить оборудование</button></div>
-
-                            <label class="form-label">Галерея Фото:</label>
-                            <div class="mb-2">
-                                <input type="file" id="edit-photo-input" class="form-control" multiple accept="image/*">
-                            </div>
-                            <div id="edit-photo-list" class="list-container d-none"></div> <div id="edit-photo-preview-container" class="photo-preview-grid"></div>
-                            
+                            <label class="form-label">Дополнительные адреса:</label><div id="edit-address-list" class="list-container"></div><div class="text-end"><button type="button" id="add-address-btn-edit-modal" class="btn btn-secondary btn-sm">Добавить доп. адрес</button></div>
+                            <label class="form-label">Контакты:</label><div id="edit-contact-list" class="list-container"></div><div class="text-end"><button type="button" id="add-contact-btn-edit-modal" class="btn btn-secondary btn-sm">Добавить контакт</button></div>
+                            <label class="form-label">Маркетинговое оборудование (POS):</label><div id="edit-pos-list" class="list-container"></div><div class="text-end"><button type="button" id="add-pos-btn-edit-modal" class="btn btn-secondary btn-sm">Добавить оборудование</button></div>
+                            <label class="form-label">Галерея Фото:</label><div class="mb-2"><input type="file" id="edit-photo-input" class="form-control" multiple accept="image/*"></div><div id="edit-photo-preview-container" class="photo-preview-grid"></div>
                             <div class="col-12"><label class="form-label">Бонусы / Примечания</label><textarea id="edit_bonuses" class="form-control" rows="3"></textarea></div>
-                            <label class="form-label">Выставленные товары:</label>
-                            <div id="edit-product-checklist" class="product-checklist"><p>Загрузка каталога...</p></div>
+                            <label class="form-label">Выставленные товары:</label><div id="edit-product-checklist" class="product-checklist"><p>Загрузка каталога...</p></div>
                         </div>
                     </form>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
-                    <button type="submit" form="edit-dealer-form" class="btn btn-primary">Сохранить</button>
-                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button><button type="submit" form="edit-dealer-form" class="btn btn-primary">Сохранить</button></div>
             </div>
         </div>
     </div>
