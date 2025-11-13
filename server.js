@@ -9,10 +9,11 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json({ limit: '50mb' })); 
 app.use(cors());
 
+// --- БЕЗОПАСНОСТЬ ---
 const ADMIN_USER = process.env.ADMIN_USER;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
-// Функция проверки безопасности (вынесли отдельно для удобства)
+// Защита включается только если заданы переменные. API оставляем открытым для скрипта.
 const authMiddleware = (req, res, next) => {
     if (!ADMIN_USER || !ADMIN_PASSWORD) return next();
     const user = basicAuth({
@@ -23,11 +24,23 @@ const authMiddleware = (req, res, next) => {
     user(req, res, next);
 };
 
-app.use(express.static('public'));
+// Сначала статические файлы (сайт), защищенные паролем
+if (ADMIN_USER && ADMIN_PASSWORD) {
+    app.use(express.static('public', { 
+        index: false // Отключаем авто-индекс, чтобы перехватить корень
+    }));
+    app.get('/', authMiddleware, (req, res) => {
+        res.sendFile(__dirname + '/public/index.html');
+    });
+    // Остальные HTML тоже защищаем, если нужно, но пока оставим просто static для ресурсов
+    app.use(express.static('public'));
+} else {
+    app.use(express.static('public'));
+}
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// --- СПИСОК ТОВАРОВ (76 шт.) ---
+// --- СПИСОК ТОВАРОВ ---
 const productsToImport = [
     { sku: "CD-507", name: "Дуб Беленый" }, { sku: "CD-508", name: "Дуб Пепельный" },
     { sku: "CD-509", name: "Дуб Северный" }, { sku: "CD-510", name: "Дуб Сафари" },
@@ -69,6 +82,7 @@ const productsToImport = [
     { sku: "Н800", name: "800мм наклейка" }, { sku: "Н600", name: "600мм наклейка" }
 ];
 
+// --- СХЕМЫ ---
 const productSchema = new mongoose.Schema({ sku: String, name: String });
 const Product = mongoose.model('Product', productSchema);
 
@@ -79,8 +93,9 @@ const posMaterialSchema = new mongoose.Schema({ name: String, quantity: Number }
 
 const dealerSchema = new mongoose.Schema({
     dealer_id: String, name: String, price_type: String, city: String, address: String, 
-    contacts: [contactSchema], bonuses: String, photos: [photoSchema], organization: String,
-    delivery: String, website: String, instagram: String,
+    contacts: [contactSchema], bonuses: String, 
+    photos: [photoSchema], 
+    organization: String, delivery: String, website: String, instagram: String,
     additional_addresses: [additionalAddressSchema],
     pos_materials: [posMaterialSchema],
     products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }]
@@ -90,21 +105,17 @@ const Dealer = mongoose.model('Dealer', dealerSchema);
 const knowledgeSchema = new mongoose.Schema({ title: String, content: String }, { timestamps: true }); 
 const Knowledge = mongoose.model('Knowledge', knowledgeSchema);
 
-async function hardcodedImportProducts() {
+async function connectToDB() {
+    if (!DB_CONNECTION_STRING) return console.error("No DB String");
     try {
+        await mongoose.connect(DB_CONNECTION_STRING);
+        console.log("Connected to MongoDB");
+        
         const count = await Product.countDocuments();
         if(count < productsToImport.length) {
              const operations = productsToImport.map(p => ({ updateOne: { filter: { sku: p.sku }, update: { $set: p }, upsert: true } }));
              await Product.bulkWrite(operations);
         }
-    } catch (e) { console.warn(e.message); }
-}
-
-async function connectToDB() {
-    if (!DB_CONNECTION_STRING) return console.error("No DB String");
-    try {
-        await mongoose.connect(DB_CONNECTION_STRING);
-        await hardcodedImportProducts();
     } catch (e) { console.error(e); }
 }
 
@@ -118,26 +129,42 @@ function convertToClient(doc) {
 
 // === API ROUTES ===
 
-// (ИЗМЕНЕНО) "Легкий" список дилеров, но со СЧЕТЧИКАМИ для Дашборда
+// (ИЗМЕНЕНО) Умный список дилеров
+// Мы запрашиваем всё, НО! удаляем тяжелые тела фото перед отправкой
 app.get('/api/dealers', async (req, res) => {
     try {
-        const dealers = await Dealer.find({}, 'dealer_id name city photos price_type organization products pos_materials').lean();
-        const clientDealers = dealers.map(d => ({
-            id: d._id,
-            dealer_id: d.dealer_id,
-            name: d.name,
-            city: d.city,
-            price_type: d.price_type,
-            organization: d.organization,
-            photo_url: (d.photos && d.photos.length > 0) ? d.photos[0].photo_url : null,
+        // Запрашиваем нужные поля (включая массивы, чтобы посчитать их длину)
+        const dealers = await Dealer.find({}, 'dealer_id name city price_type organization photos products pos_materials').lean();
+        
+        const clientDealers = dealers.map(d => {
+            // Считаем статистику ДО удаления данных
+            const hasPhotos = d.photos && d.photos.length > 0;
+            const productsCount = d.products ? d.products.length : 0;
+            const hasPos = d.pos_materials && d.pos_materials.length > 0;
             
-            // СЧЕТЧИКИ ДЛЯ ДАШБОРДА (true/false или число)
-            has_photos: (d.photos && d.photos.length > 0),
-            products_count: (d.products ? d.products.length : 0),
-            has_pos: (d.pos_materials && d.pos_materials.length > 0)
-        })); 
+            // Берем превью (первое фото) или null
+            const firstPhoto = hasPhotos ? d.photos[0].photo_url : null;
+
+            return {
+                id: d._id,
+                dealer_id: d.dealer_id,
+                name: d.name,
+                city: d.city,
+                price_type: d.price_type,
+                organization: d.organization,
+                photo_url: firstPhoto, // Отдаем только одну маленькую ссылку
+                
+                // Отдаем готовую статистику для Дашборда
+                has_photos: hasPhotos,
+                products_count: productsCount,
+                has_pos: hasPos
+            };
+        }); 
         res.json(clientDealers);
-    } catch (e) { res.status(500).json({ error: e.message }); }
+    } catch (e) { 
+        console.error(e);
+        res.status(500).json({ error: e.message }); 
+    }
 });
 
 app.get('/api/dealers/:id', async (req, res) => {
@@ -176,7 +203,7 @@ app.put('/api/dealers/:id/products', async (req, res) => {
     catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// PRODUCTS
+// Products
 app.get('/api/products', async (req, res) => {
     try {
         const search = new RegExp(req.query.search || '', 'i'); 
@@ -210,11 +237,5 @@ app.get('/api/knowledge/:id', async (req, res) => { res.json(convertToClient(awa
 app.post('/api/knowledge', async (req, res) => { const a = new Knowledge(req.body); await a.save(); res.json(convertToClient(a)); });
 app.put('/api/knowledge/:id', async (req, res) => { const a = await Knowledge.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(a)); });
 app.delete('/api/knowledge/:id', async (req, res) => { await Knowledge.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
-
-// --- ЗАЩИТА ВКЛЮЧЕНА ТОЛЬКО ДЛЯ САЙТА ---
-if (ADMIN_USER && ADMIN_PASSWORD) {
-    // Защищаем только статические файлы (HTML), API оставляем открытым для JS
-    app.use(authMiddleware);
-}
 
 app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
