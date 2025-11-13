@@ -8,18 +8,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let allDealers = [];
     let currentSort = { column: 'name', direction: 'asc' };
 
-    const posMaterialsList = [
-        "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "РФ-2 - Расческа из фанеры",
-        "РФС-1 - Расческа их фанеры старая", "С600 - 600мм задняя стенка",
-        "С800 - 800мм задняя стенка", "Табличка - Табличка орг.стекло"
-    ];
+    const posMaterialsList = ["Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа их фанеры старая", "С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "Табличка - Табличка орг.стекло"];
 
-    // --- (ИСПРАВЛЕНО ЗДЕСЬ) Объявляем элементы модальных окон ---
-    const addModalEl = document.getElementById('add-modal'); // Вот переменная, которой не хватало
-    const editModalEl = document.getElementById('edit-modal'); // И эта тоже
-
-    // Инициализация Bootstrap
+    const addModalEl = document.getElementById('add-modal');
     const addModal = new bootstrap.Modal(addModalEl);
+    const editModalEl = document.getElementById('edit-modal');
     const editModal = new bootstrap.Modal(editModalEl);
 
     const openAddModalBtn = document.getElementById('open-add-modal-btn');
@@ -28,7 +21,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const addContactList = document.getElementById('add-contact-list'); 
     const addAddressList = document.getElementById('add-address-list'); 
     const addPosList = document.getElementById('add-pos-list'); 
-    const addPhotoList = document.getElementById('add-photo-list'); 
     const addPhotoInput = document.getElementById('add-photo-input');
     const addPhotoPreviewContainer = document.getElementById('add-photo-preview-container');
     
@@ -39,13 +31,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const filterPriceType = document.getElementById('filter-price-type');
     const searchBar = document.getElementById('search-bar'); 
     const exportBtn = document.getElementById('export-dealers-btn'); 
+    const dashboardContainer = document.getElementById('dashboard-container'); // (НОВОЕ)
 
     const editForm = document.getElementById('edit-dealer-form');
     const editProductChecklist = document.getElementById('edit-product-checklist'); 
     const editContactList = document.getElementById('edit-contact-list'); 
     const editAddressList = document.getElementById('edit-address-list'); 
     const editPosList = document.getElementById('edit-pos-list'); 
-    const editPhotoList = document.getElementById('edit-photo-list'); 
     const editPhotoInput = document.getElementById('edit-photo-input');
     const editPhotoPreviewContainer = document.getElementById('edit-photo-preview-container');
 
@@ -83,9 +75,54 @@ document.addEventListener('DOMContentLoaded', () => {
             fullProductCatalog.sort((a, b) => a.sku.localeCompare(b.sku, 'ru', { numeric: true }));
         } catch (error) {
             console.error("Ошибка каталога:", error);
-            addProductChecklist.innerHTML = `<p class='text-danger'>Ошибка каталога.</p>`;
-            editProductChecklist.innerHTML = `<p class='text-danger'>Ошибка каталога.</p>`;
+            addProductChecklist.innerHTML = `<p class='text-danger'>Не удалось загрузить каталог.</p>`;
+            editProductChecklist.innerHTML = `<p class='text-danger'>Не удалось загрузить каталог.</p>`;
         }
+    }
+
+    // --- (НОВОЕ) Отрисовка Дашборда ---
+    function renderDashboard() {
+        if (!allDealers) return;
+        
+        const totalDealers = allDealers.length;
+        const citiesCount = new Set(allDealers.map(d => d.city).filter(Boolean)).size;
+        // (Для подсчета POS и Фото нам нужны детальные данные, но в "легком" списке их нет.
+        // Мы можем считать базовые вещи, которые есть. Если нужны детали, придется усложнять.
+        // Пока покажем то, что есть).
+        
+        // Поскольку мы оптимизировали список и убрали 'photos' и 'pos' из /api/dealers для скорости,
+        // мы не можем тут посчитать их точно. Давайте покажем базовую статистику.
+        
+        dashboardContainer.innerHTML = `
+            <div class="col-md-6 col-lg-3">
+                <div class="stat-card">
+                    <i class="bi bi-shop stat-icon"></i>
+                    <span class="stat-number">${totalDealers}</span>
+                    <span class="stat-label">Всего дилеров</span>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3">
+                <div class="stat-card">
+                    <i class="bi bi-geo-alt stat-icon"></i>
+                    <span class="stat-number">${citiesCount}</span>
+                    <span class="stat-label">Городов</span>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3">
+                <div class="stat-card">
+                    <i class="bi bi-box-seam stat-icon"></i>
+                    <span class="stat-number">${fullProductCatalog.length}</span>
+                    <span class="stat-label">Товаров в базе</span>
+                </div>
+            </div>
+             <div class="col-md-6 col-lg-3">
+                <div class="stat-card">
+                    <i class="bi bi-people stat-icon"></i>
+                    <span class="stat-number">-</span>
+                    <span class="stat-label">Активных</span>
+                </div>
+            </div>
+        `;
     }
 
     function createContactEntryHTML(c={}) { return `<div class="contact-entry input-group mb-2"><input type="text" class="form-control contact-name" placeholder="Имя" value="${c.name||''}"><input type="text" class="form-control contact-position" placeholder="Должность" value="${c.position||''}"><input type="text" class="form-control contact-info" placeholder="Телефон" value="${c.contactInfo||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
@@ -129,23 +166,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     async function collectPhotos(container) {
         const promises = [];
-        // Старые фото просто сохраняем
-        // (Функция renderExistingPhotos не используется в новой логике для UI, но массив данных есть)
-        // Мы берем данные из глобальных массивов addPhotosData / editPhotosData, так что collectPhotos больше не нужен для сбора из DOM
-        // Но оставим для совместимости, если вы не используете массивы напрямую в submit
+        // (В глобальных массивах уже есть данные, функция для порядка)
         return Promise.resolve([]); 
     }
-    // В новой логике мы используем глобальные массивы addPhotosData и editPhotosData напрямую в submit!
-
     function renderList(container, data, htmlGen) { container.innerHTML = (data && data.length > 0) ? data.map(htmlGen).join('') : htmlGen(); }
-    function renderProductChecklist(container, selectedIds=[]) { 
-        const set = new Set(selectedIds); 
-        if (fullProductCatalog.length === 0) {
-            container.innerHTML = "<p>Каталог пуст (ошибка загрузки).</p>";
-            return;
-        }
-        container.innerHTML = fullProductCatalog.map(p => `<div class="checklist-item form-check"><input type="checkbox" class="form-check-input" id="prod-${container.id}-${p.id}" value="${p.id}" ${set.has(p.id)?'checked':''}><label class="form-check-label" for="prod-${container.id}-${p.id}"><strong>${p.sku}</strong> - ${p.name}</label></div>`).join(''); 
-    }
+    function renderProductChecklist(container, selectedIds=[]) { const set = new Set(selectedIds); container.innerHTML = fullProductCatalog.map(p => `<div class="checklist-item form-check"><input type="checkbox" class="form-check-input" id="prod-${container.id}-${p.id}" value="${p.id}" ${set.has(p.id)?'checked':''}><label class="form-check-label" for="prod-${container.id}-${p.id}"><strong>${p.sku}</strong> - ${p.name}</label></div>`).join(''); }
     function getSelectedProductIds(containerId) { return Array.from(document.getElementById(containerId).querySelectorAll('input:checked')).map(cb=>cb.value); }
     async function saveProducts(dealerId, ids) { await fetch(`${API_DEALERS_URL}/${dealerId}/products`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({productIds: ids})}); }
 
@@ -193,6 +218,7 @@ document.addEventListener('DOMContentLoaded', () => {
             allDealers = await response.json();
             populateFilters(allDealers);
             renderDealerList();
+            renderDashboard(); // (НОВОЕ)
         } catch (error) {
             console.error(error);
             dealerListBody.innerHTML = `<tr><td colspan="8" class="text-danger text-center">Ошибка загрузки.</td></tr>`;
@@ -229,7 +255,7 @@ document.addEventListener('DOMContentLoaded', () => {
             contacts: collectData(addContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]),
             additional_addresses: collectData(addAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]),
             pos_materials: collectData(addPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]),
-            photos: addPhotosData // Используем глобальный массив фото
+            photos: addPhotosData
         };
 
         try {
@@ -262,10 +288,8 @@ document.addEventListener('DOMContentLoaded', () => {
             renderList(editAddressList, d.additional_addresses, createAddressEntryHTML);
             renderList(editPosList, d.pos_materials, createPosEntryHTML);
             renderProductChecklist(editProductChecklist, (d.products||[]).map(p=>p.id));
-            
             editPhotosData = d.photos || [];
             renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData);
-            
             editModal.show();
         } catch(e) { alert("Ошибка загрузки."); }
     }
@@ -282,7 +306,7 @@ document.addEventListener('DOMContentLoaded', () => {
             contacts: collectData(editContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]),
             additional_addresses: collectData(editAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]),
             pos_materials: collectData(editPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]),
-            photos: editPhotosData // Используем глобальный массив фото
+            photos: editPhotosData
         };
         try {
             await fetch(`${API_DEALERS_URL}/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)});
@@ -301,10 +325,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // (ВАЖНО) Здесь мы используем addModalEl и editModalEl, которые теперь определены в начале
-    const removeHandler = (e) => {
-        if(e.target.closest('.btn-remove-entry')) e.target.closest('.contact-entry, .address-entry, .pos-entry').remove();
-    };
+    const removeHandler = (e) => { if(e.target.closest('.btn-remove-entry')) e.target.closest('.contact-entry, .address-entry, .pos-entry, .photo-entry').remove(); };
     addModalEl.addEventListener('click', removeHandler);
     editModalEl.addEventListener('click', removeHandler);
 
