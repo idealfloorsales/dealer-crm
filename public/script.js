@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const addContactList = document.getElementById('add-contact-list'); 
     const addAddressList = document.getElementById('add-address-list'); 
     const addPosList = document.getElementById('add-pos-list'); 
+    const addPhotoList = document.getElementById('add-photo-list'); 
     const addPhotoInput = document.getElementById('add-photo-input');
     const addPhotoPreviewContainer = document.getElementById('add-photo-preview-container');
     
@@ -41,6 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const editContactList = document.getElementById('edit-contact-list'); 
     const editAddressList = document.getElementById('edit-address-list'); 
     const editPosList = document.getElementById('edit-pos-list'); 
+    const editPhotoList = document.getElementById('edit-photo-list'); 
     const editPhotoInput = document.getElementById('edit-photo-input');
     const editPhotoPreviewContainer = document.getElementById('edit-photo-preview-container');
 
@@ -77,9 +79,9 @@ document.addEventListener('DOMContentLoaded', () => {
             fullProductCatalog = await response.json();
             fullProductCatalog.sort((a, b) => a.sku.localeCompare(b.sku, 'ru', { numeric: true }));
         } catch (error) {
-            console.error(error);
-            addProductChecklist.innerHTML = `<p class='text-danger'>Ошибка каталога.</p>`;
-            editProductChecklist.innerHTML = `<p class='text-danger'>Ошибка каталога.</p>`;
+            console.error("Ошибка каталога:", error);
+            addProductChecklist.innerHTML = `<p class='text-danger'>Не удалось загрузить каталог.</p>`;
+            editProductChecklist.innerHTML = `<p class='text-danger'>Не удалось загрузить каталог.</p>`;
         }
     }
 
@@ -87,19 +89,39 @@ document.addEventListener('DOMContentLoaded', () => {
     function createAddressEntryHTML(a={}) { return `<div class="address-entry input-group mb-2"><input type="text" class="form-control address-description" placeholder="Описание" value="${a.description||''}"><input type="text" class="form-control address-city" placeholder="Город" value="${a.city||''}"><input type="text" class="form-control address-address" placeholder="Адрес" value="${a.address||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
     function createPosEntryHTML(p={}) { 
         const opts = posMaterialsList.map(n => `<option value="${n}" ${n===p.name?'selected':''}>${n}</option>`).join('');
-        return `<div class="pos-entry input-group mb-2"><select class="form-select pos-name"><option value="">-- Выбор --</option>${opts}</select><input type="number" class="form-control pos-quantity" value="${p.quantity||1}" min="1"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; 
+        return `<div class="pos-entry input-group mb-2"><select class="form-select pos-name"><option value="">-- Выбор --</option>${opts}</select><input type="number" class="form-control pos-quantity" value="${p.quantity||1}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; 
     }
 
+    function createNewPhotoEntryHTML() {
+        return `<div class="photo-entry new input-group mb-2">
+            <input type="text" class="form-control photo-description" placeholder="Описание фото">
+            <input type="file" class="form-control photo-file" accept="image/*">
+            <button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button>
+        </div>`;
+    }
+    
+    // (ИЗМЕНЕНО) ЖЕСТКИЙ СТИЛЬ ДЛЯ КАРТИНОК (style="width: 100px...")
+    function renderExistingPhotos(container, photos=[]) {
+        container.innerHTML = (photos && photos.length > 0) ? photos.map(p => `
+            <div class="photo-entry existing input-group mb-2">
+                <img src="${p.photo_url}" class="preview-thumb" style="width: 100px; height: 60px; object-fit: cover; border: 1px solid #ccc; border-radius: 4px;">
+                <input type="text" class="form-control photo-description" value="${p.description||''}">
+                <button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button>
+                <input type="hidden" class="photo-url" value="${p.photo_url}">
+                <input type="hidden" class="photo-date" value="${p.date||''}">
+            </div>`).join('') : ''; 
+    }
+
+    // (ИЗМЕНЕНО) ЖЕСТКИЙ СТИЛЬ ДЛЯ ПРЕВЬЮ
     function renderPhotoPreviews(container, photosArray) {
         container.innerHTML = photosArray.map((p, index) => `
-            <div class="photo-preview-item">
-                <img src="${p.photo_url}">
-                <button type="button" class="btn-remove-photo" data-index="${index}">×</button>
+            <div class="photo-preview-item" style="position: relative; width: 100px; height: 80px; border: 1px solid #ccc; border-radius: 4px; overflow: hidden;">
+                <img src="${p.photo_url}" style="width: 100%; height: 100%; object-fit: cover;">
+                <button type="button" class="btn-remove-photo" data-index="${index}" style="position: absolute; top: 0; right: 0; background: red; color: white; border: none; width: 20px; height: 20px; font-size: 12px; padding: 0;">×</button>
             </div>
         `).join('');
     }
 
-    // --- ФОТО: ДОБАВЛЕНИЕ ---
     addPhotoInput.addEventListener('change', async (e) => {
         for (let file of e.target.files) addPhotosData.push({ photo_url: await compressImage(file) });
         renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData);
@@ -107,7 +129,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     addPhotoPreviewContainer.addEventListener('click', (e) => { if(e.target.classList.contains('btn-remove-photo')) { addPhotosData.splice(e.target.dataset.index, 1); renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData); }});
 
-    // --- ФОТО: РЕДАКТИРОВАНИЕ ---
     editPhotoInput.addEventListener('change', async (e) => {
         for (let file of e.target.files) editPhotosData.push({ photo_url: await compressImage(file) });
         renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData);
@@ -124,8 +145,17 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         return data;
     }
+    async function collectPhotos(container) {
+        const promises = [];
+        container.querySelectorAll('.photo-entry.existing').forEach(e => promises.push(Promise.resolve({ photo_url: e.querySelector('.photo-url').value, description: e.querySelector('.photo-description').value, date: e.querySelector('.photo-date').value||undefined })));
+        container.querySelectorAll('.photo-entry.new').forEach(e => {
+            const files = e.querySelector('.photo-file').files;
+            if (files) Array.from(files).forEach(file => promises.push(compressImage(file).then(url => ({ description: e.querySelector('.photo-description').value, photo_url: url }))));
+        });
+        return Promise.all(promises);
+    }
     function renderList(container, data, htmlGen) { container.innerHTML = (data && data.length > 0) ? data.map(htmlGen).join('') : htmlGen(); }
-    function renderProductChecklist(container, selectedIds=[]) { const set = new Set(selectedIds); container.innerHTML = fullProductCatalog.map(p => `<div class="checklist-item form-check"><input type="checkbox" class="form-check-input" value="${p.id}" ${set.has(p.id)?'checked':''}><label>${p.sku} ${p.name}</label></div>`).join(''); }
+    function renderProductChecklist(container, selectedIds=[]) { const set = new Set(selectedIds); container.innerHTML = fullProductCatalog.map(p => `<div class="checklist-item form-check"><input type="checkbox" class="form-check-input" id="prod-${container.id}-${p.id}" value="${p.id}" ${set.has(p.id)?'checked':''}><label class="form-check-label" for="prod-${container.id}-${p.id}"><strong>${p.sku}</strong> - ${p.name}</label></div>`).join(''); }
     function getSelectedProductIds(containerId) { return Array.from(document.getElementById(containerId).querySelectorAll('input:checked')).map(cb=>cb.value); }
     async function saveProducts(dealerId, ids) { await fetch(`${API_DEALERS_URL}/${dealerId}/products`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({productIds: ids})}); }
 
@@ -142,7 +172,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         dealerListBody.innerHTML = filtered.length ? filtered.map((d, idx) => `
             <tr><td class="cell-number">${idx+1}</td>
-            <td>${d.photo_url ? `<img src="${d.photo_url}" class="table-photo">` : `<div class="no-photo">Нет</div>`}</td>
+            <td>${d.photo_url ? `<img src="${d.photo_url}" class="table-photo" style="width:60px;height:60px;object-fit:cover;border-radius:4px;">` : `<div class="no-photo">Нет</div>`}</td>
             <td>${safeText(d.dealer_id)}</td><td>${safeText(d.name)}</td><td>${safeText(d.city)}</td><td>${safeText(d.price_type)}</td><td>${safeText(d.organization)}</td>
             <td class="actions-cell"><div class="dropdown"><button class="btn btn-light btn-sm" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button><ul class="dropdown-menu dropdown-menu-end">
             <li><a class="dropdown-item btn-view" data-id="${d.id}" href="#"><i class="bi bi-eye me-2"></i>Просмотр</a></li>
@@ -175,9 +205,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error(error);
             dealerListBody.innerHTML = '';
-            noDataMsg.style.display = 'block';
-            noDataMsg.className = 'alert alert-danger';
-            noDataMsg.textContent = 'Ошибка загрузки.';
+            noDataMsg.style.display = 'block'; noDataMsg.className = 'alert alert-danger'; noDataMsg.textContent = 'Ошибка загрузки.';
         }
         const pendingId = localStorage.getItem('pendingEditDealerId');
         if (pendingId) { localStorage.removeItem('pendingEditDealerId'); openEditModal(pendingId); }
@@ -220,10 +248,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const pIds = getSelectedProductIds('add-product-checklist');
             if(pIds.length) await saveProducts(newD.id, pIds);
             addModal.hide(); initApp();
-        } catch (e) { alert("Ошибка при добавлении."); }
+        } catch (e) { alert("Ошибка: " + e.message); }
     });
 
-    // --- РЕДАКТИРОВАНИЕ ---
     async function openEditModal(id) {
         try {
             const res = await fetch(`${API_DEALERS_URL}/${id}`);
@@ -244,16 +271,13 @@ document.addEventListener('DOMContentLoaded', () => {
             renderList(editAddressList, d.additional_addresses, createAddressEntryHTML);
             renderList(editPosList, d.pos_materials, createPosEntryHTML);
             renderProductChecklist(editProductChecklist, (d.products||[]).map(p=>p.id));
-            
-            // Загружаем фото в массив
             editPhotosData = d.photos || [];
-            renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData);
-            
+            renderExistingPhotos(editPhotoList, editPhotosData);
+            renderPhotoPreviews(editPhotoPreviewContainer, []); // Очищаем контейнер новых фото
             editModal.show();
-        } catch(e) { alert("Ошибка загрузки."); }
+        } catch(e) { alert(e.message); }
     }
 
-    // --- (ИСПРАВЛЕНО) СОХРАНЕНИЕ ИЗМЕНЕНИЙ ---
     editForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const id = document.getElementById('edit_db_id').value;
@@ -266,14 +290,13 @@ document.addEventListener('DOMContentLoaded', () => {
             contacts: collectData(editContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]),
             additional_addresses: collectData(editAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]),
             pos_materials: collectData(editPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]),
-            // (ИСПРАВЛЕНО) Используем массив editPhotosData, а не функцию сбора
-            photos: editPhotosData
+            photos: await collectPhotos(editPhotoList)
         };
         try {
             await fetch(`${API_DEALERS_URL}/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)});
             await saveProducts(id, getSelectedProductIds('edit-product-checklist'));
             editModal.hide(); initApp();
-        } catch (e) { alert("Ошибка при сохранении."); }
+        } catch (e) { alert("Ошибка: " + e.message); }
     });
 
     dealerListBody.addEventListener('click', (e) => {
@@ -286,9 +309,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    const removeHandler = (e) => {
-        if(e.target.closest('.btn-remove-entry')) e.target.closest('.contact-entry, .address-entry, .pos-entry, .photo-entry').remove();
-    };
+    const removeHandler = (e) => { if(e.target.closest('.btn-remove-entry')) e.target.closest('.input-group').remove(); };
     addModalEl.addEventListener('click', removeHandler);
     editModalEl.addEventListener('click', removeHandler);
 
