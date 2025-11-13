@@ -34,8 +34,7 @@
             </div>
         </div>
 
-        <div id="dashboard-container" class="row g-3 mb-4">
-            </div>
+        <div id="dashboard-container" class="row g-3 mb-4"></div>
 
         <div class="row g-3 mb-4 p-3 bg-white rounded shadow-sm border">
             <div class="col-md-6 col-lg-4"><label for="filter-city" class="form-label">Фильтр по городу:</label><select id="filter-city" class="form-select"><option value="">-- Все города --</option></select></div>
@@ -46,16 +45,7 @@
         <div class="table-responsive bg-white rounded shadow-sm border">
             <table id="dealer-table" class="table table-hover align-middle mb-0">
                 <thead class="table-light">
-                    <tr>
-                        <th class="column-number">#</th> 
-                        <th>Фото</th>
-                        <th data-sort="dealer_id">ID точки</th>
-                        <th data-sort="name">Название точки</th>
-                        <th data-sort="city">Город</th>
-                        <th data-sort="price_type">Тип цен</th>
-                        <th data-sort="organization">Организация</th>
-                        <th style="width: 50px;">Действия</th>
-                    </tr>
+                    <tr><th class="column-number">#</th><th>Фото</th><th data-sort="dealer_id">ID точки</th><th data-sort="name">Название точки</th><th data-sort="city">Город</th><th data-sort="price_type">Тип цен</th><th data-sort="organization">Организация</th><th style="width: 50px;">Действия</th></tr>
                 </thead>
                 <tbody id="dealer-list-body"></tbody>
             </table>
@@ -80,6 +70,11 @@
                             <div class="col-md-4"><label class="form-label">Сайт</label><input type="text" id="website" class="form-control"></div>
                             <div class="col-md-4"><label class="form-label">Инстаграм</label><input type="text" id="instagram" class="form-control"></div>
                             <hr class="my-3">
+                            
+                            <label class="form-label">История посещений:</label>
+                            <div id="add-visits-list" class="list-container"></div>
+                            <div class="text-end"><button type="button" id="add-visits-btn-add-modal" class="btn btn-secondary btn-sm">Добавить визит</button></div>
+
                             <label class="form-label">Дополнительные адреса:</label><div id="add-address-list" class="list-container"></div><div class="text-end"><button type="button" id="add-address-btn-add-modal" class="btn btn-secondary btn-sm">Добавить доп. адрес</button></div>
                             <label class="form-label">Контакты:</label><div id="add-contact-list" class="list-container"></div><div class="text-end"><button type="button" id="add-contact-btn-add-modal" class="btn btn-secondary btn-sm">Добавить контакт</button></div>
                             <label class="form-label">Маркетинговое оборудование (POS):</label><div id="add-pos-list" class="list-container"></div><div class="text-end"><button type="button" id="add-pos-btn-add-modal" class="btn btn-secondary btn-sm">Добавить оборудование</button></div>
@@ -112,6 +107,11 @@
                             <div class="col-md-4"><label class="form-label">Сайт</label><input type="text" id="edit_website" class="form-control"></div>
                             <div class="col-md-4"><label class="form-label">Инстаграм</label><input type="text" id="edit_instagram" class="form-control"></div>
                             <hr class="my-3">
+                            
+                            <label class="form-label">История посещений:</label>
+                            <div id="edit-visits-list" class="list-container"></div>
+                            <div class="text-end"><button type="button" id="add-visits-btn-edit-modal" class="btn btn-secondary btn-sm">Добавить визит</button></div>
+
                             <label class="form-label">Дополнительные адреса:</label><div id="edit-address-list" class="list-container"></div><div class="text-end"><button type="button" id="add-address-btn-edit-modal" class="btn btn-secondary btn-sm">Добавить доп. адрес</button></div>
                             <label class="form-label">Контакты:</label><div id="edit-contact-list" class="list-container"></div><div class="text-end"><button type="button" id="add-contact-btn-edit-modal" class="btn btn-secondary btn-sm">Добавить контакт</button></div>
                             <label class="form-label">Маркетинговое оборудование (POS):</label><div id="edit-pos-list" class="list-container"></div><div class="text-end"><button type="button" id="add-pos-btn-edit-modal" class="btn btn-secondary btn-sm">Добавить оборудование</button></div>
