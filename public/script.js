@@ -14,21 +14,24 @@ document.addEventListener('DOMContentLoaded', () => {
         "С800 - 800мм задняя стенка", "Табличка - Табличка орг.стекло"
     ];
 
-    // Инициализация Bootstrap
-    const addModal = new bootstrap.Modal(document.getElementById('add-modal'));
-    const editModal = new bootstrap.Modal(document.getElementById('edit-modal'));
+    // --- (ИСПРАВЛЕНО ЗДЕСЬ) Объявляем элементы модальных окон ---
+    const addModalEl = document.getElementById('add-modal'); // Вот переменная, которой не хватало
+    const editModalEl = document.getElementById('edit-modal'); // И эта тоже
 
-    // Элементы Add
+    // Инициализация Bootstrap
+    const addModal = new bootstrap.Modal(addModalEl);
+    const editModal = new bootstrap.Modal(editModalEl);
+
     const openAddModalBtn = document.getElementById('open-add-modal-btn');
     const addForm = document.getElementById('add-dealer-form');
     const addProductChecklist = document.getElementById('add-product-checklist'); 
     const addContactList = document.getElementById('add-contact-list'); 
     const addAddressList = document.getElementById('add-address-list'); 
     const addPosList = document.getElementById('add-pos-list'); 
+    const addPhotoList = document.getElementById('add-photo-list'); 
     const addPhotoInput = document.getElementById('add-photo-input');
     const addPhotoPreviewContainer = document.getElementById('add-photo-preview-container');
     
-    // Элементы Main
     const dealerListBody = document.getElementById('dealer-list-body');
     const dealerTable = document.getElementById('dealer-table');
     const noDataMsg = document.getElementById('no-data-msg');
@@ -37,12 +40,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchBar = document.getElementById('search-bar'); 
     const exportBtn = document.getElementById('export-dealers-btn'); 
 
-    // Элементы Edit
     const editForm = document.getElementById('edit-dealer-form');
     const editProductChecklist = document.getElementById('edit-product-checklist'); 
     const editContactList = document.getElementById('edit-contact-list'); 
     const editAddressList = document.getElementById('edit-address-list'); 
     const editPosList = document.getElementById('edit-pos-list'); 
+    const editPhotoList = document.getElementById('edit-photo-list'); 
     const editPhotoInput = document.getElementById('edit-photo-input');
     const editPhotoPreviewContainer = document.getElementById('edit-photo-preview-container');
 
@@ -79,40 +82,19 @@ document.addEventListener('DOMContentLoaded', () => {
             fullProductCatalog = await response.json();
             fullProductCatalog.sort((a, b) => a.sku.localeCompare(b.sku, 'ru', { numeric: true }));
         } catch (error) {
-            console.error(error);
+            console.error("Ошибка каталога:", error);
             addProductChecklist.innerHTML = `<p class='text-danger'>Ошибка каталога.</p>`;
             editProductChecklist.innerHTML = `<p class='text-danger'>Ошибка каталога.</p>`;
         }
     }
 
-    // --- (ИСПРАВЛЕНО) HTML Генераторы для Bootstrap ---
-    // Используем row и col для четкой структуры
-    function createContactEntryHTML(c={}) {
-        return `<div class="contact-entry row g-2 mb-2 border rounded p-2 bg-white align-items-center">
-            <div class="col-md-4"><input type="text" class="form-control contact-name" placeholder="Имя" value="${c.name||''}"></div>
-            <div class="col-md-4"><input type="text" class="form-control contact-position" placeholder="Должность" value="${c.position||''}"></div>
-            <div class="col-md-3"><input type="text" class="form-control contact-info" placeholder="Телефон" value="${c.contactInfo||''}"></div>
-            <div class="col-md-1 text-end"><button type="button" class="btn btn-outline-danger btn-remove-entry btn-sm"><i class="bi bi-trash"></i></button></div>
-        </div>`;
-    }
-    function createAddressEntryHTML(a={}) {
-        return `<div class="address-entry row g-2 mb-2 border rounded p-2 bg-white align-items-center">
-            <div class="col-md-4"><input type="text" class="form-control address-description" placeholder="Описание" value="${a.description||''}"></div>
-            <div class="col-md-4"><input type="text" class="form-control address-city" placeholder="Город" value="${a.city||''}"></div>
-            <div class="col-md-3"><input type="text" class="form-control address-address" placeholder="Адрес" value="${a.address||''}"></div>
-            <div class="col-md-1 text-end"><button type="button" class="btn btn-outline-danger btn-remove-entry btn-sm"><i class="bi bi-trash"></i></button></div>
-        </div>`;
-    }
-    function createPosEntryHTML(p={}) {
+    function createContactEntryHTML(c={}) { return `<div class="contact-entry input-group mb-2"><input type="text" class="form-control contact-name" placeholder="Имя" value="${c.name||''}"><input type="text" class="form-control contact-position" placeholder="Должность" value="${c.position||''}"><input type="text" class="form-control contact-info" placeholder="Телефон" value="${c.contactInfo||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
+    function createAddressEntryHTML(a={}) { return `<div class="address-entry input-group mb-2"><input type="text" class="form-control address-description" placeholder="Описание" value="${a.description||''}"><input type="text" class="form-control address-city" placeholder="Город" value="${a.city||''}"><input type="text" class="form-control address-address" placeholder="Адрес" value="${a.address||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
+    function createPosEntryHTML(p={}) { 
         const opts = posMaterialsList.map(n => `<option value="${n}" ${n===p.name?'selected':''}>${n}</option>`).join('');
-        return `<div class="pos-entry row g-2 mb-2 border rounded p-2 bg-white align-items-center">
-            <div class="col-md-8"><select class="form-select pos-name"><option value="">-- Выберите оборудование --</option>${opts}</select></div>
-            <div class="col-md-3"><input type="number" class="form-control pos-quantity" placeholder="Кол-во" value="${p.quantity||1}" min="1"></div>
-            <div class="col-md-1 text-end"><button type="button" class="btn btn-outline-danger btn-remove-entry btn-sm"><i class="bi bi-trash"></i></button></div>
-        </div>`;
+        return `<div class="pos-entry input-group mb-2"><select class="form-select pos-name"><option value="">-- Выбор --</option>${opts}</select><input type="number" class="form-control pos-quantity" value="${p.quantity||1}" min="1"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; 
     }
 
-    // --- ФОТО ---
     function renderPhotoPreviews(container, photosArray) {
         container.innerHTML = photosArray.map((p, index) => `
             <div class="photo-preview-item">
@@ -122,33 +104,20 @@ document.addEventListener('DOMContentLoaded', () => {
         `).join('');
     }
 
-    // Добавление
     addPhotoInput.addEventListener('change', async (e) => {
         for (let file of e.target.files) addPhotosData.push({ photo_url: await compressImage(file) });
         renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData);
         addPhotoInput.value = '';
     });
-    addPhotoPreviewContainer.addEventListener('click', (e) => { 
-        if(e.target.classList.contains('btn-remove-photo')) { 
-            addPhotosData.splice(e.target.dataset.index, 1); 
-            renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData); 
-        }
-    });
+    addPhotoPreviewContainer.addEventListener('click', (e) => { if(e.target.classList.contains('btn-remove-photo')) { addPhotosData.splice(e.target.dataset.index, 1); renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData); }});
 
-    // Редактирование
     editPhotoInput.addEventListener('change', async (e) => {
         for (let file of e.target.files) editPhotosData.push({ photo_url: await compressImage(file) });
         renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData);
         editPhotoInput.value = '';
     });
-    editPhotoPreviewContainer.addEventListener('click', (e) => { 
-        if(e.target.classList.contains('btn-remove-photo')) { 
-            editPhotosData.splice(e.target.dataset.index, 1); 
-            renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData); 
-        }
-    });
+    editPhotoPreviewContainer.addEventListener('click', (e) => { if(e.target.classList.contains('btn-remove-photo')) { editPhotosData.splice(e.target.dataset.index, 1); renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData); }});
 
-    // --- ОБЩИЕ ФУНКЦИИ ---
     function collectData(container, selector, fields) {
         const data = [];
         container.querySelectorAll(selector).forEach(entry => {
@@ -158,8 +127,25 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         return data;
     }
+    async function collectPhotos(container) {
+        const promises = [];
+        // Старые фото просто сохраняем
+        // (Функция renderExistingPhotos не используется в новой логике для UI, но массив данных есть)
+        // Мы берем данные из глобальных массивов addPhotosData / editPhotosData, так что collectPhotos больше не нужен для сбора из DOM
+        // Но оставим для совместимости, если вы не используете массивы напрямую в submit
+        return Promise.resolve([]); 
+    }
+    // В новой логике мы используем глобальные массивы addPhotosData и editPhotosData напрямую в submit!
+
     function renderList(container, data, htmlGen) { container.innerHTML = (data && data.length > 0) ? data.map(htmlGen).join('') : htmlGen(); }
-    function renderProductChecklist(container, selectedIds=[]) { const set = new Set(selectedIds); container.innerHTML = fullProductCatalog.map(p => `<div class="checklist-item form-check"><input type="checkbox" class="form-check-input" value="${p.id}" ${set.has(p.id)?'checked':''}><label>${p.sku} ${p.name}</label></div>`).join(''); }
+    function renderProductChecklist(container, selectedIds=[]) { 
+        const set = new Set(selectedIds); 
+        if (fullProductCatalog.length === 0) {
+            container.innerHTML = "<p>Каталог пуст (ошибка загрузки).</p>";
+            return;
+        }
+        container.innerHTML = fullProductCatalog.map(p => `<div class="checklist-item form-check"><input type="checkbox" class="form-check-input" id="prod-${container.id}-${p.id}" value="${p.id}" ${set.has(p.id)?'checked':''}><label class="form-check-label" for="prod-${container.id}-${p.id}"><strong>${p.sku}</strong> - ${p.name}</label></div>`).join(''); 
+    }
     function getSelectedProductIds(containerId) { return Array.from(document.getElementById(containerId).querySelectorAll('input:checked')).map(cb=>cb.value); }
     async function saveProducts(dealerId, ids) { await fetch(`${API_DEALERS_URL}/${dealerId}/products`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({productIds: ids})}); }
 
@@ -243,8 +229,9 @@ document.addEventListener('DOMContentLoaded', () => {
             contacts: collectData(addContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]),
             additional_addresses: collectData(addAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]),
             pos_materials: collectData(addPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]),
-            photos: addPhotosData
+            photos: addPhotosData // Используем глобальный массив фото
         };
+
         try {
             const res = await fetch(API_DEALERS_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)});
             if (!res.ok) throw new Error(await res.text());
@@ -255,13 +242,11 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) { alert("Ошибка при добавлении."); }
     });
 
-    // --- (ИСПРАВЛЕНО) ЗАГРУЗКА ФОТО В EDIT ---
     async function openEditModal(id) {
         try {
             const res = await fetch(`${API_DEALERS_URL}/${id}`);
             if(!res.ok) throw new Error("Ошибка загрузки дилера");
             const d = await res.json();
-            
             document.getElementById('edit_db_id').value = d.id;
             document.getElementById('edit_dealer_id').value = d.dealer_id;
             document.getElementById('edit_name').value = d.name;
@@ -273,13 +258,11 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('edit_website').value = d.website;
             document.getElementById('edit_instagram').value = d.instagram;
             document.getElementById('edit_bonuses').value = d.bonuses;
-
             renderList(editContactList, d.contacts, createContactEntryHTML);
             renderList(editAddressList, d.additional_addresses, createAddressEntryHTML);
             renderList(editPosList, d.pos_materials, createPosEntryHTML);
             renderProductChecklist(editProductChecklist, (d.products||[]).map(p=>p.id));
             
-            // ЗАГРУЖАЕМ ФОТО
             editPhotosData = d.photos || [];
             renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData);
             
@@ -299,7 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
             contacts: collectData(editContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]),
             additional_addresses: collectData(editAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]),
             pos_materials: collectData(editPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]),
-            photos: editPhotosData
+            photos: editPhotosData // Используем глобальный массив фото
         };
         try {
             await fetch(`${API_DEALERS_URL}/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)});
@@ -318,7 +301,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    const removeHandler = (e) => { if(e.target.closest('.btn-remove-entry')) e.target.closest('.contact-entry, .address-entry, .pos-entry').remove(); };
+    // (ВАЖНО) Здесь мы используем addModalEl и editModalEl, которые теперь определены в начале
+    const removeHandler = (e) => {
+        if(e.target.closest('.btn-remove-entry')) e.target.closest('.contact-entry, .address-entry, .pos-entry').remove();
+    };
     addModalEl.addEventListener('click', removeHandler);
     editModalEl.addEventListener('click', removeHandler);
 
