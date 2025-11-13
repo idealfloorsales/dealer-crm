@@ -9,18 +9,25 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json({ limit: '50mb' })); 
 app.use(cors());
 
-// --- БЕЗОПАСНОСТЬ ---
 const ADMIN_USER = process.env.ADMIN_USER;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
-// 1. Сначала определяем API (они должны работать БЕЗ пароля для скрипта)
-// ... (см. ниже)
+// Функция проверки безопасности (вынесли отдельно для удобства)
+const authMiddleware = (req, res, next) => {
+    if (!ADMIN_USER || !ADMIN_PASSWORD) return next();
+    const user = basicAuth({
+        users: { [ADMIN_USER]: ADMIN_PASSWORD },
+        challenge: true,
+        unauthorizedResponse: 'Доступ запрещен.'
+    });
+    user(req, res, next);
+};
 
 app.use(express.static('public'));
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// --- СПИСОК 76 ТОВАРОВ ---
+// --- СПИСОК ТОВАРОВ (76 шт.) ---
 const productsToImport = [
     { sku: "CD-507", name: "Дуб Беленый" }, { sku: "CD-508", name: "Дуб Пепельный" },
     { sku: "CD-509", name: "Дуб Северный" }, { sku: "CD-510", name: "Дуб Сафари" },
@@ -62,7 +69,6 @@ const productsToImport = [
     { sku: "Н800", name: "800мм наклейка" }, { sku: "Н600", name: "600мм наклейка" }
 ];
 
-// --- СХЕМЫ ---
 const productSchema = new mongoose.Schema({ sku: String, name: String });
 const Product = mongoose.model('Product', productSchema);
 
@@ -84,19 +90,21 @@ const Dealer = mongoose.model('Dealer', dealerSchema);
 const knowledgeSchema = new mongoose.Schema({ title: String, content: String }, { timestamps: true }); 
 const Knowledge = mongoose.model('Knowledge', knowledgeSchema);
 
-// --- DB Connect ---
-async function connectToDB() {
-    if (!DB_CONNECTION_STRING) return console.error("No DB String");
+async function hardcodedImportProducts() {
     try {
-        await mongoose.connect(DB_CONNECTION_STRING);
-        console.log("MongoDB Connected");
-        
-        // Sync Products
         const count = await Product.countDocuments();
         if(count < productsToImport.length) {
              const operations = productsToImport.map(p => ({ updateOne: { filter: { sku: p.sku }, update: { $set: p }, upsert: true } }));
              await Product.bulkWrite(operations);
         }
+    } catch (e) { console.warn(e.message); }
+}
+
+async function connectToDB() {
+    if (!DB_CONNECTION_STRING) return console.error("No DB String");
+    try {
+        await mongoose.connect(DB_CONNECTION_STRING);
+        await hardcodedImportProducts();
     } catch (e) { console.error(e); }
 }
 
@@ -110,14 +118,10 @@ function convertToClient(doc) {
 
 // === API ROUTES ===
 
-// (ИЗМЕНЕНО) СПИСОК ДИЛЕРОВ - ТЕПЕРЬ МАКСИМАЛЬНО ЛЕГКИЙ
+// (ИЗМЕНЕНО) "Легкий" список дилеров, но со СЧЕТЧИКАМИ для Дашборда
 app.get('/api/dealers', async (req, res) => {
     try {
-        // Мы запрашиваем ТОЛЬКО текстовые поля. Никаких 'photos' или 'contacts'
-        const dealers = await Dealer.find({}, {
-            _id: 1, dealer_id: 1, name: 1, city: 1, price_type: 1, organization: 1
-        }).lean();
-        
+        const dealers = await Dealer.find({}, 'dealer_id name city photos price_type organization products pos_materials').lean();
         const clientDealers = dealers.map(d => ({
             id: d._id,
             dealer_id: d.dealer_id,
@@ -125,16 +129,17 @@ app.get('/api/dealers', async (req, res) => {
             city: d.city,
             price_type: d.price_type,
             organization: d.organization,
-            photo_url: null // В списке фото не показываем ради скорости
+            photo_url: (d.photos && d.photos.length > 0) ? d.photos[0].photo_url : null,
+            
+            // СЧЕТЧИКИ ДЛЯ ДАШБОРДА (true/false или число)
+            has_photos: (d.photos && d.photos.length > 0),
+            products_count: (d.products ? d.products.length : 0),
+            has_pos: (d.pos_materials && d.pos_materials.length > 0)
         })); 
         res.json(clientDealers);
-    } catch (e) { 
-        console.error("Error fetching dealers:", e);
-        res.status(500).json({ error: e.message }); 
-    }
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Получение одного дилера (Здесь фото есть!)
 app.get('/api/dealers/:id', async (req, res) => {
     try {
         const dealer = await Dealer.findById(req.params.id).populate('products');
@@ -158,7 +163,20 @@ app.delete('/api/dealers/:id', async (req, res) => {
     catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Products API
+app.get('/api/dealers/:id/products', async (req, res) => {
+    try {
+        const dealer = await Dealer.findById(req.params.id).populate({path:'products',options:{sort:{'sku':1}}});
+        if (!dealer) return res.status(404).json({ message: "Дилер не найден" });
+        res.json(dealer.products.map(convertToClient));
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/dealers/:id/products', async (req, res) => {
+    try { await Dealer.findByIdAndUpdate(req.params.id, { products: req.body.productIds }); res.json({status:'ok'}); } 
+    catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// PRODUCTS
 app.get('/api/products', async (req, res) => {
     try {
         const search = new RegExp(req.query.search || '', 'i'); 
@@ -167,10 +185,10 @@ app.get('/api/products', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.post('/api/products', async (req, res) => { try { const p = new Product(req.body); await p.save(); res.json(convertToClient(p)); } catch(e){res.status(409).json({});} });
-app.put('/api/products/:id', async (req, res) => { try { await Product.findByIdAndUpdate(req.params.id, req.body); res.json({}); } catch(e){res.status(409).json({});} });
+app.put('/api/products/:id', async (req, res) => { try { await Product.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(p)); } catch(e){res.status(409).json({});} });
 app.delete('/api/products/:id', async (req, res) => { await Product.findByIdAndDelete(req.params.id); await Dealer.updateMany({ products: req.params.id }, { $pull: { products: req.params.id } }); res.json({}); });
 
-// Matrix API
+// Matrix
 app.get('/api/matrix', async (req, res) => {
     try {
         const prods = await Product.find({}, 'sku name').sort({sku:1}).lean();
@@ -181,28 +199,22 @@ app.get('/api/matrix', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Knowledge API
+app.get('/api/products/:id/dealers', async (req, res) => {
+    const dlrs = await Dealer.find({ products: req.params.id }, 'dealer_id name city').sort({name:1}).lean(); 
+    res.json(dlrs.map(d=>{d.id=d._id; return d;}));
+});
+
+// Knowledge
 app.get('/api/knowledge', async (req, res) => { const arts = await Knowledge.find({title: new RegExp(req.query.search||'', 'i')}).sort({title:1}).lean(); res.json(arts.map(a=>{a.id=a._id; return a;})); });
 app.get('/api/knowledge/:id', async (req, res) => { res.json(convertToClient(await Knowledge.findById(req.params.id))); });
 app.post('/api/knowledge', async (req, res) => { const a = new Knowledge(req.body); await a.save(); res.json(convertToClient(a)); });
 app.put('/api/knowledge/:id', async (req, res) => { const a = await Knowledge.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(a)); });
 app.delete('/api/knowledge/:id', async (req, res) => { await Knowledge.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
 
-app.get('/api/dealers/:id/products', async (req, res) => {
-    const dealer = await Dealer.findById(req.params.id).populate({path:'products',options:{sort:{'sku':1}}});
-    res.json(dealer.products.map(convertToClient));
-});
-app.put('/api/dealers/:id/products', async (req, res) => { await Dealer.findByIdAndUpdate(req.params.id, { products: req.body.productIds }); res.json({status:'ok'}); });
-app.get('/api/products/:id/dealers', async (req, res) => { const dlrs = await Dealer.find({ products: req.params.id }, 'dealer_id name city').sort({name:1}).lean(); res.json(dlrs.map(d=>{d.id=d._id; return d;})); });
-
-
-// --- 2. ЗАЩИТА ПАРОЛЕМ (Только для сайта, API открыты) ---
+// --- ЗАЩИТА ВКЛЮЧЕНА ТОЛЬКО ДЛЯ САЙТА ---
 if (ADMIN_USER && ADMIN_PASSWORD) {
-    app.use(basicAuth({
-        users: { [ADMIN_USER]: ADMIN_PASSWORD }, 
-        challenge: true, 
-        unauthorizedResponse: 'Доступ запрещен.'
-    }));
+    // Защищаем только статические файлы (HTML), API оставляем открытым для JS
+    app.use(authMiddleware);
 }
 
 app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
