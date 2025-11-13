@@ -9,11 +9,9 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json({ limit: '50mb' })); 
 app.use(cors());
 
-// --- БЕЗОПАСНОСТЬ ---
 const ADMIN_USER = process.env.ADMIN_USER;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
-// Защита включается только если заданы переменные. API оставляем открытым для скрипта.
 const authMiddleware = (req, res, next) => {
     if (!ADMIN_USER || !ADMIN_PASSWORD) return next();
     const user = basicAuth({
@@ -24,15 +22,9 @@ const authMiddleware = (req, res, next) => {
     user(req, res, next);
 };
 
-// Сначала статические файлы (сайт), защищенные паролем
 if (ADMIN_USER && ADMIN_PASSWORD) {
-    app.use(express.static('public', { 
-        index: false // Отключаем авто-индекс, чтобы перехватить корень
-    }));
-    app.get('/', authMiddleware, (req, res) => {
-        res.sendFile(__dirname + '/public/index.html');
-    });
-    // Остальные HTML тоже защищаем, если нужно, но пока оставим просто static для ресурсов
+    app.use(express.static('public', { index: false }));
+    app.get('/', authMiddleware, (req, res) => res.sendFile(__dirname + '/public/index.html'));
     app.use(express.static('public'));
 } else {
     app.use(express.static('public'));
@@ -82,7 +74,6 @@ const productsToImport = [
     { sku: "Н800", name: "800мм наклейка" }, { sku: "Н600", name: "600мм наклейка" }
 ];
 
-// --- СХЕМЫ ---
 const productSchema = new mongoose.Schema({ sku: String, name: String });
 const Product = mongoose.model('Product', productSchema);
 
@@ -91,13 +82,19 @@ const photoSchema = new mongoose.Schema({ description: String, photo_url: String
 const additionalAddressSchema = new mongoose.Schema({ description: String, city: String, address: String }, { _id: false });
 const posMaterialSchema = new mongoose.Schema({ name: String, quantity: Number }, { _id: false });
 
+// (НОВОЕ) Схема Визитов
+const visitSchema = new mongoose.Schema({
+    date: String, // Храним как строку YYYY-MM-DD для простоты
+    comment: String
+}, { _id: false });
+
 const dealerSchema = new mongoose.Schema({
     dealer_id: String, name: String, price_type: String, city: String, address: String, 
-    contacts: [contactSchema], bonuses: String, 
-    photos: [photoSchema], 
-    organization: String, delivery: String, website: String, instagram: String,
+    contacts: [contactSchema], bonuses: String, photos: [photoSchema], organization: String,
+    delivery: String, website: String, instagram: String,
     additional_addresses: [additionalAddressSchema],
     pos_materials: [posMaterialSchema],
+    visits: [visitSchema], // (НОВОЕ ПОЛЕ)
     products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }]
 });
 const Dealer = mongoose.model('Dealer', dealerSchema);
@@ -105,18 +102,22 @@ const Dealer = mongoose.model('Dealer', dealerSchema);
 const knowledgeSchema = new mongoose.Schema({ title: String, content: String }, { timestamps: true }); 
 const Knowledge = mongoose.model('Knowledge', knowledgeSchema);
 
+async function hardcodedImportProducts() {
+    try {
+        const dbProducts = await Product.find().lean();
+        const dbSkus = new Set(dbProducts.map(p => p.sku));
+        const codeSkus = new Set(productsToImport.map(p => p.sku));
+        const skusToDelete = [...dbSkus].filter(sku => !codeSkus.has(sku));
+        if (skusToDelete.length > 0) await Product.deleteMany({ sku: { $in: skusToDelete } });
+        const productsToAdd = productsToImport.filter(p => !dbSkus.has(p.sku));
+        if (productsToAdd.length > 0) await Product.insertMany(productsToAdd, { ordered: false }).catch(e => {});
+    } catch (e) { console.warn(e.message); }
+}
+
 async function connectToDB() {
     if (!DB_CONNECTION_STRING) return console.error("No DB String");
-    try {
-        await mongoose.connect(DB_CONNECTION_STRING);
-        console.log("Connected to MongoDB");
-        
-        const count = await Product.countDocuments();
-        if(count < productsToImport.length) {
-             const operations = productsToImport.map(p => ({ updateOne: { filter: { sku: p.sku }, update: { $set: p }, upsert: true } }));
-             await Product.bulkWrite(operations);
-        }
-    } catch (e) { console.error(e); }
+    try { await mongoose.connect(DB_CONNECTION_STRING); await hardcodedImportProducts(); } 
+    catch (e) { console.error(e); }
 }
 
 function convertToClient(doc) {
@@ -127,95 +128,55 @@ function convertToClient(doc) {
     return obj;
 }
 
-// === API ROUTES ===
-
-// (ИЗМЕНЕНО) Умный список дилеров
-// Мы запрашиваем всё, НО! удаляем тяжелые тела фото перед отправкой
+// API
 app.get('/api/dealers', async (req, res) => {
     try {
-        // Запрашиваем нужные поля (включая массивы, чтобы посчитать их длину)
         const dealers = await Dealer.find({}, 'dealer_id name city price_type organization photos products pos_materials').lean();
-        
-        const clientDealers = dealers.map(d => {
-            // Считаем статистику ДО удаления данных
-            const hasPhotos = d.photos && d.photos.length > 0;
-            const productsCount = d.products ? d.products.length : 0;
-            const hasPos = d.pos_materials && d.pos_materials.length > 0;
-            
-            // Берем превью (первое фото) или null
-            const firstPhoto = hasPhotos ? d.photos[0].photo_url : null;
-
-            return {
-                id: d._id,
-                dealer_id: d.dealer_id,
-                name: d.name,
-                city: d.city,
-                price_type: d.price_type,
-                organization: d.organization,
-                photo_url: firstPhoto, // Отдаем только одну маленькую ссылку
-                
-                // Отдаем готовую статистику для Дашборда
-                has_photos: hasPhotos,
-                products_count: productsCount,
-                has_pos: hasPos
-            };
-        }); 
+        const clientDealers = dealers.map(d => ({
+            id: d._id, dealer_id: d.dealer_id, name: d.name, city: d.city, price_type: d.price_type, organization: d.organization,
+            photo_url: (d.photos && d.photos.length > 0) ? d.photos[0].photo_url : null,
+            has_photos: (d.photos && d.photos.length > 0),
+            products_count: (d.products ? d.products.length : 0),
+            has_pos: (d.pos_materials && d.pos_materials.length > 0)
+        })); 
         res.json(clientDealers);
-    } catch (e) { 
-        console.error(e);
-        res.status(500).json({ error: e.message }); 
-    }
-});
-
-app.get('/api/dealers/:id', async (req, res) => {
-    try {
-        const dealer = await Dealer.findById(req.params.id).populate('products');
-        if (!dealer) return res.status(404).json({ message: "Дилер не найден" });
-        res.json(convertToClient(dealer)); 
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/dealers', async (req, res) => {
-    try { const dealer = new Dealer(req.body); await dealer.save(); res.status(201).json(convertToClient(dealer)); } 
+app.get('/api/dealers/:id', async (req, res) => {
+    try { const dealer = await Dealer.findById(req.params.id).populate('products'); res.json(convertToClient(dealer)); } 
     catch (e) { res.status(500).json({ error: e.message }); }
 });
-
+app.post('/api/dealers', async (req, res) => {
+    try { const dealer = new Dealer(req.body); await dealer.save(); res.json(convertToClient(dealer)); } 
+    catch (e) { res.status(500).json({ error: e.message }); }
+});
 app.put('/api/dealers/:id', async (req, res) => {
     try { await Dealer.findByIdAndUpdate(req.params.id, req.body); res.json({status:'ok'}); } 
     catch (e) { res.status(500).json({ error: e.message }); }
 });
-
 app.delete('/api/dealers/:id', async (req, res) => {
     try { await Dealer.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); } 
     catch (e) { res.status(500).json({ error: e.message }); }
 });
-
 app.get('/api/dealers/:id/products', async (req, res) => {
-    try {
-        const dealer = await Dealer.findById(req.params.id).populate({path:'products',options:{sort:{'sku':1}}});
-        if (!dealer) return res.status(404).json({ message: "Дилер не найден" });
-        res.json(dealer.products.map(convertToClient));
-    } catch (e) { res.status(500).json({ error: e.message }); }
+    try { const dealer = await Dealer.findById(req.params.id).populate({path:'products',options:{sort:{'sku':1}}}); res.json(dealer.products.map(convertToClient)); } 
+    catch (e) { res.status(500).json({ error: e.message }); }
 });
-
 app.put('/api/dealers/:id/products', async (req, res) => {
     try { await Dealer.findByIdAndUpdate(req.params.id, { products: req.body.productIds }); res.json({status:'ok'}); } 
     catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Products
 app.get('/api/products', async (req, res) => {
-    try {
-        const search = new RegExp(req.query.search || '', 'i'); 
-        const products = await Product.find({$or:[{sku:search},{name:search}]}).sort({sku:1}).lean(); 
-        res.json(products.map(p=>{p.id=p._id; return p;}));
-    } catch (e) { res.status(500).json({ error: e.message }); }
+    const search = new RegExp(req.query.search || '', 'i'); 
+    const products = await Product.find({$or:[{sku:search},{name:search}]}).sort({sku:1}).lean(); 
+    res.json(products.map(p=>{p.id=p._id; return p;}));
 });
 app.post('/api/products', async (req, res) => { try { const p = new Product(req.body); await p.save(); res.json(convertToClient(p)); } catch(e){res.status(409).json({});} });
-app.put('/api/products/:id', async (req, res) => { try { await Product.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(p)); } catch(e){res.status(409).json({});} });
+app.put('/api/products/:id', async (req, res) => { try { const p = await Product.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(p)); } catch(e){res.status(409).json({});} });
 app.delete('/api/products/:id', async (req, res) => { await Product.findByIdAndDelete(req.params.id); await Dealer.updateMany({ products: req.params.id }, { $pull: { products: req.params.id } }); res.json({}); });
 
-// Matrix
 app.get('/api/matrix', async (req, res) => {
     try {
         const prods = await Product.find({}, 'sku name').sort({sku:1}).lean();
@@ -225,13 +186,11 @@ app.get('/api/matrix', async (req, res) => {
         res.json({ headers: dlrs.map(d => ({id:d._id, name:d.name})), matrix });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
-
 app.get('/api/products/:id/dealers', async (req, res) => {
     const dlrs = await Dealer.find({ products: req.params.id }, 'dealer_id name city').sort({name:1}).lean(); 
     res.json(dlrs.map(d=>{d.id=d._id; return d;}));
 });
 
-// Knowledge
 app.get('/api/knowledge', async (req, res) => { const arts = await Knowledge.find({title: new RegExp(req.query.search||'', 'i')}).sort({title:1}).lean(); res.json(arts.map(a=>{a.id=a._id; return a;})); });
 app.get('/api/knowledge/:id', async (req, res) => { res.json(convertToClient(await Knowledge.findById(req.params.id))); });
 app.post('/api/knowledge', async (req, res) => { const a = new Knowledge(req.body); await a.save(); res.json(convertToClient(a)); });
