@@ -3,20 +3,15 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const API_DEALERS_URL = '/api/dealers';
     const API_PRODUCTS_URL = '/api/products'; 
-    // ... (все переменные как раньше) ...
-    // Пожалуйста, используйте ПОЛНЫЙ код script.js из предыдущего ответа, 
-    // но ЗАМЕНИТЕ в нем функцию renderDashboard на эту:
 
     let fullProductCatalog = [];
     let allDealers = [];
     let currentSort = { column: 'name', direction: 'asc' };
-    const posMaterialsList = ["Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа их фанеры старая", "С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "Табличка - Табличка орг.стекло"];
 
-    // ... (все инициализации модалок, кнопок и т.д. - скопируйте из прошлого ответа) ...
-    const addModalEl = document.getElementById('add-modal');
-    const addModal = new bootstrap.Modal(addModalEl);
-    const editModalEl = document.getElementById('edit-modal');
-    const editModal = new bootstrap.Modal(editModalEl);
+    // ... (posMaterialsList и переменные модальных окон и форм - без изменений) ...
+    const posMaterialsList = ["Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа их фанеры старая", "С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "Табличка - Табличка орг.стекло"];
+    const addModalEl = document.getElementById('add-modal'); const addModal = new bootstrap.Modal(addModalEl);
+    const editModalEl = document.getElementById('edit-modal'); const editModal = new bootstrap.Modal(editModalEl);
     const openAddModalBtn = document.getElementById('open-add-modal-btn');
     const addForm = document.getElementById('add-dealer-form');
     const addProductChecklist = document.getElementById('add-product-checklist'); 
@@ -42,11 +37,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const editPhotoInput = document.getElementById('edit-photo-input');
     const editPhotoPreviewContainer = document.getElementById('edit-photo-preview-container');
     let addPhotosData = []; let editPhotosData = [];
-    const safeText = (text) => text ? text.replace(/</g, "&lt;") : '---';
+    const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
     const toBase64 = file => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => resolve(reader.result); reader.onerror = error => reject(error); });
     const compressImage = (file, maxWidth = 1000, quality = 0.7) => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = event => { const img = new Image(); img.src = event.target.result; img.onload = () => { const elem = document.createElement('canvas'); let width = img.width; let height = img.height; if (width > maxWidth) { height *= maxWidth / width; width = maxWidth; } elem.width = width; elem.height = height; const ctx = elem.getContext('2d'); ctx.drawImage(img, 0, 0, width, height); resolve(elem.toDataURL('image/jpeg', quality)); }; img.onerror = error => reject(error); }; reader.onerror = error => reject(error); });
 
-    // --- (НОВАЯ) Функция Дашборда ---
+    async function fetchProductCatalog() {
+        if (fullProductCatalog.length > 0) return; 
+        try {
+            const response = await fetch(API_PRODUCTS_URL);
+            if (!response.ok) throw new Error(`Ошибка: ${response.status}`);
+            fullProductCatalog = await response.json();
+            fullProductCatalog.sort((a, b) => a.sku.localeCompare(b.sku, 'ru', { numeric: true }));
+        } catch (error) {
+            console.error(error);
+            addProductChecklist.innerHTML = `<p class='text-danger'>Ошибка каталога.</p>`;
+            editProductChecklist.innerHTML = `<p class='text-danger'>Ошибка каталога.</p>`;
+        }
+    }
+
+    // --- (ИЗМЕНЕНО) Функция Дашборда ---
     function renderDashboard() {
         if (!allDealers || allDealers.length === 0) {
             dashboardContainer.innerHTML = '';
@@ -55,62 +64,29 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const totalDealers = allDealers.length;
         
-        // 1. Без фото (проблема)
+        // Теперь мы берем данные из полей, которые прислал сервер
         const noPhotosCount = allDealers.filter(d => !d.has_photos).length;
-        
-        // 2. Без товаров (пустые)
         const noProductsCount = allDealers.filter(d => d.products_count === 0).length;
-        
-        // 3. С оборудованием (POS)
         const posCount = allDealers.filter(d => d.has_pos).length;
         
-        // 4. Топ город
         const cityCounts = {};
         let topCity = "-";
         let maxCount = 0;
         allDealers.forEach(d => {
             if (d.city) {
                 cityCounts[d.city] = (cityCounts[d.city] || 0) + 1;
-                if (cityCounts[d.city] > maxCount) {
-                    maxCount = cityCounts[d.city];
-                    topCity = d.city;
-                }
+                if (cityCounts[d.city] > maxCount) { maxCount = cityCounts[d.city]; topCity = d.city; }
             }
         });
 
         dashboardContainer.innerHTML = `
-            <div class="col-md-6 col-lg-3">
-                <div class="stat-card">
-                    <i class="bi bi-shop stat-icon text-primary"></i>
-                    <span class="stat-number">${totalDealers}</span>
-                    <span class="stat-label">Всего дилеров</span>
-                </div>
-            </div>
-            <div class="col-md-6 col-lg-3">
-                <div class="stat-card ${noPhotosCount > 0 ? 'border-danger' : ''}">
-                    <i class="bi bi-camera-fill stat-icon ${noPhotosCount > 0 ? 'text-danger' : 'text-secondary'}"></i>
-                    <span class="stat-number ${noPhotosCount > 0 ? 'text-danger' : ''}">${noPhotosCount}</span>
-                    <span class="stat-label">Без фото</span>
-                </div>
-            </div>
-            <div class="col-md-6 col-lg-3">
-                <div class="stat-card">
-                    <i class="bi bi-easel stat-icon text-success"></i>
-                    <span class="stat-number text-success">${posCount}</span>
-                    <span class="stat-label">С оборудованием</span>
-                </div>
-            </div>
-             <div class="col-md-6 col-lg-3">
-                <div class="stat-card">
-                    <i class="bi bi-geo-alt-fill stat-icon text-info"></i>
-                    <span class="stat-number text-info" style="font-size: 1.8rem;">${topCity}</span>
-                    <span class="stat-label">Топ регион</span>
-                </div>
-            </div>
+            <div class="col-md-6 col-lg-3"><div class="stat-card"><i class="bi bi-shop stat-icon text-primary"></i><span class="stat-number">${totalDealers}</span><span class="stat-label">Всего дилеров</span></div></div>
+            <div class="col-md-6 col-lg-3"><div class="stat-card ${noPhotosCount > 0 ? 'border-danger' : ''}"><i class="bi bi-camera-fill stat-icon ${noPhotosCount > 0 ? 'text-danger' : 'text-secondary'}"></i><span class="stat-number ${noPhotosCount > 0 ? 'text-danger' : ''}">${noPhotosCount}</span><span class="stat-label">Без фото</span></div></div>
+            <div class="col-md-6 col-lg-3"><div class="stat-card"><i class="bi bi-easel stat-icon text-success"></i><span class="stat-number text-success">${posCount}</span><span class="stat-label">С оборудованием</span></div></div>
+             <div class="col-md-6 col-lg-3"><div class="stat-card"><i class="bi bi-geo-alt-fill stat-icon text-info"></i><span class="stat-number text-info" style="font-size: 1.5rem;">${topCity}</span><span class="stat-label">Топ регион</span></div></div>
         `;
     }
 
-    // ... (Остальные функции createContact, collectData и т.д. скопируйте из прошлого ответа) ...
     function createContactEntryHTML(c={}) { return `<div class="contact-entry input-group mb-2"><input type="text" class="form-control contact-name" placeholder="Имя" value="${c.name||''}"><input type="text" class="form-control contact-position" placeholder="Должность" value="${c.position||''}"><input type="text" class="form-control contact-info" placeholder="Телефон" value="${c.contactInfo||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
     function createAddressEntryHTML(a={}) { return `<div class="address-entry input-group mb-2"><input type="text" class="form-control address-description" placeholder="Описание" value="${a.description||''}"><input type="text" class="form-control address-city" placeholder="Город" value="${a.city||''}"><input type="text" class="form-control address-address" placeholder="Адрес" value="${a.address||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
     function createPosEntryHTML(p={}) { const opts = posMaterialsList.map(n => `<option value="${n}" ${n===p.name?'selected':''}>${n}</option>`).join(''); return `<div class="pos-entry input-group mb-2"><select class="form-select pos-name"><option value="">-- Выбор --</option>${opts}</select><input type="number" class="form-control pos-quantity" value="${p.quantity||1}" min="1"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
@@ -118,7 +94,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderExistingPhotos(container, photos=[]) { container.innerHTML = (photos && photos.length > 0) ? photos.map(p => `<div class="photo-entry existing input-group mb-2"><img src="${p.photo_url}" class="preview-thumb"><input type="hidden" class="photo-url" value="${p.photo_url}"><input type="hidden" class="photo-date" value="${p.date||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`).join('') : ''; }
     function renderPhotoPreviews(container, photosArray) { container.innerHTML = photosArray.map((p, index) => `<div class="photo-preview-item"><img src="${p.photo_url}"><button type="button" class="btn-remove-photo" data-index="${index}">×</button></div>`).join(''); }
     
-    // Listeners
     addPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) addPhotosData.push({ photo_url: await compressImage(file) }); renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData); addPhotoInput.value = ''; });
     addPhotoPreviewContainer.addEventListener('click', (e) => { if(e.target.classList.contains('btn-remove-photo')) { addPhotosData.splice(e.target.dataset.index, 1); renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData); }});
     editPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) editPhotosData.push({ photo_url: await compressImage(file) }); renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData); editPhotoInput.value = ''; });
@@ -127,28 +102,34 @@ document.addEventListener('DOMContentLoaded', () => {
     function collectData(container, selector, fields) { const d=[]; container.querySelectorAll(selector).forEach(e=>{const i={}; fields.forEach(f=>i[f.key]=e.querySelector(f.class).value); if(Object.values(i).some(v=>v)) d.push(i);}); return d; }
     async function collectPhotos(container) { const p=[]; container.querySelectorAll('.photo-entry.existing').forEach(e=>p.push(Promise.resolve({photo_url:e.querySelector('.photo-url').value, date:e.querySelector('.photo-date').value||undefined}))); container.querySelectorAll('.photo-entry.new').forEach(e=>{if(e.querySelector('.photo-file').files[0]) p.push(compressImage(e.querySelector('.photo-file').files[0]).then(u=>({photo_url:u})));}); return Promise.all(p); }
     function renderList(cont, d, gen) { cont.innerHTML = (d&&d.length)?d.map(gen).join(''):gen(); }
-    function renderProductChecklist(cont, ids=[]) { const s=new Set(ids); cont.innerHTML=fullProductCatalog.map(p=>`<div class="checklist-item form-check"><input type="checkbox" class="form-check-input" id="p-${p.id}" value="${p.id}" ${s.has(p.id)?'checked':''}><label class="form-check-label" for="p-${p.id}">${p.sku} ${p.name}</label></div>`).join(''); }
+    function renderProductChecklist(cont, ids=[]) { const s=new Set(ids); cont.innerHTML=fullProductCatalog.map(p=>`<div class="checklist-item form-check"><input type="checkbox" class="form-check-input" id="prod-${cont.id}-${p.id}" value="${p.id}" ${s.has(p.id)?'checked':''}><label class="form-check-label" for="prod-${cont.id}-${p.id}"><strong>${p.sku}</strong> - ${p.name}</label></div>`).join(''); }
     function getSelectedProductIds(cid) { return Array.from(document.getElementById(cid).querySelectorAll('input:checked')).map(c=>c.value); }
     async function saveProducts(did, ids) { await fetch(`${API_DEALERS_URL}/${did}/products`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({productIds:ids})}); }
 
     function renderDealerList() {
         const city = filterCity.value; const type = filterPriceType.value; const search = searchBar.value.toLowerCase();
-        const filtered = allDealers.filter(d => (!city||d.city===city) && (!type||d.price_type===type) && (!search || (d.name.toLowerCase().includes(search)||d.dealer_id.toLowerCase().includes(search)||d.organization.toLowerCase().includes(search))));
-        // ... (сортировка как раньше) ...
-        
-        dealerListBody.innerHTML = filtered.map((d, i) => `
-            <tr><td class="cell-number">${i+1}</td>
+        const filtered = allDealers.filter(d => {
+            return (!city || d.city === city) && (!type || d.price_type === type) &&
+                   (!search || (d.name && d.name.toLowerCase().includes(search)) || (d.dealer_id && d.dealer_id.toLowerCase().includes(search)) || (d.organization && d.organization.toLowerCase().includes(search)));
+        });
+        filtered.sort((a, b) => {
+            let valA = (a[currentSort.column] || '').toString(); let valB = (b[currentSort.column] || '').toString();
+            let res = currentSort.column === 'dealer_id' ? valA.localeCompare(valB, undefined, {numeric:true}) : valA.toLowerCase().localeCompare(valB.toLowerCase(), 'ru');
+            return currentSort.direction === 'asc' ? res : -res;
+        });
+        dealerListBody.innerHTML = filtered.length ? filtered.map((d, idx) => `
+            <tr><td class="cell-number">${idx+1}</td>
             <td>${d.photo_url ? `<img src="${d.photo_url}" class="table-photo">` : `<div class="no-photo">Нет</div>`}</td>
             <td>${safeText(d.dealer_id)}</td><td>${safeText(d.name)}</td><td>${safeText(d.city)}</td><td>${safeText(d.price_type)}</td><td>${safeText(d.organization)}</td>
-            <td class="actions-cell">
-                <div class="dropdown"><button class="btn btn-light btn-sm" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button>
-                <ul class="dropdown-menu dropdown-menu-end">
-                    <li><a class="dropdown-item btn-view" data-id="${d.id}" href="#"><i class="bi bi-eye me-2"></i>Просмотр</a></li>
-                    <li><a class="dropdown-item btn-edit" data-id="${d.id}" href="#"><i class="bi bi-pencil me-2"></i>Ред.</a></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item text-danger btn-delete" data-id="${d.id}" data-name="${safeText(d.name)}" href="#"><i class="bi bi-trash me-2"></i>Удалить</a></li>
-                </ul></div>
-            </td></tr>`).join('');
+            <td class="actions-cell"><div class="dropdown"><button class="btn btn-light btn-sm" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button><ul class="dropdown-menu dropdown-menu-end">
+            <li><a class="dropdown-item btn-view" data-id="${d.id}" href="#"><i class="bi bi-eye me-2"></i>Просмотр</a></li>
+            <li><a class="dropdown-item btn-edit" data-id="${d.id}" href="#"><i class="bi bi-pencil me-2"></i>Ред.</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item text-danger btn-delete" data-id="${d.id}" data-name="${safeText(d.name)}" href="#"><i class="bi bi-trash me-2"></i>Удалить</a></li>
+            </ul></div></td></tr>`).join('') : '';
+        dealerTable.style.display = filtered.length ? 'table' : 'none';
+        noDataMsg.style.display = filtered.length ? 'none' : 'block';
+        noDataMsg.textContent = allDealers.length === 0 ? 'Список пуст.' : 'Не найдено.';
     }
 
     function populateFilters(dealers) {
@@ -163,22 +144,22 @@ document.addEventListener('DOMContentLoaded', () => {
     async function initApp() {
         await fetchProductCatalog();
         try {
-            const res = await fetch(API_DEALERS_URL);
-            if(!res.ok) throw new Error();
-            allDealers = await res.json();
+            const response = await fetch(API_DEALERS_URL);
+            if (!response.ok) throw new Error(response.statusText);
+            allDealers = await response.json();
             populateFilters(allDealers);
             renderDealerList();
             renderDashboard(); // (ВЫЗОВ ДАШБОРДА)
-        } catch (e) { dealerListBody.innerHTML = ''; noDataMsg.style.display = 'block'; }
-        const pid = localStorage.getItem('pendingEditDealerId');
-        if(pid) { localStorage.removeItem('pendingEditDealerId'); openEditModal(pid); }
+        } catch (error) {
+            console.error(error);
+            dealerListBody.innerHTML = '';
+            noDataMsg.style.display = 'block'; noDataMsg.className = 'alert alert-danger'; noDataMsg.textContent = 'Ошибка загрузки.';
+        }
+        const pendingId = localStorage.getItem('pendingEditDealerId');
+        if (pendingId) { localStorage.removeItem('pendingEditDealerId'); openEditModal(pendingId); }
     }
 
-    // ... (остальные обработчики кнопок add/edit как в прошлом ответе) ...
-    // Чтобы не загромождать, я не пишу их все, но они должны быть!
-    // Используйте полный script.js из предыдущего шага, но замените initApp и renderDashboard.
-    
-    // (Связки кнопок)
+    // ... (Кнопки Add/Edit - БЕЗ ИЗМЕНЕНИЙ, скопируйте из прошлого ответа) ...
     document.getElementById('add-contact-btn-add-modal').onclick = () => addContactList.insertAdjacentHTML('beforeend', createContactEntryHTML());
     document.getElementById('add-address-btn-add-modal').onclick = () => addAddressList.insertAdjacentHTML('beforeend', createAddressEntryHTML());
     document.getElementById('add-pos-btn-add-modal').onclick = () => addPosList.insertAdjacentHTML('beforeend', createPosEntryHTML());
@@ -191,7 +172,7 @@ document.addEventListener('DOMContentLoaded', () => {
     addForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const data = { dealer_id: document.getElementById('dealer_id').value, name: document.getElementById('name').value, organization: document.getElementById('organization').value, price_type: document.getElementById('price_type').value, city: document.getElementById('city').value, address: document.getElementById('address').value, delivery: document.getElementById('delivery').value, website: document.getElementById('website').value, instagram: document.getElementById('instagram').value, bonuses: document.getElementById('bonuses').value, contacts: collectData(addContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]), additional_addresses: collectData(addAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]), pos_materials: collectData(addPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]), photos: addPhotosData };
-        try { const res = await fetch(API_DEALERS_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)}); if(!res.ok) throw new Error(); const nd=await res.json(); const pIds=getSelectedProductIds('add-product-checklist'); if(pIds.length) await saveProducts(nd.id, pIds); addModal.hide(); initApp(); } catch(e){alert("Ошибка");}
+        try { const res = await fetch(API_DEALERS_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)}); if(!res.ok) throw new Error(await res.text()); const newD=await res.json(); const pIds=getSelectedProductIds('add-product-checklist'); if(pIds.length) await saveProducts(newD.id, pIds); addModal.hide(); initApp(); } catch(e){alert("Ошибка");}
     });
 
     async function openEditModal(id) {
@@ -213,7 +194,7 @@ document.addEventListener('DOMContentLoaded', () => {
     addModalEl.addEventListener('click', removeHandler); editModalEl.addEventListener('click', removeHandler);
     filterCity.onchange = renderDealerList; filterPriceType.onchange = renderDealerList; searchBar.oninput = renderDealerList;
     document.querySelectorAll('th[data-sort]').forEach(th => th.onclick = () => { if(currentSort.column===th.dataset.sort) currentSort.direction=(currentSort.direction==='asc'?'desc':'asc'); else {currentSort.column=th.dataset.sort;currentSort.direction='asc';} renderDealerList(); });
-    if(exportBtn) exportBtn.onclick = () => { if(!allDealers.length) return alert("Пусто"); let csv="\uFEFFID,Название\n"+allDealers.map(d=>`"${d.dealer_id}","${d.name}"`).join('\n'); const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='dealers.csv'; a.click(); };
+    if(exportBtn) exportBtn.onclick = () => { if(!allDealers.length) return alert("Пусто"); let csv="\uFEFFID,Название,Орг,Город,Адрес,Тип,Контакты\n"+allDealers.map(d=>`"${d.dealer_id}","${d.name}","${d.organization}","${d.city}","${d.address}","${d.price_type}","${(d.contacts||[]).map(x=>x.name).join('; ')}"`).join('\n'); const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='dealers.csv'; a.click(); };
 
     initApp();
 });
