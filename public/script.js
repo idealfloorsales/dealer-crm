@@ -8,13 +8,24 @@ document.addEventListener('DOMContentLoaded', () => {
     let allDealers = [];
     let currentSort = { column: 'name', direction: 'asc' };
 
-    const posMaterialsList = ["Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа их фанеры старая", "С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "Табличка - Табличка орг.стекло"];
+    // Список Стендов (POS)
+    const posMaterialsList = [
+        "С600 - 600мм задняя стенка",
+        "С800 - 800мм задняя стенка",
+        "РФ-2 - Расческа из фанеры",
+        "РФС-1 - Расческа из фанеры СТАРАЯ",
+        "Н600 - 600мм наклейка",
+        "Н800 - 800мм наклейка",
+        "Табличка - Табличка орг.стекло"
+    ];
 
     // Модалки
-    const addModalEl = document.getElementById('add-modal'); const addModal = new bootstrap.Modal(addModalEl);
-    const editModalEl = document.getElementById('edit-modal'); const editModal = new bootstrap.Modal(editModalEl);
+    const addModalEl = document.getElementById('add-modal');
+    const addModal = new bootstrap.Modal(addModalEl);
+    const editModalEl = document.getElementById('edit-modal');
+    const editModal = new bootstrap.Modal(editModalEl);
 
-    // Элементы
+    // Элементы интерфейса
     const openAddModalBtn = document.getElementById('open-add-modal-btn');
     const addForm = document.getElementById('add-dealer-form');
     const addProductChecklist = document.getElementById('add-product-checklist'); 
@@ -95,55 +106,26 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- (ИЗМЕНЕНО) Функция выполнения задачи ---
-    // Теперь отправляем ТОЛЬКО поле visits, чтобы не перегружать сервер
     async function completeTask(btn, dealerId, visitIndex) {
         try {
             btn.disabled = true; 
             btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; 
-
-            // 1. Получаем актуального дилера
             const res = await fetch(`${API_DEALERS_URL}/${dealerId}`);
             if(!res.ok) throw new Error('Не удалось загрузить данные');
             const dealer = await res.json();
-
-            // 2. Меняем статус
+            let found = false;
             if (dealer.visits && dealer.visits[visitIndex]) {
                 dealer.visits[visitIndex].isCompleted = true;
-            } else {
-                btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg"></i>';
-                return alert("Задача не найдена. Попробуйте обновить страницу.");
+                found = true;
             }
-
-            // 3. Отправляем ТОЛЬКО обновленный массив визитов
-            const updateData = {
-                visits: dealer.visits
-            };
-
-            const saveRes = await fetch(`${API_DEALERS_URL}/${dealerId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updateData) // <-- Отправляем только visits!
-            });
-
-            if (!saveRes.ok) {
-                throw new Error("Сервер не сохранил изменения");
-            }
-
-            // 4. Обновляем
-            initApp();
-
-        } catch (e) {
-            console.error("Task error:", e);
-            alert("Ошибка сохранения: " + e.message);
-            btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg"></i>';
-        }
+            if (!found) return alert("Задача не найдена или уже выполнена.");
+            await fetch(`${API_DEALERS_URL}/${dealerId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visits: dealer.visits }) });
+            initApp(); 
+        } catch (e) { alert("Ошибка: " + e.message); btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg"></i>'; }
     }
 
-    // --- Дашборд ---
     function renderDashboard() {
         if (!allDealers || allDealers.length === 0) { dashboardContainer.innerHTML = ''; return; }
-        
         const totalDealers = allDealers.length;
         const noPhotosCount = allDealers.filter(d => !d.has_photos).length;
         const posCount = allDealers.filter(d => d.has_pos).length;
@@ -160,7 +142,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!tasksList) return;
         const today = new Date(); today.setHours(0,0,0,0);
         const tasks = [];
-        
         allDealers.forEach(d => {
             if (d.visits && Array.isArray(d.visits)) {
                 d.visits.forEach((v, index) => { 
@@ -169,46 +150,28 @@ document.addEventListener('DOMContentLoaded', () => {
                         const vDateMidnight = new Date(vDate); vDateMidnight.setHours(0,0,0,0);
                         let isOverdue = vDateMidnight < today;
                         let isToday = vDateMidnight.getTime() === today.getTime();
-                        
                         if (vDate >= today || isOverdue) {
-                            tasks.push({
-                                dealerName: d.name,
-                                dealerId: d.id,
-                                date: vDate,
-                                dateStrRaw: v.date,
-                                comment: v.comment || "",
-                                isOverdue: isOverdue,
-                                isToday: isToday,
-                                visitIndex: index 
-                            });
+                            tasks.push({ dealerName: d.name, dealerId: d.id, date: vDate, dateStrRaw: v.date, comment: v.comment || "", isOverdue: isOverdue, isToday: isToday, visitIndex: index });
                         }
                     }
                 });
             }
         });
-
         tasks.sort((a, b) => a.date - b.date);
-
-        if (tasks.length === 0) {
-            tasksList.innerHTML = `<div class="text-center py-4 text-muted"><i class="bi bi-check2-circle fs-3 d-block mb-2"></i>Задач нет</div>`;
-        } else {
+        if (tasks.length === 0) { tasksList.innerHTML = `<div class="text-center py-4 text-muted"><i class="bi bi-check2-circle fs-3 d-block mb-2"></i>Задач нет</div>`; } 
+        else {
             tasksList.innerHTML = tasks.map(t => {
                 const dateStr = t.date.toLocaleDateString('ru-RU');
                 let itemClass = 'list-group-item-action'; let badgeClass = 'bg-primary'; let badgeText = dateStr;
                 if (t.isOverdue) { itemClass += ' list-group-item-danger'; badgeClass = 'bg-danger'; badgeText = `Просрочено: ${dateStr}`; } 
                 else if (t.isToday) { itemClass += ' list-group-item-warning'; badgeClass = 'bg-warning text-dark'; badgeText = 'Сегодня'; }
-                
                 return `
                     <div class="list-group-item ${itemClass} task-item d-flex justify-content-between align-items-center">
                         <div class="me-auto">
                             <div class="d-flex align-items-center mb-1"><span class="badge ${badgeClass} rounded-pill me-2">${badgeText}</span><a href="dealer.html?id=${t.dealerId}" target="_blank" class="fw-bold text-decoration-none text-dark">${t.dealerName}</a></div>
                             <small class="text-muted" style="white-space: pre-wrap;">${safeText(t.comment)}</small>
                         </div>
-                        <button class="btn btn-sm btn-success btn-complete-task ms-2" title="Выполнено" 
-                                data-id="${t.dealerId}" 
-                                data-index="${t.visitIndex}">
-                            <i class="bi bi-check-lg"></i>
-                        </button>
+                        <button class="btn btn-sm btn-success btn-complete-task ms-2" title="Выполнено" data-id="${t.dealerId}" data-index="${t.visitIndex}"><i class="bi bi-check-lg"></i></button>
                     </div>`;
             }).join('');
         }
@@ -218,7 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tasksList.addEventListener('click', (e) => {
             const btn = e.target.closest('.btn-complete-task');
             if (btn) {
-                // НЕ отключаем кнопку сразу, даем сработать completeTask
+                e.preventDefault(); // Предотвращаем переход, если вдруг он есть
                 completeTask(btn, btn.dataset.id, btn.dataset.index);
             }
         });
@@ -227,14 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function createContactEntryHTML(c={}) { return `<div class="contact-entry input-group mb-2"><input type="text" class="form-control contact-name" placeholder="Имя" value="${c.name||''}"><input type="text" class="form-control contact-position" placeholder="Должность" value="${c.position||''}"><input type="text" class="form-control contact-info" placeholder="Телефон" value="${c.contactInfo||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
     function createAddressEntryHTML(a={}) { return `<div class="address-entry input-group mb-2"><input type="text" class="form-control address-description" placeholder="Описание" value="${a.description||''}"><input type="text" class="form-control address-city" placeholder="Город" value="${a.city||''}"><input type="text" class="form-control address-address" placeholder="Адрес" value="${a.address||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
     function createPosEntryHTML(p={}) { const opts = posMaterialsList.map(n => `<option value="${n}" ${n===p.name?'selected':''}>${n}</option>`).join(''); return `<div class="pos-entry input-group mb-2"><select class="form-select pos-name"><option value="">-- Выбор --</option>${opts}</select><input type="number" class="form-control pos-quantity" value="${p.quantity||1}" min="1"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
-    function createVisitEntryHTML(v={}) { 
-        return `<div class="visit-entry input-group mb-2">
-            <input type="date" class="form-control visit-date" value="${v.date||''}">
-            <input type="text" class="form-control visit-comment w-50" placeholder="Результат визита..." value="${v.comment||''}">
-            <input type="hidden" class="visit-completed" value="${v.isCompleted || 'false'}">
-            <button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button>
-        </div>`; 
-    }
+    function createVisitEntryHTML(v={}) { return `<div class="visit-entry input-group mb-2"><input type="date" class="form-control visit-date" value="${v.date||''}"><input type="text" class="form-control visit-comment w-50" placeholder="Результат визита..." value="${v.comment||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
     
     function renderPhotoPreviews(container, photosArray) { container.innerHTML = photosArray.map((p, index) => `<div class="photo-preview-item"><img src="${p.photo_url}"><button type="button" class="btn-remove-photo" data-index="${index}">×</button></div>`).join(''); }
     addPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) addPhotosData.push({ photo_url: await compressImage(file) }); renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData); addPhotoInput.value = ''; });
@@ -242,21 +198,14 @@ document.addEventListener('DOMContentLoaded', () => {
     editPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) editPhotosData.push({ photo_url: await compressImage(file) }); renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData); editPhotoInput.value = ''; });
     editPhotoPreviewContainer.addEventListener('click', (e) => { if(e.target.classList.contains('btn-remove-photo')) { editPhotosData.splice(e.target.dataset.index, 1); renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData); }});
 
-    function collectData(container, selector, fields) {
-        const data = [];
-        container.querySelectorAll(selector).forEach(entry => {
-            const item = {}; let hasData = false;
-            fields.forEach(f => { item[f.key] = entry.querySelector(f.class).value; if(item[f.key]) hasData=true; });
-            if(hasData) data.push(item);
-        });
-        return data;
-    }
+    function collectData(container, selector, fields) { const d=[]; container.querySelectorAll(selector).forEach(e=>{const i={}; fields.forEach(f=>i[f.key]=e.querySelector(f.class).value); if(Object.values(i).some(v=>v)) d.push(i);}); return d; }
     async function collectPhotos(container) { return Promise.resolve([]); }
     function renderList(container, data, htmlGen) { container.innerHTML = (data && data.length > 0) ? data.map(htmlGen).join('') : htmlGen(); }
     function renderProductChecklist(container, selectedIds=[]) { const set = new Set(selectedIds); container.innerHTML = fullProductCatalog.map(p => `<div class="checklist-item form-check"><input type="checkbox" class="form-check-input" id="prod-${container.id}-${p.id}" value="${p.id}" ${set.has(p.id)?'checked':''}><label class="form-check-label" for="prod-${container.id}-${p.id}"><strong>${p.sku}</strong> - ${p.name}</label></div>`).join(''); }
     function getSelectedProductIds(containerId) { return Array.from(document.getElementById(containerId).querySelectorAll('input:checked')).map(cb=>cb.value); }
     async function saveProducts(dealerId, ids) { await fetch(`${API_DEALERS_URL}/${dealerId}/products`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({productIds: ids})}); }
 
+    // --- (ИЗМЕНЕНО) Рендер списка дилеров ---
     function renderDealerList() {
         const city = filterCity.value; const type = filterPriceType.value; const search = searchBar.value.toLowerCase();
         const filtered = allDealers.filter(d => (!city||d.city===city) && (!type||d.price_type===type) && (!search || (d.name.toLowerCase().includes(search)||d.dealer_id.toLowerCase().includes(search)||d.organization.toLowerCase().includes(search))));
@@ -270,8 +219,8 @@ document.addEventListener('DOMContentLoaded', () => {
             <td>${d.photo_url ? `<img src="${d.photo_url}" class="table-photo">` : `<div class="no-photo">Нет</div>`}</td>
             <td>${safeText(d.dealer_id)}</td><td>${safeText(d.name)}</td><td>${safeText(d.city)}</td><td>${safeText(d.price_type)}</td><td>${safeText(d.organization)}</td>
             <td class="actions-cell"><div class="dropdown"><button class="btn btn-light btn-sm" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button><ul class="dropdown-menu dropdown-menu-end">
-            <li><a class="dropdown-item btn-view" data-id="${d.id}" href="#"><i class="bi bi-eye me-2"></i>Просмотр</a></li>
-            <li><a class="dropdown-item btn-edit" data-id="${d.id}" href="#"><i class="bi bi-pencil me-2"></i>Ред.</a></li>
+            <li><a class="dropdown-item btn-view" data-id="${d.id}" href="#"><i class="bi bi-eye me-2"></i>Подробнее</a></li>
+            <li><a class="dropdown-item btn-edit" data-id="${d.id}" href="#"><i class="bi bi-pencil me-2"></i>Редактировать</a></li>
             <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item text-danger btn-delete" data-id="${d.id}" data-name="${safeText(d.name)}" href="#"><i class="bi bi-trash me-2"></i>Удалить</a></li>
             </ul></div></td></tr>`).join('') : '';
@@ -394,7 +343,7 @@ document.addEventListener('DOMContentLoaded', () => {
             contacts: collectData(editContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]),
             additional_addresses: collectData(editAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]),
             pos_materials: collectData(editPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]),
-            // Сохраняем isCompleted при редактировании
+            // (ВАЖНО) Сохраняем isCompleted при редактировании
             visits: collectData(editVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'},{key:'isCompleted',class:'.visit-completed'}]),
             photos: editPhotosData
         };
@@ -405,6 +354,34 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) { alert("Ошибка при сохранении."); }
     });
 
+    // --- (ИЗМЕНЕНО) Глобальный обработчик кликов (Исправление кнопок) ---
+    dealerListBody.addEventListener('click', (e) => {
+        const t = e.target;
+        // Предотвращаем дефолтное поведение ссылок
+        if (t.closest('a.dropdown-item')) {
+            e.preventDefault();
+        }
+
+        if (t.closest('.btn-view')) {
+            const id = t.closest('.btn-view').dataset.id;
+            window.open(`dealer.html?id=${id}`, '_blank');
+        }
+        if (t.closest('.btn-edit')) {
+            const id = t.closest('.btn-edit').dataset.id;
+            openEditModal(id);
+        }
+        if (t.closest('.btn-delete')) {
+            const btn = t.closest('.btn-delete');
+            if(confirm(`Удалить "${btn.dataset.name}"?`)) {
+                fetch(`${API_DEALERS_URL}/${btn.dataset.id}`, {method:'DELETE'}).then(initApp);
+            }
+        }
+    });
+
+    const removeHandler = (e) => { if(e.target.closest('.btn-remove-entry')) e.target.closest('.contact-entry, .address-entry, .pos-entry, .photo-entry, .visit-entry').remove(); };
+    addModalEl.addEventListener('click', removeHandler); editModalEl.addEventListener('click', removeHandler);
+    filterCity.onchange = renderDealerList; filterPriceType.onchange = renderDealerList; searchBar.oninput = renderDealerList;
+    document.querySelectorAll('th[data-sort]').forEach(th => th.onclick = () => { if(currentSort.column===th.dataset.sort) currentSort.direction=(currentSort.direction==='asc'?'desc':'asc'); else {currentSort.column=th.dataset.sort;currentSort.direction='asc';} renderDealerList(); });
     if(exportBtn) exportBtn.onclick = () => { if(!allDealers.length) return alert("Пусто"); let csv="\uFEFFID,Название,Орг,Город,Адрес,Тип,Контакты\n"+allDealers.map(d=>`"${d.dealer_id}","${d.name}","${d.organization}","${d.city}","${d.address}","${d.price_type}","${(d.contacts||[]).map(x=>x.name).join('; ')}"`).join('\n'); const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='dealers.csv'; a.click(); };
 
     initApp();
