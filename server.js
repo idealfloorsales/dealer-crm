@@ -27,6 +27,7 @@ if (ADMIN_USER && ADMIN_PASSWORD) {
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
+// --- СПИСОК ТОВАРОВ (79 шт.) ---
 const productsToImport = [
     { sku: "CD-507", name: "Дуб Беленый" }, { sku: "CD-508", name: "Дуб Пепельный" },
     { sku: "8EH34-701", name: "Дуб Снежный" }, { sku: "8EH34-702", name: "Дуб Арабика" },
@@ -75,7 +76,13 @@ const contactSchema = new mongoose.Schema({ name: String, position: String, cont
 const photoSchema = new mongoose.Schema({ description: String, photo_url: String, date: { type: Date, default: Date.now } }, { _id: false });
 const additionalAddressSchema = new mongoose.Schema({ description: String, city: String, address: String }, { _id: false });
 const posMaterialSchema = new mongoose.Schema({ name: String, quantity: Number }, { _id: false });
-const visitSchema = new mongoose.Schema({ date: String, comment: String }, { _id: false });
+
+// (ИЗМЕНЕНО) Добавлено поле isCompleted
+const visitSchema = new mongoose.Schema({ 
+    date: String, 
+    comment: String,
+    isCompleted: { type: Boolean, default: false } 
+}, { _id: false });
 
 const dealerSchema = new mongoose.Schema({
     dealer_id: String, name: String, price_type: String, city: String, address: String, 
@@ -112,8 +119,6 @@ function convertToClient(doc) {
     return obj;
 }
 
-// API
-// (ИЗМЕНЕНО) Добавлено поле 'visits' в запрос списка
 app.get('/api/dealers', async (req, res) => {
     try {
         const dealers = await Dealer.find({}, 'dealer_id name city photos price_type organization products pos_materials visits latitude longitude').lean();
@@ -123,7 +128,7 @@ app.get('/api/dealers', async (req, res) => {
             has_photos: (d.photos && d.photos.length > 0),
             products_count: (d.products ? d.products.length : 0),
             has_pos: (d.pos_materials && d.pos_materials.length > 0),
-            visits: d.visits, // Передаем визиты для дашборда
+            visits: d.visits, 
             latitude: d.latitude, longitude: d.longitude
         }))); 
     } catch (e) { res.status(500).json({ error: e.message }); }
