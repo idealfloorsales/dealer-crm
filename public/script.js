@@ -8,7 +8,33 @@ document.addEventListener('DOMContentLoaded', () => {
     let allDealers = [];
     let currentSort = { column: 'name', direction: 'asc' };
 
-    // Список Стендов (POS)
+    // Координаты основных городов (для авто-фокуса карты)
+    const CITY_COORDS = {
+        "Астана": [51.1605, 71.4704],
+        "Алматы": [43.2220, 76.8512],
+        "Шымкент": [42.3417, 69.5901],
+        "Караганда": [49.8020, 73.1021],
+        "Актобе": [50.2839, 57.1670],
+        "Тараз": [42.9000, 71.3667],
+        "Павлодар": [52.2873, 76.9674],
+        "Усть-Каменогорск": [49.9632, 82.6059],
+        "Семей": [50.4113, 80.2275],
+        "Атырау": [47.1167, 51.8833],
+        "Костанай": [53.2148, 63.6321],
+        "Кызылорда": [44.8488, 65.4823],
+        "Уральск": [51.2333, 51.3667],
+        "Петропавловск": [54.8753, 69.1622],
+        "Актау": [43.6500, 51.1500],
+        "Темиртау": [50.0639, 72.9642],
+        "Туркестан": [43.3000, 68.2667],
+        "Кокшетау": [53.2833, 69.3833],
+        "Талдыкорган": [45.0167, 78.3667],
+        "Экибастуз": [51.7233, 75.3228],
+        "Рудный": [52.9728, 63.1167]
+    };
+    const DEFAULT_LAT = 51.1605; // Астана по умолчанию
+    const DEFAULT_LNG = 71.4704;
+
     const posMaterialsList = [
         "С600 - 600мм задняя стенка",
         "С800 - 800мм задняя стенка",
@@ -60,7 +86,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let editPhotosData = [];
 
     // Карта
-    const DEFAULT_LAT = 51.1605; const DEFAULT_LNG = 71.4704;
     let addMap, editMap;
 
     function initMap(mapId) {
@@ -75,16 +100,42 @@ document.addEventListener('DOMContentLoaded', () => {
             if (markerRef.current) markerRef.current.setLatLng([lat, lng]); else markerRef.current = L.marker([lat, lng]).addTo(map);
         });
     }
+
+    // --- (ИЗМЕНЕНО) Инициализация карты при открытии модалки ADD ---
     addModalEl.addEventListener('shown.bs.modal', () => {
         if (!addMap) { addMap = initMap('add-map'); addModalEl.markerRef = { current: null }; setupMapClick(addMap, 'add_latitude', 'add_longitude', addModalEl.markerRef); } else { addMap.invalidateSize(); }
         if (addModalEl.markerRef && addModalEl.markerRef.current) { addMap.removeLayer(addModalEl.markerRef.current); addModalEl.markerRef.current = null; }
-        addMap.setView([DEFAULT_LAT, DEFAULT_LNG], 13);
+        
+        // Умное центрирование
+        const city = document.getElementById('city').value.trim();
+        if (city && CITY_COORDS[city]) {
+            addMap.setView(CITY_COORDS[city], 12);
+        } else {
+            addMap.setView([DEFAULT_LAT, DEFAULT_LNG], 13);
+        }
     });
+
+    // --- (ИЗМЕНЕНО) Инициализация карты при открытии модалки EDIT ---
     editModalEl.addEventListener('shown.bs.modal', () => {
         if (!editMap) { editMap = initMap('edit-map'); editModalEl.markerRef = { current: null }; setupMapClick(editMap, 'edit_latitude', 'edit_longitude', editModalEl.markerRef); } else { editMap.invalidateSize(); }
-        const lat = parseFloat(document.getElementById('edit_latitude').value); const lng = parseFloat(document.getElementById('edit_longitude').value);
+        
+        const lat = parseFloat(document.getElementById('edit_latitude').value); 
+        const lng = parseFloat(document.getElementById('edit_longitude').value);
+        const city = document.getElementById('edit_city').value.trim();
+
         if (editModalEl.markerRef.current) editMap.removeLayer(editModalEl.markerRef.current);
-        if (!isNaN(lat) && !isNaN(lng)) { editModalEl.markerRef.current = L.marker([lat, lng]).addTo(editMap); editMap.setView([lat, lng], 15); } else { editMap.setView([DEFAULT_LAT, DEFAULT_LNG], 13); }
+        
+        if (!isNaN(lat) && !isNaN(lng)) {
+            // Если координаты ЕСТЬ - показываем их
+            editModalEl.markerRef.current = L.marker([lat, lng]).addTo(editMap);
+            editMap.setView([lat, lng], 15);
+        } else if (city && CITY_COORDS[city]) {
+            // Если координат НЕТ, но есть ГОРОД - летим в город
+            editMap.setView(CITY_COORDS[city], 12);
+        } else {
+            // Иначе - Астана
+            editMap.setView([DEFAULT_LAT, DEFAULT_LNG], 13);
+        }
     });
 
     const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
@@ -119,7 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 found = true;
             }
             if (!found) return alert("Задача не найдена или уже выполнена.");
-            await fetch(`${API_DEALERS_URL}/${dealerId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visits: dealer.visits }) });
+            await fetch(`${API_DEALERS_URL}/${dealerId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dealer) });
             initApp(); 
         } catch (e) { alert("Ошибка: " + e.message); btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg"></i>'; }
     }
@@ -181,7 +232,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tasksList.addEventListener('click', (e) => {
             const btn = e.target.closest('.btn-complete-task');
             if (btn) {
-                e.preventDefault(); // Предотвращаем переход, если вдруг он есть
+                // Не дизейблим кнопку здесь, это сделает completeTask
                 completeTask(btn, btn.dataset.id, btn.dataset.index);
             }
         });
@@ -205,7 +256,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function getSelectedProductIds(containerId) { return Array.from(document.getElementById(containerId).querySelectorAll('input:checked')).map(cb=>cb.value); }
     async function saveProducts(dealerId, ids) { await fetch(`${API_DEALERS_URL}/${dealerId}/products`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({productIds: ids})}); }
 
-    // --- (ИЗМЕНЕНО) Рендер списка дилеров ---
     function renderDealerList() {
         const city = filterCity.value; const type = filterPriceType.value; const search = searchBar.value.toLowerCase();
         const filtered = allDealers.filter(d => (!city||d.city===city) && (!type||d.price_type===type) && (!search || (d.name.toLowerCase().includes(search)||d.dealer_id.toLowerCase().includes(search)||d.organization.toLowerCase().includes(search))));
@@ -219,7 +269,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <td>${d.photo_url ? `<img src="${d.photo_url}" class="table-photo">` : `<div class="no-photo">Нет</div>`}</td>
             <td>${safeText(d.dealer_id)}</td><td>${safeText(d.name)}</td><td>${safeText(d.city)}</td><td>${safeText(d.price_type)}</td><td>${safeText(d.organization)}</td>
             <td class="actions-cell"><div class="dropdown"><button class="btn btn-light btn-sm" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button><ul class="dropdown-menu dropdown-menu-end">
-            <li><a class="dropdown-item btn-view" data-id="${d.id}" href="#"><i class="bi bi-eye me-2"></i>Подробнее</a></li>
+            <li><a class="dropdown-item btn-view" data-id="${d.id}" href="#"><i class="bi bi-eye me-2"></i>Просмотр</a></li>
             <li><a class="dropdown-item btn-edit" data-id="${d.id}" href="#"><i class="bi bi-pencil me-2"></i>Редактировать</a></li>
             <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item text-danger btn-delete" data-id="${d.id}" data-name="${safeText(d.name)}" href="#"><i class="bi bi-trash me-2"></i>Удалить</a></li>
@@ -276,8 +326,13 @@ document.addEventListener('DOMContentLoaded', () => {
         addModal.show();
     };
 
+    // --- (ИЗМЕНЕНО) Добавление с визуальным фидбеком кнопки ---
     addForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+        const btn = addForm.querySelector('button[type="submit"]');
+        const oldText = btn.innerHTML;
+        btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...';
+
         const data = {
             dealer_id: document.getElementById('dealer_id').value, name: document.getElementById('name').value,
             organization: document.getElementById('organization').value, price_type: document.getElementById('price_type').value,
@@ -298,7 +353,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const pIds = getSelectedProductIds('add-product-checklist');
             if(pIds.length) await saveProducts(newD.id, pIds);
             addModal.hide(); initApp();
-        } catch (e) { alert("Ошибка при добавлении."); }
+        } catch (e) { alert("Ошибка при добавлении."); } 
+        finally { btn.disabled = false; btn.innerHTML = oldText; }
     });
 
     async function openEditModal(id) {
@@ -330,8 +386,13 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(e) { alert("Ошибка загрузки."); }
     }
 
+    // --- (ИЗМЕНЕНО) Редактирование с визуальным фидбеком ---
     editForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+        const btn = editForm.querySelector('button[type="submit"]');
+        const oldText = btn.innerHTML;
+        btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...';
+
         const id = document.getElementById('edit_db_id').value;
         const data = {
             dealer_id: document.getElementById('edit_dealer_id').value, name: document.getElementById('edit_name').value,
@@ -343,7 +404,6 @@ document.addEventListener('DOMContentLoaded', () => {
             contacts: collectData(editContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]),
             additional_addresses: collectData(editAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]),
             pos_materials: collectData(editPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]),
-            // (ВАЖНО) Сохраняем isCompleted при редактировании
             visits: collectData(editVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'},{key:'isCompleted',class:'.visit-completed'}]),
             photos: editPhotosData
         };
@@ -352,36 +412,9 @@ document.addEventListener('DOMContentLoaded', () => {
             await saveProducts(id, getSelectedProductIds('edit-product-checklist'));
             editModal.hide(); initApp();
         } catch (e) { alert("Ошибка при сохранении."); }
+        finally { btn.disabled = false; btn.innerHTML = oldText; }
     });
 
-    // --- (ИЗМЕНЕНО) Глобальный обработчик кликов (Исправление кнопок) ---
-    dealerListBody.addEventListener('click', (e) => {
-        const t = e.target;
-        // Предотвращаем дефолтное поведение ссылок
-        if (t.closest('a.dropdown-item')) {
-            e.preventDefault();
-        }
-
-        if (t.closest('.btn-view')) {
-            const id = t.closest('.btn-view').dataset.id;
-            window.open(`dealer.html?id=${id}`, '_blank');
-        }
-        if (t.closest('.btn-edit')) {
-            const id = t.closest('.btn-edit').dataset.id;
-            openEditModal(id);
-        }
-        if (t.closest('.btn-delete')) {
-            const btn = t.closest('.btn-delete');
-            if(confirm(`Удалить "${btn.dataset.name}"?`)) {
-                fetch(`${API_DEALERS_URL}/${btn.dataset.id}`, {method:'DELETE'}).then(initApp);
-            }
-        }
-    });
-
-    const removeHandler = (e) => { if(e.target.closest('.btn-remove-entry')) e.target.closest('.contact-entry, .address-entry, .pos-entry, .photo-entry, .visit-entry').remove(); };
-    addModalEl.addEventListener('click', removeHandler); editModalEl.addEventListener('click', removeHandler);
-    filterCity.onchange = renderDealerList; filterPriceType.onchange = renderDealerList; searchBar.oninput = renderDealerList;
-    document.querySelectorAll('th[data-sort]').forEach(th => th.onclick = () => { if(currentSort.column===th.dataset.sort) currentSort.direction=(currentSort.direction==='asc'?'desc':'asc'); else {currentSort.column=th.dataset.sort;currentSort.direction='asc';} renderDealerList(); });
     if(exportBtn) exportBtn.onclick = () => { if(!allDealers.length) return alert("Пусто"); let csv="\uFEFFID,Название,Орг,Город,Адрес,Тип,Контакты\n"+allDealers.map(d=>`"${d.dealer_id}","${d.name}","${d.organization}","${d.city}","${d.address}","${d.price_type}","${(d.contacts||[]).map(x=>x.name).join('; ')}"`).join('\n'); const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='dealers.csv'; a.click(); };
 
     initApp();
