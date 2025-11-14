@@ -1,14 +1,20 @@
 // script.js
 document.addEventListener('DOMContentLoaded', () => {
+    
     const API_DEALERS_URL = '/api/dealers';
     const API_PRODUCTS_URL = '/api/products'; 
+
     let fullProductCatalog = [];
     let allDealers = [];
     let currentSort = { column: 'name', direction: 'asc' };
+
     const posMaterialsList = ["Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа их фанеры старая", "С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "Табличка - Табличка орг.стекло"];
 
+    // Модалки
     const addModalEl = document.getElementById('add-modal'); const addModal = new bootstrap.Modal(addModalEl);
     const editModalEl = document.getElementById('edit-modal'); const editModal = new bootstrap.Modal(editModalEl);
+
+    // Элементы
     const openAddModalBtn = document.getElementById('open-add-modal-btn');
     const addForm = document.getElementById('add-dealer-form');
     const addProductChecklist = document.getElementById('add-product-checklist'); 
@@ -18,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const addVisitsList = document.getElementById('add-visits-list');
     const addPhotoInput = document.getElementById('add-photo-input');
     const addPhotoPreviewContainer = document.getElementById('add-photo-preview-container');
+    
     const dealerListBody = document.getElementById('dealer-list-body');
     const dealerTable = document.getElementById('dealer-table');
     const noDataMsg = document.getElementById('no-data-msg');
@@ -27,6 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const exportBtn = document.getElementById('export-dealers-btn'); 
     const dashboardContainer = document.getElementById('dashboard-container'); 
     const tasksList = document.getElementById('tasks-list'); 
+
     const editForm = document.getElementById('edit-dealer-form');
     const editProductChecklist = document.getElementById('edit-product-checklist'); 
     const editContactList = document.getElementById('edit-contact-list'); 
@@ -36,8 +44,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const editPhotoList = document.getElementById('edit-photo-list'); 
     const editPhotoInput = document.getElementById('edit-photo-input');
     const editPhotoPreviewContainer = document.getElementById('edit-photo-preview-container');
-    let addPhotosData = []; let editPhotosData = [];
-    
+
+    let addPhotosData = []; 
+    let editPhotosData = [];
+
+    // Карта
     const DEFAULT_LAT = 51.1605; const DEFAULT_LNG = 71.4704;
     let addMap, editMap;
 
@@ -66,6 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
+    const safeAttr = (text) => text ? text.replace(/"/g, '&quot;') : '';
     const toBase64 = file => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => resolve(reader.result); reader.onerror = error => reject(error); });
     const compressImage = (file, maxWidth = 1000, quality = 0.7) => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = event => { const img = new Image(); img.src = event.target.result; img.onload = () => { const elem = document.createElement('canvas'); let width = img.width; let height = img.height; if (width > maxWidth) { height *= maxWidth / width; width = maxWidth; } elem.width = width; elem.height = height; const ctx = elem.getContext('2d'); ctx.drawImage(img, 0, 0, width, height); resolve(elem.toDataURL('image/jpeg', quality)); }; img.onerror = error => reject(error); }; reader.onerror = error => reject(error); });
 
@@ -83,38 +95,52 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- (ИЗМЕНЕНО) ВЫПОЛНЕНИЕ ЗАДАЧИ ПО ИНДЕКСУ ---
+    // --- (ИЗМЕНЕНО) Функция выполнения задачи ---
+    // Теперь отправляем ТОЛЬКО поле visits, чтобы не перегружать сервер
     async function completeTask(btn, dealerId, visitIndex) {
         try {
             btn.disabled = true; 
             btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; 
 
+            // 1. Получаем актуального дилера
             const res = await fetch(`${API_DEALERS_URL}/${dealerId}`);
             if(!res.ok) throw new Error('Не удалось загрузить данные');
             const dealer = await res.json();
 
-            // Используем индекс массива для точного попадания
+            // 2. Меняем статус
             if (dealer.visits && dealer.visits[visitIndex]) {
                 dealer.visits[visitIndex].isCompleted = true;
             } else {
                 btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg"></i>';
-                return alert("Ошибка: Задача не найдена (возможно, список изменился). Обновите страницу.");
+                return alert("Задача не найдена. Попробуйте обновить страницу.");
             }
 
-            await fetch(`${API_DEALERS_URL}/${dealerId}`, {
+            // 3. Отправляем ТОЛЬКО обновленный массив визитов
+            const updateData = {
+                visits: dealer.visits
+            };
+
+            const saveRes = await fetch(`${API_DEALERS_URL}/${dealerId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(dealer)
+                body: JSON.stringify(updateData) // <-- Отправляем только visits!
             });
 
-            initApp(); 
+            if (!saveRes.ok) {
+                throw new Error("Сервер не сохранил изменения");
+            }
+
+            // 4. Обновляем
+            initApp();
 
         } catch (e) {
-            alert("Ошибка: " + e.message);
+            console.error("Task error:", e);
+            alert("Ошибка сохранения: " + e.message);
             btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg"></i>';
         }
     }
 
+    // --- Дашборд ---
     function renderDashboard() {
         if (!allDealers || allDealers.length === 0) { dashboardContainer.innerHTML = ''; return; }
         
@@ -137,23 +163,23 @@ document.addEventListener('DOMContentLoaded', () => {
         
         allDealers.forEach(d => {
             if (d.visits && Array.isArray(d.visits)) {
-                d.visits.forEach((v, index) => { // Берем индекс!
+                d.visits.forEach((v, index) => { 
                     if (!v.isCompleted) {
                         const vDate = new Date(v.date);
                         const vDateMidnight = new Date(vDate); vDateMidnight.setHours(0,0,0,0);
                         let isOverdue = vDateMidnight < today;
                         let isToday = vDateMidnight.getTime() === today.getTime();
                         
-                        // Добавляем задачу только если она сегодня или позже, ИЛИ просрочена
                         if (vDate >= today || isOverdue) {
                             tasks.push({
                                 dealerName: d.name,
                                 dealerId: d.id,
                                 date: vDate,
+                                dateStrRaw: v.date,
                                 comment: v.comment || "",
                                 isOverdue: isOverdue,
                                 isToday: isToday,
-                                visitIndex: index // (НОВОЕ) Сохраняем индекс визита
+                                visitIndex: index 
                             });
                         }
                     }
@@ -192,6 +218,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tasksList.addEventListener('click', (e) => {
             const btn = e.target.closest('.btn-complete-task');
             if (btn) {
+                // НЕ отключаем кнопку сразу, даем сработать completeTask
                 completeTask(btn, btn.dataset.id, btn.dataset.index);
             }
         });
@@ -256,10 +283,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function populateFilters(dealers) {
         const cities = [...new Set(dealers.map(d => d.city).filter(Boolean))].sort();
         const types = [...new Set(dealers.map(d => d.price_type).filter(Boolean))].sort();
-        const selCity = filterCity.value; const selType = filterPriceType.value;
+        const sc = filterCity.value; const st = filterPriceType.value;
         filterCity.innerHTML = '<option value="">-- Все города --</option>'; filterPriceType.innerHTML = '<option value="">-- Все типы --</option>';
         cities.forEach(c => filterCity.add(new Option(c, c))); types.forEach(t => filterPriceType.add(new Option(t, t)));
-        filterCity.value = selCity; filterPriceType.value = selType;
+        filterCity.value = sc; filterPriceType.value = st;
     }
 
     async function initApp() {
@@ -367,7 +394,7 @@ document.addEventListener('DOMContentLoaded', () => {
             contacts: collectData(editContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]),
             additional_addresses: collectData(editAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]),
             pos_materials: collectData(editPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]),
-            // (ВАЖНО) Сохраняем isCompleted
+            // Сохраняем isCompleted при редактировании
             visits: collectData(editVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'},{key:'isCompleted',class:'.visit-completed'}]),
             photos: editPhotosData
         };
@@ -378,11 +405,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) { alert("Ошибка при сохранении."); }
     });
 
-    dealerListBody.addEventListener('click', (e) => { const t=e.target; if(t.closest('.btn-view')) window.open(`dealer.html?id=${t.closest('.btn-view').dataset.id}`,'_blank'); if(t.closest('.btn-edit')) openEditModal(t.closest('.btn-edit').dataset.id); if(t.closest('.btn-delete') && confirm("Удалить?")) fetch(`${API_DEALERS_URL}/${t.closest('.btn-delete').dataset.id}`, {method:'DELETE'}).then(initApp); });
-    const removeHandler = (e) => { if(e.target.closest('.btn-remove-entry')) e.target.closest('.contact-entry, .address-entry, .pos-entry, .photo-entry, .visit-entry').remove(); };
-    addModalEl.addEventListener('click', removeHandler); editModalEl.addEventListener('click', removeHandler);
-    filterCity.onchange = renderDealerList; filterPriceType.onchange = renderDealerList; searchBar.oninput = renderDealerList;
-    document.querySelectorAll('th[data-sort]').forEach(th => th.onclick = () => { if(currentSort.column===th.dataset.sort) currentSort.direction=(currentSort.direction==='asc'?'desc':'asc'); else {currentSort.column=th.dataset.sort;currentSort.direction='asc';} renderDealerList(); });
     if(exportBtn) exportBtn.onclick = () => { if(!allDealers.length) return alert("Пусто"); let csv="\uFEFFID,Название,Орг,Город,Адрес,Тип,Контакты\n"+allDealers.map(d=>`"${d.dealer_id}","${d.name}","${d.organization}","${d.city}","${d.address}","${d.price_type}","${(d.contacts||[]).map(x=>x.name).join('; ')}"`).join('\n'); const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='dealers.csv'; a.click(); };
 
     initApp();
