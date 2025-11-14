@@ -65,8 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!isNaN(lat) && !isNaN(lng)) { editModalEl.markerRef.current = L.marker([lat, lng]).addTo(editMap); editMap.setView([lat, lng], 15); } else { editMap.setView([DEFAULT_LAT, DEFAULT_LNG], 13); }
     });
 
-    const safeText = (text) => text ? text.replace(/</g, "&lt;") : '---';
-    const safeAttr = (text) => text ? text.replace(/"/g, '&quot;') : '';
+    const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
     const toBase64 = file => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => resolve(reader.result); reader.onerror = error => reject(error); });
     const compressImage = (file, maxWidth = 1000, quality = 0.7) => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = event => { const img = new Image(); img.src = event.target.result; img.onload = () => { const elem = document.createElement('canvas'); let width = img.width; let height = img.height; if (width > maxWidth) { height *= maxWidth / width; width = maxWidth; } elem.width = width; elem.height = height; const ctx = elem.getContext('2d'); ctx.drawImage(img, 0, 0, width, height); resolve(elem.toDataURL('image/jpeg', quality)); }; img.onerror = error => reject(error); }; reader.onerror = error => reject(error); });
 
@@ -84,33 +83,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- ВЫПОЛНЕНИЕ ЗАДАЧИ ---
-    async function completeTask(btn, dealerId, visitDate, visitComment) {
+    // --- (ИЗМЕНЕНО) ВЫПОЛНЕНИЕ ЗАДАЧИ ПО ИНДЕКСУ ---
+    async function completeTask(btn, dealerId, visitIndex) {
         try {
-            btn.disabled = true; // Блокируем кнопку
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; // Показываем загрузку
+            btn.disabled = true; 
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; 
 
             const res = await fetch(`${API_DEALERS_URL}/${dealerId}`);
             if(!res.ok) throw new Error('Не удалось загрузить данные');
             const dealer = await res.json();
 
-            let found = false;
-            if (dealer.visits) {
-                dealer.visits.forEach(v => {
-                    // Приводим к строкам для надежного сравнения
-                    const vComment = String(v.comment || "").trim();
-                    const sComment = String(visitComment || "").trim();
-                    
-                    if (v.date === visitDate && vComment === sComment && !v.isCompleted) {
-                        v.isCompleted = true;
-                        found = true;
-                    }
-                });
-            }
-
-            if (!found) {
+            // Используем индекс массива для точного попадания
+            if (dealer.visits && dealer.visits[visitIndex]) {
+                dealer.visits[visitIndex].isCompleted = true;
+            } else {
                 btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg"></i>';
-                return alert("Задача не найдена. Попробуйте обновить страницу.");
+                return alert("Ошибка: Задача не найдена (возможно, список изменился). Обновите страницу.");
             }
 
             await fetch(`${API_DEALERS_URL}/${dealerId}`, {
@@ -119,7 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify(dealer)
             });
 
-            initApp(); // Перезагружаем дашборд
+            initApp(); 
 
         } catch (e) {
             alert("Ошибка: " + e.message);
@@ -149,13 +137,25 @@ document.addEventListener('DOMContentLoaded', () => {
         
         allDealers.forEach(d => {
             if (d.visits && Array.isArray(d.visits)) {
-                d.visits.forEach(v => {
+                d.visits.forEach((v, index) => { // Берем индекс!
                     if (!v.isCompleted) {
                         const vDate = new Date(v.date);
                         const vDateMidnight = new Date(vDate); vDateMidnight.setHours(0,0,0,0);
                         let isOverdue = vDateMidnight < today;
                         let isToday = vDateMidnight.getTime() === today.getTime();
-                        tasks.push({ dealerName: d.name, dealerId: d.id, date: vDate, dateStrRaw: v.date, comment: v.comment || "", isOverdue: isOverdue, isToday: isToday });
+                        
+                        // Добавляем задачу только если она сегодня или позже, ИЛИ просрочена
+                        if (vDate >= today || isOverdue) {
+                            tasks.push({
+                                dealerName: d.name,
+                                dealerId: d.id,
+                                date: vDate,
+                                comment: v.comment || "",
+                                isOverdue: isOverdue,
+                                isToday: isToday,
+                                visitIndex: index // (НОВОЕ) Сохраняем индекс визита
+                            });
+                        }
                     }
                 });
             }
@@ -171,52 +171,43 @@ document.addEventListener('DOMContentLoaded', () => {
                 let itemClass = 'list-group-item-action'; let badgeClass = 'bg-primary'; let badgeText = dateStr;
                 if (t.isOverdue) { itemClass += ' list-group-item-danger'; badgeClass = 'bg-danger'; badgeText = `Просрочено: ${dateStr}`; } 
                 else if (t.isToday) { itemClass += ' list-group-item-warning'; badgeClass = 'bg-warning text-dark'; badgeText = 'Сегодня'; }
+                
                 return `
                     <div class="list-group-item ${itemClass} task-item d-flex justify-content-between align-items-center">
                         <div class="me-auto">
                             <div class="d-flex align-items-center mb-1"><span class="badge ${badgeClass} rounded-pill me-2">${badgeText}</span><a href="dealer.html?id=${t.dealerId}" target="_blank" class="fw-bold text-decoration-none text-dark">${t.dealerName}</a></div>
                             <small class="text-muted" style="white-space: pre-wrap;">${safeText(t.comment)}</small>
                         </div>
-                        <button class="btn btn-sm btn-success btn-complete-task ms-2" title="Выполнено" data-id="${t.dealerId}" data-date="${t.dateStrRaw}" data-comment="${safeAttr(t.comment)}"><i class="bi bi-check-lg"></i></button>
+                        <button class="btn btn-sm btn-success btn-complete-task ms-2" title="Выполнено" 
+                                data-id="${t.dealerId}" 
+                                data-index="${t.visitIndex}">
+                            <i class="bi bi-check-lg"></i>
+                        </button>
                     </div>`;
             }).join('');
         }
     }
 
-    // --- ГЛОБАЛЬНЫЙ ОБРАБОТЧИК КЛИКОВ (ДЛЯ НАДЕЖНОСТИ) ---
-    document.body.addEventListener('click', (e) => {
-        const t = e.target;
-        
-        // Обработка галочки "Выполнить задачу"
-        const completeBtn = t.closest('.btn-complete-task');
-        if (completeBtn) {
-            e.preventDefault();
-            completeTask(completeBtn, completeBtn.dataset.id, completeBtn.dataset.date, completeBtn.dataset.comment);
-            return;
-        }
-
-        // Обработка кнопок списка дилеров (View, Edit, Delete)
-        if (t.closest('.btn-view')) {
-            window.open(`dealer.html?id=${t.closest('.btn-view').dataset.id}`, '_blank');
-        }
-        if (t.closest('.btn-edit')) {
-            openEditModal(t.closest('.btn-edit').dataset.id);
-        }
-        if (t.closest('.btn-delete')) {
-            const btn = t.closest('.btn-delete');
-            if(confirm(`Удалить?`)) fetch(`${API_DEALERS_URL}/${btn.dataset.id}`, {method:'DELETE'}).then(initApp);
-        }
-
-        // Обработка удаления строк в модалках
-        if (t.closest('.btn-remove-entry')) {
-            t.closest('.contact-entry, .address-entry, .pos-entry, .photo-entry, .visit-entry').remove();
-        }
-    });
+    if(tasksList) {
+        tasksList.addEventListener('click', (e) => {
+            const btn = e.target.closest('.btn-complete-task');
+            if (btn) {
+                completeTask(btn, btn.dataset.id, btn.dataset.index);
+            }
+        });
+    }
 
     function createContactEntryHTML(c={}) { return `<div class="contact-entry input-group mb-2"><input type="text" class="form-control contact-name" placeholder="Имя" value="${c.name||''}"><input type="text" class="form-control contact-position" placeholder="Должность" value="${c.position||''}"><input type="text" class="form-control contact-info" placeholder="Телефон" value="${c.contactInfo||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
     function createAddressEntryHTML(a={}) { return `<div class="address-entry input-group mb-2"><input type="text" class="form-control address-description" placeholder="Описание" value="${a.description||''}"><input type="text" class="form-control address-city" placeholder="Город" value="${a.city||''}"><input type="text" class="form-control address-address" placeholder="Адрес" value="${a.address||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
     function createPosEntryHTML(p={}) { const opts = posMaterialsList.map(n => `<option value="${n}" ${n===p.name?'selected':''}>${n}</option>`).join(''); return `<div class="pos-entry input-group mb-2"><select class="form-select pos-name"><option value="">-- Выбор --</option>${opts}</select><input type="number" class="form-control pos-quantity" value="${p.quantity||1}" min="1"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
-    function createVisitEntryHTML(v={}) { return `<div class="visit-entry input-group mb-2"><input type="date" class="form-control visit-date" value="${v.date||''}"><input type="text" class="form-control visit-comment w-50" placeholder="Результат визита..." value="${v.comment||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
+    function createVisitEntryHTML(v={}) { 
+        return `<div class="visit-entry input-group mb-2">
+            <input type="date" class="form-control visit-date" value="${v.date||''}">
+            <input type="text" class="form-control visit-comment w-50" placeholder="Результат визита..." value="${v.comment||''}">
+            <input type="hidden" class="visit-completed" value="${v.isCompleted || 'false'}">
+            <button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button>
+        </div>`; 
+    }
     
     function renderPhotoPreviews(container, photosArray) { container.innerHTML = photosArray.map((p, index) => `<div class="photo-preview-item"><img src="${p.photo_url}"><button type="button" class="btn-remove-photo" data-index="${index}">×</button></div>`).join(''); }
     addPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) addPhotosData.push({ photo_url: await compressImage(file) }); renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData); addPhotoInput.value = ''; });
@@ -224,7 +215,15 @@ document.addEventListener('DOMContentLoaded', () => {
     editPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) editPhotosData.push({ photo_url: await compressImage(file) }); renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData); editPhotoInput.value = ''; });
     editPhotoPreviewContainer.addEventListener('click', (e) => { if(e.target.classList.contains('btn-remove-photo')) { editPhotosData.splice(e.target.dataset.index, 1); renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData); }});
 
-    function collectData(container, selector, fields) { const d=[]; container.querySelectorAll(selector).forEach(e=>{const i={}; fields.forEach(f=>i[f.key]=e.querySelector(f.class).value); if(Object.values(i).some(v=>v)) d.push(i);}); return d; }
+    function collectData(container, selector, fields) {
+        const data = [];
+        container.querySelectorAll(selector).forEach(entry => {
+            const item = {}; let hasData = false;
+            fields.forEach(f => { item[f.key] = entry.querySelector(f.class).value; if(item[f.key]) hasData=true; });
+            if(hasData) data.push(item);
+        });
+        return data;
+    }
     async function collectPhotos(container) { return Promise.resolve([]); }
     function renderList(container, data, htmlGen) { container.innerHTML = (data && data.length > 0) ? data.map(htmlGen).join('') : htmlGen(); }
     function renderProductChecklist(container, selectedIds=[]) { const set = new Set(selectedIds); container.innerHTML = fullProductCatalog.map(p => `<div class="checklist-item form-check"><input type="checkbox" class="form-check-input" id="prod-${container.id}-${p.id}" value="${p.id}" ${set.has(p.id)?'checked':''}><label class="form-check-label" for="prod-${container.id}-${p.id}"><strong>${p.sku}</strong> - ${p.name}</label></div>`).join(''); }
@@ -257,10 +256,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function populateFilters(dealers) {
         const cities = [...new Set(dealers.map(d => d.city).filter(Boolean))].sort();
         const types = [...new Set(dealers.map(d => d.price_type).filter(Boolean))].sort();
-        const sc = filterCity.value; const st = filterPriceType.value;
+        const selCity = filterCity.value; const selType = filterPriceType.value;
         filterCity.innerHTML = '<option value="">-- Все города --</option>'; filterPriceType.innerHTML = '<option value="">-- Все типы --</option>';
         cities.forEach(c => filterCity.add(new Option(c, c))); types.forEach(t => filterPriceType.add(new Option(t, t)));
-        filterCity.value = sc; filterPriceType.value = st;
+        filterCity.value = selCity; filterPriceType.value = selType;
     }
 
     async function initApp() {
@@ -368,7 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
             contacts: collectData(editContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]),
             additional_addresses: collectData(editAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]),
             pos_materials: collectData(editPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]),
-            // СОХРАНЯЕМ isCompleted
+            // (ВАЖНО) Сохраняем isCompleted
             visits: collectData(editVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'},{key:'isCompleted',class:'.visit-completed'}]),
             photos: editPhotosData
         };
@@ -379,6 +378,11 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) { alert("Ошибка при сохранении."); }
     });
 
+    dealerListBody.addEventListener('click', (e) => { const t=e.target; if(t.closest('.btn-view')) window.open(`dealer.html?id=${t.closest('.btn-view').dataset.id}`,'_blank'); if(t.closest('.btn-edit')) openEditModal(t.closest('.btn-edit').dataset.id); if(t.closest('.btn-delete') && confirm("Удалить?")) fetch(`${API_DEALERS_URL}/${t.closest('.btn-delete').dataset.id}`, {method:'DELETE'}).then(initApp); });
+    const removeHandler = (e) => { if(e.target.closest('.btn-remove-entry')) e.target.closest('.contact-entry, .address-entry, .pos-entry, .photo-entry, .visit-entry').remove(); };
+    addModalEl.addEventListener('click', removeHandler); editModalEl.addEventListener('click', removeHandler);
+    filterCity.onchange = renderDealerList; filterPriceType.onchange = renderDealerList; searchBar.oninput = renderDealerList;
+    document.querySelectorAll('th[data-sort]').forEach(th => th.onclick = () => { if(currentSort.column===th.dataset.sort) currentSort.direction=(currentSort.direction==='asc'?'desc':'asc'); else {currentSort.column=th.dataset.sort;currentSort.direction='asc';} renderDealerList(); });
     if(exportBtn) exportBtn.onclick = () => { if(!allDealers.length) return alert("Пусто"); let csv="\uFEFFID,Название,Орг,Город,Адрес,Тип,Контакты\n"+allDealers.map(d=>`"${d.dealer_id}","${d.name}","${d.organization}","${d.city}","${d.address}","${d.price_type}","${(d.contacts||[]).map(x=>x.name).join('; ')}"`).join('\n'); const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='dealers.csv'; a.click(); };
 
     initApp();
