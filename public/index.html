@@ -7,7 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-    <link rel="stylesheet" href="style.css?v=5">
+    <link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-4">
@@ -36,33 +36,33 @@
         </div>
 
         <div class="row g-4 mb-4">
-            <div class="col-lg-7">
-                <div id="dashboard-container" class="row g-3">
-                    </div>
-            </div>
+            <div class="col-lg-7"><div id="dashboard-container" class="row g-3"></div></div>
             <div class="col-lg-5">
                 <div class="card shadow-sm border-0 h-100">
-                    <div class="card-header bg-white border-bottom-0 pt-3 pb-0">
-                        <h5 class="card-title text-primary fw-bold"><i class="bi bi-calendar-check me-2"></i>Ближайшие задачи</h5>
-                    </div>
-                    <div class="card-body">
-                        <div id="tasks-list" class="list-group list-group-flush">
-                            <p class="text-muted text-center">Нет запланированных визитов.</p>
-                        </div>
-                    </div>
+                    <div class="card-header bg-white border-bottom-0 pt-3 pb-0"><h5 class="card-title text-primary fw-bold"><i class="bi bi-calendar-check me-2"></i>Ближайшие задачи</h5></div>
+                    <div class="card-body"><div id="tasks-list" class="list-group list-group-flush"><p class="text-muted text-center">Нет задач.</p></div></div>
                 </div>
             </div>
         </div>
 
         <div class="row g-3 mb-4 p-3 bg-white rounded shadow-sm border">
-            <div class="col-md-6 col-lg-4"><label class="form-label">Фильтр по городу:</label><select id="filter-city" class="form-select"><option value="">-- Все города --</option></select></div>
-            <div class="col-md-6 col-lg-4"><label class="form-label">Фильтр по типу цен:</label><select id="filter-price-type" class="form-select"><option value="">-- Все типы --</option></select></div>
-            <div class="col-md-12 col-lg-4"><label class="form-label">Поиск:</label><input type="text" id="search-bar" class="form-control" placeholder="По ID, Названию, Организации..."></div>
+            <div class="col-md-6 col-lg-3"><label class="form-label">Фильтр по статусу:</label>
+                <select id="filter-status" class="form-select">
+                    <option value="">-- Все статусы --</option>
+                    <option value="active">🟢 VIP / Активный</option>
+                    <option value="standard">🟡 Стандарт</option>
+                    <option value="problem">🔴 Проблемный / Новичок</option>
+                    <option value="archive">⚫ Архив</option>
+                </select>
+            </div>
+            <div class="col-md-6 col-lg-3"><label class="form-label">Фильтр по городу:</label><select id="filter-city" class="form-select"><option value="">-- Все города --</option></select></div>
+            <div class="col-md-6 col-lg-3"><label class="form-label">Фильтр по типу цен:</label><select id="filter-price-type" class="form-select"><option value="">-- Все типы --</option></select></div>
+            <div class="col-md-12 col-lg-3"><label class="form-label">Поиск:</label><input type="text" id="search-bar" class="form-control" placeholder="Поиск..."></div>
         </div>
 
         <div class="table-responsive bg-white rounded shadow-sm border">
             <table id="dealer-table" class="table table-hover align-middle mb-0">
-                <thead class="table-light"><tr><th class="column-number">#</th><th>Фото</th><th data-sort="dealer_id">ID</th><th data-sort="name">Название</th><th data-sort="city">Город</th><th data-sort="price_type">Тип</th><th data-sort="organization">Организация</th><th style="width: 50px;"></th></tr></thead>
+                <thead class="table-light"><tr><th class="column-number">#</th><th>Статус</th><th>Фото</th><th data-sort="dealer_id">ID</th><th data-sort="name">Название</th><th data-sort="city">Город</th><th data-sort="price_type">Тип</th><th data-sort="organization">Организация</th><th style="width: 50px;"></th></tr></thead>
                 <tbody id="dealer-list-body"></tbody>
             </table>
         </div>
@@ -78,7 +78,18 @@
                         <div class="row g-3">
                             <div class="col-md-6"><label class="form-label">ID точки *</label><input type="text" id="dealer_id" class="form-control" required></div>
                             <div class="col-md-6"><label class="form-label">Название точки *</label><input type="text" id="name" class="form-control" required></div>
-                            <div class="col-12"><label class="form-label">Координаты (кликните на карту):</label><div id="add-map" class="mini-map"></div><div class="input-group mt-2"><span class="input-group-text">Lat</span><input type="text" id="add_latitude" class="form-control" readonly><span class="input-group-text">Lng</span><input type="text" id="add_longitude" class="form-control" readonly></div></div>
+                            
+                            <div class="col-md-12">
+                                <label class="form-label">Статус клиента:</label>
+                                <select id="status" class="form-select">
+                                    <option value="standard" selected>🟡 Стандарт</option>
+                                    <option value="active">🟢 VIP / Активный</option>
+                                    <option value="problem">🔴 Проблемный / Новичок</option>
+                                    <option value="archive">⚫ Архив</option>
+                                </select>
+                            </div>
+
+                            <div class="col-12"><label class="form-label">Координаты:</label><div id="add-map" class="mini-map"></div><div class="input-group mt-2"><span class="input-group-text">Lat</span><input type="text" id="add_latitude" class="form-control" readonly><span class="input-group-text">Lng</span><input type="text" id="add_longitude" class="form-control" readonly></div></div>
                             <div class="col-md-6"><label class="form-label">Организация</label><input type="text" id="organization" class="form-control"></div>
                             <div class="col-md-6"><label class="form-label">Тип цен</label><input type="text" id="price_type" class="form-control"></div>
                             <div class="col-md-6"><label class="form-label">Главный город</label><input type="text" id="city" class="form-control"></div>
@@ -87,7 +98,7 @@
                             <div class="col-md-4"><label class="form-label">Сайт</label><input type="text" id="website" class="form-control"></div>
                             <div class="col-md-4"><label class="form-label">Инстаграм</label><input type="text" id="instagram" class="form-control"></div>
                             <hr class="my-3">
-                            <label class="form-label">История посещений (Будущие даты = Задачи):</label><div id="add-visits-list" class="list-container"></div><div class="text-end"><button type="button" id="add-visits-btn-add-modal" class="btn btn-secondary btn-sm">Добавить визит</button></div>
+                            <label class="form-label">История посещений:</label><div id="add-visits-list" class="list-container"></div><div class="text-end"><button type="button" id="add-visits-btn-add-modal" class="btn btn-secondary btn-sm">Добавить визит</button></div>
                             <label class="form-label">Дополнительные адреса:</label><div id="add-address-list" class="list-container"></div><div class="text-end"><button type="button" id="add-address-btn-add-modal" class="btn btn-secondary btn-sm">Добавить доп. адрес</button></div>
                             <label class="form-label">Контакты:</label><div id="add-contact-list" class="list-container"></div><div class="text-end"><button type="button" id="add-contact-btn-add-modal" class="btn btn-secondary btn-sm">Добавить контакт</button></div>
                             <label class="form-label">Стенды:</label><div id="add-pos-list" class="list-container"></div><div class="text-end"><button type="button" id="add-pos-btn-add-modal" class="btn btn-secondary btn-sm">Добавить стенд</button></div>
@@ -112,7 +123,18 @@
                         <div class="row g-3">
                             <div class="col-md-6"><label class="form-label">ID точки *</label><input type="text" id="edit_dealer_id" class="form-control" required></div>
                             <div class="col-md-6"><label class="form-label">Название точки *</label><input type="text" id="edit_name" class="form-control" required></div>
-                            <div class="col-12"><label class="form-label">Координаты (кликните на карту):</label><div id="edit-map" class="mini-map"></div><div class="input-group mt-2"><span class="input-group-text">Lat</span><input type="text" id="edit_latitude" class="form-control" readonly><span class="input-group-text">Lng</span><input type="text" id="edit_longitude" class="form-control" readonly></div></div>
+                            
+                            <div class="col-md-12">
+                                <label class="form-label">Статус клиента:</label>
+                                <select id="edit_status" class="form-select">
+                                    <option value="standard">🟡 Стандарт</option>
+                                    <option value="active">🟢 VIP / Активный</option>
+                                    <option value="problem">🔴 Проблемный / Новичок</option>
+                                    <option value="archive">⚫ Архив</option>
+                                </select>
+                            </div>
+
+                            <div class="col-12"><label class="form-label">Координаты:</label><div id="edit-map" class="mini-map"></div><div class="input-group mt-2"><span class="input-group-text">Lat</span><input type="text" id="edit_latitude" class="form-control" readonly><span class="input-group-text">Lng</span><input type="text" id="edit_longitude" class="form-control" readonly></div></div>
                             <div class="col-md-6"><label class="form-label">Организация</label><input type="text" id="edit_organization" class="form-control"></div>
                             <div class="col-md-6"><label class="form-label">Тип цен</label><input type="text" id="edit_price_type" class="form-control"></div>
                             <div class="col-md-6"><label class="form-label">Главный город</label><input type="text" id="edit_city" class="form-control"></div>
@@ -121,7 +143,7 @@
                             <div class="col-md-4"><label class="form-label">Сайт</label><input type="text" id="edit_website" class="form-control"></div>
                             <div class="col-md-4"><label class="form-label">Инстаграм</label><input type="text" id="edit_instagram" class="form-control"></div>
                             <hr class="my-3">
-                            <label class="form-label">История посещений (Будущие даты = Задачи):</label><div id="edit-visits-list" class="list-container"></div><div class="text-end"><button type="button" id="add-visits-btn-edit-modal" class="btn btn-secondary btn-sm">Добавить визит</button></div>
+                            <label class="form-label">История посещений:</label><div id="edit-visits-list" class="list-container"></div><div class="text-end"><button type="button" id="add-visits-btn-edit-modal" class="btn btn-secondary btn-sm">Добавить визит</button></div>
                             <label class="form-label">Дополнительные адреса:</label><div id="edit-address-list" class="list-container"></div><div class="text-end"><button type="button" id="add-address-btn-edit-modal" class="btn btn-secondary btn-sm">Добавить доп. адрес</button></div>
                             <label class="form-label">Контакты:</label><div id="edit-contact-list" class="list-container"></div><div class="text-end"><button type="button" id="add-contact-btn-edit-modal" class="btn btn-secondary btn-sm">Добавить контакт</button></div>
                             <label class="form-label">Стенды:</label><div id="edit-pos-list" class="list-container"></div><div class="text-end"><button type="button" id="add-pos-btn-edit-modal" class="btn btn-secondary btn-sm">Добавить оборудование</button></div>
