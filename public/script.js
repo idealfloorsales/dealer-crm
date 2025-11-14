@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchBar = document.getElementById('search-bar'); 
     const exportBtn = document.getElementById('export-dealers-btn'); 
     const dashboardContainer = document.getElementById('dashboard-container'); 
-    const tasksList = document.getElementById('tasks-list'); // (НОВОЕ)
+    const tasksList = document.getElementById('tasks-list'); 
     const editForm = document.getElementById('edit-dealer-form');
     const editProductChecklist = document.getElementById('edit-product-checklist'); 
     const editContactList = document.getElementById('edit-contact-list'); 
@@ -78,16 +78,52 @@ document.addEventListener('DOMContentLoaded', () => {
             fullProductCatalog = await response.json();
             fullProductCatalog.sort((a, b) => a.sku.localeCompare(b.sku, 'ru', { numeric: true }));
         } catch (error) {
-            addProductChecklist.innerHTML = `<p class='text-danger'>Ошибка каталога.</p>`;
-            editProductChecklist.innerHTML = `<p class='text-danger'>Ошибка каталога.</p>`;
+            console.error("Ошибка каталога:", error);
+            addProductChecklist.innerHTML = `<p class='text-danger'>Не удалось загрузить каталог.</p>`;
+            editProductChecklist.innerHTML = `<p class='text-danger'>Не удалось загрузить каталог.</p>`;
         }
     }
 
-    // --- (ИЗМЕНЕНО) Дашборд с ЗАДАЧАМИ ---
+    // --- (ИЗМЕНЕНО) Функция выполнения задачи ---
+    async function completeTask(dealerId, visitDate, visitComment) {
+        try {
+            // 1. Получаем полные данные дилера
+            const res = await fetch(`${API_DEALERS_URL}/${dealerId}`);
+            if(!res.ok) throw new Error('Не удалось загрузить данные');
+            const dealer = await res.json();
+
+            // 2. Находим визит и ставим "выполнено"
+            let found = false;
+            if (dealer.visits) {
+                dealer.visits.forEach(v => {
+                    if (v.date === visitDate && v.comment === visitComment && !v.isCompleted) {
+                        v.isCompleted = true;
+                        found = true;
+                    }
+                });
+            }
+
+            if (!found) return alert("Задача не найдена или уже выполнена.");
+
+            // 3. Сохраняем дилера
+            await fetch(`${API_DEALERS_URL}/${dealerId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(dealer)
+            });
+
+            // 4. Обновляем
+            initApp();
+
+        } catch (e) {
+            alert("Ошибка: " + e.message);
+        }
+    }
+
+    // --- Дашборд с ЗАДАЧАМИ ---
     function renderDashboard() {
         if (!allDealers || allDealers.length === 0) { dashboardContainer.innerHTML = ''; return; }
         
-        // Статистика
         const totalDealers = allDealers.length;
         const noPhotosCount = allDealers.filter(d => !d.has_photos).length;
         const posCount = allDealers.filter(d => d.has_pos).length;
@@ -101,32 +137,34 @@ document.addEventListener('DOMContentLoaded', () => {
              <div class="col-md-6 col-lg-3"><div class="stat-card"><i class="bi bi-geo-alt-fill stat-icon text-info"></i><span class="stat-number text-info" style="font-size: 1.5rem;">${topCity}</span><span class="stat-label">Топ регион</span></div></div>
         `;
 
-        // --- ЗАДАЧИ (ВИЗИТЫ) ---
+        // --- ЗАДАЧИ ---
         if (!tasksList) return;
         
         const today = new Date();
-        today.setHours(0,0,0,0); // Начало сегодняшнего дня
+        today.setHours(0,0,0,0);
         
         const tasks = [];
         
         allDealers.forEach(d => {
             if (d.visits && Array.isArray(d.visits)) {
                 d.visits.forEach(v => {
-                    const vDate = new Date(v.date);
-                    // Если дата сегодня или в будущем
-                    if (vDate >= today) {
-                        tasks.push({
-                            dealerName: d.name,
-                            dealerId: d.id, // Используем ID с сервера
-                            date: vDate,
-                            comment: v.comment
-                        });
+                    // Проверяем: будущее + НЕ выполнено
+                    if (!v.isCompleted) {
+                        const vDate = new Date(v.date);
+                        if (vDate >= today) {
+                            tasks.push({
+                                dealerName: d.name,
+                                dealerId: d.id,
+                                date: vDate,
+                                dateStrRaw: v.date, // Для поиска при сохранении
+                                comment: v.comment
+                            });
+                        }
                     }
                 });
             }
         });
 
-        // Сортируем: ближайшие сверху
         tasks.sort((a, b) => a.date - b.date);
 
         if (tasks.length === 0) {
@@ -137,24 +175,48 @@ document.addEventListener('DOMContentLoaded', () => {
                 const dateStr = t.date.toLocaleDateString('ru-RU');
                 
                 return `
-                    <a href="dealer.html?id=${t.dealerId}" target="_blank" class="list-group-item list-group-item-action task-item d-flex justify-content-between align-items-start">
-                        <div class="ms-2 me-auto">
-                            <div class="fw-bold">${t.dealerName}</div>
-                            ${safeText(t.comment)}
+                    <div class="list-group-item list-group-item-action task-item d-flex justify-content-between align-items-center">
+                        <div class="me-auto">
+                            <div class="d-flex align-items-center mb-1">
+                                <span class="badge ${isToday ? 'bg-danger' : 'bg-primary'} rounded-pill me-2">${isToday ? 'Сегодня' : dateStr}</span>
+                                <a href="dealer.html?id=${t.dealerId}" target="_blank" class="fw-bold text-decoration-none text-dark">${t.dealerName}</a>
+                            </div>
+                            <small class="text-muted">${safeText(t.comment)}</small>
                         </div>
-                        <span class="badge ${isToday ? 'bg-danger' : 'bg-primary'} rounded-pill">
-                            ${isToday ? 'Сегодня' : dateStr}
-                        </span>
-                    </a>
+                        <button class="btn btn-sm btn-success btn-complete-task ms-2" 
+                                data-id="${t.dealerId}" 
+                                data-date="${t.dateStrRaw}" 
+                                data-comment="${safeText(t.comment)}">
+                            <i class="bi bi-check-lg"></i>
+                        </button>
+                    </div>
                 `;
             }).join('');
         }
     }
 
+    // Обработчик клика по "Выполнить"
+    if(tasksList) {
+        tasksList.addEventListener('click', (e) => {
+            const btn = e.target.closest('.btn-complete-task');
+            if (btn) {
+                completeTask(btn.dataset.id, btn.dataset.date, btn.dataset.comment);
+            }
+        });
+    }
+
+    // --- HTML Генераторы (добавлено скрытое поле isCompleted) ---
     function createContactEntryHTML(c={}) { return `<div class="contact-entry input-group mb-2"><input type="text" class="form-control contact-name" placeholder="Имя" value="${c.name||''}"><input type="text" class="form-control contact-position" placeholder="Должность" value="${c.position||''}"><input type="text" class="form-control contact-info" placeholder="Телефон" value="${c.contactInfo||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
     function createAddressEntryHTML(a={}) { return `<div class="address-entry input-group mb-2"><input type="text" class="form-control address-description" placeholder="Описание" value="${a.description||''}"><input type="text" class="form-control address-city" placeholder="Город" value="${a.city||''}"><input type="text" class="form-control address-address" placeholder="Адрес" value="${a.address||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
     function createPosEntryHTML(p={}) { const opts = posMaterialsList.map(n => `<option value="${n}" ${n===p.name?'selected':''}>${n}</option>`).join(''); return `<div class="pos-entry input-group mb-2"><select class="form-select pos-name"><option value="">-- Выбор --</option>${opts}</select><input type="number" class="form-control pos-quantity" value="${p.quantity||1}" min="1"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
-    function createVisitEntryHTML(v={}) { return `<div class="visit-entry input-group mb-2"><input type="date" class="form-control visit-date" value="${v.date||''}"><input type="text" class="form-control visit-comment w-50" placeholder="Результат визита..." value="${v.comment||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
+    function createVisitEntryHTML(v={}) { 
+        return `<div class="visit-entry input-group mb-2">
+            <input type="date" class="form-control visit-date" value="${v.date||''}">
+            <input type="text" class="form-control visit-comment w-50" placeholder="Результат визита..." value="${v.comment||''}">
+            <input type="hidden" class="visit-completed" value="${v.isCompleted || 'false'}">
+            <button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button>
+        </div>`; 
+    }
     
     function renderPhotoPreviews(container, photosArray) { container.innerHTML = photosArray.map((p, index) => `<div class="photo-preview-item"><img src="${p.photo_url}"><button type="button" class="btn-remove-photo" data-index="${index}">×</button></div>`).join(''); }
     addPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) addPhotosData.push({ photo_url: await compressImage(file) }); renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData); addPhotoInput.value = ''; });
@@ -162,8 +224,18 @@ document.addEventListener('DOMContentLoaded', () => {
     editPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) editPhotosData.push({ photo_url: await compressImage(file) }); renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData); editPhotoInput.value = ''; });
     editPhotoPreviewContainer.addEventListener('click', (e) => { if(e.target.classList.contains('btn-remove-photo')) { editPhotosData.splice(e.target.dataset.index, 1); renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData); }});
 
-    function collectData(container, selector, fields) { const d=[]; container.querySelectorAll(selector).forEach(e=>{const i={}; fields.forEach(f=>i[f.key]=e.querySelector(f.class).value); if(Object.values(i).some(v=>v)) d.push(i);}); return d; }
-    async function collectPhotos(container) { return Promise.resolve([]); }
+    function collectData(container, selector, fields) {
+        const data = [];
+        container.querySelectorAll(selector).forEach(entry => {
+            const item = {}; let hasData = false;
+            fields.forEach(f => { item[f.key] = entry.querySelector(f.class).value; if(item[f.key]) hasData=true; });
+            if(hasData) data.push(item);
+        });
+        return data;
+    }
+    async function collectPhotos(container) {
+        return Promise.resolve([]); 
+    }
     function renderList(container, data, htmlGen) { container.innerHTML = (data && data.length > 0) ? data.map(htmlGen).join('') : htmlGen(); }
     function renderProductChecklist(container, selectedIds=[]) { const set = new Set(selectedIds); container.innerHTML = fullProductCatalog.map(p => `<div class="checklist-item form-check"><input type="checkbox" class="form-check-input" id="prod-${container.id}-${p.id}" value="${p.id}" ${set.has(p.id)?'checked':''}><label class="form-check-label" for="prod-${container.id}-${p.id}"><strong>${p.sku}</strong> - ${p.name}</label></div>`).join(''); }
     function getSelectedProductIds(containerId) { return Array.from(document.getElementById(containerId).querySelectorAll('input:checked')).map(cb=>cb.value); }
@@ -234,11 +306,8 @@ document.addEventListener('DOMContentLoaded', () => {
         renderList(addAddressList, [], createAddressEntryHTML);
         renderList(addPosList, [], createPosEntryHTML);
         renderList(addVisitsList, [], createVisitEntryHTML);
-        // Сброс координат
         document.getElementById('add_latitude').value = ''; document.getElementById('add_longitude').value = '';
-        // Сброс фото
         addPhotosData = []; renderPhotoPreviews(addPhotoPreviewContainer, []);
-        // Перерисовка карты при открытии
         addModal.show();
     };
 
@@ -309,7 +378,8 @@ document.addEventListener('DOMContentLoaded', () => {
             contacts: collectData(editContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]),
             additional_addresses: collectData(editAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]),
             pos_materials: collectData(editPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]),
-            visits: collectData(editVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'}]),
+            // (ИЗМЕНЕНО) Собираем визиты с полем isCompleted
+            visits: collectData(editVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'},{key:'isCompleted',class:'.visit-completed'}]),
             photos: editPhotosData
         };
         try {
