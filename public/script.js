@@ -1,26 +1,14 @@
 // script.js
 document.addEventListener('DOMContentLoaded', () => {
-    
     const API_DEALERS_URL = '/api/dealers';
     const API_PRODUCTS_URL = '/api/products'; 
-
     let fullProductCatalog = [];
     let allDealers = [];
     let currentSort = { column: 'name', direction: 'asc' };
+    const posMaterialsList = ["Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа их фанеры старая", "С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "Табличка - Табличка орг.стекло"];
 
-    const posMaterialsList = [
-        "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "РФ-2 - Расческа из фанеры",
-        "РФС-1 - Расческа их фанеры старая", "С600 - 600мм задняя стенка",
-        "С800 - 800мм задняя стенка", "Табличка - Табличка орг.стекло"
-    ];
-
-    // --- Модалки ---
-    const addModalEl = document.getElementById('add-modal');
-    const addModal = new bootstrap.Modal(addModalEl);
-    const editModalEl = document.getElementById('edit-modal');
-    const editModal = new bootstrap.Modal(editModalEl);
-
-    // --- Элементы ---
+    const addModalEl = document.getElementById('add-modal'); const addModal = new bootstrap.Modal(addModalEl);
+    const editModalEl = document.getElementById('edit-modal'); const editModal = new bootstrap.Modal(editModalEl);
     const openAddModalBtn = document.getElementById('open-add-modal-btn');
     const addForm = document.getElementById('add-dealer-form');
     const addProductChecklist = document.getElementById('add-product-checklist'); 
@@ -30,7 +18,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const addVisitsList = document.getElementById('add-visits-list');
     const addPhotoInput = document.getElementById('add-photo-input');
     const addPhotoPreviewContainer = document.getElementById('add-photo-preview-container');
-    
     const dealerListBody = document.getElementById('dealer-list-body');
     const dealerTable = document.getElementById('dealer-table');
     const noDataMsg = document.getElementById('no-data-msg');
@@ -40,7 +27,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const exportBtn = document.getElementById('export-dealers-btn'); 
     const dashboardContainer = document.getElementById('dashboard-container'); 
     const tasksList = document.getElementById('tasks-list'); 
-
     const editForm = document.getElementById('edit-dealer-form');
     const editProductChecklist = document.getElementById('edit-product-checklist'); 
     const editContactList = document.getElementById('edit-contact-list'); 
@@ -50,44 +36,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const editPhotoList = document.getElementById('edit-photo-list'); 
     const editPhotoInput = document.getElementById('edit-photo-input');
     const editPhotoPreviewContainer = document.getElementById('edit-photo-preview-container');
-
-    let addPhotosData = []; 
-    let editPhotosData = [];
-
-    // Вспомогательные функции
-    const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
+    let addPhotosData = []; let editPhotosData = [];
     
-    // (НОВОЕ) Безопасное значение для атрибутов (кавычки ломают HTML)
-    const safeAttr = (text) => text ? text.replace(/"/g, '&quot;') : '';
-
-    const toBase64 = file => new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = error => reject(error);
-    });
-
-    const compressImage = (file, maxWidth = 1000, quality = 0.7) => new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = event => {
-            const img = new Image();
-            img.src = event.target.result;
-            img.onload = () => {
-                const elem = document.createElement('canvas');
-                let width = img.width; let height = img.height;
-                if (width > maxWidth) { height *= maxWidth / width; width = maxWidth; }
-                elem.width = width; elem.height = height;
-                const ctx = elem.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
-                resolve(elem.toDataURL('image/jpeg', quality));
-            };
-            img.onerror = error => reject(error);
-        };
-        reader.onerror = error => reject(error);
-    });
-
-    // --- Карта ---
     const DEFAULT_LAT = 51.1605; const DEFAULT_LNG = 71.4704;
     let addMap, editMap;
 
@@ -115,6 +65,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!isNaN(lat) && !isNaN(lng)) { editModalEl.markerRef.current = L.marker([lat, lng]).addTo(editMap); editMap.setView([lat, lng], 15); } else { editMap.setView([DEFAULT_LAT, DEFAULT_LNG], 13); }
     });
 
+    const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
+    const safeAttr = (text) => text ? text.replace(/"/g, '&quot;') : '';
+    const toBase64 = file => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => resolve(reader.result); reader.onerror = error => reject(error); });
+    const compressImage = (file, maxWidth = 1000, quality = 0.7) => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = event => { const img = new Image(); img.src = event.target.result; img.onload = () => { const elem = document.createElement('canvas'); let width = img.width; let height = img.height; if (width > maxWidth) { height *= maxWidth / width; width = maxWidth; } elem.width = width; elem.height = height; const ctx = elem.getContext('2d'); ctx.drawImage(img, 0, 0, width, height); resolve(elem.toDataURL('image/jpeg', quality)); }; img.onerror = error => reject(error); }; reader.onerror = error => reject(error); });
+
     async function fetchProductCatalog() {
         if (fullProductCatalog.length > 0) return; 
         try {
@@ -129,7 +84,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- (ИСПРАВЛЕНО) Функция выполнения задачи ---
     async function completeTask(dealerId, visitDate, visitComment) {
         try {
             const res = await fetch(`${API_DEALERS_URL}/${dealerId}`);
@@ -139,11 +93,8 @@ document.addEventListener('DOMContentLoaded', () => {
             let found = false;
             if (dealer.visits) {
                 dealer.visits.forEach(v => {
-                    // Сравниваем дату И комментарий. 
-                    // Учитываем, что комментарий может быть undefined в базе, а мы ищем пустую строку.
                     const dbComment = v.comment || "";
                     const searchComment = visitComment || "";
-                    
                     if (v.date === visitDate && dbComment === searchComment && !v.isCompleted) {
                         v.isCompleted = true;
                         found = true;
@@ -152,8 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (!found) {
-                console.warn("Задача не найдена в базе:", visitDate, visitComment);
-                return alert("Не удалось найти эту задачу (возможно, она была изменена).");
+                return alert("Задача не найдена или уже выполнена (обновите страницу).");
             }
 
             await fetch(`${API_DEALERS_URL}/${dealerId}`, {
@@ -162,17 +112,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify(dealer)
             });
 
-            initApp(); // Обновляем экран
+            initApp(); // Перезагружаем, задача должна исчезнуть
 
         } catch (e) {
             alert("Ошибка: " + e.message);
         }
     }
 
-    // --- Дашборд ---
+    // --- (ИЗМЕНЕНО) Дашборд с ЗАДАЧАМИ ---
     function renderDashboard() {
         if (!allDealers || allDealers.length === 0) { dashboardContainer.innerHTML = ''; return; }
         
+        // Статистика
         const totalDealers = allDealers.length;
         const noPhotosCount = allDealers.filter(d => !d.has_photos).length;
         const posCount = allDealers.filter(d => d.has_pos).length;
@@ -188,50 +139,87 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // --- ЗАДАЧИ ---
         if (!tasksList) return;
-        const today = new Date(); today.setHours(0,0,0,0);
+        
+        const today = new Date();
+        today.setHours(0,0,0,0); // Сегодня 00:00
+        
         const tasks = [];
         
         allDealers.forEach(d => {
             if (d.visits && Array.isArray(d.visits)) {
                 d.visits.forEach(v => {
+                    // Показываем ТОЛЬКО невыполненные
                     if (!v.isCompleted) {
                         const vDate = new Date(v.date);
-                        if (vDate >= today) {
-                            tasks.push({
-                                dealerName: d.name,
-                                dealerId: d.id,
-                                date: vDate,
-                                dateStrRaw: v.date,
-                                comment: v.comment || "" // Гарантируем пустую строку, если null
-                            });
+                        
+                        // Обнуляем время у даты визита для корректного сравнения
+                        const vDateMidnight = new Date(vDate);
+                        vDateMidnight.setHours(0,0,0,0);
+
+                        // Определяем статус (Просрочено / Сегодня / Будущее)
+                        let isOverdue = false;
+                        let isToday = false;
+
+                        if (vDateMidnight < today) {
+                            isOverdue = true; // Просрочено
+                        } else if (vDateMidnight.getTime() === today.getTime()) {
+                            isToday = true;   // Сегодня
                         }
+                        // Будущее тоже добавляем, как вы просили
+
+                        tasks.push({
+                            dealerName: d.name,
+                            dealerId: d.id,
+                            date: vDate,
+                            dateStrRaw: v.date,
+                            comment: v.comment || "",
+                            isOverdue: isOverdue,
+                            isToday: isToday
+                        });
                     }
                 });
             }
         });
 
+        // Сортируем: сначала старые (просроченные), потом сегодняшние, потом будущие
         tasks.sort((a, b) => a.date - b.date);
 
         if (tasks.length === 0) {
             tasksList.innerHTML = `<div class="text-center py-4 text-muted"><i class="bi bi-check2-circle fs-3 d-block mb-2"></i>Задач нет</div>`;
         } else {
             tasksList.innerHTML = tasks.map(t => {
-                const isToday = t.date.getTime() === today.getTime();
                 const dateStr = t.date.toLocaleDateString('ru-RU');
                 
+                // Стилизация
+                let itemClass = 'list-group-item-action';
+                let badgeClass = 'bg-primary';
+                let badgeText = dateStr;
+
+                if (t.isOverdue) {
+                    itemClass += ' list-group-item-danger'; // Красный фон
+                    badgeClass = 'bg-danger';
+                    badgeText = `Просрочено: ${dateStr}`;
+                } else if (t.isToday) {
+                    itemClass += ' list-group-item-warning'; // Желтоватый фон
+                    badgeClass = 'bg-warning text-dark';
+                    badgeText = 'Сегодня';
+                }
+
                 return `
-                    <div class="list-group-item list-group-item-action task-item d-flex justify-content-between align-items-center">
+                    <div class="list-group-item ${itemClass} task-item d-flex justify-content-between align-items-center">
                         <div class="me-auto">
                             <div class="d-flex align-items-center mb-1">
-                                <span class="badge ${isToday ? 'bg-danger' : 'bg-primary'} rounded-pill me-2">${isToday ? 'Сегодня' : dateStr}</span>
+                                <span class="badge ${badgeClass} rounded-pill me-2">${badgeText}</span>
                                 <a href="dealer.html?id=${t.dealerId}" target="_blank" class="fw-bold text-decoration-none text-dark">${t.dealerName}</a>
                             </div>
-                            <small class="text-muted">${safeText(t.comment)}</small>
+                            <small class="text-muted" style="white-space: pre-wrap;">${safeText(t.comment)}</small>
                         </div>
                         <button class="btn btn-sm btn-success btn-complete-task ms-2" 
+                                title="Отметить выполненным"
                                 data-id="${t.dealerId}" 
                                 data-date="${t.dateStrRaw}" 
-                                data-comment="${safeAttr(t.comment)}"> <i class="bi bi-check-lg"></i>
+                                data-comment="${safeAttr(t.comment)}">
+                            <i class="bi bi-check-lg"></i>
                         </button>
                     </div>
                 `;
@@ -243,7 +231,6 @@ document.addEventListener('DOMContentLoaded', () => {
         tasksList.addEventListener('click', (e) => {
             const btn = e.target.closest('.btn-complete-task');
             if (btn) {
-                // Отключаем кнопку, чтобы не нажать дважды
                 btn.disabled = true; 
                 completeTask(btn.dataset.id, btn.dataset.date, btn.dataset.comment);
             }
