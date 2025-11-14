@@ -1,99 +1,16 @@
 // script.js
 document.addEventListener('DOMContentLoaded', () => {
-    
     const API_DEALERS_URL = '/api/dealers';
     const API_PRODUCTS_URL = '/api/products'; 
-
     let fullProductCatalog = [];
     let allDealers = [];
     let currentSort = { column: 'name', direction: 'asc' };
-
-    // Координаты Астаны по умолчанию
-    const DEFAULT_LAT = 51.1605;
-    const DEFAULT_LNG = 71.4704;
-
     const posMaterialsList = ["Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа их фанеры старая", "С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "Табличка - Табличка орг.стекло"];
 
-    const addModalEl = document.getElementById('add-modal');
-    const addModal = new bootstrap.Modal(addModalEl);
-    const editModalEl = document.getElementById('edit-modal');
-    const editModal = new bootstrap.Modal(editModalEl);
-
+    const addModalEl = document.getElementById('add-modal'); const addModal = new bootstrap.Modal(addModalEl);
+    const editModalEl = document.getElementById('edit-modal'); const editModal = new bootstrap.Modal(editModalEl);
     const openAddModalBtn = document.getElementById('open-add-modal-btn');
     const addForm = document.getElementById('add-dealer-form');
-    
-    // Переменные карт
-    let addMap, editMap;
-    let addMarker, editMarker;
-
-    // Инициализация карты (функция)
-    function initMap(mapId) {
-        const map = L.map(mapId).setView([DEFAULT_LAT, DEFAULT_LNG], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: 'OSM'
-        }).addTo(map);
-        return map;
-    }
-
-    // Обработчик клика по карте
-    function setupMapClick(map, latInputId, lngInputId, markerRef) {
-        map.on('click', function(e) {
-            const lat = e.latlng.lat;
-            const lng = e.latlng.lng;
-            document.getElementById(latInputId).value = lat;
-            document.getElementById(lngInputId).value = lng;
-
-            if (markerRef.current) {
-                markerRef.current.setLatLng([lat, lng]);
-            } else {
-                markerRef.current = L.marker([lat, lng]).addTo(map);
-            }
-        });
-    }
-
-    // --- Инициализация карт при открытии модалок ---
-    // Карты глючат в скрытых модалках, поэтому инициализируем при показе
-    addModalEl.addEventListener('shown.bs.modal', () => {
-        if (!addMap) {
-            addMap = initMap('add-map');
-            // Ссылка на маркер (чтобы менять его позицию)
-            addModalEl.markerRef = { current: null }; 
-            setupMapClick(addMap, 'add_latitude', 'add_longitude', addModalEl.markerRef);
-        } else {
-            addMap.invalidateSize(); // "Встряхиваем" карту
-        }
-        // Сброс маркера при новом добавлении
-        if (addModalEl.markerRef && addModalEl.markerRef.current) {
-            addMap.removeLayer(addModalEl.markerRef.current);
-            addModalEl.markerRef.current = null;
-        }
-        addMap.setView([DEFAULT_LAT, DEFAULT_LNG], 13);
-    });
-
-    editModalEl.addEventListener('shown.bs.modal', () => {
-        if (!editMap) {
-            editMap = initMap('edit-map');
-            editModalEl.markerRef = { current: null };
-            setupMapClick(editMap, 'edit_latitude', 'edit_longitude', editModalEl.markerRef);
-        } else {
-            editMap.invalidateSize();
-        }
-        
-        // Установка маркера, если координаты есть
-        const lat = parseFloat(document.getElementById('edit_latitude').value);
-        const lng = parseFloat(document.getElementById('edit_longitude').value);
-        
-        if (editModalEl.markerRef.current) editMap.removeLayer(editModalEl.markerRef.current);
-        
-        if (!isNaN(lat) && !isNaN(lng)) {
-            editModalEl.markerRef.current = L.marker([lat, lng]).addTo(editMap);
-            editMap.setView([lat, lng], 15);
-        } else {
-            editMap.setView([DEFAULT_LAT, DEFAULT_LNG], 13);
-        }
-    });
-
-
     const addProductChecklist = document.getElementById('add-product-checklist'); 
     const addContactList = document.getElementById('add-contact-list'); 
     const addAddressList = document.getElementById('add-address-list'); 
@@ -101,7 +18,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const addVisitsList = document.getElementById('add-visits-list');
     const addPhotoInput = document.getElementById('add-photo-input');
     const addPhotoPreviewContainer = document.getElementById('add-photo-preview-container');
-    
     const dealerListBody = document.getElementById('dealer-list-body');
     const dealerTable = document.getElementById('dealer-table');
     const noDataMsg = document.getElementById('no-data-msg');
@@ -110,7 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchBar = document.getElementById('search-bar'); 
     const exportBtn = document.getElementById('export-dealers-btn'); 
     const dashboardContainer = document.getElementById('dashboard-container'); 
-
+    const tasksList = document.getElementById('tasks-list'); // (НОВОЕ)
     const editForm = document.getElementById('edit-dealer-form');
     const editProductChecklist = document.getElementById('edit-product-checklist'); 
     const editContactList = document.getElementById('edit-contact-list'); 
@@ -120,9 +36,35 @@ document.addEventListener('DOMContentLoaded', () => {
     const editPhotoList = document.getElementById('edit-photo-list'); 
     const editPhotoInput = document.getElementById('edit-photo-input');
     const editPhotoPreviewContainer = document.getElementById('edit-photo-preview-container');
+    let addPhotosData = []; let editPhotosData = [];
+    
+    // Карта
+    const DEFAULT_LAT = 51.1605; const DEFAULT_LNG = 71.4704;
+    let addMap, editMap;
 
-    let addPhotosData = []; 
-    let editPhotosData = [];
+    function initMap(mapId) {
+        const map = L.map(mapId).setView([DEFAULT_LAT, DEFAULT_LNG], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: 'OSM' }).addTo(map);
+        return map;
+    }
+    function setupMapClick(map, latId, lngId, markerRef) {
+        map.on('click', function(e) {
+            const lat = e.latlng.lat; const lng = e.latlng.lng;
+            document.getElementById(latId).value = lat; document.getElementById(lngId).value = lng;
+            if (markerRef.current) markerRef.current.setLatLng([lat, lng]); else markerRef.current = L.marker([lat, lng]).addTo(map);
+        });
+    }
+    addModalEl.addEventListener('shown.bs.modal', () => {
+        if (!addMap) { addMap = initMap('add-map'); addModalEl.markerRef = { current: null }; setupMapClick(addMap, 'add_latitude', 'add_longitude', addModalEl.markerRef); } else { addMap.invalidateSize(); }
+        if (addModalEl.markerRef && addModalEl.markerRef.current) { addMap.removeLayer(addModalEl.markerRef.current); addModalEl.markerRef.current = null; }
+        addMap.setView([DEFAULT_LAT, DEFAULT_LNG], 13);
+    });
+    editModalEl.addEventListener('shown.bs.modal', () => {
+        if (!editMap) { editMap = initMap('edit-map'); editModalEl.markerRef = { current: null }; setupMapClick(editMap, 'edit_latitude', 'edit_longitude', editModalEl.markerRef); } else { editMap.invalidateSize(); }
+        const lat = parseFloat(document.getElementById('edit_latitude').value); const lng = parseFloat(document.getElementById('edit_longitude').value);
+        if (editModalEl.markerRef.current) editMap.removeLayer(editModalEl.markerRef.current);
+        if (!isNaN(lat) && !isNaN(lng)) { editModalEl.markerRef.current = L.marker([lat, lng]).addTo(editMap); editMap.setView([lat, lng], 15); } else { editMap.setView([DEFAULT_LAT, DEFAULT_LNG], 13); }
+    });
 
     const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
     const toBase64 = file => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => resolve(reader.result); reader.onerror = error => reject(error); });
@@ -136,25 +78,77 @@ document.addEventListener('DOMContentLoaded', () => {
             fullProductCatalog = await response.json();
             fullProductCatalog.sort((a, b) => a.sku.localeCompare(b.sku, 'ru', { numeric: true }));
         } catch (error) {
-            console.error("Ошибка каталога:", error);
-            addProductChecklist.innerHTML = `<p class='text-danger'>Не удалось загрузить каталог.</p>`;
-            editProductChecklist.innerHTML = `<p class='text-danger'>Не удалось загрузить каталог.</p>`;
+            addProductChecklist.innerHTML = `<p class='text-danger'>Ошибка каталога.</p>`;
+            editProductChecklist.innerHTML = `<p class='text-danger'>Ошибка каталога.</p>`;
         }
     }
 
+    // --- (ИЗМЕНЕНО) Дашборд с ЗАДАЧАМИ ---
     function renderDashboard() {
         if (!allDealers || allDealers.length === 0) { dashboardContainer.innerHTML = ''; return; }
+        
+        // Статистика
         const totalDealers = allDealers.length;
         const noPhotosCount = allDealers.filter(d => !d.has_photos).length;
         const posCount = allDealers.filter(d => d.has_pos).length;
         const cityCounts = {}; let topCity = "-"; let maxCount = 0;
         allDealers.forEach(d => { if (d.city) { cityCounts[d.city] = (cityCounts[d.city] || 0) + 1; if (cityCounts[d.city] > maxCount) { maxCount = cityCounts[d.city]; topCity = d.city; } } });
+
         dashboardContainer.innerHTML = `
             <div class="col-md-6 col-lg-3"><div class="stat-card"><i class="bi bi-shop stat-icon text-primary"></i><span class="stat-number">${totalDealers}</span><span class="stat-label">Всего дилеров</span></div></div>
             <div class="col-md-6 col-lg-3"><div class="stat-card ${noPhotosCount > 0 ? 'border-danger' : ''}"><i class="bi bi-camera-fill stat-icon ${noPhotosCount > 0 ? 'text-danger' : 'text-secondary'}"></i><span class="stat-number ${noPhotosCount > 0 ? 'text-danger' : ''}">${noPhotosCount}</span><span class="stat-label">Без фото</span></div></div>
             <div class="col-md-6 col-lg-3"><div class="stat-card"><i class="bi bi-easel stat-icon text-success"></i><span class="stat-number text-success">${posCount}</span><span class="stat-label">С оборудованием</span></div></div>
              <div class="col-md-6 col-lg-3"><div class="stat-card"><i class="bi bi-geo-alt-fill stat-icon text-info"></i><span class="stat-number text-info" style="font-size: 1.5rem;">${topCity}</span><span class="stat-label">Топ регион</span></div></div>
         `;
+
+        // --- ЗАДАЧИ (ВИЗИТЫ) ---
+        if (!tasksList) return;
+        
+        const today = new Date();
+        today.setHours(0,0,0,0); // Начало сегодняшнего дня
+        
+        const tasks = [];
+        
+        allDealers.forEach(d => {
+            if (d.visits && Array.isArray(d.visits)) {
+                d.visits.forEach(v => {
+                    const vDate = new Date(v.date);
+                    // Если дата сегодня или в будущем
+                    if (vDate >= today) {
+                        tasks.push({
+                            dealerName: d.name,
+                            dealerId: d.id, // Используем ID с сервера
+                            date: vDate,
+                            comment: v.comment
+                        });
+                    }
+                });
+            }
+        });
+
+        // Сортируем: ближайшие сверху
+        tasks.sort((a, b) => a.date - b.date);
+
+        if (tasks.length === 0) {
+            tasksList.innerHTML = `<div class="text-center py-4 text-muted"><i class="bi bi-check2-circle fs-3 d-block mb-2"></i>Задач нет</div>`;
+        } else {
+            tasksList.innerHTML = tasks.map(t => {
+                const isToday = t.date.getTime() === today.getTime();
+                const dateStr = t.date.toLocaleDateString('ru-RU');
+                
+                return `
+                    <a href="dealer.html?id=${t.dealerId}" target="_blank" class="list-group-item list-group-item-action task-item d-flex justify-content-between align-items-start">
+                        <div class="ms-2 me-auto">
+                            <div class="fw-bold">${t.dealerName}</div>
+                            ${safeText(t.comment)}
+                        </div>
+                        <span class="badge ${isToday ? 'bg-danger' : 'bg-primary'} rounded-pill">
+                            ${isToday ? 'Сегодня' : dateStr}
+                        </span>
+                    </a>
+                `;
+            }).join('');
+        }
     }
 
     function createContactEntryHTML(c={}) { return `<div class="contact-entry input-group mb-2"><input type="text" class="form-control contact-name" placeholder="Имя" value="${c.name||''}"><input type="text" class="form-control contact-position" placeholder="Должность" value="${c.position||''}"><input type="text" class="form-control contact-info" placeholder="Телефон" value="${c.contactInfo||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
@@ -240,11 +234,11 @@ document.addEventListener('DOMContentLoaded', () => {
         renderList(addAddressList, [], createAddressEntryHTML);
         renderList(addPosList, [], createPosEntryHTML);
         renderList(addVisitsList, [], createVisitEntryHTML);
-        // СБРОС ПОЛЕЙ LAT/LNG
-        document.getElementById('add_latitude').value = '';
-        document.getElementById('add_longitude').value = '';
-        
+        // Сброс координат
+        document.getElementById('add_latitude').value = ''; document.getElementById('add_longitude').value = '';
+        // Сброс фото
         addPhotosData = []; renderPhotoPreviews(addPhotoPreviewContainer, []);
+        // Перерисовка карты при открытии
         addModal.show();
     };
 
@@ -255,9 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
             organization: document.getElementById('organization').value, price_type: document.getElementById('price_type').value,
             city: document.getElementById('city').value, address: document.getElementById('address').value,
             delivery: document.getElementById('delivery').value, website: document.getElementById('website').value, instagram: document.getElementById('instagram').value,
-            // (НОВОЕ) Собираем координаты
-            latitude: document.getElementById('add_latitude').value, 
-            longitude: document.getElementById('add_longitude').value,
+            latitude: document.getElementById('add_latitude').value, longitude: document.getElementById('add_longitude').value,
             bonuses: document.getElementById('bonuses').value,
             contacts: collectData(addContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]),
             additional_addresses: collectData(addAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]),
@@ -290,10 +282,8 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('edit_delivery').value = d.delivery;
             document.getElementById('edit_website').value = d.website;
             document.getElementById('edit_instagram').value = d.instagram;
-            // (НОВОЕ) Заполняем координаты
             document.getElementById('edit_latitude').value = d.latitude || '';
             document.getElementById('edit_longitude').value = d.longitude || '';
-            
             document.getElementById('edit_bonuses').value = d.bonuses;
             renderList(editContactList, d.contacts, createContactEntryHTML);
             renderList(editAddressList, d.additional_addresses, createAddressEntryHTML);
@@ -314,9 +304,7 @@ document.addEventListener('DOMContentLoaded', () => {
             organization: document.getElementById('edit_organization').value, price_type: document.getElementById('edit_price_type').value,
             city: document.getElementById('edit_city').value, address: document.getElementById('edit_address').value,
             delivery: document.getElementById('edit_delivery').value, website: document.getElementById('edit_website').value, instagram: document.getElementById('edit_instagram').value,
-            // (НОВОЕ) Сохраняем координаты
-            latitude: document.getElementById('edit_latitude').value,
-            longitude: document.getElementById('edit_longitude').value,
+            latitude: document.getElementById('edit_latitude').value, longitude: document.getElementById('edit_longitude').value,
             bonuses: document.getElementById('edit_bonuses').value,
             contacts: collectData(editContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]),
             additional_addresses: collectData(editAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]),
