@@ -1,14 +1,26 @@
 // script.js
 document.addEventListener('DOMContentLoaded', () => {
+    
     const API_DEALERS_URL = '/api/dealers';
     const API_PRODUCTS_URL = '/api/products'; 
+
     let fullProductCatalog = [];
     let allDealers = [];
     let currentSort = { column: 'name', direction: 'asc' };
-    const posMaterialsList = ["Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа их фанеры старая", "С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "Табличка - Табличка орг.стекло"];
 
-    const addModalEl = document.getElementById('add-modal'); const addModal = new bootstrap.Modal(addModalEl);
-    const editModalEl = document.getElementById('edit-modal'); const editModal = new bootstrap.Modal(editModalEl);
+    const posMaterialsList = [
+        "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "РФ-2 - Расческа из фанеры",
+        "РФС-1 - Расческа их фанеры старая", "С600 - 600мм задняя стенка",
+        "С800 - 800мм задняя стенка", "Табличка - Табличка орг.стекло"
+    ];
+
+    // --- Модалки ---
+    const addModalEl = document.getElementById('add-modal');
+    const addModal = new bootstrap.Modal(addModalEl);
+    const editModalEl = document.getElementById('edit-modal');
+    const editModal = new bootstrap.Modal(editModalEl);
+
+    // --- Элементы ---
     const openAddModalBtn = document.getElementById('open-add-modal-btn');
     const addForm = document.getElementById('add-dealer-form');
     const addProductChecklist = document.getElementById('add-product-checklist'); 
@@ -18,6 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const addVisitsList = document.getElementById('add-visits-list');
     const addPhotoInput = document.getElementById('add-photo-input');
     const addPhotoPreviewContainer = document.getElementById('add-photo-preview-container');
+    
     const dealerListBody = document.getElementById('dealer-list-body');
     const dealerTable = document.getElementById('dealer-table');
     const noDataMsg = document.getElementById('no-data-msg');
@@ -27,6 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const exportBtn = document.getElementById('export-dealers-btn'); 
     const dashboardContainer = document.getElementById('dashboard-container'); 
     const tasksList = document.getElementById('tasks-list'); 
+
     const editForm = document.getElementById('edit-dealer-form');
     const editProductChecklist = document.getElementById('edit-product-checklist'); 
     const editContactList = document.getElementById('edit-contact-list'); 
@@ -36,9 +50,44 @@ document.addEventListener('DOMContentLoaded', () => {
     const editPhotoList = document.getElementById('edit-photo-list'); 
     const editPhotoInput = document.getElementById('edit-photo-input');
     const editPhotoPreviewContainer = document.getElementById('edit-photo-preview-container');
-    let addPhotosData = []; let editPhotosData = [];
+
+    let addPhotosData = []; 
+    let editPhotosData = [];
+
+    // Вспомогательные функции
+    const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
     
-    // Карта
+    // (НОВОЕ) Безопасное значение для атрибутов (кавычки ломают HTML)
+    const safeAttr = (text) => text ? text.replace(/"/g, '&quot;') : '';
+
+    const toBase64 = file => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+    });
+
+    const compressImage = (file, maxWidth = 1000, quality = 0.7) => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = event => {
+            const img = new Image();
+            img.src = event.target.result;
+            img.onload = () => {
+                const elem = document.createElement('canvas');
+                let width = img.width; let height = img.height;
+                if (width > maxWidth) { height *= maxWidth / width; width = maxWidth; }
+                elem.width = width; elem.height = height;
+                const ctx = elem.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                resolve(elem.toDataURL('image/jpeg', quality));
+            };
+            img.onerror = error => reject(error);
+        };
+        reader.onerror = error => reject(error);
+    });
+
+    // --- Карта ---
     const DEFAULT_LAT = 51.1605; const DEFAULT_LNG = 71.4704;
     let addMap, editMap;
 
@@ -66,10 +115,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!isNaN(lat) && !isNaN(lng)) { editModalEl.markerRef.current = L.marker([lat, lng]).addTo(editMap); editMap.setView([lat, lng], 15); } else { editMap.setView([DEFAULT_LAT, DEFAULT_LNG], 13); }
     });
 
-    const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
-    const toBase64 = file => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => resolve(reader.result); reader.onerror = error => reject(error); });
-    const compressImage = (file, maxWidth = 1000, quality = 0.7) => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = event => { const img = new Image(); img.src = event.target.result; img.onload = () => { const elem = document.createElement('canvas'); let width = img.width; let height = img.height; if (width > maxWidth) { height *= maxWidth / width; width = maxWidth; } elem.width = width; elem.height = height; const ctx = elem.getContext('2d'); ctx.drawImage(img, 0, 0, width, height); resolve(elem.toDataURL('image/jpeg', quality)); }; img.onerror = error => reject(error); }; reader.onerror = error => reject(error); });
-
     async function fetchProductCatalog() {
         if (fullProductCatalog.length > 0) return; 
         try {
@@ -79,48 +124,52 @@ document.addEventListener('DOMContentLoaded', () => {
             fullProductCatalog.sort((a, b) => a.sku.localeCompare(b.sku, 'ru', { numeric: true }));
         } catch (error) {
             console.error("Ошибка каталога:", error);
-            addProductChecklist.innerHTML = `<p class='text-danger'>Не удалось загрузить каталог.</p>`;
-            editProductChecklist.innerHTML = `<p class='text-danger'>Не удалось загрузить каталог.</p>`;
+            addProductChecklist.innerHTML = `<p class='text-danger'>Ошибка каталога.</p>`;
+            editProductChecklist.innerHTML = `<p class='text-danger'>Ошибка каталога.</p>`;
         }
     }
 
-    // --- (ИЗМЕНЕНО) Функция выполнения задачи ---
+    // --- (ИСПРАВЛЕНО) Функция выполнения задачи ---
     async function completeTask(dealerId, visitDate, visitComment) {
         try {
-            // 1. Получаем полные данные дилера
             const res = await fetch(`${API_DEALERS_URL}/${dealerId}`);
             if(!res.ok) throw new Error('Не удалось загрузить данные');
             const dealer = await res.json();
 
-            // 2. Находим визит и ставим "выполнено"
             let found = false;
             if (dealer.visits) {
                 dealer.visits.forEach(v => {
-                    if (v.date === visitDate && v.comment === visitComment && !v.isCompleted) {
+                    // Сравниваем дату И комментарий. 
+                    // Учитываем, что комментарий может быть undefined в базе, а мы ищем пустую строку.
+                    const dbComment = v.comment || "";
+                    const searchComment = visitComment || "";
+                    
+                    if (v.date === visitDate && dbComment === searchComment && !v.isCompleted) {
                         v.isCompleted = true;
                         found = true;
                     }
                 });
             }
 
-            if (!found) return alert("Задача не найдена или уже выполнена.");
+            if (!found) {
+                console.warn("Задача не найдена в базе:", visitDate, visitComment);
+                return alert("Не удалось найти эту задачу (возможно, она была изменена).");
+            }
 
-            // 3. Сохраняем дилера
             await fetch(`${API_DEALERS_URL}/${dealerId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(dealer)
             });
 
-            // 4. Обновляем
-            initApp();
+            initApp(); // Обновляем экран
 
         } catch (e) {
             alert("Ошибка: " + e.message);
         }
     }
 
-    // --- Дашборд с ЗАДАЧАМИ ---
+    // --- Дашборд ---
     function renderDashboard() {
         if (!allDealers || allDealers.length === 0) { dashboardContainer.innerHTML = ''; return; }
         
@@ -139,16 +188,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // --- ЗАДАЧИ ---
         if (!tasksList) return;
-        
-        const today = new Date();
-        today.setHours(0,0,0,0);
-        
+        const today = new Date(); today.setHours(0,0,0,0);
         const tasks = [];
         
         allDealers.forEach(d => {
             if (d.visits && Array.isArray(d.visits)) {
                 d.visits.forEach(v => {
-                    // Проверяем: будущее + НЕ выполнено
                     if (!v.isCompleted) {
                         const vDate = new Date(v.date);
                         if (vDate >= today) {
@@ -156,8 +201,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                 dealerName: d.name,
                                 dealerId: d.id,
                                 date: vDate,
-                                dateStrRaw: v.date, // Для поиска при сохранении
-                                comment: v.comment
+                                dateStrRaw: v.date,
+                                comment: v.comment || "" // Гарантируем пустую строку, если null
                             });
                         }
                     }
@@ -186,8 +231,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <button class="btn btn-sm btn-success btn-complete-task ms-2" 
                                 data-id="${t.dealerId}" 
                                 data-date="${t.dateStrRaw}" 
-                                data-comment="${safeText(t.comment)}">
-                            <i class="bi bi-check-lg"></i>
+                                data-comment="${safeAttr(t.comment)}"> <i class="bi bi-check-lg"></i>
                         </button>
                     </div>
                 `;
@@ -195,17 +239,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Обработчик клика по "Выполнить"
     if(tasksList) {
         tasksList.addEventListener('click', (e) => {
             const btn = e.target.closest('.btn-complete-task');
             if (btn) {
+                // Отключаем кнопку, чтобы не нажать дважды
+                btn.disabled = true; 
                 completeTask(btn.dataset.id, btn.dataset.date, btn.dataset.comment);
             }
         });
     }
 
-    // --- HTML Генераторы (добавлено скрытое поле isCompleted) ---
     function createContactEntryHTML(c={}) { return `<div class="contact-entry input-group mb-2"><input type="text" class="form-control contact-name" placeholder="Имя" value="${c.name||''}"><input type="text" class="form-control contact-position" placeholder="Должность" value="${c.position||''}"><input type="text" class="form-control contact-info" placeholder="Телефон" value="${c.contactInfo||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
     function createAddressEntryHTML(a={}) { return `<div class="address-entry input-group mb-2"><input type="text" class="form-control address-description" placeholder="Описание" value="${a.description||''}"><input type="text" class="form-control address-city" placeholder="Город" value="${a.city||''}"><input type="text" class="form-control address-address" placeholder="Адрес" value="${a.address||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
     function createPosEntryHTML(p={}) { const opts = posMaterialsList.map(n => `<option value="${n}" ${n===p.name?'selected':''}>${n}</option>`).join(''); return `<div class="pos-entry input-group mb-2"><select class="form-select pos-name"><option value="">-- Выбор --</option>${opts}</select><input type="number" class="form-control pos-quantity" value="${p.quantity||1}" min="1"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
@@ -233,9 +277,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         return data;
     }
-    async function collectPhotos(container) {
-        return Promise.resolve([]); 
-    }
+    async function collectPhotos(container) { return Promise.resolve([]); }
     function renderList(container, data, htmlGen) { container.innerHTML = (data && data.length > 0) ? data.map(htmlGen).join('') : htmlGen(); }
     function renderProductChecklist(container, selectedIds=[]) { const set = new Set(selectedIds); container.innerHTML = fullProductCatalog.map(p => `<div class="checklist-item form-check"><input type="checkbox" class="form-check-input" id="prod-${container.id}-${p.id}" value="${p.id}" ${set.has(p.id)?'checked':''}><label class="form-check-label" for="prod-${container.id}-${p.id}"><strong>${p.sku}</strong> - ${p.name}</label></div>`).join(''); }
     function getSelectedProductIds(containerId) { return Array.from(document.getElementById(containerId).querySelectorAll('input:checked')).map(cb=>cb.value); }
@@ -267,10 +309,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function populateFilters(dealers) {
         const cities = [...new Set(dealers.map(d => d.city).filter(Boolean))].sort();
         const types = [...new Set(dealers.map(d => d.price_type).filter(Boolean))].sort();
-        const selCity = filterCity.value; const selType = filterPriceType.value;
+        const sc = filterCity.value; const st = filterPriceType.value;
         filterCity.innerHTML = '<option value="">-- Все города --</option>'; filterPriceType.innerHTML = '<option value="">-- Все типы --</option>';
         cities.forEach(c => filterCity.add(new Option(c, c))); types.forEach(t => filterPriceType.add(new Option(t, t)));
-        filterCity.value = selCity; filterPriceType.value = selType;
+        filterCity.value = sc; filterPriceType.value = st;
     }
 
     async function initApp() {
@@ -378,7 +420,7 @@ document.addEventListener('DOMContentLoaded', () => {
             contacts: collectData(editContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]),
             additional_addresses: collectData(editAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]),
             pos_materials: collectData(editPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]),
-            // (ИЗМЕНЕНО) Собираем визиты с полем isCompleted
+            // (ВАЖНО) Собираем isCompleted, чтобы не потерять статус выполненных задач при редактировании
             visits: collectData(editVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'},{key:'isCompleted',class:'.visit-completed'}]),
             photos: editPhotosData
         };
