@@ -1,4 +1,3 @@
-// server.js
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -27,7 +26,7 @@ if (ADMIN_USER && ADMIN_PASSWORD) {
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// --- СПИСОК ТОВАРОВ (79 шт.) ---
+// --- ВАШ НОВЫЙ СПИСОК ТОВАРОВ (79 шт.) ---
 const productsToImport = [
     { sku: "CD-507", name: "Дуб Беленый" }, { sku: "CD-508", name: "Дуб Пепельный" },
     { sku: "8EH34-701", name: "Дуб Снежный" }, { sku: "8EH34-702", name: "Дуб Арабика" },
@@ -76,13 +75,7 @@ const contactSchema = new mongoose.Schema({ name: String, position: String, cont
 const photoSchema = new mongoose.Schema({ description: String, photo_url: String, date: { type: Date, default: Date.now } }, { _id: false });
 const additionalAddressSchema = new mongoose.Schema({ description: String, city: String, address: String }, { _id: false });
 const posMaterialSchema = new mongoose.Schema({ name: String, quantity: Number }, { _id: false });
-
-// (ИЗМЕНЕНО) Добавлено поле isCompleted
-const visitSchema = new mongoose.Schema({ 
-    date: String, 
-    comment: String,
-    isCompleted: { type: Boolean, default: false } 
-}, { _id: false });
+const visitSchema = new mongoose.Schema({ date: String, comment: String, isCompleted: { type: Boolean, default: false } }, { _id: false });
 
 const dealerSchema = new mongoose.Schema({
     dealer_id: String, name: String, price_type: String, city: String, address: String, 
@@ -99,10 +92,10 @@ const Knowledge = mongoose.model('Knowledge', knowledgeSchema);
 async function hardcodedImportProducts() {
     try {
         const count = await Product.countDocuments();
-        if(count < productsToImport.length) {
-             const operations = productsToImport.map(p => ({ updateOne: { filter: { sku: p.sku }, update: { $set: p }, upsert: true } }));
-             await Product.bulkWrite(operations);
-        }
+        // Принудительно обновляем, если список в коде изменился
+        const operations = productsToImport.map(p => ({ updateOne: { filter: { sku: p.sku }, update: { $set: p }, upsert: true } }));
+        await Product.bulkWrite(operations);
+        console.log("Каталог обновлен.");
     } catch (e) { console.warn(e.message); }
 }
 
@@ -128,27 +121,22 @@ app.get('/api/dealers', async (req, res) => {
             has_photos: (d.photos && d.photos.length > 0),
             products_count: (d.products ? d.products.length : 0),
             has_pos: (d.pos_materials && d.pos_materials.length > 0),
-            visits: d.visits, 
-            latitude: d.latitude, longitude: d.longitude
+            visits: d.visits, latitude: d.latitude, longitude: d.longitude
         }))); 
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
-
 app.get('/api/dealers/:id', async (req, res) => { try { const dealer = await Dealer.findById(req.params.id).populate('products'); res.json(convertToClient(dealer)); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.post('/api/dealers', async (req, res) => { try { const dealer = new Dealer(req.body); await dealer.save(); res.status(201).json(convertToClient(dealer)); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.put('/api/dealers/:id', async (req, res) => { try { await Dealer.findByIdAndUpdate(req.params.id, req.body); res.json({status:'ok'}); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.delete('/api/dealers/:id', async (req, res) => { try { await Dealer.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.get('/api/dealers/:id/products', async (req, res) => { try { const dealer = await Dealer.findById(req.params.id).populate({path:'products',options:{sort:{'sku':1}}}); res.json(dealer.products.map(convertToClient)); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.put('/api/dealers/:id/products', async (req, res) => { try { await Dealer.findByIdAndUpdate(req.params.id, { products: req.body.productIds }); res.json({status:'ok'}); } catch (e) { res.status(500).json({ error: e.message }); } });
-
 app.get('/api/products', async (req, res) => { const search = new RegExp(req.query.search || '', 'i'); const products = await Product.find({$or:[{sku:search},{name:search}]}).sort({sku:1}).lean(); res.json(products.map(p=>{p.id=p._id; return p;})); });
 app.post('/api/products', async (req, res) => { try { const p = new Product(req.body); await p.save(); res.json(convertToClient(p)); } catch(e){res.status(409).json({});} });
 app.put('/api/products/:id', async (req, res) => { try { const p = await Product.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(p)); } catch(e){res.status(409).json({});} });
 app.delete('/api/products/:id', async (req, res) => { await Product.findByIdAndDelete(req.params.id); await Dealer.updateMany({ products: req.params.id }, { $pull: { products: req.params.id } }); res.json({}); });
-
 app.get('/api/matrix', async (req, res) => { try { const prods = await Product.find({}, 'sku name').sort({sku:1}).lean(); const dlrs = await Dealer.find({}, 'name products').sort({name:1}).lean(); const map = new Map(); dlrs.forEach(d => map.set(d._id.toString(), new Set(d.products.map(String)))); const matrix = prods.map(p => ({ sku: p.sku, name: p.name, dealers: dlrs.map(d => ({ has_product: map.get(d._id.toString()).has(p._id.toString()) })) })); res.json({ headers: dlrs.map(d => ({id:d._id, name:d.name})), matrix }); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.get('/api/products/:id/dealers', async (req, res) => { const dlrs = await Dealer.find({ products: req.params.id }, 'dealer_id name city').sort({name:1}).lean(); res.json(dlrs.map(d=>{d.id=d._id; return d;})); });
-
 app.get('/api/knowledge', async (req, res) => { const arts = await Knowledge.find({title: new RegExp(req.query.search||'', 'i')}).sort({title:1}).lean(); res.json(arts.map(a=>{a.id=a._id; return a;})); });
 app.get('/api/knowledge/:id', async (req, res) => { res.json(convertToClient(await Knowledge.findById(req.params.id))); });
 app.post('/api/knowledge', async (req, res) => { const a = new Knowledge(req.body); await a.save(); res.json(convertToClient(a)); });
