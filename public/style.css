@@ -417,3 +417,16 @@ td a:hover { text-decoration: underline; color: var(--primary-hover) !important;
     .btn-remove-entry { grid-row: 1 / span 3; grid-column: 2 / 3; }
     .pos-entry .btn-remove-entry { grid-row: 1 / span 2; }
 }
+
+/* ... (весь ваш старый CSS код) ... */
+
+/* (НОВОЕ) Стиль для мини-карты в модалке */
+.mini-map {
+    height: 250px;
+    width: 100%;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    margin-bottom: 10px;
+}
+
+/* ... (остальной код) ... */
