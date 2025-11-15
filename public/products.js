@@ -22,7 +22,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
 
-    // (ИСПРАВЛЕНО) fetchProducts
     async function fetchProducts(searchTerm = '') {
         try {
             const response = await fetch(`${API_URL}?search=${encodeURIComponent(searchTerm)}`);
