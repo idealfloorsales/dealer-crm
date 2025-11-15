@@ -66,9 +66,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if(bonusesContainer) bonusesContainer.textContent = safeText(dealer.bonuses) || 'Нет данных';
 
             document.title = `Дилер: ${dealer.name}`;
+
         } catch (error) {
             console.error('Ошибка:', error);
-            detailsContainer.innerHTML = `<h2 class="text-danger">${error.message}</h2>`;
+            if(detailsContainer) detailsContainer.innerHTML = `<h2 class="text-danger">${error.message}</h2>`;
         }
     }
     
@@ -114,7 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // (ИСПРАВЛЕНО) Оборачиваем все таблицы в table-responsive
+    // --- (ИСПРАВЛЕНО) Обертки table-responsive ---
     function renderDealerVisits(visits) {
         if (!visitsListContainer) return;
         if (!visits || visits.length === 0) { visitsListContainer.innerHTML = '<p><i>Нет записей.</i></p>'; return; }
@@ -166,7 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if(editBtn) editBtn.addEventListener('click', () => { localStorage.setItem('pendingEditDealerId', dealerId); window.location.href = 'index.html'; });
-    if(navigateBtn) navigateBtn.addEventListener('click', () => { if (dealerLat && dealerLng) window.open(`http://googleusercontent.com/maps.google.com/?q=${dealerLat},${dealerLng}`, '_blank'); else alert("Координаты не заданы."); });
+    if(navigateBtn) navigateBtn.addEventListener('click', () => { if (dealerLat && dealerLng) window.open(`http://googleusercontent.com/maps/google.com/?q=${dealerLat},${dealerLng}`, '_blank'); else alert("Координаты не заданы."); });
     if(deleteBtn) deleteBtn.addEventListener('click', async () => { if (confirm(`Удалить?`)) { try { const response = await fetch(`${API_URL}/${dealerId}`, { method: 'DELETE' }); if (response.ok) window.location.href = 'index.html'; } catch (error) { alert('Ошибка.'); } } });
 
     fetchDealerDetails();
