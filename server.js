@@ -27,7 +27,7 @@ if (ADMIN_USER && ADMIN_PASSWORD) {
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// --- (ИЗМЕНЕНО) ПОЛНЫЙ СПИСОК (Ламинат + Стенды) ---
+// --- СПИСОК ТОВАРОВ (79 шт., Ламинат + Стенды) ---
 const productsToImport = [
     { sku: "CD-507", name: "Дуб Беленый" }, { sku: "CD-508", name: "Дуб Пепельный" },
     { sku: "8EH34-701", name: "Дуб Снежный" }, { sku: "8EH34-702", name: "Дуб Арабика" },
@@ -79,15 +79,15 @@ const visitSchema = new mongoose.Schema({ date: String, comment: String, isCompl
 
 const dealerSchema = new mongoose.Schema({
     dealer_id: String, name: String, price_type: String, city: String, address: String, 
-    // (ИЗМЕНЕНО) Добавлен Аватар, убраны POS
-    avatarUrl: String, 
-    latitude: Number, longitude: Number,
-    status: { type: String, default: 'standard' }, 
     contacts: [contactSchema], bonuses: String, photos: [photoSchema], organization: String,
     delivery: String, website: String, instagram: String,
     additional_addresses: [additionalAddressSchema], 
+    // pos_materials: [posMaterialSchema], // (УДАЛЕНО)
     visits: [visitSchema],
-    products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }]
+    products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
+    latitude: Number, longitude: Number,
+    status: { type: String, default: 'standard' },
+    avatarUrl: String // (НОВОЕ)
 });
 const Dealer = mongoose.model('Dealer', dealerSchema);
 const knowledgeSchema = new mongoose.Schema({ title: String, content: String }, { timestamps: true }); 
@@ -114,16 +114,16 @@ function convertToClient(doc) {
     return obj;
 }
 
-// (ИЗМЕНЕНО) API отда
+// API
 app.get('/api/dealers', async (req, res) => {
     try {
-        const dealers = await Dealer.find({}, 'dealer_id name city price_type organization products visits latitude longitude status avatarUrl pos_materials').lean();
+        const dealers = await Dealer.find({}, 'dealer_id name city price_type organization products visits latitude longitude status avatarUrl').lean();
         res.json(dealers.map(d => ({
             id: d._id, dealer_id: d.dealer_id, name: d.name, city: d.city, price_type: d.price_type, organization: d.organization,
-            photo_url: d.avatarUrl, // (ИЗМЕНЕНО) Отправляем Аватар
+            photo_url: d.avatarUrl, // (ИЗМЕНЕНО) Отдаем Аватар для списка
             has_photos: (d.photos && d.photos.length > 0),
             products_count: (d.products ? d.products.length : 0),
-            has_pos: (d.pos_materials && d.pos_materials.length > 0),
+            // has_pos: (d.pos_materials && d.pos_materials.length > 0), // (УДАЛЕНО)
             visits: d.visits, latitude: d.latitude, longitude: d.longitude,
             status: d.status || 'standard'
         }))); 
