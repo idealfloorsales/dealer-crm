@@ -1,6 +1,4 @@
 /* style.css */
-
-/* --- Базовые стили --- */
 :root {
     --primary-color: #b9040a;   
     --primary-hover: #a00309;   
@@ -14,9 +12,17 @@
     --shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
-body { font-family: system-ui, -apple-system, sans-serif; margin: 0; background: var(--light-gray); color: var(--text-color); line-height: 1.5; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    margin: 0;
+    background-color: var(--light-gray);
+    color: var(--text-color);
+    line-height: 1.5;
+}
+
 .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
 .container-fluid { max-width: 98%; margin: 0 auto; padding: 20px; }
+
 h1, h2, h3 { color: #333; border-bottom: 2px solid var(--primary-color); padding-bottom: 10px; margin-top: 1.5rem; }
 h3 { border-bottom: 1px solid var(--medium-gray); margin-top: 30px; }
 
@@ -30,10 +36,14 @@ nav a.nav-link.active { background: var(--primary-color); color: white !importan
 
 button, a.btn { padding: 0.5rem 1rem; border-radius: 5px; border: none; cursor: pointer; font-size: 14px; font-weight: 500; margin-top: 10px; text-decoration: none; display: inline-block; transition: 0.2s; }
 button:hover, a.btn:hover { opacity: 0.85; }
+button[type="submit"] { background: var(--primary-color); font-size: 16px; color: white; }
+button[type="submit"]:hover { background: var(--primary-hover); }
 .btn-danger, a.btn-danger { background: var(--danger-color); color: white; }
+.btn-danger:hover, a.btn-danger:hover { background: #c82333; }
 .btn-primary, #open-add-modal-btn, #open-add-product-btn, #open-add-article-btn, #export-csv-btn { background: var(--primary-color) !important; color: white !important; }
 .btn-primary:hover { background: var(--primary-hover) !important; }
 .btn-secondary, a.btn-secondary { background: var(--secondary-color); color: white; }
+.btn-secondary:hover, a.btn-secondary:hover { background: #5a6268; }
 
 label { font-weight: 600; color: #555; margin-top: 5px; display: block; }
 .form-control:focus, .form-select:focus { border-color: var(--primary-color) !important; box-shadow: 0 0 0 3px rgba(185, 4, 10, 0.25) !important; outline: none; }
@@ -44,22 +54,67 @@ label { font-weight: 600; color: #555; margin-top: 5px; display: block; }
 .filter-group select, .filter-container input[type="text"] { padding: 8px; min-width: 220px; margin-top: 0; height: 38px; }
 #search-bar { padding: 8px 12px !important; height: 38px !important; font-size: 1rem !important; }
 
-#dealer-table { width: 100%; background: transparent; box-shadow: none; border-radius: 0; border-collapse: separate; border-spacing: 0 3px; }
-td, th { padding: 12px 15px; vertical-align: middle; }
-th { background: var(--light-gray); color: #333; font-weight: 600; white-space: nowrap; border-bottom: 2px solid var(--border-color); }
-tbody tr { border: none; box-shadow: var(--shadow); border-radius: 8px; overflow: hidden; }
-tbody tr:hover td { background: var(--medium-gray); }
+/* --- (ИСПРАВЛЕНО) Таблицы --- */
+#dealer-table, #products-table, #report-table, #matrix-table {
+    width: 100%;
+    border-collapse: separate; /* Отдельные границы */
+    border-spacing: 0 5px; /* Отступ 5px по вертикали */
+    background: transparent;
+    box-shadow: none;
+    border-radius: 0;
+}
+#dealer-table td, #dealer-table th,
+#products-table td, #products-table th,
+#report-table td, #report-table th,
+#matrix-table td, #matrix-table th {
+    padding: 12px 15px;
+    vertical-align: middle;
+    background: #fff; /* Белый фон ячейкам */
+    border-bottom: none; /* Убираем стандартную границу */
+}
+#dealer-table th, #products-table th, #report-table th, #matrix-table th {
+    background: var(--light-gray);
+    color: #333;
+    font-weight: 600;
+    white-space: nowrap;
+    border-bottom: 2px solid var(--border-color);
+}
+#dealer-table tbody tr, 
+#products-table tbody tr,
+#report-table tbody tr,
+#matrix-table tbody tr {
+    border: none;
+    box-shadow: var(--shadow); /* Тень для каждой строки */
+    border-radius: 8px;
+    overflow: hidden;
+}
+#dealer-table tbody tr:hover td,
+#products-table tbody tr:hover td,
+#report-table tbody tr:hover td,
+#matrix-table tbody tr:hover td {
+    background: var(--medium-gray);
+}
 th[data-sort]:hover { background: #dde1e5; cursor: pointer; } 
-tbody tr td { background: #fff; }
-tbody tr:nth-of-type(even) td { background: var(--light-gray); }
 
-tr.row-status-active td { background-color: #f0fff9 !important; border-bottom: 2px solid #198754 !important; }
-tr.row-status-problem td { background-color: #fff5f5 !important; border-bottom: 2px solid #dc3545 !important; }
-tr.row-status-archive { opacity: 0.7; }
-tr.row-status-archive td { background-color: #f2f2f2 !important; border-bottom: 2px solid #6c757d !important; }
-tr.row-status-standard td { border-bottom: 2px solid #ffc107 !important; }
+/* Скругление углов у строк */
 tbody tr td:first-child, tbody tr th:first-child { border-radius: 8px 0 0 8px; }
 tbody tr td:last-child, tbody tr th:last-child { border-radius: 0 8px 8px 0; }
+/* Убираем "зебру", т.к. строки и так разделены */
+tbody tr:nth-of-type(even) td { background: #fff; }
+
+/* Статусы (Полоска снизу) */
+tr.row-status-active { box-shadow: 0 3px 8px -2px #198754; }
+tr.row-status-active td { border-bottom: 2px solid #198754 !important; }
+
+tr.row-status-problem { box-shadow: 0 3px 8px -2px #dc3545; }
+tr.row-status-problem td { border-bottom: 2px solid #dc3545 !important; }
+
+tr.row-status-archive { opacity: 0.7; }
+tr.row-status-archive td { border-bottom: 2px solid #6c757d !important; }
+
+tr.row-status-standard { box-shadow: var(--shadow); }
+tr.row-status-standard td { border-bottom: 2px solid #ffc107 !important; }
+/* --- КОНЕЦ СТАТУСОВ --- */
 
 .column-number, .cell-number { width: 40px; text-align: center; font-weight: bold; color: #555; }
 .table-photo { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border-color); }
@@ -89,8 +144,6 @@ td a { text-decoration: none; color: var(--primary-color) !important; font-weigh
 .checklist-item { break-inside: avoid; }
 
 .details-container { max-width: 900px; margin: 20px auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: var(--shadow); border: 1px solid var(--border-color); }
-/* (ИСПРАВЛЕНО) Таблицы в карточке дилера */
-.details-container .table-responsive { margin-top: 10px; }
 .products-display { background: var(--light-gray); border: 1px solid var(--border-color); padding: 15px; border-radius: 4px; white-space: pre-wrap; font-family: monospace; }
 .products-list-detailed { padding-left: 20px; }
 .dealer-links-container { display: flex; gap: 10px; margin: 15px 0; border-bottom: 1px solid var(--medium-gray); padding-bottom: 20px; flex-wrap: wrap; }
@@ -103,11 +156,9 @@ td a { text-decoration: none; color: var(--primary-color) !important; font-weigh
 .gallery-date { background: var(--light-gray); padding: 5px 10px; font-size: 0.85rem; font-weight: 600; color: #555; border-bottom: 1px solid var(--border-color); }
 .gallery-img-wrapper { width: 100%; height: 150px; }
 .gallery-img-wrapper img { width: 100%; height: 100%; object-fit: cover; }
-
 #matrix-table th { position: sticky; top: 0; z-index: 10; }
 .matrix-product-cell { position: sticky; left: 0; background: #fff; font-weight: bold; border-right: 2px solid var(--border-color) !important; z-index: 20; }
 .matrix-cell-yes { color: var(--primary-color); font-size: 1.3rem; text-align: center; font-weight: bold; }
-
 .knowledge-item { background: #fff; border: 1px solid var(--border-color); margin-bottom: 10px; border-radius: 8px; overflow: hidden; }
 .knowledge-item-header button { font-size: 1.1rem; font-weight: 600; color: var(--primary-color); text-align: left; width: 100%; background: none; border: none; padding: 15px 20px; }
 .knowledge-item-content { padding: 0 20px 20px 20px; border-top: 1px solid var(--border-color); }
@@ -118,11 +169,16 @@ td a { text-decoration: none; color: var(--primary-color) !important; font-weigh
 .stat-number { font-size: 2.5rem; font-weight: 700; color: var(--primary-color); display: block; margin-bottom: 5px; }
 .stat-label { font-size: 0.9rem; color: #6c757d; text-transform: uppercase; letter-spacing: 1px; }
 .stat-icon { font-size: 1.5rem; color: var(--medium-gray); margin-bottom: 10px; display: block; }
-
 #map { height: calc(100vh - 150px); min-height: 500px; width: 100%; border: 1px solid var(--border-color); border-radius: 8px; z-index: 1; }
 .mini-map { height: 250px; width: 100%; border: 1px solid var(--border-color); border-radius: 4px; margin-bottom: 10px; z-index: 1; }
 #no-data-msg { text-align: center; font-size: 1.2em; color: #555; padding: 30px; background: #fff; border-radius: 8px; box-shadow: var(--shadow); }
-#tasks-list { height: 240px; overflow-y: auto; padding-right: 5px; }
+
+/* (ИСПРАВЛЕНО) Высота дашборда */
+#tasks-list {
+    max-height: 280px; /* Уменьшаем высоту */
+    overflow-y: auto;
+    padding-right: 5px;
+}
 .task-item { background-color: #f8f9fa; border-left: 4px solid var(--primary-color); transition: background-color 0.2s; border-radius: 4px; margin-bottom: 5px; }
 .task-item:hover { background-color: #e9ecef; }
 .task-item .badge { font-size: 0.8em; font-weight: 500; }
@@ -130,6 +186,29 @@ td a { text-decoration: none; color: var(--primary-color) !important; font-weigh
 .btn-contact-call:hover { background-color: #0d6efd; color: white; }
 .btn-contact-wa { color: #198754; border-color: #198754; }
 .btn-contact-wa:hover { background-color: #198754; color: white; }
+
+/* (НОВОЕ) Стили для вкладок */
+.details-container .nav-tabs {
+    border-bottom: 2px solid var(--border-color);
+}
+.details-container .nav-tabs .nav-link {
+    font-weight: 600;
+    color: var(--secondary-color);
+    border: none;
+    border-bottom: 2px solid transparent;
+}
+.details-container .nav-tabs .nav-link.active {
+    color: var(--primary-color);
+    border-bottom: 2px solid var(--primary-color);
+    background: none;
+}
+.details-container .tab-pane {
+    padding-top: 20px;
+}
+.details-container .table-responsive {
+    margin-top: 10px;
+}
+
 @media (max-width: 768px) {
     .contact-entry, .address-entry, .pos-entry { grid-template-columns: 1fr 1fr auto; }
     .contact-entry input:nth-of-type(3), .address-entry input:nth-of-type(3), .pos-entry input { grid-column: 1 / span 2; }
