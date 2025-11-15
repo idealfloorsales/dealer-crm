@@ -1,62 +1,40 @@
-// map.js
-document.addEventListener('DOMContentLoaded', async () => {
-    const API_DEALERS_URL = '/api/dealers';
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Карта Дилеров</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     
-    // Инициализация карты (Центр - Астана)
-    const map = L.map('map').setView([51.1605, 71.4704], 12);
+    <link rel="stylesheet" href="style.css?v=10">
+    <link rel="icon" href="favicon.gif" type="image/gif">
+    
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-4">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/"><img src="logo.png" alt="Logo" height="40"></a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"><span class="navbar-toggler-icon"></span></button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item"><a class="nav-link" href="/">Дилеры</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="/map.html">Карта</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/products.html">Матрица</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/report.html">Выставленность</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/knowledge.html">Статьи</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="container-fluid">
+        <div id="map"></div>
+    </div>
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
-
-    // Кнопка "Я здесь"
-    const locateControl = L.control({position: 'topleft'});
-    locateControl.onAdd = function () {
-        const div = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-custom');
-        div.innerHTML = '<button class="btn btn-light btn-sm" style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;padding:0;"><i class="bi bi-cursor-fill"></i></button>';
-        div.onclick = () => {
-            map.locate({setView: true, maxZoom: 16});
-        };
-        return div;
-    };
-    locateControl.addTo(map);
-
-    map.on('locationfound', (e) => {
-        L.marker(e.latlng).addTo(map).bindPopup("Вы здесь").openPopup();
-    });
-
-    // Загрузка дилеров
-    try {
-        const response = await fetch(API_DEALERS_URL);
-        if (!response.ok) throw new Error();
-        const dealers = await response.json();
-
-        const markers = L.featureGroup();
-        let hasMarkers = false;
-
-        dealers.forEach(d => {
-            if (d.latitude && d.longitude) {
-                const marker = L.marker([d.latitude, d.longitude]).addTo(map);
-                
-                const popupContent = `
-                    <div style="text-align:center; min-width: 150px;">
-                        <h6 style="margin-bottom:5px;">${d.name}</h6>
-                        <small class="text-muted">${d.city || ''}</small><br>
-                        <a href="dealer.html?id=${d.id}" target="_blank" class="btn btn-primary btn-sm mt-2 w-100">Открыть</a>
-                    </div>
-                `;
-                
-                marker.bindPopup(popupContent);
-                markers.addLayer(marker);
-                hasMarkers = true;
-            }
-        });
-
-        if (hasMarkers) {
-            map.fitBounds(markers.getBounds(), { padding: [50, 50] });
-        }
-
-    } catch (error) {
-        console.error("Ошибка загрузки карты:", error);
-    }
-});
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="map.js"></script>
+</body>
+</html>
