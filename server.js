@@ -1,3 +1,4 @@
+// server.js
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -26,7 +27,7 @@ if (ADMIN_USER && ADMIN_PASSWORD) {
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// --- СПИСОК ТОВАРОВ (79 шт.) ---
+// --- (ИЗМЕНЕНО) ПОЛНЫЙ СПИСОК (Ламинат + Стенды) ---
 const productsToImport = [
     { sku: "CD-507", name: "Дуб Беленый" }, { sku: "CD-508", name: "Дуб Пепельный" },
     { sku: "8EH34-701", name: "Дуб Снежный" }, { sku: "8EH34-702", name: "Дуб Арабика" },
@@ -74,18 +75,19 @@ const Product = mongoose.model('Product', productSchema);
 const contactSchema = new mongoose.Schema({ name: String, position: String, contactInfo: String }, { _id: false }); 
 const photoSchema = new mongoose.Schema({ description: String, photo_url: String, date: { type: Date, default: Date.now } }, { _id: false });
 const additionalAddressSchema = new mongoose.Schema({ description: String, city: String, address: String }, { _id: false });
-const posMaterialSchema = new mongoose.Schema({ name: String, quantity: Number }, { _id: false });
 const visitSchema = new mongoose.Schema({ date: String, comment: String, isCompleted: { type: Boolean, default: false } }, { _id: false });
 
 const dealerSchema = new mongoose.Schema({
     dealer_id: String, name: String, price_type: String, city: String, address: String, 
+    // (ИЗМЕНЕНО) Добавлен Аватар, убраны POS
+    avatarUrl: String, 
+    latitude: Number, longitude: Number,
+    status: { type: String, default: 'standard' }, 
     contacts: [contactSchema], bonuses: String, photos: [photoSchema], organization: String,
     delivery: String, website: String, instagram: String,
-    additional_addresses: [additionalAddressSchema], pos_materials: [posMaterialSchema], visits: [visitSchema],
-    products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
-    latitude: Number, longitude: Number,
-    // (НОВОЕ) Статус дилера
-    status: { type: String, default: 'standard' } 
+    additional_addresses: [additionalAddressSchema], 
+    visits: [visitSchema],
+    products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }]
 });
 const Dealer = mongoose.model('Dealer', dealerSchema);
 const knowledgeSchema = new mongoose.Schema({ title: String, content: String }, { timestamps: true }); 
@@ -93,11 +95,9 @@ const Knowledge = mongoose.model('Knowledge', knowledgeSchema);
 
 async function hardcodedImportProducts() {
     try {
-        const count = await Product.countDocuments();
-        if(count < productsToImport.length) {
-             const operations = productsToImport.map(p => ({ updateOne: { filter: { sku: p.sku }, update: { $set: p }, upsert: true } }));
-             await Product.bulkWrite(operations);
-        }
+        const operations = productsToImport.map(p => ({ updateOne: { filter: { sku: p.sku }, update: { $set: p }, upsert: true } }));
+        await Product.bulkWrite(operations);
+        console.log("Каталог (включая стенды) обновлен.");
     } catch (e) { console.warn(e.message); }
 }
 
@@ -114,18 +114,18 @@ function convertToClient(doc) {
     return obj;
 }
 
-// (ИЗМЕНЕНО) Добавлено поле 'status' в выборку
+// (ИЗМЕНЕНО) API отда
 app.get('/api/dealers', async (req, res) => {
     try {
-        const dealers = await Dealer.find({}, 'dealer_id name city photos price_type organization products pos_materials visits latitude longitude status').lean();
+        const dealers = await Dealer.find({}, 'dealer_id name city price_type organization products visits latitude longitude status avatarUrl pos_materials').lean();
         res.json(dealers.map(d => ({
             id: d._id, dealer_id: d.dealer_id, name: d.name, city: d.city, price_type: d.price_type, organization: d.organization,
-            photo_url: (d.photos && d.photos.length > 0) ? d.photos[0].photo_url : null,
+            photo_url: d.avatarUrl, // (ИЗМЕНЕНО) Отправляем Аватар
             has_photos: (d.photos && d.photos.length > 0),
             products_count: (d.products ? d.products.length : 0),
             has_pos: (d.pos_materials && d.pos_materials.length > 0),
             visits: d.visits, latitude: d.latitude, longitude: d.longitude,
-            status: d.status || 'standard' // По умолчанию стандарт
+            status: d.status || 'standard'
         }))); 
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
