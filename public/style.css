@@ -14,17 +14,9 @@
     --shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
-body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    margin: 0;
-    background-color: var(--light-gray);
-    color: var(--text-color);
-    line-height: 1.5;
-}
-
+body { font-family: system-ui, -apple-system, sans-serif; margin: 0; background: var(--light-gray); color: var(--text-color); line-height: 1.5; }
 .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
 .container-fluid { max-width: 98%; margin: 0 auto; padding: 20px; }
-
 h1, h2, h3 { color: #333; border-bottom: 2px solid var(--primary-color); padding-bottom: 10px; margin-top: 1.5rem; }
 h3 { border-bottom: 1px solid var(--medium-gray); margin-top: 30px; }
 
@@ -38,14 +30,10 @@ nav a.nav-link.active { background: var(--primary-color); color: white !importan
 
 button, a.btn { padding: 0.5rem 1rem; border-radius: 5px; border: none; cursor: pointer; font-size: 14px; font-weight: 500; margin-top: 10px; text-decoration: none; display: inline-block; transition: 0.2s; }
 button:hover, a.btn:hover { opacity: 0.85; }
-button[type="submit"] { background: var(--primary-color); font-size: 16px; color: white; }
-button[type="submit"]:hover { background: var(--primary-hover); }
 .btn-danger, a.btn-danger { background: var(--danger-color); color: white; }
-.btn-danger:hover, a.btn-danger:hover { background: #c82333; }
 .btn-primary, #open-add-modal-btn, #open-add-product-btn, #open-add-article-btn, #export-csv-btn { background: var(--primary-color) !important; color: white !important; }
 .btn-primary:hover { background: var(--primary-hover) !important; }
 .btn-secondary, a.btn-secondary { background: var(--secondary-color); color: white; }
-.btn-secondary:hover, a.btn-secondary:hover { background: #5a6268; }
 
 label { font-weight: 600; color: #555; margin-top: 5px; display: block; }
 .form-control:focus, .form-select:focus { border-color: var(--primary-color) !important; box-shadow: 0 0 0 3px rgba(185, 4, 10, 0.25) !important; outline: none; }
@@ -56,64 +44,22 @@ label { font-weight: 600; color: #555; margin-top: 5px; display: block; }
 .filter-group select, .filter-container input[type="text"] { padding: 8px; min-width: 220px; margin-top: 0; height: 38px; }
 #search-bar { padding: 8px 12px !important; height: 38px !important; font-size: 1rem !important; }
 
-/* --- (ИЗМЕНЕНО) Таблицы с отступом --- */
-#dealer-table, #products-table, #report-table, #matrix-table { 
-    width: 100%; 
-    background: transparent; /* Убираем фон, чтобы был виден фон body */
-    box-shadow: none; 
-    border-radius: 0; 
-    border-collapse: separate; /* Разделяем границы */
-    border-spacing: 0 3px;   /* Отступ 3px по вертикали */
-}
-td, th { 
-    padding: 12px 15px; 
-    vertical-align: middle; 
-    background: #fff; /* Фон ячейкам, а не таблице */
-}
-th { 
-    background: var(--light-gray); 
-    color: #333; 
-    font-weight: 600; 
-    white-space: nowrap; 
-    border-bottom: 2px solid var(--border-color); 
-}
-tbody tr { 
-    border: none; /* Убираем стандартную границу, т.к. есть отступ */
-    box-shadow: var(--shadow);
-    border-radius: 8px;
-    overflow: hidden; /* Для скругления углов */
-}
-tbody tr:hover { background: var(--medium-gray); }
+#dealer-table { width: 100%; background: transparent; box-shadow: none; border-radius: 0; border-collapse: separate; border-spacing: 0 3px; }
+td, th { padding: 12px 15px; vertical-align: middle; }
+th { background: var(--light-gray); color: #333; font-weight: 600; white-space: nowrap; border-bottom: 2px solid var(--border-color); }
+tbody tr { border: none; box-shadow: var(--shadow); border-radius: 8px; overflow: hidden; }
+tbody tr:hover td { background: var(--medium-gray); }
 th[data-sort]:hover { background: #dde1e5; cursor: pointer; } 
+tbody tr td { background: #fff; }
+tbody tr:nth-of-type(even) td { background: var(--light-gray); }
 
-/* Скругляем углы у первой и последней ячейки в строке */
+tr.row-status-active td { background-color: #f0fff9 !important; border-bottom: 2px solid #198754 !important; }
+tr.row-status-problem td { background-color: #fff5f5 !important; border-bottom: 2px solid #dc3545 !important; }
+tr.row-status-archive { opacity: 0.7; }
+tr.row-status-archive td { background-color: #f2f2f2 !important; border-bottom: 2px solid #6c757d !important; }
+tr.row-status-standard td { border-bottom: 2px solid #ffc107 !important; }
 tbody tr td:first-child, tbody tr th:first-child { border-radius: 8px 0 0 8px; }
 tbody tr td:last-child, tbody tr th:last-child { border-radius: 0 8px 8px 0; }
-tbody tr:nth-of-type(even) { background: transparent; } /* Убираем зебру, т.к. строки и так разделены */
-tbody tr:nth-of-type(even) td { background: var(--light-gray); } /* Фон для зебры */
-
-/* --- СТАТУСЫ (Полоска снизу) --- */
-/* Применяем к ячейкам, а не к строке */
-tr.row-status-active td {
-    background-color: #f0fff9 !important;
-    border-bottom: 2px solid #198754 !important; 
-}
-tr.row-status-problem td {
-    background-color: #fff5f5 !important;
-    border-bottom: 2px solid #dc3545 !important; 
-}
-tr.row-status-archive {
-    opacity: 0.7;
-}
-tr.row-status-archive td {
-    background-color: #f2f2f2 !important;
-    border-bottom: 2px solid #6c757d !important; 
-}
-tr.row-status-standard td {
-    border-bottom: 2px solid #ffc107 !important;
-}
-/* --- КОНЕЦ СТАТУСОВ --- */
-
 
 .column-number, .cell-number { width: 40px; text-align: center; font-weight: bold; color: #555; }
 .table-photo { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border-color); }
@@ -141,7 +87,10 @@ td a { text-decoration: none; color: var(--primary-color) !important; font-weigh
 .photo-preview-item .btn-remove-photo { position: absolute; top: 2px; right: 2px; background: rgba(220, 53, 69, 0.9); color: white; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 14px; line-height: 1; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .product-checklist { max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 4px; padding: 1.25rem; background: var(--light-gray); columns: 2; column-gap: 20px; }
 .checklist-item { break-inside: avoid; }
+
 .details-container { max-width: 900px; margin: 20px auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: var(--shadow); border: 1px solid var(--border-color); }
+/* (ИСПРАВЛЕНО) Таблицы в карточке дилера */
+.details-container .table-responsive { margin-top: 10px; }
 .products-display { background: var(--light-gray); border: 1px solid var(--border-color); padding: 15px; border-radius: 4px; white-space: pre-wrap; font-family: monospace; }
 .products-list-detailed { padding-left: 20px; }
 .dealer-links-container { display: flex; gap: 10px; margin: 15px 0; border-bottom: 1px solid var(--medium-gray); padding-bottom: 20px; flex-wrap: wrap; }
@@ -154,18 +103,22 @@ td a { text-decoration: none; color: var(--primary-color) !important; font-weigh
 .gallery-date { background: var(--light-gray); padding: 5px 10px; font-size: 0.85rem; font-weight: 600; color: #555; border-bottom: 1px solid var(--border-color); }
 .gallery-img-wrapper { width: 100%; height: 150px; }
 .gallery-img-wrapper img { width: 100%; height: 100%; object-fit: cover; }
+
 #matrix-table th { position: sticky; top: 0; z-index: 10; }
 .matrix-product-cell { position: sticky; left: 0; background: #fff; font-weight: bold; border-right: 2px solid var(--border-color) !important; z-index: 20; }
 .matrix-cell-yes { color: var(--primary-color); font-size: 1.3rem; text-align: center; font-weight: bold; }
+
 .knowledge-item { background: #fff; border: 1px solid var(--border-color); margin-bottom: 10px; border-radius: 8px; overflow: hidden; }
 .knowledge-item-header button { font-size: 1.1rem; font-weight: 600; color: var(--primary-color); text-align: left; width: 100%; background: none; border: none; padding: 15px 20px; }
 .knowledge-item-content { padding: 0 20px 20px 20px; border-top: 1px solid var(--border-color); }
 .knowledge-content-display { white-space: pre-wrap; background: var(--light-gray); padding: 15px; border-radius: 5px; }
+
 .stat-card { background: #fff; border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; box-shadow: var(--shadow); text-align: center; height: 100%; transition: transform 0.2s; display: flex; flex-direction: column; justify-content: center; align-items: center; }
 .stat-card:hover { transform: translateY(-3px); }
 .stat-number { font-size: 2.5rem; font-weight: 700; color: var(--primary-color); display: block; margin-bottom: 5px; }
 .stat-label { font-size: 0.9rem; color: #6c757d; text-transform: uppercase; letter-spacing: 1px; }
 .stat-icon { font-size: 1.5rem; color: var(--medium-gray); margin-bottom: 10px; display: block; }
+
 #map { height: calc(100vh - 150px); min-height: 500px; width: 100%; border: 1px solid var(--border-color); border-radius: 8px; z-index: 1; }
 .mini-map { height: 250px; width: 100%; border: 1px solid var(--border-color); border-radius: 4px; margin-bottom: 10px; z-index: 1; }
 #no-data-msg { text-align: center; font-size: 1.2em; color: #555; padding: 30px; background: #fff; border-radius: 8px; box-shadow: var(--shadow); }
