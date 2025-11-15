@@ -1,40 +1,86 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Карта Дилеров</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+// map.js
+document.addEventListener('DOMContentLoaded', async () => {
+    const API_DEALERS_URL = '/api/dealers';
     
-    <link rel="stylesheet" href="style.css?v=10">
-    <link rel="icon" href="favicon.gif" type="image/gif">
-    
-</head>
-<body>
-    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-4">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="/"><img src="logo.png" alt="Logo" height="40"></a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"><span class="navbar-toggler-icon"></span></button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav">
-                    <li class="nav-item"><a class="nav-link" href="/">Дилеры</a></li>
-                    <li class="nav-item"><a class="nav-link active" href="/map.html">Карта</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/products.html">Матрица</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/report.html">Выставленность</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/knowledge.html">Статьи</a></li>
-                </ul>
-            </div>
-        </div>
-    </nav>
-    
-    <div class="container-fluid">
-        <div id="map"></div>
-    </div>
+    // Координаты по умолчанию (Астана)
+    const DEFAULT_LAT = 51.1605;
+    const DEFAULT_LNG = 71.4704;
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="map.js"></script>
-</body>
-</html>
+    // Проверяем, загрузилась ли библиотека Leaflet (L)
+    if (typeof L === 'undefined') {
+        console.error("Leaflet не загрузился!");
+        document.getElementById('map').innerHTML = '<div class="alert alert-danger">Ошибка: Не удалось загрузить карту.</div>';
+        return;
+    }
+
+    const map = L.map('map').setView([DEFAULT_LAT, DEFAULT_LNG], 12);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // --- Кнопка "Найти меня" ---
+    const locateControl = L.control({position: 'topleft'});
+    locateControl.onAdd = function () {
+        const div = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-custom');
+        div.innerHTML = '<button class="btn btn-light btn-sm" style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;padding:0;"><i class="bi bi-cursor-fill"></i></button>';
+        div.onclick = (e) => {
+            e.stopPropagation(); // Остановка клика, чтобы карта не среагировала
+            map.locate({setView: true, maxZoom: 16});
+        };
+        return div;
+    };
+    locateControl.addTo(map);
+
+    // Событие: Геопозиция найдена
+    map.on('locationfound', (e) => {
+        L.marker(e.latlng).addTo(map).bindPopup("Вы здесь").openPopup();
+    });
+    // Событие: Ошибка геопозиции
+    map.on('locationerror', (e) => {
+        alert("Не удалось определить вашу геопозицию.");
+    });
+
+    // --- Загрузка дилеров ---
+    try {
+        const response = await fetch(API_DEALERS_URL);
+        if (!response.ok) throw new Error('Ошибка загрузки данных');
+        const dealers = await response.json();
+
+        const markers = L.featureGroup();
+        let hasMarkers = false;
+
+        dealers.forEach(d => {
+            // Ставим маркер, только если есть обе координаты
+            if (d.latitude && d.longitude) {
+                const lat = parseFloat(d.latitude);
+                const lng = parseFloat(d.longitude);
+
+                if (!isNaN(lat) && !isNaN(lng)) {
+                    const marker = L.marker([lat, lng]);
+                    
+                    const popupContent = `
+                        <div style="text-align:center; min-width: 150px;">
+                            <h6 style="margin-bottom:5px; font-weight: 600;">${d.name}</h6>
+                            <small class="text-muted">${d.city || ''}</small><br>
+                            <a href="dealer.html?id=${d.id}" target="_blank" class="btn btn-primary btn-sm mt-2 w-100">Открыть</a>
+                        </div>
+                    `;
+                    
+                    marker.bindPopup(popupContent);
+                    markers.addLayer(marker);
+                    hasMarkers = true;
+                }
+            }
+        });
+
+        // Если маркеры есть, центрируем карту по ним
+        if (hasMarkers) {
+            map.fitBounds(markers.getBounds(), { padding: [50, 50] });
+        }
+
+    } catch (error) {
+        console.error("Ошибка загрузки дилеров на карту:", error);
+        alert("Не удалось загрузить список дилеров на карту.");
+    }
+});
