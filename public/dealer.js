@@ -1,5 +1,6 @@
 // dealer.js
 document.addEventListener('DOMContentLoaded', () => {
+    
     const detailsContainer = document.getElementById('dealer-details');
     const productsListContainer = document.getElementById('dealer-products-list');
     const contactsListContainer = document.getElementById('dealer-contacts-list'); 
@@ -13,19 +14,18 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const deleteBtn = document.getElementById('delete-dealer-btn'); 
     const editBtn = document.getElementById('edit-dealer-btn'); 
-    const navigateBtn = document.getElementById('navigate-btn'); // (НОВАЯ КНОПКА)
+    const navigateBtn = document.getElementById('navigate-btn'); 
     const carouselInner = document.getElementById('carousel-inner');
 
     const API_URL = '/api/dealers';
     const params = new URLSearchParams(window.location.search);
     const dealerId = params.get('id');
 
-    // Переменные для координат
     let dealerLat = null;
     let dealerLng = null;
 
     if (!dealerId) {
-        detailsContainer.innerHTML = '<h2 class="text-danger">Ошибка: ID дилера не указан в URL.</h2>';
+        if(detailsContainer) detailsContainer.innerHTML = '<h2 class="text-danger">Ошибка: ID дилера не указан в URL.</h2>';
         if(deleteBtn) deleteBtn.style.display = 'none'; 
         if(editBtn) editBtn.style.display = 'none'; 
         if(navigateBtn) navigateBtn.style.display = 'none';
@@ -39,16 +39,12 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch(`${API_URL}/${dealerId}`);
             if (!response.ok) throw new Error(`Дилер с ID ${dealerId} не найден.`);
+            
             const dealer = await response.json();
-
-            // Сохраняем координаты
             dealerLat = dealer.latitude;
             dealerLng = dealer.longitude;
 
-            // Если координат нет, скрываем кнопку "Поехать"
-            if (!dealerLat || !dealerLng) {
-                if(navigateBtn) navigateBtn.style.display = 'none';
-            }
+            if (!dealerLat || !dealerLng) { if(navigateBtn) navigateBtn.style.display = 'none'; }
 
             detailsContainer.innerHTML = `
                 <h1 class="display-6">${safeText(dealer.name)}</h1>
@@ -70,13 +66,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if(bonusesContainer) bonusesContainer.textContent = safeText(dealer.bonuses) || 'Нет данных';
 
             document.title = `Дилер: ${dealer.name}`;
-
         } catch (error) {
             console.error('Ошибка:', error);
             detailsContainer.innerHTML = `<h2 class="text-danger">${error.message}</h2>`;
-            if(deleteBtn) deleteBtn.style.display = 'none';
-            if(editBtn) editBtn.style.display = 'none';
-            if(navigateBtn) navigateBtn.style.display = 'none';
         }
     }
     
@@ -92,22 +84,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderDealerPhotos(photos) {
-        const photoGalleryContainer = document.getElementById('dealer-photo-gallery');
         if (!photoGalleryContainer) return;
         if (!photos || photos.length === 0) { photoGalleryContainer.innerHTML = '<p><i>Нет фотографий.</i></p>'; return; }
-        photos.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
-        let html = '<div class="gallery-grid">';
-        let carouselHtml = '';
-        photos.forEach((photo, index) => {
-            let dateString = "Ранее";
-            if (photo.date) {
-                const dateObj = new Date(photo.date);
-                dateString = dateObj.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-            }
-            html += `<div class="gallery-card" onclick="openLightbox(${index})"><div class="gallery-date">${dateString}</div><div class="gallery-img-wrapper"><img src="${photo.photo_url}" loading="lazy" alt="Фото"></div></div>`;
-            carouselHtml += `<div class="carousel-item ${index === 0 ? 'active' : ''}" style="height: 100%;"><div class="d-flex justify-content-center align-items-center h-100"><img src="${photo.photo_url}" style="max-height: 100%; max-width: 100%; object-fit: contain;"><div class="carousel-caption d-none d-md-block bg-dark bg-opacity-50 rounded p-2"><p class="mb-0">${dateString}</p></div></div></div>`;
-        });
-        html += '</div>';
+        photos.sort((a, b) => new Date(b.date||0) - new Date(a.date||0));
+        let html = ''; let slideIndex = 0; let carouselHtml = '';
+        const groups = {};
+        photos.forEach(p => { const d = p.date ? new Date(p.date).toLocaleDateString('ru-RU') : "Ранее"; if(!groups[d]) groups[d]=[]; groups[d].push(p); });
+        
+        for (const [date, group] of Object.entries(groups)) {
+            html += `<h5 class="mt-4 border-bottom pb-2 text-secondary">${date}</h5><div class="gallery-grid">`;
+            group.forEach(p => {
+                html += `<div class="gallery-item" onclick="openLightbox(${slideIndex})"><img src="${p.photo_url}" loading="lazy"></div>`;
+                carouselHtml += `<div class="carousel-item ${slideIndex===0?'active':''}" style="height: 100%;"><div class="d-flex justify-content-center align-items-center h-100"><img src="${p.photo_url}" style="max-height: 100%; max-width: 100%; object-fit: contain;"></div></div>`;
+                slideIndex++;
+            });
+            html += `</div>`;
+        }
         photoGalleryContainer.innerHTML = html;
         if (carouselInner) carouselInner.innerHTML = carouselHtml;
     }
@@ -118,54 +110,30 @@ document.addEventListener('DOMContentLoaded', () => {
         if (modalEl && carouselEl) {
             const myModal = new bootstrap.Modal(modalEl);
             const carousel = new bootstrap.Carousel(carouselEl);
-            carousel.to(index); 
-            myModal.show();
+            carousel.to(index); myModal.show();
         }
     }
 
+    // (ИСПРАВЛЕНО) Оборачиваем все таблицы в table-responsive
     function renderDealerVisits(visits) {
         if (!visitsListContainer) return;
         if (!visits || visits.length === 0) { visitsListContainer.innerHTML = '<p><i>Нет записей.</i></p>'; return; }
         visits.sort((a, b) => new Date(b.date) - new Date(a.date));
-        let html = '<table class="table table-bordered table-striped" style="margin-top:0"><thead><tr><th style="width:120px">Дата</th><th>Комментарий</th></tr></thead><tbody>';
-        visits.forEach(v => {
-            const dateStr = v.date ? new Date(v.date).toLocaleDateString('ru-RU') : '-';
-            html += `<tr><td>${dateStr}</td><td>${safeText(v.comment)}</td></tr>`;
-        });
-        visitsListContainer.innerHTML = html + '</tbody></table>';
+        let html = '<div class="table-responsive"><table class="table table-bordered table-striped" style="margin-top:0"><thead><tr><th style="width:120px">Дата</th><th>Комментарий</th></tr></thead><tbody>';
+        visits.forEach(v => { const dateStr = v.date ? new Date(v.date).toLocaleDateString('ru-RU') : '-'; html += `<tr><td>${dateStr}</td><td style="white-space: pre-wrap;">${safeText(v.comment)}</td></tr>`; });
+        visitsListContainer.innerHTML = html + '</tbody></table></div>';
     }
 
-    // --- (ИЗМЕНЕНО) Умные контакты ---
     function renderDealerContacts(contacts) {
         if (!contactsListContainer) return;
         if (!contacts || contacts.length === 0) { contactsListContainer.innerHTML = '<p><i>Нет данных.</i></p>'; return; }
-        
         let html = '<div class="table-responsive"><table class="table table-bordered table-striped" style="margin-top: 0;"><thead><tr><th>Имя</th><th>Должность</th><th>Действия</th></tr></thead><tbody>';
-        
         contacts.forEach(contact => {
             const phoneClean = contact.contactInfo ? contact.contactInfo.replace(/[^0-9]/g, '') : '';
-            const hasPhone = phoneClean.length >= 10; // Хотя бы 10 цифр
-            
-            let actions = safeText(contact.contactInfo); // По умолчанию просто текст
-            
-            if (hasPhone) {
-                // Если есть телефон, делаем кнопки
-                actions = `
-                    <div class="d-flex align-items-center gap-2">
-                        <span>${safeText(contact.contactInfo)}</span>
-                        <a href="tel:+${phoneClean}" class="btn btn-sm btn-outline-primary btn-contact-call" title="Позвонить"><i class="bi bi-telephone-fill"></i></a>
-                        <a href="https://wa.me/${phoneClean}" target="_blank" class="btn btn-sm btn-outline-success btn-contact-wa" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>
-                    </div>
-                `;
-            }
-
-            html += `
-                <tr>
-                    <td>${safeText(contact.name)}</td>
-                    <td>${safeText(contact.position)}</td>
-                    <td>${actions}</td>
-                </tr>
-            `;
+            const hasPhone = phoneClean.length >= 10; 
+            let actions = safeText(contact.contactInfo); 
+            if (hasPhone) { actions = `<div class="d-flex align-items-center gap-2"><span>${safeText(contact.contactInfo)}</span><a href="tel:+${phoneClean}" class="btn btn-sm btn-outline-primary btn-contact-call" title="Позвонить"><i class="bi bi-telephone-fill"></i></a><a href="https://wa.me/${phoneClean}" target="_blank" class="btn btn-sm btn-outline-success btn-contact-wa" title="WhatsApp"><i class="bi bi-whatsapp"></i></a></div>`; }
+            html += `<tr><td>${safeText(contact.name)}</td><td>${safeText(contact.position)}</td><td>${actions}</td></tr>`;
         });
         contactsListContainer.innerHTML = html + '</tbody></table></div>';
     }
@@ -173,21 +141,17 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderDealerAddresses(addresses) {
         if (!addressesListContainer) return;
         if (!addresses || addresses.length === 0) { addressesListContainer.innerHTML = '<p><i>Нет данных.</i></p>'; return; }
-        let html = '<table class="table table-bordered table-striped" style="margin-top: 0;"><thead><tr><th>Описание</th><th>Город</th><th>Адрес</th></tr></thead><tbody>';
-        addresses.forEach(addr => {
-            html += `<tr><td>${safeText(addr.description)}</td><td>${safeText(addr.city)}</td><td>${safeText(addr.address)}</td></tr>`;
-        });
-        addressesListContainer.innerHTML = html + '</tbody></table>';
+        let html = '<div class="table-responsive"><table class="table table-bordered table-striped" style="margin-top: 0;"><thead><tr><th>Описание</th><th>Город</th><th>Адрес</th></tr></thead><tbody>';
+        addresses.forEach(addr => { html += `<tr><td>${safeText(addr.description)}</td><td>${safeText(addr.city)}</td><td>${safeText(addr.address)}</td></tr>`; });
+        addressesListContainer.innerHTML = html + '</tbody></table></div>';
     }
 
     function renderDealerPos(posItems) {
         if (!posListContainer) return;
         if (!posItems || posItems.length === 0) { posListContainer.innerHTML = '<p><i>Нет оборудования.</i></p>'; return; }
-        let html = '<table class="table table-bordered table-striped" style="margin-top: 0;"><thead><tr><th>Оборудование</th><th>Количество</th></tr></thead><tbody>';
-        posItems.forEach(item => {
-            html += `<tr><td>${safeText(item.name)}</td><td>${item.quantity || 1}</td></tr>`;
-        });
-        posListContainer.innerHTML = html + '</tbody></table>';
+        let html = '<div class="table-responsive"><table class="table table-bordered table-striped" style="margin-top: 0;"><thead><tr><th>Оборудование</th><th>Количество</th></tr></thead><tbody>';
+        posItems.forEach(item => { html += `<tr><td>${safeText(item.name)}</td><td>${item.quantity || 1}</td></tr>`; });
+        posListContainer.innerHTML = html + '</tbody></table></div>';
     }
 
     async function fetchDealerProducts() {
@@ -201,40 +165,9 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) { productsListContainer.innerHTML = `<p class="text-danger">${error.message}</p>`; }
     }
 
-    if(editBtn) editBtn.addEventListener('click', () => {
-        localStorage.setItem('pendingEditDealerId', dealerId);
-        window.location.href = 'index.html';
-    });
-
-    // --- (НОВОЕ) Кнопка "Поехать" ---
-    if (navigateBtn) {
-        navigateBtn.addEventListener('click', () => {
-            if (dealerLat && dealerLng) {
-                // Универсальная ссылка, которая открывает выбор карт на телефоне (Google/Apple/Yandex)
-                const url = `https://www.google.com/maps/dir/?api=1&destination=${dealerLat},${dealerLng}`;
-                window.open(url, '_blank');
-            } else {
-                alert("У этого дилера не заданы координаты.");
-            }
-        });
-    }
-
-    if(deleteBtn) deleteBtn.addEventListener('click', async () => {
-        if (confirm(`Вы уверены, что хотите НАВСЕГДА удалить этого дилера?\nЭто действие нельзя отменить.`)) {
-            try {
-                const response = await fetch(`${API_URL}/${dealerId}`, {
-                    method: 'DELETE'
-                });
-                if (response.ok) {
-                    window.location.href = 'index.html'; 
-                } else {
-                    alert('Ошибка при удалении дилера.');
-                }
-            } catch (error) {
-                alert('Сетевая ошибка при удалении.');
-            }
-        }
-    });
+    if(editBtn) editBtn.addEventListener('click', () => { localStorage.setItem('pendingEditDealerId', dealerId); window.location.href = 'index.html'; });
+    if(navigateBtn) navigateBtn.addEventListener('click', () => { if (dealerLat && dealerLng) window.open(`http://googleusercontent.com/maps.google.com/?q=${dealerLat},${dealerLng}`, '_blank'); else alert("Координаты не заданы."); });
+    if(deleteBtn) deleteBtn.addEventListener('click', async () => { if (confirm(`Удалить?`)) { try { const response = await fetch(`${API_URL}/${dealerId}`, { method: 'DELETE' }); if (response.ok) window.location.href = 'index.html'; } catch (error) { alert('Ошибка.'); } } });
 
     fetchDealerDetails();
     fetchDealerProducts();
