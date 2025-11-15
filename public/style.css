@@ -64,23 +64,22 @@ tbody tr:nth-of-type(even) { background: var(--light-gray); }
 tbody tr:hover { background: var(--medium-gray); }
 th[data-sort]:hover { background: #dde1e5; cursor: pointer; } 
 
-/* --- (ИСПРАВЛЕНО) СТАТУСЫ (Полоска снизу строки) --- */
+/* --- (ИЗМЕНЕНО) СТАТУСЫ (Полоска снизу 2px) --- */
 tr.row-status-active {
     background-color: #f0fff9 !important;
-    border-bottom: 3px solid #198754 !important; /* Зеленый */
+    border-bottom: 2px solid #198754 !important; /* Зеленый 2px */
 }
 tr.row-status-problem {
     background-color: #fff5f5 !important;
-    border-bottom: 3px solid #dc3545 !important; /* Красный */
+    border-bottom: 2px solid #dc3545 !important; /* Красный 2px */
 }
 tr.row-status-archive {
     opacity: 0.7;
     background-color: #f2f2f2 !important;
-    border-bottom: 3px solid #6c757d !important; /* Серый */
+    border-bottom: 2px solid #6c757d !important; /* Серый 2px */
 }
 tr.row-status-standard {
-    /* Стандартный - желтый */
-    border-bottom: 3px solid #ffc107 !important;
+    border-bottom: 2px solid #ffc107 !important; /* Желтый 2px */
 }
 /* --- КОНЕЦ СТАТУСОВ --- */
 
