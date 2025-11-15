@@ -9,11 +9,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSort = { column: 'name', direction: 'asc' };
     const posMaterialsList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"];
 
-    // Модалки
     const addModalEl = document.getElementById('add-modal'); const addModal = new bootstrap.Modal(addModalEl);
     const editModalEl = document.getElementById('edit-modal'); const editModal = new bootstrap.Modal(editModalEl);
-
-    // Элементы
     const openAddModalBtn = document.getElementById('open-add-modal-btn');
     const addForm = document.getElementById('add-dealer-form');
     const addProductChecklist = document.getElementById('add-product-checklist'); 
@@ -23,7 +20,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const addVisitsList = document.getElementById('add-visits-list');
     const addPhotoInput = document.getElementById('add-photo-input');
     const addPhotoPreviewContainer = document.getElementById('add-photo-preview-container');
-    
     const dealerListBody = document.getElementById('dealer-list-body');
     const dealerTable = document.getElementById('dealer-table');
     const noDataMsg = document.getElementById('no-data-msg');
@@ -34,7 +30,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const exportBtn = document.getElementById('export-dealers-btn'); 
     const dashboardContainer = document.getElementById('dashboard-container'); 
     const tasksList = document.getElementById('tasks-list'); 
-
     const editForm = document.getElementById('edit-dealer-form');
     const editProductChecklist = document.getElementById('edit-product-checklist'); 
     const editContactList = document.getElementById('edit-contact-list'); 
@@ -44,17 +39,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const editPhotoList = document.getElementById('edit-photo-list'); 
     const editPhotoInput = document.getElementById('edit-photo-input');
     const editPhotoPreviewContainer = document.getElementById('edit-photo-preview-container');
-
-    let addPhotosData = []; 
-    let editPhotosData = [];
-
+    let addPhotosData = []; let editPhotosData = [];
+    
     const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
     const safeText = (text) => (text || '').toString().replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const safeAttr = (text) => (text || '').toString().replace(/"/g, '&quot;');
     const toBase64 = file => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => resolve(reader.result); reader.onerror = error => reject(error); });
     const compressImage = (file, maxWidth = 1000, quality = 0.7) => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = event => { const img = new Image(); img.src = event.target.result; img.onload = () => { const elem = document.createElement('canvas'); let width = img.width; let height = img.height; if (width > maxWidth) { height *= maxWidth / width; width = maxWidth; } elem.width = width; elem.height = height; const ctx = elem.getContext('2d'); ctx.drawImage(img, 0, 0, width, height); resolve(elem.toDataURL('image/jpeg', quality)); }; img.onerror = error => reject(error); }; reader.onerror = error => reject(error); });
 
-    // Карта
     const DEFAULT_LAT = 51.1605; const DEFAULT_LNG = 71.4704;
     const CITY_COORDS = { "Астана": [51.1605, 71.4704], "Алматы": [43.2220, 76.8512], "Шымкент": [42.3417, 69.5901], "Караганда": [49.8020, 73.1021], "Актобе": [50.2839, 57.1670], "Тараз": [42.9000, 71.3667], "Павлодар": [52.2873, 76.9674], "Усть-Каменогорск": [49.9632, 82.6059], "Семей": [50.4113, 80.2275], "Атырау": [47.1167, 51.8833], "Костанай": [53.2148, 63.6321], "Кызылорда": [44.8488, 65.4823], "Уральск": [51.2333, 51.3667], "Петропавловск": [54.8753, 69.1622], "Актау": [43.6500, 51.1500] };
     let addMap, editMap;
@@ -217,18 +209,30 @@ document.addEventListener('DOMContentLoaded', () => {
     function getSelectedProductIds(containerId) { const el=document.getElementById(containerId); if(!el) return []; return Array.from(el.querySelectorAll('input:checked')).map(cb=>cb.value); }
     async function saveProducts(dealerId, ids) { await fetch(`${API_DEALERS_URL}/${dealerId}/products`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({productIds: ids})}); }
 
+    // --- (ИЗМЕНЕНО) Логика фильтрации ---
     function renderDealerList() {
         if (!dealerListBody) return;
-        const city = filterCity ? filterCity.value : ''; const type = filterPriceType ? filterPriceType.value : ''; 
+        const city = filterCity ? filterCity.value : ''; 
+        const type = filterPriceType ? filterPriceType.value : ''; 
         const status = filterStatus ? filterStatus.value : '';
         const search = searchBar ? searchBar.value.toLowerCase() : '';
         
-        const filtered = allDealers.filter(d => 
-            (!city||d.city===city) && 
-            (!type||d.price_type===type) && 
-            (!status||(d.status||'standard')===status) &&
-            (!search || (d.name.toLowerCase().includes(search)||d.dealer_id.toLowerCase().includes(search)||d.organization.toLowerCase().includes(search)))
-        );
+        const filtered = allDealers.filter(d => {
+            // Ваша логика "Астана/Регионы"
+            let cityMatch = true;
+            if (city === 'Астана') {
+                cityMatch = d.city === 'Астана';
+            } else if (city === 'Регионы') {
+                cityMatch = d.city !== 'Астана' && d.city; // Показываем всех, кто НЕ Астана (и не пустой)
+            } else if (city) {
+                cityMatch = d.city === city; // Обычный фильтр по городу
+            }
+
+            return cityMatch &&
+                   (!type || d.price_type === type) && 
+                   (!status || (d.status || 'standard') === status) &&
+                   (!search || (d.name.toLowerCase().includes(search) || d.dealer_id.toLowerCase().includes(search) || d.organization.toLowerCase().includes(search)));
+        });
         
         filtered.sort((a, b) => {
             let valA = (a[currentSort.column] || '').toString(); let valB = (b[currentSort.column] || '').toString();
@@ -258,14 +262,35 @@ document.addEventListener('DOMContentLoaded', () => {
         if(noDataMsg) { noDataMsg.style.display = filtered.length ? 'none' : 'block'; noDataMsg.textContent = allDealers.length === 0 ? 'Список пуст.' : 'Не найдено.'; }
     }
 
+    // --- (ИЗМЕНЕНО) Логика "Умного фильтра" ---
     function populateFilters(dealers) {
         if(!filterCity || !filterPriceType) return;
-        const cities = [...new Set(dealers.map(d => d.city).filter(Boolean))].sort();
+        
+        // --- Фильтр Регионов (Городов) ---
+        const cities = [...new Set(dealers.map(d => d.city).filter(Boolean))];
+        const astanaInList = cities.includes('Астана');
+        const otherCities = cities.filter(c => c !== 'Астана').sort();
+        const sc = filterCity.value; 
+        
+        filterCity.innerHTML = ''; // Очищаем
+        filterCity.add(new Option('-- Все регионы --', ''));
+        if (astanaInList) {
+            filterCity.add(new Option('Астана', 'Астана'));
+            filterCity.add(new Option('Регионы (все, кроме Астаны)', 'Регионы'));
+            // Добавляем разделитель, если есть другие города
+            if (otherCities.length > 0) {
+                 filterCity.add(new Option('---', ''), true).disabled = true;
+            }
+        }
+        otherCities.forEach(c => filterCity.add(new Option(c, c)));
+        filterCity.value = sc;
+
+        // --- Фильтр Типов Цен ---
         const types = [...new Set(dealers.map(d => d.price_type).filter(Boolean))].sort();
-        const sc = filterCity.value; const st = filterPriceType.value;
-        filterCity.innerHTML = '<option value="">-- Все города --</option>'; filterPriceType.innerHTML = '<option value="">-- Все типы --</option>';
-        cities.forEach(c => filterCity.add(new Option(c, c))); types.forEach(t => filterPriceType.add(new Option(t, t)));
-        filterCity.value = sc; filterPriceType.value = st;
+        const st = filterPriceType.value;
+        filterPriceType.innerHTML = '<option value="">-- Все типы --</option>';
+        types.forEach(t => filterPriceType.add(new Option(t, t)));
+        filterPriceType.value = st;
     }
 
     async function initApp() {
@@ -289,7 +314,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if(document.getElementById('add-address-btn-add-modal')) document.getElementById('add-address-btn-add-modal').onclick = () => addAddressList.insertAdjacentHTML('beforeend', createAddressEntryHTML());
     if(document.getElementById('add-pos-btn-add-modal')) document.getElementById('add-pos-btn-add-modal').onclick = () => addPosList.insertAdjacentHTML('beforeend', createPosEntryHTML());
     if(document.getElementById('add-visits-btn-add-modal')) document.getElementById('add-visits-btn-add-modal').onclick = () => addVisitsList.insertAdjacentHTML('beforeend', createVisitEntryHTML());
-
     if(document.getElementById('add-contact-btn-edit-modal')) document.getElementById('add-contact-btn-edit-modal').onclick = () => editContactList.insertAdjacentHTML('beforeend', createContactEntryHTML());
     if(document.getElementById('add-address-btn-edit-modal')) document.getElementById('add-address-btn-edit-modal').onclick = () => editAddressList.insertAdjacentHTML('beforeend', createAddressEntryHTML());
     if(document.getElementById('add-pos-btn-edit-modal')) document.getElementById('add-pos-btn-edit-modal').onclick = () => editPosList.insertAdjacentHTML('beforeend', createPosEntryHTML());
@@ -306,10 +330,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if(addForm) addForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const btn = document.querySelector('button[form="add-dealer-form"]'); // (ИСПРАВЛЕНО)
-        const oldText = btn ? btn.innerHTML : 'Добавить';
-        if(btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...'; }
-
+        const btn = addForm.querySelector('button[type="submit"]'); const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...';
         const data = {
             dealer_id: getVal('dealer_id'), name: getVal('name'), organization: getVal('organization'), price_type: getVal('price_type'),
             city: getVal('city'), address: getVal('address'), delivery: getVal('delivery'), website: getVal('website'), instagram: getVal('instagram'),
@@ -320,7 +341,7 @@ document.addEventListener('DOMContentLoaded', () => {
             visits: collectData(addVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'}]),
             photos: addPhotosData
         };
-        try { const res = await fetch(API_DEALERS_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); if (!res.ok) throw new Error(await res.text()); const newD = await res.json(); const pIds = getSelectedProductIds('add-product-checklist'); if(pIds.length) await saveProducts(newD.id, pIds); addModal.hide(); initApp(); } catch (e) { alert("Ошибка при добавлении."); } finally { if(btn) { btn.disabled = false; btn.innerHTML = oldText; } }
+        try { const res = await fetch(API_DEALERS_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); if (!res.ok) throw new Error(await res.text()); const newD = await res.json(); const pIds = getSelectedProductIds('add-product-checklist'); if(pIds.length) await saveProducts(newD.id, pIds); addModal.hide(); initApp(); } catch (e) { alert("Ошибка при добавлении."); } finally { btn.disabled = false; btn.innerHTML = oldText; }
     });
 
     async function openEditModal(id) {
@@ -340,10 +361,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if(editForm) editForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const btn = document.querySelector('button[form="edit-dealer-form"]'); // (ИСПРАВЛЕНО)
-        const oldText = btn ? btn.innerHTML : 'Сохранить';
-        if(btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...'; }
-
+        const btn = editForm.querySelector('button[type="submit"]'); const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...';
         const id = document.getElementById('edit_db_id').value;
         const data = {
             dealer_id: getVal('edit_dealer_id'), name: getVal('edit_name'),
@@ -354,7 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
             bonuses: getVal('edit_bonuses'),
             status: getVal('edit_status'),
             contacts: collectData(editContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]),
-            additional_addresses: collectData(editAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]),
+            additional_addresses: collectData(addAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]),
             pos_materials: collectData(editPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]),
             visits: collectData(editVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'},{key:'isCompleted',class:'.visit-completed'}]),
             photos: editPhotosData
