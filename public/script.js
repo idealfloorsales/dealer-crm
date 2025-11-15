@@ -9,11 +9,14 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSort = { column: 'name', direction: 'asc' };
     const posMaterialsList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"];
 
-    // Модалки
+    // (ИСПРАВЛЕНО) Безопасная инициализация модалок
     const addModalEl = document.getElementById('add-modal');
-    const addModal = new bootstrap.Modal(addModalEl);
-    const editModalEl = document.getElementById('edit-modal');
-    const editModal = new bootstrap.Modal(editModalEl);
+    let addModal;
+    if (addModalEl) addModal = new bootstrap.Modal(addModalEl);
+    
+    const editModalEl = document.getElementById('edit-modal'); 
+    let editModal;
+    if (editModalEl) editModal = new bootstrap.Modal(editModalEl);
 
     // Элементы
     const openAddModalBtn = document.getElementById('open-add-modal-btn');
@@ -50,9 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let addPhotosData = []; 
     let editPhotosData = [];
 
-    // Безопасное получение значения
     const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
-
     const safeText = (text) => (text || '').toString().replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const safeAttr = (text) => (text || '').toString().replace(/"/g, '&quot;');
     const toBase64 = file => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => resolve(reader.result); reader.onerror = error => reject(error); });
@@ -305,27 +306,34 @@ document.addEventListener('DOMContentLoaded', () => {
         renderList(addPosList, [], createPosEntryHTML); renderList(addVisitsList, [], createVisitEntryHTML);
         if(document.getElementById('add_latitude')) { document.getElementById('add_latitude').value = ''; document.getElementById('add_longitude').value = ''; }
         addPhotosData = []; renderPhotoPreviews(addPhotoPreviewContainer, []);
-        addModal.show();
+        if(addModal) addModal.show();
     };
 
     if(addForm) addForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const btn = addForm.querySelector('button[type="submit"]'); const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...';
+        const btn = document.querySelector('button[form="add-dealer-form"]'); 
+        const oldText = btn ? btn.innerHTML : 'Добавить';
+        if(btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...'; }
+
         const data = {
-            dealer_id: getVal('dealer_id'), name: getVal('name'),
-            organization: getVal('organization'), price_type: getVal('price_type'),
-            city: getVal('city'), address: getVal('address'),
-            delivery: getVal('delivery'), website: getVal('website'), instagram: getVal('instagram'),
-            latitude: getVal('add_latitude'), longitude: getVal('add_longitude'),
-            bonuses: getVal('bonuses'),
-            status: getVal('status'),
+            dealer_id: getVal('dealer_id'), name: getVal('name'), organization: getVal('organization'), price_type: getVal('price_type'),
+            city: getVal('city'), address: getVal('address'), delivery: getVal('delivery'), website: getVal('website'), instagram: getVal('instagram'),
+            latitude: getVal('add_latitude'), longitude: getVal('add_longitude'), bonuses: getVal('bonuses'), status: getVal('status'),
             contacts: collectData(addContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]),
             additional_addresses: collectData(addAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]),
             pos_materials: collectData(addPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]),
             visits: collectData(addVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'}]),
             photos: addPhotosData
         };
-        try { const res = await fetch(API_DEALERS_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); if (!res.ok) throw new Error(await res.text()); const newD = await res.json(); const pIds = getSelectedProductIds('add-product-checklist'); if(pIds.length) await saveProducts(newD.id, pIds); addModal.hide(); initApp(); } catch (e) { alert("Ошибка при добавлении."); } finally { btn.disabled = false; btn.innerHTML = oldText; }
+        try { 
+            const res = await fetch(API_DEALERS_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); 
+            if (!res.ok) throw new Error(await res.text()); 
+            const newD = await res.json(); 
+            const pIds = getSelectedProductIds('add-product-checklist'); 
+            if(pIds.length) await saveProducts(newD.id, pIds); 
+            addModal.hide(); initApp(); 
+        } catch (e) { alert("Ошибка при добавлении."); } 
+        finally { if(btn) { btn.disabled = false; btn.innerHTML = oldText; } }
     });
 
     async function openEditModal(id) {
