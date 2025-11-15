@@ -20,6 +20,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let allProducts = []; 
     let currentSort = { column: 'sku', direction: 'asc' }; 
 
+    const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
+
+    // (ИСПРАВЛЕНО) fetchProducts
     async function fetchProducts(searchTerm = '') {
         try {
             const response = await fetch(`${API_URL}?search=${encodeURIComponent(searchTerm)}`);
@@ -27,13 +30,12 @@ document.addEventListener('DOMContentLoaded', () => {
             allProducts = await response.json(); 
             renderProducts(); 
         } catch (error) {
-            productListBody.innerHTML = `<tr><td colspan="3" class="text-danger">${error.message}</td></tr>`;
+            console.error(error);
+            if(productListBody) productListBody.innerHTML = `<tr><td colspan="3" class="text-danger">${error.message}</td></tr>`;
         }
     }
     
     function renderProducts() {
-        const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
-        
         const sortedProducts = allProducts.sort((a, b) => {
             const col = currentSort.column;
             let valA = (a[col] || '').toString(); 
@@ -42,15 +44,16 @@ document.addEventListener('DOMContentLoaded', () => {
             return currentSort.direction === 'asc' ? comparison : -comparison;
         });
         
+        if(!productListBody) return;
         productListBody.innerHTML = '';
+        
         if (sortedProducts.length === 0) {
-            productsTable.style.display = 'none';
-            noDataMsg.style.display = 'block';
-            noDataMsg.textContent = 'Товары не найдены.';
+            if(productsTable) productsTable.style.display = 'none';
+            if(noDataMsg) { noDataMsg.style.display = 'block'; noDataMsg.textContent = 'Товары не найдены.'; }
             return;
         }
-        productsTable.style.display = 'table';
-        noDataMsg.style.display = 'none';
+        if(productsTable) productsTable.style.display = 'table';
+        if(noDataMsg) noDataMsg.style.display = 'none';
 
         sortedProducts.forEach(product => {
             const row = productListBody.insertRow();
@@ -70,14 +73,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     let debounceTimer;
-    searchBar.addEventListener('input', (e) => {
+    if(searchBar) searchBar.addEventListener('input', (e) => {
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => fetchProducts(e.target.value), 300);
     });
 
-    openAddBtn.onclick = () => { addForm.reset(); addModal.show(); };
+    if(openAddBtn) openAddBtn.onclick = () => { addForm.reset(); addModal.show(); };
     
-    addForm.addEventListener('submit', async (e) => {
+    if(addForm) addForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         try {
             const response = await fetch(API_URL, {
@@ -89,7 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) { alert('Ошибка сети.'); }
     });
 
-    productListBody.addEventListener('click', (e) => {
+    if(productListBody) productListBody.addEventListener('click', (e) => {
         if (e.target.closest('.btn-edit')) {
             e.preventDefault();
             const btn = e.target.closest('.btn-edit');
@@ -107,7 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    editForm.addEventListener('submit', async (e) => {
+    if(editForm) editForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         try {
             const response = await fetch(`${API_URL}/${document.getElementById('edit_product_id').value}`, {
