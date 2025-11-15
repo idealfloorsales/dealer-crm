@@ -1,13 +1,30 @@
 /* style.css */
+
+/* --- Базовые стили --- */
 :root {
-    --primary-color: #b9040a; --primary-hover: #a00309;
-    --danger-color: #dc3545; --warning-color: #ffc107; --secondary-color: #6c757d; 
-    --light-gray: #f8f9fa; --medium-gray: #e9ecef; --text-color: #212529; --border-color: #dee2e6;
+    --primary-color: #b9040a;   
+    --primary-hover: #a00309;   
+    --danger-color: #dc3545;    
+    --warning-color: #ffc107;  
+    --secondary-color: #6c757d; 
+    --light-gray: #f8f9fa;
+    --medium-gray: #e9ecef;
+    --text-color: #212529;
+    --border-color: #dee2e6;
     --shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
-body { font-family: system-ui, -apple-system, sans-serif; margin: 0; background: var(--light-gray); color: var(--text-color); line-height: 1.5; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    margin: 0;
+    background-color: var(--light-gray);
+    color: var(--text-color);
+    line-height: 1.5;
+}
+
 .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
 .container-fluid { max-width: 98%; margin: 0 auto; padding: 20px; }
+
 h1, h2, h3 { color: #333; border-bottom: 2px solid var(--primary-color); padding-bottom: 10px; margin-top: 1.5rem; }
 h3 { border-bottom: 1px solid var(--medium-gray); margin-top: 30px; }
 
@@ -21,6 +38,8 @@ nav a.nav-link.active { background: var(--primary-color); color: white !importan
 
 button, a.btn { padding: 0.5rem 1rem; border-radius: 5px; border: none; cursor: pointer; font-size: 14px; font-weight: 500; margin-top: 10px; text-decoration: none; display: inline-block; transition: 0.2s; }
 button:hover, a.btn:hover { opacity: 0.85; }
+button[type="submit"] { background: var(--primary-color); font-size: 16px; color: white; }
+button[type="submit"]:hover { background: var(--primary-hover); }
 .btn-danger, a.btn-danger { background: var(--danger-color); color: white; }
 .btn-danger:hover, a.btn-danger:hover { background: #c82333; }
 .btn-primary, #open-add-modal-btn, #open-add-product-btn, #open-add-article-btn, #export-csv-btn { background: var(--primary-color) !important; color: white !important; }
@@ -34,16 +53,45 @@ label { font-weight: 600; color: #555; margin-top: 5px; display: block; }
 
 .filter-container { display: flex; flex-wrap: wrap; gap: 20px; background: #fff; padding: 20px; border-radius: 8px; box-shadow: var(--shadow); margin-bottom: 20px; }
 .filter-group { display: flex; flex-direction: column; flex: 1; }
-.filter-group select, .filter-container input[type="text"] { padding: 8px; min-width: 220px; height: 38px; margin-top: 0; }
+.filter-group select, .filter-container input[type="text"] { padding: 8px; min-width: 220px; margin-top: 0; height: 38px; }
 #search-bar { padding: 8px 12px !important; height: 38px !important; font-size: 1rem !important; }
 
-#dealer-table, #products-table, #report-table, #matrix-table { width: 100%; background: #fff; box-shadow: var(--shadow); border-radius: 8px; overflow: hidden; }
-td, th { border-bottom: none; padding: 12px 15px; vertical-align: middle; }
-tbody tr { border-bottom: 1px solid var(--border-color); }
-th { background: var(--light-gray); color: #333; font-weight: 600; white-space: nowrap; }
+#dealer-table, #products-table, #report-table, #matrix-table { width: 100%; background: #fff; box-shadow: var(--shadow); border-radius: 8px; overflow: hidden; border-collapse: collapse; }
+td, th { padding: 12px 15px; vertical-align: middle; }
+th { background: var(--light-gray); color: #333; font-weight: 600; white-space: nowrap; border-bottom: 2px solid var(--border-color); }
+tbody tr { border-bottom: 1px solid var(--border-color); } /* Дефолтный бордер */
 tbody tr:nth-of-type(even) { background: var(--light-gray); }
 tbody tr:hover { background: var(--medium-gray); }
 th[data-sort]:hover { background: #dde1e5; cursor: pointer; } 
+
+/* --- (НОВОЕ) СТАТУСЫ (Полоска снизу) --- */
+.row-status-active td {
+    border-bottom: 3px solid #198754 !important; /* Зеленая линия снизу */
+}
+.row-status-active {
+    background-color: #f0fff4 !important; /* Еле заметный зеленый фон */
+}
+
+.row-status-problem td {
+    border-bottom: 3px solid #dc3545 !important; /* Красная линия снизу */
+}
+.row-status-problem {
+    background-color: #fff5f5 !important; /* Еле заметный красный фон */
+}
+
+.row-status-archive td {
+    border-bottom: 3px solid #6c757d !important; /* Серая линия снизу */
+}
+.row-status-archive {
+    opacity: 0.7;
+    background-color: #f2f2f2 !important;
+}
+/* Стандартный (желтый) оставляем без изменений или с легкой полоской, если хотите */
+.row-status-standard td {
+    /* border-bottom: 1px solid var(--border-color); - обычный */
+}
+/* --- КОНЕЦ СТАТУСОВ --- */
+
 .column-number, .cell-number { width: 40px; text-align: center; font-weight: bold; color: #555; }
 .table-photo { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border-color); }
 .no-photo { width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; background: var(--medium-gray); color: #aaa; font-size: 12px; border-radius: 4px; }
@@ -51,20 +99,22 @@ td a { text-decoration: none; color: var(--primary-color) !important; font-weigh
 .actions-cell { text-align: center; }
 .actions-cell .btn-light { background: #fff !important; border: 1px solid #ccc !important; color: #333 !important; }
 
-.modal-content { border: none; border-radius: 0.5rem; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+.modal-content { border: none; border-radius: 0.5rem; }
 .modal-header { background: var(--light-gray); border-bottom: 1px solid var(--border-color); }
 .modal-footer { background: var(--light-gray); border-top: 1px solid var(--border-color); }
 
 .list-container { display: flex; flex-direction: column; gap: 10px; border: 1px solid var(--border-color); border-radius: 4px; padding: 15px; background: var(--light-gray); max-height: 250px; overflow-y: auto; }
 .btn-remove-entry { padding: 0.375rem 0.75rem; margin-top: 0 !important; line-height: 1.5; }
 .preview-thumb { width: 100px; height: 38px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border-color); }
+
 .contact-entry, .address-entry, .pos-entry, .visit-entry { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; background: #fff; padding: 10px; border-radius: 4px; border: 1px solid var(--border-color); }
 .contact-entry input, .address-entry input, .pos-entry input, .pos-entry select, .visit-entry input { flex: 1 1 150px; margin: 0; }
-.visit-date { flex: 1; max-width: 150px; }
-.visit-comment { flex: 3; }
-.photo-entry { display: grid; grid-template-columns: 100px 1fr 1fr auto; }
+.visit-date { flex: 1; max-width: 150px; } .visit-comment { flex: 3; }
+
+.photo-entry { display: grid; grid-template-columns: 100px 1fr 1fr auto; gap: 10px; align-items: center; background: #fff; padding: 10px; border: 1px solid var(--border-color); }
 .photo-entry.new { grid-template-columns: 1fr 1fr auto; }
 .photo-entry input { margin-top: 0; }
+
 .photo-preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; margin-top: 10px; border: 1px solid var(--border-color); padding: 10px; border-radius: 4px; background: var(--light-gray); }
 .photo-preview-item { position: relative; border: 1px solid #ddd; border-radius: 4px; overflow: hidden; background: #fff; height: 80px; }
 .photo-preview-item img { width: 100%; height: 100%; object-fit: cover; }
@@ -112,7 +162,6 @@ td a { text-decoration: none; color: var(--primary-color) !important; font-weigh
 .task-item:hover { background-color: #e9ecef; }
 .task-item .badge { font-size: 0.8em; font-weight: 500; }
 
-/* (НОВОЕ) Стили кнопок связи */
 .btn-contact-call { color: #0d6efd; border-color: #0d6efd; }
 .btn-contact-call:hover { background-color: #0d6efd; color: white; }
 .btn-contact-wa { color: #198754; border-color: #198754; }
