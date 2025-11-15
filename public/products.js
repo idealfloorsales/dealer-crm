@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
 
+    // (ИСПРАВЛЕНО) fetchProducts
     async function fetchProducts(searchTerm = '') {
         try {
             const response = await fetch(`${API_URL}?search=${encodeURIComponent(searchTerm)}`);
@@ -35,6 +36,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     function renderProducts() {
+        // (ИСПРАВЛЕНО) Проверка на существование allProducts
+        if (!allProducts) allProducts = [];
+        
         const sortedProducts = allProducts.sort((a, b) => {
             const col = currentSort.column;
             let valA = (a[col] || '').toString(); 
@@ -63,8 +67,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="dropdown">
                         <button class="btn btn-light btn-sm" type="button" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button>
                         <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item btn-edit" data-id="${product.id}" data-sku="${safeText(product.sku)}" data-name="${safeText(product.name)}" href="#"><i class="bi bi-pencil me-2"></i>Редактировать</a></li>
-                            <li><a class="dropdown-item text-danger btn-delete" data-id="${product.id}" data-name="${safeText(product.name)}" href="#"><i class="bi bi-trash me-2"></i>Удалить</a></li>
+                            <li><a class="dropdown-item btn-edit" data-id="${product.id}" data-sku="${safeAttr(product.sku)}" data-name="${safeAttr(product.name)}" href="#"><i class="bi bi-pencil me-2"></i>Редактировать</a></li>
+                            <li><a class="dropdown-item text-danger btn-delete" data-id="${product.id}" data-name="${safeAttr(product.name)}" href="#"><i class="bi bi-trash me-2"></i>Удалить</a></li>
                         </ul>
                     </div>
                 </td>`;
