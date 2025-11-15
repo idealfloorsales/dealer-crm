@@ -16,14 +16,17 @@ document.addEventListener('DOMContentLoaded', () => {
     let dealerLat = null;
     let dealerLng = null;
 
-    // Вспомогательные функции
-    const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
-    const formatUrl = (url) => { if (!url) return null; if (!url.startsWith('http')) return 'https://' + url; return url; }
-
     if (!dealerId) {
-        document.getElementById('dealer-details').innerHTML = '<h2 class="text-danger">Ошибка: ID дилера не указан в URL.</h2>';
+        document.getElementById('dealer-name').textContent = 'Ошибка';
+        document.getElementById('dealer-id-subtitle').textContent = 'ID дилера не найден';
+        if(deleteBtn) deleteBtn.style.display = 'none'; 
+        if(editBtn) editBtn.style.display = 'none'; 
+        if(navigateBtn) navigateBtn.style.display = 'none';
         return;
     }
+
+    const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
+    const formatUrl = (url) => { if (!url) return null; if (!url.startsWith('http')) return 'https://' + url; return url; }
 
     // --- 1. ОСНОВНАЯ ФУНКЦИЯ ЗАГРУЗКИ ---
     async function fetchDealerDetails() {
@@ -38,11 +41,16 @@ document.addEventListener('DOMContentLoaded', () => {
             dealerLng = dealer.longitude;
             if (!dealerLat || !dealerLng) { if(navigateBtn) navigateBtn.style.display = 'none'; }
 
-            // --- ЗАГОЛОВОК СТРАНИЦЫ ---
-            document.getElementById('dealer-header').innerHTML = `
-                <h1 class="display-6 mb-0">${safeText(dealer.name)}</h1>
-                <p class="lead text-muted">${safeText(dealer.dealer_id)}</p>
-            `;
+            // --- ЗАГОЛОВОК СТРАНИЦЫ (с Аватаром) ---
+            document.getElementById('dealer-name').textContent = safeText(dealer.name);
+            document.getElementById('dealer-id-subtitle').textContent = `ID: ${safeText(dealer.dealer_id)}`;
+            const avatarImg = document.getElementById('dealer-avatar-img');
+            if (dealer.avatarUrl) {
+                avatarImg.src = dealer.avatarUrl;
+            } else {
+                avatarImg.src = 'logo.png'; // Заглушка
+                avatarImg.style.opacity = '0.3';
+            }
             document.title = `Дилер: ${dealer.name}`;
             
             // --- ВКЛАДКА "ИНФО" ---
@@ -51,21 +59,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 <p><strong>Город:</strong> ${safeText(dealer.city)}</p>
                 <p><strong>Адрес:</strong> ${safeText(dealer.address)}</p>
                 <p><strong>Тип цен:</strong> ${safeText(dealer.price_type)}</p>
+                <p><strong>Статус:</strong> ${safeText(dealer.status)}</p>
             `;
             document.getElementById('dealer-delivery').textContent = safeText(dealer.delivery) || 'Нет данных';
             document.getElementById('dealer-bonuses').textContent = safeText(dealer.bonuses) || 'Нет данных';
+            renderDealerAddresses(dealer.additional_addresses || []); 
+            // renderDealerPos(dealer.pos_materials || []); // Убрали
 
-            // --- ОТДЕЛЬНЫЕ ФУНКЦИИ ДЛЯ КАЖДОЙ ВКЛАДКИ ---
+            // --- ДРУГИЕ ВКЛАДКИ ---
             renderDealerLinks(dealer.website, dealer.instagram); 
             renderDealerVisits(dealer.visits || []);
             renderDealerContacts(dealer.contacts || []);
-            renderDealerAddresses(dealer.additional_addresses || []); 
-            renderDealerPos(dealer.pos_materials || []); 
             renderDealerPhotos(dealer.photos || []); 
             fetchDealerProducts(); // Товары грузим отдельно
 
         } catch (error) {
-            document.getElementById('dealer-details').innerHTML = `<h2 class="text-danger">${error.message}</h2>`;
+            document.getElementById('dealer-name').textContent = 'Ошибка';
+            document.getElementById('dealer-id-subtitle').textContent = error.message;
         }
     }
     
@@ -109,13 +119,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // (ИСПРАВЛЕНО) Все таблицы обернуты в .table-responsive
     function renderDealerVisits(visits) {
         const c = document.getElementById('dealer-visits-list'); if (!c) return;
         if (!visits || visits.length === 0) { c.innerHTML = '<p><i>Нет записей.</i></p>'; return; }
         visits.sort((a, b) => new Date(b.date) - new Date(a.date));
-        let html = '<div class="table-responsive"><table class="table table-bordered table-striped" style="margin-top:0"><thead><tr><th style="width:120px">Дата</th><th>Комментарий</th></tr></thead><tbody>';
-        visits.forEach(v => { const dateStr = v.date ? new Date(v.date).toLocaleDateString('ru-RU') : '-'; html += `<tr><td>${dateStr}</td><td style="white-space: pre-wrap;">${safeText(v.comment)}</td></tr>`; });
+        let html = '<div class="table-responsive"><table class="table table-bordered table-striped" style="margin-top:0"><thead><tr><th style="width:120px">Дата</th><th>Комментарий</th><th style="width:100px">Статус</th></tr></thead><tbody>';
+        visits.forEach(v => { 
+            const dateStr = v.date ? new Date(v.date).toLocaleDateString('ru-RU') : '-'; 
+            const status = v.isCompleted ? '<span class="badge bg-success">Выполнено</span>' : '<span class="badge bg-warning">В плане</span>';
+            html += `<tr><td>${dateStr}</td><td style="white-space: pre-wrap;">${safeText(v.comment)}</td><td>${status}</td></tr>`; 
+        });
         c.innerHTML = html + '</tbody></table></div>';
     }
 
@@ -142,11 +155,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderDealerPos(posItems) {
-        const c = document.getElementById('dealer-pos-list'); if (!c) return;
-        if (!posItems || posItems.length === 0) { c.innerHTML = '<p><i>Нет оборудования.</i></p>'; return; }
-        let html = '<div class="table-responsive"><table class="table table-bordered table-striped" style="margin-top: 0;"><thead><tr><th>Оборудование</th><th>Количество</th></tr></thead><tbody>';
-        posItems.forEach(item => { html += `<tr><td>${safeText(item.name)}</td><td>${item.quantity || 1}</td></tr>`; });
-        c.innerHTML = html + '</tbody></table></div>';
+        // (УДАЛЕНО)
+        const c = document.getElementById('dealer-pos-list');
+        if(c) c.innerHTML = '<p><i>(Перенесено в "Выставленность")</i></p>';
     }
 
     async function fetchDealerProducts() {
