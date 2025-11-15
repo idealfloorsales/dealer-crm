@@ -25,25 +25,86 @@
             </div>
         </div>
     </nav>
+    
     <div class="container mt-4">
         <div class="details-container p-4 bg-white rounded shadow-sm border">
-            <div id="dealer-details"><h1 class="display-6">Загрузка...</h1></div>
+            
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <div id="dealer-header">
+                    <h1 class="display-6 mb-0">Загрузка...</h1>
+                    <p id="dealer-id-subtitle" class="lead text-muted"></p>
+                </div>
+                <div>
+                    <a href="index.html" class="btn btn-outline-secondary">← Назад</a>
+                    <button id="navigate-btn" class="btn btn-success"><i class="bi bi-geo-alt-fill me-2"></i>Поехать</button>
+                    <button id="edit-dealer-btn" class="btn btn-warning"><i class="bi bi-pencil me-2"></i>Редактировать</button>
+                    <button id="delete-dealer-btn" class="btn btn-danger"><i class="bi bi-trash me-2"></i>Удалить</button>
+                </div>
+            </div>
+            
             <div id="dealer-links" class="dealer-links-container"></div>
-            <h3>История посещений:</h3><div id="dealer-visits-list"><p>Загрузка...</p></div>
-            <h3>Контакты:</h3><div id="dealer-contacts-list"><p>Загрузка...</p></div>
-            <h3>Дополнительные адреса:</h3><div id="dealer-addresses-list"><p>Загрузка...</p></div>
-            <h3>Стенды:</h3><div id="dealer-pos-list"><p>Загрузка...</p></div>
-            <h3>Выставленные товары:</h3><div id="dealer-products-list"><p>Загрузка...</p></div>
-            <h3>Условия доставки:</h3><div id="dealer-delivery" class="products-display"><p>...</p></div>
-            <h3>Бонусы и примечания:</h3><div id="dealer-bonuses" class="products-display"><p>...</p></div>
-            <h3>Фотогалерея:</h3><div id="dealer-photo-gallery" class="gallery-container"><p>Загрузка фото...</p></div>
-            <hr class="my-4">
-            <a href="index.html" class="btn btn-outline-secondary">← Вернуться к списку</a>
-            <button id="edit-dealer-btn" class="btn btn-warning float-end" style="margin-left: 10px;"><i class="bi bi-pencil me-2"></i>Редактировать</button>
-            <button id="navigate-btn" class="btn btn-success float-end" style="margin-left: 10px;"><i class="bi bi-geo-alt-fill me-2"></i>Поехать</button>
-            <button id="delete-dealer-btn" class="btn btn-danger float-end"><i class="bi bi-trash me-2"></i>Удалить</button>
+
+            <ul class="nav nav-tabs mt-4" id="dealerTab" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="info-tab" data-bs-toggle="tab" data-bs-target="#info-pane" type="button" role="tab">ℹ️ Инфо</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="visits-tab" data-bs-toggle="tab" data-bs-target="#visits-pane" type="button" role="tab">📅 История визитов</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="contacts-tab" data-bs-toggle="tab" data-bs-target="#contacts-pane" type="button" role="tab">📞 Контакты</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="photos-tab" data-bs-toggle="tab" data-bs-target="#photos-pane" type="button" role="tab">📸 Фотогалерея</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="products-tab" data-bs-toggle="tab" data-bs-target="#products-pane" type="button" role="tab">📦 Товары</button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="dealerTabContent">
+                
+                <div class="tab-pane fade show active" id="info-pane" role="tabpanel">
+                    <h3>Основная информация</h3>
+                    <div id="dealer-info-main"></div>
+                    
+                    <h3>Дополнительные адреса:</h3>
+                    <div id="dealer-addresses-list"><p>Нет данных</p></div>
+                    
+                    <h3>Стенды:</h3>
+                    <div id="dealer-pos-list"><p>Нет данных</p></div>
+                    
+                    <h3>Условия доставки:</h3>
+                    <div id="dealer-delivery" class="products-display"><p>Нет данных</p></div>
+                    
+                    <h3>Бонусы и примечания:</h3>
+                    <div id="dealer-bonuses" class="products-display"><p>Нет данных</p></div>
+                </div>
+
+                <div class="tab-pane fade" id="visits-pane" role="tabpanel">
+                    <h3>История посещений</h3>
+                    <div id="dealer-visits-list"><p>Нет данных</p></div>
+                </div>
+
+                <div class="tab-pane fade" id="contacts-pane" role="tabpanel">
+                    <h3>Контакты</h3>
+                    <div id="dealer-contacts-list"><p>Нет данных</p></div>
+                </div>
+
+                <div class="tab-pane fade" id="photos-pane" role="tabpanel">
+                    <h3>Фотогалерея</h3>
+                    <div id="dealer-photo-gallery" class="gallery-container"><p>Нет фото</p></div>
+                </div>
+
+                <div class="tab-pane fade" id="products-pane" role="tabpanel">
+                    <h3>Выставленные товары</h3>
+                    <div id="dealer-products-list"><p>Нет данных</p></div>
+                </div>
+                
+            </div>
         </div>
     </div>
+
     <div class="modal fade" id="imageModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-fullscreen">
             <div class="modal-content bg-dark">
@@ -58,6 +119,7 @@
             </div>
         </div>
     </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="dealer.js"></script>
 </body>
