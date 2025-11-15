@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSort = { column: 'name', direction: 'asc' };
     const posMaterialsList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"];
 
+    // ... (весь код модалок, элементов и карты) ...
     const addModalEl = document.getElementById('add-modal'); const addModal = new bootstrap.Modal(addModalEl);
     const editModalEl = document.getElementById('edit-modal'); const editModal = new bootstrap.Modal(editModalEl);
     const openAddModalBtn = document.getElementById('open-add-modal-btn');
@@ -20,19 +21,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const addVisitsList = document.getElementById('add-visits-list');
     const addPhotoInput = document.getElementById('add-photo-input');
     const addPhotoPreviewContainer = document.getElementById('add-photo-preview-container');
-    
     const dealerListBody = document.getElementById('dealer-list-body');
     const dealerTable = document.getElementById('dealer-table');
     const noDataMsg = document.getElementById('no-data-msg');
-    const filterCity = document.getElementById('filter-city'); // (ВОЗВРАЩЕНО)
+    const filterCity = document.getElementById('filter-city');
     const filterPriceType = document.getElementById('filter-price-type');
     const filterStatus = document.getElementById('filter-status');
-    // const filterRegion = document.getElementById('filter-region'); // Убрали
     const searchBar = document.getElementById('search-bar'); 
     const exportBtn = document.getElementById('export-dealers-btn'); 
     const dashboardContainer = document.getElementById('dashboard-container'); 
     const tasksList = document.getElementById('tasks-list'); 
-
     const editForm = document.getElementById('edit-dealer-form');
     const editProductChecklist = document.getElementById('edit-product-checklist'); 
     const editContactList = document.getElementById('edit-contact-list'); 
@@ -42,199 +40,43 @@ document.addEventListener('DOMContentLoaded', () => {
     const editPhotoList = document.getElementById('edit-photo-list'); 
     const editPhotoInput = document.getElementById('edit-photo-input');
     const editPhotoPreviewContainer = document.getElementById('edit-photo-preview-container');
-
-    let addPhotosData = []; 
-    let editPhotosData = [];
-
+    let addPhotosData = []; let editPhotosData = [];
     const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
     const safeText = (text) => (text || '').toString().replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const safeAttr = (text) => (text || '').toString().replace(/"/g, '&quot;');
     const toBase64 = file => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => resolve(reader.result); reader.onerror = error => reject(error); });
     const compressImage = (file, maxWidth = 1000, quality = 0.7) => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = event => { const img = new Image(); img.src = event.target.result; img.onload = () => { const elem = document.createElement('canvas'); let width = img.width; let height = img.height; if (width > maxWidth) { height *= maxWidth / width; width = maxWidth; } elem.width = width; elem.height = height; const ctx = elem.getContext('2d'); ctx.drawImage(img, 0, 0, width, height); resolve(elem.toDataURL('image/jpeg', quality)); }; img.onerror = error => reject(error); }; reader.onerror = error => reject(error); });
-
     const DEFAULT_LAT = 51.1605; const DEFAULT_LNG = 71.4704;
-    const CITY_COORDS = { "Астана": [51.1605, 71.4704], "Алматы": [43.2220, 76.8512], "Шымкент": [42.3417, 69.5901], "Караганда": [49.8020, 73.1021], "Актобе": [50.2839, 57.1670], "Тараз": [42.9000, 71.3667], "Павлодар": [52.2873, 76.9674], "Усть-Каменогорск": [49.9632, 82.6059], "Семей": [50.4113, 80.2275], "Атырау": [47.1167, 51.8833], "Костанай": [53.2148, 63.6321], "Кызылорда": [44.8488, 65.4823], "Уральск": [51.2333, 51.3667], "Петропавловск": [54.8753, 69.1622], "Актау": [43.6500, 51.1500] };
+    const CITY_COORDS = { "Астана": [51.1605, 71.4704], "Алматы": [43.2220, 76.8512], "Шымкент": [42.3417, 69.5901], "Караганда": [49.8020, 73.1021] };
     let addMap, editMap;
-
-    function initMap(mapId) {
-        const el = document.getElementById(mapId); if (!el) return null;
-        if (typeof L === 'undefined') { console.warn("Leaflet не загружен"); return null; }
-        const map = L.map(mapId).setView([DEFAULT_LAT, DEFAULT_LNG], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: 'OSM' }).addTo(map);
-        return map;
-    }
-    function setupMapClick(map, latId, lngId, markerRef) {
-        if (!map) return;
-        map.on('click', function(e) {
-            const lat = e.latlng.lat; const lng = e.latlng.lng;
-            const latIn = document.getElementById(latId); const lngIn = document.getElementById(lngId);
-            if(latIn) latIn.value = lat; if(lngIn) lngIn.value = lng;
-            if (markerRef.current) markerRef.current.setLatLng([lat, lng]); else markerRef.current = L.marker([lat, lng]).addTo(map);
-        });
-    }
-    if (addModalEl) {
-        addModalEl.addEventListener('shown.bs.modal', () => {
-            if (!addMap) { addMap = initMap('add-map'); addModalEl.markerRef = { current: null }; setupMapClick(addMap, 'add_latitude', 'add_longitude', addModalEl.markerRef); } else { addMap.invalidateSize(); }
-            if (addMap && addModalEl.markerRef && addModalEl.markerRef.current) { addMap.removeLayer(addModalEl.markerRef.current); addModalEl.markerRef.current = null; }
-            if (addMap) {
-                const city = document.getElementById('city') ? document.getElementById('city').value.trim() : '';
-                if (city && CITY_COORDS[city]) addMap.setView(CITY_COORDS[city], 12); else addMap.setView([DEFAULT_LAT, DEFAULT_LNG], 13);
-            }
-        });
-    }
-    if (editModalEl) {
-        editModalEl.addEventListener('shown.bs.modal', () => {
-            if (!editMap) { editMap = initMap('edit-map'); editModalEl.markerRef = { current: null }; setupMapClick(editMap, 'edit_latitude', 'edit_longitude', editModalEl.markerRef); } else { editMap.invalidateSize(); }
-            const latEl = document.getElementById('edit_latitude'); const lngEl = document.getElementById('edit_longitude');
-            if (latEl && lngEl && editMap) {
-                const lat = parseFloat(latEl.value); const lng = parseFloat(lngEl.value);
-                const city = document.getElementById('edit_city') ? document.getElementById('edit_city').value.trim() : '';
-                if (editModalEl.markerRef.current) editMap.removeLayer(editModalEl.markerRef.current);
-                if (!isNaN(lat) && !isNaN(lng)) { editModalEl.markerRef.current = L.marker([lat, lng]).addTo(editMap); editMap.setView([lat, lng], 15); } 
-                else if (city && CITY_COORDS[city]) { editMap.setView(CITY_COORDS[city], 12); }
-                else { editMap.setView([DEFAULT_LAT, DEFAULT_LNG], 13); }
-            }
-        });
-    }
-
-    async function fetchProductCatalog() {
-        if (fullProductCatalog.length > 0) return; 
-        try {
-            const response = await fetch(API_PRODUCTS_URL);
-            if (!response.ok) throw new Error(`Ошибка: ${response.status}`);
-            fullProductCatalog = await response.json();
-            fullProductCatalog.sort((a, b) => a.sku.localeCompare(b.sku, 'ru', { numeric: true }));
-        } catch (error) {
-            if(addProductChecklist) addProductChecklist.innerHTML = `<p class='text-danger'>Ошибка каталога.</p>`;
-            if(editProductChecklist) editProductChecklist.innerHTML = `<p class='text-danger'>Ошибка каталога.</p>`;
-        }
-    }
-
-    async function completeTask(btn, dealerId, visitIndex) {
-        try {
-            btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; 
-            const res = await fetch(`${API_DEALERS_URL}/${dealerId}`);
-            if(!res.ok) throw new Error('Не удалось загрузить данные');
-            const dealer = await res.json();
-            let found = false;
-            if (dealer.visits && dealer.visits[visitIndex]) {
-                dealer.visits[visitIndex].isCompleted = true;
-                found = true;
-            }
-            if (!found) return alert("Задача не найдена.");
-            await fetch(`${API_DEALERS_URL}/${dealerId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visits: dealer.visits }) });
-            initApp(); 
-        } catch (e) { alert("Ошибка: " + e.message); btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg"></i>'; }
-    }
-
-    function renderDashboard() {
-        if (!dashboardContainer) return;
-        if (!allDealers || allDealers.length === 0) { dashboardContainer.innerHTML = ''; return; }
-        const totalDealers = allDealers.length;
-        const noPhotosCount = allDealers.filter(d => !d.has_photos).length;
-        const posCount = allDealers.filter(d => d.has_pos).length;
-        const cityCounts = {}; let topCity = "-"; let maxCount = 0;
-        allDealers.forEach(d => { if (d.city) { cityCounts[d.city] = (cityCounts[d.city] || 0) + 1; if (cityCounts[d.city] > maxCount) { maxCount = cityCounts[d.city]; topCity = d.city; } } });
-
-        dashboardContainer.innerHTML = `
-            <div class="col-md-6 col-lg-3"><div class="stat-card"><i class="bi bi-shop stat-icon text-primary"></i><span class="stat-number">${totalDealers}</span><span class="stat-label">Всего дилеров</span></div></div>
-            <div class="col-md-6 col-lg-3"><div class="stat-card ${noPhotosCount > 0 ? 'border-danger' : ''}"><i class="bi bi-camera-fill stat-icon ${noPhotosCount > 0 ? 'text-danger' : 'text-secondary'}"></i><span class="stat-number ${noPhotosCount > 0 ? 'text-danger' : ''}">${noPhotosCount}</span><span class="stat-label">Без фото</span></div></div>
-            <div class="col-md-6 col-lg-3"><div class="stat-card"><i class="bi bi-easel stat-icon text-success"></i><span class="stat-number text-success">${posCount}</span><span class="stat-label">С оборудованием</span></div></div>
-             <div class="col-md-6 col-lg-3"><div class="stat-card"><i class="bi bi-geo-alt-fill stat-icon text-info"></i><span class="stat-number text-info" style="font-size: 1.5rem;">${topCity}</span><span class="stat-label">Топ регион</span></div></div>
-        `;
-
-        if (!tasksList) return;
-        const today = new Date(); today.setHours(0,0,0,0);
-        const tasks = [];
-        allDealers.forEach(d => {
-            if (d.visits && Array.isArray(d.visits)) {
-                d.visits.forEach((v, index) => { 
-                    if (!v.isCompleted) {
-                        const vDate = new Date(v.date);
-                        const vDateMidnight = new Date(vDate); vDateMidnight.setHours(0,0,0,0);
-                        let isOverdue = vDateMidnight < today;
-                        let isToday = vDateMidnight.getTime() === today.getTime();
-                        if (vDate >= today || isOverdue) {
-                            tasks.push({ dealerName: d.name, dealerId: d.id, date: vDate, dateStrRaw: v.date, comment: v.comment || "", isOverdue: isOverdue, isToday: isToday, visitIndex: index });
-                        }
-                    }
-                });
-            }
-        });
-        tasks.sort((a, b) => a.date - b.date);
-        if (tasks.length === 0) { tasksList.innerHTML = `<div class="text-center py-4 text-muted"><i class="bi bi-check2-circle fs-3 d-block mb-2"></i>Задач нет</div>`; } 
-        else {
-            tasksList.innerHTML = tasks.map(t => {
-                const dateStr = t.date.toLocaleDateString('ru-RU');
-                let itemClass = 'list-group-item-action'; let badgeClass = 'bg-primary'; let badgeText = dateStr;
-                if (t.isOverdue) { itemClass += ' list-group-item-danger'; badgeClass = 'bg-danger'; badgeText = `Просрочено: ${dateStr}`; } 
-                else if (t.isToday) { itemClass += ' list-group-item-warning'; badgeClass = 'bg-warning text-dark'; badgeText = 'Сегодня'; }
-                return `
-                    <div class="list-group-item ${itemClass} task-item d-flex justify-content-between align-items-center">
-                        <div class="me-auto">
-                            <div class="d-flex align-items-center mb-1"><span class="badge ${badgeClass} rounded-pill me-2">${badgeText}</span><a href="dealer.html?id=${t.dealerId}" target="_blank" class="fw-bold text-decoration-none text-dark">${t.dealerName}</a></div>
-                            <small class="text-muted" style="white-space: pre-wrap;">${safeText(t.comment)}</small>
-                        </div>
-                        <button class="btn btn-sm btn-success btn-complete-task ms-2" title="Выполнено" data-id="${t.dealerId}" data-index="${t.visitIndex}"><i class="bi bi-check-lg"></i></button>
-                    </div>`;
-            }).join('');
-        }
-    }
-
-    if(tasksList) {
-        tasksList.addEventListener('click', (e) => {
-            const btn = e.target.closest('.btn-complete-task');
-            if (btn) { btn.disabled = true; completeTask(btn, btn.dataset.id, btn.dataset.index); }
-        });
-    }
-
+    function initMap(mapId) { const el = document.getElementById(mapId); if (!el || typeof L === 'undefined') return null; const map = L.map(mapId).setView([DEFAULT_LAT, DEFAULT_LNG], 13); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: 'OSM' }).addTo(map); return map; }
+    function setupMapClick(map, latId, lngId, markerRef) { if (!map) return; map.on('click', function(e) { const lat = e.latlng.lat; const lng = e.latlng.lng; const latIn = document.getElementById(latId); const lngIn = document.getElementById(lngId); if(latIn) latIn.value = lat; if(lngIn) lngIn.value = lng; if (markerRef.current) markerRef.current.setLatLng([lat, lng]); else markerRef.current = L.marker([lat, lng]).addTo(map); }); }
+    if (addModalEl) { addModalEl.addEventListener('shown.bs.modal', () => { if (!addMap) { addMap = initMap('add-map'); addModalEl.markerRef = { current: null }; setupMapClick(addMap, 'add_latitude', 'add_longitude', addModalEl.markerRef); } else { addMap.invalidateSize(); } if (addMap && addModalEl.markerRef && addModalEl.markerRef.current) { addMap.removeLayer(addModalEl.markerRef.current); addModalEl.markerRef.current = null; } if (addMap) { const city = document.getElementById('city') ? document.getElementById('city').value.trim() : ''; if (city && CITY_COORDS[city]) addMap.setView(CITY_COORDS[city], 12); else addMap.setView([DEFAULT_LAT, DEFAULT_LNG], 13); } }); }
+    if (editModalEl) { editModalEl.addEventListener('shown.bs.modal', () => { if (!editMap) { editMap = initMap('edit-map'); editModalEl.markerRef = { current: null }; setupMapClick(editMap, 'edit_latitude', 'edit_longitude', editModalEl.markerRef); } else { editMap.invalidateSize(); } const latEl = document.getElementById('edit_latitude'); const lngEl = document.getElementById('edit_longitude'); if (latEl && lngEl && editMap) { const lat = parseFloat(latEl.value); const lng = parseFloat(lngEl.value); const city = document.getElementById('edit_city') ? document.getElementById('edit_city').value.trim() : ''; if (editModalEl.markerRef.current) editMap.removeLayer(editModalEl.markerRef.current); if (!isNaN(lat) && !isNaN(lng)) { editModalEl.markerRef.current = L.marker([lat, lng]).addTo(editMap); editMap.setView([lat, lng], 15); } else if (city && CITY_COORDS[city]) { editMap.setView(CITY_COORDS[city], 12); } else { editMap.setView([DEFAULT_LAT, DEFAULT_LNG], 13); } } }); }
+    async function fetchProductCatalog() { if (fullProductCatalog.length > 0) return; try { const response = await fetch(API_PRODUCTS_URL); if (!response.ok) throw new Error(`Ошибка: ${response.status}`); fullProductCatalog = await response.json(); fullProductCatalog.sort((a, b) => a.sku.localeCompare(b.sku, 'ru', { numeric: true })); } catch (error) { if(addProductChecklist) addProductChecklist.innerHTML = `<p class='text-danger'>Ошибка каталога.</p>`; if(editProductChecklist) editProductChecklist.innerHTML = `<p class='text-danger'>Ошибка каталога.</p>`; } }
+    async function completeTask(btn, dealerId, visitIndex) { try { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; const res = await fetch(`${API_DEALERS_URL}/${dealerId}`); if(!res.ok) throw new Error('Не удалось загрузить данные'); const dealer = await res.json(); let found = false; if (dealer.visits && dealer.visits[visitIndex]) { dealer.visits[visitIndex].isCompleted = true; found = true; } if (!found) return alert("Задача не найдена."); await fetch(`${API_DEALERS_URL}/${dealerId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visits: dealer.visits }) }); initApp(); } catch (e) { alert("Ошибка: " + e.message); btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg"></i>'; } }
+    function renderDashboard() { if (!dashboardContainer) return; if (!allDealers || allDealers.length === 0) { dashboardContainer.innerHTML = ''; return; } const totalDealers = allDealers.length; const noPhotosCount = allDealers.filter(d => !d.has_photos).length; const posCount = allDealers.filter(d => d.has_pos).length; const cityCounts = {}; let topCity = "-"; let maxCount = 0; allDealers.forEach(d => { if (d.city) { cityCounts[d.city] = (cityCounts[d.city] || 0) + 1; if (cityCounts[d.city] > maxCount) { maxCount = cityCounts[d.city]; topCity = d.city; } } }); dashboardContainer.innerHTML = ` <div class="col-md-6 col-lg-3"><div class="stat-card"><i class="bi bi-shop stat-icon text-primary"></i><span class="stat-number">${totalDealers}</span><span class="stat-label">Всего дилеров</span></div></div> <div class="col-md-6 col-lg-3"><div class="stat-card ${noPhotosCount > 0 ? 'border-danger' : ''}"><i class="bi bi-camera-fill stat-icon ${noPhotosCount > 0 ? 'text-danger' : 'text-secondary'}"></i><span class="stat-number ${noPhotosCount > 0 ? 'text-danger' : ''}">${noPhotosCount}</span><span class="stat-label">Без фото</span></div></div> <div class="col-md-6 col-lg-3"><div class="stat-card"><i class="bi bi-easel stat-icon text-success"></i><span class="stat-number text-success">${posCount}</span><span class="stat-label">С оборудованием</span></div></div> <div class="col-md-6 col-lg-3"><div class="stat-card"><i class="bi bi-geo-alt-fill stat-icon text-info"></i><span class="stat-number text-info" style="font-size: 1.5rem;">${topCity}</span><span class="stat-label">Топ регион</span></div></div> `; if (!tasksList) return; const today = new Date(); today.setHours(0,0,0,0); const tasks = []; allDealers.forEach(d => { if (d.visits && Array.isArray(d.visits)) { d.visits.forEach((v, index) => { if (!v.isCompleted) { const vDate = new Date(v.date); const vDateMidnight = new Date(vDate); vDateMidnight.setHours(0,0,0,0); let isOverdue = vDateMidnight < today; let isToday = vDateMidnight.getTime() === today.getTime(); if (vDate >= today || isOverdue) { tasks.push({ dealerName: d.name, dealerId: d.id, date: vDate, dateStrRaw: v.date, comment: v.comment || "", isOverdue: isOverdue, isToday: isToday, visitIndex: index }); } } }); } }); tasks.sort((a, b) => a.date - b.date); if (tasks.length === 0) { tasksList.innerHTML = `<div class="text-center py-4 text-muted"><i class="bi bi-check2-circle fs-3 d-block mb-2"></i>Задач нет</div>`; } else { tasksList.innerHTML = tasks.map(t => { const dateStr = t.date.toLocaleDateString('ru-RU'); let itemClass = 'list-group-item-action'; let badgeClass = 'bg-primary'; let badgeText = dateStr; if (t.isOverdue) { itemClass += ' list-group-item-danger'; badgeClass = 'bg-danger'; badgeText = `Просрочено: ${dateStr}`; } else if (t.isToday) { itemClass += ' list-group-item-warning'; badgeClass = 'bg-warning text-dark'; badgeText = 'Сегодня'; } return ` <div class="list-group-item ${itemClass} task-item d-flex justify-content-between align-items-center"> <div class="me-auto"> <div class="d-flex align-items-center mb-1"><span class="badge ${badgeClass} rounded-pill me-2">${badgeText}</span><a href="dealer.html?id=${t.dealerId}" target="_blank" class="fw-bold text-decoration-none text-dark">${t.dealerName}</a></div> <small class="text-muted" style="white-space: pre-wrap;">${safeText(t.comment)}</small> </div> <button class="btn btn-sm btn-success btn-complete-task ms-2" title="Выполнено" data-id="${t.dealerId}" data-index="${t.visitIndex}"><i class="bi bi-check-lg"></i></button> </div>`; }).join(''); } }
+    if(tasksList) tasksList.addEventListener('click', (e) => { const btn = e.target.closest('.btn-complete-task'); if (btn) { btn.disabled = true; completeTask(btn, btn.dataset.id, btn.dataset.index); } });
     function createContactEntryHTML(c={}) { return `<div class="contact-entry input-group mb-2"><input type="text" class="form-control contact-name" placeholder="Имя" value="${c.name||''}"><input type="text" class="form-control contact-position" placeholder="Должность" value="${c.position||''}"><input type="text" class="form-control contact-info" placeholder="Телефон" value="${c.contactInfo||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
     function createAddressEntryHTML(a={}) { return `<div class="address-entry input-group mb-2"><input type="text" class="form-control address-description" placeholder="Описание" value="${a.description||''}"><input type="text" class="form-control address-city" placeholder="Город" value="${a.city||''}"><input type="text" class="form-control address-address" placeholder="Адрес" value="${a.address||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
     function createPosEntryHTML(p={}) { const opts = posMaterialsList.map(n => `<option value="${n}" ${n===p.name?'selected':''}>${n}</option>`).join(''); return `<div class="pos-entry input-group mb-2"><select class="form-select pos-name"><option value="">-- Выбор --</option>${opts}</select><input type="number" class="form-control pos-quantity" value="${p.quantity||1}" min="1"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
     function createVisitEntryHTML(v={}) { return `<div class="visit-entry input-group mb-2"><input type="date" class="form-control visit-date" value="${v.date||''}"><input type="text" class="form-control visit-comment w-50" placeholder="Результат визита..." value="${v.comment||''}"><input type="hidden" class="visit-completed" value="${v.isCompleted || 'false'}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
-    
     function renderPhotoPreviews(container, photosArray) { if(container) container.innerHTML = photosArray.map((p, index) => `<div class="photo-preview-item"><img src="${p.photo_url}"><button type="button" class="btn-remove-photo" data-index="${index}">×</button></div>`).join(''); }
     if(addPhotoInput) addPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) addPhotosData.push({ photo_url: await compressImage(file) }); renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData); addPhotoInput.value = ''; });
     if(addPhotoPreviewContainer) addPhotoPreviewContainer.addEventListener('click', (e) => { if(e.target.classList.contains('btn-remove-photo')) { addPhotosData.splice(e.target.dataset.index, 1); renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData); }});
     if(editPhotoInput) editPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) editPhotosData.push({ photo_url: await compressImage(file) }); renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData); editPhotoInput.value = ''; });
     if(editPhotoPreviewContainer) editPhotoPreviewContainer.addEventListener('click', (e) => { if(e.target.classList.contains('btn-remove-photo')) { editPhotosData.splice(e.target.dataset.index, 1); renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData); }});
-
-    function collectData(container, selector, fields) {
-        if (!container) return [];
-        const data = [];
-        container.querySelectorAll(selector).forEach(entry => {
-            const item = {}; let hasData = false;
-            fields.forEach(f => { const inp = entry.querySelector(f.class); if(inp){item[f.key]=inp.value; if(item[f.key]) hasData=true;} });
-            if(hasData) data.push(item);
-        });
-        return data;
-    }
+    function collectData(container, selector, fields) { if (!container) return []; const data = []; container.querySelectorAll(selector).forEach(entry => { const item = {}; let hasData = false; fields.forEach(f => { const inp = entry.querySelector(f.class); if(inp){item[f.key]=inp.value; if(item[f.key]) hasData=true;} }); if(hasData) data.push(item); }); return data; }
     function renderList(container, data, htmlGen) { if(container) container.innerHTML = (data && data.length > 0) ? data.map(htmlGen).join('') : htmlGen(); }
     function renderProductChecklist(container, selectedIds=[]) { if(!container) return; const set = new Set(selectedIds); container.innerHTML = fullProductCatalog.map(p => `<div class="checklist-item form-check"><input type="checkbox" class="form-check-input" id="prod-${container.id}-${p.id}" value="${p.id}" ${set.has(p.id)?'checked':''}><label class="form-check-label" for="prod-${container.id}-${p.id}"><strong>${p.sku}</strong> - ${p.name}</label></div>`).join(''); }
     function getSelectedProductIds(containerId) { const el=document.getElementById(containerId); if(!el) return []; return Array.from(el.querySelectorAll('input:checked')).map(cb=>cb.value); }
     async function saveProducts(dealerId, ids) { await fetch(`${API_DEALERS_URL}/${dealerId}/products`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({productIds: ids})}); }
 
-    // --- (ВОЗВРАЩЕНО) Рендер списка с ПРОСТЫМ фильтром ---
     function renderDealerList() {
         if (!dealerListBody) return;
-        const city = filterCity ? filterCity.value : ''; 
-        const type = filterPriceType ? filterPriceType.value : ''; 
-        const status = filterStatus ? filterStatus.value : '';
-        const search = searchBar ? searchBar.value.toLowerCase() : '';
-        
-        const filtered = allDealers.filter(d => 
-            (!city||d.city===city) && 
-            (!type||d.price_type===type) && 
-            (!status||(d.status||'standard')===status) &&
-            (!search || (d.name.toLowerCase().includes(search)||d.dealer_id.toLowerCase().includes(search)||d.organization.toLowerCase().includes(search)))
-        );
-        
-        filtered.sort((a, b) => {
-            let valA = (a[currentSort.column] || '').toString(); let valB = (b[currentSort.column] || '').toString();
-            let res = currentSort.column === 'dealer_id' ? valA.localeCompare(valB, undefined, {numeric:true}) : valA.toLowerCase().localeCompare(valB.toLowerCase(), 'ru');
-            return currentSort.direction === 'asc' ? res : -res;
-        });
-        
+        const city = filterCity ? filterCity.value : ''; const type = filterPriceType ? filterPriceType.value : ''; const status = filterStatus ? filterStatus.value : ''; const search = searchBar ? searchBar.value.toLowerCase() : '';
+        const filtered = allDealers.filter(d => (!city||d.city===city) && (!type||d.price_type===type) && (!status||(d.status||'standard')===status) && (!search || ((d.name||'').toLowerCase().includes(search)||(d.dealer_id||'').toLowerCase().includes(search)||(d.organization||'').toLowerCase().includes(search))));
+        filtered.sort((a, b) => { let valA = (a[currentSort.column] || '').toString(); let valB = (b[currentSort.column] || '').toString(); let res = currentSort.column === 'dealer_id' ? valA.localeCompare(valB, undefined, {numeric:true}) : valA.toLowerCase().localeCompare(valB.toLowerCase(), 'ru'); return currentSort.direction === 'asc' ? res : -res; });
         dealerListBody.innerHTML = filtered.length ? filtered.map((d, idx) => {
             let rowClass = 'row-status-standard';
             if (d.status === 'active') rowClass = 'row-status-active';
@@ -252,25 +94,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 <li><a class="dropdown-item text-danger btn-delete" data-id="${d.id}" data-name="${safeText(d.name)}" href="#"><i class="bi bi-trash me-2"></i>Удалить</a></li>
                 </ul></div></td></tr>`;
         }).join('') : '';
-        
         if(dealerTable) dealerTable.style.display = filtered.length ? 'table' : 'none';
         if(noDataMsg) { noDataMsg.style.display = filtered.length ? 'none' : 'block'; noDataMsg.textContent = allDealers.length === 0 ? 'Список пуст.' : 'Не найдено.'; }
     }
 
-    // --- (ВОЗВРАЩЕНО) ПРОСТОЙ фильтр городов ---
     function populateFilters(dealers) {
         if(!filterCity || !filterPriceType) return;
-        
         const cities = [...new Set(dealers.map(d => d.city).filter(Boolean))].sort();
         const types = [...new Set(dealers.map(d => d.price_type).filter(Boolean))].sort();
         const sc = filterCity.value; const st = filterPriceType.value;
-        
-        filterCity.innerHTML = '<option value="">-- Все города --</option>'; // Обычный
-        filterPriceType.innerHTML = '<option value="">-- Все типы --</option>';
-        
-        cities.forEach(c => filterCity.add(new Option(c, c))); 
-        types.forEach(t => filterPriceType.add(new Option(t, t)));
-        
+        filterCity.innerHTML = '<option value="">-- Все города --</option>'; filterPriceType.innerHTML = '<option value="">-- Все типы --</option>';
+        cities.forEach(c => filterCity.add(new Option(c, c))); types.forEach(t => filterPriceType.add(new Option(t, t)));
         filterCity.value = sc; filterPriceType.value = st;
     }
 
@@ -291,7 +125,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pendingId) { localStorage.removeItem('pendingEditDealerId'); openEditModal(pendingId); }
     }
 
-    // --- (Остальные функции без изменений) ---
     if(document.getElementById('add-contact-btn-add-modal')) document.getElementById('add-contact-btn-add-modal').onclick = () => addContactList.insertAdjacentHTML('beforeend', createContactEntryHTML());
     if(document.getElementById('add-address-btn-add-modal')) document.getElementById('add-address-btn-add-modal').onclick = () => addAddressList.insertAdjacentHTML('beforeend', createAddressEntryHTML());
     if(document.getElementById('add-pos-btn-add-modal')) document.getElementById('add-pos-btn-add-modal').onclick = () => addPosList.insertAdjacentHTML('beforeend', createPosEntryHTML());
