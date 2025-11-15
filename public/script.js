@@ -9,8 +9,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSort = { column: 'name', direction: 'asc' };
     const posMaterialsList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"];
 
+    // Модалки
     const addModalEl = document.getElementById('add-modal'); const addModal = new bootstrap.Modal(addModalEl);
     const editModalEl = document.getElementById('edit-modal'); const editModal = new bootstrap.Modal(editModalEl);
+
+    // Элементы
     const openAddModalBtn = document.getElementById('open-add-modal-btn');
     const addForm = document.getElementById('add-dealer-form');
     const addProductChecklist = document.getElementById('add-product-checklist'); 
@@ -24,7 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const dealerListBody = document.getElementById('dealer-list-body');
     const dealerTable = document.getElementById('dealer-table');
     const noDataMsg = document.getElementById('no-data-msg');
-    const filterCity = document.getElementById('filter-city');
+    const filterCity = document.getElementById('filter-city'); // Это наш "умный" фильтр
     const filterPriceType = document.getElementById('filter-price-type');
     const filterStatus = document.getElementById('filter-status');
     const searchBar = document.getElementById('search-bar'); 
@@ -45,7 +48,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let addPhotosData = []; 
     let editPhotosData = [];
 
+    // Безопасное получение значения
     const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
+
     const safeText = (text) => (text || '').toString().replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const safeAttr = (text) => (text || '').toString().replace(/"/g, '&quot;');
     const toBase64 = file => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => resolve(reader.result); reader.onerror = error => reject(error); });
@@ -226,11 +231,11 @@ document.addEventListener('DOMContentLoaded', () => {
             // Ваша логика "Астана/Регионы"
             let cityMatch = true;
             if (city === 'Астана') {
-                cityMatch = d.city === 'Астана';
+                cityMatch = (d.city === 'Астана');
             } else if (city === 'Регионы') {
-                cityMatch = d.city !== 'Астана' && d.city; // Показываем всех, кто НЕ Астана (и не пустой)
+                cityMatch = (d.city !== 'Астана' && d.city); // Показываем всех, кто НЕ Астана (и не пустой)
             } else if (city) {
-                cityMatch = d.city === city; // Обычный фильтр по городу
+                cityMatch = (d.city === city); // Обычный фильтр по городу
             }
 
             const searchMatch = !search || 
@@ -319,6 +324,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pendingId) { localStorage.removeItem('pendingEditDealerId'); openEditModal(pendingId); }
     }
 
+    // --- Безопасные обработчики кнопок ---
     if(document.getElementById('add-contact-btn-add-modal')) document.getElementById('add-contact-btn-add-modal').onclick = () => addContactList.insertAdjacentHTML('beforeend', createContactEntryHTML());
     if(document.getElementById('add-address-btn-add-modal')) document.getElementById('add-address-btn-add-modal').onclick = () => addAddressList.insertAdjacentHTML('beforeend', createAddressEntryHTML());
     if(document.getElementById('add-pos-btn-add-modal')) document.getElementById('add-pos-btn-add-modal').onclick = () => addPosList.insertAdjacentHTML('beforeend', createPosEntryHTML());
