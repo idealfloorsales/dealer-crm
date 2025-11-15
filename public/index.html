@@ -57,12 +57,23 @@
             </div>
             <div class="col-md-6 col-lg-3"><label class="form-label">Фильтр по городу:</label><select id="filter-city" class="form-select"><option value="">-- Все города --</option></select></div>
             <div class="col-md-6 col-lg-3"><label class="form-label">Фильтр по типу цен:</label><select id="filter-price-type" class="form-select"><option value="">-- Все типы --</option></select></div>
-            <div class="col-md-12 col-lg-3"><label class="form-label">Поиск:</label><input type="text" id="search-bar" class="form-control" placeholder="Поиск..."></div>
+            <div class="col-md-12 col-lg-3"><label class="form-label">Поиск:</label><input type="text" id="search-bar" class="form-control" placeholder="По ID, Названию, Организации..."></div>
         </div>
 
         <div class="table-responsive bg-white rounded shadow-sm border">
             <table id="dealer-table" class="table table-hover align-middle mb-0">
-                <thead class="table-light"><tr><th class="column-number">#</th><th>Статус</th><th>Фото</th><th data-sort="dealer_id">ID</th><th data-sort="name">Название</th><th data-sort="city">Город</th><th data-sort="price_type">Тип</th><th data-sort="organization">Организация</th><th style="width: 50px;"></th></tr></thead>
+                <thead class="table-light">
+                    <tr>
+                        <th class="column-number">#</th> 
+                        <th>Фото</th>
+                        <th data-sort="dealer_id">ID</th>
+                        <th data-sort="name">Название</th>
+                        <th data-sort="city">Город</th>
+                        <th data-sort="price_type">Тип</th>
+                        <th data-sort="organization">Организация</th>
+                        <th style="width: 50px;"></th>
+                    </tr>
+                </thead>
                 <tbody id="dealer-list-body"></tbody>
             </table>
         </div>
@@ -89,7 +100,7 @@
                                 </select>
                             </div>
 
-                            <div class="col-12"><label class="form-label">Координаты:</label><div id="add-map" class="mini-map"></div><div class="input-group mt-2"><span class="input-group-text">Lat</span><input type="text" id="add_latitude" class="form-control" readonly><span class="input-group-text">Lng</span><input type="text" id="add_longitude" class="form-control" readonly></div></div>
+                            <div class="col-12"><label class="form-label">Координаты (кликните на карту):</label><div id="add-map" class="mini-map"></div><div class="input-group mt-2"><span class="input-group-text">Lat</span><input type="text" id="add_latitude" class="form-control" readonly><span class="input-group-text">Lng</span><input type="text" id="add_longitude" class="form-control" readonly></div></div>
                             <div class="col-md-6"><label class="form-label">Организация</label><input type="text" id="organization" class="form-control"></div>
                             <div class="col-md-6"><label class="form-label">Тип цен</label><input type="text" id="price_type" class="form-control"></div>
                             <div class="col-md-6"><label class="form-label">Главный город</label><input type="text" id="city" class="form-control"></div>
