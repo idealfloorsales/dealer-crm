@@ -9,14 +9,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSort = { column: 'name', direction: 'asc' };
     const posMaterialsList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"];
 
-    // (ИСПРАВЛЕНО) Безопасная инициализация модалок
-    const addModalEl = document.getElementById('add-modal');
-    let addModal;
-    if (addModalEl) addModal = new bootstrap.Modal(addModalEl);
-    
-    const editModalEl = document.getElementById('edit-modal'); 
-    let editModal;
-    if (editModalEl) editModal = new bootstrap.Modal(editModalEl);
+    // Модалки
+    const addModalEl = document.getElementById('add-modal'); const addModal = new bootstrap.Modal(addModalEl);
+    const editModalEl = document.getElementById('edit-modal'); const editModal = new bootstrap.Modal(editModalEl);
 
     // Элементы
     const openAddModalBtn = document.getElementById('open-add-modal-btn');
@@ -311,7 +306,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if(addForm) addForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const btn = document.querySelector('button[form="add-dealer-form"]'); 
+        const btn = document.querySelector('button[form="add-dealer-form"]'); // (ИСПРАВЛЕНО)
         const oldText = btn ? btn.innerHTML : 'Добавить';
         if(btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...'; }
 
@@ -325,15 +320,7 @@ document.addEventListener('DOMContentLoaded', () => {
             visits: collectData(addVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'}]),
             photos: addPhotosData
         };
-        try { 
-            const res = await fetch(API_DEALERS_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); 
-            if (!res.ok) throw new Error(await res.text()); 
-            const newD = await res.json(); 
-            const pIds = getSelectedProductIds('add-product-checklist'); 
-            if(pIds.length) await saveProducts(newD.id, pIds); 
-            addModal.hide(); initApp(); 
-        } catch (e) { alert("Ошибка при добавлении."); } 
-        finally { if(btn) { btn.disabled = false; btn.innerHTML = oldText; } }
+        try { const res = await fetch(API_DEALERS_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); if (!res.ok) throw new Error(await res.text()); const newD = await res.json(); const pIds = getSelectedProductIds('add-product-checklist'); if(pIds.length) await saveProducts(newD.id, pIds); addModal.hide(); initApp(); } catch (e) { alert("Ошибка при добавлении."); } finally { if(btn) { btn.disabled = false; btn.innerHTML = oldText; } }
     });
 
     async function openEditModal(id) {
@@ -353,7 +340,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if(editForm) editForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const btn = editForm.querySelector('button[type="submit"]'); const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...';
+        const btn = document.querySelector('button[form="edit-dealer-form"]'); // (ИСПРАВЛЕНО)
+        const oldText = btn ? btn.innerHTML : 'Сохранить';
+        if(btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...'; }
+
         const id = document.getElementById('edit_db_id').value;
         const data = {
             dealer_id: getVal('edit_dealer_id'), name: getVal('edit_name'),
