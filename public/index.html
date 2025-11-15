@@ -7,7 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-    <link rel="stylesheet" href="style.css?v=8">
+    <link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-4">
@@ -89,7 +89,6 @@
                         <div class="row g-3">
                             <div class="col-md-6"><label class="form-label">ID точки *</label><input type="text" id="dealer_id" class="form-control" required></div>
                             <div class="col-md-6"><label class="form-label">Название точки *</label><input type="text" id="name" class="form-control" required></div>
-                            
                             <div class="col-md-12"><label class="form-label">Статус клиента:</label>
                                 <select id="status" class="form-select">
                                     <option value="standard" selected>🟡 Стандарт</option>
@@ -99,7 +98,6 @@
                                 </select>
                             </div>
                             <div class="col-12"><label class="form-label">Координаты (кликните на карту):</label><div id="add-map" class="mini-map"></div><div class="input-group mt-2"><span class="input-group-text">Lat</span><input type="text" id="add_latitude" class="form-control" readonly><span class="input-group-text">Lng</span><input type="text" id="add_longitude" class="form-control" readonly></div></div>
-                            
                             <div class="col-md-6"><label class="form-label">Организация</label><input type="text" id="organization" class="form-control"></div>
                             <div class="col-md-6"><label class="form-label">Тип цен</label><input type="text" id="price_type" class="form-control"></div>
                             <div class="col-md-6"><label class="form-label">Главный город</label><input type="text" id="city" class="form-control"></div>
@@ -133,7 +131,6 @@
                         <div class="row g-3">
                             <div class="col-md-6"><label class="form-label">ID точки *</label><input type="text" id="edit_dealer_id" class="form-control" required></div>
                             <div class="col-md-6"><label class="form-label">Название точки *</label><input type="text" id="edit_name" class="form-control" required></div>
-                            
                             <div class="col-md-12"><label class="form-label">Статус клиента:</label>
                                 <select id="edit_status" class="form-select">
                                     <option value="standard">🟡 Стандарт</option>
