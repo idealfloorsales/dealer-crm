@@ -27,7 +27,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const filterCity = document.getElementById('filter-city');
     const filterPriceType = document.getElementById('filter-price-type');
     const filterStatus = document.getElementById('filter-status');
-    const filterRegion = document.getElementById('filter-region'); // (НОВОЕ)
     const searchBar = document.getElementById('search-bar'); 
     const exportBtn = document.getElementById('export-dealers-btn'); 
     const dashboardContainer = document.getElementById('dashboard-container'); 
@@ -52,6 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const toBase64 = file => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => resolve(reader.result); reader.onerror = error => reject(error); });
     const compressImage = (file, maxWidth = 1000, quality = 0.7) => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = event => { const img = new Image(); img.src = event.target.result; img.onload = () => { const elem = document.createElement('canvas'); let width = img.width; let height = img.height; if (width > maxWidth) { height *= maxWidth / width; width = maxWidth; } elem.width = width; elem.height = height; const ctx = elem.getContext('2d'); ctx.drawImage(img, 0, 0, width, height); resolve(elem.toDataURL('image/jpeg', quality)); }; img.onerror = error => reject(error); }; reader.onerror = error => reject(error); });
 
+    // Карта
     const DEFAULT_LAT = 51.1605; const DEFAULT_LNG = 71.4704;
     const CITY_COORDS = { "Астана": [51.1605, 71.4704], "Алматы": [43.2220, 76.8512], "Шымкент": [42.3417, 69.5901], "Караганда": [49.8020, 73.1021], "Актобе": [50.2839, 57.1670], "Тараз": [42.9000, 71.3667], "Павлодар": [52.2873, 76.9674], "Усть-Каменогорск": [49.9632, 82.6059], "Семей": [50.4113, 80.2275], "Атырау": [47.1167, 51.8833], "Костанай": [53.2148, 63.6321], "Кызылорда": [44.8488, 65.4823], "Уральск": [51.2333, 51.3667], "Петропавловск": [54.8753, 69.1622], "Актау": [43.6500, 51.1500] };
     let addMap, editMap;
@@ -220,22 +220,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const city = filterCity ? filterCity.value : ''; 
         const type = filterPriceType ? filterPriceType.value : ''; 
         const status = filterStatus ? filterStatus.value : '';
-        const region = filterRegion ? filterRegion.value : ''; // (НОВОЕ)
         const search = searchBar ? searchBar.value.toLowerCase() : '';
         
         const filtered = allDealers.filter(d => {
-            // (НОВОЕ) Логика Региона
-            let regionMatch = true;
-            if (region === 'Астана') {
-                regionMatch = (d.city === 'Астана');
-            } else if (region === 'Регионы') {
-                regionMatch = (d.city !== 'Астана' && d.city);
-            }
-
-            // (НОВОЕ) Логика Города (работает, только если не выбран "Регион")
+            // Ваша логика "Астана/Регионы"
             let cityMatch = true;
-            if (!region && city) {
-                cityMatch = (d.city === city);
+            if (city === 'Астана') {
+                cityMatch = d.city === 'Астана';
+            } else if (city === 'Регионы') {
+                cityMatch = d.city !== 'Астана' && d.city; // Показываем всех, кто НЕ Астана (и не пустой)
+            } else if (city) {
+                cityMatch = d.city === city; // Обычный фильтр по городу
             }
 
             const searchMatch = !search || 
@@ -243,7 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ((d.dealer_id || '').toLowerCase().includes(search)) ||
                 ((d.organization || '').toLowerCase().includes(search));
             
-            return regionMatch && cityMatch &&
+            return cityMatch &&
                    (!type || d.price_type === type) && 
                    (!status || (d.status || 'standard') === status) &&
                    searchMatch;
@@ -277,21 +272,29 @@ document.addEventListener('DOMContentLoaded', () => {
         if(noDataMsg) { noDataMsg.style.display = filtered.length ? 'none' : 'block'; noDataMsg.textContent = allDealers.length === 0 ? 'Список пуст.' : 'Не найдено.'; }
     }
 
-    // --- (ИЗМЕНЕНО) Умный фильтр городов ---
+    // --- (ИЗМЕНЕНО) Логика "Умного фильтра" ---
     function populateFilters(dealers) {
         if(!filterCity || !filterPriceType) return;
         
+        // --- Фильтр Регионов (Городов) ---
         const cities = [...new Set(dealers.map(d => d.city).filter(Boolean))];
         const astanaInList = cities.includes('Астана');
         const otherCities = cities.filter(c => c !== 'Астана').sort();
         const sc = filterCity.value; 
         
         filterCity.innerHTML = '';
-        filterCity.add(new Option('-- Все города --', '')); // Обычный фильтр
-        if(astanaInList) filterCity.add(new Option('Астана (Только)', 'Астана'));
+        filterCity.add(new Option('-- Все регионы --', ''));
+        if (astanaInList) {
+            filterCity.add(new Option('Астана', 'Астана'));
+            filterCity.add(new Option('Регионы (все, кроме Астаны)', 'Регионы'));
+        }
+        if (otherCities.length > 0) {
+             filterCity.add(new Option('---', ''), true).disabled = true;
+        }
         otherCities.forEach(c => filterCity.add(new Option(c, c)));
         filterCity.value = sc;
 
+        // --- Фильтр Типов Цен ---
         const types = [...new Set(dealers.map(d => d.price_type).filter(Boolean))].sort();
         const st = filterPriceType.value;
         filterPriceType.innerHTML = '<option value="">-- Все типы --</option>';
@@ -316,7 +319,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pendingId) { localStorage.removeItem('pendingEditDealerId'); openEditModal(pendingId); }
     }
 
-    // --- ОБРАБОТЧИКИ ---
     if(document.getElementById('add-contact-btn-add-modal')) document.getElementById('add-contact-btn-add-modal').onclick = () => addContactList.insertAdjacentHTML('beforeend', createContactEntryHTML());
     if(document.getElementById('add-address-btn-add-modal')) document.getElementById('add-address-btn-add-modal').onclick = () => addAddressList.insertAdjacentHTML('beforeend', createAddressEntryHTML());
     if(document.getElementById('add-pos-btn-add-modal')) document.getElementById('add-pos-btn-add-modal').onclick = () => addPosList.insertAdjacentHTML('beforeend', createPosEntryHTML());
@@ -403,7 +405,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if(filterCity) filterCity.onchange = renderDealerList; 
     if(filterPriceType) filterPriceType.onchange = renderDealerList; 
     if(filterStatus) filterStatus.onchange = renderDealerList;
-    if(filterRegion) filterRegion.onchange = renderDealerList; // (НОВОЕ)
     if(searchBar) searchBar.oninput = renderDealerList;
     
     document.querySelectorAll('th[data-sort]').forEach(th => th.onclick = () => { if(currentSort.column===th.dataset.sort) currentSort.direction=(currentSort.direction==='asc'?'desc':'asc'); else {currentSort.column=th.dataset.sort;currentSort.direction='asc';} renderDealerList(); });
