@@ -21,9 +21,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSort = { column: 'sku', direction: 'asc' }; 
 
     const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
-    const safeAttr = (text) => text ? text.replace(/"/g, '&quot;') : ''; // Для data-атрибутов
+    // (ИСПРАВЛЕНО) Добавлена функция safeAttr
+    const safeAttr = (text) => text ? text.replace(/"/g, '&quot;') : ''; 
 
-    // (ИСПРАВЛЕНО) fetchProducts
     async function fetchProducts(searchTerm = '') {
         try {
             const response = await fetch(`${API_URL}?search=${encodeURIComponent(searchTerm)}`);
