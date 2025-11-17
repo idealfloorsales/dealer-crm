@@ -7,7 +7,17 @@ document.addEventListener('DOMContentLoaded', () => {
     let fullProductCatalog = [];
     let allDealers = [];
     let currentSort = { column: 'name', direction: 'asc' };
-    const posMaterialsList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"];
+    
+    // (ИЗМЕНЕНО) Список стендов (POS) убран из каталога и живет здесь
+    const posMaterialsList = [
+        "С600 - 600мм задняя стенка",
+        "С800 - 800мм задняя стенка",
+        "РФ-2 - Расческа из фанеры",
+        "РФС-1 - Расческа из фанеры СТАРАЯ",
+        "Н600 - 600мм наклейка",
+        "Н800 - 800мм наклейка",
+        "Табличка - Табличка орг.стекло"
+    ];
 
     // Модалки
     const addModalEl = document.getElementById('add-modal'); const addModal = new bootstrap.Modal(addModalEl);
@@ -19,6 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const addProductChecklist = document.getElementById('add-product-checklist'); 
     const addContactList = document.getElementById('add-contact-list'); 
     const addAddressList = document.getElementById('add-address-list'); 
+    const addPosList = document.getElementById('add-pos-list'); // (ВОЗВРАЩЕНО)
     const addVisitsList = document.getElementById('add-visits-list');
     const addPhotoInput = document.getElementById('add-photo-input');
     const addPhotoPreviewContainer = document.getElementById('add-photo-preview-container');
@@ -40,6 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const editProductChecklist = document.getElementById('edit-product-checklist'); 
     const editContactList = document.getElementById('edit-contact-list'); 
     const editAddressList = document.getElementById('edit-address-list'); 
+    const editPosList = document.getElementById('edit-pos-list'); // (ВОЗВРАЩЕНО)
     const editVisitsList = document.getElementById('edit-visits-list');
     const editPhotoList = document.getElementById('edit-photo-list'); 
     const editPhotoInput = document.getElementById('edit-photo-input');
@@ -50,9 +62,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let addPhotosData = []; 
     let editPhotosData = [];
-    let newAvatarBase64 = null; 
+    let newAvatarBase64 = null; // Хранит новый аватар (Base64)
 
+    // Безопасное получение значения
     const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
+
     const safeText = (text) => (text || '').toString().replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const safeAttr = (text) => (text || '').toString().replace(/"/g, '&quot;');
     const toBase64 = file => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => resolve(reader.result); reader.onerror = error => reject(error); });
@@ -124,7 +138,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if(!res.ok) throw new Error('Не удалось загрузить данные');
             const dealer = await res.json();
             let found = false;
-            if (dealer.visits && dealer.visits[visitIndex]) { dealer.visits[visitIndex].isCompleted = true; found = true; }
+            if (dealer.visits && dealer.visits[visitIndex]) {
+                dealer.visits[visitIndex].isCompleted = true;
+                found = true;
+            }
             if (!found) return alert("Задача не найдена.");
             await fetch(`${API_DEALERS_URL}/${dealerId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visits: dealer.visits }) });
             initApp(); 
@@ -135,15 +152,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!dashboardContainer) return;
         if (!allDealers || allDealers.length === 0) { dashboardContainer.innerHTML = ''; return; }
         const totalDealers = allDealers.length;
-        const noPhotosCount = allDealers.filter(d => !d.has_photos).length;
-        // const posCount = allDealers.filter(d => d.has_pos).length; // (УДАЛЕНО)
+        const noPhotosCount = allDealers.filter(d => !d.photo_url).length; // (ИЗМЕНЕНО) Считаем по photo_url (аватару)
+        const posCount = allDealers.filter(d => d.has_pos).length; // (ВОЗВРАЩЕНО)
         const cityCounts = {}; let topCity = "-"; let maxCount = 0;
         allDealers.forEach(d => { if (d.city) { cityCounts[d.city] = (cityCounts[d.city] || 0) + 1; if (cityCounts[d.city] > maxCount) { maxCount = cityCounts[d.city]; topCity = d.city; } } });
 
         dashboardContainer.innerHTML = `
-            <div class="col-md-6 col-lg-4"><div class="stat-card"><i class="bi bi-shop stat-icon text-primary"></i><span class="stat-number">${totalDealers}</span><span class="stat-label">Всего дилеров</span></div></div>
-            <div class="col-md-6 col-lg-4"><div class="stat-card ${noPhotosCount > 0 ? 'border-danger' : ''}"><i class="bi bi-camera-fill stat-icon ${noPhotosCount > 0 ? 'text-danger' : 'text-secondary'}"></i><span class="stat-number ${noPhotosCount > 0 ? 'text-danger' : ''}">${noPhotosCount}</span><span class="stat-label">Без аватара</span></div></div>
-            <div class="col-md-6 col-lg-4"><div class="stat-card"><i class="bi bi-geo-alt-fill stat-icon text-info"></i><span class="stat-number text-info" style="font-size: 1.5rem;">${topCity}</span><span class="stat-label">Топ регион</span></div></div>
+            <div class="col-md-6 col-lg-3"><div class="stat-card"><i class="bi bi-shop stat-icon text-primary"></i><span class="stat-number">${totalDealers}</span><span class="stat-label">Всего дилеров</span></div></div>
+            <div class="col-md-6 col-lg-3"><div class="stat-card ${noPhotosCount > 0 ? 'border-danger' : ''}"><i class="bi bi-camera-fill stat-icon ${noPhotosCount > 0 ? 'text-danger' : 'text-secondary'}"></i><span class="stat-number ${noPhotosCount > 0 ? 'text-danger' : ''}">${noPhotosCount}</span><span class="stat-label">Без Аватара</span></div></div>
+            <div class="col-md-6 col-lg-3"><div class="stat-card"><i class="bi bi-easel stat-icon text-success"></i><span class="stat-number text-success">${posCount}</span><span class="stat-label">Со стендами</span></div></div>
+             <div class="col-md-6 col-lg-3"><div class="stat-card"><i class="bi bi-geo-alt-fill stat-icon text-info"></i><span class="stat-number text-info" style="font-size: 1.5rem;">${topCity}</span><span class="stat-label">Топ регион</span></div></div>
         `;
 
         if (!tasksList) return;
@@ -193,10 +211,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function createContactEntryHTML(c={}) { return `<div class="contact-entry input-group mb-2"><input type="text" class="form-control contact-name" placeholder="Имя" value="${c.name||''}"><input type="text" class="form-control contact-position" placeholder="Должность" value="${c.position||''}"><input type="text" class="form-control contact-info" placeholder="Телефон" value="${c.contactInfo||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
     function createAddressEntryHTML(a={}) { return `<div class="address-entry input-group mb-2"><input type="text" class="form-control address-description" placeholder="Описание" value="${a.description||''}"><input type="text" class="form-control address-city" placeholder="Город" value="${a.city||''}"><input type="text" class="form-control address-address" placeholder="Адрес" value="${a.address||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
+    function createPosEntryHTML(p={}) { const opts = posMaterialsList.map(n => `<option value="${n}" ${n===p.name?'selected':''}>${n}</option>`).join(''); return `<div class="pos-entry input-group mb-2"><select class="form-select pos-name"><option value="">-- Выбор --</option>${opts}</select><input type="number" class="form-control pos-quantity" value="${p.quantity||1}" min="1"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
     function createVisitEntryHTML(v={}) { return `<div class="visit-entry input-group mb-2"><input type="date" class="form-control visit-date" value="${v.date||''}"><input type="text" class="form-control visit-comment w-50" placeholder="Результат визита..." value="${v.comment||''}"><input type="hidden" class="visit-completed" value="${v.isCompleted || 'false'}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
     
     function renderPhotoPreviews(container, photosArray) { if(container) container.innerHTML = photosArray.map((p, index) => `<div class="photo-preview-item"><img src="${p.photo_url}"><button type="button" class="btn-remove-photo" data-index="${index}">×</button></div>`).join(''); }
     
+    // (ИЗМЕНЕНО) Логика Аватара
     if(addAvatarInput) addAvatarInput.addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (file) { newAvatarBase64 = await compressImage(file, 200, 0.8); addAvatarPreview.src = newAvatarBase64; }
@@ -283,17 +303,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pendingId) { localStorage.removeItem('pendingEditDealerId'); openEditModal(pendingId); }
     }
 
-    // --- (ИСПРАВЛЕНО) Убраны кнопки POS ---
     if(document.getElementById('add-contact-btn-add-modal')) document.getElementById('add-contact-btn-add-modal').onclick = () => addContactList.insertAdjacentHTML('beforeend', createContactEntryHTML());
     if(document.getElementById('add-address-btn-add-modal')) document.getElementById('add-address-btn-add-modal').onclick = () => addAddressList.insertAdjacentHTML('beforeend', createAddressEntryHTML());
+    // (УДАЛЕНО)
     if(document.getElementById('add-visits-btn-add-modal')) document.getElementById('add-visits-btn-add-modal').onclick = () => addVisitsList.insertAdjacentHTML('beforeend', createVisitEntryHTML());
     if(document.getElementById('add-contact-btn-edit-modal')) document.getElementById('add-contact-btn-edit-modal').onclick = () => editContactList.insertAdjacentHTML('beforeend', createContactEntryHTML());
     if(document.getElementById('add-address-btn-edit-modal')) document.getElementById('add-address-btn-edit-modal').onclick = () => editAddressList.insertAdjacentHTML('beforeend', createAddressEntryHTML());
+    // (УДАЛЕНО)
     if(document.getElementById('add-visits-btn-edit-modal')) document.getElementById('add-visits-btn-edit-modal').onclick = () => editVisitsList.insertAdjacentHTML('beforeend', createVisitEntryHTML());
 
     if(openAddModalBtn) openAddModalBtn.onclick = () => {
         addForm.reset(); renderProductChecklist(addProductChecklist);
         renderList(addContactList, [], createContactEntryHTML); renderList(addAddressList, [], createAddressEntryHTML);
+        // (УДАЛЕНО)
         renderList(addVisitsList, [], createVisitEntryHTML);
         if(document.getElementById('add_latitude')) { document.getElementById('add_latitude').value = ''; document.getElementById('add_longitude').value = ''; }
         addPhotosData = []; renderPhotoPreviews(addPhotoPreviewContainer, []);
@@ -310,6 +332,7 @@ document.addEventListener('DOMContentLoaded', () => {
             latitude: getVal('add_latitude'), longitude: getVal('add_longitude'), bonuses: getVal('bonuses'), status: getVal('status'),
             contacts: collectData(addContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]),
             additional_addresses: collectData(addAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]),
+            // (УДАЛЕНО)
             visits: collectData(addVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'}]),
             photos: addPhotosData,
             avatarUrl: newAvatarBase64
@@ -329,6 +352,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if(editCurrentAvatarUrl) editCurrentAvatarUrl.value = d.avatarUrl || '';
             newAvatarBase64 = null;
             renderList(editContactList, d.contacts, createContactEntryHTML); renderList(editAddressList, d.additional_addresses, createAddressEntryHTML); 
+            // (УДАЛЕНО)
             renderList(editVisitsList, d.visits, createVisitEntryHTML);
             renderProductChecklist(editProductChecklist, (d.products||[]).map(p=>p.id));
             editPhotosData = d.photos||[]; renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData);
@@ -352,6 +376,7 @@ document.addEventListener('DOMContentLoaded', () => {
             avatarUrl: avatarToSend,
             contacts: collectData(editContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]),
             additional_addresses: collectData(editAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]),
+            // (УДАЛЕНО)
             visits: collectData(editVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'},{key:'isCompleted',class:'.visit-completed'}]),
             photos: editPhotosData
         };
@@ -377,26 +402,31 @@ document.addEventListener('DOMContentLoaded', () => {
     
     document.querySelectorAll('th[data-sort]').forEach(th => th.onclick = () => { if(currentSort.column===th.dataset.sort) currentSort.direction=(currentSort.direction==='asc'?'desc':'asc'); else {currentSort.column=th.dataset.sort;currentSort.direction='asc';} renderDealerList(); });
     
-    // (ИСПРАВЛЕНО) Умный экспорт
+    // (ИСПРАВЛЕНО) УМНЫЙ ЭКСПОРТ
     if(exportBtn) {
         exportBtn.onclick = async () => {
             if (!allDealers.length) return alert("Пусто. Нечего экспортировать.");
             exportBtn.disabled = true;
             exportBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Загрузка...';
+
             const clean = (text) => `"${String(text || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`;
             const headers = ["ID", "Название", "Статус", "Город", "Адрес", "Тип цен", "Организация", "Доставка", "Сайт", "Инстаграм", "Контакты (Имя)", "Контакты (Должность)", "Контакты (Телефон)", "Доп. Адреса", "Бонусы"];
             let csv = "\uFEFF" + headers.join(",") + "\r\n";
+
             try {
                 // Берем ID дилеров, которые сейчас видны на экране
                 const visibleDealerIds = Array.from(dealerListBody.querySelectorAll('tr .btn-view')).map(btn => btn.dataset.id);
+                
                 for (const id of visibleDealerIds) {
                     const res = await fetch(`${API_DEALERS_URL}/${id}`); // Запрашиваем полные данные
                     if (!res.ok) continue;
                     const dealer = await res.json();
+                    
                     const contactsName = (dealer.contacts || []).map(c => c.name).join('; ');
                     const contactsPos = (dealer.contacts || []).map(c => c.position).join('; ');
                     const contactsInfo = (dealer.contacts || []).map(c => c.contactInfo).join('; ');
                     const addresses = (dealer.additional_addresses || []).map(a => `${a.description || ''}: ${a.city || ''} ${a.address || ''}`).join('; ');
+                    
                     const row = [
                         clean(dealer.dealer_id), clean(dealer.name), clean(dealer.status),
                         clean(dealer.city), clean(dealer.address), clean(dealer.price_type),
@@ -417,6 +447,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
     }
-
+    
     initApp();
 });
