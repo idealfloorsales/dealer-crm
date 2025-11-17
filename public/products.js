@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSort = { column: 'sku', direction: 'asc' }; 
 
     const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
+    const safeAttr = (text) => text ? text.replace(/"/g, '&quot;') : ''; // Для data-атрибутов
 
     // (ИСПРАВЛЕНО) fetchProducts
     async function fetchProducts(searchTerm = '') {
@@ -36,7 +37,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     function renderProducts() {
-        // (ИСПРАВЛЕНО) Проверка на существование allProducts
         if (!allProducts) allProducts = [];
         
         const sortedProducts = allProducts.sort((a, b) => {
