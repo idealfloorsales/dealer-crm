@@ -152,8 +152,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!dashboardContainer) return;
         if (!allDealers || allDealers.length === 0) { dashboardContainer.innerHTML = ''; return; }
         const totalDealers = allDealers.length;
-        const noPhotosCount = allDealers.filter(d => !d.photo_url).length; // (ИЗМЕНЕНО) Считаем по photo_url (аватару)
-        const posCount = allDealers.filter(d => d.has_pos).length; // (ВОЗВРАЩЕНО)
+        const noPhotosCount = allDealers.filter(d => !d.photo_url).length;
+        const posCount = allDealers.filter(d => d.has_pos).length;
         const cityCounts = {}; let topCity = "-"; let maxCount = 0;
         allDealers.forEach(d => { if (d.city) { cityCounts[d.city] = (cityCounts[d.city] || 0) + 1; if (cityCounts[d.city] > maxCount) { maxCount = cityCounts[d.city]; topCity = d.city; } } });
 
@@ -216,7 +216,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     function renderPhotoPreviews(container, photosArray) { if(container) container.innerHTML = photosArray.map((p, index) => `<div class="photo-preview-item"><img src="${p.photo_url}"><button type="button" class="btn-remove-photo" data-index="${index}">×</button></div>`).join(''); }
     
-    // (ИЗМЕНЕНО) Логика Аватара
     if(addAvatarInput) addAvatarInput.addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (file) { newAvatarBase64 = await compressImage(file, 200, 0.8); addAvatarPreview.src = newAvatarBase64; }
@@ -305,18 +304,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if(document.getElementById('add-contact-btn-add-modal')) document.getElementById('add-contact-btn-add-modal').onclick = () => addContactList.insertAdjacentHTML('beforeend', createContactEntryHTML());
     if(document.getElementById('add-address-btn-add-modal')) document.getElementById('add-address-btn-add-modal').onclick = () => addAddressList.insertAdjacentHTML('beforeend', createAddressEntryHTML());
-    // (УДАЛЕНО)
+    if(document.getElementById('add-pos-btn-add-modal')) document.getElementById('add-pos-btn-add-modal').onclick = () => addPosList.insertAdjacentHTML('beforeend', createPosEntryHTML());
     if(document.getElementById('add-visits-btn-add-modal')) document.getElementById('add-visits-btn-add-modal').onclick = () => addVisitsList.insertAdjacentHTML('beforeend', createVisitEntryHTML());
     if(document.getElementById('add-contact-btn-edit-modal')) document.getElementById('add-contact-btn-edit-modal').onclick = () => editContactList.insertAdjacentHTML('beforeend', createContactEntryHTML());
     if(document.getElementById('add-address-btn-edit-modal')) document.getElementById('add-address-btn-edit-modal').onclick = () => editAddressList.insertAdjacentHTML('beforeend', createAddressEntryHTML());
-    // (УДАЛЕНО)
+    if(document.getElementById('add-pos-btn-edit-modal')) document.getElementById('add-pos-btn-edit-modal').onclick = () => editPosList.insertAdjacentHTML('beforeend', createPosEntryHTML());
     if(document.getElementById('add-visits-btn-edit-modal')) document.getElementById('add-visits-btn-edit-modal').onclick = () => editVisitsList.insertAdjacentHTML('beforeend', createVisitEntryHTML());
 
     if(openAddModalBtn) openAddModalBtn.onclick = () => {
         addForm.reset(); renderProductChecklist(addProductChecklist);
         renderList(addContactList, [], createContactEntryHTML); renderList(addAddressList, [], createAddressEntryHTML);
-        // (УДАЛЕНО)
-        renderList(addVisitsList, [], createVisitEntryHTML);
+        renderList(addPosList, [], createPosEntryHTML); renderList(addVisitsList, [], createVisitEntryHTML);
         if(document.getElementById('add_latitude')) { document.getElementById('add_latitude').value = ''; document.getElementById('add_longitude').value = ''; }
         addPhotosData = []; renderPhotoPreviews(addPhotoPreviewContainer, []);
         addAvatarPreview.src = 'logo.png'; newAvatarBase64 = null;
@@ -332,7 +330,7 @@ document.addEventListener('DOMContentLoaded', () => {
             latitude: getVal('add_latitude'), longitude: getVal('add_longitude'), bonuses: getVal('bonuses'), status: getVal('status'),
             contacts: collectData(addContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]),
             additional_addresses: collectData(addAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]),
-            // (УДАЛЕНО)
+            pos_materials: collectData(addPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]),
             visits: collectData(addVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'}]),
             photos: addPhotosData,
             avatarUrl: newAvatarBase64
@@ -352,7 +350,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if(editCurrentAvatarUrl) editCurrentAvatarUrl.value = d.avatarUrl || '';
             newAvatarBase64 = null;
             renderList(editContactList, d.contacts, createContactEntryHTML); renderList(editAddressList, d.additional_addresses, createAddressEntryHTML); 
-            // (УДАЛЕНО)
+            renderList(editPosList, d.pos_materials, createPosEntryHTML); 
             renderList(editVisitsList, d.visits, createVisitEntryHTML);
             renderProductChecklist(editProductChecklist, (d.products||[]).map(p=>p.id));
             editPhotosData = d.photos||[]; renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData);
@@ -376,7 +374,7 @@ document.addEventListener('DOMContentLoaded', () => {
             avatarUrl: avatarToSend,
             contacts: collectData(editContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]),
             additional_addresses: collectData(editAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]),
-            // (УДАЛЕНО)
+            pos_materials: collectData(editPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]),
             visits: collectData(editVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'},{key:'isCompleted',class:'.visit-completed'}]),
             photos: editPhotosData
         };
@@ -410,7 +408,7 @@ document.addEventListener('DOMContentLoaded', () => {
             exportBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Загрузка...';
 
             const clean = (text) => `"${String(text || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`;
-            const headers = ["ID", "Название", "Статус", "Город", "Адрес", "Тип цен", "Организация", "Доставка", "Сайт", "Инстаграм", "Контакты (Имя)", "Контакты (Должность)", "Контакты (Телефон)", "Доп. Адреса", "Бонусы"];
+            const headers = ["ID", "Название", "Статус", "Город", "Адрес", "Тип цен", "Организация", "Доставка", "Сайт", "Инстаграм", "Контакты (Имя)", "Контакты (Должность)", "Контакты (Телефон)", "Доп. Адреса", "Стенды", "Бонусы"];
             let csv = "\uFEFF" + headers.join(",") + "\r\n";
 
             try {
@@ -426,13 +424,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     const contactsPos = (dealer.contacts || []).map(c => c.position).join('; ');
                     const contactsInfo = (dealer.contacts || []).map(c => c.contactInfo).join('; ');
                     const addresses = (dealer.additional_addresses || []).map(a => `${a.description || ''}: ${a.city || ''} ${a.address || ''}`).join('; ');
-                    
+                    const stands = (dealer.pos_materials || []).map(p => `${p.name} (${p.quantity} шт)`).join('; ');
+
                     const row = [
                         clean(dealer.dealer_id), clean(dealer.name), clean(dealer.status),
                         clean(dealer.city), clean(dealer.address), clean(dealer.price_type),
                         clean(dealer.organization), clean(dealer.delivery), clean(dealer.website), clean(dealer.instagram),
                         clean(contactsName), clean(contactsPos), clean(contactsInfo),
-                        clean(addresses), clean(dealer.bonuses)
+                        clean(addresses), clean(stands), clean(dealer.bonuses)
                     ];
                     csv += row.join(",") + "\r\n";
                 }
