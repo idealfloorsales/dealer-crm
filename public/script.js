@@ -1,450 +1,175 @@
-// script.js
-document.addEventListener('DOMContentLoaded', () => {
-    
-    const API_DEALERS_URL = '/api/dealers';
-    const API_PRODUCTS_URL = '/api/products'; 
+// server.js
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const basicAuth = require('express-basic-auth'); 
 
-    let fullProductCatalog = [];
-    let allDealers = [];
-    let currentSort = { column: 'name', direction: 'asc' };
-    
-    // (ВОЗВРАЩЕНО) Список Стендов (POS)
-    const posMaterialsList = [
-        "С600 - 600мм задняя стенка",
-        "С800 - 800мм задняя стенка",
-        "РФ-2 - Расческа из фанеры",
-        "РФС-1 - Расческа из фанеры СТАРАЯ",
-        "Н600 - 600мм наклейка",
-        "Н800 - 800мм наклейка",
-        "Табличка - Табличка орг.стекло"
-    ];
+const app = express();
+const PORT = process.env.PORT || 3000; 
+app.use(express.json({ limit: '50mb' })); 
+app.use(cors());
 
-    // (ИСПРАВЛЕНО) Модалки и Формы объявлены здесь
-    const addModalEl = document.getElementById('add-modal'); 
-    const addModal = new bootstrap.Modal(addModalEl);
-    const addForm = document.getElementById('add-dealer-form'); // <--- ВОТ ОН
-    
-    const editModalEl = document.getElementById('edit-modal'); 
-    const editModal = new bootstrap.Modal(editModalEl);
-    const editForm = document.getElementById('edit-dealer-form'); // <--- И ЭТОТ
+const ADMIN_USER = process.env.ADMIN_USER;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
-    // Элементы
-    const openAddModalBtn = document.getElementById('open-add-modal-btn');
-    const addProductChecklist = document.getElementById('add-product-checklist'); 
-    const addContactList = document.getElementById('add-contact-list'); 
-    const addAddressList = document.getElementById('add-address-list'); 
-    const addPosList = document.getElementById('add-pos-list'); // (ВОЗВРАЩЕНО)
-    const addVisitsList = document.getElementById('add-visits-list');
-    const addPhotoInput = document.getElementById('add-photo-input');
-    const addPhotoPreviewContainer = document.getElementById('add-photo-preview-container');
-    const addAvatarInput = document.getElementById('add-avatar-input');
-    const addAvatarPreview = document.getElementById('add-avatar-preview');
-    
-    const dealerListBody = document.getElementById('dealer-list-body');
-    const dealerTable = document.getElementById('dealer-table');
-    const noDataMsg = document.getElementById('no-data-msg');
-    const filterCity = document.getElementById('filter-city');
-    const filterPriceType = document.getElementById('filter-price-type');
-    const filterStatus = document.getElementById('filter-status');
-    const searchBar = document.getElementById('search-bar'); 
-    const exportBtn = document.getElementById('export-dealers-btn'); 
-    const dashboardContainer = document.getElementById('dashboard-container'); 
-    const tasksList = document.getElementById('tasks-list'); 
+const authMiddleware = (req, res, next) => {
+    if (!ADMIN_USER || !ADMIN_PASSWORD) return next();
+    const user = basicAuth({ users: { [ADMIN_USER]: ADMIN_PASSWORD }, challenge: true, unauthorizedResponse: 'Доступ запрещен.' });
+    user(req, res, next);
+};
 
-    const editProductChecklist = document.getElementById('edit-product-checklist'); 
-    const editContactList = document.getElementById('edit-contact-list'); 
-    const editAddressList = document.getElementById('edit-address-list'); 
-    const editPosList = document.getElementById('edit-pos-list'); // (ВОЗВРАЩЕНО)
-    const editVisitsList = document.getElementById('edit-visits-list');
-    const editPhotoList = document.getElementById('edit-photo-list'); 
-    const editPhotoInput = document.getElementById('edit-photo-input');
-    const editPhotoPreviewContainer = document.getElementById('edit-photo-preview-container');
-    const editAvatarInput = document.getElementById('edit-avatar-input');
-    const editAvatarPreview = document.getElementById('edit-avatar-preview');
-    const editCurrentAvatarUrl = document.getElementById('edit-current-avatar-url');
+if (ADMIN_USER && ADMIN_PASSWORD) {
+    app.use(express.static('public', { index: false }));
+    app.get('/', authMiddleware, (req, res) => res.sendFile(__dirname + '/public/index.html'));
+    app.get('/map.html', authMiddleware, (req, res) => res.sendFile(__dirname + '/public/map.html'));
+    app.use(express.static('public'));
+} else { app.use(express.static('public')); }
 
-    let addPhotosData = []; 
-    let editPhotosData = [];
-    let newAvatarBase64 = null; // Хранит новый аватар (Base64)
+const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-    // Безопасное получение значения
-    const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
+// --- СПИСОК ТОВАРОВ (72 шт.) ---
+const productsToImport = [
+    { sku: "CD-507", name: "Дуб Беленый" }, { sku: "CD-508", name: "Дуб Пепельный" },
+    { sku: "8EH34-701", name: "Дуб Снежный" }, { sku: "8EH34-702", name: "Дуб Арабика" },
+    { sku: "8EH34-703", name: "Дуб Мокко" }, { sku: "8EH34-704", name: "Дуб Капучино" },
+    { sku: "8EH34-705", name: "Дуб Голд" }, { sku: "8EH34-706", name: "Орех Кедровый" },
+    { sku: "8EH34-707", name: "Дуб Натур" }, { sku: "8EH34-708", name: "Дуб Робуста" },
+    { sku: "8EH34-709", name: "Дуб Паркетный" }, { sku: "8EH34-710", name: "Дуб Блэквуд" },
+    { sku: "8EH34-711", name: "Дуб Миндаль" }, { sku: "8EH34-712", name: "Дуб Эмбер" },
+    { sku: "8EH34-713", name: "дуб Бурбон" }, { sku: "8EH34-714", name: "Дуб Твин" },
+    { sku: "8EH34-715", name: "Дуб Флорвуд" }, { sku: "8EH34-716", name: "Дуб Лайт" },
+    { sku: "8EH34-717", name: "Дуб Натур светлый" }, { sku: "8EH34-718", name: "Дуб Хайвуд" },
+    { sku: "8EH34-719", name: "Дуб Стоун" }, { sku: "8EH34-720", name: "Дуб Крафтовый" },
+    { sku: "FP-41", name: "Paris Белый" }, { sku: "FP-42", name: "Paris Серый" },
+    { sku: "FP-43", name: "Paris Натур" }, { sku: "FP-44", name: "Paris Рустик" },
+    { sku: "FP-45", name: "Версаль Светлый" }, { sku: "FP-46", name: "Версаль Капучино" },
+    { sku: "MC-101", name: "Орех Испанский" }, { sku: "MC-102", name: "Орех Венгерский" },
+    { sku: "MC-103", name: "Дуб Австрийский" }, { sku: "MC-104", name: "Клен Канадский" },
+    { sku: "MC-105", name: "Сандал Португальский" }, { sku: "HP-31", name: "Дуб Лоредо светлый" },
+    { sku: "HP-32", name: "Дуб Родос темный" }, { sku: "HP-96", name: "Дуб Алор натуральный" },
+    { sku: "HP-91", name: "Дуб Браун" }, { sku: "HP-92", name: "Дуб Латте" },
+    { sku: "HP-93", name: "Дуб Эльбрус" }, { sku: "HP-94", name: "Дуб Аланда" },
+    { sku: "HP-95", name: "Дуб Сантана" }, { sku: "HP-97", name: "Дуб Айленд" },
+    { sku: "RWN-31", name: "Дуб Эверест" }, { sku: "RWN-32", name: "Дуб Альпийский" },
+    { sku: "RWN-33", name: "Дуб Сахара" }, { sku: "RWN-36", name: "Кедр Гималайкий" },
+    { sku: "RWN-37", name: "Дуб Ниагара" }, { sku: "RWN-39", name: "Дуб Сибирский" },
+    { sku: "RWЕ-41", name: "Дуб Жемчужный" }, { sku: "RWE-44", name: "Орех Классик" },
+    { sku: "RWZ-03", name: "Дуб Винтаж" }, { sku: "RWZ-05", name: "Дуб Меланж" }, { sku: "RWZ-06", name: "Дуб Магнат" },
+    { sku: "AS-81", name: "Дуб Карибский" }, { sku: "AS-82", name: "Дуб Средиземноморский" },
+    { sku: "AS-83", name: "Дуб Саргасс" }, { sku: "AS-84", name: "Дуб Песчаный" },
+    { sku: "AS-85", name: "Дуб Атлантик" }, { sku: "RPL-1", name: "Дуб Сицилия" },
+    { sku: "RPL-2", name: "Дуб Сицилия темный" }, { sku: "RPL-4", name: "Дуб Сицилия серый" },
+    { sku: "RPL-6", name: "Дуб Бризе" }, { sku: "RPL-15", name: "Дуб Фламенко" },
+    { sku: "RPL-20", name: "Дуб Милан" }, { sku: "RPL-21", name: "Дуб Флоренция" },
+    { sku: "RPL-22", name: "Дуб Неаполь" }, { sku: "RPL-23", name: "Дуб Монарх" },
+    { sku: "RPL-24", name: "Дуб Эмперадор" }, { sku: "RPL-25", name: "Дуб Авангард" },
+    { sku: "RPL-28", name: "Дуб Венеция" }
+];
 
-    const safeText = (text) => (text || '').toString().replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    const safeAttr = (text) => (text || '').toString().replace(/"/g, '&quot;');
-    const toBase64 = file => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => resolve(reader.result); reader.onerror = error => reject(error); });
-    const compressImage = (file, maxWidth = 1000, quality = 0.7) => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = event => { const img = new Image(); img.src = event.target.result; img.onload = () => { const elem = document.createElement('canvas'); let width = img.width; let height = img.height; if (width > maxWidth) { height *= maxWidth / width; width = maxWidth; } elem.width = width; elem.height = height; const ctx = elem.getContext('2d'); ctx.drawImage(img, 0, 0, width, height); resolve(elem.toDataURL('image/jpeg', quality)); }; img.onerror = error => reject(error); }; reader.onerror = error => reject(error); });
+const productSchema = new mongoose.Schema({ sku: String, name: String });
+const Product = mongoose.model('Product', productSchema);
+const contactSchema = new mongoose.Schema({ name: String, position: String, contactInfo: String }, { _id: false }); 
+const photoSchema = new mongoose.Schema({ description: String, photo_url: String, date: { type: Date, default: Date.now } }, { _id: false });
+const additionalAddressSchema = new mongoose.Schema({ description: String, city: String, address: String }, { _id: false });
+const visitSchema = new mongoose.Schema({ date: String, comment: String, isCompleted: { type: Boolean, default: false } }, { _id: false });
+const posMaterialSchema = new mongoose.Schema({ name: String, quantity: Number }, { _id: false });
 
-    // Карта
-    const DEFAULT_LAT = 51.1605; const DEFAULT_LNG = 71.4704;
-    const CITY_COORDS = { "Астана": [51.1605, 71.4704], "Алматы": [43.2220, 76.8512], "Шымкент": [42.3417, 69.5901], "Караганда": [49.8020, 73.1021], "Актобе": [50.2839, 57.1670], "Тараз": [42.9000, 71.3667], "Павлодар": [52.2873, 76.9674], "Усть-Каменогорск": [49.9632, 82.6059], "Семей": [50.4113, 80.2275], "Атырау": [47.1167, 51.8833], "Костанай": [53.2148, 63.6321], "Кызылорда": [44.8488, 65.4823], "Уральск": [51.2333, 51.3667], "Петропавловск": [54.8753, 69.1622], "Актау": [43.6500, 51.1500] };
-    let addMap, editMap;
-
-    function initMap(mapId) {
-        const el = document.getElementById(mapId); if (!el) return null;
-        if (typeof L === 'undefined') { console.warn("Leaflet не загружен"); return null; }
-        const map = L.map(mapId).setView([DEFAULT_LAT, DEFAULT_LNG], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: 'OSM' }).addTo(map);
-        return map;
-    }
-    function setupMapClick(map, latId, lngId, markerRef) {
-        if (!map) return;
-        map.on('click', function(e) {
-            const lat = e.latlng.lat; const lng = e.latlng.lng;
-            const latIn = document.getElementById(latId); const lngIn = document.getElementById(lngId);
-            if(latIn) latIn.value = lat; if(lngIn) lngIn.value = lng;
-            if (markerRef.current) markerRef.current.setLatLng([lat, lng]); else markerRef.current = L.marker([lat, lng]).addTo(map);
-        });
-    }
-    if (addModalEl) {
-        addModalEl.addEventListener('shown.bs.modal', () => {
-            if (!addMap) { addMap = initMap('add-map'); addModalEl.markerRef = { current: null }; setupMapClick(addMap, 'add_latitude', 'add_longitude', addModalEl.markerRef); } else { addMap.invalidateSize(); }
-            if (addMap && addModalEl.markerRef && addModalEl.markerRef.current) { addMap.removeLayer(addModalEl.markerRef.current); addModalEl.markerRef.current = null; }
-            if (addMap) {
-                const city = document.getElementById('city') ? document.getElementById('city').value.trim() : '';
-                if (city && CITY_COORDS[city]) addMap.setView(CITY_COORDS[city], 12); else addMap.setView([DEFAULT_LAT, DEFAULT_LNG], 13);
-            }
-        });
-    }
-    if (editModalEl) {
-        editModalEl.addEventListener('shown.bs.modal', () => {
-            if (!editMap) { editMap = initMap('edit-map'); editModalEl.markerRef = { current: null }; setupMapClick(editMap, 'edit_latitude', 'edit_longitude', editModalEl.markerRef); } else { editMap.invalidateSize(); }
-            const latEl = document.getElementById('edit_latitude'); const lngEl = document.getElementById('edit_longitude');
-            if (latEl && lngEl && editMap) {
-                const lat = parseFloat(latEl.value); const lng = parseFloat(lngEl.value);
-                const city = document.getElementById('edit_city') ? document.getElementById('edit_city').value.trim() : '';
-                if (editModalEl.markerRef.current) editMap.removeLayer(editModalEl.markerRef.current);
-                if (!isNaN(lat) && !isNaN(lng)) { editModalEl.markerRef.current = L.marker([lat, lng]).addTo(editMap); editMap.setView([lat, lng], 15); } 
-                else if (city && CITY_COORDS[city]) { editMap.setView(CITY_COORDS[city], 12); }
-                else { editMap.setView([DEFAULT_LAT, DEFAULT_LNG], 13); }
-            }
-        });
-    }
-
-    async function fetchProductCatalog() {
-        if (fullProductCatalog.length > 0) return; 
-        try {
-            const response = await fetch(API_PRODUCTS_URL);
-            if (!response.ok) throw new Error(`Ошибка: ${response.status}`);
-            fullProductCatalog = await response.json();
-            fullProductCatalog.sort((a, b) => a.sku.localeCompare(b.sku, 'ru', { numeric: true }));
-        } catch (error) {
-            if(addProductChecklist) addProductChecklist.innerHTML = `<p class='text-danger'>Ошибка каталога.</p>`;
-            if(editProductChecklist) editProductChecklist.innerHTML = `<p class='text-danger'>Ошибка каталога.</p>`;
-        }
-    }
-
-    async function completeTask(btn, dealerId, visitIndex) {
-        try {
-            btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; 
-            const res = await fetch(`${API_DEALERS_URL}/${dealerId}`);
-            if(!res.ok) throw new Error('Не удалось загрузить данные');
-            const dealer = await res.json();
-            let found = false;
-            if (dealer.visits && dealer.visits[visitIndex]) {
-                dealer.visits[visitIndex].isCompleted = true;
-                found = true;
-            }
-            if (!found) return alert("Задача не найдена.");
-            await fetch(`${API_DEALERS_URL}/${dealerId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visits: dealer.visits }) });
-            initApp(); 
-        } catch (e) { alert("Ошибка: " + e.message); btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg"></i>'; }
-    }
-
-    function renderDashboard() {
-        if (!dashboardContainer) return;
-        if (!allDealers || allDealers.length === 0) { dashboardContainer.innerHTML = ''; return; }
-        const totalDealers = allDealers.length;
-        const noPhotosCount = allDealers.filter(d => !d.photo_url).length; 
-        const posCount = allDealers.filter(d => d.has_pos).length; 
-        const cityCounts = {}; let topCity = "-"; let maxCount = 0;
-        allDealers.forEach(d => { if (d.city) { cityCounts[d.city] = (cityCounts[d.city] || 0) + 1; if (cityCounts[d.city] > maxCount) { maxCount = cityCounts[d.city]; topCity = d.city; } } });
-
-        dashboardContainer.innerHTML = `
-            <div class="col-md-6 col-lg-3"><div class="stat-card"><i class="bi bi-shop stat-icon text-primary"></i><span class="stat-number">${totalDealers}</span><span class="stat-label">Всего дилеров</span></div></div>
-            <div class="col-md-6 col-lg-3"><div class="stat-card ${noPhotosCount > 0 ? 'border-danger' : ''}"><i class="bi bi-camera-fill stat-icon ${noPhotosCount > 0 ? 'text-danger' : 'text-secondary'}"></i><span class="stat-number ${noPhotosCount > 0 ? 'text-danger' : ''}">${noPhotosCount}</span><span class="stat-label">Без Аватара</span></div></div>
-            <div class="col-md-6 col-lg-3"><div class="stat-card"><i class="bi bi-easel stat-icon text-success"></i><span class="stat-number text-success">${posCount}</span><span class="stat-label">Со стендами</span></div></div>
-             <div class="col-md-6 col-lg-3"><div class="stat-card"><i class="bi bi-geo-alt-fill stat-icon text-info"></i><span class="stat-number text-info" style="font-size: 1.5rem;">${topCity}</span><span class="stat-label">Топ регион</span></div></div>
-        `;
-
-        if (!tasksList) return;
-        const today = new Date(); today.setHours(0,0,0,0);
-        const tasks = [];
-        allDealers.forEach(d => {
-            if (d.visits && Array.isArray(d.visits)) {
-                d.visits.forEach((v, index) => { 
-                    if (!v.isCompleted) {
-                        const vDate = new Date(v.date);
-                        const vDateMidnight = new Date(vDate); vDateMidnight.setHours(0,0,0,0);
-                        let isOverdue = vDateMidnight < today;
-                        let isToday = vDateMidnight.getTime() === today.getTime();
-                        if (vDate >= today || isOverdue) {
-                            tasks.push({ dealerName: d.name, dealerId: d.id, date: vDate, dateStrRaw: v.date, comment: v.comment || "", isOverdue: isOverdue, isToday: isToday, visitIndex: index });
-                        }
-                    }
-                });
-            }
-        });
-        tasks.sort((a, b) => a.date - b.date);
-        if (tasks.length === 0) { tasksList.innerHTML = `<div class="text-center py-4 text-muted"><i class="bi bi-check2-circle fs-3 d-block mb-2"></i>Задач нет</div>`; } 
-        else {
-            tasksList.innerHTML = tasks.map(t => {
-                const dateStr = t.date.toLocaleDateString('ru-RU');
-                let itemClass = 'list-group-item-action'; let badgeClass = 'bg-primary'; let badgeText = dateStr;
-                if (t.isOverdue) { itemClass += ' list-group-item-danger'; badgeClass = 'bg-danger'; badgeText = `Просрочено: ${dateStr}`; } 
-                else if (t.isToday) { itemClass += ' list-group-item-warning'; badgeClass = 'bg-warning text-dark'; badgeText = 'Сегодня'; }
-                return `
-                    <div class="list-group-item ${itemClass} task-item d-flex justify-content-between align-items-center">
-                        <div class="me-auto">
-                            <div class="d-flex align-items-center mb-1"><span class="badge ${badgeClass} rounded-pill me-2">${badgeText}</span><a href="dealer.html?id=${t.dealerId}" target="_blank" class="fw-bold text-decoration-none text-dark">${t.dealerName}</a></div>
-                            <small class="text-muted" style="white-space: pre-wrap;">${safeText(t.comment)}</small>
-                        </div>
-                        <button class="btn btn-sm btn-success btn-complete-task ms-2" title="Выполнено" data-id="${t.dealerId}" data-index="${t.visitIndex}"><i class="bi bi-check-lg"></i></button>
-                    </div>`;
-            }).join('');
-        }
-    }
-
-    if(tasksList) {
-        tasksList.addEventListener('click', (e) => {
-            const btn = e.target.closest('.btn-complete-task');
-            if (btn) { btn.disabled = true; completeTask(btn, btn.dataset.id, btn.dataset.index); }
-        });
-    }
-
-    function createContactEntryHTML(c={}) { return `<div class="contact-entry input-group mb-2"><input type="text" class="form-control contact-name" placeholder="Имя" value="${c.name||''}"><input type="text" class="form-control contact-position" placeholder="Должность" value="${c.position||''}"><input type="text" class="form-control contact-info" placeholder="Телефон" value="${c.contactInfo||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
-    function createAddressEntryHTML(a={}) { return `<div class="address-entry input-group mb-2"><input type="text" class="form-control address-description" placeholder="Описание" value="${a.description||''}"><input type="text" class="form-control address-city" placeholder="Город" value="${a.city||''}"><input type="text" class="form-control address-address" placeholder="Адрес" value="${a.address||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
-    function createPosEntryHTML(p={}) { const opts = posMaterialsList.map(n => `<option value="${n}" ${n===p.name?'selected':''}>${n}</option>`).join(''); return `<div class="pos-entry input-group mb-2"><select class="form-select pos-name"><option value="">-- Выбор --</option>${opts}</select><input type="number" class="form-control pos-quantity" value="${p.quantity||1}" min="1"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
-    function createVisitEntryHTML(v={}) { return `<div class="visit-entry input-group mb-2"><input type="date" class="form-control visit-date" value="${v.date||''}"><input type="text" class="form-control visit-comment w-50" placeholder="Результат визита..." value="${v.comment||''}"><input type="hidden" class="visit-completed" value="${v.isCompleted || 'false'}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
-    
-    function renderPhotoPreviews(container, photosArray) { if(container) container.innerHTML = photosArray.map((p, index) => `<div class="photo-preview-item"><img src="${p.photo_url}"><button type="button" class="btn-remove-photo" data-index="${index}">×</button></div>`).join(''); }
-    
-    if(addAvatarInput) addAvatarInput.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (file) { newAvatarBase64 = await compressImage(file, 200, 0.8); addAvatarPreview.src = newAvatarBase64; }
-    });
-    if(editAvatarInput) editAvatarInput.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (file) { newAvatarBase64 = await compressImage(file, 200, 0.8); editAvatarPreview.src = newAvatarBase64; }
-    });
-    
-    if(addPhotoInput) addPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) addPhotosData.push({ photo_url: await compressImage(file) }); renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData); addPhotoInput.value = ''; });
-    if(addPhotoPreviewContainer) addPhotoPreviewContainer.addEventListener('click', (e) => { if(e.target.classList.contains('btn-remove-photo')) { addPhotosData.splice(e.target.dataset.index, 1); renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData); }});
-    if(editPhotoInput) editPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) editPhotosData.push({ photo_url: await compressImage(file) }); renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData); editPhotoInput.value = ''; });
-    if(editPhotoPreviewContainer) editPhotoPreviewContainer.addEventListener('click', (e) => { if(e.target.classList.contains('btn-remove-photo')) { editPhotosData.splice(e.target.dataset.index, 1); renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData); }});
-
-    function collectData(container, selector, fields) {
-        if (!container) return [];
-        const data = [];
-        container.querySelectorAll(selector).forEach(entry => {
-            const item = {}; let hasData = false;
-            fields.forEach(f => { const inp = entry.querySelector(f.class); if(inp){item[f.key]=inp.value; if(item[f.key]) hasData=true;} });
-            if(hasData) data.push(item);
-        });
-        return data;
-    }
-    function renderList(container, data, htmlGen) { if(container) container.innerHTML = (data && data.length > 0) ? data.map(htmlGen).join('') : htmlGen(); }
-    function renderProductChecklist(container, selectedIds=[]) { if(!container) return; const set = new Set(selectedIds); container.innerHTML = fullProductCatalog.map(p => `<div class="checklist-item form-check"><input type="checkbox" class="form-check-input" id="prod-${container.id}-${p.id}" value="${p.id}" ${set.has(p.id)?'checked':''}><label class="form-check-label" for="prod-${container.id}-${p.id}"><strong>${p.sku}</strong> - ${p.name}</label></div>`).join(''); }
-    function getSelectedProductIds(containerId) { const el=document.getElementById(containerId); if(!el) return []; return Array.from(el.querySelectorAll('input:checked')).map(cb=>cb.value); }
-    async function saveProducts(dealerId, ids) { await fetch(`${API_DEALERS_URL}/${dealerId}/products`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({productIds: ids})}); }
-
-    function renderDealerList() {
-        if (!dealerListBody) return;
-        const city = filterCity ? filterCity.value : ''; const type = filterPriceType ? filterPriceType.value : ''; const status = filterStatus ? filterStatus.value : ''; const search = searchBar ? searchBar.value.toLowerCase() : '';
-        const filtered = allDealers.filter(d => (!city||d.city===city) && (!type||d.price_type===type) && (!status||(d.status||'standard')===status) && (!search || ((d.name||'').toLowerCase().includes(search)||(d.dealer_id||'').toLowerCase().includes(search)||(d.organization||'').toLowerCase().includes(search))));
-        filtered.sort((a, b) => {
-            let valA = (a[currentSort.column] || '').toString(); let valB = (b[currentSort.column] || '').toString();
-            let res = currentSort.column === 'dealer_id' ? valA.localeCompare(valB, undefined, {numeric:true}) : valA.toLowerCase().localeCompare(valB.toLowerCase(), 'ru');
-            return currentSort.direction === 'asc' ? res : -res;
-        });
-        dealerListBody.innerHTML = filtered.length ? filtered.map((d, idx) => {
-            let rowClass = 'row-status-standard';
-            if (d.status === 'active') rowClass = 'row-status-active';
-            else if (d.status === 'problem') rowClass = 'row-status-problem';
-            else if (d.status === 'archive') rowClass = 'row-status-archive';
-            return `
-            <tr class="${rowClass}">
-                <td class="cell-number">${idx+1}</td>
-                <td>${d.photo_url ? `<img src="${d.photo_url}" class="table-photo">` : `<div class="no-photo">Нет</div>`}</td>
-                <td>${safeText(d.dealer_id)}</td><td>${safeText(d.name)}</td><td>${safeText(d.city)}</td><td>${safeText(d.price_type)}</td><td>${safeText(d.organization)}</td>
-                <td class="actions-cell"><div class="dropdown"><button class="btn btn-light btn-sm" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button><ul class="dropdown-menu dropdown-menu-end">
-                <li><a class="dropdown-item btn-view" data-id="${d.id}" href="#"><i class="bi bi-eye me-2"></i>Подробнее</a></li>
-                <li><a class="dropdown-item btn-edit" data-id="${d.id}" href="#"><i class="bi bi-pencil me-2"></i>Редактировать</a></li>
-                <li><hr class="dropdown-divider"></li>
-                <li><a class="dropdown-item text-danger btn-delete" data-id="${d.id}" data-name="${safeText(d.name)}" href="#"><i class="bi bi-trash me-2"></i>Удалить</a></li>
-                </ul></div></td></tr>`;
-        }).join('') : '';
-        if(dealerTable) dealerTable.style.display = filtered.length ? 'table' : 'none';
-        if(noDataMsg) { noDataMsg.style.display = filtered.length ? 'none' : 'block'; noDataMsg.textContent = allDealers.length === 0 ? 'Список пуст.' : 'Не найдено.'; }
-    }
-
-    function populateFilters(dealers) {
-        if(!filterCity || !filterPriceType) return;
-        const cities = [...new Set(dealers.map(d => d.city).filter(Boolean))].sort();
-        const types = [...new Set(dealers.map(d => d.price_type).filter(Boolean))].sort();
-        const sc = filterCity.value; const st = filterPriceType.value;
-        filterCity.innerHTML = '<option value="">-- Все города --</option>'; filterPriceType.innerHTML = '<option value="">-- Все типы --</option>';
-        cities.forEach(c => filterCity.add(new Option(c, c))); types.forEach(t => filterPriceType.add(new Option(t, t)));
-        filterCity.value = sc; filterPriceType.value = st;
-    }
-
-    async function initApp() {
-        await fetchProductCatalog();
-        try {
-            const response = await fetch(API_DEALERS_URL);
-            if (!response.ok) throw new Error(response.statusText);
-            allDealers = await response.json();
-            populateFilters(allDealers);
-            renderDealerList();
-            renderDashboard(); 
-        } catch (error) {
-            console.error(error);
-            if(dealerListBody) dealerListBody.innerHTML = `<tr><td colspan="8" class="text-danger text-center">Ошибка загрузки.</td></tr>`;
-        }
-        const pendingId = localStorage.getItem('pendingEditDealerId');
-        if (pendingId) { localStorage.removeItem('pendingEditDealerId'); openEditModal(pendingId); }
-    }
-
-    // (ВОЗВРАЩЕНО) Кнопки POS
-    if(document.getElementById('add-contact-btn-add-modal')) document.getElementById('add-contact-btn-add-modal').onclick = () => addContactList.insertAdjacentHTML('beforeend', createContactEntryHTML());
-    if(document.getElementById('add-address-btn-add-modal')) document.getElementById('add-address-btn-add-modal').onclick = () => addAddressList.insertAdjacentHTML('beforeend', createAddressEntryHTML());
-    if(document.getElementById('add-pos-btn-add-modal')) document.getElementById('add-pos-btn-add-modal').onclick = () => addPosList.insertAdjacentHTML('beforeend', createPosEntryHTML());
-    if(document.getElementById('add-visits-btn-add-modal')) document.getElementById('add-visits-btn-add-modal').onclick = () => addVisitsList.insertAdjacentHTML('beforeend', createVisitEntryHTML());
-    if(document.getElementById('add-contact-btn-edit-modal')) document.getElementById('add-contact-btn-edit-modal').onclick = () => editContactList.insertAdjacentHTML('beforeend', createContactEntryHTML());
-    if(document.getElementById('add-address-btn-edit-modal')) document.getElementById('add-address-btn-edit-modal').onclick = () => editAddressList.insertAdjacentHTML('beforeend', createAddressEntryHTML());
-    if(document.getElementById('add-pos-btn-edit-modal')) document.getElementById('add-pos-btn-edit-modal').onclick = () => editPosList.insertAdjacentHTML('beforeend', createPosEntryHTML());
-    if(document.getElementById('add-visits-btn-edit-modal')) document.getElementById('add-visits-btn-edit-modal').onclick = () => editVisitsList.insertAdjacentHTML('beforeend', createVisitEntryHTML());
-
-    if(openAddModalBtn) openAddModalBtn.onclick = () => {
-        addForm.reset(); renderProductChecklist(addProductChecklist);
-        renderList(addContactList, [], createContactEntryHTML); renderList(addAddressList, [], createAddressEntryHTML);
-        renderList(addPosList, [], createPosEntryHTML); renderList(addVisitsList, [], createVisitEntryHTML);
-        if(document.getElementById('add_latitude')) { document.getElementById('add_latitude').value = ''; document.getElementById('add_longitude').value = ''; }
-        addPhotosData = []; renderPhotoPreviews(addPhotoPreviewContainer, []);
-        addAvatarPreview.src = ''; newAvatarBase64 = null;
-        if(addModal) addModal.show();
-    };
-
-    if(addForm) addForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const btn = document.querySelector('button[form="add-dealer-form"]'); const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...';
-        const data = {
-            dealer_id: getVal('dealer_id'), name: getVal('name'), organization: getVal('organization'), price_type: getVal('price_type'),
-            city: getVal('city'), address: getVal('address'), delivery: getVal('delivery'), website: getVal('website'), instagram: getVal('instagram'),
-            latitude: getVal('add_latitude'), longitude: getVal('add_longitude'), bonuses: getVal('bonuses'), status: getVal('status'),
-            contacts: collectData(addContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]),
-            additional_addresses: collectData(addAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]),
-            pos_materials: collectData(addPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]),
-            visits: collectData(addVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'}]),
-            photos: addPhotosData,
-            avatarUrl: newAvatarBase64
-        };
-        try { const res = await fetch(API_DEALERS_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); if (!res.ok) throw new Error(await res.text()); const newD = await res.json(); const pIds = getSelectedProductIds('add-product-checklist'); if(pIds.length) await saveProducts(newD.id, pIds); addModal.hide(); initApp(); } catch (e) { alert("Ошибка при добавлении."); } finally { btn.disabled = false; btn.innerHTML = oldText; }
-    });
-
-    async function openEditModal(id) {
-        try {
-            const res = await fetch(`${API_DEALERS_URL}/${id}`); if(!res.ok) throw new Error("Ошибка"); const d = await res.json();
-            document.getElementById('edit_db_id').value=d.id; document.getElementById('edit_dealer_id').value=d.dealer_id; document.getElementById('edit_name').value=d.name; document.getElementById('edit_organization').value=d.organization; document.getElementById('edit_price_type').value=d.price_type; document.getElementById('edit_city').value=d.city; document.getElementById('edit_address').value=d.address; document.getElementById('edit_delivery').value=d.delivery; document.getElementById('edit_website').value=d.website; document.getElementById('edit_instagram').value=d.instagram;
-            if(document.getElementById('edit_latitude')) document.getElementById('edit_latitude').value=d.latitude||'';
-            if(document.getElementById('edit_longitude')) document.getElementById('edit_longitude').value=d.longitude||'';
-            document.getElementById('edit_bonuses').value=d.bonuses;
-            if(document.getElementById('edit_status')) document.getElementById('edit_status').value = d.status || 'standard';
-            if(editAvatarPreview) editAvatarPreview.src = d.avatarUrl || '';
-            if(editCurrentAvatarUrl) editCurrentAvatarUrl.value = d.avatarUrl || '';
-            newAvatarBase64 = null;
-            renderList(editContactList, d.contacts, createContactEntryHTML); 
-            renderList(editAddressList, d.additional_addresses, createAddressEntryHTML); 
-            renderList(editPosList, d.pos_materials, createPosEntryHTML); 
-            renderList(editVisitsList, d.visits, createVisitEntryHTML);
-            renderProductChecklist(editProductChecklist, (d.products||[]).map(p=>p.id));
-            editPhotosData = d.photos||[]; renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData);
-            editModal.show();
-        } catch(e){alert("Ошибка загрузки.");}
-    }
-
-    if(editForm) editForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const btn = document.querySelector('button[form="edit-dealer-form"]'); // (ИСПРАВЛЕНО)
-        const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...';
-        const id = document.getElementById('edit_db_id').value;
-        let avatarToSend = getVal('edit-current-avatar-url'); if (newAvatarBase64) avatarToSend = newAvatarBase64;
-        const data = {
-            dealer_id: getVal('edit_dealer_id'), name: getVal('edit_name'),
-            organization: getVal('edit_organization'), price_type: getVal('edit_price_type'),
-            city: getVal('edit_city'), address: getVal('edit_address'),
-            delivery: getVal('edit_delivery'), website: getVal('edit_website'), instagram: getVal('edit_instagram'),
-            latitude: getVal('edit_latitude'), longitude: getVal('edit_longitude'),
-            bonuses: getVal('edit_bonuses'),
-            status: getVal('edit_status'),
-            avatarUrl: avatarToSend,
-            contacts: collectData(editContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]),
-            additional_addresses: collectData(editAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]),
-            pos_materials: collectData(editPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]),
-            visits: collectData(editVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'},{key:'isCompleted',class:'.visit-completed'}]),
-            photos: editPhotosData
-        };
-        try { await fetch(`${API_DEALERS_URL}/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); await saveProducts(id, getSelectedProductIds('edit-product-checklist')); editModal.hide(); initApp(); } catch (e) { alert("Ошибка при сохранении."); } finally { if(btn) { btn.disabled = false; btn.innerHTML = oldText; } }
-    });
-
-    if(dealerListBody) dealerListBody.addEventListener('click', (e) => {
-        const t = e.target;
-        if (t.closest('a.dropdown-item')) e.preventDefault();
-        if (t.closest('.btn-view')) window.open(`dealer.html?id=${t.closest('.btn-view').dataset.id}`, '_blank');
-        if (t.closest('.btn-edit')) openEditModal(t.closest('.btn-edit').dataset.id);
-        if (t.closest('.btn-delete') && confirm("Удалить?")) fetch(`${API_DEALERS_URL}/${t.closest('.btn-delete').dataset.id}`, {method:'DELETE'}).then(initApp);
-    });
-
-    const removeHandler = (e) => { if(e.target.closest('.btn-remove-entry')) e.target.closest('.contact-entry, .address-entry, .pos-entry, .photo-entry, .visit-entry').remove(); };
-    if(addModalEl) addModalEl.addEventListener('click', removeHandler);
-    if(editModalEl) editModalEl.addEventListener('click', removeHandler);
-
-    if(filterCity) filterCity.onchange = renderDealerList; 
-    if(filterPriceType) filterPriceType.onchange = renderDealerList; 
-    if(filterStatus) filterStatus.onchange = renderDealerList;
-    if(searchBar) searchBar.oninput = renderDealerList;
-    
-    document.querySelectorAll('th[data-sort]').forEach(th => th.onclick = () => { if(currentSort.column===th.dataset.sort) currentSort.direction=(currentSort.direction==='asc'?'desc':'asc'); else {currentSort.column=th.dataset.sort;currentSort.direction='asc';} renderDealerList(); });
-    
-    if(exportBtn) {
-        exportBtn.onclick = async () => {
-            if (!allDealers.length) return alert("Пусто. Нечего экспортировать.");
-            exportBtn.disabled = true;
-            exportBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Загрузка...';
-            const clean = (text) => `"${String(text || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`;
-            const headers = ["ID", "Название", "Статус", "Город", "Адрес", "Тип цен", "Организация", "Доставка", "Сайт", "Инстаграм", "Контакты (Имя)", "Контакты (Должность)", "Контакты (Телефон)", "Доп. Адреса", "Стенды", "Бонусы"];
-            let csv = "\uFEFF" + headers.join(",") + "\r\n";
-            try {
-                const visibleDealerIds = Array.from(dealerListBody.querySelectorAll('tr .btn-view')).map(btn => btn.dataset.id);
-                for (const id of visibleDealerIds) {
-                    const res = await fetch(`${API_DEALERS_URL}/${id}`);
-                    if (!res.ok) continue;
-                    const dealer = await res.json();
-                    const contactsName = (dealer.contacts || []).map(c => c.name).join('; ');
-                    const contactsPos = (dealer.contacts || []).map(c => c.position).join('; ');
-                    const contactsInfo = (dealer.contacts || []).map(c => c.contactInfo).join('; ');
-                    const addresses = (dealer.additional_addresses || []).map(a => `${a.description || ''}: ${a.city || ''} ${a.address || ''}`).join('; ');
-                    const stands = (dealer.pos_materials || []).map(p => `${p.name} (${p.quantity} шт)`).join('; '); 
-                    const row = [
-                        clean(dealer.dealer_id), clean(dealer.name), clean(dealer.status),
-                        clean(dealer.city), clean(dealer.address), clean(dealer.price_type),
-                        clean(dealer.organization), clean(dealer.delivery), clean(dealer.website), clean(dealer.instagram),
-                        clean(contactsName), clean(contactsPos), clean(contactsInfo),
-                        clean(addresses), clean(stands), clean(dealer.bonuses)
-                    ];
-                    csv += row.join(",") + "\r\n";
-                }
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'}));
-                a.download = 'dealers_export.csv';
-                a.click();
-            } catch (e) { alert("Ошибка: " + e.message); } 
-            finally {
-                exportBtn.disabled = false;
-                exportBtn.innerHTML = '<i class="bi bi-file-earmark-excel me-2"></i>Экспорт';
-            }
-        };
-    }
-    
-    initApp();
+const dealerSchema = new mongoose.Schema({
+    dealer_id: String, name: String, price_type: String, city: String, address: String, 
+    contacts: [contactSchema], bonuses: String, photos: [photoSchema], organization: String,
+    delivery: String, website: String, instagram: String,
+    additional_addresses: [additionalAddressSchema], 
+    pos_materials: [posMaterialSchema], 
+    visits: [visitSchema],
+    products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
+    latitude: Number, longitude: Number,
+    status: { type: String, default: 'standard' },
+    avatarUrl: String
 });
+const Dealer = mongoose.model('Dealer', dealerSchema);
+const knowledgeSchema = new mongoose.Schema({ title: String, content: String }, { timestamps: true }); 
+const Knowledge = mongoose.model('Knowledge', knowledgeSchema);
+
+async function hardcodedImportProducts() {
+    try {
+        const operations = productsToImport.map(p => ({ updateOne: { filter: { sku: p.sku }, update: { $set: p }, upsert: true } }));
+        await Product.bulkWrite(operations);
+        console.log("Каталог (только ламинат) обновлен.");
+    } catch (e) { console.warn(e.message); }
+}
+
+async function connectToDB() {
+    if (!DB_CONNECTION_STRING) return console.error("No DB String");
+    try { await mongoose.connect(DB_CONNECTION_STRING); await hardcodedImportProducts(); } catch (e) { console.error(e); }
+}
+
+function convertToClient(doc) {
+    if(!doc) return null;
+    const obj = doc.toObject ? doc.toObject() : doc;
+    obj.id = obj._id; delete obj._id; delete obj.__v;
+    if(obj.products) obj.products = obj.products.map(p => { if(p){p.id=p._id; delete p._id;} return p;});
+    return obj;
+}
+
+// API
+app.get('/api/dealers', async (req, res) => {
+    try {
+        const dealers = await Dealer.find({}, 'dealer_id name city price_type organization products pos_materials visits latitude longitude status avatarUrl').lean();
+        res.json(dealers.map(d => ({
+            id: d._id, dealer_id: d.dealer_id, name: d.name, city: d.city, price_type: d.price_type, organization: d.organization,
+            photo_url: d.avatarUrl,
+            has_photos: (d.photos && d.photos.length > 0),
+            products_count: (d.products ? d.products.length : 0),
+            has_pos: (d.pos_materials && d.pos_materials.length > 0), 
+            visits: d.visits, latitude: d.latitude, longitude: d.longitude,
+            status: d.status || 'standard'
+        }))); 
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/dealers/:id', async (req, res) => { try { const dealer = await Dealer.findById(req.params.id).populate('products'); res.json(convertToClient(dealer)); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.post('/api/dealers', async (req, res) => { try { const dealer = new Dealer(req.body); await dealer.save(); res.status(201).json(convertToClient(dealer)); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.put('/api/dealers/:id', async (req, res) => { try { await Dealer.findByIdAndUpdate(req.params.id, req.body); res.json({status:'ok'}); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.delete('/api/dealers/:id', async (req, res) => { try { await Dealer.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.get('/api/dealers/:id/products', async (req, res) => { try { const dealer = await Dealer.findById(req.params.id).populate({path:'products',options:{sort:{'sku':1}}}); res.json(dealer.products.map(convertToClient)); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.put('/api/dealers/:id/products', async (req, res) => { try { await Dealer.findByIdAndUpdate(req.params.id, { products: req.body.productIds }); res.json({status:'ok'}); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.get('/api/products', async (req, res) => { const search = new RegExp(req.query.search || '', 'i'); const products = await Product.find({$or:[{sku:search},{name:search}]}).sort({sku:1}).lean(); res.json(products.map(p=>{p.id=p._id; return p;})); });
+app.post('/api/products', async (req, res) => { try { const p = new Product(req.body); await p.save(); res.json(convertToClient(p)); } catch(e){res.status(409).json({});} });
+app.put('/api/products/:id', async (req, res) => { try { const p = await Product.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(p)); } catch(e){res.status(409).json({});} });
+app.delete('/api/products/:id', async (req, res) => { await Product.findByIdAndDelete(req.params.id); await Dealer.updateMany({ products: req.params.id }, { $pull: { products: req.params.id } }); res.json({}); });
+
+// --- (ИЗМЕНЕНО) API Матрицы ---
+app.get('/api/matrix', async (req, res) => {
+    try {
+        const allProducts = await Product.find({}, 'sku name').sort({ sku: 1 }).lean();
+        // (ИЗМЕНЕНО) Получаем Город и Статус
+        const allDealers = await Dealer.find({}, 'name products city status').sort({ name: 1 }).lean();
+        
+        const map = new Map(); 
+        allDealers.forEach(d => map.set(d._id.toString(), new Set(d.products.map(String))));
+        
+        const matrix = allProducts.map(p => ({
+            sku: p.sku, name: p.name,
+            dealers: allDealers.map(d => ({ has_product: map.get(d._id.toString()).has(p._id.toString()) }))
+        }));
+        
+        // (ИЗМЕНЕНО) Отправляем полные данные в заголовках
+        const headers = allDealers.map(d => ({
+            id: d._id, 
+            name: d.name,
+            city: d.city || '',
+            status: d.status || 'standard'
+        }));
+        
+        res.json({ headers: headers, matrix });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/products/:id/dealers', async (req, res) => { const dlrs = await Dealer.find({ products: req.params.id }, 'dealer_id name city').sort({name:1}).lean(); res.json(dlrs.map(d=>{d.id=d._id; return d;})); });
+app.get('/api/knowledge', async (req, res) => { const arts = await Knowledge.find({title: new RegExp(req.query.search||'', 'i')}).sort({title:1}).lean(); res.json(arts.map(a=>{a.id=a._id; return a;})); });
+app.get('/api/knowledge/:id', async (req, res) => { res.json(convertToClient(await Knowledge.findById(req.params.id))); });
+app.post('/api/knowledge', async (req, res) => { const a = new Knowledge(req.body); await a.save(); res.json(convertToClient(a)); });
+app.put('/api/knowledge/:id', async (req, res) => { const a = await Knowledge.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(a)); });
+app.delete('/api/knowledge/:id', async (req, res) => { await Knowledge.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
+
+app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
