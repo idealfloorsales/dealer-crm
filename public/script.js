@@ -7,17 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let fullProductCatalog = [];
     let allDealers = [];
     let currentSort = { column: 'name', direction: 'asc' };
-    
-    // (ИЗМЕНЕНО) Список стендов (POS) убран из каталога и живет здесь
-    const posMaterialsList = [
-        "С600 - 600мм задняя стенка",
-        "С800 - 800мм задняя стенка",
-        "РФ-2 - Расческа из фанеры",
-        "РФС-1 - Расческа из фанеры СТАРАЯ",
-        "Н600 - 600мм наклейка",
-        "Н800 - 800мм наклейка",
-        "Табличка - Табличка орг.стекло"
-    ];
+    const posMaterialsList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"];
 
     // Модалки
     const addModalEl = document.getElementById('add-modal'); const addModal = new bootstrap.Modal(addModalEl);
@@ -29,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const addProductChecklist = document.getElementById('add-product-checklist'); 
     const addContactList = document.getElementById('add-contact-list'); 
     const addAddressList = document.getElementById('add-address-list'); 
-    const addPosList = document.getElementById('add-pos-list'); // (ВОЗВРАЩЕНО)
+    const addPosList = document.getElementById('add-pos-list'); 
     const addVisitsList = document.getElementById('add-visits-list');
     const addPhotoInput = document.getElementById('add-photo-input');
     const addPhotoPreviewContainer = document.getElementById('add-photo-preview-container');
@@ -51,7 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const editProductChecklist = document.getElementById('edit-product-checklist'); 
     const editContactList = document.getElementById('edit-contact-list'); 
     const editAddressList = document.getElementById('edit-address-list'); 
-    const editPosList = document.getElementById('edit-pos-list'); // (ВОЗВРАЩЕНО)
+    const editPosList = document.getElementById('edit-pos-list'); 
     const editVisitsList = document.getElementById('edit-visits-list');
     const editPhotoList = document.getElementById('edit-photo-list'); 
     const editPhotoInput = document.getElementById('edit-photo-input');
@@ -62,11 +52,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let addPhotosData = []; 
     let editPhotosData = [];
-    let newAvatarBase64 = null; // Хранит новый аватар (Base64)
+    let newAvatarBase64 = null; 
 
-    // Безопасное получение значения
     const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
-
     const safeText = (text) => (text || '').toString().replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const safeAttr = (text) => (text || '').toString().replace(/"/g, '&quot;');
     const toBase64 = file => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => resolve(reader.result); reader.onerror = error => reject(error); });
@@ -152,8 +140,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!dashboardContainer) return;
         if (!allDealers || allDealers.length === 0) { dashboardContainer.innerHTML = ''; return; }
         const totalDealers = allDealers.length;
-        const noPhotosCount = allDealers.filter(d => !d.photo_url).length;
-        const posCount = allDealers.filter(d => d.has_pos).length;
+        const noPhotosCount = allDealers.filter(d => !d.photo_url).length; 
+        const posCount = allDealers.filter(d => d.has_pos).length; 
         const cityCounts = {}; let topCity = "-"; let maxCount = 0;
         allDealers.forEach(d => { if (d.city) { cityCounts[d.city] = (cityCounts[d.city] || 0) + 1; if (cityCounts[d.city] > maxCount) { maxCount = cityCounts[d.city]; topCity = d.city; } } });
 
@@ -360,7 +348,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if(editForm) editForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const btn = editForm.querySelector('button[type="submit"]'); const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...';
+        const btn = document.querySelector('button[form="edit-dealer-form"]'); // (ИСПРАВЛЕНО)
+        const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...';
         const id = document.getElementById('edit_db_id').value;
         let avatarToSend = getVal('edit-current-avatar-url'); if (newAvatarBase64) avatarToSend = newAvatarBase64;
         const data = {
@@ -400,32 +389,25 @@ document.addEventListener('DOMContentLoaded', () => {
     
     document.querySelectorAll('th[data-sort]').forEach(th => th.onclick = () => { if(currentSort.column===th.dataset.sort) currentSort.direction=(currentSort.direction==='asc'?'desc':'asc'); else {currentSort.column=th.dataset.sort;currentSort.direction='asc';} renderDealerList(); });
     
-    // (ИСПРАВЛЕНО) УМНЫЙ ЭКСПОРТ
     if(exportBtn) {
         exportBtn.onclick = async () => {
             if (!allDealers.length) return alert("Пусто. Нечего экспортировать.");
             exportBtn.disabled = true;
             exportBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Загрузка...';
-
             const clean = (text) => `"${String(text || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`;
             const headers = ["ID", "Название", "Статус", "Город", "Адрес", "Тип цен", "Организация", "Доставка", "Сайт", "Инстаграм", "Контакты (Имя)", "Контакты (Должность)", "Контакты (Телефон)", "Доп. Адреса", "Стенды", "Бонусы"];
             let csv = "\uFEFF" + headers.join(",") + "\r\n";
-
             try {
-                // Берем ID дилеров, которые сейчас видны на экране
                 const visibleDealerIds = Array.from(dealerListBody.querySelectorAll('tr .btn-view')).map(btn => btn.dataset.id);
-                
                 for (const id of visibleDealerIds) {
-                    const res = await fetch(`${API_DEALERS_URL}/${id}`); // Запрашиваем полные данные
+                    const res = await fetch(`${API_DEALERS_URL}/${id}`);
                     if (!res.ok) continue;
                     const dealer = await res.json();
-                    
                     const contactsName = (dealer.contacts || []).map(c => c.name).join('; ');
                     const contactsPos = (dealer.contacts || []).map(c => c.position).join('; ');
                     const contactsInfo = (dealer.contacts || []).map(c => c.contactInfo).join('; ');
                     const addresses = (dealer.additional_addresses || []).map(a => `${a.description || ''}: ${a.city || ''} ${a.address || ''}`).join('; ');
-                    const stands = (dealer.pos_materials || []).map(p => `${p.name} (${p.quantity} шт)`).join('; ');
-
+                    const stands = (dealer.pos_materials || []).map(p => `${p.name} (${p.quantity} шт)`).join('; '); // (ВОЗВРАЩЕНО)
                     const row = [
                         clean(dealer.dealer_id), clean(dealer.name), clean(dealer.status),
                         clean(dealer.city), clean(dealer.address), clean(dealer.price_type),
