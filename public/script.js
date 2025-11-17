@@ -7,19 +7,33 @@ document.addEventListener('DOMContentLoaded', () => {
     let fullProductCatalog = [];
     let allDealers = [];
     let currentSort = { column: 'name', direction: 'asc' };
-    const posMaterialsList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"];
+    
+    // (ВОЗВРАЩЕНО) Список Стендов (POS)
+    const posMaterialsList = [
+        "С600 - 600мм задняя стенка",
+        "С800 - 800мм задняя стенка",
+        "РФ-2 - Расческа из фанеры",
+        "РФС-1 - Расческа из фанеры СТАРАЯ",
+        "Н600 - 600мм наклейка",
+        "Н800 - 800мм наклейка",
+        "Табличка - Табличка орг.стекло"
+    ];
 
-    // Модалки
-    const addModalEl = document.getElementById('add-modal'); const addModal = new bootstrap.Modal(addModalEl);
-    const editModalEl = document.getElementById('edit-modal'); const editModal = new bootstrap.Modal(editModalEl);
+    // (ИСПРАВЛЕНО) Модалки и Формы объявлены здесь
+    const addModalEl = document.getElementById('add-modal'); 
+    const addModal = new bootstrap.Modal(addModalEl);
+    const addForm = document.getElementById('add-dealer-form'); // <--- ВОТ ОН
+    
+    const editModalEl = document.getElementById('edit-modal'); 
+    const editModal = new bootstrap.Modal(editModalEl);
+    const editForm = document.getElementById('edit-dealer-form'); // <--- И ЭТОТ
 
     // Элементы
     const openAddModalBtn = document.getElementById('open-add-modal-btn');
-    const addForm = document.getElementById('add-dealer-form');
     const addProductChecklist = document.getElementById('add-product-checklist'); 
     const addContactList = document.getElementById('add-contact-list'); 
     const addAddressList = document.getElementById('add-address-list'); 
-    const addPosList = document.getElementById('add-pos-list'); 
+    const addPosList = document.getElementById('add-pos-list'); // (ВОЗВРАЩЕНО)
     const addVisitsList = document.getElementById('add-visits-list');
     const addPhotoInput = document.getElementById('add-photo-input');
     const addPhotoPreviewContainer = document.getElementById('add-photo-preview-container');
@@ -37,11 +51,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const dashboardContainer = document.getElementById('dashboard-container'); 
     const tasksList = document.getElementById('tasks-list'); 
 
-    const editForm = document.getElementById('edit-dealer-form');
     const editProductChecklist = document.getElementById('edit-product-checklist'); 
     const editContactList = document.getElementById('edit-contact-list'); 
     const editAddressList = document.getElementById('edit-address-list'); 
-    const editPosList = document.getElementById('edit-pos-list'); 
+    const editPosList = document.getElementById('edit-pos-list'); // (ВОЗВРАЩЕНО)
     const editVisitsList = document.getElementById('edit-visits-list');
     const editPhotoList = document.getElementById('edit-photo-list'); 
     const editPhotoInput = document.getElementById('edit-photo-input');
@@ -52,9 +65,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let addPhotosData = []; 
     let editPhotosData = [];
-    let newAvatarBase64 = null; 
+    let newAvatarBase64 = null; // Хранит новый аватар (Base64)
 
+    // Безопасное получение значения
     const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
+
     const safeText = (text) => (text || '').toString().replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const safeAttr = (text) => (text || '').toString().replace(/"/g, '&quot;');
     const toBase64 = file => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => resolve(reader.result); reader.onerror = error => reject(error); });
@@ -126,7 +141,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if(!res.ok) throw new Error('Не удалось загрузить данные');
             const dealer = await res.json();
             let found = false;
-            if (dealer.visits && dealer.visits[visitIndex]) { dealer.visits[visitIndex].isCompleted = true; found = true; }
+            if (dealer.visits && dealer.visits[visitIndex]) {
+                dealer.visits[visitIndex].isCompleted = true;
+                found = true;
+            }
             if (!found) return alert("Задача не найдена.");
             await fetch(`${API_DEALERS_URL}/${dealerId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visits: dealer.visits }) });
             initApp(); 
@@ -143,9 +161,10 @@ document.addEventListener('DOMContentLoaded', () => {
         allDealers.forEach(d => { if (d.city) { cityCounts[d.city] = (cityCounts[d.city] || 0) + 1; if (cityCounts[d.city] > maxCount) { maxCount = cityCounts[d.city]; topCity = d.city; } } });
 
         dashboardContainer.innerHTML = `
-            <div class="col-md-6 col-lg-4"><div class="stat-card"><i class="bi bi-shop stat-icon text-primary"></i><span class="stat-number">${totalDealers}</span><span class="stat-label">Всего дилеров</span></div></div>
-            <div class="col-md-6 col-lg-4"><div class="stat-card ${noPhotosCount > 0 ? 'border-danger' : ''}"><i class="bi bi-camera-fill stat-icon ${noPhotosCount > 0 ? 'text-danger' : 'text-secondary'}"></i><span class="stat-number ${noPhotosCount > 0 ? 'text-danger' : ''}">${noPhotosCount}</span><span class="stat-label">Без Аватара</span></div></div>
-            <div class="col-md-6 col-lg-4"><div class="stat-card"><i class="bi bi-geo-alt-fill stat-icon text-info"></i><span class="stat-number text-info" style="font-size: 1.5rem;">${topCity}</span><span class="stat-label">Топ регион</span></div></div>
+            <div class="col-md-6 col-lg-3"><div class="stat-card"><i class="bi bi-shop stat-icon text-primary"></i><span class="stat-number">${totalDealers}</span><span class="stat-label">Всего дилеров</span></div></div>
+            <div class="col-md-6 col-lg-3"><div class="stat-card ${noPhotosCount > 0 ? 'border-danger' : ''}"><i class="bi bi-camera-fill stat-icon ${noPhotosCount > 0 ? 'text-danger' : 'text-secondary'}"></i><span class="stat-number ${noPhotosCount > 0 ? 'text-danger' : ''}">${noPhotosCount}</span><span class="stat-label">Без Аватара</span></div></div>
+            <div class="col-md-6 col-lg-3"><div class="stat-card"><i class="bi bi-easel stat-icon text-success"></i><span class="stat-number text-success">${posCount}</span><span class="stat-label">Со стендами</span></div></div>
+             <div class="col-md-6 col-lg-3"><div class="stat-card"><i class="bi bi-geo-alt-fill stat-icon text-info"></i><span class="stat-number text-info" style="font-size: 1.5rem;">${topCity}</span><span class="stat-label">Топ регион</span></div></div>
         `;
 
         if (!tasksList) return;
@@ -286,6 +305,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pendingId) { localStorage.removeItem('pendingEditDealerId'); openEditModal(pendingId); }
     }
 
+    // (ВОЗВРАЩЕНО) Кнопки POS
     if(document.getElementById('add-contact-btn-add-modal')) document.getElementById('add-contact-btn-add-modal').onclick = () => addContactList.insertAdjacentHTML('beforeend', createContactEntryHTML());
     if(document.getElementById('add-address-btn-add-modal')) document.getElementById('add-address-btn-add-modal').onclick = () => addAddressList.insertAdjacentHTML('beforeend', createAddressEntryHTML());
     if(document.getElementById('add-pos-btn-add-modal')) document.getElementById('add-pos-btn-add-modal').onclick = () => addPosList.insertAdjacentHTML('beforeend', createPosEntryHTML());
@@ -301,7 +321,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderList(addPosList, [], createPosEntryHTML); renderList(addVisitsList, [], createVisitEntryHTML);
         if(document.getElementById('add_latitude')) { document.getElementById('add_latitude').value = ''; document.getElementById('add_longitude').value = ''; }
         addPhotosData = []; renderPhotoPreviews(addPhotoPreviewContainer, []);
-        addAvatarPreview.src = ''; newAvatarBase64 = null; // (ИЗМЕНЕНО)
+        addAvatarPreview.src = ''; newAvatarBase64 = null;
         if(addModal) addModal.show();
     };
 
@@ -317,7 +337,7 @@ document.addEventListener('DOMContentLoaded', () => {
             pos_materials: collectData(addPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]),
             visits: collectData(addVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'}]),
             photos: addPhotosData,
-            avatarUrl: newAvatarBase64 // (ИЗМЕНЕНО)
+            avatarUrl: newAvatarBase64
         };
         try { const res = await fetch(API_DEALERS_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); if (!res.ok) throw new Error(await res.text()); const newD = await res.json(); const pIds = getSelectedProductIds('add-product-checklist'); if(pIds.length) await saveProducts(newD.id, pIds); addModal.hide(); initApp(); } catch (e) { alert("Ошибка при добавлении."); } finally { btn.disabled = false; btn.innerHTML = oldText; }
     });
@@ -333,7 +353,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if(editAvatarPreview) editAvatarPreview.src = d.avatarUrl || '';
             if(editCurrentAvatarUrl) editCurrentAvatarUrl.value = d.avatarUrl || '';
             newAvatarBase64 = null;
-            renderList(editContactList, d.contacts, createContactEntryHTML); renderList(editAddressList, d.additional_addresses, createAddressEntryHTML); 
+            renderList(editContactList, d.contacts, createContactEntryHTML); 
+            renderList(editAddressList, d.additional_addresses, createAddressEntryHTML); 
             renderList(editPosList, d.pos_materials, createPosEntryHTML); 
             renderList(editVisitsList, d.visits, createVisitEntryHTML);
             renderProductChecklist(editProductChecklist, (d.products||[]).map(p=>p.id));
@@ -344,7 +365,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if(editForm) editForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const btn = editForm.querySelector('button[type="submit"]'); const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...';
+        const btn = document.querySelector('button[form="edit-dealer-form"]'); // (ИСПРАВЛЕНО)
+        const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...';
         const id = document.getElementById('edit_db_id').value;
         let avatarToSend = getVal('edit-current-avatar-url'); if (newAvatarBase64) avatarToSend = newAvatarBase64;
         const data = {
@@ -402,7 +424,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const contactsPos = (dealer.contacts || []).map(c => c.position).join('; ');
                     const contactsInfo = (dealer.contacts || []).map(c => c.contactInfo).join('; ');
                     const addresses = (dealer.additional_addresses || []).map(a => `${a.description || ''}: ${a.city || ''} ${a.address || ''}`).join('; ');
-                    const stands = (dealer.pos_materials || []).map(p => `${p.name} (${p.quantity} шт)`).join('; '); // (ВОЗВРАЩЕНО)
+                    const stands = (dealer.pos_materials || []).map(p => `${p.name} (${p.quantity} шт)`).join('; '); 
                     const row = [
                         clean(dealer.dealer_id), clean(dealer.name), clean(dealer.status),
                         clean(dealer.city), clean(dealer.address), clean(dealer.price_type),
