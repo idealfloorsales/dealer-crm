@@ -7,23 +7,19 @@ document.addEventListener('DOMContentLoaded', () => {
     let fullProductCatalog = [];
     let allDealers = [];
     let currentSort = { column: 'name', direction: 'asc' };
-    const posMaterialsList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"];
-
-    // (ИСПРАВЛЕНО) Все объявления DOM-элементов модалок и форм ВВЕРХУ
-    const addModalEl = document.getElementById('add-modal'); 
-    const addModal = new bootstrap.Modal(addModalEl);
-    const addForm = document.getElementById('add-dealer-form'); // <--- ВОТ ОН
     
-    const editModalEl = document.getElementById('edit-modal'); 
-    const editModal = new bootstrap.Modal(editModalEl);
-    const editForm = document.getElementById('edit-dealer-form'); // <--- И ЭТОТ
+    // (УДАЛЕНО) posMaterialsList
+
+    // Модалки
+    const addModalEl = document.getElementById('add-modal'); const addModal = new bootstrap.Modal(addModalEl);
+    const editModalEl = document.getElementById('edit-modal'); const editModal = new bootstrap.Modal(editModalEl);
 
     // Элементы
     const openAddModalBtn = document.getElementById('open-add-modal-btn');
+    const addForm = document.getElementById('add-dealer-form');
     const addProductChecklist = document.getElementById('add-product-checklist'); 
     const addContactList = document.getElementById('add-contact-list'); 
     const addAddressList = document.getElementById('add-address-list'); 
-    // const addPosList = document.getElementById('add-pos-list'); // (УДАЛЕНО)
     const addVisitsList = document.getElementById('add-visits-list');
     const addPhotoInput = document.getElementById('add-photo-input');
     const addPhotoPreviewContainer = document.getElementById('add-photo-preview-container');
@@ -41,10 +37,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const dashboardContainer = document.getElementById('dashboard-container'); 
     const tasksList = document.getElementById('tasks-list'); 
 
+    const editForm = document.getElementById('edit-dealer-form');
     const editProductChecklist = document.getElementById('edit-product-checklist'); 
     const editContactList = document.getElementById('edit-contact-list'); 
     const editAddressList = document.getElementById('edit-address-list'); 
-    // const editPosList = document.getElementById('edit-pos-list'); // (УДАЛЕНО)
     const editVisitsList = document.getElementById('edit-visits-list');
     const editPhotoList = document.getElementById('edit-photo-list'); 
     const editPhotoInput = document.getElementById('edit-photo-input');
@@ -131,10 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if(!res.ok) throw new Error('Не удалось загрузить данные');
             const dealer = await res.json();
             let found = false;
-            if (dealer.visits && dealer.visits[visitIndex]) {
-                dealer.visits[visitIndex].isCompleted = true;
-                found = true;
-            }
+            if (dealer.visits && dealer.visits[visitIndex]) { dealer.visits[visitIndex].isCompleted = true; found = true; }
             if (!found) return alert("Задача не найдена.");
             await fetch(`${API_DEALERS_URL}/${dealerId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visits: dealer.visits }) });
             initApp(); 
@@ -146,7 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!allDealers || allDealers.length === 0) { dashboardContainer.innerHTML = ''; return; }
         const totalDealers = allDealers.length;
         const noPhotosCount = allDealers.filter(d => !d.has_photos).length;
-        // const posCount = allDealers.filter(d => d.has_pos).length;
+        // const posCount = allDealers.filter(d => d.has_pos).length; // (УДАЛЕНО)
         const cityCounts = {}; let topCity = "-"; let maxCount = 0;
         allDealers.forEach(d => { if (d.city) { cityCounts[d.city] = (cityCounts[d.city] || 0) + 1; if (cityCounts[d.city] > maxCount) { maxCount = cityCounts[d.city]; topCity = d.city; } } });
 
@@ -203,10 +196,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function createContactEntryHTML(c={}) { return `<div class="contact-entry input-group mb-2"><input type="text" class="form-control contact-name" placeholder="Имя" value="${c.name||''}"><input type="text" class="form-control contact-position" placeholder="Должность" value="${c.position||''}"><input type="text" class="form-control contact-info" placeholder="Телефон" value="${c.contactInfo||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
     function createAddressEntryHTML(a={}) { return `<div class="address-entry input-group mb-2"><input type="text" class="form-control address-description" placeholder="Описание" value="${a.description||''}"><input type="text" class="form-control address-city" placeholder="Город" value="${a.city||''}"><input type="text" class="form-control address-address" placeholder="Адрес" value="${a.address||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
+    // (УДАЛЕНО) createPosEntryHTML
     function createVisitEntryHTML(v={}) { return `<div class="visit-entry input-group mb-2"><input type="date" class="form-control visit-date" value="${v.date||''}"><input type="text" class="form-control visit-comment w-50" placeholder="Результат визита..." value="${v.comment||''}"><input type="hidden" class="visit-completed" value="${v.isCompleted || 'false'}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
     
     function renderPhotoPreviews(container, photosArray) { if(container) container.innerHTML = photosArray.map((p, index) => `<div class="photo-preview-item"><img src="${p.photo_url}"><button type="button" class="btn-remove-photo" data-index="${index}">×</button></div>`).join(''); }
     
+    // (ИЗМЕНЕНО) Логика Аватара
     if(addAvatarInput) addAvatarInput.addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (file) { newAvatarBase64 = await compressImage(file, 200, 0.8); addAvatarPreview.src = newAvatarBase64; }
@@ -293,31 +288,27 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pendingId) { localStorage.removeItem('pendingEditDealerId'); openEditModal(pendingId); }
     }
 
+    // --- (ИЗМЕНЕНО) Убраны кнопки POS ---
     if(document.getElementById('add-contact-btn-add-modal')) document.getElementById('add-contact-btn-add-modal').onclick = () => addContactList.insertAdjacentHTML('beforeend', createContactEntryHTML());
     if(document.getElementById('add-address-btn-add-modal')) document.getElementById('add-address-btn-add-modal').onclick = () => addAddressList.insertAdjacentHTML('beforeend', createAddressEntryHTML());
-    if(document.getElementById('add-pos-btn-add-modal')) document.getElementById('add-pos-btn-add-modal').onclick = () => addPosList.insertAdjacentHTML('beforeend', createPosEntryHTML());
     if(document.getElementById('add-visits-btn-add-modal')) document.getElementById('add-visits-btn-add-modal').onclick = () => addVisitsList.insertAdjacentHTML('beforeend', createVisitEntryHTML());
     if(document.getElementById('add-contact-btn-edit-modal')) document.getElementById('add-contact-btn-edit-modal').onclick = () => editContactList.insertAdjacentHTML('beforeend', createContactEntryHTML());
     if(document.getElementById('add-address-btn-edit-modal')) document.getElementById('add-address-btn-edit-modal').onclick = () => editAddressList.insertAdjacentHTML('beforeend', createAddressEntryHTML());
-    if(document.getElementById('add-pos-btn-edit-modal')) document.getElementById('add-pos-btn-edit-modal').onclick = () => editPosList.insertAdjacentHTML('beforeend', createPosEntryHTML());
     if(document.getElementById('add-visits-btn-edit-modal')) document.getElementById('add-visits-btn-edit-modal').onclick = () => editVisitsList.insertAdjacentHTML('beforeend', createVisitEntryHTML());
 
     if(openAddModalBtn) openAddModalBtn.onclick = () => {
         addForm.reset(); renderProductChecklist(addProductChecklist);
         renderList(addContactList, [], createContactEntryHTML); renderList(addAddressList, [], createAddressEntryHTML);
-        renderList(addPosList, [], createPosEntryHTML); renderList(addVisitsList, [], createVisitEntryHTML);
+        renderList(addVisitsList, [], createVisitEntryHTML);
         if(document.getElementById('add_latitude')) { document.getElementById('add_latitude').value = ''; document.getElementById('add_longitude').value = ''; }
         addPhotosData = []; renderPhotoPreviews(addPhotoPreviewContainer, []);
+        addAvatarPreview.src = 'logo.png'; newAvatarBase64 = null;
         if(addModal) addModal.show();
     };
 
-    // --- (ИСПРАВЛЕНО) Кнопка "Добавить" ---
     if(addForm) addForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const btn = document.querySelector('button[form="add-dealer-form"]'); // Ищем кнопку по form
-        const oldText = btn ? btn.innerHTML : 'Добавить';
-        if(btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...'; }
-
+        const btn = document.querySelector('button[form="add-dealer-form"]'); const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...';
         const data = {
             dealer_id: getVal('dealer_id'), name: getVal('name'), organization: getVal('organization'), price_type: getVal('price_type'),
             city: getVal('city'), address: getVal('address'), delivery: getVal('delivery'), website: getVal('website'), instagram: getVal('instagram'),
@@ -325,9 +316,10 @@ document.addEventListener('DOMContentLoaded', () => {
             contacts: collectData(addContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]),
             additional_addresses: collectData(addAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]),
             visits: collectData(addVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'}]),
-            photos: addPhotosData
+            photos: addPhotosData,
+            avatarUrl: newAvatarBase64
         };
-        try { const res = await fetch(API_DEALERS_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); if (!res.ok) throw new Error(await res.text()); const newD = await res.json(); const pIds = getSelectedProductIds('add-product-checklist'); if(pIds.length) await saveProducts(newD.id, pIds); addModal.hide(); initApp(); } catch (e) { alert("Ошибка при добавлении."); } finally { if(btn) { btn.disabled = false; btn.innerHTML = oldText; } }
+        try { const res = await fetch(API_DEALERS_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); if (!res.ok) throw new Error(await res.text()); const newD = await res.json(); const pIds = getSelectedProductIds('add-product-checklist'); if(pIds.length) await saveProducts(newD.id, pIds); addModal.hide(); initApp(); } catch (e) { alert("Ошибка при добавлении."); } finally { btn.disabled = false; btn.innerHTML = oldText; }
     });
 
     async function openEditModal(id) {
@@ -338,7 +330,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if(document.getElementById('edit_longitude')) document.getElementById('edit_longitude').value=d.longitude||'';
             document.getElementById('edit_bonuses').value=d.bonuses;
             if(document.getElementById('edit_status')) document.getElementById('edit_status').value = d.status || 'standard';
-            renderList(editContactList, d.contacts, createContactEntryHTML); renderList(editAddressList, d.additional_addresses, createAddressEntryHTML);
+            if(editAvatarPreview) editAvatarPreview.src = d.avatarUrl || 'logo.png';
+            if(editCurrentAvatarUrl) editCurrentAvatarUrl.value = d.avatarUrl || '';
+            newAvatarBase64 = null;
+            renderList(editContactList, d.contacts, createContactEntryHTML); renderList(editAddressList, d.additional_addresses, createAddressEntryHTML); 
             renderList(editVisitsList, d.visits, createVisitEntryHTML);
             renderProductChecklist(editProductChecklist, (d.products||[]).map(p=>p.id));
             editPhotosData = d.photos||[]; renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData);
@@ -346,14 +341,12 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(e){alert("Ошибка загрузки.");}
     }
 
-    // --- (ИСПРАВЛЕНО) Кнопка "Сохранить" ---
     if(editForm) editForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const btn = document.querySelector('button[form="edit-dealer-form"]'); // Ищем кнопку по form
-        const oldText = btn ? btn.innerHTML : 'Сохранить';
-        if(btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...'; }
-
+        const btn = editForm.querySelector('button[type="submit"]'); const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...';
         const id = document.getElementById('edit_db_id').value;
+        let avatarToSend = getVal('edit-current-avatar-url'); 
+        if (newAvatarBase64) avatarToSend = newAvatarBase64;
         const data = {
             dealer_id: getVal('edit_dealer_id'), name: getVal('edit_name'),
             organization: getVal('edit_organization'), price_type: getVal('edit_price_type'),
@@ -362,6 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
             latitude: getVal('edit_latitude'), longitude: getVal('edit_longitude'),
             bonuses: getVal('edit_bonuses'),
             status: getVal('edit_status'),
+            avatarUrl: avatarToSend,
             contacts: collectData(editContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]),
             additional_addresses: collectData(addAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]),
             visits: collectData(editVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'},{key:'isCompleted',class:'.visit-completed'}]),
