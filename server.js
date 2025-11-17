@@ -27,7 +27,7 @@ if (ADMIN_USER && ADMIN_PASSWORD) {
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// --- СПИСОК ТОВАРОВ (79 шт., Ламинат + Стенды) ---
+// --- (ИЗМЕНЕНО) СПИСОК ТОВАРОВ (Только Ламинат, 72 шт.) ---
 const productsToImport = [
     { sku: "CD-507", name: "Дуб Беленый" }, { sku: "CD-508", name: "Дуб Пепельный" },
     { sku: "8EH34-701", name: "Дуб Снежный" }, { sku: "8EH34-702", name: "Дуб Арабика" },
@@ -63,11 +63,7 @@ const productsToImport = [
     { sku: "RPL-20", name: "Дуб Милан" }, { sku: "RPL-21", name: "Дуб Флоренция" },
     { sku: "RPL-22", name: "Дуб Неаполь" }, { sku: "RPL-23", name: "Дуб Монарх" },
     { sku: "RPL-24", name: "Дуб Эмперадор" }, { sku: "RPL-25", name: "Дуб Авангард" },
-    { sku: "RPL-28", name: "Дуб Венеция" },
-    { sku: "РФС-1", name: "Расческа из фанеры СТАРАЯ" }, { sku: "РФ-2", name: "Расческа из фанеры" },
-    { sku: "С800", name: "800мм задняя стенка" }, { sku: "С600", name: "600мм задняя стенка" },
-    { sku: "Табличка", name: "Табличка орг.стекло" }, { sku: "Н800", name: "800мм наклейка" },
-    { sku: "Н600", name: "600мм наклейка" }
+    { sku: "RPL-28", name: "Дуб Венеция" }
 ];
 
 const productSchema = new mongoose.Schema({ sku: String, name: String });
@@ -77,17 +73,20 @@ const photoSchema = new mongoose.Schema({ description: String, photo_url: String
 const additionalAddressSchema = new mongoose.Schema({ description: String, city: String, address: String }, { _id: false });
 const visitSchema = new mongoose.Schema({ date: String, comment: String, isCompleted: { type: Boolean, default: false } }, { _id: false });
 
+// (ВОЗВРАЩЕНО) Схема для Стендов
+const posMaterialSchema = new mongoose.Schema({ name: String, quantity: Number }, { _id: false });
+
 const dealerSchema = new mongoose.Schema({
     dealer_id: String, name: String, price_type: String, city: String, address: String, 
     contacts: [contactSchema], bonuses: String, photos: [photoSchema], organization: String,
     delivery: String, website: String, instagram: String,
     additional_addresses: [additionalAddressSchema], 
-    // pos_materials: [posMaterialSchema], // (УДАЛЕНО)
+    pos_materials: [posMaterialSchema], // (ВОЗВРАЩЕНО)
     visits: [visitSchema],
     products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
     latitude: Number, longitude: Number,
     status: { type: String, default: 'standard' },
-    avatarUrl: String // (НОВОЕ)
+    avatarUrl: String
 });
 const Dealer = mongoose.model('Dealer', dealerSchema);
 const knowledgeSchema = new mongoose.Schema({ title: String, content: String }, { timestamps: true }); 
@@ -97,7 +96,7 @@ async function hardcodedImportProducts() {
     try {
         const operations = productsToImport.map(p => ({ updateOne: { filter: { sku: p.sku }, update: { $set: p }, upsert: true } }));
         await Product.bulkWrite(operations);
-        console.log("Каталог (включая стенды) обновлен.");
+        console.log("Каталог (только ламинат) обновлен.");
     } catch (e) { console.warn(e.message); }
 }
 
@@ -114,16 +113,16 @@ function convertToClient(doc) {
     return obj;
 }
 
-// API
+// (ИЗМЕНЕНО) API для списка
 app.get('/api/dealers', async (req, res) => {
     try {
-        const dealers = await Dealer.find({}, 'dealer_id name city price_type organization products visits latitude longitude status avatarUrl').lean();
+        const dealers = await Dealer.find({}, 'dealer_id name city price_type organization products pos_materials visits latitude longitude status avatarUrl').lean();
         res.json(dealers.map(d => ({
             id: d._id, dealer_id: d.dealer_id, name: d.name, city: d.city, price_type: d.price_type, organization: d.organization,
-            photo_url: d.avatarUrl, // (ИЗМЕНЕНО) Отдаем Аватар для списка
+            photo_url: d.avatarUrl,
             has_photos: (d.photos && d.photos.length > 0),
             products_count: (d.products ? d.products.length : 0),
-            // has_pos: (d.pos_materials && d.pos_materials.length > 0), // (УДАЛЕНО)
+            has_pos: (d.pos_materials && d.pos_materials.length > 0), // (ВОЗВРАЩЕНО)
             visits: d.visits, latitude: d.latitude, longitude: d.longitude,
             status: d.status || 'standard'
         }))); 
