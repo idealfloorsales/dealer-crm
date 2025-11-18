@@ -9,19 +9,23 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSort = { column: 'name', direction: 'asc' };
     const posMaterialsList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"];
 
-    // Модалки
-    const addModalEl = document.getElementById('add-modal'); const addModal = new bootstrap.Modal(addModalEl);
-    const editModalEl = document.getElementById('edit-modal'); const editModal = new bootstrap.Modal(editModalEl);
+    // (ИСПРАВЛЕНО) Все объявления DOM-элементов модалок и форм ВВЕРХУ
+    const addModalEl = document.getElementById('add-modal'); 
+    const addModal = new bootstrap.Modal(addModalEl);
+    const addForm = document.getElementById('add-dealer-form'); // <--- ВОТ ОН
+    
+    const editModalEl = document.getElementById('edit-modal'); 
+    const editModal = new bootstrap.Modal(editModalEl);
+    const editForm = document.getElementById('edit-dealer-form'); // <--- И ЭТОТ
 
     // Элементы
     const openAddModalBtn = document.getElementById('open-add-modal-btn');
-    const addForm = document.getElementById('add-dealer-form');
     const addProductChecklist = document.getElementById('add-product-checklist'); 
     const addContactList = document.getElementById('add-contact-list'); 
     const addAddressList = document.getElementById('add-address-list'); 
     const addPosList = document.getElementById('add-pos-list'); 
     const addVisitsList = document.getElementById('add-visits-list');
-    const addCompetitorList = document.getElementById('add-competitor-list'); // (НОВОЕ)
+    const addCompetitorList = document.getElementById('add-competitor-list');
     const addPhotoInput = document.getElementById('add-photo-input');
     const addPhotoPreviewContainer = document.getElementById('add-photo-preview-container');
     const addAvatarInput = document.getElementById('add-avatar-input');
@@ -36,18 +40,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchBar = document.getElementById('search-bar'); 
     const exportBtn = document.getElementById('export-dealers-btn'); 
     
-    const dashboardContainer = document.getElementById('dashboard-container'); 
+    const dashboardContainer = document.getElementById('dashboard-container');
     const tasksListUpcoming = document.getElementById('tasks-list-upcoming');
     const tasksListProblem = document.getElementById('tasks-list-problem');
     const tasksListCooling = document.getElementById('tasks-list-cooling');
 
-    const editForm = document.getElementById('edit-dealer-form');
     const editProductChecklist = document.getElementById('edit-product-checklist'); 
     const editContactList = document.getElementById('edit-contact-list'); 
     const editAddressList = document.getElementById('edit-address-list'); 
     const editPosList = document.getElementById('edit-pos-list'); 
     const editVisitsList = document.getElementById('edit-visits-list');
-    const editCompetitorList = document.getElementById('edit-competitor-list'); // (НОВОЕ)
+    const editCompetitorList = document.getElementById('edit-competitor-list');
     const editPhotoList = document.getElementById('edit-photo-list'); 
     const editPhotoInput = document.getElementById('edit-photo-input');
     const editPhotoPreviewContainer = document.getElementById('edit-photo-preview-container');
@@ -138,7 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) { alert("Ошибка: " + e.message); btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg"></i>'; }
     }
 
-    // --- (ИСПРАВЛЕНО) Дашборд 2x2 ---
+    // --- (ВОЗВРАЩЕНО) Рендер нового Дашборда 2x2 ---
     function renderDashboard() {
         if (!dashboardContainer) {
             if(tasksListUpcoming) tasksListUpcoming.innerHTML = '<p class="text-muted text-center p-3">Нет задач</p>';
@@ -407,7 +410,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if(addForm) addForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const btn = document.querySelector('button[form="add-dealer-form"]'); const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...';
+        const btn = document.querySelector('button[form="add-dealer-form"]'); // (ИСПРАВЛЕНО)
+        const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...';
         const data = {
             dealer_id: getVal('dealer_id'), name: getVal('name'), organization: getVal('organization'), price_type: getVal('price_type'),
             city: getVal('city'), address: getVal('address'), delivery: getVal('delivery'), website: getVal('website'), instagram: getVal('instagram'),
