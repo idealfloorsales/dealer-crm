@@ -1,3 +1,4 @@
+// script.js
 document.addEventListener('DOMContentLoaded', () => {
     
     const API_DEALERS_URL = '/api/dealers';
@@ -6,35 +7,19 @@ document.addEventListener('DOMContentLoaded', () => {
     let fullProductCatalog = [];
     let allDealers = [];
     let currentSort = { column: 'name', direction: 'asc' };
-    
-    // Список Стендов (POS)
-    const posMaterialsList = [
-        "С600 - 600мм задняя стенка",
-        "С800 - 800мм задняя стенка",
-        "РФ-2 - Расческа из фанеры",
-        "РФС-1 - Расческа из фанеры СТАРАЯ",
-        "Н600 - 600мм наклейка",
-        "Н800 - 800мм наклейка",
-        "Табличка - Табличка орг.стекло"
-    ];
+    const posMaterialsList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"];
 
-    // --- Модалки и Формы (Объявляем в начале) ---
-    const addModalEl = document.getElementById('add-modal'); 
-    const addModal = new bootstrap.Modal(addModalEl);
-    const addForm = document.getElementById('add-dealer-form');
-    
-    const editModalEl = document.getElementById('edit-modal'); 
-    const editModal = new bootstrap.Modal(editModalEl);
-    const editForm = document.getElementById('edit-dealer-form');
+    // Модалки
+    const addModalEl = document.getElementById('add-modal'); const addModal = new bootstrap.Modal(addModalEl);
+    const editModalEl = document.getElementById('edit-modal'); const editModal = new bootstrap.Modal(editModalEl);
 
-    // --- Элементы интерфейса ---
+    // Элементы
     const openAddModalBtn = document.getElementById('open-add-modal-btn');
-    
-    // Списки в модалке ADD
+    const addForm = document.getElementById('add-dealer-form');
     const addProductChecklist = document.getElementById('add-product-checklist'); 
     const addContactList = document.getElementById('add-contact-list'); 
     const addAddressList = document.getElementById('add-address-list'); 
-    const addPosList = document.getElementById('add-pos-list'); // Вернули POS
+    const addPosList = document.getElementById('add-pos-list'); 
     const addVisitsList = document.getElementById('add-visits-list');
     const addCompetitorList = document.getElementById('add-competitor-list');
     const addPhotoInput = document.getElementById('add-photo-input');
@@ -42,21 +27,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const addAvatarInput = document.getElementById('add-avatar-input');
     const addAvatarPreview = document.getElementById('add-avatar-preview');
     
-    // Списки в модалке EDIT
-    const editProductChecklist = document.getElementById('edit-product-checklist'); 
-    const editContactList = document.getElementById('edit-contact-list'); 
-    const editAddressList = document.getElementById('edit-address-list'); 
-    const editPosList = document.getElementById('edit-pos-list'); // Вернули POS
-    const editVisitsList = document.getElementById('edit-visits-list');
-    const editCompetitorList = document.getElementById('edit-competitor-list');
-    const editPhotoList = document.getElementById('edit-photo-list'); 
-    const editPhotoInput = document.getElementById('edit-photo-input');
-    const editPhotoPreviewContainer = document.getElementById('edit-photo-preview-container');
-    const editAvatarInput = document.getElementById('edit-avatar-input');
-    const editAvatarPreview = document.getElementById('edit-avatar-preview');
-    const editCurrentAvatarUrl = document.getElementById('edit-current-avatar-url');
-
-    // Основные элементы страницы
     const dealerListBody = document.getElementById('dealer-list-body');
     const dealerTable = document.getElementById('dealer-table');
     const noDataMsg = document.getElementById('no-data-msg');
@@ -66,24 +36,36 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchBar = document.getElementById('search-bar'); 
     const exportBtn = document.getElementById('export-dealers-btn'); 
     
-    // Дашборд
-    const dashboardContainer = document.getElementById('dashboard-container');
+    const dashboardContainer = document.getElementById('dashboard-container'); 
     const tasksListUpcoming = document.getElementById('tasks-list-upcoming');
     const tasksListProblem = document.getElementById('tasks-list-problem');
     const tasksListCooling = document.getElementById('tasks-list-cooling');
+
+    const editForm = document.getElementById('edit-dealer-form');
+    const editProductChecklist = document.getElementById('edit-product-checklist'); 
+    const editContactList = document.getElementById('edit-contact-list'); 
+    const editAddressList = document.getElementById('edit-address-list'); 
+    const editPosList = document.getElementById('edit-pos-list'); 
+    const editVisitsList = document.getElementById('edit-visits-list');
+    const editCompetitorList = document.getElementById('edit-competitor-list');
+    const editPhotoList = document.getElementById('edit-photo-list'); 
+    const editPhotoInput = document.getElementById('edit-photo-input');
+    const editPhotoPreviewContainer = document.getElementById('edit-photo-preview-container');
+    const editAvatarInput = document.getElementById('edit-avatar-input');
+    const editAvatarPreview = document.getElementById('edit-avatar-preview');
+    const editCurrentAvatarUrl = document.getElementById('edit-current-avatar-url');
 
     let addPhotosData = []; 
     let editPhotosData = [];
     let newAvatarBase64 = null; 
 
-    // Вспомогательные функции
     const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
     const safeText = (text) => (text || '').toString().replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const safeAttr = (text) => (text || '').toString().replace(/"/g, '&quot;');
     const toBase64 = file => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => resolve(reader.result); reader.onerror = error => reject(error); });
     const compressImage = (file, maxWidth = 1000, quality = 0.7) => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = event => { const img = new Image(); img.src = event.target.result; img.onload = () => { const elem = document.createElement('canvas'); let width = img.width; let height = img.height; if (width > maxWidth) { height *= maxWidth / width; width = maxWidth; } elem.width = width; elem.height = height; const ctx = elem.getContext('2d'); ctx.drawImage(img, 0, 0, width, height); resolve(elem.toDataURL('image/jpeg', quality)); }; img.onerror = error => reject(error); }; reader.onerror = error => reject(error); });
 
-    // --- КАРТА ---
+    // Карта
     const DEFAULT_LAT = 51.1605; const DEFAULT_LNG = 71.4704;
     const CITY_COORDS = { "Астана": [51.1605, 71.4704], "Алматы": [43.2220, 76.8512], "Шымкент": [42.3417, 69.5901], "Караганда": [49.8020, 73.1021], "Актобе": [50.2839, 57.1670], "Тараз": [42.9000, 71.3667], "Павлодар": [52.2873, 76.9674], "Усть-Каменогорск": [49.9632, 82.6059], "Семей": [50.4113, 80.2275], "Атырау": [47.1167, 51.8833], "Костанай": [53.2148, 63.6321], "Кызылорда": [44.8488, 65.4823], "Уральск": [51.2333, 51.3667], "Петропавловск": [54.8753, 69.1622], "Актау": [43.6500, 51.1500] };
     let addMap, editMap;
@@ -104,8 +86,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (markerRef.current) markerRef.current.setLatLng([lat, lng]); else markerRef.current = L.marker([lat, lng]).addTo(map);
         });
     }
-    
-    // Инициализация карт в модалках
     if (addModalEl) {
         addModalEl.addEventListener('shown.bs.modal', () => {
             if (!addMap) { addMap = initMap('add-map'); addModalEl.markerRef = { current: null }; setupMapClick(addMap, 'add_latitude', 'add_longitude', addModalEl.markerRef); } else { addMap.invalidateSize(); }
@@ -131,7 +111,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- ЛОГИКА ПРИЛОЖЕНИЯ ---
     async function fetchProductCatalog() {
         if (fullProductCatalog.length > 0) return; 
         try {
@@ -149,7 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; 
             const res = await fetch(`${API_DEALERS_URL}/${dealerId}`);
-            if(!res.ok) throw new Error('Ошибка загрузки');
+            if(!res.ok) throw new Error('Не удалось загрузить данные');
             const dealer = await res.json();
             let found = false;
             if (dealer.visits && dealer.visits[visitIndex]) { dealer.visits[visitIndex].isCompleted = true; found = true; }
@@ -159,24 +138,21 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) { alert("Ошибка: " + e.message); btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg"></i>'; }
     }
 
-    // --- РЕНДЕР ДАШБОРДА (2x2) ---
     function renderDashboard() {
-        if (!dashboardContainer) return; // Если не на главной
-        if (!allDealers || allDealers.length === 0) { 
-            dashboardContainer.innerHTML = '';
-            return; 
-        }
+        if (!dashboardContainer) return;
+        if (!allDealers || allDealers.length === 0) { dashboardContainer.innerHTML = ''; return; }
         
-        const totalDealers = allDealers.length;
-        const noAvatarCount = allDealers.filter(d => !d.photo_url).length; 
+        // Исключаем потенциальных из статистики "Всего"
+        const activeDealers = allDealers.filter(d => d.status !== 'potential');
+        const totalDealers = activeDealers.length;
+        const noPhotosCount = activeDealers.filter(d => !d.photo_url).length; 
+        const posCount = activeDealers.filter(d => d.has_pos).length; 
 
-        // 1. Карточки Статистики
         dashboardContainer.innerHTML = `
             <div class="col-md-6"><div class="stat-card h-100"><i class="bi bi-shop stat-icon text-primary"></i><span class="stat-number">${totalDealers}</span><span class="stat-label">Всего дилеров</span></div></div>
-            <div class="col-md-6"><div class="stat-card h-100 ${noAvatarCount > 0 ? 'border-danger' : ''}"><i class="bi bi-camera-fill stat-icon ${noAvatarCount > 0 ? 'text-danger' : 'text-secondary'}"></i><span class="stat-number ${noAvatarCount > 0 ? 'text-danger' : ''}">${noAvatarCount}</span><span class="stat-label">Без Аватара</span></div></div>
+            <div class="col-md-6"><div class="stat-card h-100 ${noPhotosCount > 0 ? 'border-danger' : ''}"><i class="bi bi-camera-fill stat-icon ${noPhotosCount > 0 ? 'text-danger' : 'text-secondary'}"></i><span class="stat-number ${noPhotosCount > 0 ? 'text-danger' : ''}">${noPhotosCount}</span><span class="stat-label">Без Аватара</span></div></div>
         `;
 
-        // 2. Сбор задач
         const today = new Date(); today.setHours(0,0,0,0);
         const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
         const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
@@ -187,11 +163,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         allDealers.forEach(d => {
             if (d.status === 'archive') return; 
+            // Если статус потенциальный - не показываем в "остывающих", но задачи показываем
+            const isPotential = d.status === 'potential';
 
             let lastVisitDate = null;
             let hasFutureTasks = false;
 
-            // Визиты
             if (d.visits && Array.isArray(d.visits)) {
                 d.visits.forEach((v, index) => {
                     const vDate = new Date(v.date);
@@ -216,15 +193,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
 
-            // Проблемный статус
             if (d.status === 'problem') {
                 if (!tasksProblem.some(t => t.dealerId === d.id && t.type === 'overdue')) {
                     tasksProblem.push({ dealerName: d.name, dealerId: d.id, type: 'status' });
                 }
             }
 
-            // Остывающие
-            if (!hasFutureTasks && d.status !== 'problem' && d.status !== 'potential') {
+            // Остывающие (только для действующих)
+            if (!hasFutureTasks && d.status !== 'problem' && !isPotential) {
                 if (!lastVisitDate) {
                     tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: 999 }); 
                 } else if (lastVisitDate < thirtyDaysAgo) {
@@ -297,8 +273,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- Генераторы HTML для списков ---
-    // (НОВОЕ) Конкуренты с 4 полями
     function createCompetitorEntryHTML(c={}) { 
         return `<div class="competitor-entry">
             <input type="text" class="form-control competitor-brand" placeholder="Бренд" value="${c.brand||''}">
@@ -315,7 +289,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     function renderPhotoPreviews(container, photosArray) { if(container) container.innerHTML = photosArray.map((p, index) => `<div class="photo-preview-item"><img src="${p.photo_url}"><button type="button" class="btn-remove-photo" data-index="${index}">×</button></div>`).join(''); }
     
-    // --- Обработчики изображений ---
     if(addAvatarInput) addAvatarInput.addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (file) { newAvatarBase64 = await compressImage(file, 200, 0.8); addAvatarPreview.src = newAvatarBase64; }
@@ -324,6 +297,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const file = e.target.files[0];
         if (file) { newAvatarBase64 = await compressImage(file, 200, 0.8); editAvatarPreview.src = newAvatarBase64; }
     });
+    
     if(addPhotoInput) addPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) addPhotosData.push({ photo_url: await compressImage(file) }); renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData); addPhotoInput.value = ''; });
     if(addPhotoPreviewContainer) addPhotoPreviewContainer.addEventListener('click', (e) => { if(e.target.classList.contains('btn-remove-photo')) { addPhotosData.splice(e.target.dataset.index, 1); renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData); }});
     if(editPhotoInput) editPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) editPhotosData.push({ photo_url: await compressImage(file) }); renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData); editPhotoInput.value = ''; });
@@ -344,29 +318,46 @@ document.addEventListener('DOMContentLoaded', () => {
     function getSelectedProductIds(containerId) { const el=document.getElementById(containerId); if(!el) return []; return Array.from(el.querySelectorAll('input:checked')).map(cb=>cb.value); }
     async function saveProducts(dealerId, ids) { await fetch(`${API_DEALERS_URL}/${dealerId}/products`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({productIds: ids})}); }
 
+    // --- (ИЗМЕНЕНО) ФИЛЬТРАЦИЯ (Потенциальные скрыты) ---
     function renderDealerList() {
         if (!dealerListBody) return;
-        const city = filterCity ? filterCity.value : ''; const type = filterPriceType ? filterPriceType.value : ''; const status = filterStatus ? filterStatus.value : ''; const search = searchBar ? searchBar.value.toLowerCase() : '';
+        const city = filterCity ? filterCity.value : ''; 
+        const type = filterPriceType ? filterPriceType.value : ''; 
+        const status = filterStatus ? filterStatus.value : ''; 
+        const search = searchBar ? searchBar.value.toLowerCase() : '';
+        
         const filtered = allDealers.filter(d => {
-            // Логика: Если фильтр не выбран, скрываем 'potential'
+            // Логика статуса
+            const currentStatus = d.status || 'standard';
             let statusMatch = false;
-            const s = d.status || 'standard';
-            if (status) statusMatch = s === status;
-            else statusMatch = s !== 'potential';
+            
+            if (status) {
+                // Если фильтр ВЫБРАН - показываем только его
+                statusMatch = currentStatus === status;
+            } else {
+                // Если фильтр "Все" - скрываем Potential
+                statusMatch = currentStatus !== 'potential';
+            }
 
-            return (!city||d.city===city) && (!type||d.price_type===type) && statusMatch && (!search || ((d.name||'').toLowerCase().includes(search)||(d.dealer_id||'').toLowerCase().includes(search)||(d.organization||'').toLowerCase().includes(search)));
+            return (!city || d.city === city) && 
+                   (!type || d.price_type === type) && 
+                   statusMatch && 
+                   (!search || ((d.name || '').toLowerCase().includes(search) || (d.dealer_id || '').toLowerCase().includes(search) || (d.organization || '').toLowerCase().includes(search)));
         });
+        
         filtered.sort((a, b) => {
             let valA = (a[currentSort.column] || '').toString(); let valB = (b[currentSort.column] || '').toString();
             let res = currentSort.column === 'dealer_id' ? valA.localeCompare(valB, undefined, {numeric:true}) : valA.toLowerCase().localeCompare(valB.toLowerCase(), 'ru');
             return currentSort.direction === 'asc' ? res : -res;
         });
+        
         dealerListBody.innerHTML = filtered.length ? filtered.map((d, idx) => {
             let rowClass = 'row-status-standard';
             if (d.status === 'active') rowClass = 'row-status-active';
             else if (d.status === 'problem') rowClass = 'row-status-problem';
             else if (d.status === 'archive') rowClass = 'row-status-archive';
-            else if (d.status === 'potential') rowClass = 'row-status-potential';
+            else if (d.status === 'potential') rowClass = 'row-status-potential'; // (НОВОЕ)
+
             return `
             <tr class="${rowClass}">
                 <td class="cell-number">${idx+1}</td>
@@ -379,6 +370,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <li><a class="dropdown-item text-danger btn-delete" data-id="${d.id}" data-name="${safeText(d.name)}" href="#"><i class="bi bi-trash me-2"></i>Удалить</a></li>
                 </ul></div></td></tr>`;
         }).join('') : '';
+        
         if(dealerTable) dealerTable.style.display = filtered.length ? 'table' : 'none';
         if(noDataMsg) { noDataMsg.style.display = filtered.length ? 'none' : 'block'; noDataMsg.textContent = allDealers.length === 0 ? 'Список пуст.' : 'Не найдено.'; }
     }
@@ -410,14 +402,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pendingId) { localStorage.removeItem('pendingEditDealerId'); openEditModal(pendingId); }
     }
 
-    // --- Кнопки ADD (включая POS и Competitors) ---
+    // (ИСПРАВЛЕНО) Кнопки ADD
     if(document.getElementById('add-contact-btn-add-modal')) document.getElementById('add-contact-btn-add-modal').onclick = () => addContactList.insertAdjacentHTML('beforeend', createContactEntryHTML());
     if(document.getElementById('add-address-btn-add-modal')) document.getElementById('add-address-btn-add-modal').onclick = () => addAddressList.insertAdjacentHTML('beforeend', createAddressEntryHTML());
     if(document.getElementById('add-pos-btn-add-modal')) document.getElementById('add-pos-btn-add-modal').onclick = () => addPosList.insertAdjacentHTML('beforeend', createPosEntryHTML());
     if(document.getElementById('add-visits-btn-add-modal')) document.getElementById('add-visits-btn-add-modal').onclick = () => addVisitsList.insertAdjacentHTML('beforeend', createVisitEntryHTML());
     if(document.getElementById('add-competitor-btn-add-modal')) document.getElementById('add-competitor-btn-add-modal').onclick = () => addCompetitorList.insertAdjacentHTML('beforeend', createCompetitorEntryHTML());
-    
-    // --- Кнопки EDIT ---
+
+    // (ИСПРАВЛЕНО) Кнопки EDIT
     if(document.getElementById('add-contact-btn-edit-modal')) document.getElementById('add-contact-btn-edit-modal').onclick = () => editContactList.insertAdjacentHTML('beforeend', createContactEntryHTML());
     if(document.getElementById('add-address-btn-edit-modal')) document.getElementById('add-address-btn-edit-modal').onclick = () => editAddressList.insertAdjacentHTML('beforeend', createAddressEntryHTML());
     if(document.getElementById('add-pos-btn-edit-modal')) document.getElementById('add-pos-btn-edit-modal').onclick = () => editPosList.insertAdjacentHTML('beforeend', createPosEntryHTML());
@@ -518,7 +510,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     document.querySelectorAll('th[data-sort]').forEach(th => th.onclick = () => { if(currentSort.column===th.dataset.sort) currentSort.direction=(currentSort.direction==='asc'?'desc':'asc'); else {currentSort.column=th.dataset.sort;currentSort.direction='asc';} renderDealerList(); });
     
-    // Умный экспорт
     if(exportBtn) {
         exportBtn.onclick = async () => {
             if (!allDealers.length) return alert("Пусто. Нечего экспортировать.");
