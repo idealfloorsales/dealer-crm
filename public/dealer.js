@@ -84,7 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (productsStatsContainer) {
                 productsStatsContainer.innerHTML = `
                     <div class="alert alert-light border mb-3">
-                        <p class="mb-1"><strong>📊 Загрузка матрицы:</strong> ${dealerProductsCount} из ${totalProductsCount} (${percent}%)</p>
+                        <p class="mb-1"><strong>Загрузка матрицы:</strong> ${dealerProductsCount} из ${totalProductsCount} (${percent}%)</p>
                         <div class="progress" style="height: 6px;">
                             <div class="progress-bar bg-success" role="progressbar" style="width: ${percent}%"></div>
                         </div>
@@ -228,3 +228,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
     fetchDealerDetails();
 });
+
