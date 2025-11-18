@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const addressesListContainer = document.getElementById('dealer-addresses-list'); 
     const posListContainer = document.getElementById('dealer-pos-list'); 
     const visitsListContainer = document.getElementById('dealer-visits-list'); 
-    const competitorsListContainer = document.getElementById('dealer-competitors-list'); // (НОВОЕ)
+    const competitorsListContainer = document.getElementById('dealer-competitors-list'); 
     const productsListContainer = document.getElementById('dealer-products-list');
     
     // Заголовок
@@ -24,7 +24,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const navigateBtn = document.getElementById('navigate-btn'); 
     const carouselInner = document.getElementById('carousel-inner');
 
-    const API_URL = '/api/dealers';
+    const API_DEALERS_URL = '/api/dealers';
+    const API_PRODUCTS_URL = '/api/products'; // Для подсчета общего кол-ва
     const params = new URLSearchParams(window.location.search);
     const dealerId = params.get('id');
 
@@ -46,35 +47,55 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- 1. ОСНОВНАЯ ФУНКЦИЯ ЗАГРУЗКИ ---
     async function fetchDealerDetails() {
         try {
-            const response = await fetch(`${API_URL}/${dealerId}`);
-            if (!response.ok) throw new Error(`Дилер не найден.`);
+            // 1. Загружаем дилера
+            const dealerRes = await fetch(`${API_DEALERS_URL}/${dealerId}`);
+            if (!dealerRes.ok) throw new Error(`Дилер не найден.`);
+            const dealer = await dealerRes.json();
+
+            // 2. Загружаем ВСЕ товары, чтобы узнать их общее количество
+            const productsRes = await fetch(API_PRODUCTS_URL);
+            const allProducts = await productsRes.json();
+            const totalProductsCount = allProducts.length;
             
-            const dealer = await response.json();
-            
+            // 3. Считаем товары дилера
+            const dealerProductsCount = dealer.products ? dealer.products.length : 0;
+            const percent = totalProductsCount > 0 ? Math.round((dealerProductsCount / totalProductsCount) * 100) : 0;
+
+            // Сохраняем координаты
             dealerLat = dealer.latitude;
             dealerLng = dealer.longitude;
             if (!dealerLat || !dealerLng) { if(navigateBtn) navigateBtn.style.display = 'none'; }
 
-            // --- ЗАГОЛОВОК СТРАНИЦЫ (с Аватаром) ---
+            // --- ЗАГОЛОВОК ---
             dealerNameEl.textContent = safeText(dealer.name);
             dealerIdEl.textContent = `ID: ${safeText(dealer.dealer_id)}`;
             if (dealer.avatarUrl) {
                 dealerAvatarImg.src = dealer.avatarUrl;
             } else {
-                dealerAvatarImg.src = ""; // Пусто, если нет аватара
+                dealerAvatarImg.src = ""; // Пусто
             }
             document.title = `Дилер: ${dealer.name}`;
             
-            // --- ВКЛАДКА "ИНФО" ---
+            // --- (ИЗМЕНЕНО) ВКЛАДКА "ИНФО" ---
+            // Добавлен блок Выставленность
             document.getElementById('dealer-info-main').innerHTML = `
+                <div class="alert alert-light border mb-3">
+                    <p class="mb-1"><strong>📊 Выставленность:</strong> ${dealerProductsCount} из ${totalProductsCount} SKU (${percent}%)</p>
+                    <div class="progress" style="height: 6px;">
+                        <div class="progress-bar bg-success" role="progressbar" style="width: ${percent}%"></div>
+                    </div>
+                </div>
+
                 <p><strong>Организация:</strong> ${safeText(dealer.organization)}</p>
                 <p><strong>Город:</strong> ${safeText(dealer.city)}</p>
                 <p><strong>Адрес:</strong> ${safeText(dealer.address)}</p>
                 <p><strong>Тип цен:</strong> ${safeText(dealer.price_type)}</p>
                 <p><strong>Статус:</strong> ${safeText(dealer.status)}</p>
             `;
+
             document.getElementById('dealer-delivery').textContent = safeText(dealer.delivery) || 'Нет данных';
             document.getElementById('dealer-bonuses').textContent = safeText(dealer.bonuses) || 'Нет данных';
+            
             renderDealerAddresses(dealer.additional_addresses || []); 
             renderDealerPos(dealer.pos_materials || []); 
 
@@ -82,9 +103,17 @@ document.addEventListener('DOMContentLoaded', () => {
             renderDealerLinks(dealer.website, dealer.instagram); 
             renderDealerVisits(dealer.visits || []);
             renderDealerContacts(dealer.contacts || []);
-            renderDealerCompetitors(dealer.competitors || []); // (НОВОЕ)
+            renderDealerCompetitors(dealer.competitors || []); 
             renderDealerPhotos(dealer.photos || []); 
-            fetchDealerProducts(); 
+            
+            // Рендер списка товаров
+            if (productsListContainer) {
+                if (dealer.products && dealer.products.length > 0) {
+                    productsListContainer.innerHTML = `<ul class="products-list-detailed">${dealer.products.map(p => `<li><strong>${safeText(p.sku)}</strong> - ${safeText(p.name)}</li>`).join('')}</ul>`;
+                } else {
+                    productsListContainer.innerHTML = '<p><i>Нет выставленных товаров.</i></p>';
+                }
+            }
 
         } catch (error) {
             dealerNameEl.textContent = 'Ошибка';
@@ -175,7 +204,6 @@ document.addEventListener('DOMContentLoaded', () => {
         posListContainer.innerHTML = html + '</tbody></table></div>';
     }
 
-    // (НОВАЯ ФУНКЦИЯ)
     function renderDealerCompetitors(competitors) {
         if (!competitorsListContainer) return;
         if (!competitors || competitors.length === 0) { competitorsListContainer.innerHTML = '<p><i>Нет данных о конкурентах.</i></p>'; return; }
@@ -186,20 +214,9 @@ document.addEventListener('DOMContentLoaded', () => {
         competitorsListContainer.innerHTML = html + '</tbody></table></div>';
     }
 
-    async function fetchDealerProducts() {
-        const c = document.getElementById('dealer-products-list'); if (!c) return;
-        try {
-            const response = await fetch(`${API_URL}/${dealerId}/products`);
-            if (!response.ok) throw new Error('');
-            const products = await response.json(); 
-            if (products.length === 0) { c.innerHTML = '<p><i>Нет выставленных товаров.</i></p>'; return; }
-            c.innerHTML = `<ul class="products-list-detailed">${products.map(p => `<li><strong>${safeText(p.sku)}</strong> - ${safeText(p.name)}</li>`).join('')}</ul>`;
-        } catch (error) { c.innerHTML = `<p class="text-danger">${error.message}</p>`; }
-    }
-
     if(editBtn) editBtn.addEventListener('click', () => { localStorage.setItem('pendingEditDealerId', dealerId); window.location.href = 'index.html'; });
     if(navigateBtn) navigateBtn.addEventListener('click', () => { if (dealerLat && dealerLng) window.open(`http://googleusercontent.com/maps/google.com/?q=${dealerLat},${dealerLng}`, '_blank'); else alert("Координаты не заданы."); });
-    if(deleteBtn) deleteBtn.addEventListener('click', async () => { if (confirm(`Удалить?`)) { try { const response = await fetch(`${API_URL}/${dealerId}`, { method: 'DELETE' }); if (response.ok) window.location.href = 'index.html'; } catch (error) { alert('Ошибка.'); } } });
+    if(deleteBtn) deleteBtn.addEventListener('click', async () => { if (confirm(`Удалить?`)) { try { const response = await fetch(`${API_DEALERS_URL}/${dealerId}`, { method: 'DELETE' }); if (response.ok) window.location.href = 'index.html'; } catch (error) { alert('Ошибка.'); } } });
 
     fetchDealerDetails();
 });
