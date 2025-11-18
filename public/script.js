@@ -35,12 +35,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchBar = document.getElementById('search-bar'); 
     const exportBtn = document.getElementById('export-dealers-btn'); 
     
-    // (ИЗМЕНЕНО) Новые ID дашборда
     const dashboardCardTotal = document.getElementById('dashboard-card-total'); 
     const tasksListUpcoming = document.getElementById('tasks-list-upcoming');
     const tasksListProblem = document.getElementById('tasks-list-problem');
     const tasksListCooling = document.getElementById('tasks-list-cooling');
-    const dashboardContainer = document.getElementById('dashboard-container'); // Родительский контейнер
+    const dashboardContainer = document.getElementById('dashboard-container');
 
     const editForm = document.getElementById('edit-dealer-form');
     const editProductChecklist = document.getElementById('edit-product-checklist'); 
@@ -131,7 +130,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if(!res.ok) throw new Error('Не удалось загрузить данные');
             const dealer = await res.json();
             let found = false;
-            if (dealer.visits && dealer.visits[visitIndex]) { dealer.visits[visitIndex].isCompleted = true; found = true; }
+            if (dealer.visits && dealer.visits[visitIndex]) {
+                dealer.visits[visitIndex].isCompleted = true;
+                found = true;
+            }
             if (!found) return alert("Задача не найдена.");
             await fetch(`${API_DEALERS_URL}/${dealerId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visits: dealer.visits }) });
             initApp(); 
@@ -140,7 +142,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- (ИСПРАВЛЕНО) Рендер нового Дашборда 2x2 ---
     function renderDashboard() {
-        if (!dashboardContainer) return;
+        if (!dashboardContainer) {
+            // Если мы не на главной, просто выходим
+            if(tasksListUpcoming) tasksListUpcoming.innerHTML = '<p class="text-muted text-center p-3">Нет задач</p>';
+            if(tasksListProblem) tasksListProblem.innerHTML = '<p class="text-muted text-center p-3">Нет задач</p>';
+            if(tasksListCooling) tasksListCooling.innerHTML = '<p class="text-muted text-center p-3">Нет таких</p>';
+            return;
+        }
         if (!allDealers || allDealers.length === 0) { 
             dashboardContainer.innerHTML = '';
             return; 
@@ -173,7 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (d.visits && Array.isArray(d.visits)) {
                 d.visits.forEach((v, index) => {
                     const vDate = new Date(v.date);
-                    if (!vDate) return;
+                    if (!v.date || !vDate.getTime()) return; // Пропускаем невалидные даты
                     vDate.setHours(0,0,0,0);
 
                     if (v.isCompleted && (!lastVisitDate || vDate > lastVisitDate)) {
@@ -195,7 +203,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (d.status === 'problem') {
-                tasksProblem.push({ dealerName: d.name, dealerId: d.id, type: 'status' });
+                // Добавляем, только если уже нет просроченной задачи (чтобы не дублировать)
+                if (!tasksProblem.some(t => t.dealerId === d.id && t.type === 'overdue')) {
+                    tasksProblem.push({ dealerName: d.name, dealerId: d.id, type: 'status' });
+                }
             }
 
             if (!hasFutureTasks && d.status !== 'problem') {
@@ -217,10 +228,12 @@ document.addEventListener('DOMContentLoaded', () => {
         renderTaskList(tasksListCooling, tasksCooling, 'cooling');
     }
 
+    // (ИСПРАВЛЕНО) Вспомогательная функция для рендера списков задач
     function renderTaskList(container, tasks, type) {
         if (!container) return;
         if (tasks.length === 0) {
-            container.innerHTML = `<p class="text-muted text-center p-3">Нет задач</p>`;
+            const message = type === 'cooling' ? 'Нет таких' : 'Нет задач';
+            container.innerHTML = `<p class="text-muted text-center p-3">${message}</p>`;
             return;
         }
         container.innerHTML = tasks.map(t => {
@@ -363,7 +376,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pendingId) { localStorage.removeItem('pendingEditDealerId'); openEditModal(pendingId); }
     }
 
-    // (ВОЗВРАЩЕНО) Кнопки POS
     if(document.getElementById('add-contact-btn-add-modal')) document.getElementById('add-contact-btn-add-modal').onclick = () => addContactList.insertAdjacentHTML('beforeend', createContactEntryHTML());
     if(document.getElementById('add-address-btn-add-modal')) document.getElementById('add-address-btn-add-modal').onclick = () => addAddressList.insertAdjacentHTML('beforeend', createAddressEntryHTML());
     if(document.getElementById('add-pos-btn-add-modal')) document.getElementById('add-pos-btn-add-modal').onclick = () => addPosList.insertAdjacentHTML('beforeend', createPosEntryHTML());
