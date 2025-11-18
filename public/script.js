@@ -35,11 +35,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchBar = document.getElementById('search-bar'); 
     const exportBtn = document.getElementById('export-dealers-btn'); 
     
-    const dashboardCardTotal = document.getElementById('dashboard-card-total'); 
+    // (ИЗМЕНЕНО) Новые ID дашборда
+    const dashboardContainer = document.getElementById('dashboard-container');
     const tasksListUpcoming = document.getElementById('tasks-list-upcoming');
     const tasksListProblem = document.getElementById('tasks-list-problem');
     const tasksListCooling = document.getElementById('tasks-list-cooling');
-    const dashboardContainer = document.getElementById('dashboard-container');
 
     const editForm = document.getElementById('edit-dealer-form');
     const editProductChecklist = document.getElementById('edit-product-checklist'); 
@@ -130,20 +130,16 @@ document.addEventListener('DOMContentLoaded', () => {
             if(!res.ok) throw new Error('Не удалось загрузить данные');
             const dealer = await res.json();
             let found = false;
-            if (dealer.visits && dealer.visits[visitIndex]) {
-                dealer.visits[visitIndex].isCompleted = true;
-                found = true;
-            }
+            if (dealer.visits && dealer.visits[visitIndex]) { dealer.visits[visitIndex].isCompleted = true; found = true; }
             if (!found) return alert("Задача не найдена.");
             await fetch(`${API_DEALERS_URL}/${dealerId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visits: dealer.visits }) });
             initApp(); 
         } catch (e) { alert("Ошибка: " + e.message); btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg"></i>'; }
     }
 
-    // --- (ИСПРАВЛЕНО) Рендер нового Дашборда 2x2 ---
+    // --- (ВОЗВРАЩЕНО) Рендер нового Дашборда 2x2 ---
     function renderDashboard() {
         if (!dashboardContainer) {
-            // Если мы не на главной, просто выходим
             if(tasksListUpcoming) tasksListUpcoming.innerHTML = '<p class="text-muted text-center p-3">Нет задач</p>';
             if(tasksListProblem) tasksListProblem.innerHTML = '<p class="text-muted text-center p-3">Нет задач</p>';
             if(tasksListCooling) tasksListCooling.innerHTML = '<p class="text-muted text-center p-3">Нет таких</p>';
@@ -181,7 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (d.visits && Array.isArray(d.visits)) {
                 d.visits.forEach((v, index) => {
                     const vDate = new Date(v.date);
-                    if (!v.date || !vDate.getTime()) return; // Пропускаем невалидные даты
+                    if (!v.date || !vDate.getTime()) return; 
                     vDate.setHours(0,0,0,0);
 
                     if (v.isCompleted && (!lastVisitDate || vDate > lastVisitDate)) {
@@ -203,7 +199,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (d.status === 'problem') {
-                // Добавляем, только если уже нет просроченной задачи (чтобы не дублировать)
                 if (!tasksProblem.some(t => t.dealerId === d.id && t.type === 'overdue')) {
                     tasksProblem.push({ dealerName: d.name, dealerId: d.id, type: 'status' });
                 }
@@ -228,7 +223,6 @@ document.addEventListener('DOMContentLoaded', () => {
         renderTaskList(tasksListCooling, tasksCooling, 'cooling');
     }
 
-    // (ИСПРАВЛЕНО) Вспомогательная функция для рендера списков задач
     function renderTaskList(container, tasks, type) {
         if (!container) return;
         if (tasks.length === 0) {
@@ -376,6 +370,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pendingId) { localStorage.removeItem('pendingEditDealerId'); openEditModal(pendingId); }
     }
 
+    // (ВОЗВРАЩЕНО) Кнопки POS
     if(document.getElementById('add-contact-btn-add-modal')) document.getElementById('add-contact-btn-add-modal').onclick = () => addContactList.insertAdjacentHTML('beforeend', createContactEntryHTML());
     if(document.getElementById('add-address-btn-add-modal')) document.getElementById('add-address-btn-add-modal').onclick = () => addAddressList.insertAdjacentHTML('beforeend', createAddressEntryHTML());
     if(document.getElementById('add-pos-btn-add-modal')) document.getElementById('add-pos-btn-add-modal').onclick = () => addPosList.insertAdjacentHTML('beforeend', createPosEntryHTML());
@@ -397,7 +392,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if(addForm) addForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const btn = document.querySelector('button[form="add-dealer-form"]'); const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...';
+        const btn = document.querySelector('button[form="add-dealer-form"]'); // (ИСПРАВЛЕНО)
+        const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...';
         const data = {
             dealer_id: getVal('dealer_id'), name: getVal('name'), organization: getVal('organization'), price_type: getVal('price_type'),
             city: getVal('city'), address: getVal('address'), delivery: getVal('delivery'), website: getVal('website'), instagram: getVal('instagram'),
