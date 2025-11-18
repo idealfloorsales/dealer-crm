@@ -138,6 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) { alert("Ошибка: " + e.message); btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg"></i>'; }
     }
 
+    // --- (ИСПРАВЛЕНО) Дашборд 2x2 ---
     function renderDashboard() {
         if (!dashboardContainer) {
             if(tasksListUpcoming) tasksListUpcoming.innerHTML = '<p class="text-muted text-center p-3">Нет задач</p>';
@@ -282,7 +283,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return `<div class="competitor-entry">
             <input type="text" class="form-control competitor-brand" placeholder="Бренд (Kastamonu)" value="${c.brand||''}">
             <input type="text" class="form-control competitor-collection" placeholder="Коллекция (Blue)" value="${c.collection||''}">
-            <input type="text" class="form-control competitor-price" placeholder="Цена (4500)" value="${c.price||''}">
+            <input type="text" class="form-control competitor-price-opt" placeholder="Цена ОПТ" value="${c.price_opt||''}">
+            <input type="text" class="form-control competitor-price-retail" placeholder="Цена Розница" value="${c.price_retail||''}">
             <button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button>
         </div>`; 
     }
@@ -380,7 +382,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pendingId) { localStorage.removeItem('pendingEditDealerId'); openEditModal(pendingId); }
     }
 
-    // (ВОЗВРАЩЕНО) Кнопки POS
     if(document.getElementById('add-contact-btn-add-modal')) document.getElementById('add-contact-btn-add-modal').onclick = () => addContactList.insertAdjacentHTML('beforeend', createContactEntryHTML());
     if(document.getElementById('add-address-btn-add-modal')) document.getElementById('add-address-btn-add-modal').onclick = () => addAddressList.insertAdjacentHTML('beforeend', createAddressEntryHTML());
     if(document.getElementById('add-pos-btn-add-modal')) document.getElementById('add-pos-btn-add-modal').onclick = () => addPosList.insertAdjacentHTML('beforeend', createPosEntryHTML());
@@ -417,7 +418,7 @@ document.addEventListener('DOMContentLoaded', () => {
             visits: collectData(addVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'}]),
             photos: addPhotosData,
             avatarUrl: newAvatarBase64,
-            competitors: collectData(addCompetitorList, '.competitor-entry', [{key:'brand',class:'.competitor-brand'},{key:'collection',class:'.competitor-collection'},{key:'price',class:'.competitor-price'}]) // (НОВОЕ)
+            competitors: collectData(addCompetitorList, '.competitor-entry', [{key:'brand',class:'.competitor-brand'},{key:'collection',class:'.competitor-collection'},{key:'price_opt',class:'.competitor-price-opt'},{key:'price_retail',class:'.competitor-price-retail'}]) // (ИЗМЕНЕНО)
         };
         try { const res = await fetch(API_DEALERS_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); if (!res.ok) throw new Error(await res.text()); const newD = await res.json(); const pIds = getSelectedProductIds('add-product-checklist'); if(pIds.length) await saveProducts(newD.id, pIds); addModal.hide(); initApp(); } catch (e) { alert("Ошибка при добавлении."); } finally { btn.disabled = false; btn.innerHTML = oldText; }
     });
@@ -463,7 +464,7 @@ document.addEventListener('DOMContentLoaded', () => {
             pos_materials: collectData(editPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]),
             visits: collectData(editVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'},{key:'isCompleted',class:'.visit-completed'}]),
             photos: editPhotosData,
-            competitors: collectData(editCompetitorList, '.competitor-entry', [{key:'brand',class:'.competitor-brand'},{key:'collection',class:'.competitor-collection'},{key:'price',class:'.competitor-price'}]) // (НОВОЕ)
+            competitors: collectData(editCompetitorList, '.competitor-entry', [{key:'brand',class:'.competitor-brand'},{key:'collection',class:'.competitor-collection'},{key:'price_opt',class:'.competitor-price-opt'},{key:'price_retail',class:'.competitor-price-retail'}]) // (ИЗМЕНЕНО)
         };
         try { await fetch(`${API_DEALERS_URL}/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); await saveProducts(id, getSelectedProductIds('edit-product-checklist')); editModal.hide(); initApp(); } catch (e) { alert("Ошибка при сохранении."); } finally { if(btn) { btn.disabled = false; btn.innerHTML = oldText; } }
     });
@@ -476,6 +477,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (t.closest('.btn-delete') && confirm("Удалить?")) fetch(`${API_DEALERS_URL}/${t.closest('.btn-delete').dataset.id}`, {method:'DELETE'}).then(initApp);
     });
 
+    // (ИЗМЕНЕНО) Добавлен .competitor-entry
     const removeHandler = (e) => { if(e.target.closest('.btn-remove-entry')) e.target.closest('.contact-entry, .address-entry, .pos-entry, .photo-entry, .visit-entry, .competitor-entry').remove(); };
     if(addModalEl) addModalEl.addEventListener('click', removeHandler);
     if(editModalEl) editModalEl.addEventListener('click', removeHandler);
@@ -493,8 +495,7 @@ document.addEventListener('DOMContentLoaded', () => {
             exportBtn.disabled = true;
             exportBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Загрузка...';
             const clean = (text) => `"${String(text || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`;
-            // (ИЗМЕНЕНО) Добавлены Конкуренты
-            const headers = ["ID", "Название", "Статус", "Город", "Адрес", "Тип цен", "Организация", "Доставка", "Сайт", "Инстаграм", "Контакты (Имя)", "Контакты (Должность)", "Контакты (Телефон)", "Доп. Адреса", "Стенды", "Конкуренты (Бренд)", "Конкуренты (Коллекция)", "Конкуренты (Цена)", "Бонусы"];
+            const headers = ["ID", "Название", "Статус", "Город", "Адрес", "Тип цен", "Организация", "Доставка", "Сайт", "Инстаграм", "Контакты (Имя)", "Контакты (Должность)", "Контакты (Телефон)", "Доп. Адреса", "Стенды", "Конкуренты (Бренд)", "Конкуренты (Коллекция)", "Конкуренты (ОПТ)", "Конкуренты (Розница)", "Бонусы"];
             let csv = "\uFEFF" + headers.join(",") + "\r\n";
             try {
                 const visibleDealerIds = Array.from(dealerListBody.querySelectorAll('tr .btn-view')).map(btn => btn.dataset.id);
@@ -509,14 +510,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     const stands = (dealer.pos_materials || []).map(p => `${p.name} (${p.quantity} шт)`).join('; '); 
                     const compBrand = (dealer.competitors || []).map(c => c.brand).join('; ');
                     const compColl = (dealer.competitors || []).map(c => c.collection).join('; ');
-                    const compPrice = (dealer.competitors || []).map(c => c.price).join('; ');
+                    const compPriceOpt = (dealer.competitors || []).map(c => c.price_opt).join('; ');
+                    const compPriceRetail = (dealer.competitors || []).map(c => c.price_retail).join('; ');
                     const row = [
                         clean(dealer.dealer_id), clean(dealer.name), clean(dealer.status),
                         clean(dealer.city), clean(dealer.address), clean(dealer.price_type),
                         clean(dealer.organization), clean(dealer.delivery), clean(dealer.website), clean(dealer.instagram),
                         clean(contactsName), clean(contactsPos), clean(contactsInfo),
                         clean(addresses), clean(stands),
-                        clean(compBrand), clean(compColl), clean(compPrice), // (НОВОЕ)
+                        clean(compBrand), clean(compColl), clean(compPriceOpt), clean(compPriceRetail),
                         clean(dealer.bonuses)
                     ];
                     csv += row.join(",") + "\r\n";
