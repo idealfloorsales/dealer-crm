@@ -61,7 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (dealer.avatarUrl) {
                 dealerAvatarImg.src = dealer.avatarUrl;
             } else {
-                dealerAvatarImg.src = ""; // Пусто
+                dealerAvatarImg.src = ""; // Пусто, если нет аватара
             }
             document.title = `Дилер: ${dealer.name}`;
             
@@ -179,9 +179,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderDealerCompetitors(competitors) {
         if (!competitorsListContainer) return;
         if (!competitors || competitors.length === 0) { competitorsListContainer.innerHTML = '<p><i>Нет данных о конкурентах.</i></p>'; return; }
-        let html = '<div class="table-responsive"><table class="table table-bordered table-striped" style="margin-top: 0;"><thead><tr><th>Бренд</th><th>Коллекция</th><th>Цена (Розница)</th></tr></thead><tbody>';
+        let html = '<div class="table-responsive"><table class="table table-bordered table-striped" style="margin-top: 0;"><thead><tr><th>Бренд</th><th>Коллекция</th><th>Цена ОПТ</th><th>Цена Розница</th></tr></thead><tbody>';
         competitors.forEach(c => {
-            html += `<tr><td>${safeText(c.brand)}</td><td>${safeText(c.collection)}</td><td>${safeText(c.price)}</td></tr>`;
+            html += `<tr><td>${safeText(c.brand)}</td><td>${safeText(c.collection)}</td><td>${safeText(c.price_opt)}</td><td>${safeText(c.price_retail)}</td></tr>`;
         });
         competitorsListContainer.innerHTML = html + '</tbody></table></div>';
     }
