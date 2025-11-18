@@ -7,33 +7,19 @@ document.addEventListener('DOMContentLoaded', () => {
     let fullProductCatalog = [];
     let allDealers = [];
     let currentSort = { column: 'name', direction: 'asc' };
-    
-    // (ВОЗВРАЩЕНО) Список Стендов (POS)
-    const posMaterialsList = [
-        "С600 - 600мм задняя стенка",
-        "С800 - 800мм задняя стенка",
-        "РФ-2 - Расческа из фанеры",
-        "РФС-1 - Расческа из фанеры СТАРАЯ",
-        "Н600 - 600мм наклейка",
-        "Н800 - 800мм наклейка",
-        "Табличка - Табличка орг.стекло"
-    ];
+    const posMaterialsList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"];
 
-    // (ИСПРАВЛЕНО) Безопасная инициализация модалок
-    const addModalEl = document.getElementById('add-modal'); 
-    const addModal = new bootstrap.Modal(addModalEl);
-    const addForm = document.getElementById('add-dealer-form');
-    
-    const editModalEl = document.getElementById('edit-modal'); 
-    const editModal = new bootstrap.Modal(editModalEl);
-    const editForm = document.getElementById('edit-dealer-form');
+    // Модалки
+    const addModalEl = document.getElementById('add-modal'); const addModal = new bootstrap.Modal(addModalEl);
+    const editModalEl = document.getElementById('edit-modal'); const editModal = new bootstrap.Modal(editModalEl);
 
     // Элементы
     const openAddModalBtn = document.getElementById('open-add-modal-btn');
+    const addForm = document.getElementById('add-dealer-form');
     const addProductChecklist = document.getElementById('add-product-checklist'); 
     const addContactList = document.getElementById('add-contact-list'); 
     const addAddressList = document.getElementById('add-address-list'); 
-    const addPosList = document.getElementById('add-pos-list'); // (ВОЗВРАЩЕНО)
+    const addPosList = document.getElementById('add-pos-list'); 
     const addVisitsList = document.getElementById('add-visits-list');
     const addPhotoInput = document.getElementById('add-photo-input');
     const addPhotoPreviewContainer = document.getElementById('add-photo-preview-container');
@@ -48,13 +34,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const filterStatus = document.getElementById('filter-status');
     const searchBar = document.getElementById('search-bar'); 
     const exportBtn = document.getElementById('export-dealers-btn'); 
-    const dashboardContainer = document.getElementById('dashboard-container'); 
-    const tasksList = document.getElementById('tasks-list'); 
+    
+    // (ИЗМЕНЕНО) Новые ID дашборда
+    const dashboardCardTotal = document.getElementById('dashboard-card-total'); 
+    const tasksListUpcoming = document.getElementById('tasks-list-upcoming');
+    const tasksListProblem = document.getElementById('tasks-list-problem');
+    const tasksListCooling = document.getElementById('tasks-list-cooling');
+    const dashboardContainer = document.getElementById('dashboard-container'); // Родительский контейнер
 
+    const editForm = document.getElementById('edit-dealer-form');
     const editProductChecklist = document.getElementById('edit-product-checklist'); 
     const editContactList = document.getElementById('edit-contact-list'); 
     const editAddressList = document.getElementById('edit-address-list'); 
-    const editPosList = document.getElementById('edit-pos-list'); // (ВОЗВРАЩЕНО)
+    const editPosList = document.getElementById('edit-pos-list'); 
     const editVisitsList = document.getElementById('edit-visits-list');
     const editPhotoList = document.getElementById('edit-photo-list'); 
     const editPhotoInput = document.getElementById('edit-photo-input');
@@ -139,33 +131,29 @@ document.addEventListener('DOMContentLoaded', () => {
             if(!res.ok) throw new Error('Не удалось загрузить данные');
             const dealer = await res.json();
             let found = false;
-            if (dealer.visits && dealer.visits[visitIndex]) {
-                dealer.visits[visitIndex].isCompleted = true;
-                found = true;
-            }
+            if (dealer.visits && dealer.visits[visitIndex]) { dealer.visits[visitIndex].isCompleted = true; found = true; }
             if (!found) return alert("Задача не найдена.");
             await fetch(`${API_DEALERS_URL}/${dealerId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visits: dealer.visits }) });
             initApp(); 
         } catch (e) { alert("Ошибка: " + e.message); btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg"></i>'; }
     }
 
-    // --- (ВОЗВРАЩЕНО) Правильный Дашборд ---
+    // --- (ИСПРАВЛЕНО) Рендер нового Дашборда 2x2 ---
     function renderDashboard() {
         if (!dashboardContainer) return;
-        if (!allDealers || allDealers.length === 0) { dashboardContainer.innerHTML = ''; return; }
+        if (!allDealers || allDealers.length === 0) { 
+            dashboardContainer.innerHTML = '';
+            return; 
+        }
+        
         const totalDealers = allDealers.length;
-        const noPhotosCount = allDealers.filter(d => !d.photo_url).length; 
-        const posCount = allDealers.filter(d => d.has_pos).length; 
+        const noAvatarCount = allDealers.filter(d => !d.photo_url).length; 
 
-        // 1. Карточка "Всего дилеров" (Колонка 1)
-        const totalCardHtml = `
-            <div class="col-lg-3">
-                <div class="stat-card h-100">
-                    <i class="bi bi-shop stat-icon text-primary"></i>
-                    <span class="stat-number">${totalDealers}</span>
-                    <span class="stat-label">Всего дилеров</span>
-                </div>
-            </div>`;
+        // 1. Карточки Статистики (2 шт.)
+        dashboardContainer.innerHTML = `
+            <div class="col-md-6"><div class="stat-card h-100"><i class="bi bi-shop stat-icon text-primary"></i><span class="stat-number">${totalDealers}</span><span class="stat-label">Всего дилеров</span></div></div>
+            <div class="col-md-6"><div class="stat-card h-100 ${noAvatarCount > 0 ? 'border-danger' : ''}"><i class="bi bi-camera-fill stat-icon ${noAvatarCount > 0 ? 'text-danger' : 'text-secondary'}"></i><span class="stat-number ${noAvatarCount > 0 ? 'text-danger' : ''}">${noAvatarCount}</span><span class="stat-label">Без Аватара</span></div></div>
+        `;
 
         // 2. Списки Задач
         const today = new Date(); today.setHours(0,0,0,0);
@@ -185,6 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (d.visits && Array.isArray(d.visits)) {
                 d.visits.forEach((v, index) => {
                     const vDate = new Date(v.date);
+                    if (!vDate) return;
                     vDate.setHours(0,0,0,0);
 
                     if (v.isCompleted && (!lastVisitDate || vDate > lastVisitDate)) {
@@ -223,42 +212,18 @@ document.addEventListener('DOMContentLoaded', () => {
         tasksProblem.sort((a, b) => (a.date || 0) - (b.date || 0));
         tasksCooling.sort((a, b) => b.days - a.days);
 
-        // 3. Рендеринг списков задач
-        const upcomingHtml = renderTaskList(tasksUpcoming, 'upcoming');
-        const problemHtml = renderTaskList(tasksProblem, 'problem');
-        const coolingHtml = renderTaskList(tasksCooling, 'cooling');
-
-        // 4. Собираем дашборд
-        dashboardContainer.innerHTML = `
-            ${totalCardHtml}
-            <div class="col-lg-3">
-                <div class="card task-card shadow-sm border-0 h-100 task-card-upcoming">
-                    <div class="card-header bg-white"><h5 class="card-title text-primary"><i class="bi bi-calendar-check me-2"></i>Ближайшие задачи</h5></div>
-                    <div class="card-body"><div id="tasks-list-upcoming" class="list-group list-group-flush task-list">${upcomingHtml}</div></div>
-                </div>
-            </div>
-            <div class="col-lg-3">
-                <div class="card task-card shadow-sm border-0 h-100 task-card-problem">
-                    <div class="card-header bg-white"><h5 class="card-title text-danger"><i class="bi bi-fire me-2"></i>Проблемные / Просрочено</h5></div>
-                    <div class="card-body"><div id="tasks-list-problem" class="list-group list-group-flush task-list">${problemHtml}</div></div>
-                </div>
-            </div>
-            <div class="col-lg-3">
-                <div class="card task-card shadow-sm border-0 h-100 task-card-cooling">
-                    <div class="card-header bg-white"><h5 class="card-title text-warning"><i class="bi bi-snow2 me-2"></i>"Остывающие" (> 30 дн.)</h5></div>
-                    <div class="card-body"><div id="tasks-list-cooling" class="list-group list-group-flush task-list">${coolingHtml}</div></div>
-                </div>
-            </div>
-        `;
+        renderTaskList(tasksListUpcoming, tasksUpcoming, 'upcoming');
+        renderTaskList(tasksListProblem, tasksProblem, 'problem');
+        renderTaskList(tasksListCooling, tasksCooling, 'cooling');
     }
 
-    // (ВОЗВРАЩЕНО) Вспомогательная функция для рендера списков задач
-    function renderTaskList(tasks, type) {
+    function renderTaskList(container, tasks, type) {
+        if (!container) return;
         if (tasks.length === 0) {
-            return `<p class="text-muted text-center p-3">Нет задач</p>`;
+            container.innerHTML = `<p class="text-muted text-center p-3">Нет задач</p>`;
+            return;
         }
-        
-        return tasks.map(t => {
+        container.innerHTML = tasks.map(t => {
             let badge = '';
             let comment = safeText(t.comment);
             
@@ -295,14 +260,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
     }
 
-    // (ИСПРАВЛЕНО) Глобальный слушатель для кнопок задач
-    document.body.addEventListener('click', (e) => {
-        const taskBtn = e.target.closest('.btn-complete-task');
-        if (taskBtn) {
-            taskBtn.disabled = true;
-            completeTask(taskBtn, taskBtn.dataset.id, taskBtn.dataset.index);
-        }
-    });
+    if(document.body) {
+        document.body.addEventListener('click', (e) => {
+            const taskBtn = e.target.closest('.btn-complete-task');
+            if (taskBtn) { 
+                taskBtn.disabled = true; 
+                completeTask(taskBtn, taskBtn.dataset.id, taskBtn.dataset.index);
+            }
+        });
+    }
 
     function createContactEntryHTML(c={}) { return `<div class="contact-entry input-group mb-2"><input type="text" class="form-control contact-name" placeholder="Имя" value="${c.name||''}"><input type="text" class="form-control contact-position" placeholder="Должность" value="${c.position||''}"><input type="text" class="form-control contact-info" placeholder="Телефон" value="${c.contactInfo||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
     function createAddressEntryHTML(a={}) { return `<div class="address-entry input-group mb-2"><input type="text" class="form-control address-description" placeholder="Описание" value="${a.description||''}"><input type="text" class="form-control address-city" placeholder="Город" value="${a.city||''}"><input type="text" class="form-control address-address" placeholder="Адрес" value="${a.address||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
@@ -397,6 +363,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pendingId) { localStorage.removeItem('pendingEditDealerId'); openEditModal(pendingId); }
     }
 
+    // (ВОЗВРАЩЕНО) Кнопки POS
     if(document.getElementById('add-contact-btn-add-modal')) document.getElementById('add-contact-btn-add-modal').onclick = () => addContactList.insertAdjacentHTML('beforeend', createContactEntryHTML());
     if(document.getElementById('add-address-btn-add-modal')) document.getElementById('add-address-btn-add-modal').onclick = () => addAddressList.insertAdjacentHTML('beforeend', createAddressEntryHTML());
     if(document.getElementById('add-pos-btn-add-modal')) document.getElementById('add-pos-btn-add-modal').onclick = () => addPosList.insertAdjacentHTML('beforeend', createPosEntryHTML());
