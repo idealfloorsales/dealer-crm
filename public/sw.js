@@ -3,9 +3,9 @@ const CACHE_NAME = 'dealer-crm-cache-v29'; // (ИЗМЕНЕНО)
 const urlsToCache = [
     '/',
     '/index.html?v=29', // (ИЗМЕНЕНО)
-    '/style.css?v=29',
+    '/style.css?v=32',
     '/script.js?v=28',
-    '/dealer.html?v=28',
+    '/dealer.html?v=32',
     '/dealer.js?v=28',
     '/map.html?v=28',
     '/map.js?v=28',
