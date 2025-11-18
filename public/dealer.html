@@ -6,7 +6,7 @@
     <title>Подробная информация о дилере</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="style.css?v=28">
+    <link rel="stylesheet" href="style.css?v=29">
     <link rel="icon" href="favicon.gif" type="image/gif">
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -75,12 +75,13 @@
                 <div class="tab-pane fade show active" id="info-pane" role="tabpanel">
                     <h3 class="mt-3">Основная информация</h3>
                     <div id="dealer-info-main"></div>
+                    
                     <h3>Дополнительные адреса:</h3>
                     <div id="dealer-addresses-list"><p>Нет данных</p></div>
-                    <h3>Стенды:</h3>
-                    <div id="dealer-pos-list"><p>Нет данных</p></div>
+                    
                     <h3>Условия доставки:</h3>
                     <div id="dealer-delivery" class="products-display"><p>Нет данных</p></div>
+                    
                     <h3>Бонусы и примечания:</h3>
                     <div id="dealer-bonuses" class="products-display"><p>Нет данных</p></div>
                 </div>
@@ -103,6 +104,11 @@
                 </div>
 
                 <div class="tab-pane fade" id="products-pane" role="tabpanel">
+                    
+                    <h3 class="mt-3 text-primary">Оборудование (Стенды)</h3>
+                    <div id="dealer-pos-list"><p>Нет данных</p></div>
+
+                    <h3 class="mt-4 text-primary">Товары (Ламинат)</h3>
                     <div id="dealer-products-list"><p>Нет данных</p></div>
                 </div>
                 
@@ -126,7 +132,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="dealer.js?v=23"></script>
+    <script src="dealer.js?v=29"></script>
 </body>
 </html>
-
