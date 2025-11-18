@@ -27,7 +27,7 @@ if (ADMIN_USER && ADMIN_PASSWORD) {
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// --- СПИСОК ТОВАРОВ (72 шт.) ---
+// СПИСОК ТОВАРОВ
 const productsToImport = [
     { sku: "CD-507", name: "Дуб Беленый" }, { sku: "CD-508", name: "Дуб Пепельный" },
     { sku: "8EH34-701", name: "Дуб Снежный" }, { sku: "8EH34-702", name: "Дуб Арабика" },
@@ -73,15 +73,9 @@ const photoSchema = new mongoose.Schema({ description: String, photo_url: String
 const additionalAddressSchema = new mongoose.Schema({ description: String, city: String, address: String }, { _id: false });
 const visitSchema = new mongoose.Schema({ date: String, comment: String, isCompleted: { type: Boolean, default: false } }, { _id: false });
 const posMaterialSchema = new mongoose.Schema({ name: String, quantity: Number }, { _id: false });
+const competitorSchema = new mongoose.Schema({ brand: String, collection: String, price_opt: String, price_retail: String }, { _id: false });
 
-// (ИЗМЕНЕНО) Схема для Конкурентов
-const competitorSchema = new mongoose.Schema({ 
-    brand: String, 
-    collection: String, 
-    price_opt: String, // ОПТ
-    price_retail: String // Розница
-}, { _id: false });
-
+// СХЕМА ДИЛЕРА
 const dealerSchema = new mongoose.Schema({
     dealer_id: String, name: String, price_type: String, city: String, address: String, 
     contacts: [contactSchema], bonuses: String, photos: [photoSchema], organization: String,
@@ -91,19 +85,18 @@ const dealerSchema = new mongoose.Schema({
     visits: [visitSchema],
     products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
     latitude: Number, longitude: Number,
-    status: { type: String, default: 'standard' },
+    status: { type: String, default: 'standard' }, // ВОТ ЭТО ПОЛЕ
     avatarUrl: String,
-    competitors: [competitorSchema] // (ИЗМЕНЕНО)
+    competitors: [competitorSchema]
 });
 const Dealer = mongoose.model('Dealer', dealerSchema);
-const knowledgeSchema = new mongoose.Schema({ title: String, content: String }, { timestamps: true }); 
-const Knowledge = mongoose.model('Knowledge', knowledgeSchema);
+const Knowledge = mongoose.model('Knowledge', new mongoose.Schema({ title: String, content: String }, { timestamps: true }));
 
 async function hardcodedImportProducts() {
     try {
         const operations = productsToImport.map(p => ({ updateOne: { filter: { sku: p.sku }, update: { $set: p }, upsert: true } }));
         await Product.bulkWrite(operations);
-        console.log("Каталог (только ламинат) обновлен.");
+        console.log("Каталог обновлен.");
     } catch (e) { console.warn(e.message); }
 }
 
@@ -123,6 +116,7 @@ function convertToClient(doc) {
 // API
 app.get('/api/dealers', async (req, res) => {
     try {
+        // ВАЖНО: Добавлено 'status' в запрос
         const dealers = await Dealer.find({}, 'dealer_id name city price_type organization products pos_materials visits latitude longitude status avatarUrl').lean();
         res.json(dealers.map(d => ({
             id: d._id, dealer_id: d.dealer_id, name: d.name, city: d.city, price_type: d.price_type, organization: d.organization,
@@ -131,7 +125,7 @@ app.get('/api/dealers', async (req, res) => {
             products_count: (d.products ? d.products.length : 0),
             has_pos: (d.pos_materials && d.pos_materials.length > 0), 
             visits: d.visits, latitude: d.latitude, longitude: d.longitude,
-            status: d.status || 'standard'
+            status: d.status || 'standard' // Если статуса нет, ставим стандарт
         }))); 
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -157,12 +151,7 @@ app.get('/api/matrix', async (req, res) => {
             sku: p.sku, name: p.name,
             dealers: allDealers.map(d => ({ has_product: map.get(d._id.toString()).has(p._id.toString()) }))
         }));
-        const headers = allDealers.map(d => ({
-            id: d._id, 
-            name: d.name,
-            city: d.city || '',
-            status: d.status || 'standard'
-        }));
+        const headers = allDealers.map(d => ({ id: d._id, name: d.name, city: d.city || '', status: d.status || 'standard' }));
         res.json({ headers: headers, matrix });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
