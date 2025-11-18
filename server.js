@@ -65,7 +65,6 @@ const productsToImport = [
     { sku: "RPL-24", name: "Дуб Эмперадор" }, { sku: "RPL-25", name: "Дуб Авангард" },
     { sku: "RPL-28", name: "Дуб Венеция" }
 ];
-// (Стенды убраны отсюда, они в `posMaterialSchema`)
 
 const productSchema = new mongoose.Schema({ sku: String, name: String });
 const Product = mongoose.model('Product', productSchema);
@@ -74,6 +73,9 @@ const photoSchema = new mongoose.Schema({ description: String, photo_url: String
 const additionalAddressSchema = new mongoose.Schema({ description: String, city: String, address: String }, { _id: false });
 const visitSchema = new mongoose.Schema({ date: String, comment: String, isCompleted: { type: Boolean, default: false } }, { _id: false });
 const posMaterialSchema = new mongoose.Schema({ name: String, quantity: Number }, { _id: false });
+
+// (НОВОЕ) Схема для Конкурентов
+const competitorSchema = new mongoose.Schema({ brand: String, collection: String, price: String }, { _id: false });
 
 const dealerSchema = new mongoose.Schema({
     dealer_id: String, name: String, price_type: String, city: String, address: String, 
@@ -85,7 +87,8 @@ const dealerSchema = new mongoose.Schema({
     products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
     latitude: Number, longitude: Number,
     status: { type: String, default: 'standard' },
-    avatarUrl: String
+    avatarUrl: String,
+    competitors: [competitorSchema] // (НОВОЕ)
 });
 const Dealer = mongoose.model('Dealer', dealerSchema);
 const knowledgeSchema = new mongoose.Schema({ title: String, content: String }, { timestamps: true }); 
@@ -139,29 +142,23 @@ app.post('/api/products', async (req, res) => { try { const p = new Product(req.
 app.put('/api/products/:id', async (req, res) => { try { const p = await Product.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(p)); } catch(e){res.status(409).json({});} });
 app.delete('/api/products/:id', async (req, res) => { await Product.findByIdAndDelete(req.params.id); await Dealer.updateMany({ products: req.params.id }, { $pull: { products: req.params.id } }); res.json({}); });
 
-// --- (ИЗМЕНЕНО) API Матрицы ---
+// (ИЗМЕНЕНО) API Матрицы (возвращаем данные для фильтров)
 app.get('/api/matrix', async (req, res) => {
     try {
         const allProducts = await Product.find({}, 'sku name').sort({ sku: 1 }).lean();
-        // (ИЗМЕНЕНО) Получаем Город и Статус
         const allDealers = await Dealer.find({}, 'name products city status').sort({ name: 1 }).lean();
-        
         const map = new Map(); 
         allDealers.forEach(d => map.set(d._id.toString(), new Set(d.products.map(String))));
-        
         const matrix = allProducts.map(p => ({
             sku: p.sku, name: p.name,
             dealers: allDealers.map(d => ({ has_product: map.get(d._id.toString()).has(p._id.toString()) }))
         }));
-        
-        // (ИЗМЕНЕНО) Отправляем полные данные в заголовках
         const headers = allDealers.map(d => ({
             id: d._id, 
             name: d.name,
             city: d.city || '',
             status: d.status || 'standard'
         }));
-        
         res.json({ headers: headers, matrix });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
