@@ -74,8 +74,13 @@ const additionalAddressSchema = new mongoose.Schema({ description: String, city:
 const visitSchema = new mongoose.Schema({ date: String, comment: String, isCompleted: { type: Boolean, default: false } }, { _id: false });
 const posMaterialSchema = new mongoose.Schema({ name: String, quantity: Number }, { _id: false });
 
-// (НОВОЕ) Схема для Конкурентов
-const competitorSchema = new mongoose.Schema({ brand: String, collection: String, price: String }, { _id: false });
+// (ИЗМЕНЕНО) Схема для Конкурентов
+const competitorSchema = new mongoose.Schema({ 
+    brand: String, 
+    collection: String, 
+    price_opt: String, // ОПТ
+    price_retail: String // Розница
+}, { _id: false });
 
 const dealerSchema = new mongoose.Schema({
     dealer_id: String, name: String, price_type: String, city: String, address: String, 
@@ -88,7 +93,7 @@ const dealerSchema = new mongoose.Schema({
     latitude: Number, longitude: Number,
     status: { type: String, default: 'standard' },
     avatarUrl: String,
-    competitors: [competitorSchema] // (НОВОЕ)
+    competitors: [competitorSchema] // (ИЗМЕНЕНО)
 });
 const Dealer = mongoose.model('Dealer', dealerSchema);
 const knowledgeSchema = new mongoose.Schema({ title: String, content: String }, { timestamps: true }); 
@@ -142,7 +147,6 @@ app.post('/api/products', async (req, res) => { try { const p = new Product(req.
 app.put('/api/products/:id', async (req, res) => { try { const p = await Product.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(p)); } catch(e){res.status(409).json({});} });
 app.delete('/api/products/:id', async (req, res) => { await Product.findByIdAndDelete(req.params.id); await Dealer.updateMany({ products: req.params.id }, { $pull: { products: req.params.id } }); res.json({}); });
 
-// (ИЗМЕНЕНО) API Матрицы (возвращаем данные для фильтров)
 app.get('/api/matrix', async (req, res) => {
     try {
         const allProducts = await Product.find({}, 'sku name').sort({ sku: 1 }).lean();
