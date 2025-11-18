@@ -1,24 +1,39 @@
 // dealer.js
 document.addEventListener('DOMContentLoaded', () => {
     
-    // Получаем ID дилера из URL
-    const params = new URLSearchParams(window.location.search);
-    const dealerId = params.get('id');
-    const API_URL = '/api/dealers';
-
-    // Элементы управления
+    // Элементы
+    const contactsListContainer = document.getElementById('dealer-contacts-list'); 
+    const bonusesContainer = document.getElementById('dealer-bonuses');
+    const photoGalleryContainer = document.getElementById('dealer-photo-gallery'); 
+    const deliveryContainer = document.getElementById('dealer-delivery'); 
+    const linksContainer = document.getElementById('dealer-links'); 
+    const addressesListContainer = document.getElementById('dealer-addresses-list'); 
+    const posListContainer = document.getElementById('dealer-pos-list'); 
+    const visitsListContainer = document.getElementById('dealer-visits-list'); 
+    const competitorsListContainer = document.getElementById('dealer-competitors-list'); // (НОВОЕ)
+    const productsListContainer = document.getElementById('dealer-products-list');
+    
+    // Заголовок
+    const dealerNameEl = document.getElementById('dealer-name');
+    const dealerIdEl = document.getElementById('dealer-id-subtitle');
+    const dealerAvatarImg = document.getElementById('dealer-avatar-img');
+    
+    // Кнопки
     const deleteBtn = document.getElementById('delete-dealer-btn'); 
     const editBtn = document.getElementById('edit-dealer-btn'); 
     const navigateBtn = document.getElementById('navigate-btn'); 
     const carouselInner = document.getElementById('carousel-inner');
-    
-    // Глобальные переменные для координат
+
+    const API_URL = '/api/dealers';
+    const params = new URLSearchParams(window.location.search);
+    const dealerId = params.get('id');
+
     let dealerLat = null;
     let dealerLng = null;
 
     if (!dealerId) {
-        document.getElementById('dealer-name').textContent = 'Ошибка';
-        document.getElementById('dealer-id-subtitle').textContent = 'ID дилера не найден';
+        if(dealerNameEl) dealerNameEl.textContent = 'Ошибка';
+        if(dealerIdEl) dealerIdEl.textContent = 'ID дилера не найден';
         if(deleteBtn) deleteBtn.style.display = 'none'; 
         if(editBtn) editBtn.style.display = 'none'; 
         if(navigateBtn) navigateBtn.style.display = 'none';
@@ -36,19 +51,17 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const dealer = await response.json();
             
-            // Сохраняем координаты
             dealerLat = dealer.latitude;
             dealerLng = dealer.longitude;
             if (!dealerLat || !dealerLng) { if(navigateBtn) navigateBtn.style.display = 'none'; }
 
             // --- ЗАГОЛОВОК СТРАНИЦЫ (с Аватаром) ---
-            document.getElementById('dealer-name').textContent = safeText(dealer.name);
-            document.getElementById('dealer-id-subtitle').textContent = `ID: ${safeText(dealer.dealer_id)}`;
-            const avatarImg = document.getElementById('dealer-avatar-img');
+            dealerNameEl.textContent = safeText(dealer.name);
+            dealerIdEl.textContent = `ID: ${safeText(dealer.dealer_id)}`;
             if (dealer.avatarUrl) {
-                avatarImg.src = dealer.avatarUrl;
+                dealerAvatarImg.src = dealer.avatarUrl;
             } else {
-                avatarImg.src = ""; // Пусто, если нет аватара
+                dealerAvatarImg.src = ""; // Пусто
             }
             document.title = `Дилер: ${dealer.name}`;
             
@@ -62,34 +75,35 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             document.getElementById('dealer-delivery').textContent = safeText(dealer.delivery) || 'Нет данных';
             document.getElementById('dealer-bonuses').textContent = safeText(dealer.bonuses) || 'Нет данных';
+            renderDealerAddresses(dealer.additional_addresses || []); 
+            renderDealerPos(dealer.pos_materials || []); 
 
-            // --- ОТДЕЛЬНЫЕ ФУНКЦИИ ДЛЯ КАЖДОЙ ВКЛАДКИ ---
+            // --- ДРУГИЕ ВКЛАДКИ ---
             renderDealerLinks(dealer.website, dealer.instagram); 
             renderDealerVisits(dealer.visits || []);
             renderDealerContacts(dealer.contacts || []);
-            renderDealerAddresses(dealer.additional_addresses || []); 
-            renderDealerPos(dealer.pos_materials || []); // (ВОЗВРАЩЕНО)
+            renderDealerCompetitors(dealer.competitors || []); // (НОВОЕ)
             renderDealerPhotos(dealer.photos || []); 
-            fetchDealerProducts(); // Товары грузим отдельно
+            fetchDealerProducts(); 
 
         } catch (error) {
-            document.getElementById('dealer-name').textContent = 'Ошибка';
-            document.getElementById('dealer-id-subtitle').textContent = error.message;
+            dealerNameEl.textContent = 'Ошибка';
+            dealerIdEl.textContent = error.message;
         }
     }
     
     function renderDealerLinks(website, instagram) {
-        const c = document.getElementById('dealer-links'); if (!c) return;
+        if (!linksContainer) return;
         let html = '';
         const safeWebsite = formatUrl(website); const safeInstagram = formatUrl(instagram);
         if (safeWebsite) html += `<a href="${safeWebsite}" target="_blank" class="btn btn-secondary me-2"><i class="bi bi-globe me-2"></i>Сайт</a>`;
         if (safeInstagram) html += `<a href="${safeInstagram}" target="_blank" class="btn btn-secondary"><i class="bi bi-instagram me-2"></i>Instagram</a>`;
-        if (!safeWebsite && !safeInstagram) c.style.display = 'none'; else { c.innerHTML = html; c.style.display = 'flex'; }
+        if (!safeWebsite && !safeInstagram) linksContainer.style.display = 'none'; else { linksContainer.innerHTML = html; linksContainer.style.display = 'flex'; }
     }
 
     function renderDealerPhotos(photos) {
-        const c = document.getElementById('dealer-photo-gallery'); if (!c) return;
-        if (!photos || photos.length === 0) { c.innerHTML = '<p><i>Нет фотографий.</i></p>'; return; }
+        if (!photoGalleryContainer) return;
+        if (!photos || photos.length === 0) { photoGalleryContainer.innerHTML = '<p><i>Нет фотографий.</i></p>'; return; }
         photos.sort((a, b) => new Date(b.date||0) - new Date(a.date||0));
         let html = ''; let slideIndex = 0; let carouselHtml = '';
         const groups = {};
@@ -104,7 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             html += `</div>`;
         }
-        c.innerHTML = html;
+        photoGalleryContainer.innerHTML = html;
         if (carouselInner) carouselInner.innerHTML = carouselHtml;
     }
 
@@ -118,10 +132,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // (ИСПРАВЛЕНО) Все таблицы обернуты в .table-responsive
     function renderDealerVisits(visits) {
-        const c = document.getElementById('dealer-visits-list'); if (!c) return;
-        if (!visits || visits.length === 0) { c.innerHTML = '<p><i>Нет записей.</i></p>'; return; }
+        if (!visitsListContainer) return;
+        if (!visits || visits.length === 0) { visitsListContainer.innerHTML = '<p><i>Нет записей.</i></p>'; return; }
         visits.sort((a, b) => new Date(b.date) - new Date(a.date));
         let html = '<div class="table-responsive"><table class="table table-bordered table-striped" style="margin-top:0"><thead><tr><th style="width:120px">Дата</th><th>Комментарий</th><th style="width:100px">Статус</th></tr></thead><tbody>';
         visits.forEach(v => { 
@@ -129,12 +142,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const status = v.isCompleted ? '<span class="badge bg-success">Выполнено</span>' : '<span class="badge bg-warning">В плане</span>';
             html += `<tr><td>${dateStr}</td><td style="white-space: pre-wrap;">${safeText(v.comment)}</td><td>${status}</td></tr>`; 
         });
-        c.innerHTML = html + '</tbody></table></div>';
+        visitsListContainer.innerHTML = html + '</tbody></table></div>';
     }
 
     function renderDealerContacts(contacts) {
-        const c = document.getElementById('dealer-contacts-list'); if (!c) return;
-        if (!contacts || contacts.length === 0) { c.innerHTML = '<p><i>Нет данных.</i></p>'; return; }
+        if (!contactsListContainer) return;
+        if (!contacts || contacts.length === 0) { contactsListContainer.innerHTML = '<p><i>Нет данных.</i></p>'; return; }
         let html = '<div class="table-responsive"><table class="table table-bordered table-striped" style="margin-top: 0;"><thead><tr><th>Имя</th><th>Должность</th><th>Действия</th></tr></thead><tbody>';
         contacts.forEach(contact => {
             const phoneClean = contact.contactInfo ? contact.contactInfo.replace(/[^0-9]/g, '') : '';
@@ -143,24 +156,34 @@ document.addEventListener('DOMContentLoaded', () => {
             if (hasPhone) { actions = `<div class="d-flex align-items-center gap-2"><span>${safeText(contact.contactInfo)}</span><a href="tel:+${phoneClean}" class="btn btn-sm btn-outline-primary btn-contact-call" title="Позвонить"><i class="bi bi-telephone-fill"></i></a><a href="https://wa.me/${phoneClean}" target="_blank" class="btn btn-sm btn-outline-success btn-contact-wa" title="WhatsApp"><i class="bi bi-whatsapp"></i></a></div>`; }
             html += `<tr><td>${safeText(contact.name)}</td><td>${safeText(contact.position)}</td><td>${actions}</td></tr>`;
         });
-        c.innerHTML = html + '</tbody></table></div>';
+        contactsListContainer.innerHTML = html + '</tbody></table></div>';
     }
     
     function renderDealerAddresses(addresses) {
-        const c = document.getElementById('dealer-addresses-list'); if (!c) return;
-        if (!addresses || addresses.length === 0) { c.innerHTML = '<p><i>Нет данных.</i></p>'; return; }
+        if (!addressesListContainer) return;
+        if (!addresses || addresses.length === 0) { addressesListContainer.innerHTML = '<p><i>Нет данных.</i></p>'; return; }
         let html = '<div class="table-responsive"><table class="table table-bordered table-striped" style="margin-top: 0;"><thead><tr><th>Описание</th><th>Город</th><th>Адрес</th></tr></thead><tbody>';
         addresses.forEach(addr => { html += `<tr><td>${safeText(addr.description)}</td><td>${safeText(addr.city)}</td><td>${safeText(addr.address)}</td></tr>`; });
-        c.innerHTML = html + '</tbody></table></div>';
+        addressesListContainer.innerHTML = html + '</tbody></table></div>';
     }
 
-    // (ВОЗВРАЩЕНО)
     function renderDealerPos(posItems) {
-        const c = document.getElementById('dealer-pos-list'); if (!c) return;
-        if (!posItems || posItems.length === 0) { c.innerHTML = '<p><i>Нет оборудования.</i></p>'; return; }
+        if (!posListContainer) return;
+        if (!posItems || posItems.length === 0) { posListContainer.innerHTML = '<p><i>Нет оборудования.</i></p>'; return; }
         let html = '<div class="table-responsive"><table class="table table-bordered table-striped" style="margin-top: 0;"><thead><tr><th>Оборудование</th><th>Количество</th></tr></thead><tbody>';
         posItems.forEach(item => { html += `<tr><td>${safeText(item.name)}</td><td>${item.quantity || 1}</td></tr>`; });
-        c.innerHTML = html + '</tbody></table></div>';
+        posListContainer.innerHTML = html + '</tbody></table></div>';
+    }
+
+    // (НОВАЯ ФУНКЦИЯ)
+    function renderDealerCompetitors(competitors) {
+        if (!competitorsListContainer) return;
+        if (!competitors || competitors.length === 0) { competitorsListContainer.innerHTML = '<p><i>Нет данных о конкурентах.</i></p>'; return; }
+        let html = '<div class="table-responsive"><table class="table table-bordered table-striped" style="margin-top: 0;"><thead><tr><th>Бренд</th><th>Коллекция</th><th>Цена (Розница)</th></tr></thead><tbody>';
+        competitors.forEach(c => {
+            html += `<tr><td>${safeText(c.brand)}</td><td>${safeText(c.collection)}</td><td>${safeText(c.price)}</td></tr>`;
+        });
+        competitorsListContainer.innerHTML = html + '</tbody></table></div>';
     }
 
     async function fetchDealerProducts() {
