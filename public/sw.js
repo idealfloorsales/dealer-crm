@@ -1,20 +1,20 @@
 // sw.js (Service Worker)
-const CACHE_NAME = 'dealer-crm-cache-v19'; // (ИЗМЕНЕНО)
+const CACHE_NAME = 'dealer-crm-cache-v25'; // (ИЗМЕНЕНО)
 const urlsToCache = [
     '/',
-    '/index.html?v=19', // (ИЗМЕНЕНО)
-    '/style.css?v=19', // (ИЗМЕНЕНО)
-    '/script.js?v=19', // (ИЗМЕНЕНО)
-    '/dealer.html?v=19',
-    '/dealer.js?v=19',
-    '/map.html?v=19',
-    '/map.js?v=19',
-    '/products.html?v=19',
-    '/products.js?v=19',
-    '/report.html?v=19',
-    '/report.js?v=19',
-    '/knowledge.html?v=19',
-    '/knowledge.js?v=19',
+    '/index.html?v=25', // (ИЗМЕНЕНО)
+    '/style.css?v=25', // (ИЗМЕНЕНО)
+    '/script.js?v=25', // (ИЗМЕНЕНО)
+    '/dealer.html?v=25',
+    '/dealer.js?v=25',
+    '/map.html?v=25',
+    '/map.js?v=25',
+    '/products.html?v=25',
+    '/products.js?v=25',
+    '/report.html?v=25',
+    '/report.js?v=25',
+    '/knowledge.html?v=25',
+    '/knowledge.js?v=25',
     '/logo.png',
     '/favicon.gif',
     'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css',
@@ -28,15 +28,17 @@ self.addEventListener('install', event => {
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then(cache => {
-                console.log('Opened cache v19 and caching new files');
-                return cache.addAll(urlsToCache);
+                console.log('Opened cache v25 and caching new files');
+                urlsToCache.forEach(url => {
+                    cache.add(url).catch(err => console.warn(`Failed to cache ${url}`, err));
+                });
             })
     );
 });
 
 // Активация (очистка старого кэша)
 self.addEventListener('activate', event => {
-    const cacheWhitelist = [CACHE_NAME]; // Оставляем только v19
+    const cacheWhitelist = [CACHE_NAME]; // Оставляем только v25
     event.waitUntil(
         caches.keys().then(cacheNames => {
             return Promise.all(
@@ -53,7 +55,7 @@ self.addEventListener('activate', event => {
 
 // Перехват запросов (Fetch)
 self.addEventListener('fetch', event => {
-    // Не кэшируем запросы API, только статику
+    // API запросы всегда идут в сеть
     if (event.request.url.includes('/api/')) {
         return fetch(event.request);
     }
@@ -61,10 +63,12 @@ self.addEventListener('fetch', event => {
     event.respondWith(
         caches.match(event.request)
             .then(response => {
+                // 1. Из кэша
                 if (response) {
-                    return response; // Из кэша
+                    return response;
                 }
-                // Из сети
+                
+                // 2. Из сети
                 return fetch(event.request).then(
                     response => {
                         if(!response || response.status !== 200) {
