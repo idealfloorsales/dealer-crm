@@ -27,7 +27,7 @@ if (ADMIN_USER && ADMIN_PASSWORD) {
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// СПИСОК ТОВАРОВ (72 шт.)
+// СПИСОК ТОВАРОВ
 const productsToImport = [
     { sku: "CD-507", name: "Дуб Беленый" }, { sku: "CD-508", name: "Дуб Пепельный" },
     { sku: "8EH34-701", name: "Дуб Снежный" }, { sku: "8EH34-702", name: "Дуб Арабика" },
@@ -87,7 +87,7 @@ const dealerSchema = new mongoose.Schema({
     status: { type: String, default: 'standard' },
     avatarUrl: String,
     competitors: [competitorSchema],
-    responsible: String // (НОВОЕ) Поле Ответственный
+    responsible: String
 });
 const Dealer = mongoose.model('Dealer', dealerSchema);
 const Knowledge = mongoose.model('Knowledge', new mongoose.Schema({ title: String, content: String }, { timestamps: true }));
@@ -116,7 +116,6 @@ function convertToClient(doc) {
 // API
 app.get('/api/dealers', async (req, res) => {
     try {
-        // (ИЗМЕНЕНО) Добавлено 'responsible'
         const dealers = await Dealer.find({}, 'dealer_id name city price_type organization products pos_materials visits latitude longitude status avatarUrl responsible').lean();
         res.json(dealers.map(d => ({
             id: d._id, dealer_id: d.dealer_id, name: d.name, city: d.city, price_type: d.price_type, organization: d.organization,
@@ -126,7 +125,7 @@ app.get('/api/dealers', async (req, res) => {
             has_pos: (d.pos_materials && d.pos_materials.length > 0), 
             visits: d.visits, latitude: d.latitude, longitude: d.longitude,
             status: d.status || 'standard',
-            responsible: d.responsible // (НОВОЕ)
+            responsible: d.responsible
         }))); 
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -142,17 +141,24 @@ app.post('/api/products', async (req, res) => { try { const p = new Product(req.
 app.put('/api/products/:id', async (req, res) => { try { const p = await Product.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(p)); } catch(e){res.status(409).json({});} });
 app.delete('/api/products/:id', async (req, res) => { await Product.findByIdAndDelete(req.params.id); await Dealer.updateMany({ products: req.params.id }, { $pull: { products: req.params.id } }); res.json({}); });
 
+// (ИЗМЕНЕНО) Добавлено поле responsible в матрицу
 app.get('/api/matrix', async (req, res) => {
     try {
         const allProducts = await Product.find({}, 'sku name').sort({ sku: 1 }).lean();
-        const allDealers = await Dealer.find({}, 'name products city status').sort({ name: 1 }).lean();
+        const allDealers = await Dealer.find({}, 'name products city status responsible').sort({ name: 1 }).lean();
         const map = new Map(); 
         allDealers.forEach(d => map.set(d._id.toString(), new Set(d.products.map(String))));
         const matrix = allProducts.map(p => ({
             sku: p.sku, name: p.name,
             dealers: allDealers.map(d => ({ has_product: map.get(d._id.toString()).has(p._id.toString()) }))
         }));
-        const headers = allDealers.map(d => ({ id: d._id, name: d.name, city: d.city || '', status: d.status || 'standard' }));
+        const headers = allDealers.map(d => ({ 
+            id: d._id, 
+            name: d.name, 
+            city: d.city || '', 
+            status: d.status || 'standard',
+            responsible: d.responsible || '' // (НОВОЕ)
+        }));
         res.json({ headers: headers, matrix });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
