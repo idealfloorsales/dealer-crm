@@ -112,6 +112,7 @@ tbody tr:nth-of-type(even) td { background: #fff; }
 }
 
 /* --- Левые колонки (Артикул и Название) - ЛИПКИЕ --- */
+
 /* 1-я колонка: Артикул */
 #matrix-table th:nth-child(1),
 #matrix-table td:nth-child(1) {
@@ -119,11 +120,49 @@ tbody tr:nth-of-type(even) td { background: #fff; }
     left: 0;
     z-index: 5;
     background-color: #fff;
-    border-right: 2px solid #ddd; /* Жирная линия справа */
+    
+    /* (ИЗМЕНЕНО) Ширина и перенос */
+    width: 130px;       /* Было 100px */
+    min-width: 130px;   /* Было 100px */
+    white-space: nowrap; /* Запрещаем перенос текста вниз */
+    
+    /* (ИЗМЕНЕНО) Граница */
+    border-right: 1px solid #e9ecef; /* Тонкая светлая линия вместо жирной */
     font-weight: 700;
     color: var(--primary-color);
-    width: 100px;
-    min-width: 100px;
+}
+
+/* Исправление для шапки 1-й колонки */
+#matrix-table thead th:nth-child(1) {
+    z-index: 20; 
+}
+
+/* 2-я колонка: Название */
+#matrix-table th:nth-child(2),
+#matrix-table td:nth-child(2) {
+    position: sticky;
+    
+    /* (ИЗМЕНЕНО) Отступ слева = ширине 1-й колонки */
+    left: 130px; 
+    
+    z-index: 5;
+    background-color: #fff;
+    
+    /* (ИЗМЕНЕНО) Дизайн разделителя */
+    border-right: none; 
+    box-shadow: 4px 0 5px -2px rgba(0,0,0,0.1); /* Красивая тень вместо черной полосы */
+    
+    width: 200px;
+    min-width: 200px;
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Исправление для шапки 2-й колонки */
+#matrix-table thead th:nth-child(2) {
+    z-index: 20;
 }
 /* Исправление для шапки 1-й колонки (чтобы была выше всех) */
 #matrix-table thead th:nth-child(1) {
@@ -426,4 +465,5 @@ td a { text-decoration: none; color: var(--primary-color) !important; font-weigh
     font-size: 0.8rem;
     padding: 2px 8px;
 }
+
 
