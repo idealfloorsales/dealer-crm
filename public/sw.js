@@ -3,7 +3,7 @@ const urlsToCache = [
     '/',
     '/index.html?v=38',
     '/style.css?v=38',
-    '/script.js?v=38',
+    '/script.js?v=40',
     '/dealer.html?v=38',
     '/dealer.js?v=38',
     '/map.html?v=38', // (ИЗМЕНЕНО)
