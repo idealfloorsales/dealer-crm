@@ -2,6 +2,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     
     const API_MATRIX_URL = '/api/matrix';
+    const API_PRODUCTS_URL = '/api/products'; // Для списка товаров
     
     // Элементы
     const matrixHeader = document.getElementById('matrix-header');
@@ -10,11 +11,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadingMsg = document.getElementById('loading-msg');
     const exportBtn = document.getElementById('export-csv-btn');
     
-    // Фильтры (Глобальные)
+    // Фильтры
     const filterCity = document.getElementById('filter-city');
     const filterResponsible = document.getElementById('filter-responsible');
 
-    // Мульти-селекты (Точечные)
+    // Мульти-селекты
     const dealerBtn = document.getElementById('dealer-dropdown-btn');
     const dealerMenu = document.getElementById('dealer-menu');
     const dealerListContainer = document.getElementById('dealer-list-container');
@@ -30,6 +31,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const productClear = document.getElementById('product-clear');
     
     let fullData = { headers: [], matrix: [] };
+    let allProducts = []; // Список всех товаров для фильтра
+    
     let selectedDealerIds = new Set();
     let selectedProductSkus = new Set();
 
@@ -41,15 +44,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const responsible = filterResponsible.value;
         
         // A. Фильтр КОЛОНОК (Дилеры)
-        // Дилер должен:
-        // 1. Совпадать по Городу (если выбран)
-        // 2. Совпадать по Ответственному (если выбран)
-        // 3. Быть отмечен галочкой (или галочки не стоят вообще)
         const filteredHeaders = fullData.headers.filter(h => {
-            const matchCity = !city || h.city === city;
-            const matchResp = !responsible || h.responsible === responsible;
-            const matchCheck = (selectedDealerIds.size === 0) || selectedDealerIds.has(h.id);
-            return matchCity && matchResp && matchCheck;
+            const matchFilters = (!city || h.city === city) && 
+                                 (!responsible || h.responsible === responsible);
+            
+            // Если в мульти-селекте выбраны конкретные - показываем их.
+            // Если НЕ выбраны - показываем всех, кто прошел фильтры Города/Отв.
+            const matchCheckboxes = (selectedDealerIds.size === 0) || selectedDealerIds.has(h.id);
+            
+            return matchFilters && matchCheckboxes;
         });
         
         const visibleColumnIndices = new Set(filteredHeaders.map(h => fullData.headers.indexOf(h)));
@@ -87,12 +90,23 @@ document.addEventListener('DOMContentLoaded', () => {
     async function initPage() {
         try {
             loadingMsg.style.display = 'block';
-            const response = await fetch(API_MATRIX_URL);
-            if (!response.ok) throw new Error('Ошибка сети');
-            fullData = await response.json(); 
             
-            populateFilters(); 
-            populateMultiSelects();
+            // Загружаем матрицу и список товаров
+            const [matrixRes, prodRes] = await Promise.all([
+                fetch(API_MATRIX_URL),
+                fetch(API_PRODUCTS_URL)
+            ]);
+
+            if (!matrixRes.ok || !prodRes.ok) throw new Error('Ошибка сети');
+            fullData = await matrixRes.json(); 
+            allProducts = await prodRes.json();
+            
+            populateGlobalFilters();  // Заполняем Город и Отв.
+            
+            // Заполняем списки галочек
+            updateDealerListOptions(); // (НОВОЕ) Зависимый список дилеров
+            populateProductList();     // Список товаров (он статичный)
+            
             renderMatrix();    
 
             loadingMsg.style.display = 'none';
@@ -103,39 +117,78 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function populateFilters() {
+    function populateGlobalFilters() {
         const cities = [...new Set(fullData.headers.map(h => h.city).filter(Boolean))].sort();
         filterCity.innerHTML = '<option value="">-- Все города --</option>';
         cities.forEach(c => filterCity.add(new Option(c, c)));
     }
 
-    function populateMultiSelects() {
-        // Дилеры
-        dealerListContainer.innerHTML = fullData.headers.map(d => `
+    // --- (НОВОЕ) Умное обновление списка дилеров (3 фильтр) ---
+    function updateDealerListOptions() {
+        const city = filterCity.value;
+        const responsible = filterResponsible.value;
+        const term = dealerSearch.value.toLowerCase(); // Учитываем и поиск внутри списка
+
+        // Фильтруем исходный список дилеров на основе 1 и 2 фильтра
+        const availableDealers = fullData.headers.filter(d => {
+            const matchCity = !city || d.city === city;
+            const matchResp = !responsible || d.responsible === responsible;
+            const matchSearch = !term || d.name.toLowerCase().includes(term);
+            return matchCity && matchResp && matchSearch;
+        });
+
+        dealerListContainer.innerHTML = availableDealers.map(d => {
+            const isChecked = selectedDealerIds.has(d.id) ? 'checked' : '';
+            return `
             <div class="multi-select-item">
                 <div class="form-check">
-                    <input class="form-check-input dealer-checkbox" type="checkbox" value="${d.id}" id="d-${d.id}">
-                    <label class="form-check-label" for="d-${d.id}">${safeText(d.name)}</label>
+                    <input class="form-check-input dealer-checkbox" type="checkbox" value="${d.id}" id="d-${d.id}" ${isChecked}>
+                    <label class="form-check-label" for="d-${d.id}">
+                        ${safeText(d.name)} <small class="text-muted">(${safeText(d.city)})</small>
+                    </label>
                 </div>
-            </div>
-        `).join('');
-        // Товары
-        productListContainer.innerHTML = fullData.matrix.map(p => `
+            </div>`;
+        }).join('');
+        
+        if (availableDealers.length === 0) {
+            dealerListContainer.innerHTML = '<div class="p-2 text-muted small">Нет дилеров с такими параметрами</div>';
+        }
+
+        // Вешаем слушатели на новые чекбоксы
+        document.querySelectorAll('.dealer-checkbox').forEach(cb => cb.addEventListener('change', (e) => {
+            if (e.target.checked) selectedDealerIds.add(e.target.value); 
+            else selectedDealerIds.delete(e.target.value);
+            renderMatrix();
+        }));
+    }
+
+    function populateProductList() {
+        // Товары берем из allProducts (чтобы был полный список и сортировка)
+        // Сортировка по артикулу уже есть с сервера
+        productListContainer.innerHTML = allProducts.map(p => `
             <div class="multi-select-item">
                 <div class="form-check">
                     <input class="form-check-input product-checkbox" type="checkbox" value="${p.sku}" id="p-${p.sku}">
-                    <label class="form-check-label" for="p-${p.sku}"><strong>${safeText(p.sku)}</strong> ${safeText(p.name)}</label>
+                    <label class="form-check-label" for="p-${p.sku}">
+                        <strong>${safeText(p.sku)}</strong> ${safeText(p.name)}
+                    </label>
                 </div>
             </div>
         `).join('');
 
-        // Слушатели чекбоксов
-        document.querySelectorAll('.dealer-checkbox').forEach(cb => cb.addEventListener('change', (e) => {
-            if (e.target.checked) selectedDealerIds.add(e.target.value); else selectedDealerIds.delete(e.target.value);
-            renderMatrix();
-        }));
+        // Поиск внутри списка товаров
+        productSearch.addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            const items = productListContainer.querySelectorAll('.multi-select-item');
+            items.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                item.style.display = text.includes(term) ? 'block' : 'none';
+            });
+        });
+
         document.querySelectorAll('.product-checkbox').forEach(cb => cb.addEventListener('change', (e) => {
-            if (e.target.checked) selectedProductSkus.add(e.target.value); else selectedProductSkus.delete(e.target.value);
+            if (e.target.checked) selectedProductSkus.add(e.target.value); 
+            else selectedProductSkus.delete(e.target.value);
             renderMatrix();
         }));
     }
@@ -154,19 +207,15 @@ document.addEventListener('DOMContentLoaded', () => {
     dealerBtn.onclick = () => toggleMenu(dealerMenu);
     productBtn.onclick = () => toggleMenu(productMenu);
 
-    const setupSearch = (input, container) => {
-        input.addEventListener('input', (e) => {
-            const term = e.target.value.toLowerCase();
-            container.querySelectorAll('.multi-select-item').forEach(item => {
-                item.style.display = item.textContent.toLowerCase().includes(term) ? 'block' : 'none';
-            });
-        });
-    };
-    setupSearch(dealerSearch, dealerListContainer);
-    setupSearch(productSearch, productListContainer);
+    // Поиск внутри списка Дилеров (теперь вызывает перерисовку списка)
+    dealerSearch.addEventListener('input', () => {
+        updateDealerListOptions();
+    });
 
+    // Кнопки "Все" / "Сброс"
     const bulkAction = (container, className, set, action) => {
         container.querySelectorAll(`.${className}`).forEach(cb => {
+            // Только если элемент видим (не скрыт поиском)
             if (cb.closest('.multi-select-item').style.display !== 'none') {
                 cb.checked = action;
                 if (action) set.add(cb.value); else set.delete(cb.value);
@@ -174,20 +223,42 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         renderMatrix();
     };
-    dealerSelectAll.onclick = () => bulkAction(dealerListContainer, 'dealer-checkbox', selectedDealerIds, true);
-    dealerClear.onclick = () => bulkAction(dealerListContainer, 'dealer-checkbox', selectedDealerIds, false);
+
+    dealerSelectAll.onclick = () => {
+        // Выбираем только тех, кто сейчас в списке (с учетом фильтров города/отв)
+        document.querySelectorAll('.dealer-checkbox').forEach(cb => {
+             cb.checked = true;
+             selectedDealerIds.add(cb.value);
+        });
+        renderMatrix();
+    };
+    dealerClear.onclick = () => {
+        // Сбрасываем только видимых
+        document.querySelectorAll('.dealer-checkbox').forEach(cb => {
+             cb.checked = false;
+             selectedDealerIds.delete(cb.value);
+        });
+        renderMatrix();
+    };
+
     productSelectAll.onclick = () => bulkAction(productListContainer, 'product-checkbox', selectedProductSkus, true);
     productClear.onclick = () => bulkAction(productListContainer, 'product-checkbox', selectedProductSkus, false);
 
     // --- 4. Обработчики Глобальных Фильтров ---
-    if(filterCity) filterCity.onchange = renderMatrix;
-    if(filterResponsible) filterResponsible.onchange = renderMatrix;
+    // При изменении Города или Ответственного -> обновляем список галочек Дилеров
+    if(filterCity) filterCity.onchange = () => {
+        updateDealerListOptions(); // Перестроить список галочек
+        renderMatrix();            // Перестроить таблицу
+    };
+    if(filterResponsible) filterResponsible.onchange = () => {
+        updateDealerListOptions();
+        renderMatrix();
+    };
 
     // --- 5. Экспорт ---
     if(exportBtn) exportBtn.onclick = () => {
         if (!fullData.matrix.length) return;
         
-        // Повтор логики фильтрации
         const city = filterCity.value;
         const responsible = filterResponsible.value;
         
