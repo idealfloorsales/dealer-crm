@@ -70,7 +70,122 @@ th[data-sort]:hover { background: #dde1e5; cursor: pointer; }
 tbody tr td:first-child, tbody tr th:first-child { border-radius: 8px 0 0 8px; }
 tbody tr td:last-child, tbody tr th:last-child { border-radius: 0 8px 8px 0; }
 tbody tr:nth-of-type(even) td { background: #fff; }
+/* --- (НОВОЕ) ПРОФЕССИОНАЛЬНАЯ МАТРИЦА --- */
 
+/* Контейнер для прокрутки */
+#matrix-container {
+    max-height: 75vh; /* Высота на 75% экрана */
+    overflow: auto;   /* Включаем скролл */
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    background: #fff;
+}
+
+#matrix-table {
+    width: 100%;
+    border-collapse: separate; /* Важно для sticky! */
+    border-spacing: 0;
+    font-size: 0.9rem; /* Чуть компактнее шрифт */
+}
+
+/* --- Ячейки --- */
+#matrix-table th, #matrix-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #eee;
+    border-right: 1px solid #eee; /* Вертикальные линии */
+    vertical-align: middle;
+}
+
+/* --- Заголовок (Шапка) --- */
+#matrix-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10; /* Поверх контента */
+    background-color: #f8f9fa; /* Светло-серый фон */
+    color: #444;
+    font-weight: 700;
+    border-bottom: 2px solid var(--primary-color); /* Красная линия снизу шапки */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    white-space: nowrap; /* Текст не переносится */
+    text-align: center;
+}
+
+/* --- Левые колонки (Артикул и Название) - ЛИПКИЕ --- */
+/* 1-я колонка: Артикул */
+#matrix-table th:nth-child(1),
+#matrix-table td:nth-child(1) {
+    position: sticky;
+    left: 0;
+    z-index: 5;
+    background-color: #fff;
+    border-right: 2px solid #ddd; /* Жирная линия справа */
+    font-weight: 700;
+    color: var(--primary-color);
+    width: 100px;
+    min-width: 100px;
+}
+/* Исправление для шапки 1-й колонки (чтобы была выше всех) */
+#matrix-table thead th:nth-child(1) {
+    z-index: 20; 
+}
+
+/* 2-я колонка: Название */
+#matrix-table th:nth-child(2),
+#matrix-table td:nth-child(2) {
+    position: sticky;
+    left: 100px; /* Отступ равен ширине 1-й колонки */
+    z-index: 5;
+    background-color: #fff;
+    border-right: 2px solid #ddd; /* Жирная линия справа */
+    width: 200px;
+    min-width: 200px;
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis; /* Троеточие, если длинное */
+}
+/* Исправление для шапки 2-й колонки */
+#matrix-table thead th:nth-child(2) {
+    z-index: 20;
+}
+
+/* --- Строки --- */
+/* Зебра (чередование цветов) для строк, КРОМЕ липких колонок */
+#matrix-table tbody tr:nth-child(even) td {
+    background-color: #fafafa;
+}
+/* Но липкие колонки должны оставаться белыми/своим цветом, иначе просвечивают */
+#matrix-table tbody tr:nth-child(even) td:nth-child(1),
+#matrix-table tbody tr:nth-child(even) td:nth-child(2) {
+    background-color: #fdfdfd;
+}
+
+/* Эффект наведения (Hover) */
+#matrix-table tbody tr:hover td {
+    background-color: #fff8f8; /* Нежно-розовый при наведении */
+}
+/* Hover для липких колонок тоже */
+#matrix-table tbody tr:hover td:nth-child(1),
+#matrix-table tbody tr:hover td:nth-child(2) {
+    background-color: #fff8f8;
+}
+
+/* --- Галочка (Ячейка с товаром) --- */
+.matrix-check {
+    color: #198754; /* Зеленый */
+    font-size: 1.2rem;
+    font-weight: 900;
+    display: block;
+    text-align: center;
+}
+/* Пустая ячейка - точка для визуального ряда (опционально) */
+.matrix-empty {
+    color: #eee;
+    text-align: center;
+    font-size: 1.5rem;
+    line-height: 0.5;
+}
 /* Статусы (Полоска снизу) */
 tr.row-status-active td { background-color: #f0fff9 !important; border-bottom: 2px solid #198754 !important; }
 tr.row-status-problem td { background-color: #fff5f5 !important; border-bottom: 2px solid #dc3545 !important; }
@@ -311,3 +426,4 @@ td a { text-decoration: none; color: var(--primary-color) !important; font-weigh
     font-size: 0.8rem;
     padding: 2px 8px;
 }
+
