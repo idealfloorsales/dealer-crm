@@ -1,7 +1,7 @@
 // dealer.js
 document.addEventListener('DOMContentLoaded', () => {
     
-    // Элементы
+    // ... (переменные элементов без изменений) ...
     const contactsListContainer = document.getElementById('dealer-contacts-list'); 
     const bonusesContainer = document.getElementById('dealer-bonuses');
     const photoGalleryContainer = document.getElementById('dealer-photo-gallery'); 
@@ -14,12 +14,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const productsListContainer = document.getElementById('dealer-products-list');
     const productsStatsContainer = document.getElementById('dealer-products-stats');
     
-    // Заголовок
     const dealerNameEl = document.getElementById('dealer-name');
     const dealerIdEl = document.getElementById('dealer-id-subtitle');
     const dealerAvatarImg = document.getElementById('dealer-avatar-img');
     
-    // Кнопки
     const deleteBtn = document.getElementById('delete-dealer-btn'); 
     const editBtn = document.getElementById('edit-dealer-btn'); 
     const navigateBtn = document.getElementById('navigate-btn'); 
@@ -46,15 +44,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
     const formatUrl = (url) => { if (!url) return null; if (!url.startsWith('http')) return 'https://' + url; return url; }
 
-    // --- 1. ОСНОВНАЯ ФУНКЦИЯ ЗАГРУЗКИ ---
+    // (НОВОЕ) Перевод значений ответственного
+    const formatResponsible = (val) => {
+        if (val === 'regional_astana') return 'Региональный Астана';
+        if (val === 'regional_regions') return 'Региональный Регионы';
+        return '---';
+    };
+
     async function fetchDealerDetails() {
         try {
-            // 1. Загружаем дилера
             const dealerRes = await fetch(`${API_DEALERS_URL}/${dealerId}`);
             if (!dealerRes.ok) throw new Error(`Дилер не найден.`);
             const dealer = await dealerRes.json();
 
-            // 2. Загружаем ВСЕ товары для статистики
             const productsRes = await fetch(API_PRODUCTS_URL);
             const allProducts = await productsRes.json();
             const totalProductsCount = allProducts.length;
@@ -66,23 +68,20 @@ document.addEventListener('DOMContentLoaded', () => {
             dealerLng = dealer.longitude;
             if (!dealerLat || !dealerLng) { if(navigateBtn) navigateBtn.style.display = 'none'; }
 
-            // --- ЗАГОЛОВОК ---
             dealerNameEl.textContent = safeText(dealer.name);
             dealerIdEl.textContent = `ID: ${safeText(dealer.dealer_id)}`;
             if (dealer.avatarUrl) {
                 dealerAvatarImg.src = dealer.avatarUrl;
                 dealerAvatarImg.style.display = 'block';
-                
-                dealerAvatarImg.onclick = () => {
-                    openAvatarModal(dealer.avatarUrl);
-                };
+                dealerAvatarImg.onclick = () => { openAvatarModal(dealer.avatarUrl); };
             } else {
                 dealerAvatarImg.style.display = 'none'; 
             }
             document.title = `Дилер: ${dealer.name}`;
             
-            // --- ВКЛАДКА ИНФО ---
+            // (ИЗМЕНЕНО) Добавлен Ответственный
             document.getElementById('dealer-info-main').innerHTML = `
+                <p><strong>Ответственный:</strong> <span class="text-primary fw-bold">${formatResponsible(dealer.responsible)}</span></p>
                 <p><strong>Организация:</strong> ${safeText(dealer.organization)}</p>
                 <p><strong>Город:</strong> ${safeText(dealer.city)}</p>
                 <p><strong>Адрес:</strong> ${safeText(dealer.address)}</p>
@@ -90,7 +89,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 <p><strong>Статус:</strong> ${safeText(dealer.status)}</p>
             `;
 
-            // --- ВКЛАДКА ВЫСТАВЛЕННОСТЬ (Статистика) ---
             if (productsStatsContainer) {
                 productsStatsContainer.innerHTML = `
                     <div class="alert alert-light border mb-3">
@@ -114,7 +112,6 @@ document.addEventListener('DOMContentLoaded', () => {
             renderDealerCompetitors(dealer.competitors || []); 
             renderDealerPhotos(dealer.photos || []); 
             
-            // Загружаем товары (плиткой) - передаем ID дилера
             fetchDealerProducts(dealer.products); 
 
         } catch (error) {
@@ -122,6 +119,13 @@ document.addEventListener('DOMContentLoaded', () => {
             dealerIdEl.textContent = error.message;
         }
     }
+    
+    // ... (остальные функции: renderDealerLinks, renderDealerPhotos, openLightbox, openAvatarModal, toggleArrows, renderDealerVisits, renderDealerContacts, renderDealerAddresses, renderDealerPos, renderDealerCompetitors, fetchDealerProducts и обработчики кнопок - БЕЗ ИЗМЕНЕНИЙ) ...
+    // Просто скопируйте их из предыдущего файла dealer.js. 
+    // Главное изменение - в fetchDealerDetails (строки 60-70).
+    
+    // Чтобы не загромождать ответ, я не дублирую весь код dealer.js, 
+    // так как изменился ТОЛЬКО блок dealer-info-main внутри fetchDealerDetails.
     
     function renderDealerLinks(website, instagram) {
         if (!linksContainer) return;
@@ -137,11 +141,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!photos || photos.length === 0) { photoGalleryContainer.innerHTML = '<p><i>Нет фотографий.</i></p>'; return; }
         photos.sort((a, b) => new Date(b.date||0) - new Date(a.date||0));
         let html = ''; let slideIndex = 0; 
-        galleryCarouselContent = ''; // Сброс
-        
+        galleryCarouselContent = ''; 
         const groups = {};
         photos.forEach(p => { const d = p.date ? new Date(p.date).toLocaleDateString('ru-RU') : "Ранее"; if(!groups[d]) groups[d]=[]; groups[d].push(p); });
-        
         for (const [date, group] of Object.entries(groups)) {
             html += `<h5 class="mt-4 border-bottom pb-2 text-secondary">${date}</h5><div class="gallery-grid">`;
             group.forEach(p => {
@@ -245,31 +247,13 @@ document.addEventListener('DOMContentLoaded', () => {
         competitorsListContainer.innerHTML = html + '</tbody></table></div>';
     }
 
-    // (ИЗМЕНЕНО) Теперь принимаем products сразу из объекта дилера
     function fetchDealerProducts(products) {
         const c = document.getElementById('dealer-products-list'); if (!c) return;
-        
-        if (!products || products.length === 0) { 
-            c.innerHTML = '<p class="text-muted"><i>Нет выставленных товаров.</i></p>'; 
-            return; 
-        }
-
-        // Сортировка по артикулу
+        if (!products || products.length === 0) { c.innerHTML = '<p class="text-muted"><i>Нет выставленных товаров.</i></p>'; return; }
         products.sort((a, b) => a.sku.localeCompare(b.sku, undefined, {numeric: true}));
-
-        // Генерация сетки
         let html = '<div class="products-grid">';
-        html += products.map(p => `
-            <div class="product-grid-item">
-                <i class="bi bi-check-circle-fill"></i>
-                <div class="product-info">
-                    <span class="product-sku">${safeText(p.sku)}</span>
-                    <span class="product-name">${safeText(p.name)}</span>
-                </div>
-            </div>
-        `).join('');
+        html += products.map(p => `<div class="product-grid-item"><i class="bi bi-check-circle-fill"></i><div class="product-info"><span class="product-sku">${safeText(p.sku)}</span><span class="product-name">${safeText(p.name)}</span></div></div>`).join('');
         html += '</div>';
-        
         c.innerHTML = html;
     }
 
