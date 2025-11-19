@@ -291,11 +291,11 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if(addAvatarInput) addAvatarInput.addEventListener('change', async (e) => {
         const file = e.target.files[0];
-        if (file) { newAvatarBase64 = await compressImage(file, 200, 0.8); addAvatarPreview.src = newAvatarBase64; }
+        if (file) { newAvatarBase64 = await compressImage(file, 800, 0.8); addAvatarPreview.src = newAvatarBase64; }
     });
     if(editAvatarInput) editAvatarInput.addEventListener('change', async (e) => {
         const file = e.target.files[0];
-        if (file) { newAvatarBase64 = await compressImage(file, 200, 0.8); editAvatarPreview.src = newAvatarBase64; }
+        if (file) { newAvatarBase64 = await compressImage(file, 800, 0.8); editAvatarPreview.src = newAvatarBase64; }
     });
     
     if(addPhotoInput) addPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) addPhotosData.push({ photo_url: await compressImage(file) }); renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData); addPhotoInput.value = ''; });
@@ -558,3 +558,4 @@ document.addEventListener('DOMContentLoaded', () => {
     
     initApp();
 });
+
