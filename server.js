@@ -27,7 +27,7 @@ if (ADMIN_USER && ADMIN_PASSWORD) {
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// СПИСОК ТОВАРОВ (72 шт.)
+// СПИСОК ТОВАРОВ
 const productsToImport = [
     { sku: "CD-507", name: "Дуб Беленый" }, { sku: "CD-508", name: "Дуб Пепельный" },
     { sku: "8EH34-701", name: "Дуб Снежный" }, { sku: "8EH34-702", name: "Дуб Арабика" },
@@ -66,7 +66,7 @@ const productsToImport = [
     { sku: "RPL-28", name: "Дуб Венеция" }
 ];
 
-// (НОВОЕ) Список стендов для Матрицы
+// Список стендов
 const posMaterialsList = [
     "С600 - 600мм задняя стенка",
     "С800 - 800мм задняя стенка",
@@ -76,6 +76,9 @@ const posMaterialsList = [
     "Н800 - 800мм наклейка",
     "Табличка - Табличка орг.стекло"
 ];
+
+// Артикулы стендов, которые надо скрыть из основного списка товаров
+const posSkusToExclude = ["С600", "С800", "РФ-2", "РФС-1", "Н600", "Н800", "Табличка"];
 
 const productSchema = new mongoose.Schema({ sku: String, name: String });
 const Product = mongoose.model('Product', productSchema);
@@ -152,36 +155,37 @@ app.post('/api/products', async (req, res) => { try { const p = new Product(req.
 app.put('/api/products/:id', async (req, res) => { try { const p = await Product.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(p)); } catch(e){res.status(409).json({});} });
 app.delete('/api/products/:id', async (req, res) => { await Product.findByIdAndDelete(req.params.id); await Dealer.updateMany({ products: req.params.id }, { $pull: { products: req.params.id } }); res.json({}); });
 
-// (ИЗМЕНЕНО) API Матрицы теперь включает Стенды
+// (ИЗМЕНЕНО) API Матрицы (Исключаем Стенды из списка товаров)
 app.get('/api/matrix', async (req, res) => {
     try {
-        const allProducts = await Product.find({}, 'sku name').sort({ sku: 1 }).lean();
+        // 1. Берем товары, КРОМЕ стендов (по SKU)
+        const allProducts = await Product.find({ sku: { $nin: posSkusToExclude } }, 'sku name').sort({ sku: 1 }).lean();
+        
         const allDealers = await Dealer.find({}, 'name products pos_materials city status responsible').sort({ name: 1 }).lean();
         
-        // Карта товаров (ламинат)
-        const productMap = new Map(); 
-        allDealers.forEach(d => productMap.set(d._id.toString(), new Set(d.products.map(String))));
+        const map = new Map(); 
+        allDealers.forEach(d => map.set(d._id.toString(), new Set(d.products.map(String))));
 
-        // 1. Строки Товаров
+        // 2. Строим строки для Товаров
         const matrix = allProducts.map(p => ({
             sku: p.sku, name: p.name,
             type: 'product',
             dealers: allDealers.map(d => ({ 
-                value: productMap.get(d._id.toString()).has(p._id.toString()) ? 1 : 0,
+                value: map.get(d._id.toString()).has(p._id.toString()) ? 1 : 0,
                 is_pos: false
             }))
         }));
 
-        // 2. Строки Стендов (POS)
+        // 3. Строим строки для Стендов (POS)
         posMaterialsList.forEach(posName => {
             matrix.push({
-                sku: "POS", // Маркер для сортировки
+                sku: "POS", 
                 name: posName,
                 type: 'pos',
                 dealers: allDealers.map(d => {
                     const found = (d.pos_materials || []).find(pm => pm.name === posName);
                     return {
-                        value: found ? found.quantity : 0, // Количество
+                        value: found ? found.quantity : 0,
                         is_pos: true
                     };
                 })
