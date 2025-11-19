@@ -27,7 +27,7 @@ if (ADMIN_USER && ADMIN_PASSWORD) {
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// СПИСОК ТОВАРОВ
+// СПИСОК ТОВАРОВ (72 шт.)
 const productsToImport = [
     { sku: "CD-507", name: "Дуб Беленый" }, { sku: "CD-508", name: "Дуб Пепельный" },
     { sku: "8EH34-701", name: "Дуб Снежный" }, { sku: "8EH34-702", name: "Дуб Арабика" },
@@ -75,7 +75,6 @@ const visitSchema = new mongoose.Schema({ date: String, comment: String, isCompl
 const posMaterialSchema = new mongoose.Schema({ name: String, quantity: Number }, { _id: false });
 const competitorSchema = new mongoose.Schema({ brand: String, collection: String, price_opt: String, price_retail: String }, { _id: false });
 
-// СХЕМА ДИЛЕРА
 const dealerSchema = new mongoose.Schema({
     dealer_id: String, name: String, price_type: String, city: String, address: String, 
     contacts: [contactSchema], bonuses: String, photos: [photoSchema], organization: String,
@@ -85,9 +84,10 @@ const dealerSchema = new mongoose.Schema({
     visits: [visitSchema],
     products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
     latitude: Number, longitude: Number,
-    status: { type: String, default: 'standard' }, // ВОТ ЭТО ПОЛЕ
+    status: { type: String, default: 'standard' },
     avatarUrl: String,
-    competitors: [competitorSchema]
+    competitors: [competitorSchema],
+    responsible: String // (НОВОЕ) Поле Ответственный
 });
 const Dealer = mongoose.model('Dealer', dealerSchema);
 const Knowledge = mongoose.model('Knowledge', new mongoose.Schema({ title: String, content: String }, { timestamps: true }));
@@ -116,8 +116,8 @@ function convertToClient(doc) {
 // API
 app.get('/api/dealers', async (req, res) => {
     try {
-        // ВАЖНО: Добавлено 'status' в запрос
-        const dealers = await Dealer.find({}, 'dealer_id name city price_type organization products pos_materials visits latitude longitude status avatarUrl').lean();
+        // (ИЗМЕНЕНО) Добавлено 'responsible'
+        const dealers = await Dealer.find({}, 'dealer_id name city price_type organization products pos_materials visits latitude longitude status avatarUrl responsible').lean();
         res.json(dealers.map(d => ({
             id: d._id, dealer_id: d.dealer_id, name: d.name, city: d.city, price_type: d.price_type, organization: d.organization,
             photo_url: d.avatarUrl,
@@ -125,7 +125,8 @@ app.get('/api/dealers', async (req, res) => {
             products_count: (d.products ? d.products.length : 0),
             has_pos: (d.pos_materials && d.pos_materials.length > 0), 
             visits: d.visits, latitude: d.latitude, longitude: d.longitude,
-            status: d.status || 'standard' // Если статуса нет, ставим стандарт
+            status: d.status || 'standard',
+            responsible: d.responsible // (НОВОЕ)
         }))); 
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
