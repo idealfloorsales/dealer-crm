@@ -1,19 +1,20 @@
-const CACHE_NAME = 'dealer-crm-cache-v37'; // (ИЗМЕНЕНО)
+const CACHE_NAME = 'dealer-crm-cache-v38'; // (ИЗМЕНЕНО)
 const urlsToCache = [
     '/',
-    '/index.html?v=37',
-    '/style.css?v=37',
-    '/script.js?v=37',
-    '/dealer.html?v=37',
-    '/dealer.js?v=37',
-    '/map.html?v=37',
-    '/map.js?v=37',
-    '/products.html?v=37',
-    '/products.js?v=37',
-    '/report.html?v=37',
-    '/report.js?v=37',
-    '/knowledge.html?v=37',
-    '/knowledge.js?v=37',
+    '/index.html?v=38',
+    '/style.css?v=38',
+    '/script.js?v=38',
+    '/dealer.html?v=38',
+    '/dealer.js?v=38',
+    '/map.html?v=38', // (ИЗМЕНЕНО)
+    '/map.js?v=38',   // (ИЗМЕНЕНО)
+    // ... (остальные файлы тоже v=38)
+    '/products.html?v=38',
+    '/products.js?v=38',
+    '/report.html?v=38',
+    '/report.js?v=38',
+    '/knowledge.html?v=38',
+    '/knowledge.js?v=38',
     '/logo.png',
     '/favicon.gif',
     'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css',
