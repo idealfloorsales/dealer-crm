@@ -39,7 +39,138 @@ document.addEventListener('DOMContentLoaded', () => {
     const filterStatus = document.getElementById('filter-status');
     const filterResponsible = document.getElementById('filter-responsible'); // (НОВОЕ)
     const searchBar = document.getElementById('search-bar'); 
-    const exportBtn = document.getElementById('export-dealers-btn'); 
+    // ... (весь код выше без изменений) ...
+
+    // (ИЗМЕНЕНО) ПРОФЕССИОНАЛЬНЫЙ ЭКСПОРТ
+    if(exportBtn) {
+        exportBtn.onclick = async () => {
+            // 1. Проверка
+            if (!allDealers.length) return alert("Список пуст. Нечего экспортировать.");
+            
+            // 2. Включаем анимацию загрузки
+            const originalText = exportBtn.innerHTML;
+            exportBtn.disabled = true;
+            exportBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Формирование Excel...';
+
+            // 3. Функция очистки данных для CSV (экранирование кавычек)
+            const clean = (text) => {
+                if (!text) return "";
+                return `"${String(text).replace(/"/g, '""')}"`; // Оборачиваем в кавычки, экранируем внутренние
+            };
+
+            // 4. Заголовки таблицы (Русские)
+            const headers = [
+                "ID Дилера", 
+                "Название", 
+                "Статус", 
+                "Ответственный", 
+                "Город", 
+                "Адрес", 
+                "Тип цен", 
+                "Организация", 
+                "Телефоны / Контакты", 
+                "Мониторинг Конкурентов (Бренд - Коллекция - Цены)", 
+                "Доп. Адреса", 
+                "Сайт / Инстаграм",
+                "Бонусы / Примечания"
+            ];
+            
+            // BOM для корректного открытия кириллицы в Excel
+            let csv = "\uFEFF" + headers.join(";") + "\r\n"; // Используем ; как разделитель (стандарт для Excel в СНГ)
+
+            try {
+                // Берем только тех дилеров, которые сейчас ОТФИЛЬТРОВАНЫ на экране
+                // (ищем строки таблицы, у которых есть кнопка .btn-view, и берем их ID)
+                const visibleRows = Array.from(dealerListBody.querySelectorAll('tr'));
+                const visibleDealerIds = visibleRows
+                    .map(tr => tr.querySelector('.btn-view')?.dataset.id)
+                    .filter(id => id); // Убираем пустые, если есть
+
+                // Проходим по каждому дилеру и запрашиваем ПОЛНЫЕ данные
+                for (const id of visibleDealerIds) {
+                    const res = await fetch(`${API_DEALERS_URL}/${id}`);
+                    if (!res.ok) continue;
+                    const d = await res.json();
+
+                    // --- ФОРМАТИРОВАНИЕ ДАННЫХ ---
+
+                    // 1. Контакты (Имя - Должность: Телефон) -> каждый с новой строки
+                    const contactsStr = (d.contacts || []).map(c => 
+                        `${c.name || '-'} (${c.position || '-'}): ${c.contactInfo || '-'}`
+                    ).join('\n'); // \n делает перенос строки ВНУТРИ ячейки Excel
+
+                    // 2. Конкуренты (Бренд Коллекция [Опт/Розн]) -> каждый с новой строки
+                    const compStr = (d.competitors || []).map(c => 
+                        `⚔️ ${c.brand} - ${c.collection} (Опт: ${c.price_opt} / Розн: ${c.price_retail})`
+                    ).join('\n');
+
+                    // 3. Доп адреса
+                    const addrStr = (d.additional_addresses || []).map(a => 
+                        `${a.city}: ${a.address} (${a.description})`
+                    ).join('\n');
+
+                    // 4. Статус (перевод)
+                    let statusRu = d.status;
+                    if(d.status === 'active') statusRu = 'Active (VIP)';
+                    if(d.status === 'standard') statusRu = 'Standard';
+                    if(d.status === 'problem') statusRu = 'Проблемный';
+                    if(d.status === 'potential') statusRu = 'Потенциальный';
+                    if(d.status === 'archive') statusRu = 'Архив';
+
+                    // 5. Ответственный (перевод)
+                    let respRu = d.responsible || '-';
+                    if(d.responsible === 'regional_astana') respRu = 'Региональный Астана';
+                    if(d.responsible === 'regional_regions') respRu = 'Региональный Регионы';
+
+                    // 6. Соцсети
+                    const links = [d.website, d.instagram].filter(Boolean).join('\n');
+
+                    // СОБИРАЕМ СТРОКУ
+                    const row = [
+                        clean(d.dealer_id),
+                        clean(d.name),
+                        clean(statusRu),
+                        clean(respRu),
+                        clean(d.city),
+                        clean(d.address),
+                        clean(d.price_type),
+                        clean(d.organization),
+                        clean(contactsStr),  // С переносами
+                        clean(compStr),      // С переносами
+                        clean(addrStr),
+                        clean(links),
+                        clean(d.bonuses)
+                    ];
+
+                    csv += row.join(";") + "\r\n";
+                }
+
+                // СКАЧИВАНИЕ
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                
+                // Имя файла с текущей датой
+                const date = new Date().toISOString().slice(0,10);
+                a.download = `Dealers_Export_${date}.csv`;
+                
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+
+            } catch (e) {
+                console.error(e);
+                alert("Ошибка экспорта: " + e.message);
+            } finally {
+                exportBtn.disabled = false;
+                exportBtn.innerHTML = originalText;
+            }
+        };
+    }
+    
+    initApp();
+});
     
     const dashboardContainer = document.getElementById('dashboard-container');
     const tasksListUpcoming = document.getElementById('tasks-list-upcoming');
@@ -394,3 +525,4 @@ document.addEventListener('DOMContentLoaded', () => {
     
     initApp();
 });
+
