@@ -260,3 +260,9 @@ td a { text-decoration: none; color: var(--primary-color) !important; font-weigh
     box-shadow: 0 4px 10px rgba(0,0,0,0.15);
     border-color: var(--primary-color);
 }
+
+.carousel-item img {
+    max-height: 100%; 
+    max-width: 100%; 
+    object-fit: contain;
+}
