@@ -73,12 +73,20 @@ document.addEventListener('DOMContentLoaded', () => {
             </tr>
         `;
         
+       // ... внутри renderMatrix ...
         matrixBody.innerHTML = filteredMatrix.map(row => `
             <tr>
-                <td class="matrix-product-cell">${safeText(row.sku)}</td>
-                <td class="matrix-product-cell">${safeText(row.name)}</td>
+                <td title="${safeText(row.sku)}">${safeText(row.sku)}</td>
+                <td title="${safeText(row.name)}">${safeText(row.name)}</td>
                 ${row.dealers.map((cell, index) => {
-                    return visibleColumnIndices.has(index) ? (cell.has_product ? '<td class="matrix-cell-yes">✔</td>' : '<td></td>') : '';
+                    if (!visibleColumnIndices.has(index)) return '';
+                    
+                    // (ИЗМЕНЕНО) Красивая галочка или точка
+                    if (cell.has_product) {
+                        return '<td><span class="matrix-check">✔</span></td>';
+                    } else {
+                        return '<td><span class="matrix-empty">·</span></td>';
+                    }
                 }).join('')}
             </tr>
         `).join('');
@@ -294,3 +302,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
     initPage();
 });
+
