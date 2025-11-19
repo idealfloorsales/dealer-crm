@@ -19,14 +19,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const dealerIdEl = document.getElementById('dealer-id-subtitle');
     const dealerAvatarImg = document.getElementById('dealer-avatar-img');
     
-    // Кнопки и Модалка
+    // Кнопки
     const deleteBtn = document.getElementById('delete-dealer-btn'); 
     const editBtn = document.getElementById('edit-dealer-btn'); 
     const navigateBtn = document.getElementById('navigate-btn'); 
     const carouselInner = document.getElementById('carousel-inner');
-    
-    // (НОВОЕ) Переменная для хранения HTML галереи
-    let galleryCarouselContent = '';
 
     const API_DEALERS_URL = '/api/dealers';
     const API_PRODUCTS_URL = '/api/products'; 
@@ -35,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let dealerLat = null;
     let dealerLng = null;
+    let galleryCarouselContent = '';
 
     if (!dealerId) {
         if(dealerNameEl) dealerNameEl.textContent = 'Ошибка';
@@ -51,10 +49,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- 1. ОСНОВНАЯ ФУНКЦИЯ ЗАГРУЗКИ ---
     async function fetchDealerDetails() {
         try {
+            // 1. Загружаем дилера
             const dealerRes = await fetch(`${API_DEALERS_URL}/${dealerId}`);
             if (!dealerRes.ok) throw new Error(`Дилер не найден.`);
             const dealer = await dealerRes.json();
 
+            // 2. Загружаем ВСЕ товары для статистики
             const productsRes = await fetch(API_PRODUCTS_URL);
             const allProducts = await productsRes.json();
             const totalProductsCount = allProducts.length;
@@ -66,15 +66,13 @@ document.addEventListener('DOMContentLoaded', () => {
             dealerLng = dealer.longitude;
             if (!dealerLat || !dealerLng) { if(navigateBtn) navigateBtn.style.display = 'none'; }
 
-            // --- ЗАГОЛОВОК И АВАТАР ---
+            // --- ЗАГОЛОВОК ---
             dealerNameEl.textContent = safeText(dealer.name);
             dealerIdEl.textContent = `ID: ${safeText(dealer.dealer_id)}`;
-            
             if (dealer.avatarUrl) {
                 dealerAvatarImg.src = dealer.avatarUrl;
                 dealerAvatarImg.style.display = 'block';
                 
-                // (НОВОЕ) Клик по аватару
                 dealerAvatarImg.onclick = () => {
                     openAvatarModal(dealer.avatarUrl);
                 };
@@ -83,7 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             document.title = `Дилер: ${dealer.name}`;
             
-            // --- Вкладки ---
+            // --- ВКЛАДКА ИНФО ---
             document.getElementById('dealer-info-main').innerHTML = `
                 <p><strong>Организация:</strong> ${safeText(dealer.organization)}</p>
                 <p><strong>Город:</strong> ${safeText(dealer.city)}</p>
@@ -92,10 +90,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 <p><strong>Статус:</strong> ${safeText(dealer.status)}</p>
             `;
 
+            // --- ВКЛАДКА ВЫСТАВЛЕННОСТЬ (Статистика) ---
             if (productsStatsContainer) {
                 productsStatsContainer.innerHTML = `
                     <div class="alert alert-light border mb-3">
-                        <p class="mb-1"><strong>📊 Загрузка матрицы:</strong> ${dealerProductsCount} из ${totalProductsCount} SKU (${percent}%)</p>
+                        <p class="mb-1"><strong>Загрузка матрицы:</strong> ${dealerProductsCount} из ${totalProductsCount} (${percent}%)</p>
                         <div class="progress" style="height: 6px;">
                             <div class="progress-bar bg-success" role="progressbar" style="width: ${percent}%"></div>
                         </div>
@@ -115,7 +114,8 @@ document.addEventListener('DOMContentLoaded', () => {
             renderDealerCompetitors(dealer.competitors || []); 
             renderDealerPhotos(dealer.photos || []); 
             
-            fetchDealerProducts(); 
+            // Загружаем товары (плиткой) - передаем ID дилера
+            fetchDealerProducts(dealer.products); 
 
         } catch (error) {
             dealerNameEl.textContent = 'Ошибка';
@@ -137,10 +137,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!photos || photos.length === 0) { photoGalleryContainer.innerHTML = '<p><i>Нет фотографий.</i></p>'; return; }
         photos.sort((a, b) => new Date(b.date||0) - new Date(a.date||0));
         let html = ''; let slideIndex = 0; 
+        galleryCarouselContent = ''; // Сброс
         
-        // Сбрасываем контент карусели
-        galleryCarouselContent = ''; 
-
         const groups = {};
         photos.forEach(p => { const d = p.date ? new Date(p.date).toLocaleDateString('ru-RU') : "Ранее"; if(!groups[d]) groups[d]=[]; groups[d].push(p); });
         
@@ -148,29 +146,21 @@ document.addEventListener('DOMContentLoaded', () => {
             html += `<h5 class="mt-4 border-bottom pb-2 text-secondary">${date}</h5><div class="gallery-grid">`;
             group.forEach(p => {
                 html += `<div class="gallery-item" onclick="openLightbox(${slideIndex})"><img src="${p.photo_url}" loading="lazy"></div>`;
-                
-                // Формируем HTML для слайдера галереи
                 galleryCarouselContent += `<div class="carousel-item ${slideIndex===0?'active':''}" style="height: 100%;"><div class="d-flex justify-content-center align-items-center h-100"><img src="${p.photo_url}" style="max-height: 100%; max-width: 100%; object-fit: contain;"></div></div>`;
-                
                 slideIndex++;
             });
             html += `</div>`;
         }
         photoGalleryContainer.innerHTML = html;
-        // Изначально загружаем галерею в карусель
         if (carouselInner) carouselInner.innerHTML = galleryCarouselContent;
     }
 
-    // (ИЗМЕНЕНО) Функция открытия ГАЛЕРЕИ
     window.openLightbox = function(index) {
         const modalEl = document.getElementById('imageModal');
         const carouselEl = document.querySelector('#photoCarousel');
         if (modalEl && carouselEl && carouselInner) {
-            // 1. Восстанавливаем контент галереи
             carouselInner.innerHTML = galleryCarouselContent;
-            // 2. Показываем стрелки навигации
             toggleArrows(true);
-            
             const myModal = new bootstrap.Modal(modalEl);
             const carousel = new bootstrap.Carousel(carouselEl);
             carousel.to(index); 
@@ -178,27 +168,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // (НОВОЕ) Функция открытия АВАТАРА
     function openAvatarModal(url) {
         const modalEl = document.getElementById('imageModal');
         if (modalEl && carouselInner) {
-            // 1. Заменяем контент на одно фото
             carouselInner.innerHTML = `
                 <div class="carousel-item active" style="height: 100%;">
                     <div class="d-flex justify-content-center align-items-center h-100">
                         <img src="${url}" style="max-height: 100%; max-width: 100%; object-fit: contain;">
                     </div>
                 </div>`;
-            
-            // 2. Прячем стрелки навигации (так как фото одно)
             toggleArrows(false);
-
             const myModal = new bootstrap.Modal(modalEl);
             myModal.show();
         }
     }
 
-    // (НОВОЕ) Управление стрелками
     function toggleArrows(show) {
         const prevBtn = document.querySelector('.carousel-control-prev');
         const nextBtn = document.querySelector('.carousel-control-next');
@@ -261,42 +245,37 @@ document.addEventListener('DOMContentLoaded', () => {
         competitorsListContainer.innerHTML = html + '</tbody></table></div>';
     }
 
-    async function fetchDealerProducts() {
+    // (ИЗМЕНЕНО) Теперь принимаем products сразу из объекта дилера
+    function fetchDealerProducts(products) {
         const c = document.getElementById('dealer-products-list'); if (!c) return;
-        try {
-            const response = await fetch(`${API_URL}/${dealerId}/products`);
-            if (!response.ok) throw new Error('');
-            const products = await response.json(); 
-            
-            if (products.length === 0) { 
-                c.innerHTML = '<p class="text-muted"><i>Нет выставленных товаров.</i></p>'; 
-                return; 
-            }
+        
+        if (!products || products.length === 0) { 
+            c.innerHTML = '<p class="text-muted"><i>Нет выставленных товаров.</i></p>'; 
+            return; 
+        }
 
-            // Сортировка по артикулу
-            products.sort((a, b) => a.sku.localeCompare(b.sku, undefined, {numeric: true}));
+        // Сортировка по артикулу
+        products.sort((a, b) => a.sku.localeCompare(b.sku, undefined, {numeric: true}));
 
-            // Генерация сетки
-            let html = '<div class="products-grid">';
-            html += products.map(p => `
-                <div class="product-grid-item">
-                    <i class="bi bi-check-circle-fill"></i>
-                    <div class="product-info">
-                        <span class="product-sku">${safeText(p.sku)}</span>
-                        <span class="product-name">${safeText(p.name)}</span>
-                    </div>
+        // Генерация сетки
+        let html = '<div class="products-grid">';
+        html += products.map(p => `
+            <div class="product-grid-item">
+                <i class="bi bi-check-circle-fill"></i>
+                <div class="product-info">
+                    <span class="product-sku">${safeText(p.sku)}</span>
+                    <span class="product-name">${safeText(p.name)}</span>
                 </div>
-            `).join('');
-            html += '</div>';
-            
-            c.innerHTML = html;
-            
-        } catch (error) { c.innerHTML = `<p class="text-danger">${error.message}</p>`; }
+            </div>
+        `).join('');
+        html += '</div>';
+        
+        c.innerHTML = html;
     }
 
     if(editBtn) editBtn.addEventListener('click', () => { localStorage.setItem('pendingEditDealerId', dealerId); window.location.href = 'index.html'; });
     if(navigateBtn) navigateBtn.addEventListener('click', () => { if (dealerLat && dealerLng) window.open(`http://googleusercontent.com/maps/google.com/?q=${dealerLat},${dealerLng}`, '_blank'); else alert("Координаты не заданы."); });
-    if(deleteBtn) deleteBtn.addEventListener('click', async () => { if (confirm(`Удалить?`)) { try { const response = await fetch(`${API_URL}/${dealerId}`, { method: 'DELETE' }); if (response.ok) window.location.href = 'index.html'; } catch (error) { alert('Ошибка.'); } } });
+    if(deleteBtn) deleteBtn.addEventListener('click', async () => { if (confirm(`Удалить?`)) { try { const response = await fetch(`${API_DEALERS_URL}/${dealerId}`, { method: 'DELETE' }); if (response.ok) window.location.href = 'index.html'; } catch (error) { alert('Ошибка.'); } } });
 
     fetchDealerDetails();
 });
