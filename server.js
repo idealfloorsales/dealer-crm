@@ -27,7 +27,7 @@ if (ADMIN_USER && ADMIN_PASSWORD) {
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// СПИСОК ТОВАРОВ
+// СПИСОК ТОВАРОВ (72 шт.)
 const productsToImport = [
     { sku: "CD-507", name: "Дуб Беленый" }, { sku: "CD-508", name: "Дуб Пепельный" },
     { sku: "8EH34-701", name: "Дуб Снежный" }, { sku: "8EH34-702", name: "Дуб Арабика" },
@@ -64,6 +64,17 @@ const productsToImport = [
     { sku: "RPL-22", name: "Дуб Неаполь" }, { sku: "RPL-23", name: "Дуб Монарх" },
     { sku: "RPL-24", name: "Дуб Эмперадор" }, { sku: "RPL-25", name: "Дуб Авангард" },
     { sku: "RPL-28", name: "Дуб Венеция" }
+];
+
+// (НОВОЕ) Список стендов для Матрицы
+const posMaterialsList = [
+    "С600 - 600мм задняя стенка",
+    "С800 - 800мм задняя стенка",
+    "РФ-2 - Расческа из фанеры",
+    "РФС-1 - Расческа из фанеры СТАРАЯ",
+    "Н600 - 600мм наклейка",
+    "Н800 - 800мм наклейка",
+    "Табличка - Табличка орг.стекло"
 ];
 
 const productSchema = new mongoose.Schema({ sku: String, name: String });
@@ -141,24 +152,46 @@ app.post('/api/products', async (req, res) => { try { const p = new Product(req.
 app.put('/api/products/:id', async (req, res) => { try { const p = await Product.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(p)); } catch(e){res.status(409).json({});} });
 app.delete('/api/products/:id', async (req, res) => { await Product.findByIdAndDelete(req.params.id); await Dealer.updateMany({ products: req.params.id }, { $pull: { products: req.params.id } }); res.json({}); });
 
-// (ИЗМЕНЕНО) Добавлено поле responsible в матрицу
+// (ИЗМЕНЕНО) API Матрицы теперь включает Стенды
 app.get('/api/matrix', async (req, res) => {
     try {
         const allProducts = await Product.find({}, 'sku name').sort({ sku: 1 }).lean();
-        const allDealers = await Dealer.find({}, 'name products city status responsible').sort({ name: 1 }).lean();
-        const map = new Map(); 
-        allDealers.forEach(d => map.set(d._id.toString(), new Set(d.products.map(String))));
+        const allDealers = await Dealer.find({}, 'name products pos_materials city status responsible').sort({ name: 1 }).lean();
+        
+        // Карта товаров (ламинат)
+        const productMap = new Map(); 
+        allDealers.forEach(d => productMap.set(d._id.toString(), new Set(d.products.map(String))));
+
+        // 1. Строки Товаров
         const matrix = allProducts.map(p => ({
             sku: p.sku, name: p.name,
-            dealers: allDealers.map(d => ({ has_product: map.get(d._id.toString()).has(p._id.toString()) }))
+            type: 'product',
+            dealers: allDealers.map(d => ({ 
+                value: productMap.get(d._id.toString()).has(p._id.toString()) ? 1 : 0,
+                is_pos: false
+            }))
         }));
+
+        // 2. Строки Стендов (POS)
+        posMaterialsList.forEach(posName => {
+            matrix.push({
+                sku: "POS", // Маркер для сортировки
+                name: posName,
+                type: 'pos',
+                dealers: allDealers.map(d => {
+                    const found = (d.pos_materials || []).find(pm => pm.name === posName);
+                    return {
+                        value: found ? found.quantity : 0, // Количество
+                        is_pos: true
+                    };
+                })
+            });
+        });
+
         const headers = allDealers.map(d => ({ 
-            id: d._id, 
-            name: d.name, 
-            city: d.city || '', 
-            status: d.status || 'standard',
-            responsible: d.responsible || '' // (НОВОЕ)
+            id: d._id, name: d.name, city: d.city || '', status: d.status || 'standard', responsible: d.responsible || ''
         }));
+        
         res.json({ headers: headers, matrix });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
