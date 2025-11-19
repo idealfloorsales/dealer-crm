@@ -297,6 +297,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const file = e.target.files[0];
         if (file) { newAvatarBase64 = await compressImage(file, 800, 0.8); editAvatarPreview.src = newAvatarBase64; }
     });
+
+function openAvatarModal(url) {
+        const modalEl = document.getElementById('imageModal');
+        if (modalEl && carouselInner) {
+            carouselInner.innerHTML = `
+                <div class="carousel-item active" style="height: 100%;">
+                    <div class="d-flex justify-content-center align-items-center h-100">
+                        <img src="${url}" style="max-height: 100%; max-width: 100%; object-fit: contain;">
+                    </div>
+                </div>`;
+            
+            toggleArrows(false);
+            const myModal = new bootstrap.Modal(modalEl);
+            myModal.show();
+        }
+    }
     
     if(addPhotoInput) addPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) addPhotosData.push({ photo_url: await compressImage(file) }); renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData); addPhotoInput.value = ''; });
     if(addPhotoPreviewContainer) addPhotoPreviewContainer.addEventListener('click', (e) => { if(e.target.classList.contains('btn-remove-photo')) { addPhotosData.splice(e.target.dataset.index, 1); renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData); }});
@@ -558,4 +574,5 @@ document.addEventListener('DOMContentLoaded', () => {
     
     initApp();
 });
+
 
