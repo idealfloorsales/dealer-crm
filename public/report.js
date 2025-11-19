@@ -3,56 +3,70 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const API_MATRIX_URL = '/api/matrix';
     
+    // Элементы
     const matrixHeader = document.getElementById('matrix-header');
     const matrixBody = document.getElementById('matrix-body');
     const matrixContainer = document.getElementById('matrix-container');
     const loadingMsg = document.getElementById('loading-msg');
     const exportBtn = document.getElementById('export-csv-btn');
     
-    const filterStatus = document.getElementById('filter-status');
+    // Фильтры (Глобальные)
     const filterCity = document.getElementById('filter-city');
-    const filterResponsible = document.getElementById('filter-responsible'); // (НОВОЕ)
-    const searchDealer = document.getElementById('search-dealer');
-    const searchProduct = document.getElementById('search-product');
+    const filterResponsible = document.getElementById('filter-responsible');
+
+    // Мульти-селекты (Точечные)
+    const dealerBtn = document.getElementById('dealer-dropdown-btn');
+    const dealerMenu = document.getElementById('dealer-menu');
+    const dealerListContainer = document.getElementById('dealer-list-container');
+    const dealerSearch = document.getElementById('dealer-search');
+    const dealerSelectAll = document.getElementById('dealer-select-all');
+    const dealerClear = document.getElementById('dealer-clear');
+
+    const productBtn = document.getElementById('product-dropdown-btn');
+    const productMenu = document.getElementById('product-menu');
+    const productListContainer = document.getElementById('product-list-container');
+    const productSearch = document.getElementById('product-search');
+    const productSelectAll = document.getElementById('product-select-all');
+    const productClear = document.getElementById('product-clear');
     
     let fullData = { headers: [], matrix: [] };
+    let selectedDealerIds = new Set();
+    let selectedProductSkus = new Set();
 
     const safeText = (text) => (text || '').toString().replace(/</g, "&lt;");
 
+    // --- 1. Рендер Таблицы ---
     function renderMatrix() {
-        const status = filterStatus.value;
         const city = filterCity.value;
-        const responsible = filterResponsible ? filterResponsible.value : ''; // (НОВОЕ)
-        const dealerSearch = searchDealer.value.toLowerCase();
-        const productSearchRaw = searchProduct.value.toLowerCase();
+        const responsible = filterResponsible.value;
         
-        const productSearchTerms = productSearchRaw.split(/[ ,]+/).filter(term => term.length > 0);
-
-        // --- A. Фильтруем Колонки (Дилеров) ---
-        const filteredHeaders = fullData.headers.filter(h => 
-            (!status || h.status === status) &&
-            (!city || h.city === city) &&
-            (!responsible || h.responsible === responsible) && // (НОВОЕ)
-            (!dealerSearch || h.name.toLowerCase().includes(dealerSearch))
-        );
+        // A. Фильтр КОЛОНОК (Дилеры)
+        // Дилер должен:
+        // 1. Совпадать по Городу (если выбран)
+        // 2. Совпадать по Ответственному (если выбран)
+        // 3. Быть отмечен галочкой (или галочки не стоят вообще)
+        const filteredHeaders = fullData.headers.filter(h => {
+            const matchCity = !city || h.city === city;
+            const matchResp = !responsible || h.responsible === responsible;
+            const matchCheck = (selectedDealerIds.size === 0) || selectedDealerIds.has(h.id);
+            return matchCity && matchResp && matchCheck;
+        });
+        
         const visibleColumnIndices = new Set(filteredHeaders.map(h => fullData.headers.indexOf(h)));
 
-        // --- B. Фильтруем Строки (Товары) ---
-        const filteredMatrix = fullData.matrix.filter(p => {
-            if (productSearchTerms.length === 0) return true;
-            const sku = (p.sku || '').toLowerCase();
-            const name = (p.name || '').toLowerCase();
-            return productSearchTerms.some(term => sku.includes(term) || name.includes(term));
-        });
+        // B. Фильтр СТРОК (Товары)
+        const filteredMatrix = fullData.matrix.filter(p => 
+            (selectedProductSkus.size === 0) || selectedProductSkus.has(p.sku)
+        );
 
-        // --- C. Рендеринг ---
+        // C. Отрисовка
         if (!matrixHeader || !matrixBody) return;
 
         matrixHeader.innerHTML = `
             <tr>
                 <th class="matrix-product-cell">Артикул</th>
                 <th class="matrix-product-cell">Название</th>
-                ${filteredHeaders.map(h => `<th>${safeText(h.name)}</th>`).join('')}
+                ${filteredHeaders.map(h => `<th>${safeText(h.name)}<br><small class="fw-normal text-muted" style="font-size:10px">${safeText(h.city)}</small></th>`).join('')}
             </tr>
         `;
         
@@ -65,6 +79,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 }).join('')}
             </tr>
         `).join('');
+
+        updateDropdownLabels();
+    }
+
+    // --- 2. Инициализация ---
+    async function initPage() {
+        try {
+            loadingMsg.style.display = 'block';
+            const response = await fetch(API_MATRIX_URL);
+            if (!response.ok) throw new Error('Ошибка сети');
+            fullData = await response.json(); 
+            
+            populateFilters(); 
+            populateMultiSelects();
+            renderMatrix();    
+
+            loadingMsg.style.display = 'none';
+            matrixContainer.style.display = 'block';
+        } catch (error) {
+            loadingMsg.textContent = 'Ошибка загрузки: ' + error.message;
+            loadingMsg.className = 'alert alert-danger';
+        }
     }
 
     function populateFilters() {
@@ -73,68 +109,100 @@ document.addEventListener('DOMContentLoaded', () => {
         cities.forEach(c => filterCity.add(new Option(c, c)));
     }
 
-    async function initPage() {
-        try {
-            loadingMsg.style.display = 'block';
-            matrixContainer.style.display = 'none';
+    function populateMultiSelects() {
+        // Дилеры
+        dealerListContainer.innerHTML = fullData.headers.map(d => `
+            <div class="multi-select-item">
+                <div class="form-check">
+                    <input class="form-check-input dealer-checkbox" type="checkbox" value="${d.id}" id="d-${d.id}">
+                    <label class="form-check-label" for="d-${d.id}">${safeText(d.name)}</label>
+                </div>
+            </div>
+        `).join('');
+        // Товары
+        productListContainer.innerHTML = fullData.matrix.map(p => `
+            <div class="multi-select-item">
+                <div class="form-check">
+                    <input class="form-check-input product-checkbox" type="checkbox" value="${p.sku}" id="p-${p.sku}">
+                    <label class="form-check-label" for="p-${p.sku}"><strong>${safeText(p.sku)}</strong> ${safeText(p.name)}</label>
+                </div>
+            </div>
+        `).join('');
 
-            const response = await fetch(API_MATRIX_URL);
-            if (!response.ok) throw new Error('Ошибка сети');
-            
-            fullData = await response.json(); 
-            
-            populateFilters(); 
-            renderMatrix();    
-
-            loadingMsg.style.display = 'none';
-            matrixContainer.style.display = 'block';
-
-        } catch (error) {
-            loadingMsg.textContent = 'Ошибка загрузки: ' + error.message;
-            loadingMsg.className = 'alert alert-danger';
-        }
+        // Слушатели чекбоксов
+        document.querySelectorAll('.dealer-checkbox').forEach(cb => cb.addEventListener('change', (e) => {
+            if (e.target.checked) selectedDealerIds.add(e.target.value); else selectedDealerIds.delete(e.target.value);
+            renderMatrix();
+        }));
+        document.querySelectorAll('.product-checkbox').forEach(cb => cb.addEventListener('change', (e) => {
+            if (e.target.checked) selectedProductSkus.add(e.target.value); else selectedProductSkus.delete(e.target.value);
+            renderMatrix();
+        }));
     }
 
-    let debounceTimer;
-    function setupDebouncedFiltering() {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => renderMatrix(), 300);
+    function updateDropdownLabels() {
+        dealerBtn.textContent = selectedDealerIds.size > 0 ? `Выбрано: ${selectedDealerIds.size}` : 'Все дилеры';
+        productBtn.textContent = selectedProductSkus.size > 0 ? `Выбрано: ${selectedProductSkus.size}` : 'Все товары';
     }
 
-    if(filterStatus) filterStatus.onchange = renderMatrix;
+    // --- 3. Управление UI ---
+    function toggleMenu(menu) { menu.classList.toggle('show'); }
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('#dealer-dropdown')) dealerMenu.classList.remove('show');
+        if (!e.target.closest('#product-dropdown')) productMenu.classList.remove('show');
+    });
+    dealerBtn.onclick = () => toggleMenu(dealerMenu);
+    productBtn.onclick = () => toggleMenu(productMenu);
+
+    const setupSearch = (input, container) => {
+        input.addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            container.querySelectorAll('.multi-select-item').forEach(item => {
+                item.style.display = item.textContent.toLowerCase().includes(term) ? 'block' : 'none';
+            });
+        });
+    };
+    setupSearch(dealerSearch, dealerListContainer);
+    setupSearch(productSearch, productListContainer);
+
+    const bulkAction = (container, className, set, action) => {
+        container.querySelectorAll(`.${className}`).forEach(cb => {
+            if (cb.closest('.multi-select-item').style.display !== 'none') {
+                cb.checked = action;
+                if (action) set.add(cb.value); else set.delete(cb.value);
+            }
+        });
+        renderMatrix();
+    };
+    dealerSelectAll.onclick = () => bulkAction(dealerListContainer, 'dealer-checkbox', selectedDealerIds, true);
+    dealerClear.onclick = () => bulkAction(dealerListContainer, 'dealer-checkbox', selectedDealerIds, false);
+    productSelectAll.onclick = () => bulkAction(productListContainer, 'product-checkbox', selectedProductSkus, true);
+    productClear.onclick = () => bulkAction(productListContainer, 'product-checkbox', selectedProductSkus, false);
+
+    // --- 4. Обработчики Глобальных Фильтров ---
     if(filterCity) filterCity.onchange = renderMatrix;
-    if(filterResponsible) filterResponsible.onchange = renderMatrix; // (НОВОЕ)
-    if(searchDealer) searchDealer.addEventListener('input', setupDebouncedFiltering);
-    if(searchProduct) searchProduct.addEventListener('input', setupDebouncedFiltering);
+    if(filterResponsible) filterResponsible.onchange = renderMatrix;
 
+    // --- 5. Экспорт ---
     if(exportBtn) exportBtn.onclick = () => {
         if (!fullData.matrix.length) return;
         
-        const status = filterStatus.value;
+        // Повтор логики фильтрации
         const city = filterCity.value;
-        const responsible = filterResponsible ? filterResponsible.value : ''; // (НОВОЕ)
-        const dealerSearch = searchDealer.value.toLowerCase();
-        const productSearchRaw = searchProduct.value.toLowerCase();
-        const productSearchTerms = productSearchRaw.split(/[ ,]+/).filter(term => term.length > 0);
-
-        const visibleHeaders = fullData.headers.filter(h => 
-            (!status || h.status === status) &&
-            (!city || h.city === city) &&
-            (!responsible || h.responsible === responsible) && // (НОВОЕ)
-            (!dealerSearch || h.name.toLowerCase().includes(dealerSearch))
-        );
-        const visibleColumnIndices = new Set(visibleHeaders.map(h => fullData.headers.indexOf(h)));
-
-        const filteredMatrix = fullData.matrix.filter(p => {
-            if (productSearchTerms.length === 0) return true;
-            const sku = (p.sku || '').toLowerCase();
-            const name = (p.name || '').toLowerCase();
-            return productSearchTerms.some(term => sku.includes(term) || name.includes(term));
+        const responsible = filterResponsible.value;
+        
+        const filteredHeaders = fullData.headers.filter(h => {
+            const matchFilters = (!city || h.city === city) && (!responsible || h.responsible === responsible);
+            const matchCheckboxes = (selectedDealerIds.size === 0) || selectedDealerIds.has(h.id);
+            return matchFilters && matchCheckboxes;
         });
+        
+        const visibleColumnIndices = new Set(filteredHeaders.map(h => fullData.headers.indexOf(h)));
+        const filteredMatrix = fullData.matrix.filter(p => (selectedProductSkus.size === 0) || selectedProductSkus.has(p.sku));
 
         const clean = (text) => `"${String(text || '').replace(/"/g, '""')}"`;
         let csv = "\uFEFFАртикул,Название,";
-        csv += visibleHeaders.map(h => clean(h.name)).join(",") + "\r\n";
+        csv += filteredHeaders.map(h => clean(h.name)).join(",") + "\r\n";
 
         filteredMatrix.forEach(row => {
             csv += `${clean(row.sku)},${clean(row.name)},`;
