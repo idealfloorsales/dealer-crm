@@ -1,3 +1,4 @@
+// sales.js
 document.addEventListener('DOMContentLoaded', () => {
     
     const API_DEALERS = '/api/dealers';
@@ -11,19 +12,50 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentMonthStr = now.toISOString().slice(0, 7);
     monthPicker.value = currentMonthStr;
 
+    // Группы для отображения
     const groupsOrder = [
         { key: 'michael', title: 'Отдел продаж Михаил' },
         { key: 'alexander', title: 'Отдел продаж Александр' },
+        { key: 'regional_astana', title: 'Региональный Астана' }, // (ИЗМЕНЕНО)
         { key: 'north', title: 'Регион Север' },
         { key: 'south', title: 'Регион Юг' },
         { key: 'west', title: 'Регион Запад' },
         { key: 'east', title: 'Регион Восток' },
         { key: 'center', title: 'Регион Центр' },
-        { key: '', title: 'Без группы' }
+        { key: 'other', title: 'Остальные' } 
     ];
+
+    // (НОВОЕ) Карта городов к регионам
+    const cityToRegion = {
+        "Павлодар": "north", "Кокшетау": "north", "Петропавловск": "north", "Костанай": "north",
+        "Семей": "east", "Усть-Каменогорск": "east",
+        "Шымкент": "south", "Алматы": "south", "Тараз": "south", "Кызылорда": "south",
+        "Актобе": "west", "Актау": "west", "Атырау": "west", "Уральск": "west",
+        "Караганда": "center", "Жезказган": "center"
+    };
 
     let allDealers = [];
     let currentSales = [];
+
+    // Функция определения группы дилера
+    function getDealerGroup(dealer) {
+        const resp = dealer.responsible || '';
+        const city = dealer.city || '';
+
+        // Если явно назначен Михаил, Александр или Астана - они главнее
+        if (['michael', 'alexander', 'regional_astana'].includes(resp)) {
+            return resp;
+        }
+
+        // Если назначен "Региональный Регионы" - смотрим на город
+        if (resp === 'regional_regions') {
+            if (cityToRegion[city]) return cityToRegion[city]; // Возвращаем 'north', 'south' и т.д.
+            return 'other'; // Если город неизвестен
+        }
+        
+        // Если ответственный вообще не назначен
+        return 'other';
+    }
 
     async function loadData() {
         try {
@@ -42,12 +74,10 @@ document.addEventListener('DOMContentLoaded', () => {
         plan = parseFloat(plan) || 0;
         fact = parseFloat(fact) || 0;
         const diff = fact - plan;
-        
         let forecast = 0;
         if (currentDay > 0) {
             forecast = (fact / currentDay) * daysInMonth;
         }
-        
         const percent = plan > 0 ? (fact / plan) * 100 : 0;
         return { diff, forecast, percent };
     }
@@ -67,7 +97,9 @@ document.addEventListener('DOMContentLoaded', () => {
         container.innerHTML = '';
 
         groupsOrder.forEach(grp => {
-            const groupDealers = allDealers.filter(d => (d.responsible || '') === grp.key);
+            // 1. Фильтруем дилеров с помощью умной функции
+            const groupDealers = allDealers.filter(d => getDealerGroup(d) === grp.key);
+            
             const customSales = currentSales.filter(s => s.isCustom && s.group === grp.key);
 
             if (groupDealers.length === 0 && customSales.length === 0) return;
