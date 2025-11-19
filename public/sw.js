@@ -1,20 +1,20 @@
 // sw.js (Service Worker)
-const CACHE_NAME = 'dealer-crm-cache-v29'; // (ИЗМЕНЕНО)
+const CACHE_NAME = 'dealer-crm-cache-v35'; // (ИЗМЕНЕНО)
 const urlsToCache = [
     '/',
-    '/index.html?v=29', // (ИЗМЕНЕНО)
-    '/style.css?v=32',
-    '/script.js?v=28',
-    '/dealer.html?v=32',
-    '/dealer.js?v=28',
-    '/map.html?v=28',
-    '/map.js?v=28',
-    '/products.html?v=28',
-    '/products.js?v=28',
-    '/report.html?v=28',
-    '/report.js?v=28',
-    '/knowledge.html?v=28',
-    '/knowledge.js?v=28',
+    '/index.html?v=35', // (ИЗМЕНЕНО)
+    '/style.css?v=35',
+    '/script.js?v=35',
+    '/dealer.html?v=35',
+    '/dealer.js?v=35',
+    '/map.html?v=235',
+    '/map.js?v=35',
+    '/products.html?v=35',
+    '/products.js?v=35',
+    '/report.html?v=35',
+    '/report.js?v=35',
+    '/knowledge.html?v=35',
+    '/knowledge.js?v=35',
     '/logo.png',
     '/favicon.gif',
     'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css',
