@@ -79,7 +79,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Карта ---
     const DEFAULT_LAT = 51.1605; const DEFAULT_LNG = 71.4704;
-    const CITY_COORDS = { "Астана": [51.1605, 71.4704], "Алматы": [43.2220, 76.8512], "Шымкент": [42.3417, 69.5901], "Караганда": [49.8020, 73.1021], "Актобе": [50.2839, 57.1670], "Тараз": [42.9000, 71.3667], "Павлодар": [52.2873, 76.9674], "Усть-Каменогорск": [49.9632, 82.6059], "Семей": [50.4113, 80.2275], "Атырау": [47.1167, 51.8833], "Костанай": [53.2148, 63.6321], "Кызылорда": [44.8488, 65.4823], "Уральск": [51.2333, 51.3667], "Петропавловск": [54.8753, 69.1622], "Актау": [43.6500, 51.1500] };
     let addMap, editMap;
 
     function initMap(mapId) {
@@ -98,26 +97,74 @@ document.addEventListener('DOMContentLoaded', () => {
             if (markerRef.current) markerRef.current.setLatLng([lat, lng]); else markerRef.current = L.marker([lat, lng]).addTo(map);
         });
     }
+    // (НОВОЕ) Поиск на карте
+    function setupMapSearch(map, inputId, suggestionsId, latId, lngId, markerRef) {
+        const input = document.getElementById(inputId);
+        const suggestionsBox = document.getElementById(suggestionsId);
+        const latInput = document.getElementById(latId);
+        const lngInput = document.getElementById(lngId);
+        if (!input || !suggestionsBox) return;
+        let debounceTimer;
+        input.addEventListener('input', async () => {
+            clearTimeout(debounceTimer);
+            const query = input.value.trim();
+            if (query.length < 3) { suggestionsBox.style.display = 'none'; return; }
+            debounceTimer = setTimeout(async () => {
+                try {
+                    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=kz`);
+                    const data = await res.json();
+                    suggestionsBox.innerHTML = '';
+                    if (data.length > 0) {
+                        suggestionsBox.style.display = 'block';
+                        data.slice(0, 5).forEach(place => {
+                            const div = document.createElement('div');
+                            div.className = 'address-suggestion-item';
+                            div.textContent = place.display_name;
+                            div.onclick = () => {
+                                const lat = parseFloat(place.lat);
+                                const lon = parseFloat(place.lon);
+                                if (markerRef.current) markerRef.current.setLatLng([lat, lon]);
+                                else markerRef.current = L.marker([lat, lon]).addTo(map);
+                                map.setView([lat, lon], 16);
+                                if (latInput) latInput.value = lat;
+                                if (lngInput) lngInput.value = lon;
+                                input.value = place.display_name;
+                                suggestionsBox.style.display = 'none';
+                            };
+                            suggestionsBox.appendChild(div);
+                        });
+                    } else { suggestionsBox.style.display = 'none'; }
+                } catch (e) { console.error(e); }
+            }, 500);
+        });
+        document.addEventListener('click', (e) => { if (!e.target.closest('.map-search-container')) suggestionsBox.style.display = 'none'; });
+    }
+
     if (addModalEl) {
         addModalEl.addEventListener('shown.bs.modal', () => {
-            if (!addMap) { addMap = initMap('add-map'); addModalEl.markerRef = { current: null }; setupMapClick(addMap, 'add_latitude', 'add_longitude', addModalEl.markerRef); } else { addMap.invalidateSize(); }
+            if (!addMap) { 
+                addMap = initMap('add-map'); 
+                addModalEl.markerRef = { current: null }; 
+                setupMapClick(addMap, 'add_latitude', 'add_longitude', addModalEl.markerRef);
+                setupMapSearch(addMap, 'add-map-search', 'add-map-suggestions', 'add_latitude', 'add_longitude', addModalEl.markerRef);
+            } else { addMap.invalidateSize(); }
             if (addMap && addModalEl.markerRef && addModalEl.markerRef.current) { addMap.removeLayer(addModalEl.markerRef.current); addModalEl.markerRef.current = null; }
-            if (addMap) {
-                const city = document.getElementById('city') ? document.getElementById('city').value.trim() : '';
-                if (city && CITY_COORDS[city]) addMap.setView(CITY_COORDS[city], 12); else addMap.setView([DEFAULT_LAT, DEFAULT_LNG], 13);
-            }
+            if (addMap) addMap.setView([DEFAULT_LAT, DEFAULT_LNG], 13);
         });
     }
     if (editModalEl) {
         editModalEl.addEventListener('shown.bs.modal', () => {
-            if (!editMap) { editMap = initMap('edit-map'); editModalEl.markerRef = { current: null }; setupMapClick(editMap, 'edit_latitude', 'edit_longitude', editModalEl.markerRef); } else { editMap.invalidateSize(); }
+            if (!editMap) { 
+                editMap = initMap('edit-map'); 
+                editModalEl.markerRef = { current: null }; 
+                setupMapClick(editMap, 'edit_latitude', 'edit_longitude', editModalEl.markerRef); 
+                setupMapSearch(editMap, 'edit-map-search', 'edit-map-suggestions', 'edit_latitude', 'edit_longitude', editModalEl.markerRef);
+            } else { editMap.invalidateSize(); }
             const latEl = document.getElementById('edit_latitude'); const lngEl = document.getElementById('edit_longitude');
             if (latEl && lngEl && editMap) {
                 const lat = parseFloat(latEl.value); const lng = parseFloat(lngEl.value);
-                const city = document.getElementById('edit_city') ? document.getElementById('edit_city').value.trim() : '';
                 if (editModalEl.markerRef.current) editMap.removeLayer(editModalEl.markerRef.current);
                 if (!isNaN(lat) && !isNaN(lng)) { editModalEl.markerRef.current = L.marker([lat, lng]).addTo(editMap); editMap.setView([lat, lng], 15); } 
-                else if (city && CITY_COORDS[city]) { editMap.setView(CITY_COORDS[city], 12); }
                 else { editMap.setView([DEFAULT_LAT, DEFAULT_LNG], 13); }
             }
         });
@@ -172,130 +219,34 @@ document.addEventListener('DOMContentLoaded', () => {
         const today = new Date(); today.setHours(0,0,0,0);
         const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
         const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
-        
-        const tasksUpcoming = [];
-        const tasksProblem = [];
-        const tasksCooling = [];
-
+        const tasksUpcoming = []; const tasksProblem = []; const tasksCooling = [];
         allDealers.forEach(d => {
             if (d.status === 'archive') return; 
             const isPotential = d.status === 'potential';
-
-            let lastVisitDate = null;
-            let hasFutureTasks = false;
-
-            if (d.visits && Array.isArray(d.visits)) {
-                d.visits.forEach((v, index) => {
-                    const vDate = new Date(v.date);
-                    if (!v.date) return; 
-                    vDate.setHours(0,0,0,0);
-
-                    if (v.isCompleted && (!lastVisitDate || vDate > lastVisitDate)) {
-                        lastVisitDate = vDate;
-                    }
-                    
-                    if (!v.isCompleted) {
-                        const taskData = { dealerName: d.name, dealerId: d.id, date: vDate, comment: v.comment || "", visitIndex: index };
-                        if (vDate < today) {
-                            tasksProblem.push({...taskData, type: 'overdue'}); 
-                        } else if (vDate.getTime() === today.getTime() || vDate.getTime() === tomorrow.getTime()) {
-                            tasksUpcoming.push({...taskData, isToday: vDate.getTime() === today.getTime()});
-                            hasFutureTasks = true;
-                        } else {
-                            hasFutureTasks = true; 
-                        }
-                    }
-                });
-            }
-
-            if (d.status === 'problem') {
-                if (!tasksProblem.some(t => t.dealerId === d.id && t.type === 'overdue')) {
-                    tasksProblem.push({ dealerName: d.name, dealerId: d.id, type: 'status' });
-                }
-            }
-
-            if (!hasFutureTasks && d.status !== 'problem' && !isPotential) {
-                if (!lastVisitDate) {
-                    tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: 999 }); 
-                } else if (lastVisitDate < thirtyDaysAgo) {
-                    const days = Math.floor((today - lastVisitDate) / (1000 * 60 * 60 * 24));
-                    tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: days });
-                }
-            }
+            let lastVisitDate = null; let hasFutureTasks = false;
+            if (d.visits && Array.isArray(d.visits)) { d.visits.forEach((v, index) => { const vDate = new Date(v.date); if (!v.date) return; vDate.setHours(0,0,0,0); if (v.isCompleted && (!lastVisitDate || vDate > lastVisitDate)) { lastVisitDate = vDate; } if (!v.isCompleted) { const taskData = { dealerName: d.name, dealerId: d.id, date: vDate, comment: v.comment || "", visitIndex: index }; if (vDate < today) { tasksProblem.push({...taskData, type: 'overdue'}); } else if (vDate.getTime() === today.getTime() || vDate.getTime() === tomorrow.getTime()) { tasksUpcoming.push({...taskData, isToday: vDate.getTime() === today.getTime()}); hasFutureTasks = true; } else { hasFutureTasks = true; } } }); }
+            if (d.status === 'problem') { if (!tasksProblem.some(t => t.dealerId === d.id && t.type === 'overdue')) { tasksProblem.push({ dealerName: d.name, dealerId: d.id, type: 'status' }); } }
+            if (!hasFutureTasks && d.status !== 'problem' && !isPotential) { if (!lastVisitDate) { tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: 999 }); } else if (lastVisitDate < thirtyDaysAgo) { const days = Math.floor((today - lastVisitDate) / (1000 * 60 * 60 * 24)); tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: days }); } }
         });
-
-        tasksUpcoming.sort((a, b) => a.date - b.date);
-        tasksProblem.sort((a, b) => (a.date || 0) - (b.date || 0));
-        tasksCooling.sort((a, b) => b.days - a.days);
-
-        renderTaskList(tasksListUpcoming, tasksUpcoming, 'upcoming');
-        renderTaskList(tasksListProblem, tasksProblem, 'problem');
-        renderTaskList(tasksListCooling, tasksCooling, 'cooling');
+        tasksUpcoming.sort((a, b) => a.date - b.date); tasksProblem.sort((a, b) => (a.date || 0) - (b.date || 0)); tasksCooling.sort((a, b) => b.days - a.days);
+        renderTaskList(tasksListUpcoming, tasksUpcoming, 'upcoming'); renderTaskList(tasksListProblem, tasksProblem, 'problem'); renderTaskList(tasksListCooling, tasksCooling, 'cooling');
     }
 
     function renderTaskList(container, tasks, type) {
         if (!container) return;
-        if (tasks.length === 0) {
-            const message = type === 'cooling' ? 'Нет таких' : 'Нет задач';
-            container.innerHTML = `<p class="text-muted text-center p-3">${message}</p>`;
-            return;
-        }
+        if (tasks.length === 0) { container.innerHTML = `<p class="text-muted text-center p-3">${type === 'cooling' ? 'Нет таких' : 'Нет задач'}</p>`; return; }
         container.innerHTML = tasks.map(t => {
-            let badge = '';
-            let comment = safeText(t.comment);
-            
-            if (type === 'upcoming') {
-                const badgeClass = t.isToday ? 'bg-danger' : 'bg-primary';
-                const badgeText = t.isToday ? 'Сегодня' : t.date.toLocaleDateString('ru-RU');
-                badge = `<span class="badge ${badgeClass} rounded-pill me-2">${badgeText}</span>`;
-            } else if (type === 'problem') {
-                if(t.type === 'overdue') {
-                    badge = `<span class="badge bg-danger rounded-pill me-2">Просрочено: ${t.date.toLocaleDateString('ru-RU')}</span>`;
-                } else {
-                    badge = `<span class="badge bg-danger rounded-pill me-2">Статус: Проблемный</span>`;
-                    comment = '<i>Требует внимания</i>';
-                }
-            } else if (type === 'cooling') {
-                const text = t.days === 999 ? 'Никогда' : `${t.days} дн.`;
-                badge = `<span class="badge bg-warning text-dark rounded-pill me-2">Нет визитов: ${text}</span>`;
-                comment = '<i>Нужно связаться</i>';
-            }
-
-            return `
-                <div class="list-group-item task-item d-flex justify-content-between align-items-center">
-                    <div class="me-auto">
-                        <div class="d-flex align-items-center mb-1">
-                            ${badge}
-                            <a href="dealer.html?id=${t.dealerId}" target="_blank" class="fw-bold text-decoration-none text-dark">${t.dealerName}</a>
-                        </div>
-                        <small class="text-muted" style="white-space: pre-wrap;">${comment}</small>
-                    </div>
-                    ${(type === 'upcoming' || (type === 'problem' && t.type === 'overdue')) ? 
-                        `<button class="btn btn-sm btn-success btn-complete-task ms-2" title="Выполнено" data-id="${t.dealerId}" data-index="${t.visitIndex}"><i class="bi bi-check-lg"></i></button>` : ''
-                    }
-                </div>`;
+            let badge = ''; let comment = safeText(t.comment);
+            if (type === 'upcoming') { badge = `<span class="badge ${t.isToday ? 'bg-danger' : 'bg-primary'} rounded-pill me-2">${t.isToday ? 'Сегодня' : t.date.toLocaleDateString('ru-RU')}</span>`; } 
+            else if (type === 'problem') { badge = t.type === 'overdue' ? `<span class="badge bg-danger rounded-pill me-2">Просрочено: ${t.date.toLocaleDateString('ru-RU')}</span>` : `<span class="badge bg-danger rounded-pill me-2">Статус: Проблемный</span>`; if(t.type !== 'overdue') comment = '<i>Требует внимания</i>'; } 
+            else if (type === 'cooling') { badge = `<span class="badge bg-warning text-dark rounded-pill me-2">Нет визитов: ${t.days === 999 ? 'Никогда' : `${t.days} дн.`}</span>`; comment = '<i>Нужно связаться</i>'; }
+            return `<div class="list-group-item task-item d-flex justify-content-between align-items-center"><div class="me-auto"><div class="d-flex align-items-center mb-1">${badge}<a href="dealer.html?id=${t.dealerId}" target="_blank" class="fw-bold text-decoration-none text-dark">${t.dealerName}</a></div><small class="text-muted" style="white-space: pre-wrap;">${comment}</small></div>${(type === 'upcoming' || (type === 'problem' && t.type === 'overdue')) ? `<button class="btn btn-sm btn-success btn-complete-task ms-2" title="Выполнено" data-id="${t.dealerId}" data-index="${t.visitIndex}"><i class="bi bi-check-lg"></i></button>` : ''}</div>`;
         }).join('');
     }
+    
+    if(document.body) { document.body.addEventListener('click', (e) => { const taskBtn = e.target.closest('.btn-complete-task'); if (taskBtn) { taskBtn.disabled = true; completeTask(taskBtn, taskBtn.dataset.id, taskBtn.dataset.index); } }); }
 
-    if(document.body) {
-        document.body.addEventListener('click', (e) => {
-            const taskBtn = e.target.closest('.btn-complete-task');
-            if (taskBtn) { 
-                taskBtn.disabled = true; 
-                completeTask(taskBtn, taskBtn.dataset.id, taskBtn.dataset.index);
-            }
-        });
-    }
-
-    function createCompetitorEntryHTML(c={}) { 
-        return `<div class="competitor-entry">
-            <input type="text" class="form-control competitor-brand" placeholder="Бренд" value="${c.brand||''}">
-            <input type="text" class="form-control competitor-collection" placeholder="Коллекция" value="${c.collection||''}">
-            <input type="text" class="form-control competitor-price-opt" placeholder="Цена ОПТ" value="${c.price_opt||''}">
-            <input type="text" class="form-control competitor-price-retail" placeholder="Цена Розница" value="${c.price_retail||''}">
-            <button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button>
-        </div>`; 
-    }
+    function createCompetitorEntryHTML(c={}) { return `<div class="competitor-entry"><input type="text" class="form-control competitor-brand" placeholder="Бренд" value="${c.brand||''}"><input type="text" class="form-control competitor-collection" placeholder="Коллекция" value="${c.collection||''}"><input type="text" class="form-control competitor-price-opt" placeholder="Цена ОПТ" value="${c.price_opt||''}"><input type="text" class="form-control competitor-price-retail" placeholder="Цена Розница" value="${c.price_retail||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
     function createContactEntryHTML(c={}) { return `<div class="contact-entry input-group mb-2"><input type="text" class="form-control contact-name" placeholder="Имя" value="${c.name||''}"><input type="text" class="form-control contact-position" placeholder="Должность" value="${c.position||''}"><input type="text" class="form-control contact-info" placeholder="Телефон" value="${c.contactInfo||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
     function createAddressEntryHTML(a={}) { return `<div class="address-entry input-group mb-2"><input type="text" class="form-control address-description" placeholder="Описание" value="${a.description||''}"><input type="text" class="form-control address-city" placeholder="Город" value="${a.city||''}"><input type="text" class="form-control address-address" placeholder="Адрес" value="${a.address||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
     function createPosEntryHTML(p={}) { const opts = posMaterialsList.map(n => `<option value="${n}" ${n===p.name?'selected':''}>${n}</option>`).join(''); return `<div class="pos-entry input-group mb-2"><select class="form-select pos-name"><option value="">-- Выбор --</option>${opts}</select><input type="number" class="form-control pos-quantity" value="${p.quantity||1}" min="1"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
