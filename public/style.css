@@ -278,3 +278,38 @@ td a { text-decoration: none; color: var(--primary-color) !important; font-weigh
     .contact-entry, .address-entry, .pos-entry, .competitor-entry { grid-template-columns: 1fr auto; }
     .contact-entry input, .address-entry input, .pos-entry input, .pos-entry select, .competitor-entry input { grid-column: 1; }
 }
+
+/* style.css */
+
+/* ... (весь ваш код) ... */
+
+/* (НОВОЕ) Автодополнение адреса на карте */
+.address-suggestions {
+    position: absolute;
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 2000; /* Поверх карты */
+    width: 100%;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    display: none; /* Скрыто по умолчанию */
+}
+
+.address-suggestion-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    border-bottom: 1px solid #eee;
+}
+
+.address-suggestion-item:hover {
+    background-color: #f0f0f0;
+}
+
+/* Контейнер поиска над картой */
+.map-search-container {
+    position: relative; 
+    margin-bottom: 10px;
+}
