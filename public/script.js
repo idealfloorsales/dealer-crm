@@ -1,3 +1,4 @@
+// script.js
 document.addEventListener('DOMContentLoaded', () => {
     
     const API_DEALERS_URL = '/api/dealers';
@@ -31,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const addProductChecklist = document.getElementById('add-product-checklist'); 
     const addContactList = document.getElementById('add-contact-list'); 
     const addAddressList = document.getElementById('add-address-list'); 
-    const addPosList = document.getElementById('add-pos-list');
+    const addPosList = document.getElementById('add-pos-list'); 
     const addVisitsList = document.getElementById('add-visits-list');
     const addCompetitorList = document.getElementById('add-competitor-list');
     const addPhotoInput = document.getElementById('add-photo-input');
@@ -49,7 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchBar = document.getElementById('search-bar'); 
     const exportBtn = document.getElementById('export-dealers-btn'); 
     
-    const dashboardContainer = document.getElementById('dashboard-container');
+    const dashboardContainer = document.getElementById('dashboard-container'); 
     const tasksListUpcoming = document.getElementById('tasks-list-upcoming');
     const tasksListProblem = document.getElementById('tasks-list-problem');
     const tasksListCooling = document.getElementById('tasks-list-cooling');
@@ -57,7 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const editProductChecklist = document.getElementById('edit-product-checklist'); 
     const editContactList = document.getElementById('edit-contact-list'); 
     const editAddressList = document.getElementById('edit-address-list'); 
-    const editPosList = document.getElementById('edit-pos-list');
+    const editPosList = document.getElementById('edit-pos-list'); 
     const editVisitsList = document.getElementById('edit-visits-list');
     const editCompetitorList = document.getElementById('edit-competitor-list');
     const editPhotoList = document.getElementById('edit-photo-list'); 
@@ -77,8 +78,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const toBase64 = file => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => resolve(reader.result); reader.onerror = error => reject(error); });
     const compressImage = (file, maxWidth = 1000, quality = 0.7) => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = event => { const img = new Image(); img.src = event.target.result; img.onload = () => { const elem = document.createElement('canvas'); let width = img.width; let height = img.height; if (width > maxWidth) { height *= maxWidth / width; width = maxWidth; } elem.width = width; elem.height = height; const ctx = elem.getContext('2d'); ctx.drawImage(img, 0, 0, width, height); resolve(elem.toDataURL('image/jpeg', quality)); }; img.onerror = error => reject(error); }; reader.onerror = error => reject(error); });
 
-    // --- Карта ---
+    // Карта
     const DEFAULT_LAT = 51.1605; const DEFAULT_LNG = 71.4704;
+    const CITY_COORDS = { "Астана": [51.1605, 71.4704], "Алматы": [43.2220, 76.8512], "Шымкент": [42.3417, 69.5901], "Караганда": [49.8020, 73.1021], "Актобе": [50.2839, 57.1670], "Тараз": [42.9000, 71.3667], "Павлодар": [52.2873, 76.9674], "Усть-Каменогорск": [49.9632, 82.6059], "Семей": [50.4113, 80.2275], "Атырау": [47.1167, 51.8833], "Костанай": [53.2148, 63.6321], "Кызылорда": [44.8488, 65.4823], "Уральск": [51.2333, 51.3667], "Петропавловск": [54.8753, 69.1622], "Актау": [43.6500, 51.1500] };
     let addMap, editMap;
 
     function initMap(mapId) {
@@ -97,7 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (markerRef.current) markerRef.current.setLatLng([lat, lng]); else markerRef.current = L.marker([lat, lng]).addTo(map);
         });
     }
-    // (НОВОЕ) Поиск на карте
+    // Поиск на карте
     function setupMapSearch(map, inputId, suggestionsId, latId, lngId, markerRef) {
         const input = document.getElementById(inputId);
         const suggestionsBox = document.getElementById(suggestionsId);
@@ -163,6 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const latEl = document.getElementById('edit_latitude'); const lngEl = document.getElementById('edit_longitude');
             if (latEl && lngEl && editMap) {
                 const lat = parseFloat(latEl.value); const lng = parseFloat(lngEl.value);
+                const city = document.getElementById('edit_city') ? document.getElementById('edit_city').value.trim() : '';
                 if (editModalEl.markerRef.current) editMap.removeLayer(editModalEl.markerRef.current);
                 if (!isNaN(lat) && !isNaN(lng)) { editModalEl.markerRef.current = L.marker([lat, lng]).addTo(editMap); editMap.setView([lat, lng], 15); } 
                 else { editMap.setView([DEFAULT_LAT, DEFAULT_LNG], 13); }
@@ -170,7 +173,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- Данные ---
     async function fetchProductCatalog() {
         if (fullProductCatalog.length > 0) return; 
         try {
@@ -205,48 +207,147 @@ document.addEventListener('DOMContentLoaded', () => {
             if(tasksListCooling) tasksListCooling.innerHTML = '<p class="text-muted text-center p-3">Нет таких</p>';
             return;
         }
-        if (!allDealers || allDealers.length === 0) { dashboardContainer.innerHTML = ''; return; }
+        if (!allDealers || allDealers.length === 0) { 
+            dashboardContainer.innerHTML = '';
+            return; 
+        }
         
         const activeDealers = allDealers.filter(d => d.status !== 'potential');
         const totalDealers = activeDealers.length;
-        const noPhotosCount = activeDealers.filter(d => !d.photo_url).length; 
+        const noAvatarCount = activeDealers.filter(d => !d.photo_url).length; 
 
         dashboardContainer.innerHTML = `
             <div class="col-md-6"><div class="stat-card h-100"><i class="bi bi-shop stat-icon text-primary"></i><span class="stat-number">${totalDealers}</span><span class="stat-label">Всего дилеров</span></div></div>
-            <div class="col-md-6"><div class="stat-card h-100 ${noPhotosCount > 0 ? 'border-danger' : ''}"><i class="bi bi-camera-fill stat-icon ${noPhotosCount > 0 ? 'text-danger' : 'text-secondary'}"></i><span class="stat-number ${noPhotosCount > 0 ? 'text-danger' : ''}">${noPhotosCount}</span><span class="stat-label">Без Аватара</span></div></div>
+            <div class="col-md-6"><div class="stat-card h-100 ${noAvatarCount > 0 ? 'border-danger' : ''}"><i class="bi bi-camera-fill stat-icon ${noAvatarCount > 0 ? 'text-danger' : 'text-secondary'}"></i><span class="stat-number ${noAvatarCount > 0 ? 'text-danger' : ''}">${noAvatarCount}</span><span class="stat-label">Без Аватара</span></div></div>
         `;
 
         const today = new Date(); today.setHours(0,0,0,0);
         const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
         const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
-        const tasksUpcoming = []; const tasksProblem = []; const tasksCooling = [];
+        
+        const tasksUpcoming = [];
+        const tasksProblem = [];
+        const tasksCooling = [];
+
         allDealers.forEach(d => {
             if (d.status === 'archive') return; 
             const isPotential = d.status === 'potential';
-            let lastVisitDate = null; let hasFutureTasks = false;
-            if (d.visits && Array.isArray(d.visits)) { d.visits.forEach((v, index) => { const vDate = new Date(v.date); if (!v.date) return; vDate.setHours(0,0,0,0); if (v.isCompleted && (!lastVisitDate || vDate > lastVisitDate)) { lastVisitDate = vDate; } if (!v.isCompleted) { const taskData = { dealerName: d.name, dealerId: d.id, date: vDate, comment: v.comment || "", visitIndex: index }; if (vDate < today) { tasksProblem.push({...taskData, type: 'overdue'}); } else if (vDate.getTime() === today.getTime() || vDate.getTime() === tomorrow.getTime()) { tasksUpcoming.push({...taskData, isToday: vDate.getTime() === today.getTime()}); hasFutureTasks = true; } else { hasFutureTasks = true; } } }); }
-            if (d.status === 'problem') { if (!tasksProblem.some(t => t.dealerId === d.id && t.type === 'overdue')) { tasksProblem.push({ dealerName: d.name, dealerId: d.id, type: 'status' }); } }
-            if (!hasFutureTasks && d.status !== 'problem' && !isPotential) { if (!lastVisitDate) { tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: 999 }); } else if (lastVisitDate < thirtyDaysAgo) { const days = Math.floor((today - lastVisitDate) / (1000 * 60 * 60 * 24)); tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: days }); } }
+
+            let lastVisitDate = null;
+            let hasFutureTasks = false;
+
+            if (d.visits && Array.isArray(d.visits)) {
+                d.visits.forEach((v, index) => {
+                    const vDate = new Date(v.date);
+                    if (!v.date || !vDate.getTime()) return; 
+                    vDate.setHours(0,0,0,0);
+
+                    if (v.isCompleted && (!lastVisitDate || vDate > lastVisitDate)) {
+                        lastVisitDate = vDate;
+                    }
+                    
+                    if (!v.isCompleted) {
+                        const taskData = { dealerName: d.name, dealerId: d.id, date: vDate, comment: v.comment || "", visitIndex: index };
+                        if (vDate < today) {
+                            tasksProblem.push({...taskData, type: 'overdue'}); 
+                        } else if (vDate.getTime() === today.getTime() || vDate.getTime() === tomorrow.getTime()) {
+                            tasksUpcoming.push({...taskData, isToday: vDate.getTime() === today.getTime()});
+                            hasFutureTasks = true;
+                        } else {
+                            hasFutureTasks = true; 
+                        }
+                    }
+                });
+            }
+
+            if (d.status === 'problem') {
+                if (!tasksProblem.some(t => t.dealerId === d.id && t.type === 'overdue')) {
+                    tasksProblem.push({ dealerName: d.name, dealerId: d.id, type: 'status' });
+                }
+            }
+
+            if (!hasFutureTasks && d.status !== 'problem' && !isPotential) {
+                if (!lastVisitDate) {
+                    tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: 999 }); 
+                } else if (lastVisitDate < thirtyDaysAgo) {
+                    const days = Math.floor((today - lastVisitDate) / (1000 * 60 * 60 * 24));
+                    tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: days });
+                }
+            }
         });
-        tasksUpcoming.sort((a, b) => a.date - b.date); tasksProblem.sort((a, b) => (a.date || 0) - (b.date || 0)); tasksCooling.sort((a, b) => b.days - a.days);
-        renderTaskList(tasksListUpcoming, tasksUpcoming, 'upcoming'); renderTaskList(tasksListProblem, tasksProblem, 'problem'); renderTaskList(tasksListCooling, tasksCooling, 'cooling');
+
+        tasksUpcoming.sort((a, b) => a.date - b.date);
+        tasksProblem.sort((a, b) => (a.date || 0) - (b.date || 0));
+        tasksCooling.sort((a, b) => b.days - a.days);
+
+        renderTaskList(tasksListUpcoming, tasksUpcoming, 'upcoming');
+        renderTaskList(tasksListProblem, tasksProblem, 'problem');
+        renderTaskList(tasksListCooling, tasksCooling, 'cooling');
     }
 
     function renderTaskList(container, tasks, type) {
         if (!container) return;
-        if (tasks.length === 0) { container.innerHTML = `<p class="text-muted text-center p-3">${type === 'cooling' ? 'Нет таких' : 'Нет задач'}</p>`; return; }
+        if (tasks.length === 0) {
+            const message = type === 'cooling' ? 'Нет таких' : 'Нет задач';
+            container.innerHTML = `<p class="text-muted text-center p-3">${message}</p>`;
+            return;
+        }
         container.innerHTML = tasks.map(t => {
-            let badge = ''; let comment = safeText(t.comment);
-            if (type === 'upcoming') { badge = `<span class="badge ${t.isToday ? 'bg-danger' : 'bg-primary'} rounded-pill me-2">${t.isToday ? 'Сегодня' : t.date.toLocaleDateString('ru-RU')}</span>`; } 
-            else if (type === 'problem') { badge = t.type === 'overdue' ? `<span class="badge bg-danger rounded-pill me-2">Просрочено: ${t.date.toLocaleDateString('ru-RU')}</span>` : `<span class="badge bg-danger rounded-pill me-2">Статус: Проблемный</span>`; if(t.type !== 'overdue') comment = '<i>Требует внимания</i>'; } 
-            else if (type === 'cooling') { badge = `<span class="badge bg-warning text-dark rounded-pill me-2">Нет визитов: ${t.days === 999 ? 'Никогда' : `${t.days} дн.`}</span>`; comment = '<i>Нужно связаться</i>'; }
-            return `<div class="list-group-item task-item d-flex justify-content-between align-items-center"><div class="me-auto"><div class="d-flex align-items-center mb-1">${badge}<a href="dealer.html?id=${t.dealerId}" target="_blank" class="fw-bold text-decoration-none text-dark">${t.dealerName}</a></div><small class="text-muted" style="white-space: pre-wrap;">${comment}</small></div>${(type === 'upcoming' || (type === 'problem' && t.type === 'overdue')) ? `<button class="btn btn-sm btn-success btn-complete-task ms-2" title="Выполнено" data-id="${t.dealerId}" data-index="${t.visitIndex}"><i class="bi bi-check-lg"></i></button>` : ''}</div>`;
+            let badge = '';
+            let comment = safeText(t.comment);
+            
+            if (type === 'upcoming') {
+                const badgeClass = t.isToday ? 'bg-danger' : 'bg-primary';
+                const badgeText = t.isToday ? 'Сегодня' : t.date.toLocaleDateString('ru-RU');
+                badge = `<span class="badge ${badgeClass} rounded-pill me-2">${badgeText}</span>`;
+            } else if (type === 'problem') {
+                if(t.type === 'overdue') {
+                    badge = `<span class="badge bg-danger rounded-pill me-2">Просрочено: ${t.date.toLocaleDateString('ru-RU')}</span>`;
+                } else {
+                    badge = `<span class="badge bg-danger rounded-pill me-2">Статус: Проблемный</span>`;
+                    comment = '<i>Требует внимания</i>';
+                }
+            } else if (type === 'cooling') {
+                const text = t.days === 999 ? 'Никогда' : `${t.days} дн.`;
+                badge = `<span class="badge bg-warning text-dark rounded-pill me-2">Нет визитов: ${text}</span>`;
+                comment = '<i>Нужно связаться</i>';
+            }
+
+            return `
+                <div class="list-group-item task-item d-flex justify-content-between align-items-center">
+                    <div class="me-auto">
+                        <div class="d-flex align-items-center mb-1">
+                            ${badge}
+                            <a href="dealer.html?id=${t.dealerId}" target="_blank" class="fw-bold text-decoration-none text-dark">${t.dealerName}</a>
+                        </div>
+                        <small class="text-muted" style="white-space: pre-wrap;">${comment}</small>
+                    </div>
+                    ${(type === 'upcoming' || (type === 'problem' && t.type === 'overdue')) ? 
+                        `<button class="btn btn-sm btn-success btn-complete-task ms-2" title="Выполнено" data-id="${t.dealerId}" data-index="${t.visitIndex}"><i class="bi bi-check-lg"></i></button>` : ''
+                    }
+                </div>`;
         }).join('');
     }
-    
-    if(document.body) { document.body.addEventListener('click', (e) => { const taskBtn = e.target.closest('.btn-complete-task'); if (taskBtn) { taskBtn.disabled = true; completeTask(taskBtn, taskBtn.dataset.id, taskBtn.dataset.index); } }); }
 
-    function createCompetitorEntryHTML(c={}) { return `<div class="competitor-entry"><input type="text" class="form-control competitor-brand" placeholder="Бренд" value="${c.brand||''}"><input type="text" class="form-control competitor-collection" placeholder="Коллекция" value="${c.collection||''}"><input type="text" class="form-control competitor-price-opt" placeholder="Цена ОПТ" value="${c.price_opt||''}"><input type="text" class="form-control competitor-price-retail" placeholder="Цена Розница" value="${c.price_retail||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
+    if(document.body) {
+        document.body.addEventListener('click', (e) => {
+            const taskBtn = e.target.closest('.btn-complete-task');
+            if (taskBtn) { 
+                taskBtn.disabled = true; 
+                completeTask(taskBtn, taskBtn.dataset.id, taskBtn.dataset.index);
+            }
+        });
+    }
+
+    function createCompetitorEntryHTML(c={}) { 
+        return `<div class="competitor-entry">
+            <input type="text" class="form-control competitor-brand" placeholder="Бренд" value="${c.brand||''}">
+            <input type="text" class="form-control competitor-collection" placeholder="Коллекция" value="${c.collection||''}">
+            <input type="text" class="form-control competitor-price-opt" placeholder="Цена ОПТ" value="${c.price_opt||''}">
+            <input type="text" class="form-control competitor-price-retail" placeholder="Цена Розница" value="${c.price_retail||''}">
+            <button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button>
+        </div>`; 
+    }
     function createContactEntryHTML(c={}) { return `<div class="contact-entry input-group mb-2"><input type="text" class="form-control contact-name" placeholder="Имя" value="${c.name||''}"><input type="text" class="form-control contact-position" placeholder="Должность" value="${c.position||''}"><input type="text" class="form-control contact-info" placeholder="Телефон" value="${c.contactInfo||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
     function createAddressEntryHTML(a={}) { return `<div class="address-entry input-group mb-2"><input type="text" class="form-control address-description" placeholder="Описание" value="${a.description||''}"><input type="text" class="form-control address-city" placeholder="Город" value="${a.city||''}"><input type="text" class="form-control address-address" placeholder="Адрес" value="${a.address||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
     function createPosEntryHTML(p={}) { const opts = posMaterialsList.map(n => `<option value="${n}" ${n===p.name?'selected':''}>${n}</option>`).join(''); return `<div class="pos-entry input-group mb-2"><select class="form-select pos-name"><option value="">-- Выбор --</option>${opts}</select><input type="number" class="form-control pos-quantity" value="${p.quantity||1}" min="1"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
@@ -344,6 +445,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const pendingId = localStorage.getItem('pendingEditDealerId');
         if (pendingId) { localStorage.removeItem('pendingEditDealerId'); openEditModal(pendingId); }
     }
+
+    // (НОВОЕ) Кнопка "💰 Продажи" (если бы мы ее добавляли в index.html, но у нас отдельная страница)
+    // Если хотите кнопку в шапке script.js, то добавьте её в index.html и здесь обработчик
+    // В текущей версии index.html кнопки "Продажи" нет в шапке, но есть ссылка в меню.
 
     if(document.getElementById('add-contact-btn-add-modal')) document.getElementById('add-contact-btn-add-modal').onclick = () => addContactList.insertAdjacentHTML('beforeend', createContactEntryHTML());
     if(document.getElementById('add-address-btn-add-modal')) document.getElementById('add-address-btn-add-modal').onclick = () => addAddressList.insertAdjacentHTML('beforeend', createAddressEntryHTML());
