@@ -266,3 +266,48 @@ td a { text-decoration: none; color: var(--primary-color) !important; font-weigh
     max-width: 100%; 
     object-fit: contain;
 }
+
+/* (НОВОЕ) Мульти-селект для отчетов */
+.multi-select-dropdown {
+    position: relative;
+}
+.multi-select-menu {
+    display: none;
+    position: absolute;
+    background-color: #fff;
+    min-width: 100%;
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow);
+    z-index: 1000;
+    padding: 10px;
+    border-radius: 4px;
+    top: 100%;
+    left: 0;
+}
+.multi-select-menu.show {
+    display: block;
+}
+.multi-select-item {
+    display: block;
+    padding: 5px 0;
+}
+.multi-select-search {
+    width: 100%;
+    padding: 5px;
+    margin-bottom: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+.multi-select-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 5px;
+}
+.multi-select-actions button {
+    font-size: 0.8rem;
+    padding: 2px 8px;
+}
