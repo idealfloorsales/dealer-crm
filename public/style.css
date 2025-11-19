@@ -236,3 +236,27 @@ td a { text-decoration: none; color: var(--primary-color) !important; font-weigh
     color: #666;
     font-size: 0.85rem;
 }
+/* (ИЗМЕНЕНО) Стили для Аватара на странице дилера */
+.dealer-avatar {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid var(--border-color);
+    background-color: var(--light-gray);
+    
+    /* НОВОЕ: курсор и анимация */
+    cursor: pointer;
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s;
+}
+
+.dealer-avatar[src=""] {
+    display: none;
+}
+
+/* НОВОЕ: Эффект при наведении */
+.dealer-avatar:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+    border-color: var(--primary-color);
+}
