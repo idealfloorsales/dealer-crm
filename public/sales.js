@@ -13,7 +13,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentMonthStr = now.toISOString().slice(0, 7);
     monthPicker.value = currentMonthStr;
 
-    // Группы для ВВОДА (верхняя часть)
     const inputGroups = [
         { key: 'regional_astana', title: 'Региональный Астана' },
         { key: 'north', title: 'Регион Север' },
@@ -24,16 +23,17 @@ document.addEventListener('DOMContentLoaded', () => {
         { key: 'other', title: 'Остальные / Разовые' }
     ];
 
+    // (ИЗМЕНЕНО) Все ключи маленькими буквами для надежности
     const cityToRegion = {
-        "Павлодар": "north", "Кокшетау": "north", "Петропавловск": "north", "Костанай": "north",
-        "Семей": "east", "Усть-Каменогорск": "east",
-        "Шымкент": "south", "Алматы": "south", "Тараз": "south", "Кызылорда": "south",
-        "Актобе": "west", "Актау": "west", "Атырау": "west", "Уральск": "west",
-        "Караганда": "center", "Жезказган": "center",
-        "Астана": "regional_astana"
+        "павлодар": "north", "кокшетау": "north", "петропавловск": "north", "костанай": "north", "экибастуз": "north",
+        "семей": "east", "усть-каменогорск": "east", "оскемен": "east",
+        "шымкент": "south", "алматы": "south", "алмата": "south", "тараз": "south", "кызылорда": "south", "туркестан": "south", "талдыкорган": "south",
+        "актобе": "west", "актау": "west", "атырау": "west", "уральск": "west", "орал": "west", "жанаозен": "west",
+        "караганда": "center", "жезказган": "center", "темиртау": "center",
+        "астана": "regional_astana"
     };
 
-    // Крупные дилеры (Исключения из Астаны)
+    // Крупные дилеры (Исключения)
     const majorDealersConfig = [
         { name: "Мир Ламината", key: "mir_laminata" },
         { name: "12 месяцев Алаш", key: "twelve_months" }
@@ -43,20 +43,27 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSales = [];
 
     function getDealerGroup(d) {
+        // 1. Сначала Ответственный
         if (d.responsible === 'regional_astana') return 'regional_astana';
-        if (d.responsible === 'regional_regions') {
-            if (d.city && cityToRegion[d.city]) return cityToRegion[d.city];
-            return 'other';
+        
+        // 2. Если Регионы - смотрим город (УМНОЕ СРАВНЕНИЕ)
+        if (d.responsible === 'regional_regions' || (!d.responsible && d.city)) {
+            const cityKey = (d.city || '').trim().toLowerCase();
+            
+            if (cityKey === 'астана') return 'regional_astana';
+            if (cityToRegion[cityKey]) return cityToRegion[cityKey];
+            
+            // Если город неизвестен, но это Региональный менеджер - 
+            // пока кидаем в Other, но можно назначить дефолт (например Center)
         }
-        if (!d.responsible && d.city === 'Астана') return 'regional_astana';
-        if (!d.responsible && d.city && cityToRegion[d.city]) return cityToRegion[d.city];
+        
         return 'other';
     }
 
-    // Проверка: является ли дилер "Крупным"
     function getMajorKey(dealerName) {
         if (!dealerName) return null;
         const lowerName = dealerName.toLowerCase();
+        // Улучшенный поиск
         if (lowerName.includes("мир ламината")) return "mir_laminata";
         if (lowerName.includes("12 месяцев") && lowerName.includes("алаш")) return "twelve_months";
         return null;
@@ -85,7 +92,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return { diff, forecast, percent };
     }
 
-    // --- РЕНДЕР ---
     function renderAll() {
         const date = new Date(monthPicker.value);
         const year = date.getFullYear();
@@ -100,17 +106,25 @@ document.addEventListener('DOMContentLoaded', () => {
         container.innerHTML = '';
         summaryBody.innerHTML = '';
 
-        // 1. СБОР ФАКТОВ (СУММИРОВАНИЕ)
         const facts = {
             north: 0, south: 0, west: 0, east: 0, center: 0,
-            regional_astana: 0, // Чистая Астана (без крупных)
+            regional_astana: 0,
             mir_laminata: 0,
             twelve_months: 0,
             other: 0
         };
 
         inputGroups.forEach(grp => {
-            const groupDealers = allDealers.filter(d => getDealerGroup(d) === grp.key);
+            // 1. Фильтруем дилеров
+            const groupDealers = allDealers.filter(d => {
+                // Группа
+                const matchGroup = getDealerGroup(d) === grp.key;
+                // (ИЗМЕНЕНО) Жесткий фильтр: убираем potential
+                const isReal = d.status !== 'potential' && d.status !== 'archive';
+                
+                return matchGroup && isReal;
+            });
+            
             const customSales = currentSales.filter(s => s.isCustom && s.group === grp.key);
 
             if (groupDealers.length === 0 && customSales.length === 0) return;
@@ -125,17 +139,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const sale = currentSales.find(s => (item.isCustom && s.isCustom && s.dealerName === item.name) || (!item.isCustom && !s.isCustom && s.dealerId === item.id)) || {};
                 const fact = parseFloat(sale.fact) || 0;
 
-                // --- ЛОГИКА РАСПРЕДЕЛЕНИЯ СУММ ---
                 const majorKey = getMajorKey(item.name);
-                
                 if (majorKey) {
-                    // Если это Крупный дилер - пишем в его личную кассу
                     facts[majorKey] += fact;
                 } else if (grp.key === 'regional_astana') {
-                    // Если Астана и НЕ крупный - пишем в Астану
                     facts.regional_astana += fact;
                 } else if (grp.key !== 'other') {
-                    // Регионы
                     facts[grp.key] += fact;
                 } else {
                     facts.other += fact;
@@ -164,24 +173,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>`;
         });
 
-        // --- 2. СВОДНАЯ ТАБЛИЦА ---
-        // Загружаем сохраненные ПЛАНЫ
+        // 2. СВОДНАЯ ТАБЛИЦА
         const plans = {};
         ["regional_regions", "north", "south", "west", "east", "center", "regional_astana", "mir_laminata", "twelve_months"].forEach(k => {
             const p = currentSales.find(s => s.dealerId === `PLAN_${k}`) || {};
             plans[k] = parseFloat(p.plan) || 0;
         });
 
-        // Считаем суммы
         const totalRegionsFact = facts.north + facts.south + facts.west + facts.east + facts.center;
-        
-        // ОБЩИЙ ПЛАН (Регионы + Астана + Мир Ламината + 12 Месяцев)
         const totalPlanAll = plans.regional_regions + plans.regional_astana + plans.mir_laminata + plans.twelve_months;
-        
-        // ОБЩИЙ ФАКТ (Регионы + Астана + Мир Ламината + 12 Месяцев + Прочие)
         const totalFactAll = totalRegionsFact + facts.regional_astana + facts.mir_laminata + facts.twelve_months + facts.other;
 
-        // Функция строки сводки
         const renderSummaryRow = (title, planKey, factVal, isBold=false, isMain=false) => {
             const plan = plans[planKey] || 0;
             const { diff, forecast, percent } = calculateKPI(plan, factVal, daysInMonth, currentDay);
@@ -210,7 +212,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let summaryHtml = '';
         
-        // Блок Регионов
         summaryHtml += renderSummaryRow("Региональный Регионы (Сумма)", "regional_regions", totalRegionsFact, true, true);
         summaryHtml += renderSummaryRow("   - Север", "north", facts.north);
         summaryHtml += renderSummaryRow("   - Восток", "east", facts.east);
@@ -218,10 +219,8 @@ document.addEventListener('DOMContentLoaded', () => {
         summaryHtml += renderSummaryRow("   - Запад", "west", facts.west);
         summaryHtml += renderSummaryRow("   - Центр", "center", facts.center);
         
-        // Блок Астаны (Исключая крупных)
         summaryHtml += renderSummaryRow("Региональный Астана", "regional_astana", facts.regional_astana, true, true);
         
-        // Крупные (отдельно)
         summaryHtml += renderSummaryRow("Мир Ламината", "mir_laminata", facts.mir_laminata, true);
         summaryHtml += renderSummaryRow("12 Месяцев Алаш", "twelve_months", facts.twelve_months, true);
 
@@ -235,7 +234,8 @@ document.addEventListener('DOMContentLoaded', () => {
         summaryHtml += `
             <tr class="table-dark fw-bold" style="border-top: 2px solid #000;">
                 <td>ОБЩЕЕ ВЫПОЛНЕНИЕ</td>
-                <td>${totalPlanAll}</td> <td>${Math.round(totalFactAll)}</td>
+                <td>${totalPlanAll}</td>
+                <td>${Math.round(totalFactAll)}</td>
                 <td class="${totalDiff >= 0 ? 'text-success' : 'text-danger'}">${Math.round(totalDiff)}</td>
                 <td>${currentDay}</td>
                 <td>${daysInMonth}</td>
@@ -274,7 +274,6 @@ document.addEventListener('DOMContentLoaded', () => {
     saveBtn.onclick = async () => {
         const dataToSave = [];
         
-        // 1. Факты
         document.querySelectorAll('#sales-container tbody tr').forEach(tr => {
             const dealerId = tr.dataset.id;
             const dealerName = tr.dataset.name;
@@ -291,13 +290,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // 2. Планы групп (из сводной таблицы)
         document.querySelectorAll('.inp-group-plan').forEach(inp => {
             const row = inp.closest('tr');
             const planKey = row.dataset.planKey;
             const plan = parseFloat(inp.value) || 0;
             
-            if (plan > 0 || planKey) { // Сохраняем даже 0, чтобы не терять структуру
+            if (plan > 0 || planKey) {
                 dataToSave.push({ 
                     month: monthPicker.value, 
                     group: 'PLAN', 
