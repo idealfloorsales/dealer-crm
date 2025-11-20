@@ -1,4 +1,3 @@
-// sales.js
 document.addEventListener('DOMContentLoaded', () => {
     
     const API_DEALERS = '/api/dealers';
@@ -13,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentMonthStr = now.toISOString().slice(0, 7);
     monthPicker.value = currentMonthStr;
 
+    // Группы для ВВОДА (верхняя часть)
     const inputGroups = [
         { key: 'regional_astana', title: 'Региональный Астана' },
         { key: 'north', title: 'Регион Север' },
@@ -23,47 +23,32 @@ document.addEventListener('DOMContentLoaded', () => {
         { key: 'other', title: 'Остальные / Разовые' }
     ];
 
-    // (ИЗМЕНЕНО) Все ключи маленькими буквами для надежности
     const cityToRegion = {
-        "павлодар": "north", "кокшетау": "north", "петропавловск": "north", "костанай": "north", "экибастуз": "north",
-        "семей": "east", "усть-каменогорск": "east", "оскемен": "east",
-        "шымкент": "south", "алматы": "south", "алмата": "south", "тараз": "south", "кызылорда": "south", "туркестан": "south", "талдыкорган": "south",
-        "актобе": "west", "актау": "west", "атырау": "west", "уральск": "west", "орал": "west", "жанаозен": "west",
-        "караганда": "center", "жезказган": "center", "темиртау": "center",
-        "астана": "regional_astana"
+        "Павлодар": "north", "Кокшетау": "north", "Петропавловск": "north", "Костанай": "north",
+        "Семей": "east", "Усть-Каменогорск": "east",
+        "Шымкент": "south", "Алматы": "south", "Тараз": "south", "Кызылорда": "south",
+        "Актобе": "west", "Актау": "west", "Атырау": "west", "Уральск": "west",
+        "Караганда": "center", "Жезказган": "center",
+        "Астана": "regional_astana"
     };
-
-    // Крупные дилеры (Исключения)
-    const majorDealersConfig = [
-        { name: "Мир Ламината", key: "mir_laminata" },
-        { name: "12 месяцев Алаш", key: "twelve_months" }
-    ];
 
     let allDealers = [];
     let currentSales = [];
 
     function getDealerGroup(d) {
-        // 1. Сначала Ответственный
         if (d.responsible === 'regional_astana') return 'regional_astana';
-        
-        // 2. Если Регионы - смотрим город (УМНОЕ СРАВНЕНИЕ)
-        if (d.responsible === 'regional_regions' || (!d.responsible && d.city)) {
-            const cityKey = (d.city || '').trim().toLowerCase();
-            
-            if (cityKey === 'астана') return 'regional_astana';
-            if (cityToRegion[cityKey]) return cityToRegion[cityKey];
-            
-            // Если город неизвестен, но это Региональный менеджер - 
-            // пока кидаем в Other, но можно назначить дефолт (например Center)
+        if (d.responsible === 'regional_regions') {
+            if (d.city && cityToRegion[d.city]) return cityToRegion[d.city];
+            return 'other';
         }
-        
+        if (!d.responsible && d.city === 'Астана') return 'regional_astana';
+        if (!d.responsible && d.city && cityToRegion[d.city]) return cityToRegion[d.city];
         return 'other';
     }
 
     function getMajorKey(dealerName) {
         if (!dealerName) return null;
         const lowerName = dealerName.toLowerCase();
-        // Улучшенный поиск
         if (lowerName.includes("мир ламината")) return "mir_laminata";
         if (lowerName.includes("12 месяцев") && lowerName.includes("алаш")) return "twelve_months";
         return null;
@@ -92,6 +77,60 @@ document.addEventListener('DOMContentLoaded', () => {
         return { diff, forecast, percent };
     }
 
+    // (НОВОЕ) Функция "Запомнить то, что ввел юзер" перед перерисовкой
+    function captureState() {
+        // 1. Собираем Факты
+        document.querySelectorAll('.inp-fact').forEach(inp => {
+            const tr = inp.closest('tr');
+            const dealerId = tr.dataset.id === "null" ? null : tr.dataset.id;
+            const dealerName = tr.dataset.name;
+            const isCustom = tr.dataset.custom === 'true';
+            const group = tr.dataset.group;
+            const val = parseFloat(inp.value) || 0;
+
+            // Ищем запись в массиве
+            let record = currentSales.find(s => 
+                (isCustom && s.isCustom && s.dealerName === dealerName) || 
+                (!isCustom && !s.isCustom && s.dealerId === dealerId)
+            );
+
+            if (record) {
+                record.fact = val; // Обновляем
+            } else if (val > 0) {
+                // Создаем новую, если не было
+                currentSales.push({
+                    month: monthPicker.value,
+                    group, dealerId, dealerName, isCustom, plan: 0, fact: val
+                });
+            }
+        });
+
+        // 2. Собираем Планы групп (если они есть в DOM, здесь мы их не рендерим в input, но на будущее)
+        // В текущей версии Планы только в сводной таблице, а она перерисовывается.
+        // Если бы мы правили Планы в Сводной - надо было бы и их собирать.
+        // Добавим сбор планов из СВОДНОЙ таблицы:
+        document.querySelectorAll('.inp-group-plan').forEach(inp => {
+            const tr = inp.closest('tr');
+            const planKey = tr.dataset.planKey;
+            const val = parseFloat(inp.value) || 0;
+            
+            let record = currentSales.find(s => s.dealerId === `PLAN_${planKey}`);
+            if (record) {
+                record.plan = val;
+            } else if (val > 0) {
+                currentSales.push({
+                    month: monthPicker.value,
+                    group: 'PLAN',
+                    dealerId: `PLAN_${planKey}`,
+                    dealerName: `Plan ${planKey}`,
+                    isCustom: false,
+                    plan: val, fact: 0
+                });
+            }
+        });
+    }
+
+    // --- РЕНДЕР ---
     function renderAll() {
         const date = new Date(monthPicker.value);
         const year = date.getFullYear();
@@ -115,16 +154,11 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         inputGroups.forEach(grp => {
-            // 1. Фильтруем дилеров
             const groupDealers = allDealers.filter(d => {
-                // Группа
                 const matchGroup = getDealerGroup(d) === grp.key;
-                // (ИЗМЕНЕНО) Жесткий фильтр: убираем potential
                 const isReal = d.status !== 'potential' && d.status !== 'archive';
-                
                 return matchGroup && isReal;
             });
-            
             const customSales = currentSales.filter(s => s.isCustom && s.group === grp.key);
 
             if (groupDealers.length === 0 && customSales.length === 0) return;
@@ -140,16 +174,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const fact = parseFloat(sale.fact) || 0;
 
                 const majorKey = getMajorKey(item.name);
-                if (majorKey) {
-                    facts[majorKey] += fact;
-                } else if (grp.key === 'regional_astana') {
-                    facts.regional_astana += fact;
-                } else if (grp.key !== 'other') {
-                    facts[grp.key] += fact;
-                } else {
-                    facts.other += fact;
-                }
+                if (majorKey) facts[majorKey] += fact;
+                else if (grp.key === 'regional_astana') facts.regional_astana += fact;
+                else if (grp.key !== 'other') facts[grp.key] += fact;
+                else facts.other += fact;
 
+                // Инпут value="${fact || ''}" теперь будет брать обновленный факт из памяти
                 rowsHtml += `
                     <tr data-id="${item.id || ''}" data-name="${item.name}" data-custom="${item.isCustom}" data-group="${grp.key}">
                         <td class="ps-4">${item.name} ${item.isCustom ? '<span class="badge bg-secondary">Разовый</span>' : ''}</td>
@@ -173,7 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>`;
         });
 
-        // 2. СВОДНАЯ ТАБЛИЦА
+        // --- СВОДНАЯ ТАБЛИЦА ---
         const plans = {};
         ["regional_regions", "north", "south", "west", "east", "center", "regional_astana", "mir_laminata", "twelve_months"].forEach(k => {
             const p = currentSales.find(s => s.dealerId === `PLAN_${k}`) || {};
@@ -188,9 +218,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const plan = plans[planKey] || 0;
             const { diff, forecast, percent } = calculateKPI(plan, factVal, daysInMonth, currentDay);
             const dailyFact = plan > 0 ? (factVal / plan) : 0;
-
             const rowClass = isMain ? 'table-info fw-bold' : (isBold ? 'fw-bold' : '');
             
+            // Важно: value="${plan || ''}" берет данные из памяти
             return `
                 <tr class="${rowClass}" data-plan-key="${planKey}">
                     <td>${title}</td>
@@ -211,16 +241,13 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         let summaryHtml = '';
-        
         summaryHtml += renderSummaryRow("Региональный Регионы (Сумма)", "regional_regions", totalRegionsFact, true, true);
         summaryHtml += renderSummaryRow("   - Север", "north", facts.north);
         summaryHtml += renderSummaryRow("   - Восток", "east", facts.east);
         summaryHtml += renderSummaryRow("   - Юг", "south", facts.south);
         summaryHtml += renderSummaryRow("   - Запад", "west", facts.west);
         summaryHtml += renderSummaryRow("   - Центр", "center", facts.center);
-        
         summaryHtml += renderSummaryRow("Региональный Астана", "regional_astana", facts.regional_astana, true, true);
-        
         summaryHtml += renderSummaryRow("Мир Ламината", "mir_laminata", facts.mir_laminata, true);
         summaryHtml += renderSummaryRow("12 Месяцев Алаш", "twelve_months", facts.twelve_months, true);
 
@@ -228,7 +255,6 @@ document.addEventListener('DOMContentLoaded', () => {
             summaryHtml += `<tr><td colspan="2">Разовые / Прочие</td><td>${facts.other}</td><td colspan="6"></td></tr>`;
         }
 
-        // ОБЩИЙ ИТОГ
         const { diff: totalDiff, forecast: totalForecast, percent: totalPercent } = calculateKPI(totalPlanAll, totalFactAll, daysInMonth, currentDay);
 
         summaryHtml += `
@@ -252,16 +278,23 @@ document.addEventListener('DOMContentLoaded', () => {
     function setupEventListeners() {
         document.querySelectorAll('.btn-add-custom').forEach(btn => {
             btn.onclick = () => {
-                const name = prompt("Название:");
+                // (ИЗМЕНЕНО) Сначала сохраняем то, что уже введено!
+                captureState();
+                
+                const name = prompt("Введите название клиента (Разовый):");
                 if (name) {
                     currentSales.push({ month: monthPicker.value, group: btn.dataset.group, dealerName: name, isCustom: true, plan: 0, fact: 0 });
-                    renderAll();
+                    renderAll(); // Теперь перерисовка не сотрет данные
                 }
             };
         });
+        
         document.querySelectorAll('.btn-del-row').forEach(btn => {
             btn.onclick = (e) => {
-                if(confirm('Удалить?')) {
+                if(confirm('Удалить эту строку продаж?')) {
+                    // (ИЗМЕНЕНО) И здесь сохраняем перед удалением
+                    captureState();
+                    
                     const row = e.target.closest('tr');
                     const name = row.dataset.name;
                     currentSales = currentSales.filter(s => !(s.isCustom && s.dealerName === name));
@@ -269,47 +302,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             };
         });
+
+        // Живой пересчет (опционально)
+        // При изменении любого инпута - тоже можно делать captureState(), но это может быть медленно.
+        // Лучше делать это только перед "разрушительными" действиями (add/remove/refresh).
     }
 
     saveBtn.onclick = async () => {
-        const dataToSave = [];
-        
-        document.querySelectorAll('#sales-container tbody tr').forEach(tr => {
-            const dealerId = tr.dataset.id;
-            const dealerName = tr.dataset.name;
-            const isCustom = tr.dataset.custom === 'true';
-            const group = tr.dataset.group;
-            const fact = parseFloat(tr.querySelector('.inp-fact').value) || 0;
-
-            if (fact > 0 || isCustom) {
-                dataToSave.push({ 
-                    month: monthPicker.value, group, 
-                    dealerId: dealerId === "null" ? null : dealerId, 
-                    dealerName, isCustom, plan: 0, fact 
-                });
-            }
-        });
-
-        document.querySelectorAll('.inp-group-plan').forEach(inp => {
-            const row = inp.closest('tr');
-            const planKey = row.dataset.planKey;
-            const plan = parseFloat(inp.value) || 0;
-            
-            if (plan > 0 || planKey) {
-                dataToSave.push({ 
-                    month: monthPicker.value, 
-                    group: 'PLAN', 
-                    dealerId: `PLAN_${planKey}`, 
-                    dealerName: `Plan ${planKey}`, 
-                    isCustom: false, 
-                    plan, fact: 0 
-                });
-            }
-        });
+        // Перед сохранением тоже "захватываем" состояние из полей, на всякий случай
+        captureState(); 
 
         try {
-            saveBtn.disabled = true; saveBtn.innerHTML = '...';
-            const res = await fetch(API_SALES, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ month: monthPicker.value, data: dataToSave }) });
+            saveBtn.disabled = true; saveBtn.innerHTML = 'Сохранение...';
+            const res = await fetch(API_SALES, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ month: monthPicker.value, data: currentSales }) });
             if (res.ok) { alert('Сохранено!'); loadData(); } else throw new Error('Ошибка');
         } catch (e) { alert(e.message); }
         finally { saveBtn.disabled = false; saveBtn.innerHTML = '<i class="bi bi-save me-2"></i>Сохранить'; }
