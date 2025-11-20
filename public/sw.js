@@ -1,21 +1,21 @@
-const CACHE_NAME = 'dealer-crm-cache-v43'; // (ИЗМЕНЕНО)
+const CACHE_NAME = 'dealer-crm-cache-v44'; // (ИЗМЕНЕНО)
 const urlsToCache = [
     '/',
-    '/index.html?v=43',
-    '/style.css?v=43',
-    '/script.js?v=43',
-    '/dealer.html?v=43',
-    '/dealer.js?v=43',
-    '/map.html?v=43',
-    '/map.js?v=43',
-    '/products.html?v=43',
-    '/products.js?v=43',
-    '/report.html?v=43',
-    '/report.js?v=43',
-    '/sales.html?v=43', // (ИЗМЕНЕНО)
-    '/sales.js?v=43',   // (ИЗМЕНЕНО)
-    '/knowledge.html?v=43',
-    '/knowledge.js?v=43',
+    '/index.html?v=44', 
+    '/style.css?v=44', 
+    '/script.js?v=44',
+    '/dealer.html?v=44',
+    '/dealer.js?v=44',
+    '/map.html?v=44',
+    '/map.js?v=44',
+    '/products.html?v=44',
+    '/products.js?v=44',
+    '/report.html?v=44',
+    '/report.js?v=44',
+    '/sales.html?v=44', // (ИЗМЕНЕНО)
+    '/sales.js?v=44',   // (ИЗМЕНЕНО)
+    '/knowledge.html?v=44',
+    '/knowledge.js?v=44',
     '/logo.png',
     '/favicon.gif',
     'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css',
