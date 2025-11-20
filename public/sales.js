@@ -1,4 +1,3 @@
-// sales.js
 document.addEventListener('DOMContentLoaded', () => {
     
     const API_DEALERS = '/api/dealers';
@@ -12,48 +11,41 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentMonthStr = now.toISOString().slice(0, 7);
     monthPicker.value = currentMonthStr;
 
-    // Группы для отображения
-    const groupsOrder = [
-        { key: 'michael', title: 'Отдел продаж Михаил' },
-        { key: 'alexander', title: 'Отдел продаж Александр' },
-        { key: 'regional_astana', title: 'Региональный Астана' }, // (ИЗМЕНЕНО)
-        { key: 'north', title: 'Регион Север' },
-        { key: 'south', title: 'Регион Юг' },
-        { key: 'west', title: 'Регион Запад' },
-        { key: 'east', title: 'Регион Восток' },
-        { key: 'center', title: 'Регион Центр' },
-        { key: 'other', title: 'Остальные' } 
+    // Ваши группы и города
+    const groupsConfig = [
+        { key: 'astana', title: 'Региональный Астана', type: 'main' },
+        { key: 'north', title: 'Север (Павлодар, Кокшетау...)', type: 'region' },
+        { key: 'south', title: 'Юг (Алматы, Шымкент...)', type: 'region' },
+        { key: 'west', title: 'Запад (Актобе, Уральск...)', type: 'region' },
+        { key: 'east', title: 'Восток (Семей, Усть-Каменогорск)', type: 'region' },
+        { key: 'center', title: 'Центр (Караганда, Жезказган)', type: 'region' },
+        { key: 'mir_laminata', title: 'Мир Ламината', type: 'special' }, // Спец. группа
+        { key: 'other', title: 'Остальные', type: 'other' }
     ];
 
-    // (НОВОЕ) Карта городов к регионам
     const cityToRegion = {
         "Павлодар": "north", "Кокшетау": "north", "Петропавловск": "north", "Костанай": "north",
         "Семей": "east", "Усть-Каменогорск": "east",
         "Шымкент": "south", "Алматы": "south", "Тараз": "south", "Кызылорда": "south",
         "Актобе": "west", "Актау": "west", "Атырау": "west", "Уральск": "west",
-        "Караганда": "center", "Жезказган": "center"
+        "Караганда": "center", "Жезказган": "center",
+        "Астана": "astana" 
     };
 
     let allDealers = [];
     let currentSales = [];
 
-    // Функция определения группы дилера
-    function getDealerGroup(dealer) {
-        const resp = dealer.responsible || '';
-        const city = dealer.city || '';
-
-        // Если явно назначен Михаил, Александр или Астана - они главнее
-        if (['michael', 'alexander', 'regional_astana'].includes(resp)) {
-            return resp;
-        }
-
-        // Если назначен "Региональный Регионы" - смотрим на город
-        if (resp === 'regional_regions') {
-            if (cityToRegion[city]) return cityToRegion[city]; // Возвращаем 'north', 'south' и т.д.
-            return 'other'; // Если город неизвестен
-        }
+    // Определяем группу дилера
+    function getDealerGroup(d) {
+        // 1. Если явно задан ответственный (например, для Мира Ламината)
+        if (d.responsible === 'mir_laminata') return 'mir_laminata';
         
-        // Если ответственный вообще не назначен
+        // 2. Если Астана
+        if (d.city === 'Астана' || d.responsible === 'regional_astana') return 'astana';
+
+        // 3. По городу
+        if (d.city && cityToRegion[d.city]) return cityToRegion[d.city];
+
         return 'other';
     }
 
@@ -74,10 +66,10 @@ document.addEventListener('DOMContentLoaded', () => {
         plan = parseFloat(plan) || 0;
         fact = parseFloat(fact) || 0;
         const diff = fact - plan;
+        
         let forecast = 0;
-        if (currentDay > 0) {
-            forecast = (fact / currentDay) * daysInMonth;
-        }
+        if (currentDay > 0) forecast = (fact / currentDay) * daysInMonth;
+        
         const percent = plan > 0 ? (fact / plan) * 100 : 0;
         return { diff, forecast, percent };
     }
@@ -97,15 +89,16 @@ document.addEventListener('DOMContentLoaded', () => {
         container.innerHTML = '';
 
         groupsOrder.forEach(grp => {
-            // 1. Фильтруем дилеров с помощью умной функции
             const groupDealers = allDealers.filter(d => getDealerGroup(d) === grp.key);
-            
             const customSales = currentSales.filter(s => s.isCustom && s.group === grp.key);
 
-            if (groupDealers.length === 0 && customSales.length === 0) return;
+            // Ищем сохраненный ПЛАН для этой группы (он хранится как "продажа" с dealerId='GROUP_PLAN_key')
+            const groupPlanRecord = currentSales.find(s => s.dealerId === `GROUP_PLAN_${grp.key}`) || {};
+            const groupPlan = groupPlanRecord.plan || 0;
+
+            if (groupDealers.length === 0 && customSales.length === 0 && groupPlan === 0) return;
 
             let rowsHtml = '';
-            let totalPlan = 0;
             let totalFact = 0;
 
             const items = [
@@ -119,68 +112,56 @@ document.addEventListener('DOMContentLoaded', () => {
                     (!item.isCustom && !s.isCustom && s.dealerId === item.id)
                 ) || {};
 
-                const plan = sale.plan || '';
-                const fact = sale.fact || '';
-                
-                const { diff, forecast, percent } = calculateKPI(plan, fact, daysInMonth, currentDay);
-                
-                totalPlan += parseFloat(plan) || 0;
-                totalFact += parseFloat(fact) || 0;
+                const fact = parseFloat(sale.fact) || 0;
+                totalFact += fact;
 
                 rowsHtml += `
                     <tr data-id="${item.id || ''}" data-name="${item.name}" data-custom="${item.isCustom}" data-group="${grp.key}">
-                        <td>${item.name} ${item.isCustom ? '<span class="badge bg-secondary">Разовый</span>' : ''}</td>
-                        <td><input type="number" class="form-control form-control-sm inp-plan" value="${plan}" placeholder="0"></td>
-                        <td><input type="number" class="form-control form-control-sm inp-fact" value="${fact}" placeholder="0"></td>
-                        <td class="${diff >= 0 ? 'text-success' : 'text-danger'} fw-bold">${Math.round(diff)}</td>
-                        <td>${currentDay}/${daysInMonth}</td>
-                        <td class="fw-bold">${Math.round(forecast)}</td>
-                        <td>
-                            <div class="progress position-relative" style="height: 20px;">
-                                <div class="progress-bar ${percent >= 100 ? 'bg-success' : 'bg-warning'}" role="progressbar" style="width: ${Math.min(percent, 100)}%"></div>
-                                <small class="justify-content-center d-flex position-absolute w-100 text-dark">${Math.round(percent)}%</small>
-                            </div>
-                        </td>
+                        <td class="ps-4">${item.name} ${item.isCustom ? '<span class="badge bg-secondary">Разовый</span>' : ''}</td>
+                        <td class="text-muted text-center">-</td> 
+                        <td><input type="number" class="form-control form-control-sm inp-fact" value="${fact || ''}" placeholder="0"></td>
+                        <td></td><td></td><td></td><td></td>
                         <td>${item.isCustom ? `<button class="btn btn-sm btn-outline-danger btn-del-row">×</button>` : ''}</td>
                     </tr>
                 `;
             });
 
-            const { diff: totalDiff, forecast: totalForecast, percent: totalPercent } = calculateKPI(totalPlan, totalFact, daysInMonth, currentDay);
+            // ИТОГИ ГРУППЫ
+            const { diff, forecast, percent } = calculateKPI(groupPlan, totalFact, daysInMonth, currentDay);
 
             const tableHtml = `
-                <div class="card mb-4 shadow-sm">
-                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">${grp.title}</h5>
-                        <button class="btn btn-sm btn-outline-primary btn-add-custom" data-group="${grp.key}">+ Добавить разового</button>
+                <div class="card mb-4 shadow-sm border-0">
+                    <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center py-3">
+                        <h5 class="mb-0 text-primary fw-bold">${grp.title}</h5>
+                        <button class="btn btn-sm btn-outline-secondary btn-add-custom" data-group="${grp.key}">+ Разовый</button>
                     </div>
                     <div class="table-responsive">
                         <table class="table table-hover align-middle mb-0">
-                            <thead class="table-light">
+                            <thead class="table-light small text-uppercase">
                                 <tr>
-                                    <th style="width: 25%">Дилер</th>
-                                    <th style="width: 10%">План (м²)</th>
-                                    <th style="width: 10%">Факт (м²)</th>
+                                    <th style="width: 30%">Дилер</th>
+                                    <th style="width: 12%">План группы</th>
+                                    <th style="width: 12%">Факт</th>
                                     <th>Разница</th>
-                                    <th>Дней</th>
                                     <th>Прогноз</th>
-                                    <th style="width: 15%">Выполнение</th>
+                                    <th style="width: 15%">% Вып.</th>
                                     <th></th>
                                 </tr>
                             </thead>
+                            <tr class="table-warning fw-bold group-header-row" data-group-key="${grp.key}">
+                                <td>ИТОГО: ${grp.title}</td>
+                                <td>
+                                    <input type="number" class="form-control form-control-sm fw-bold inp-group-plan" 
+                                           value="${groupPlan || ''}" placeholder="План..." 
+                                           style="border: 2px solid #ffc107;">
+                                </td>
+                                <td class="fs-5">${Math.round(totalFact)}</td>
+                                <td class="${diff >= 0 ? 'text-success' : 'text-danger'}">${Math.round(diff)}</td>
+                                <td>${Math.round(forecast)}</td>
+                                <td>${Math.round(percent)}%</td>
+                                <td></td>
+                            </tr>
                             <tbody>${rowsHtml}</tbody>
-                            <tfoot class="table-secondary fw-bold">
-                                <tr>
-                                    <td>ИТОГО</td>
-                                    <td>${totalPlan}</td>
-                                    <td>${totalFact}</td>
-                                    <td class="${totalDiff >= 0 ? 'text-success' : 'text-danger'}">${Math.round(totalDiff)}</td>
-                                    <td>-</td>
-                                    <td>${Math.round(totalForecast)}</td>
-                                    <td>${Math.round(totalPercent)}%</td>
-                                    <td></td>
-                                </tr>
-                            </tfoot>
                         </table>
                     </div>
                 </div>
@@ -192,9 +173,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function setupEventListeners() {
+        // Кнопки добавления/удаления
         document.querySelectorAll('.btn-add-custom').forEach(btn => {
             btn.onclick = () => {
-                const name = prompt("Введите название разового покупателя:");
+                const name = prompt("Название:");
                 if (name) {
                     currentSales.push({ month: monthPicker.value, group: btn.dataset.group, dealerName: name, isCustom: true, plan: 0, fact: 0 });
                     renderTable();
@@ -203,7 +185,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         document.querySelectorAll('.btn-del-row').forEach(btn => {
             btn.onclick = (e) => {
-                if(confirm('Удалить строку?')) {
+                if(confirm('Удалить?')) {
                     const row = e.target.closest('tr');
                     const name = row.dataset.name;
                     currentSales = currentSales.filter(s => !(s.isCustom && s.dealerName === name));
@@ -211,20 +193,51 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             };
         });
+
+        // Живой пересчет (при вводе факта или плана группы)
+        const inputs = document.querySelectorAll('.inp-fact, .inp-group-plan');
+        inputs.forEach(inp => {
+            inp.addEventListener('change', () => {
+                 // Пока просто сохраняем в память (визуально обновится после render)
+                 // Для полноценного живого пересчета без перезагрузки нужно больше кода,
+                 // проще нажать "Сохранить".
+            });
+        });
     }
 
     saveBtn.onclick = async () => {
         const dataToSave = [];
-        document.querySelectorAll('#sales-container tr[data-group]').forEach(tr => {
+        
+        // 1. Сохраняем факты дилеров
+        document.querySelectorAll('#sales-container tbody tr').forEach(tr => {
             const dealerId = tr.dataset.id;
             const dealerName = tr.dataset.name;
             const isCustom = tr.dataset.custom === 'true';
             const group = tr.dataset.group;
-            const plan = parseFloat(tr.querySelector('.inp-plan').value) || 0;
             const fact = parseFloat(tr.querySelector('.inp-fact').value) || 0;
 
-            if (plan > 0 || fact > 0 || isCustom) {
-                dataToSave.push({ month: monthPicker.value, group, dealerId: dealerId === "null" ? null : dealerId, dealerName, isCustom, plan, fact });
+            if (fact > 0 || isCustom) {
+                dataToSave.push({ month: monthPicker.value, group, dealerId: dealerId === "null" ? null : dealerId, dealerName, isCustom, plan: 0, fact });
+            }
+        });
+
+        // 2. Сохраняем ПЛАНЫ ГРУПП
+        document.querySelectorAll('.inp-group-plan').forEach(inp => {
+            const row = inp.closest('tr');
+            const groupKey = row.dataset.groupKey;
+            const plan = parseFloat(inp.value) || 0;
+            
+            if (plan > 0) {
+                // Сохраняем план группы как "фиктивного" дилера с ID = GROUP_PLAN_...
+                dataToSave.push({
+                    month: monthPicker.value,
+                    group: groupKey,
+                    dealerId: `GROUP_PLAN_${groupKey}`,
+                    dealerName: `План ${groupKey}`,
+                    isCustom: false,
+                    plan: plan,
+                    fact: 0 
+                });
             }
         });
 
