@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentMonthStr = now.toISOString().slice(0, 7);
     monthPicker.value = currentMonthStr;
 
-    // Группы для ВВОДА
+    // (ИЗМЕНЕНО) Группы для ВВОДА (оставил только регионы и Астану)
     const inputGroups = [
         { key: 'regional_astana', title: 'Региональный Астана' },
         { key: 'north', title: 'Регион Север' },
@@ -26,12 +26,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const cityToRegion = {
         "павлодар": "north", "кокшетау": "north", "петропавловск": "north", "костанай": "north",
         "семей": "east", "усть-каменогорск": "east", "оскемен": "east",
-        "шымкент": "south", "алматы": "south", "тараз": "south", "кызылорда": "south",
-        "актобе": "west", "актау": "west", "атырау": "west", "уральск": "west",
+        "шымкент": "south", "алматы": "south", "алмата": "south", "тараз": "south", "кызылорда": "south",
+        "актобе": "west", "актау": "west", "атырау": "west", "уральск": "west", "орал": "west",
         "караганда": "center", "жезказган": "center",
         "астана": "regional_astana"
     };
 
+    // Крупные дилеры
     const majorDealersConfig = [
         { name: "Мир Ламината", key: "mir_laminata" },
         { name: "12 месяцев Алаш", key: "twelve_months" }
@@ -40,26 +41,26 @@ document.addEventListener('DOMContentLoaded', () => {
     let allDealers = [];
     let currentSales = [];
 
-    // (НОВОЕ) Функция форматирования чисел (без округления до целых)
-    function fmt(num) {
-        if (typeof num !== 'number' || isNaN(num)) return 0;
-        // Оставляем до 2 знаков после запятой, если они есть
-        return Math.round(num * 100) / 100;
-    }
-
+    // (ИЗМЕНЕНО) Убрана проверка на Михаила/Александра
     function getDealerGroup(d) {
+        // 1. Если явно назначен ответственный
         if (d.responsible === 'regional_astana') return 'regional_astana';
-        if (d.responsible === 'regional_regions') {
-            const city = (d.city || '').toLowerCase().trim();
-            if (cityToRegion[city]) return cityToRegion[city];
-            return 'other';
+        
+        // 2. Если "Региональный Регионы" - смотрим на город
+        if (d.responsible === 'regional_regions' || (!d.responsible && d.city)) {
+            const cityKey = (d.city || '').trim().toLowerCase();
+            if (cityKey === 'астана') return 'regional_astana';
+            if (cityToRegion[cityKey]) return cityToRegion[cityKey];
         }
-        const city = (d.city || '').toLowerCase().trim();
-        if (!d.responsible && city === 'астана') return 'regional_astana';
-        if (!d.responsible && cityToRegion[city]) return cityToRegion[city];
+        
         return 'other';
     }
 
+    // ... (весь остальной код: getMajorKey, loadData, calculateKPI, renderAll, renderSummaryRow и т.д. без изменений) ...
+    // Скопируйте полный код из предыдущих версий, изменив только inputGroups и getDealerGroup.
+    
+    // Для надежности - вот полный код остатка файла:
+    
     function getMajorKey(dealerName) {
         if (!dealerName) return null;
         const lowerName = dealerName.toLowerCase();
@@ -70,7 +71,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function loadData() {
         try {
-            // container.innerHTML = '<p class="text-center mt-5">Загрузка...</p>';
             const month = monthPicker.value;
             const [dealersRes, salesRes] = await Promise.all([
                 fetch(API_DEALERS),
@@ -82,7 +82,11 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) { alert('Ошибка: ' + e.message); }
     }
 
-    // (ИЗМЕНЕНО) Расчет без Math.round
+    function fmt(num) {
+        if (typeof num !== 'number' || isNaN(num)) return 0;
+        return Math.round(num * 100) / 100;
+    }
+
     function calculateKPI(plan, fact, daysInMonth, currentDay) {
         plan = parseFloat(plan) || 0;
         fact = parseFloat(fact) || 0;
@@ -93,6 +97,38 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const percent = plan > 0 ? (fact / plan) * 100 : 0;
         return { diff, forecast, percent };
+    }
+
+    // (НОВОЕ) Функция "Запомнить то, что ввел юзер" перед перерисовкой
+    function captureState() {
+        document.querySelectorAll('.inp-fact').forEach(inp => {
+            const tr = inp.closest('tr');
+            const dealerId = tr.dataset.id === "null" ? null : tr.dataset.id;
+            const dealerName = tr.dataset.name;
+            const isCustom = tr.dataset.custom === 'true';
+            const group = tr.dataset.group;
+            const val = parseFloat(inp.value) || 0;
+
+            let record = currentSales.find(s => 
+                (isCustom && s.isCustom && s.dealerName === dealerName) || 
+                (!isCustom && !s.isCustom && s.dealerId === dealerId)
+            );
+
+            if (record) { record.fact = val; } 
+            else if (val > 0) {
+                currentSales.push({ month: monthPicker.value, group, dealerId, dealerName, isCustom, plan: 0, fact: val });
+            }
+        });
+        document.querySelectorAll('.inp-group-plan').forEach(inp => {
+            const tr = inp.closest('tr');
+            const planKey = tr.dataset.planKey;
+            const val = parseFloat(inp.value) || 0;
+            let record = currentSales.find(s => s.dealerId === `PLAN_${planKey}`);
+            if (record) { record.plan = val; } 
+            else if (val > 0) {
+                currentSales.push({ month: monthPicker.value, group: 'PLAN', dealerId: `PLAN_${planKey}`, dealerName: `Plan ${planKey}`, isCustom: false, plan: val, fact: 0 });
+            }
+        });
     }
 
     function renderAll() {
@@ -109,7 +145,6 @@ document.addEventListener('DOMContentLoaded', () => {
         container.innerHTML = '';
         summaryBody.innerHTML = '';
 
-        // 1. СБОР ФАКТОВ
         const facts = {
             north: 0, south: 0, west: 0, east: 0, center: 0,
             regional_astana: 0,
@@ -137,7 +172,6 @@ document.addEventListener('DOMContentLoaded', () => {
             items.forEach(item => {
                 const sale = currentSales.find(s => (item.isCustom && s.isCustom && s.dealerName === item.name) || (!item.isCustom && !s.isCustom && s.dealerId === item.id)) || {};
                 const fact = parseFloat(sale.fact) || 0;
-
                 const majorKey = getMajorKey(item.name);
                 if (majorKey) facts[majorKey] += fact;
                 else if (grp.key === 'regional_astana') facts.regional_astana += fact;
@@ -147,31 +181,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 rowsHtml += `
                     <tr data-id="${item.id || ''}" data-name="${item.name}" data-custom="${item.isCustom}" data-group="${grp.key}">
                         <td class="ps-4">${item.name} ${item.isCustom ? '<span class="badge bg-secondary">Разовый</span>' : ''}</td>
-                        <td>
-                            <input type="number" step="0.01" class="form-control form-control-sm inp-fact" 
-                                   value="${fact || ''}" placeholder="0">
-                        </td>
+                        <td><input type="number" step="0.01" class="form-control form-control-sm inp-fact" value="${fact || ''}" placeholder="0"></td>
                         <td>${item.isCustom ? `<button class="btn btn-sm btn-outline-danger btn-del-row">×</button>` : ''}</td>
                     </tr>
                 `;
             });
 
-            container.innerHTML += `
-                <div class="card mb-4 shadow-sm border-0">
-                    <div class="card-header bg-light d-flex justify-content-between py-2">
-                        <h6 class="mb-0 fw-bold">${grp.title}</h6>
-                        <button class="btn btn-sm btn-link btn-add-custom" data-group="${grp.key}">+ Добавить</button>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0 table-sm">
-                            <tbody>${rowsHtml}</tbody>
-                        </table>
-                    </div>
-                </div>`;
+            container.innerHTML += `<div class="card mb-4 shadow-sm border-0"><div class="card-header bg-light d-flex justify-content-between py-2"><h6 class="mb-0 fw-bold">${grp.title}</h6><button class="btn btn-sm btn-link btn-add-custom" data-group="${grp.key}">+ Добавить</button></div><div class="table-responsive"><table class="table table-hover align-middle mb-0 table-sm"><tbody>${rowsHtml}</tbody></table></div></div>`;
         });
 
-        // --- 2. СВОДНАЯ ТАБЛИЦА ---
-        // Загружаем Планы (включая ОБЩИЙ ПЛАН)
         const plans = {};
         const keys = ["regional_regions", "north", "south", "west", "east", "center", "regional_astana", "mir_laminata", "twelve_months", "total_all"];
         keys.forEach(k => {
@@ -180,8 +198,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         const totalRegionsFact = facts.north + facts.south + facts.west + facts.east + facts.center;
-        
-        // (ИЗМЕНЕНО) ОБЩИЙ ПЛАН теперь берется из введенного значения, а не суммы
         const totalPlanAll = plans.total_all; 
         const totalFactAll = totalRegionsFact + facts.regional_astana + facts.mir_laminata + facts.twelve_months + facts.other;
 
@@ -189,45 +205,22 @@ document.addEventListener('DOMContentLoaded', () => {
             const plan = plans[planKey] || 0;
             const { diff, forecast, percent } = calculateKPI(plan, factVal, daysInMonth, currentDay);
             const dailyFact = plan > 0 ? (factVal / plan) : 0;
-
             const rowClass = isMain ? 'table-info fw-bold' : (isBold ? 'fw-bold' : '');
             
-            return `
-                <tr class="${rowClass}" data-plan-key="${planKey}">
-                    <td>${title}</td>
-                    <td>
-                        <input type="number" step="0.01" class="form-control form-control-sm fw-bold inp-group-plan" 
-                               value="${plan || ''}" placeholder="0" 
-                               style="width: 100px; background: #fffbf0; border: 1px solid #ffc107;">
-                    </td>
-                    <td>${fmt(factVal)}</td>
-                    <td class="${diff >= 0 ? 'text-success' : 'text-danger'}">${fmt(diff)}</td>
-                    <td>${currentDay}</td>
-                    <td>${daysInMonth}</td>
-                    <td>${fmt(forecast)}</td>
-                    <td>${fmt(dailyFact)}</td> <td>${fmt(percent)}%</td>
-                </tr>
-            `;
+            return `<tr class="${rowClass}" data-plan-key="${planKey}"><td>${title}</td><td><input type="number" step="0.01" class="form-control form-control-sm fw-bold inp-group-plan" value="${plan || ''}" placeholder="0" style="width: 100px; background: #fffbf0; border: 1px solid #ffc107;"></td><td>${fmt(factVal)}</td><td class="${diff >= 0 ? 'text-success' : 'text-danger'}">${fmt(diff)}</td><td>${currentDay}</td><td>${daysInMonth}</td><td>${fmt(forecast)}</td><td>${fmt(dailyFact)}</td><td>${fmt(percent)}%</td></tr>`;
         };
 
         let summaryHtml = '';
-        
         summaryHtml += renderSummaryRow("Региональный Регионы (Сумма)", "regional_regions", totalRegionsFact, true, true);
         summaryHtml += renderSummaryRow("   - Север", "north", facts.north);
         summaryHtml += renderSummaryRow("   - Восток", "east", facts.east);
         summaryHtml += renderSummaryRow("   - Юг", "south", facts.south);
         summaryHtml += renderSummaryRow("   - Запад", "west", facts.west);
         summaryHtml += renderSummaryRow("   - Центр", "center", facts.center);
-        
         summaryHtml += renderSummaryRow("Региональный Астана", "regional_astana", facts.regional_astana, true, true);
         summaryHtml += renderSummaryRow("Мир Ламината", "mir_laminata", facts.mir_laminata, true);
         summaryHtml += renderSummaryRow("12 Месяцев Алаш", "twelve_months", facts.twelve_months, true);
-
-        if (facts.other > 0) {
-            summaryHtml += `<tr><td colspan="2">Разовые / Прочие</td><td>${fmt(facts.other)}</td><td colspan="6"></td></tr>`;
-        }
-
-        // (ИЗМЕНЕНО) ОБЩИЙ ИТОГ - теперь тоже рендерится как редактируемая строка
+        if (facts.other > 0) summaryHtml += `<tr><td colspan="2">Разовые / Прочие</td><td>${fmt(facts.other)}</td><td colspan="6"></td></tr>`;
         summaryHtml += renderSummaryRow("ОБЩЕЕ ВЫПОЛНЕНИЕ", "total_all", totalFactAll, true, true);
 
         summaryBody.innerHTML = summaryHtml;
@@ -237,6 +230,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function setupEventListeners() {
         document.querySelectorAll('.btn-add-custom').forEach(btn => {
             btn.onclick = () => {
+                captureState();
                 const name = prompt("Название:");
                 if (name) {
                     currentSales.push({ month: monthPicker.value, group: btn.dataset.group, dealerName: name, isCustom: true, plan: 0, fact: 0 });
@@ -247,6 +241,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.btn-del-row').forEach(btn => {
             btn.onclick = (e) => {
                 if(confirm('Удалить?')) {
+                    captureState();
                     const row = e.target.closest('tr');
                     const name = row.dataset.name;
                     currentSales = currentSales.filter(s => !(s.isCustom && s.dealerName === name));
@@ -257,46 +252,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     saveBtn.onclick = async () => {
-        const dataToSave = [];
-        
-        // 1. Факты
-        document.querySelectorAll('#sales-container tbody tr').forEach(tr => {
-            const dealerId = tr.dataset.id;
-            const dealerName = tr.dataset.name;
-            const isCustom = tr.dataset.custom === 'true';
-            const group = tr.dataset.group;
-            const fact = parseFloat(tr.querySelector('.inp-fact').value) || 0;
-
-            if (fact > 0 || isCustom) {
-                dataToSave.push({ 
-                    month: monthPicker.value, group, 
-                    dealerId: dealerId === "null" ? null : dealerId, 
-                    dealerName, isCustom, plan: 0, fact 
-                });
-            }
-        });
-
-        // 2. Планы (Теперь и ОБЩИЙ ПЛАН тут)
-        document.querySelectorAll('.inp-group-plan').forEach(inp => {
-            const row = inp.closest('tr');
-            const planKey = row.dataset.planKey;
-            const plan = parseFloat(inp.value) || 0;
-            
-            if (plan > 0 || planKey) {
-                dataToSave.push({ 
-                    month: monthPicker.value, 
-                    group: 'PLAN', 
-                    dealerId: `PLAN_${planKey}`, 
-                    dealerName: `Plan ${planKey}`, 
-                    isCustom: false, 
-                    plan, fact: 0 
-                });
-            }
-        });
-
+        captureState();
         try {
             saveBtn.disabled = true; saveBtn.innerHTML = '...';
-            const res = await fetch(API_SALES, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ month: monthPicker.value, data: dataToSave }) });
+            const res = await fetch(API_SALES, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ month: monthPicker.value, data: currentSales }) });
             if (res.ok) { alert('Сохранено!'); loadData(); } else throw new Error('Ошибка');
         } catch (e) { alert(e.message); }
         finally { saveBtn.disabled = false; saveBtn.innerHTML = '<i class="bi bi-save me-2"></i>Сохранить'; }
