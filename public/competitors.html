@@ -20,7 +20,8 @@
                     <li class="nav-item"><a class="nav-link" href="/products.html">Матрица</a></li>
                     <li class="nav-item"><a class="nav-link" href="/report.html">Выставленность</a></li>
                     <li class="nav-item"><a class="nav-link" href="/sales.html">Продажи</a></li>
-                    <li class="nav-item"><a class="nav-link active" href="/competitors.html">Конкуренты</a></li> <li class="nav-item"><a class="nav-link" href="/knowledge.html">Статьи</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="/competitors.html">Конкуренты</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/knowledge.html">Статьи</a></li>
                 </ul>
             </div>
         </div>
@@ -48,10 +49,24 @@
                     <div class="card-body">
                         <form id="comp-form">
                             <input type="hidden" id="comp_id">
+                            
                             <div class="mb-3">
                                 <label class="form-label">Название Бренда</label>
-                                <input type="text" class="form-control" id="comp_name" required>
+                                <input type="text" class="form-control fw-bold" id="comp_name" required>
                             </div>
+
+                            <div class="mb-3 p-3 bg-light rounded border">
+                                <label class="form-label d-block mb-2 fw-bold">Особенности ассортимента:</label>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="comp_herringbone">
+                                    <label class="form-check-label" for="comp_herringbone">🌲 Елочка</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="comp_artistic">
+                                    <label class="form-check-label" for="comp_artistic">🎨 Художественный</label>
+                                </div>
+                            </div>
+
                             <div class="row g-3 mb-3">
                                 <div class="col-md-6">
                                     <label class="form-label">Поставщик</label>
@@ -63,22 +78,23 @@
                                 </div>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label">Доп. информация (Контакты и т.д.)</label>
+                                <label class="form-label">Доп. информация</label>
                                 <textarea class="form-control" id="comp_info" rows="2"></textarea>
                             </div>
                             
                             <hr>
-                            <label class="form-label fw-bold">Коллекции (каждая с новой строки):</label>
-                            <textarea class="form-control" id="comp_collections" rows="6" placeholder="Blue&#10;Black&#10;Lagoon"></textarea>
-                            <div class="form-text">Просто перечислите названия коллекций.</div>
+                            <label class="form-label fw-bold">Коллекции (списком):</label>
+                            <textarea class="form-control" id="comp_collections" rows="6" placeholder="Каждая с новой строки"></textarea>
 
                             <div class="text-end mt-3">
-                                <button type="submit" class="btn btn-success">Сохранить</button>
+                                <button type="submit" class="btn btn-success px-4">Сохранить</button>
                             </div>
                         </form>
                     </div>
                 </div>
-                <div id="empty-msg" class="text-center text-muted mt-5">Выберите бренд слева или добавьте новый</div>
+                <div id="empty-msg" class="text-center text-muted mt-5">
+                    <i class="bi bi-arrow-left me-2"></i>Выберите бренд слева или добавьте новый
+                </div>
             </div>
         </div>
     </div>
