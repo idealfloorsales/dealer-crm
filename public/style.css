@@ -379,3 +379,22 @@ td a { text-decoration: none; color: var(--primary-color) !important; font-weigh
     border-bottom: 1px solid var(--border-color);
     margin-bottom: 20px;
 }
+/* (НОВОЕ) Цвета типов коллекций */
+.badge-type {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-right: 4px;
+    margin-bottom: 2px;
+    color: #333;
+}
+
+.type-standard { background-color: #f0f0f0; color: #666; } /* Серый */
+.type-english { background-color: rgba(25, 135, 84, 0.2); color: #0f5132; } /* Зеленый */
+.type-french { background-color: rgba(13, 110, 253, 0.2); color: #084298; } /* Синий */
+.type-artistic { background-color: rgba(255, 193, 7, 0.3); color: #664d03; } /* Желтый */
+.type-art-eng { background-color: rgba(253, 126, 20, 0.2); color: #663300; } /* Оранжевый */
+.type-art-french { background-color: rgba(111, 66, 193, 0.2); color: #432874; } /* Фиолетовый */
+.type-art-mix { background-color: rgba(220, 53, 69, 0.2); color: #842029; } /* Красный */
