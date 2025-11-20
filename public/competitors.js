@@ -1,4 +1,4 @@
-// competitors.js
+// competitors.js 
 document.addEventListener('DOMContentLoaded', () => {
     const API_URL = '/api/competitors-ref';
     
