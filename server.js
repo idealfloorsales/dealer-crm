@@ -28,7 +28,7 @@ if (ADMIN_USER && ADMIN_PASSWORD) {
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// --- СПИСОК ТОВАРОВ (Ламинат) ---
+// СПИСОК ТОВАРОВ (Ламинат)
 const productsToImport = [
     { sku: "CD-507", name: "Дуб Беленый" }, { sku: "CD-508", name: "Дуб Пепельный" },
     { sku: "8EH34-701", name: "Дуб Снежный" }, { sku: "8EH34-702", name: "Дуб Арабика" },
@@ -92,7 +92,7 @@ const additionalAddressSchema = new mongoose.Schema({ description: String, city:
 const visitSchema = new mongoose.Schema({ date: String, comment: String, isCompleted: { type: Boolean, default: false } }, { _id: false });
 const posMaterialSchema = new mongoose.Schema({ name: String, quantity: Number }, { _id: false });
 
-// Конкурент внутри Дилера (запись факта наличия)
+// Конкурент внутри Дилера
 const competitorSchema = new mongoose.Schema({ 
     brand: String, 
     collection: String, 
@@ -100,15 +100,19 @@ const competitorSchema = new mongoose.Schema({
     price_retail: String 
 }, { _id: false });
 
-// (НОВОЕ) Справочник Конкурентов (Глобальный список брендов)
+// (НОВОЕ) Схема элемента коллекции (с типом)
+const collectionItemSchema = new mongoose.Schema({
+    name: String,
+    type: { type: String, default: 'standard' } 
+}, { _id: false });
+
+// (ИЗМЕНЕНО) Справочник Конкурентов (теперь коллекции - это объекты)
 const compRefSchema = new mongoose.Schema({
-    name: String,        // Бренд (Kastamonu)
-    supplier: String,    // Поставщик (Alina Group)
-    warehouse: String,   // Склад (Алматы)
-    info: String,        // Доп инфо
-    collections: [String], // Список коллекций
-    hasHerringbone: { type: Boolean, default: false }, // (НОВОЕ) Елочка
-    hasArtistic: { type: Boolean, default: false }     // (НОВОЕ) Художественный
+    name: String,        
+    supplier: String,    
+    warehouse: String,   
+    info: String,        
+    collections: [collectionItemSchema] 
 });
 const CompRef = mongoose.model('CompRef', compRefSchema);
 
