@@ -1,4 +1,3 @@
-// script.js v47
 document.addEventListener('DOMContentLoaded', () => {
     
     const API_DEALERS_URL = '/api/dealers';
@@ -7,9 +6,18 @@ document.addEventListener('DOMContentLoaded', () => {
     let fullProductCatalog = [];
     let allDealers = [];
     let currentSort = { column: 'name', direction: 'asc' };
-    const posMaterialsList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"];
+    
+    const posMaterialsList = [
+        "С600 - 600мм задняя стенка",
+        "С800 - 800мм задняя стенка",
+        "РФ-2 - Расческа из фанеры",
+        "РФС-1 - Расческа из фанеры СТАРАЯ",
+        "Н600 - 600мм наклейка",
+        "Н800 - 800мм наклейка",
+        "Табличка - Табличка орг.стекло"
+    ];
 
-    // Модалки
+    // --- Модалки ---
     const addModalEl = document.getElementById('add-modal'); 
     const addModal = new bootstrap.Modal(addModalEl);
     const addForm = document.getElementById('add-dealer-form');
@@ -18,7 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const editModal = new bootstrap.Modal(editModalEl);
     const editForm = document.getElementById('edit-dealer-form');
 
-    // Элементы
+    // --- Элементы ---
     const openAddModalBtn = document.getElementById('open-add-modal-btn');
     
     // Списки ADD
@@ -68,7 +76,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let editPhotosData = [];
     let newAvatarBase64 = null; 
 
-    // Вспомогательные
     const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
     const safeText = (text) => (text || '').toString().replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const safeAttr = (text) => (text || '').toString().replace(/"/g, '&quot;');
@@ -88,7 +95,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.addEventListener('click', (e) => { if (!e.target.closest('.map-search-container')) suggestionsBox.style.display = 'none'; });
     }
 
-    // Инициализация ADD (Wizard)
     if (addModalEl) {
         addModalEl.addEventListener('shown.bs.modal', () => {
             if (!addMap) { 
@@ -101,42 +107,27 @@ document.addEventListener('DOMContentLoaded', () => {
             if (addMap) addMap.setView([DEFAULT_LAT, DEFAULT_LNG], 13);
         });
     }
-
-    // Инициализация EDIT (Tabs)
     if (editModalEl) {
         editModalEl.addEventListener('shown.bs.modal', () => {
-            // Карта может быть скрыта, если активна другая вкладка.
-            // Обработка переключения вкладки
-            const tabMapBtn = document.querySelector('button[data-bs-target="#tab-map"]');
-            if(tabMapBtn) {
-                tabMapBtn.addEventListener('shown.bs.tab', () => {
-                     if (!editMap) { 
-                        editMap = initMap('edit-map'); 
-                        editModalEl.markerRef = { current: null }; 
-                        setupMapClick(editMap, 'edit_latitude', 'edit_longitude', editModalEl.markerRef); 
-                        setupMapSearch(editMap, 'edit-map-search', 'edit-map-suggestions', 'edit_latitude', 'edit_longitude', editModalEl.markerRef);
-                    }
-                    if(editMap) {
-                        editMap.invalidateSize();
-                        // Центровка
-                        const lat = parseFloat(document.getElementById('edit_latitude').value);
-                        const lng = parseFloat(document.getElementById('edit_longitude').value);
-                        if (!isNaN(lat) && !isNaN(lng)) { 
-                            editMap.setView([lat, lng], 15); 
-                            if(editModalEl.markerRef.current) editModalEl.markerRef.current.setLatLng([lat, lng]);
-                            else editModalEl.markerRef.current = L.marker([lat, lng]).addTo(editMap);
-                        } else { editMap.setView([DEFAULT_LAT, DEFAULT_LNG], 13); }
-                    }
-                });
+            if (!editMap) { 
+                editMap = initMap('edit-map'); 
+                editModalEl.markerRef = { current: null }; 
+                setupMapClick(editMap, 'edit_latitude', 'edit_longitude', editModalEl.markerRef); 
+                setupMapSearch(editMap, 'edit-map-search', 'edit-map-suggestions', 'edit_latitude', 'edit_longitude', editModalEl.markerRef);
+            } else { editMap.invalidateSize(); }
+            const latEl = document.getElementById('edit_latitude'); const lngEl = document.getElementById('edit_longitude');
+            if (latEl && lngEl && editMap) {
+                const lat = parseFloat(latEl.value); const lng = parseFloat(lngEl.value);
+                if (editModalEl.markerRef.current) editMap.removeLayer(editModalEl.markerRef.current);
+                if (!isNaN(lat) && !isNaN(lng)) { editModalEl.markerRef.current = L.marker([lat, lng]).addTo(editMap); editMap.setView([lat, lng], 15); } 
+                else { editMap.setView([DEFAULT_LAT, DEFAULT_LNG], 13); }
             }
         });
     }
 
-    // --- Данные ---
     async function fetchProductCatalog() { if (fullProductCatalog.length > 0) return; try { const response = await fetch(API_PRODUCTS_URL); if (!response.ok) throw new Error(`Ошибка: ${response.status}`); fullProductCatalog = await response.json(); fullProductCatalog.sort((a, b) => a.sku.localeCompare(b.sku, 'ru', { numeric: true })); } catch (error) {} }
     async function completeTask(btn, dealerId, visitIndex) { try { btn.disabled = true; const res = await fetch(`${API_DEALERS_URL}/${dealerId}`); if(!res.ok) throw new Error('Err'); const dealer = await res.json(); if (dealer.visits && dealer.visits[visitIndex]) { dealer.visits[visitIndex].isCompleted = true; } await fetch(`${API_DEALERS_URL}/${dealerId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visits: dealer.visits }) }); initApp(); } catch (e) { alert("Ошибка"); btn.disabled = false; } }
 
-    // --- Дашборд ---
     function renderDashboard() {
         if (!dashboardContainer) { if(tasksListUpcoming) tasksListUpcoming.innerHTML = '<p class="text-muted text-center p-3">Нет задач</p>'; return; }
         if (!allDealers || allDealers.length === 0) { dashboardContainer.innerHTML = ''; return; }
@@ -158,7 +149,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderTaskList(container, tasks, type) { if (!container) return; if (tasks.length === 0) { container.innerHTML = `<p class="text-muted text-center p-3">${type === 'cooling' ? 'Нет таких' : 'Нет задач'}</p>`; return; } container.innerHTML = tasks.map(t => { let badge = ''; let comment = safeText(t.comment); if (type === 'upcoming') { badge = `<span class="badge ${t.isToday ? 'bg-danger' : 'bg-primary'} rounded-pill me-2">${t.isToday ? 'Сегодня' : t.date.toLocaleDateString('ru-RU')}</span>`; } else if (type === 'problem') { badge = t.type === 'overdue' ? `<span class="badge bg-danger rounded-pill me-2">Просрочено: ${t.date.toLocaleDateString('ru-RU')}</span>` : `<span class="badge bg-danger rounded-pill me-2">Статус: Проблемный</span>`; if(t.type !== 'overdue') comment = '<i>Требует внимания</i>'; } else if (type === 'cooling') { badge = `<span class="badge bg-warning text-dark rounded-pill me-2">Нет визитов: ${t.days === 999 ? 'Никогда' : `${t.days} дн.`}</span>`; comment = '<i>Нужно связаться</i>'; } return `<div class="list-group-item task-item d-flex justify-content-between align-items-center"><div class="me-auto"><div class="d-flex align-items-center mb-1">${badge}<a href="dealer.html?id=${t.dealerId}" target="_blank" class="fw-bold text-decoration-none text-dark">${t.dealerName}</a></div><small class="text-muted" style="white-space: pre-wrap;">${comment}</small></div>${(type === 'upcoming' || (type === 'problem' && t.type === 'overdue')) ? `<button class="btn btn-sm btn-success btn-complete-task ms-2" title="Выполнено" data-id="${t.dealerId}" data-index="${t.visitIndex}"><i class="bi bi-check-lg"></i></button>` : ''}</div>`; }).join(''); }
     if(document.body) { document.body.addEventListener('click', (e) => { const taskBtn = e.target.closest('.btn-complete-task'); if (taskBtn) { taskBtn.disabled = true; completeTask(taskBtn, taskBtn.dataset.id, taskBtn.dataset.index); } }); }
 
-    // --- Генераторы ---
     function createCompetitorEntryHTML(c={}) { return `<div class="competitor-entry"><input type="text" class="form-control competitor-brand" placeholder="Бренд" value="${c.brand||''}"><input type="text" class="form-control competitor-collection" placeholder="Коллекция" value="${c.collection||''}"><input type="text" class="form-control competitor-price-opt" placeholder="ОПТ" value="${c.price_opt||''}"><input type="text" class="form-control competitor-price-retail" placeholder="Розница" value="${c.price_retail||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
     function createContactEntryHTML(c={}) { return `<div class="contact-entry input-group mb-2"><input type="text" class="form-control contact-name" placeholder="Имя" value="${c.name||''}"><input type="text" class="form-control contact-position" placeholder="Должность" value="${c.position||''}"><input type="text" class="form-control contact-info" placeholder="Телефон" value="${c.contactInfo||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
     function createAddressEntryHTML(a={}) { return `<div class="address-entry input-group mb-2"><input type="text" class="form-control address-description" placeholder="Описание" value="${a.description||''}"><input type="text" class="form-control address-city" placeholder="Город" value="${a.city||''}"><input type="text" class="form-control address-address" placeholder="Адрес" value="${a.address||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
@@ -166,9 +156,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function createVisitEntryHTML(v={}) { return `<div class="visit-entry input-group mb-2"><input type="date" class="form-control visit-date" value="${v.date||''}"><input type="text" class="form-control visit-comment w-50" placeholder="Результат визита..." value="${v.comment||''}"><input type="hidden" class="visit-completed" value="${v.isCompleted || 'false'}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
     function renderPhotoPreviews(container, photosArray) { if(container) container.innerHTML = photosArray.map((p, index) => `<div class="photo-preview-item"><img src="${p.photo_url}"><button type="button" class="btn-remove-photo" data-index="${index}">×</button></div>`).join(''); }
 
-    // Handlers
     if(addAvatarInput) addAvatarInput.addEventListener('change', async (e) => { const file = e.target.files[0]; if (file) { newAvatarBase64 = await compressImage(file, 800, 0.8); addAvatarPreview.src = newAvatarBase64; } });
     if(editAvatarInput) editAvatarInput.addEventListener('change', async (e) => { const file = e.target.files[0]; if (file) { newAvatarBase64 = await compressImage(file, 800, 0.8); editAvatarPreview.src = newAvatarBase64; } });
+    
     if(addPhotoInput) addPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) addPhotosData.push({ photo_url: await compressImage(file, 1000, 0.7) }); renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData); addPhotoInput.value = ''; });
     if(addPhotoPreviewContainer) addPhotoPreviewContainer.addEventListener('click', (e) => { if(e.target.classList.contains('btn-remove-photo')) { addPhotosData.splice(e.target.dataset.index, 1); renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData); }});
     if(editPhotoInput) editPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) editPhotosData.push({ photo_url: await compressImage(file, 1000, 0.7) }); renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData); editPhotoInput.value = ''; });
@@ -180,7 +170,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function getSelectedProductIds(containerId) { const el=document.getElementById(containerId); if(!el) return []; return Array.from(el.querySelectorAll('input:checked')).map(cb=>cb.value); }
     async function saveProducts(dealerId, ids) { await fetch(`${API_DEALERS_URL}/${dealerId}/products`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({productIds: ids})}); }
 
-    // --- ФИЛЬТРАЦИЯ ---
     function renderDealerList() {
         if (!dealerListBody) return;
         const city = filterCity ? filterCity.value : ''; const type = filterPriceType ? filterPriceType.value : ''; const status = filterStatus ? filterStatus.value : ''; const responsible = filterResponsible ? filterResponsible.value : ''; const search = searchBar ? searchBar.value.toLowerCase() : '';
@@ -216,22 +205,35 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pendingId) { localStorage.removeItem('pendingEditDealerId'); openEditModal(pendingId); }
     }
 
-    // --- LISTENERS ADD (Wizard) ---
-    // (Переменные кнопок внутри модалки)
+    // Listeners ADD
     if(document.getElementById('add-contact-btn-add-modal')) document.getElementById('add-contact-btn-add-modal').onclick = () => addContactList.insertAdjacentHTML('beforeend', createContactEntryHTML());
     if(document.getElementById('add-address-btn-add-modal')) document.getElementById('add-address-btn-add-modal').onclick = () => addAddressList.insertAdjacentHTML('beforeend', createAddressEntryHTML());
     if(document.getElementById('add-pos-btn-add-modal')) document.getElementById('add-pos-btn-add-modal').onclick = () => addPosList.insertAdjacentHTML('beforeend', createPosEntryHTML());
     if(document.getElementById('add-visits-btn-add-modal')) document.getElementById('add-visits-btn-add-modal').onclick = () => addVisitsList.insertAdjacentHTML('beforeend', createVisitEntryHTML());
     if(document.getElementById('add-competitor-btn-add-modal')) document.getElementById('add-competitor-btn-add-modal').onclick = () => addCompetitorList.insertAdjacentHTML('beforeend', createCompetitorEntryHTML());
     
-    // --- LISTENERS EDIT (Tabs) ---
+    // Listeners EDIT
     if(document.getElementById('add-contact-btn-edit-modal')) document.getElementById('add-contact-btn-edit-modal').onclick = () => editContactList.insertAdjacentHTML('beforeend', createContactEntryHTML());
     if(document.getElementById('add-address-btn-edit-modal')) document.getElementById('add-address-btn-edit-modal').onclick = () => editAddressList.insertAdjacentHTML('beforeend', createAddressEntryHTML());
     if(document.getElementById('add-pos-btn-edit-modal')) document.getElementById('add-pos-btn-edit-modal').onclick = () => editPosList.insertAdjacentHTML('beforeend', createPosEntryHTML());
     if(document.getElementById('add-visits-btn-edit-modal')) document.getElementById('add-visits-btn-edit-modal').onclick = () => editVisitsList.insertAdjacentHTML('beforeend', createVisitEntryHTML());
     if(document.getElementById('add-competitor-btn-edit-modal')) document.getElementById('add-competitor-btn-edit-modal').onclick = () => editCompetitorList.insertAdjacentHTML('beforeend', createCompetitorEntryHTML());
 
-    // LOGIC WIZARD
+    // OPEN ADD
+    if(openAddModalBtn) openAddModalBtn.onclick = () => {
+        if(addForm) addForm.reset();
+        currentStep = 1; showStep(1); // Сброс Wizard
+        renderProductChecklist(addProductChecklist);
+        renderList(addContactList, [], createContactEntryHTML); renderList(addAddressList, [], createAddressEntryHTML);
+        renderList(addPosList, [], createPosEntryHTML); renderList(addVisitsList, [], createVisitEntryHTML);
+        renderList(addCompetitorList, [], createCompetitorEntryHTML);
+        if(document.getElementById('add_latitude')) { document.getElementById('add_latitude').value = ''; document.getElementById('add_longitude').value = ''; }
+        addPhotosData = []; renderPhotoPreviews(addPhotoPreviewContainer, []);
+        if(addAvatarPreview) addAvatarPreview.src = ''; newAvatarBase64 = null;
+        if(addModal) addModal.show();
+    };
+
+    // WIZARD LOGIC
     let currentStep = 1;
     const totalSteps = 4;
     const prevBtn = document.getElementById('btn-prev-step');
@@ -264,25 +266,10 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     if(prevBtn) prevBtn.onclick = () => { if (currentStep > 1) { currentStep--; showStep(currentStep); } };
 
-
-    // OPEN ADD
-    if(openAddModalBtn) openAddModalBtn.onclick = () => {
-        if(addForm) addForm.reset();
-        currentStep = 1; showStep(1);
-        renderProductChecklist(addProductChecklist);
-        renderList(addContactList, [], createContactEntryHTML); renderList(addAddressList, [], createAddressEntryHTML);
-        renderList(addPosList, [], createPosEntryHTML); renderList(addVisitsList, [], createVisitEntryHTML);
-        renderList(addCompetitorList, [], createCompetitorEntryHTML);
-        if(document.getElementById('add_latitude')) { document.getElementById('add_latitude').value = ''; document.getElementById('add_longitude').value = ''; }
-        addPhotosData = []; renderPhotoPreviews(addPhotoPreviewContainer, []);
-        if(addAvatarPreview) addAvatarPreview.src = ''; newAvatarBase64 = null;
-        if(addModal) addModal.show();
-    };
-
     // SAVE ADD
     if(addForm) addForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const btn = document.getElementById('btn-finish-step'); 
+        const btn = document.getElementById('btn-finish-step'); // Кнопка визарда
         const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
         const data = {
             dealer_id: getVal('dealer_id'), name: getVal('name'), organization: getVal('organization'), price_type: getVal('price_type'),
@@ -300,7 +287,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try { const res = await fetch(API_DEALERS_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); if (!res.ok) throw new Error(await res.text()); const newD = await res.json(); const pIds = getSelectedProductIds('add-product-checklist'); if(pIds.length) await saveProducts(newD.id, pIds); addModal.hide(); initApp(); } catch (e) { alert("Ошибка при добавлении."); } finally { btn.disabled = false; btn.innerHTML = oldText; }
     });
 
-    // OPEN EDIT
+    // OPEN EDIT (TABS)
     async function openEditModal(id) {
         try {
             const res = await fetch(`${API_DEALERS_URL}/${id}`); if(!res.ok) throw new Error("Ошибка"); const d = await res.json();
@@ -321,18 +308,20 @@ document.addEventListener('DOMContentLoaded', () => {
             renderProductChecklist(editProductChecklist, (d.products||[]).map(p=>p.id));
             editPhotosData = d.photos||[]; renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData);
             
-            // Сброс на первую вкладку
+            // Reset tabs
             const firstTabEl = document.querySelector('#editTabs button[data-bs-target="#tab-main"]');
             if(firstTabEl) { const tab = new bootstrap.Tab(firstTabEl); tab.show(); }
-
+            
             editModal.show();
         } catch(e){alert("Ошибка загрузки.");}
     }
 
-    // SAVE EDIT
+    // SAVE EDIT (FIXED BUTTON SELECTOR)
     if(editForm) editForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const btn = editForm.querySelector('button[type="submit"]'); const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...';
+        // (ИСПРАВЛЕНО) Ищем кнопку по атрибуту form
+        const btn = document.querySelector('button[form="edit-dealer-form"]'); 
+        const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
         const id = document.getElementById('edit_db_id').value;
         let avatarToSend = getVal('edit-current-avatar-url'); if (newAvatarBase64) avatarToSend = newAvatarBase64;
         const data = {
@@ -375,6 +364,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     document.querySelectorAll('th[data-sort]').forEach(th => th.onclick = () => { if(currentSort.column===th.dataset.sort) currentSort.direction=(currentSort.direction==='asc'?'desc':'asc'); else {currentSort.column=th.dataset.sort;currentSort.direction='asc';} renderDealerList(); });
     
+    // EXPORT
     if(exportBtn) {
         exportBtn.onclick = async () => {
             if (!allDealers.length) return alert("Пусто. Нечего экспортировать.");
