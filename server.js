@@ -226,5 +226,37 @@ app.post('/api/sales', async (req, res) => {
         res.json({ status: 'ok' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
+// ... (существующий код)
+
+// (НОВОЕ) Схема Справочника Конкурентов
+const compRefSchema = new mongoose.Schema({
+    name: String,        // Бренд (Kastamonu)
+    supplier: String,    // Поставщик (Alina Group)
+    warehouse: String,   // Склад (Алматы)
+    info: String,        // Доп инфо
+    collections: [String] // Список коллекций ["Blue", "Black"]
+});
+const CompRef = mongoose.model('CompRef', compRefSchema);
+
+// API Справочника
+app.get('/api/competitors-ref', async (req, res) => {
+    const list = await CompRef.find().sort({name: 1});
+    res.json(list.map(c => ({ id: c._id, ...c.toObject() })));
+});
+app.post('/api/competitors-ref', async (req, res) => {
+    const c = new CompRef(req.body);
+    await c.save();
+    res.json(c);
+});
+app.put('/api/competitors-ref/:id', async (req, res) => {
+    await CompRef.findByIdAndUpdate(req.params.id, req.body);
+    res.json({status: 'ok'});
+});
+app.delete('/api/competitors-ref/:id', async (req, res) => {
+    await CompRef.findByIdAndDelete(req.params.id);
+    res.json({status: 'deleted'});
+});
+
 
 app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
+
