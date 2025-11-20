@@ -35,29 +35,31 @@
             </div>
         </div>
 
-        <h4 class="mb-3 text-muted">1. Ввод данных (Детализация)</h4>
+        <h4 class="text-muted mb-3">1. Ввод продаж по дилерам</h4>
         <div id="sales-container">
             <p class="text-center mt-5">Загрузка...</p>
         </div>
 
-        <h4 class="mb-3 text-muted mt-5">2. Сводная ведомость (Итоги)</h4>
-        <div id="summary-container" class="mb-5">
-            <div class="card shadow-sm border-0">
-                <div class="card-body p-0">
-                    <table class="table table-striped mb-0" id="summary-table">
-                        <thead class="table-dark">
-                            <tr>
-                                <th>Подразделение</th>
-                                <th>План</th>
-                                <th>Факт</th>
-                                <th>Разница</th>
-                                <th>Прогноз</th>
-                                <th>% Вып.</th>
-                            </tr>
-                        </thead>
-                        <tbody id="summary-body"></tbody>
-                    </table>
-                </div>
+        <h4 class="text-muted mb-3 mt-5">2. Сводная ведомость (План / Факт)</h4>
+        <div class="card shadow-sm border-0 mb-5">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 table-bordered" id="summary-table">
+                    <thead class="table-dark">
+                        <tr>
+                            <th style="width: 30%">Подразделение</th>
+                            <th>План</th>
+                            <th>Факт</th>
+                            <th>Разница</th>
+                            <th>Текущий день</th>
+                            <th>Дней в мес.</th>
+                            <th>Прогноз</th>
+                            <th>На тек. день</th>
+                            <th>% Вып.</th>
+                        </tr>
+                    </thead>
+                    <tbody id="summary-body">
+                        </tbody>
+                </table>
             </div>
         </div>
     </div>
