@@ -1,4 +1,3 @@
-// server.js
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -22,13 +21,14 @@ if (ADMIN_USER && ADMIN_PASSWORD) {
     app.use(express.static('public', { index: false }));
     app.get('/', authMiddleware, (req, res) => res.sendFile(__dirname + '/public/index.html'));
     app.get('/map.html', authMiddleware, (req, res) => res.sendFile(__dirname + '/public/map.html'));
-    app.get('/sales.html', authMiddleware, (req, res) => res.sendFile(__dirname + '/public/sales.html')); // НОВОЕ
+    app.get('/sales.html', authMiddleware, (req, res) => res.sendFile(__dirname + '/public/sales.html'));
+    app.get('/competitors.html', authMiddleware, (req, res) => res.sendFile(__dirname + '/public/competitors.html'));
     app.use(express.static('public'));
 } else { app.use(express.static('public')); }
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// СПИСОК ТОВАРОВ
+// --- СПИСОК ТОВАРОВ (Ламинат) ---
 const productsToImport = [
     { sku: "CD-507", name: "Дуб Беленый" }, { sku: "CD-508", name: "Дуб Пепельный" },
     { sku: "8EH34-701", name: "Дуб Снежный" }, { sku: "8EH34-702", name: "Дуб Арабика" },
@@ -78,17 +78,41 @@ const posMaterialsList = [
     "Табличка - Табличка орг.стекло"
 ];
 
+// Артикулы стендов, которые надо скрыть из основного списка товаров в Матрице
 const posSkusToExclude = ["С600", "С800", "РФ-2", "РФС-1", "Н600", "Н800", "Табличка"];
+
+// --- SCHEMAS ---
 
 const productSchema = new mongoose.Schema({ sku: String, name: String });
 const Product = mongoose.model('Product', productSchema);
+
 const contactSchema = new mongoose.Schema({ name: String, position: String, contactInfo: String }, { _id: false }); 
 const photoSchema = new mongoose.Schema({ description: String, photo_url: String, date: { type: Date, default: Date.now } }, { _id: false });
 const additionalAddressSchema = new mongoose.Schema({ description: String, city: String, address: String }, { _id: false });
 const visitSchema = new mongoose.Schema({ date: String, comment: String, isCompleted: { type: Boolean, default: false } }, { _id: false });
 const posMaterialSchema = new mongoose.Schema({ name: String, quantity: Number }, { _id: false });
-const competitorSchema = new mongoose.Schema({ brand: String, collection: String, price_opt: String, price_retail: String }, { _id: false });
 
+// Конкурент внутри Дилера (запись факта наличия)
+const competitorSchema = new mongoose.Schema({ 
+    brand: String, 
+    collection: String, 
+    price_opt: String, 
+    price_retail: String 
+}, { _id: false });
+
+// (НОВОЕ) Справочник Конкурентов (Глобальный список брендов)
+const compRefSchema = new mongoose.Schema({
+    name: String,        // Бренд (Kastamonu)
+    supplier: String,    // Поставщик (Alina Group)
+    warehouse: String,   // Склад (Алматы)
+    info: String,        // Доп инфо
+    collections: [String], // Список коллекций
+    hasHerringbone: { type: Boolean, default: false }, // (НОВОЕ) Елочка
+    hasArtistic: { type: Boolean, default: false }     // (НОВОЕ) Художественный
+});
+const CompRef = mongoose.model('CompRef', compRefSchema);
+
+// Дилер
 const dealerSchema = new mongoose.Schema({
     dealer_id: String, name: String, price_type: String, city: String, address: String, 
     contacts: [contactSchema], bonuses: String, photos: [photoSchema], organization: String,
@@ -104,9 +128,8 @@ const dealerSchema = new mongoose.Schema({
     responsible: String
 });
 const Dealer = mongoose.model('Dealer', dealerSchema);
-const Knowledge = mongoose.model('Knowledge', new mongoose.Schema({ title: String, content: String }, { timestamps: true }));
 
-// (НОВОЕ) Схема Продаж
+// Продажи
 const salesSchema = new mongoose.Schema({
     month: String, // YYYY-MM
     group: String, 
@@ -118,6 +141,9 @@ const salesSchema = new mongoose.Schema({
 });
 const Sales = mongoose.model('Sales', salesSchema);
 
+const Knowledge = mongoose.model('Knowledge', new mongoose.Schema({ title: String, content: String }, { timestamps: true }));
+
+// --- INIT ---
 async function hardcodedImportProducts() {
     try {
         const operations = productsToImport.map(p => ({ updateOne: { filter: { sku: p.sku }, update: { $set: p }, upsert: true } }));
@@ -139,7 +165,9 @@ function convertToClient(doc) {
     return obj;
 }
 
-// API
+// --- API ENDPOINTS ---
+
+// Dealers
 app.get('/api/dealers', async (req, res) => {
     try {
         const dealers = await Dealer.find({}, 'dealer_id name city price_type organization products pos_materials visits latitude longitude status avatarUrl responsible').lean();
@@ -162,25 +190,30 @@ app.put('/api/dealers/:id', async (req, res) => { try { await Dealer.findByIdAnd
 app.delete('/api/dealers/:id', async (req, res) => { try { await Dealer.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.get('/api/dealers/:id/products', async (req, res) => { try { const dealer = await Dealer.findById(req.params.id).populate({path:'products',options:{sort:{'sku':1}}}); res.json(dealer.products.map(convertToClient)); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.put('/api/dealers/:id/products', async (req, res) => { try { await Dealer.findByIdAndUpdate(req.params.id, { products: req.body.productIds }); res.json({status:'ok'}); } catch (e) { res.status(500).json({ error: e.message }); } });
+
+// Products
 app.get('/api/products', async (req, res) => { const search = new RegExp(req.query.search || '', 'i'); const products = await Product.find({$or:[{sku:search},{name:search}]}).sort({sku:1}).lean(); res.json(products.map(p=>{p.id=p._id; return p;})); });
 app.post('/api/products', async (req, res) => { try { const p = new Product(req.body); await p.save(); res.json(convertToClient(p)); } catch(e){res.status(409).json({});} });
 app.put('/api/products/:id', async (req, res) => { try { const p = await Product.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(p)); } catch(e){res.status(409).json({});} });
 app.delete('/api/products/:id', async (req, res) => { await Product.findByIdAndDelete(req.params.id); await Dealer.updateMany({ products: req.params.id }, { $pull: { products: req.params.id } }); res.json({}); });
+app.get('/api/products/:id/dealers', async (req, res) => { const dlrs = await Dealer.find({ products: req.params.id }, 'dealer_id name city').sort({name:1}).lean(); res.json(dlrs.map(d=>{d.id=d._id; return d;})); });
 
+// Matrix
 app.get('/api/matrix', async (req, res) => {
     try {
         const allProducts = await Product.find({ sku: { $nin: posSkusToExclude } }, 'sku name').sort({ sku: 1 }).lean();
         const allDealers = await Dealer.find({}, 'name products pos_materials city status responsible').sort({ name: 1 }).lean();
         const map = new Map(); 
         allDealers.forEach(d => map.set(d._id.toString(), new Set(d.products.map(String))));
+        
         const matrix = allProducts.map(p => ({
-            sku: p.sku, name: p.name,
-            type: 'product',
+            sku: p.sku, name: p.name, type: 'product',
             dealers: allDealers.map(d => ({ 
                 value: map.get(d._id.toString()).has(p._id.toString()) ? 1 : 0,
                 is_pos: false
             }))
         }));
+
         posMaterialsList.forEach(posName => {
             matrix.push({
                 sku: "POS", name: posName, type: 'pos',
@@ -190,19 +223,16 @@ app.get('/api/matrix', async (req, res) => {
                 })
             });
         });
-        const headers = allDealers.map(d => ({ id: d._id, name: d.name, city: d.city || '', status: d.status || 'standard', responsible: d.responsible || '' }));
+
+        const headers = allDealers.map(d => ({ 
+            id: d._id, name: d.name, city: d.city || '', status: d.status || 'standard', responsible: d.responsible || '' 
+        }));
+        
         res.json({ headers: headers, matrix });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/api/products/:id/dealers', async (req, res) => { const dlrs = await Dealer.find({ products: req.params.id }, 'dealer_id name city').sort({name:1}).lean(); res.json(dlrs.map(d=>{d.id=d._id; return d;})); });
-app.get('/api/knowledge', async (req, res) => { const arts = await Knowledge.find({title: new RegExp(req.query.search||'', 'i')}).sort({title:1}).lean(); res.json(arts.map(a=>{a.id=a._id; return a;})); });
-app.get('/api/knowledge/:id', async (req, res) => { res.json(convertToClient(await Knowledge.findById(req.params.id))); });
-app.post('/api/knowledge', async (req, res) => { const a = new Knowledge(req.body); await a.save(); res.json(convertToClient(a)); });
-app.put('/api/knowledge/:id', async (req, res) => { const a = await Knowledge.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(a)); });
-app.delete('/api/knowledge/:id', async (req, res) => { await Knowledge.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
-
-// (НОВОЕ) API Продаж
+// Sales
 app.get('/api/sales', async (req, res) => {
     try {
         const month = req.query.month;
@@ -226,19 +256,8 @@ app.post('/api/sales', async (req, res) => {
         res.json({ status: 'ok' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
-// ... (существующий код)
 
-// (НОВОЕ) Схема Справочника Конкурентов
-const compRefSchema = new mongoose.Schema({
-    name: String,        // Бренд (Kastamonu)
-    supplier: String,    // Поставщик (Alina Group)
-    warehouse: String,   // Склад (Алматы)
-    info: String,        // Доп инфо
-    collections: [String] // Список коллекций ["Blue", "Black"]
-});
-const CompRef = mongoose.model('CompRef', compRefSchema);
-
-// API Справочника
+// Competitors Reference (Справочник)
 app.get('/api/competitors-ref', async (req, res) => {
     const list = await CompRef.find().sort({name: 1});
     res.json(list.map(c => ({ id: c._id, ...c.toObject() })));
@@ -257,6 +276,11 @@ app.delete('/api/competitors-ref/:id', async (req, res) => {
     res.json({status: 'deleted'});
 });
 
+// Knowledge
+app.get('/api/knowledge', async (req, res) => { const arts = await Knowledge.find({title: new RegExp(req.query.search||'', 'i')}).sort({title:1}).lean(); res.json(arts.map(a=>{a.id=a._id; return a;})); });
+app.get('/api/knowledge/:id', async (req, res) => { res.json(convertToClient(await Knowledge.findById(req.params.id))); });
+app.post('/api/knowledge', async (req, res) => { const a = new Knowledge(req.body); await a.save(); res.json(convertToClient(a)); });
+app.put('/api/knowledge/:id', async (req, res) => { const a = await Knowledge.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(a)); });
+app.delete('/api/knowledge/:id', async (req, res) => { await Knowledge.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
 
 app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
-
