@@ -1,4 +1,4 @@
-// competitors.js 
+// competitors.js
 document.addEventListener('DOMContentLoaded', () => {
     const API_URL = '/api/competitors-ref';
     
@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const inpColl = document.getElementById('comp_collections');
     const cbHerringbone = document.getElementById('comp_herringbone');
     const cbArtistic = document.getElementById('comp_artistic');
+    const title = document.getElementById('comp-title');
 
     let competitors = [];
     let selectedId = null;
@@ -62,14 +63,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
     }
 
-    // Сделаем функцию глобальной, чтобы onclick в HTML работал
+    // Глобальная функция для onclick
     window.selectComp = (id) => {
         selectedId = id;
         const c = competitors.find(x => x.id === id);
         if (!c) return;
 
         inpId.value = c.id;
-        document.getElementById('comp_title').textContent = c.name;
+        title.textContent = c.name;
         
         inpName.value = c.name;
         inpSupplier.value = c.supplier || '';
@@ -77,9 +78,8 @@ document.addEventListener('DOMContentLoaded', () => {
         inpInfo.value = c.info || '';
         inpColl.value = (c.collections || []).join('\n');
         
-        // (НОВОЕ) Галочки
-        cbHerringbone.checked = c.hasHerringbone || false;
-        cbArtistic.checked = c.hasArtistic || false;
+        if(cbHerringbone) cbHerringbone.checked = c.hasHerringbone || false;
+        if(cbArtistic) cbArtistic.checked = c.hasArtistic || false;
 
         detailsCard.style.display = 'block';
         emptyMsg.style.display = 'none';
@@ -90,14 +90,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (addBtn) {
         addBtn.onclick = () => {
             selectedId = null;
-            inpId.value = '';
-            form.reset(); // Очищаем форму
+            inpId.value = ''; // Очищаем ID -> режим создания
+            form.reset(); // Очищаем поля
             
-            document.getElementById('comp_title').textContent = 'Новый бренд';
+            title.textContent = 'Новый бренд';
             
             detailsCard.style.display = 'block';
             emptyMsg.style.display = 'none';
-            renderList(); // Чтобы снять выделение с других
+            renderList(); // Снимаем подсветку
         };
     }
 
@@ -114,8 +114,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 warehouse: inpWarehouse.value,
                 info: inpInfo.value,
                 collections: collections,
-                hasHerringbone: cbHerringbone.checked, // (НОВОЕ)
-                hasArtistic: cbArtistic.checked       // (НОВОЕ)
+                hasHerringbone: cbHerringbone ? cbHerringbone.checked : false,
+                hasArtistic: cbArtistic ? cbArtistic.checked : false
             };
 
             const id = inpId.value;
@@ -137,14 +137,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (res.ok) {
                     await loadList(); // Перезагружаем список
                     
-                    // Если создавали нового - скрываем форму, чтобы не создать дубль
+                    // Если создавали нового - скрываем форму
                     if (!id) {
                         detailsCard.style.display = 'none';
                         emptyMsg.style.display = 'block';
-                        emptyMsg.textContent = 'Бренд добавлен!';
+                        // Показать уведомление (опционально)
+                        alert('Бренд добавлен!');
                     } else {
-                        // Если редактировали - оставляем открытым и обновляем заголовок
-                        document.getElementById('comp_title').textContent = data.name;
+                        title.textContent = data.name;
                     }
                 }
             } catch (e) { alert('Ошибка сохранения'); }
