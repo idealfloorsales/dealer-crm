@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const addBtn = document.getElementById('add-comp-btn');
     const delBtn = document.getElementById('btn-delete-comp');
     const form = document.getElementById('comp-form');
-
+ 
     let competitors = [];
     let selectedId = null;
 
