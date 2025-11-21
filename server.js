@@ -28,7 +28,7 @@ if (ADMIN_USER && ADMIN_PASSWORD) {
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// СПИСОК ТОВАРОВ (Ламинат)
+// --- СПИСОК ТОВАРОВ (Ламинат) ---
 const productsToImport = [
     { sku: "CD-507", name: "Дуб Беленый" }, { sku: "CD-508", name: "Дуб Пепельный" },
     { sku: "8EH34-701", name: "Дуб Снежный" }, { sku: "8EH34-702", name: "Дуб Арабика" },
@@ -92,7 +92,7 @@ const additionalAddressSchema = new mongoose.Schema({ description: String, city:
 const visitSchema = new mongoose.Schema({ date: String, comment: String, isCompleted: { type: Boolean, default: false } }, { _id: false });
 const posMaterialSchema = new mongoose.Schema({ name: String, quantity: Number }, { _id: false });
 
-// Конкурент внутри Дилера
+// Конкурент внутри Дилера (то, что мы вбиваем в карточке дилера)
 const competitorSchema = new mongoose.Schema({ 
     brand: String, 
     collection: String, 
@@ -100,21 +100,40 @@ const competitorSchema = new mongoose.Schema({
     price_retail: String 
 }, { _id: false });
 
-// (НОВОЕ) Схема элемента коллекции (с типом)
+
+// --- НОВЫЕ СХЕМЫ ДЛЯ СПРАВОЧНИКА КОНКУРЕНТОВ ---
+
+// 1. Элемент коллекции с типом (елочка, обычный и т.д.)
 const collectionItemSchema = new mongoose.Schema({
     name: String,
     type: { type: String, default: 'standard' } 
 }, { _id: false });
 
-// (ИЗМЕНЕНО) Справочник Конкурентов (теперь коллекции - это объекты)
+// 2. Контакт конкурента (Имя, Должность, Телефон)
+const compContactSchema = new mongoose.Schema({
+    name: String,
+    position: String,
+    phone: String
+}, { _id: false });
+
+// 3. Глобальный Справочник Конкурентов (Бренд)
 const compRefSchema = new mongoose.Schema({
     name: String,        
     supplier: String,    
     warehouse: String,   
-    info: String,        
-    collections: [collectionItemSchema] 
+    info: String,
+    // Новые поля досье:
+    storage_days: String,    // Срок хранения
+    stock_info: String,      // Остатки
+    reserve_days: String,    // Резерв без оплаты
+    contacts: [compContactSchema], // Список контактов
+    
+    collections: [collectionItemSchema],
+    hasHerringbone: { type: Boolean, default: false }, 
+    hasArtistic: { type: Boolean, default: false }
 });
 const CompRef = mongoose.model('CompRef', compRefSchema);
+
 
 // Дилер
 const dealerSchema = new mongoose.Schema({
