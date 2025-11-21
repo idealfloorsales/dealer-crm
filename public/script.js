@@ -2,10 +2,10 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const API_DEALERS_URL = '/api/dealers';
     const API_PRODUCTS_URL = '/api/products'; 
-    const API_COMPETITORS_REF_URL = '/api/competitors-ref'; // (НОВОЕ)
+    const API_COMPETITORS_REF_URL = '/api/competitors-ref';
 
     let fullProductCatalog = [];
-    let competitorsRef = []; // (НОВОЕ) Справочник конкурентов
+    let competitorsRef = []; 
     let allDealers = [];
     let currentSort = { column: 'name', direction: 'asc' };
     
@@ -91,53 +91,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function initMap(mapId) { const el = document.getElementById(mapId); if (!el) return null; if (typeof L === 'undefined') return null; const map = L.map(mapId).setView([DEFAULT_LAT, DEFAULT_LNG], 13); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: 'OSM' }).addTo(map); return map; }
     function setupMapClick(map, latId, lngId, markerRef) { if (!map) return; map.on('click', function(e) { const lat = e.latlng.lat; const lng = e.latlng.lng; const latIn = document.getElementById(latId); const lngIn = document.getElementById(lngId); if(latIn) latIn.value = lat; if(lngIn) lngIn.value = lng; if (markerRef.current) markerRef.current.setLatLng([lat, lng]); else markerRef.current = L.marker([lat, lng]).addTo(map); }); }
+    
     // Поиск на карте
     function setupMapSearch(map, inputId, suggestionsId, latId, lngId, markerRef) {
-        const input = document.getElementById(inputId);
-        const suggestionsBox = document.getElementById(suggestionsId);
-        const latInput = document.getElementById(latId);
-        const lngInput = document.getElementById(lngId);
-        if (!input || !suggestionsBox) return;
-        
-        let debounceTimer;
-        input.addEventListener('input', async () => {
-            clearTimeout(debounceTimer);
-            const query = input.value.trim();
-            if (query.length < 3) { suggestionsBox.style.display = 'none'; return; }
-            
-            debounceTimer = setTimeout(async () => {
-                try {
-                    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=kz`);
-                    const data = await res.json();
-                    suggestionsBox.innerHTML = '';
-                    if (data.length > 0) {
-                        suggestionsBox.style.display = 'block';
-                        data.slice(0, 5).forEach(place => {
-                            const div = document.createElement('div');
-                            div.className = 'address-suggestion-item';
-                            div.textContent = place.display_name;
-                            div.onclick = () => {
-                                const lat = parseFloat(place.lat);
-                                const lon = parseFloat(place.lon);
-                                if (markerRef.current) markerRef.current.setLatLng([lat, lon]);
-                                else markerRef.current = L.marker([lat, lon]).addTo(map);
-                                map.setView([lat, lon], 16);
-                                if (latInput) latInput.value = lat;
-                                if (lngInput) lngInput.value = lon;
-                                input.value = place.display_name;
-                                suggestionsBox.style.display = 'none';
-                            };
-                            suggestionsBox.appendChild(div);
-                        });
-                    } else { suggestionsBox.style.display = 'none'; }
-                } catch (e) { console.error(e); }
-            }, 500);
-        });
-        
+        const input = document.getElementById(inputId); const suggestionsBox = document.getElementById(suggestionsId); const latInput = document.getElementById(latId); const lngInput = document.getElementById(lngId);
+        if (!input || !suggestionsBox) return; let debounceTimer;
+        input.addEventListener('input', async () => { clearTimeout(debounceTimer); const query = input.value.trim(); if (query.length < 3) { suggestionsBox.style.display = 'none'; return; } debounceTimer = setTimeout(async () => { try { const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=kz`); const data = await res.json(); suggestionsBox.innerHTML = ''; if (data.length > 0) { suggestionsBox.style.display = 'block'; data.slice(0, 5).forEach(place => { const div = document.createElement('div'); div.className = 'address-suggestion-item'; div.textContent = place.display_name; div.onclick = () => { const lat = parseFloat(place.lat); const lon = parseFloat(place.lon); if (markerRef.current) markerRef.current.setLatLng([lat, lon]); else markerRef.current = L.marker([lat, lon]).addTo(map); map.setView([lat, lon], 16); if (latInput) latInput.value = lat; if (lngInput) lngInput.value = lon; input.value = place.display_name; suggestionsBox.style.display = 'none'; }; suggestionsBox.appendChild(div); }); } else { suggestionsBox.style.display = 'none'; } } catch (e) { console.error(e); } }, 500); });
         document.addEventListener('click', (e) => { if (!e.target.closest('.map-search-container')) suggestionsBox.style.display = 'none'; });
     }
 
-    // Инициализация карт в модалках
+    // Инициализация карт
     if (addModalEl) {
         addModalEl.addEventListener('shown.bs.modal', () => {
             if (!addMap) { 
@@ -152,7 +115,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (editModalEl) {
         editModalEl.addEventListener('shown.bs.modal', () => {
-            // Обработка переключения вкладки для карты
             const tabMapBtn = document.querySelector('button[data-bs-target="#tab-map"]');
             if(tabMapBtn) {
                 tabMapBtn.addEventListener('shown.bs.tab', () => {
@@ -177,38 +139,18 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- Данные ---
-    async function initApp() {
-        // 1. Каталог товаров
+    // --- ДАННЫЕ (ИСПРАВЛЕНО: добавлена функция fetchProductCatalog) ---
+    async function fetchProductCatalog() {
+        if (fullProductCatalog.length > 0) return; 
         try {
-            const res = await fetch(API_PRODUCTS_URL);
-            if (res.ok) {
-                fullProductCatalog = await res.json();
-                fullProductCatalog.sort((a, b) => a.sku.localeCompare(b.sku, 'ru', { numeric: true }));
-            }
-        } catch (e) { console.error("Ошибка каталога"); }
-
-        // 2. (НОВОЕ) Справочник Конкурентов
-        try {
-            const compRes = await fetch(API_COMPETITORS_REF_URL);
-            if (compRes.ok) competitorsRef = await compRes.json();
-        } catch (e) { console.error("Ошибка справочника конкурентов"); }
-
-        // 3. Дилеры
-        try {
-            const response = await fetch(API_DEALERS_URL);
-            if (!response.ok) throw new Error(response.statusText);
-            allDealers = await response.json();
-            populateFilters(allDealers);
-            renderDealerList();
-            renderDashboard(); 
+            const response = await fetch(API_PRODUCTS_URL);
+            if (!response.ok) throw new Error(`Ошибка: ${response.status}`);
+            fullProductCatalog = await response.json();
+            fullProductCatalog.sort((a, b) => a.sku.localeCompare(b.sku, 'ru', { numeric: true }));
         } catch (error) {
-            if(dealerListBody) dealerListBody.innerHTML = `<tr><td colspan="8" class="text-danger text-center">Ошибка загрузки.</td></tr>`;
+            if(addProductChecklist) addProductChecklist.innerHTML = `<p class='text-danger'>Ошибка каталога.</p>`;
+            if(editProductChecklist) editProductChecklist.innerHTML = `<p class='text-danger'>Ошибка каталога.</p>`;
         }
-        
-        // Открытие по ссылке
-        const pendingId = localStorage.getItem('pendingEditDealerId');
-        if (pendingId) { localStorage.removeItem('pendingEditDealerId'); openEditModal(pendingId); }
     }
 
     async function completeTask(btn, dealerId, visitIndex) {
@@ -259,20 +201,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!v.date) return; 
                     vDate.setHours(0,0,0,0);
 
-                    if (v.isCompleted && (!lastVisitDate || vDate > lastVisitDate)) {
-                        lastVisitDate = vDate;
-                    }
+                    if (v.isCompleted && (!lastVisitDate || vDate > lastVisitDate)) { lastVisitDate = vDate; }
                     
                     if (!v.isCompleted) {
                         const taskData = { dealerName: d.name, dealerId: d.id, date: vDate, comment: v.comment || "", visitIndex: index };
-                        if (vDate < today) {
-                            tasksProblem.push({...taskData, type: 'overdue'}); 
-                        } else if (vDate.getTime() === today.getTime() || vDate.getTime() === tomorrow.getTime()) {
+                        if (vDate < today) { tasksProblem.push({...taskData, type: 'overdue'}); } 
+                        else if (vDate.getTime() === today.getTime() || vDate.getTime() === tomorrow.getTime()) {
                             tasksUpcoming.push({...taskData, isToday: vDate.getTime() === today.getTime()});
                             hasFutureTasks = true;
-                        } else {
-                            hasFutureTasks = true; 
-                        }
+                        } else { hasFutureTasks = true; }
                     }
                 });
             }
@@ -284,9 +221,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (!hasFutureTasks && d.status !== 'problem' && !isPotential) {
-                if (!lastVisitDate) {
-                    tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: 999 }); 
-                } else if (lastVisitDate < thirtyDaysAgo) {
+                if (!lastVisitDate) { tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: 999 }); } 
+                else if (lastVisitDate < thirtyDaysAgo) {
                     const days = Math.floor((today - lastVisitDate) / (1000 * 60 * 60 * 24));
                     tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: days });
                 }
@@ -336,7 +272,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Генераторы HTML ---
     
-    // (ИЗМЕНЕНО) Конкуренты с Выпадающим Списком
+    // Конкуренты с Выпадающим Списком
     function createCompetitorEntryHTML(c={}) { 
         let brandOpts = `<option value="">-- Бренд --</option>`;
         competitorsRef.forEach(ref => {
@@ -352,7 +288,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const ref = competitorsRef.find(r => r.name === c.brand);
             if (ref && ref.collections) {
                 ref.collections.forEach(col => {
-                    // Поддержка объекта и строки
                     const colName = (typeof col === 'string') ? col : col.name;
                     const colType = (typeof col === 'object') ? col.type : 'standard';
                     const sel = colName === c.collection ? 'selected' : '';
@@ -379,7 +314,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>`; 
     }
 
-    // (ИЗМЕНЕНО) Глобальная функция обновления
     window.updateCollections = function(select) {
         const brandName = select.value;
         const row = select.closest('.competitor-entry');
@@ -389,7 +323,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const ref = competitorsRef.find(r => r.name === brandName);
         if (ref && ref.collections) {
-             // Сортировка: Спец типы выше
              const sortedCols = [...ref.collections].sort((a, b) => {
                 const typeA = (typeof a === 'object') ? a.type : 'standard';
                 const typeB = (typeof b === 'object') ? b.type : 'standard';
@@ -401,12 +334,10 @@ document.addEventListener('DOMContentLoaded', () => {
              html += sortedCols.map(col => {
                 const colName = (typeof col === 'string') ? col : col.name;
                 const colType = (typeof col === 'object') ? col.type : 'standard';
-                
                 let icon = '';
                 if(colType.includes('eng')) icon = '🌲 ';
                 else if(colType.includes('french')) icon = '🌊 ';
                 else if(colType.includes('art')) icon = '🎨 ';
-                
                 return `<option value="${colName}">${icon}${colName}</option>`;
             }).join('');
         }
@@ -419,6 +350,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function createVisitEntryHTML(v={}) { return `<div class="visit-entry input-group mb-2"><input type="date" class="form-control visit-date" value="${v.date||''}"><input type="text" class="form-control visit-comment w-50" placeholder="Результат визита..." value="${v.comment||''}"><input type="hidden" class="visit-completed" value="${v.isCompleted || 'false'}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
     function renderPhotoPreviews(container, photosArray) { if(container) container.innerHTML = photosArray.map((p, index) => `<div class="photo-preview-item"><img src="${p.photo_url}"><button type="button" class="btn-remove-photo" data-index="${index}">×</button></div>`).join(''); }
 
+    // Handlers
     if(addAvatarInput) addAvatarInput.addEventListener('change', async (e) => { const file = e.target.files[0]; if (file) { newAvatarBase64 = await compressImage(file, 800, 0.8); addAvatarPreview.src = newAvatarBase64; } });
     if(editAvatarInput) editAvatarInput.addEventListener('change', async (e) => { const file = e.target.files[0]; if (file) { newAvatarBase64 = await compressImage(file, 800, 0.8); editAvatarPreview.src = newAvatarBase64; } });
     if(addPhotoInput) addPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) addPhotosData.push({ photo_url: await compressImage(file, 1000, 0.7) }); renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData); addPhotoInput.value = ''; });
@@ -531,38 +463,11 @@ document.addEventListener('DOMContentLoaded', () => {
         try { const res = await fetch(API_DEALERS_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); if (!res.ok) throw new Error(await res.text()); const newD = await res.json(); const pIds = getSelectedProductIds('add-product-checklist'); if(pIds.length) await saveProducts(newD.id, pIds); addModal.hide(); initApp(); } catch (e) { alert("Ошибка при добавлении."); } finally { btn.disabled = false; btn.innerHTML = oldText; }
     });
 
-    // OPEN EDIT
-    async function openEditModal(id) {
-        try {
-            const res = await fetch(`${API_DEALERS_URL}/${id}`); if(!res.ok) throw new Error("Ошибка"); const d = await res.json();
-            document.getElementById('edit_db_id').value=d.id; document.getElementById('edit_dealer_id').value=d.dealer_id; document.getElementById('edit_name').value=d.name; document.getElementById('edit_organization').value=d.organization; document.getElementById('edit_price_type').value=d.price_type; document.getElementById('edit_city').value=d.city; document.getElementById('edit_address').value=d.address; document.getElementById('edit_delivery').value=d.delivery; document.getElementById('edit_website').value=d.website; document.getElementById('edit_instagram').value=d.instagram;
-            if(document.getElementById('edit_latitude')) document.getElementById('edit_latitude').value=d.latitude||'';
-            if(document.getElementById('edit_longitude')) document.getElementById('edit_longitude').value=d.longitude||'';
-            document.getElementById('edit_bonuses').value=d.bonuses;
-            if(document.getElementById('edit_status')) document.getElementById('edit_status').value = d.status || 'standard';
-            if(document.getElementById('edit_responsible')) document.getElementById('edit_responsible').value = d.responsible || '';
-
-            if(editAvatarPreview) editAvatarPreview.src = d.avatarUrl || '';
-            if(editCurrentAvatarUrl) editCurrentAvatarUrl.value = d.avatarUrl || '';
-            newAvatarBase64 = null;
-            renderList(editContactList, d.contacts, createContactEntryHTML); renderList(editAddressList, d.additional_addresses, createAddressEntryHTML); 
-            renderList(editPosList, d.pos_materials, createPosEntryHTML); 
-            renderList(editVisitsList, d.visits, createVisitEntryHTML);
-            renderList(editCompetitorList, d.competitors, createCompetitorEntryHTML);
-            renderProductChecklist(editProductChecklist, (d.products||[]).map(p=>p.id));
-            editPhotosData = d.photos||[]; renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData);
-            
-            const firstTabEl = document.querySelector('#editTabs button[data-bs-target="#tab-main"]');
-            if(firstTabEl) { const tab = new bootstrap.Tab(firstTabEl); tab.show(); }
-
-            editModal.show();
-        } catch(e){alert("Ошибка загрузки.");}
-    }
-
     // SAVE EDIT
     if(editForm) editForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const btn = document.querySelector('button[form="edit-dealer-form"]'); const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        const btn = document.querySelector('button[form="edit-dealer-form"]'); // (ИСПРАВЛЕНО)
+        const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
         const id = document.getElementById('edit_db_id').value;
         let avatarToSend = getVal('edit-current-avatar-url'); if (newAvatarBase64) avatarToSend = newAvatarBase64;
         const data = {
