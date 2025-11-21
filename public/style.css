@@ -496,3 +496,88 @@ td a { text-decoration: none; color: var(--primary-color) !important; font-weigh
     border-color: var(--primary-color);
     box-shadow: 0 0 0 3px rgba(185, 4, 10, 0.15);
 }
+/* --- КАРТОЧКА КОНКУРЕНТА (ОБНОВЛЕННАЯ) --- */
+.comp-card {
+    background: #fff;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    height: 280px; /* Фиксированная высота, чтобы список влезал */
+    position: relative; /* Для позиционирования шторки */
+    overflow: hidden;   /* Чтобы шторка не вылезала */
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.comp-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+/* Лицевая сторона */
+.comp-card-front {
+    padding: 15px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Обратная сторона (Список коллекций) */
+.comp-card-back {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #fff;
+    padding: 15px;
+    transform: translateY(100%); /* Спрятано снизу */
+    transition: transform 0.3s ease-in-out;
+    display: flex;
+    flex-direction: column;
+    z-index: 10;
+}
+
+/* Класс для открытия шторки */
+.comp-card.show-collections .comp-card-back {
+    transform: translateY(0); /* Выезжает вверх */
+}
+
+/* Кнопка редактирования (Карандаш) */
+.btn-card-edit {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 5;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #666;
+    transition: all 0.2s;
+}
+.btn-card-edit:hover {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+/* Список внутри карточки */
+.comp-card-list {
+    flex-grow: 1;
+    overflow-y: auto; /* Скролл, если коллекций много */
+    margin-top: 10px;
+    border-top: 1px solid #eee;
+    padding-top: 5px;
+}
+
+.comp-collection-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    border-bottom: 1px solid #f9f9f9;
+    font-size: 0.85rem;
+}
