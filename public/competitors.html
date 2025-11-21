@@ -6,7 +6,8 @@
     <title>Справочник Конкурентов</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="style.css?v=49"> <link rel="icon" href="favicon.gif" type="image/gif">
+    <link rel="stylesheet" href="style.css?v=50"> 
+    <link rel="icon" href="favicon.gif" type="image/gif">
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-4">
@@ -64,17 +65,39 @@
                                     <input type="text" class="form-control" id="comp_warehouse">
                                 </div>
                             </div>
+
+                            <div class="row g-3 mb-3 p-3 bg-light border rounded mx-0">
+                                <div class="col-md-4">
+                                    <label class="form-label small">Срок хранения</label>
+                                    <input type="text" class="form-control form-control-sm" id="comp_storage" placeholder="Напр: 14 дней">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small">Остатки</label>
+                                    <input type="text" class="form-control form-control-sm" id="comp_stock" placeholder="Напр: Много / Мало">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small">Резерв без оплаты</label>
+                                    <input type="text" class="form-control form-control-sm" id="comp_reserve" placeholder="Напр: 3 дня">
+                                </div>
+                            </div>
+
                             <div class="mb-3">
-                                <label class="form-label">Доп. информация</label>
+                                <label class="form-label fw-bold">Контакты:</label>
+                                <div id="comp-contacts-list"></div>
+                                <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="btn-add-contact">+ Добавить контакт</button>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Доп. заметки</label>
                                 <textarea class="form-control" id="comp_info" rows="2"></textarea>
                             </div>
                             
                             <hr>
+                            
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <label class="form-label fw-bold mb-0">Коллекции:</label>
                                 <button type="button" class="btn btn-sm btn-outline-primary" id="add-coll-row-btn">+ Добавить коллекцию</button>
                             </div>
-                            
                             <div id="collections-container" class="mb-3"></div>
 
                             <div class="text-end mt-3">
@@ -91,6 +114,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="competitors.js?v=49"></script>
+    <script src="competitors.js?v=50"></script>
 </body>
 </html>
