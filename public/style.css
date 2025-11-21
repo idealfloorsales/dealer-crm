@@ -398,3 +398,38 @@ td a { text-decoration: none; color: var(--primary-color) !important; font-weigh
 .type-art-eng { background-color: rgba(253, 126, 20, 0.2); color: #663300; } /* Оранжевый */
 .type-art-french { background-color: rgba(111, 66, 193, 0.2); color: #432874; } /* Фиолетовый */
 .type-art-mix { background-color: rgba(220, 53, 69, 0.2); color: #842029; } /* Красный */
+/* Конкуренты: Контакты (в ряд) */
+.comp-contact-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr auto;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+/* Конкуренты: Список-Аккордеон */
+.comp-item-header {
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+.comp-item-body {
+    display: none;
+    padding-top: 10px;
+    margin-top: 10px;
+    border-top: 1px solid #eee;
+    font-size: 0.85rem;
+}
+/* Когда активен - показываем тело */
+.list-group-item.active .comp-item-body {
+    display: block;
+}
+/* Цвет текста внутри активного элемента */
+.list-group-item.active .comp-item-body, 
+.list-group-item.active .text-muted {
+    color: rgba(255,255,255, 0.9) !important;
+}
+.list-group-item.active .badge-type {
+    border: 1px solid white; /* Чтобы бейджи было видно на синем фоне */
+}
