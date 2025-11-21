@@ -5,9 +5,9 @@ const CACHE_NAME = 'dealer-crm-cache-v45';
 
 const urlsToCache = [
     '/',
-    '/index.html?v=47', // (И здесь тоже меняем на 45)
-    '/style.css?v=47',
-    '/script.js?v=47',
+    '/index.html?v=51', // (И здесь тоже меняем на 45)
+    '/style.css?v=51',
+    '/script.js?v=51',
     '/dealer.html?v=45',
     '/dealer.js?v=45',
     '/map.html?v=45',
