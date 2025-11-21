@@ -69,16 +69,9 @@ const productsToImport = [
 
 // Список стендов
 const posMaterialsList = [
-    "С600 - 600мм задняя стенка",
-    "С800 - 800мм задняя стенка",
-    "РФ-2 - Расческа из фанеры",
-    "РФС-1 - Расческа из фанеры СТАРАЯ",
-    "Н600 - 600мм наклейка",
-    "Н800 - 800мм наклейка",
-    "Табличка - Табличка орг.стекло"
+    "С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры",
+    "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"
 ];
-
-// Артикулы стендов, которые надо скрыть из основного списка товаров в Матрице
 const posSkusToExclude = ["С600", "С800", "РФ-2", "РФС-1", "Н600", "Н800", "Табличка"];
 
 // --- SCHEMAS ---
@@ -100,16 +93,18 @@ const competitorSchema = new mongoose.Schema({
     price_retail: String 
 }, { _id: false });
 
-// Справочник Конкурентов
+// Справочник Конкурентов: Коллекция
 const collectionItemSchema = new mongoose.Schema({
     name: String,
     type: { type: String, default: 'standard' } 
 }, { _id: false });
 
+// Справочник Конкурентов: Контакт
 const compContactSchema = new mongoose.Schema({
     name: String, position: String, phone: String
 }, { _id: false });
 
+// Справочник Конкурентов: Бренд
 const compRefSchema = new mongoose.Schema({
     name: String,        
     supplier: String,    
@@ -180,7 +175,7 @@ function convertToClient(doc) {
 
 // --- API ENDPOINTS ---
 
-// Dealers (ИЗМЕНЕНО: Добавлено поле competitors в выборку)
+// Dealers
 app.get('/api/dealers', async (req, res) => {
     try {
         const dealers = await Dealer.find({}, 'dealer_id name city price_type organization products pos_materials visits latitude longitude status avatarUrl responsible competitors').lean();
@@ -193,7 +188,7 @@ app.get('/api/dealers', async (req, res) => {
             visits: d.visits, latitude: d.latitude, longitude: d.longitude,
             status: d.status || 'standard',
             responsible: d.responsible,
-            competitors: d.competitors // (ВАЖНО)
+            competitors: d.competitors
         }))); 
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -246,12 +241,20 @@ app.get('/api/matrix', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Sales
+// (ИЗМЕНЕНО) API Продаж - теперь поддерживает поиск по dealerId
 app.get('/api/sales', async (req, res) => {
     try {
-        const month = req.query.month;
-        if (!month) return res.json([]);
-        const sales = await Sales.find({ month }).lean();
+        const { month, dealerId } = req.query;
+        const filter = {};
+        
+        if (month) filter.month = month;
+        if (dealerId) filter.dealerId = dealerId;
+
+        // Если фильтров нет - возвращаем пустоту (защита)
+        if (Object.keys(filter).length === 0) return res.json([]);
+
+        // Сортируем по месяцу (сначала новые)
+        const sales = await Sales.find(filter).sort({ month: -1 }).lean();
         res.json(sales);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
