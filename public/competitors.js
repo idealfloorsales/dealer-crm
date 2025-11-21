@@ -1,23 +1,25 @@
-// competitors.js
 document.addEventListener('DOMContentLoaded', () => {
     const API_URL = '/api/competitors-ref';
     
+    // Элементы
     const gridContainer = document.getElementById('competitors-grid');
     const searchInput = document.getElementById('search-input');
     const filterType = document.getElementById('filter-type');
     const addBtn = document.getElementById('add-comp-btn');
 
+    // Модалка
     const modalEl = document.getElementById('comp-modal');
     const modal = new bootstrap.Modal(modalEl);
     const form = document.getElementById('comp-form');
     const modalTitle = document.getElementById('comp-modal-title');
     const delBtn = document.getElementById('btn-delete-comp');
 
+    // Поля модалки
     const collectionsContainer = document.getElementById('collections-container');
     const addCollRowBtn = document.getElementById('add-coll-row-btn');
     const contactsContainer = document.getElementById('comp-contacts-list');
     const addContactBtn = document.getElementById('btn-add-contact');
-
+    
     const inpId = document.getElementById('comp_id');
     const inpName = document.getElementById('comp_name');
     const inpSupplier = document.getElementById('comp_supplier');
@@ -27,6 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const inpStock = document.getElementById('comp_stock');
     const inpReserve = document.getElementById('comp_reserve');
 
+    // Типы и цвета
     const collectionTypes = [
         { val: 'std', label: 'Стандарт', class: 'type-std' },
         { val: 'eng', label: 'Англ. Елка', class: 'type-eng' },
@@ -39,35 +42,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let competitors = [];
 
+    // --- ЗАГРУЗКА ---
     async function loadList() {
         try {
             const res = await fetch(API_URL);
-            if(res.ok) { competitors = await res.json(); renderGrid(); }
+            if(res.ok) {
+                competitors = await res.json();
+                renderGrid();
+            }
         } catch(e) { gridContainer.innerHTML = '<p class="text-danger p-5 text-center">Ошибка загрузки</p>'; }
     }
 
-    // --- (ИЗМЕНЕНО) УМНАЯ ФИЛЬТРАЦИЯ ---
+    // --- РЕНДЕР СЕТКИ ---
     function renderGrid() {
         const search = searchInput.value.toLowerCase();
         const filter = filterType.value;
 
         const filtered = competitors.filter(c => {
-            // 1. Поиск
             const matchSearch = !search || 
                 c.name.toLowerCase().includes(search) || 
-                (c.supplier || '').toLowerCase().includes(search) ||
-                (c.warehouse || '').toLowerCase().includes(search);
+                (c.supplier || '').toLowerCase().includes(search);
             
-            // 2. Фильтр по типу
             let matchFilter = true;
             if (filter !== 'all') {
-                // Проверяем, есть ли у конкурента ХОТЯ БЫ ОДНА коллекция этого типа
                 matchFilter = c.collections && c.collections.some(col => {
                     const type = (typeof col === 'string') ? 'std' : (col.type || 'std');
                     return type === filter;
                 });
             }
-
             return matchSearch && matchFilter;
         });
 
@@ -77,40 +79,88 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         gridContainer.innerHTML = filtered.map(c => {
-            // Собираем уникальные типы, которые есть у этого бренда, чтобы показать бейджи
+            // 1. Бейджи для лицевой стороны (только особые)
             const typesSet = new Set();
             (c.collections || []).forEach(col => {
                 const t = (typeof col === 'string') ? 'std' : (col.type || 'std');
-                if (t !== 'std') typesSet.add(t); // Стандарт не подсвечиваем, чтобы не мусорить
+                if (t !== 'std') typesSet.add(t);
             });
-
-            let badgesHtml = '';
+            let frontBadges = '';
             typesSet.forEach(type => {
                 const typeInfo = collectionTypes.find(x => x.val === type);
-                if (typeInfo) {
-                    badgesHtml += `<span class="col-badge ${typeInfo.class}" style="font-size: 0.7rem;">${typeInfo.label}</span>`;
-                }
+                if (typeInfo) frontBadges += `<span class="col-badge ${typeInfo.class}" style="font-size: 0.7rem;">${typeInfo.label}</span>`;
             });
 
+            // 2. Список коллекций для обратной стороны
+            const listHtml = (c.collections || []).map(col => {
+                const name = (typeof col === 'string') ? col : col.name;
+                const type = (typeof col === 'string') ? 'std' : (col.type || 'std');
+                const typeInfo = collectionTypes.find(x => x.val === type) || collectionTypes[0];
+                
+                // Цветной кружок для типа
+                const dotStyle = type === 'std' ? 'background:#ccc' : 
+                                 (type.includes('eng') ? 'background:#198754' : 
+                                 (type.includes('fr') ? 'background:#0d6efd' : 'background:#ffc107'));
+
+                return `
+                <div class="comp-collection-item">
+                    <span>${name}</span>
+                    <span class="badge rounded-pill text-dark" style="font-size:0.65rem; border:1px solid #eee; ${type === 'std' ? '' : 'background-color:rgba(0,0,0,0.05)'}">
+                        ${typeInfo.label}
+                    </span>
+                </div>`;
+            }).join('');
+
             return `
-            <div class="col-md-6 col-lg-4">
-                <div class="comp-card" onclick="openEditModal('${c.id}')">
-                    <div class="comp-card-title d-flex justify-content-between">
-                        <span>${c.name}</span>
-                        <small class="text-muted fw-normal" style="font-size: 0.7em">${(c.collections || []).length} колл.</small>
+            <div class="col-md-6 col-lg-4 col-xl-3">
+                <div class="comp-card" id="card-${c.id}" onclick="toggleCard('${c.id}')">
+                    
+                    <button class="btn-card-edit" onclick="event.stopPropagation(); openEditModal('${c.id}')" title="Редактировать">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+
+                    <div class="comp-card-front">
+                        <h5 class="comp-card-title text-truncate">${c.name}</h5>
+                        <div class="comp-card-supplier text-muted mb-2">
+                            <i class="bi bi-box-seam me-1"></i> ${c.supplier || '-'}<br>
+                            <i class="bi bi-geo-alt me-1"></i> ${c.warehouse || '-'}
+                        </div>
+                        <div class="mt-auto">
+                            ${frontBadges}
+                            <div class="text-primary small mt-2 fw-bold">
+                                <i class="bi bi-list-ul"></i> Показать коллекции (${(c.collections || []).length})
+                            </div>
+                        </div>
                     </div>
-                    <div class="comp-card-supplier">
-                        ${c.supplier ? `<i class="bi bi-box-seam me-1"></i>${c.supplier}` : ''}
-                        ${c.warehouse ? `<span class="mx-2">•</span>${c.warehouse}` : ''}
+
+                    <div class="comp-card-back">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0 fw-bold text-truncate">${c.name}</h6>
+                            <button class="btn btn-sm btn-close" onclick="event.stopPropagation(); toggleCard('${c.id}')"></button>
+                        </div>
+                        <div class="comp-card-list">
+                            ${listHtml || '<p class="text-muted text-center my-3">Нет коллекций</p>'}
+                        </div>
                     </div>
-                    <div class="mt-2">
-                        ${badgesHtml}
-                    </div>
+
                 </div>
             </div>`;
         }).join('');
     }
 
+    // Функция переворота (открытия списка)
+    window.toggleCard = (id) => {
+        const card = document.getElementById(`card-${id}`);
+        if (card) {
+            // Закрываем другие открытые, если нужно (опционально)
+            document.querySelectorAll('.comp-card.show-collections').forEach(c => {
+                if(c !== card) c.classList.remove('show-collections');
+            });
+            card.classList.toggle('show-collections');
+        }
+    };
+
+    // --- МОДАЛКА: ОТКРЫТИЕ (РЕДАКТИРОВАНИЕ) ---
     window.openEditModal = (id) => {
         const c = competitors.find(x => x.id === id);
         if (!c) return;
@@ -127,26 +177,23 @@ document.addEventListener('DOMContentLoaded', () => {
         inpStock.value = c.stock_info || '';
         inpReserve.value = c.reserve_days || '';
 
-        // Рендер коллекций
         collectionsContainer.innerHTML = '';
         if (c.collections && c.collections.length > 0) {
             c.collections.forEach(col => {
                 if (typeof col === 'string') addCollectionRow(col, 'std');
                 else addCollectionRow(col.name, col.type);
             });
-        } else {
-            // Если пусто, можно добавить одну строку или оставить пустым
-        }
+        } else { addCollectionRow(); }
 
-        // Рендер контактов
         contactsContainer.innerHTML = '';
         if (c.contacts && c.contacts.length > 0) {
             c.contacts.forEach(cnt => addContactRow(cnt.name, cnt.position, cnt.phone));
-        }
+        } else { addContactRow(); }
 
         modal.show();
     };
 
+    // Добавление нового
     addBtn.onclick = () => {
         inpId.value = '';
         form.reset();
@@ -159,14 +206,15 @@ document.addEventListener('DOMContentLoaded', () => {
         modal.show();
     };
 
+    // Конструктор строк
     function addCollectionRow(name = '', type = 'std') {
         const div = document.createElement('div');
         div.className = 'input-group mb-2 collection-row';
         let options = collectionTypes.map(t => `<option value="${t.val}" ${t.val === type ? 'selected' : ''}>${t.label}</option>`).join('');
         div.innerHTML = `
-            <input type="text" class="form-control coll-name" placeholder="Коллекция" value="${name}" required>
+            <input type="text" class="form-control coll-name" placeholder="Название" value="${name}" required>
             <select class="form-select coll-type" style="max-width: 160px;">${options}</select>
-            <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()"><i class="bi bi-x-lg"></i></button>
+            <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()">×</button>
         `;
         collectionsContainer.appendChild(div);
     }
@@ -174,7 +222,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function addContactRow(name='', pos='', phone='') {
         const div = document.createElement('div');
         div.className = 'comp-contact-row mb-2'; 
-        // Grid для контактов
         div.style.display = 'grid';
         div.style.gridTemplateColumns = '1fr 1fr 1fr auto';
         div.style.gap = '5px';
@@ -182,7 +229,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <input type="text" class="form-control cont-name" placeholder="Имя" value="${name}">
             <input type="text" class="form-control cont-pos" placeholder="Должность" value="${pos}">
             <input type="text" class="form-control cont-phone" placeholder="Телефон" value="${phone}">
-            <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()"><i class="bi bi-x-lg"></i></button>
+            <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()">×</button>
         `;
         contactsContainer.appendChild(div);
     }
@@ -190,6 +237,7 @@ document.addEventListener('DOMContentLoaded', () => {
     addCollRowBtn.onclick = () => addCollectionRow();
     addContactBtn.onclick = () => addContactRow();
 
+    // Сохранение
     form.onsubmit = async (e) => {
         e.preventDefault();
         
@@ -228,13 +276,13 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
             if (res.ok) { await loadList(); modal.hide(); }
-        } catch (e) { alert('Ошибка'); }
+        } catch (e) { alert('Ошибка сохранения'); }
     };
 
     delBtn.onclick = async () => {
         const id = inpId.value;
         if (!id) return;
-        if (confirm('Удалить?')) {
+        if (confirm('Удалить этот бренд?')) {
             await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
             modal.hide();
             loadList();
