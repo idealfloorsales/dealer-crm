@@ -7,7 +7,7 @@ const urlsToCache = [
     '/',
     '/index.html?v=51', // (И здесь тоже меняем на 45)
     '/style.css?v=51',
-    '/script.js?v=51',
+    '/script.js?v=52',
     '/dealer.html?v=45',
     '/dealer.js?v=45',
     '/map.html?v=45',
