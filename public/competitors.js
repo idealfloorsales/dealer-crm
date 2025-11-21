@@ -2,6 +2,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     const API_URL = '/api/competitors-ref';
     
+    // Элементы
     const listContainer = document.getElementById('competitors-list');
     const detailsCard = document.getElementById('comp-details-card');
     const emptyMsg = document.getElementById('empty-msg');
@@ -9,24 +10,33 @@ document.addEventListener('DOMContentLoaded', () => {
     const delBtn = document.getElementById('btn-delete-comp');
     const form = document.getElementById('comp-form');
     
+    // Контейнеры списков
     const collectionsContainer = document.getElementById('collections-container');
     const addCollRowBtn = document.getElementById('add-coll-row-btn');
+    const contactsContainer = document.getElementById('comp-contacts-list');
+    const addContactBtn = document.getElementById('btn-add-contact');
 
+    // Поля
     const inpId = document.getElementById('comp_id');
     const inpName = document.getElementById('comp_name');
     const inpSupplier = document.getElementById('comp_supplier');
     const inpWarehouse = document.getElementById('comp_warehouse');
     const inpInfo = document.getElementById('comp_info');
+    
+    // (НОВЫЕ ПОЛЯ)
+    const inpStorage = document.getElementById('comp_storage');
+    const inpStock = document.getElementById('comp_stock');
+    const inpReserve = document.getElementById('comp_reserve');
 
-    // ТИПЫ КОЛЛЕКЦИЙ (Ваши цвета)
+    // Типы коллекций
     const collectionTypes = [
-        { val: 'standard', label: 'Стандарт (обычный)', class: 'type-standard' },
-        { val: 'english', label: 'Английская Елочка', class: 'type-english' },
-        { val: 'french', label: 'Французская Елочка', class: 'type-french' },
+        { val: 'standard', label: 'Стандарт', class: 'type-standard' },
+        { val: 'english', label: 'Английская Елка', class: 'type-english' },
+        { val: 'french', label: 'Французская Елка', class: 'type-french' },
         { val: 'artistic', label: 'Художественный', class: 'type-artistic' },
         { val: 'art_eng', label: 'Худ. Английская', class: 'type-art-eng' },
         { val: 'art_french', label: 'Худ. Французская', class: 'type-art-french' },
-        { val: 'art_mix', label: 'Худ. Англ-Франц', class: 'type-art-mix' }
+        { val: 'art_mix', label: 'Худ. Микс', class: 'type-art-mix' }
     ];
 
     let competitors = [];
@@ -39,9 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 competitors = await res.json();
                 renderList();
             }
-        } catch(e) {
-            listContainer.innerHTML = '<p class="text-danger p-3">Ошибка</p>';
-        }
+        } catch(e) { listContainer.innerHTML = '<p class="text-danger p-3">Ошибка</p>'; }
     }
 
     function renderList() {
@@ -51,49 +59,67 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         listContainer.innerHTML = competitors.map(c => {
-            // Генерируем цветные плашки для предпросмотра
-            const badges = (c.collections || [])
-                .filter(col => col.type !== 'standard') // Показываем только "особенные"
-                .map(col => {
-                    const typeInfo = collectionTypes.find(t => t.val === col.type) || {};
-                    return `<span class="badge-type ${typeInfo.class || ''}">${typeInfo.label || col.type}</span>`;
-                }).join('');
+            // Баджи для закрытого вида (только важные)
+            const hasHerringbone = (c.collections||[]).some(col => col.type && col.type.includes('eng') || col.type.includes('french'));
+            const hasArtistic = (c.collections||[]).some(col => col.type && col.type.includes('art'));
+            
+            let topBadges = '';
+            if(hasHerringbone) topBadges += '🌲 ';
+            if(hasArtistic) topBadges += '🎨 ';
+
+            // Список коллекций для развернутого вида
+            const collectionsHtml = (c.collections || []).map(col => {
+                const typeInfo = collectionTypes.find(t => t.val === col.type) || {};
+                const typeLabel = typeInfo.val !== 'standard' ? `<span class="badge-type ${typeInfo.class}">${typeInfo.label}</span>` : '';
+                return `<div class="d-flex justify-content-between align-items-center mb-1"><span>${col.name}</span>${typeLabel}</div>`;
+            }).join('');
 
             return `
-            <button class="list-group-item list-group-item-action ${c.id === selectedId ? 'active' : ''}" 
-                    onclick="selectComp('${c.id}')">
-                <div class="d-flex w-100 justify-content-between align-items-center">
-                    <h6 class="mb-1 fw-bold">${c.name}</h6>
+            <div class="list-group-item list-group-item-action ${c.id === selectedId ? 'active' : ''}" 
+                 onclick="selectComp('${c.id}')">
+                <div class="comp-item-header">
+                    <div>
+                        <h6 class="mb-0 fw-bold">${c.name} <small>${topBadges}</small></h6>
+                        <small class="${c.id === selectedId ? 'text-light' : 'text-muted'}">${c.supplier || ''}</small>
+                    </div>
+                    <i class="bi bi-chevron-right"></i>
                 </div>
-                <div class="mb-1">${badges}</div>
-                <div class="d-flex justify-content-between">
-                    <small class="${c.id === selectedId ? 'text-light' : 'text-muted'}">${c.supplier || '-'}</small>
-                    <small class="${c.id === selectedId ? 'text-light' : 'text-muted'}">${c.warehouse || '-'}</small>
+                
+                <div class="comp-item-body">
+                    ${collectionsHtml || '<em class="text-muted">Нет коллекций</em>'}
                 </div>
-            </button>`;
+            </div>`;
         }).join('');
     }
 
-    // --- Управление строками коллекций ---
+    // --- Управление КОЛЛЕКЦИЯМИ ---
     function addCollectionRow(name = '', type = 'standard') {
         const div = document.createElement('div');
         div.className = 'input-group mb-2 collection-row';
-        
-        let options = collectionTypes.map(t => 
-            `<option value="${t.val}" ${t.val === type ? 'selected' : ''}>${t.label}</option>`
-        ).join('');
-
+        let options = collectionTypes.map(t => `<option value="${t.val}" ${t.val === type ? 'selected' : ''}>${t.label}</option>`).join('');
         div.innerHTML = `
-            <input type="text" class="form-control coll-name" placeholder="Название коллекции" value="${name}" required>
-            <select class="form-select coll-type" style="max-width: 200px;">
-                ${options}
-            </select>
+            <input type="text" class="form-control coll-name" placeholder="Название" value="${name}" required>
+            <select class="form-select coll-type" style="max-width: 160px;">${options}</select>
             <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()">×</button>
         `;
         collectionsContainer.appendChild(div);
     }
 
+    // --- Управление КОНТАКТАМИ ---
+    function addContactRow(name='', pos='', phone='') {
+        const div = document.createElement('div');
+        div.className = 'comp-contact-row';
+        div.innerHTML = `
+            <input type="text" class="form-control cont-name" placeholder="Имя" value="${name}">
+            <input type="text" class="form-control cont-pos" placeholder="Должность" value="${pos}">
+            <input type="text" class="form-control cont-phone" placeholder="Телефон" value="${phone}">
+            <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()">×</button>
+        `;
+        contactsContainer.appendChild(div);
+    }
+
     addCollRowBtn.onclick = () => addCollectionRow();
+    addContactBtn.onclick = () => addContactRow();
 
     // --- Выбор бренда ---
     window.selectComp = (id) => {
@@ -108,31 +134,44 @@ document.addEventListener('DOMContentLoaded', () => {
         inpSupplier.value = c.supplier || '';
         inpWarehouse.value = c.warehouse || '';
         inpInfo.value = c.info || '';
+        
+        // Новые поля
+        inpStorage.value = c.storage_days || '';
+        inpStock.value = c.stock_info || '';
+        inpReserve.value = c.reserve_days || '';
 
         // Заполняем коллекции
         collectionsContainer.innerHTML = '';
         if (c.collections && c.collections.length > 0) {
             c.collections.forEach(col => {
-                // Поддержка старого формата (если было просто строкой)
                 if (typeof col === 'string') addCollectionRow(col, 'standard');
                 else addCollectionRow(col.name, col.type);
             });
-        } else {
-            // Пусто
+        }
+
+        // Заполняем контакты
+        contactsContainer.innerHTML = '';
+        if (c.contacts && c.contacts.length > 0) {
+            c.contacts.forEach(cnt => addContactRow(cnt.name, cnt.position, cnt.phone));
         }
 
         detailsCard.style.display = 'block';
         emptyMsg.style.display = 'none';
-        renderList();
+        renderList(); // Обновляем выделение и раскрытие списка
     };
 
+    // Кнопка ДОБАВИТЬ
     if (addBtn) {
         addBtn.onclick = () => {
             selectedId = null;
             inpId.value = '';
             form.reset();
-            collectionsContainer.innerHTML = ''; // Очищаем строки
-            addCollectionRow(); // Добавляем одну пустую для удобства
+            
+            collectionsContainer.innerHTML = '';
+            contactsContainer.innerHTML = '';
+            
+            addCollectionRow(); // Пустая строка
+            addContactRow();    // Пустая строка
             
             document.getElementById('comp_title').textContent = 'Новый бренд';
             detailsCard.style.display = 'block';
@@ -141,19 +180,26 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    // Сохранение
+    // СОХРАНЕНИЕ
     if (form) {
         form.onsubmit = async (e) => {
             e.preventDefault();
             
-            // Собираем коллекции из строк
+            // Собираем коллекции
             const collectionsData = [];
             document.querySelectorAll('.collection-row').forEach(row => {
                 const name = row.querySelector('.coll-name').value.trim();
                 const type = row.querySelector('.coll-type').value;
-                if (name) {
-                    collectionsData.push({ name, type });
-                }
+                if (name) collectionsData.push({ name, type });
+            });
+
+            // Собираем контакты
+            const contactsData = [];
+            document.querySelectorAll('.comp-contact-row').forEach(row => {
+                const name = row.querySelector('.cont-name').value.trim();
+                const pos = row.querySelector('.cont-pos').value.trim();
+                const phone = row.querySelector('.cont-phone').value.trim();
+                if (name || phone) contactsData.push({ name, position: pos, phone });
             });
 
             const data = {
@@ -161,7 +207,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 supplier: inpSupplier.value,
                 warehouse: inpWarehouse.value,
                 info: inpInfo.value,
-                collections: collectionsData
+                storage_days: inpStorage.value,
+                stock_info: inpStock.value,
+                reserve_days: inpReserve.value,
+                collections: collectionsData,
+                contacts: contactsData
             };
 
             const id = inpId.value;
@@ -183,8 +233,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (res.ok) {
                     await loadList(); 
                     if (!id) {
+                        // Если создали - закрываем и уведомляем
                         detailsCard.style.display = 'none';
                         emptyMsg.style.display = 'block';
+                        alert('Бренд успешно добавлен!');
                     } else {
                         document.getElementById('comp_title').textContent = data.name;
                     }
@@ -193,6 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    // УДАЛЕНИЕ
     if (delBtn) {
         delBtn.onclick = async () => {
             const id = inpId.value;
