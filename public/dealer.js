@@ -1,7 +1,6 @@
-// dealer.js
 document.addEventListener('DOMContentLoaded', () => {
     
-    // ... (переменные элементов без изменений) ...
+    // Элементы
     const contactsListContainer = document.getElementById('dealer-contacts-list'); 
     const bonusesContainer = document.getElementById('dealer-bonuses');
     const photoGalleryContainer = document.getElementById('dealer-photo-gallery'); 
@@ -13,11 +12,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const competitorsListContainer = document.getElementById('dealer-competitors-list'); 
     const productsListContainer = document.getElementById('dealer-products-list');
     const productsStatsContainer = document.getElementById('dealer-products-stats');
+    const salesHistoryContainer = document.getElementById('dealer-sales-history'); // (НОВОЕ)
     
+    // Заголовок
     const dealerNameEl = document.getElementById('dealer-name');
     const dealerIdEl = document.getElementById('dealer-id-subtitle');
     const dealerAvatarImg = document.getElementById('dealer-avatar-img');
     
+    // Кнопки
     const deleteBtn = document.getElementById('delete-dealer-btn'); 
     const editBtn = document.getElementById('edit-dealer-btn'); 
     const navigateBtn = document.getElementById('navigate-btn'); 
@@ -25,6 +27,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const API_DEALERS_URL = '/api/dealers';
     const API_PRODUCTS_URL = '/api/products'; 
+    const API_SALES_URL = '/api/sales'; // (НОВОЕ)
+
     const params = new URLSearchParams(window.location.search);
     const dealerId = params.get('id');
 
@@ -43,12 +47,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
     const formatUrl = (url) => { if (!url) return null; if (!url.startsWith('http')) return 'https://' + url; return url; }
-
-    // (НОВОЕ) Перевод значений ответственного
+    
+    // Формат ответственного
     const formatResponsible = (val) => {
         if (val === 'regional_astana') return 'Региональный Астана';
         if (val === 'regional_regions') return 'Региональный Регионы';
-        return '---';
+        if (val === 'michael') return 'Отдел продаж Михаил';
+        if (val === 'alexander') return 'Отдел продаж Александр';
+        return val || '---';
     };
 
     async function fetchDealerDetails() {
@@ -79,7 +85,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             document.title = `Дилер: ${dealer.name}`;
             
-            // (ИЗМЕНЕНО) Добавлен Ответственный
             document.getElementById('dealer-info-main').innerHTML = `
                 <p><strong>Ответственный:</strong> <span class="text-primary fw-bold">${formatResponsible(dealer.responsible)}</span></p>
                 <p><strong>Организация:</strong> ${safeText(dealer.organization)}</p>
@@ -92,7 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (productsStatsContainer) {
                 productsStatsContainer.innerHTML = `
                     <div class="alert alert-light border mb-3">
-                        <p class="mb-1"><strong>Загрузка матрицы:</strong> ${dealerProductsCount} из ${totalProductsCount} (${percent}%)</p>
+                        <p class="mb-1"><strong>📊 Загрузка матрицы:</strong> ${dealerProductsCount} из ${totalProductsCount} (${percent}%)</p>
                         <div class="progress" style="height: 6px;">
                             <div class="progress-bar bg-success" role="progressbar" style="width: ${percent}%"></div>
                         </div>
@@ -113,19 +118,71 @@ document.addEventListener('DOMContentLoaded', () => {
             renderDealerPhotos(dealer.photos || []); 
             
             fetchDealerProducts(dealer.products); 
+            fetchDealerSales(); // (НОВОЕ) Загрузка продаж
 
         } catch (error) {
             dealerNameEl.textContent = 'Ошибка';
             dealerIdEl.textContent = error.message;
         }
     }
+
+    // (НОВОЕ) Функция загрузки продаж
+    async function fetchDealerSales() {
+        if (!salesHistoryContainer) return;
+        try {
+            // Запрашиваем продажи по ID дилера (сервер теперь это умеет)
+            const res = await fetch(`${API_SALES_URL}?dealerId=${dealerId}`);
+            if (!res.ok) throw new Error('Ошибка');
+            const sales = await res.json();
+
+            if (!sales || sales.length === 0) {
+                salesHistoryContainer.innerHTML = '<p class="text-muted">Нет данных о продажах.</p>';
+                return;
+            }
+
+            // Сортируем: свежие месяцы сверху
+            sales.sort((a, b) => b.month.localeCompare(a.month));
+
+            let html = `
+                <div class="table-responsive">
+                    <table class="table table-bordered table-striped">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Месяц</th>
+                                <th>Факт (м²)</th>
+                                <th>План</th> </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            sales.forEach(s => {
+                // Красивый формат месяца (2025-11 -> Ноябрь 2025)
+                const date = new Date(s.month + '-01');
+                const monthName = date.toLocaleString('ru-RU', { month: 'long', year: 'numeric' });
+                // Делаем первую букву заглавной
+                const monthNameCap = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+
+                html += `
+                    <tr>
+                        <td class="fw-bold">${monthNameCap}</td>
+                        <td class="text-success fw-bold">${s.fact}</td>
+                        <td class="text-muted">${s.plan || '-'}</td>
+                    </tr>
+                `;
+            });
+
+            html += `</tbody></table></div>`;
+            salesHistoryContainer.innerHTML = html;
+
+        } catch (e) {
+            salesHistoryContainer.innerHTML = `<p class="text-danger">Ошибка загрузки продаж</p>`;
+        }
+    }
     
-    // ... (остальные функции: renderDealerLinks, renderDealerPhotos, openLightbox, openAvatarModal, toggleArrows, renderDealerVisits, renderDealerContacts, renderDealerAddresses, renderDealerPos, renderDealerCompetitors, fetchDealerProducts и обработчики кнопок - БЕЗ ИЗМЕНЕНИЙ) ...
-    // Просто скопируйте их из предыдущего файла dealer.js. 
-    // Главное изменение - в fetchDealerDetails (строки 60-70).
+    // ... (Остальные функции: renderDealerLinks, renderDealerPhotos, openLightbox, openAvatarModal, toggleArrows, renderDealerVisits, renderDealerContacts, renderDealerAddresses, renderDealerPos, renderDealerCompetitors, fetchDealerProducts - БЕЗ ИЗМЕНЕНИЙ)
     
-    // Чтобы не загромождать ответ, я не дублирую весь код dealer.js, 
-    // так как изменился ТОЛЬКО блок dealer-info-main внутри fetchDealerDetails.
+    // (Вставьте сюда весь остальной код из предыдущего dealer.js)
+    // Я сокращу для экономии места, так как изменился только fetchDealerDetails и добавился fetchDealerSales
     
     function renderDealerLinks(website, instagram) {
         if (!linksContainer) return;
