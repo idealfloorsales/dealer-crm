@@ -10,13 +10,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSort = { column: 'name', direction: 'asc' };
     
     const posMaterialsList = [
-        "С600 - 600мм задняя стенка",
-        "С800 - 800мм задняя стенка",
-        "РФ-2 - Расческа из фанеры",
-        "РФС-1 - Расческа из фанеры СТАРАЯ",
-        "Н600 - 600мм наклейка",
-        "Н800 - 800мм наклейка",
-        "Табличка - Табличка орг.стекло"
+        "С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры",
+        "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"
     ];
 
     // --- Модалки ---
@@ -91,8 +86,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function initMap(mapId) { const el = document.getElementById(mapId); if (!el) return null; if (typeof L === 'undefined') return null; const map = L.map(mapId).setView([DEFAULT_LAT, DEFAULT_LNG], 13); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: 'OSM' }).addTo(map); return map; }
     function setupMapClick(map, latId, lngId, markerRef) { if (!map) return; map.on('click', function(e) { const lat = e.latlng.lat; const lng = e.latlng.lng; const latIn = document.getElementById(latId); const lngIn = document.getElementById(lngId); if(latIn) latIn.value = lat; if(lngIn) lngIn.value = lng; if (markerRef.current) markerRef.current.setLatLng([lat, lng]); else markerRef.current = L.marker([lat, lng]).addTo(map); }); }
-    
-    // Поиск на карте
     function setupMapSearch(map, inputId, suggestionsId, latId, lngId, markerRef) {
         const input = document.getElementById(inputId); const suggestionsBox = document.getElementById(suggestionsId); const latInput = document.getElementById(latId); const lngInput = document.getElementById(lngId);
         if (!input || !suggestionsBox) return; let debounceTimer;
@@ -100,7 +93,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.addEventListener('click', (e) => { if (!e.target.closest('.map-search-container')) suggestionsBox.style.display = 'none'; });
     }
 
-    // Инициализация карт
     if (addModalEl) {
         addModalEl.addEventListener('shown.bs.modal', () => {
             if (!addMap) { 
@@ -115,6 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (editModalEl) {
         editModalEl.addEventListener('shown.bs.modal', () => {
+            // Фикс карты в табах
             const tabMapBtn = document.querySelector('button[data-bs-target="#tab-map"]');
             if(tabMapBtn) {
                 tabMapBtn.addEventListener('shown.bs.tab', () => {
@@ -139,7 +132,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- ДАННЫЕ (ИСПРАВЛЕНО: добавлена функция fetchProductCatalog) ---
+    // --- ДАННЫЕ ---
     async function fetchProductCatalog() {
         if (fullProductCatalog.length > 0) return; 
         try {
@@ -165,114 +158,32 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) { alert("Ошибка"); btn.disabled = false; }
     }
 
-    // --- ДАШБОРД 2x2 ---
+    // --- ДАШБОРД ---
     function renderDashboard() {
         if (!dashboardContainer) {
             if(tasksListUpcoming) tasksListUpcoming.innerHTML = '<p class="text-muted text-center p-3">Нет задач</p>';
             return;
         }
         if (!allDealers || allDealers.length === 0) { dashboardContainer.innerHTML = ''; return; }
-        
         const activeDealers = allDealers.filter(d => d.status !== 'potential');
         const totalDealers = activeDealers.length;
         const noAvatarCount = activeDealers.filter(d => !d.photo_url).length; 
-
-        dashboardContainer.innerHTML = `
-            <div class="col-md-6"><div class="stat-card h-100"><i class="bi bi-shop stat-icon text-primary"></i><span class="stat-number">${totalDealers}</span><span class="stat-label">Всего дилеров</span></div></div>
-            <div class="col-md-6"><div class="stat-card h-100 ${noAvatarCount > 0 ? 'border-danger' : ''}"><i class="bi bi-camera-fill stat-icon ${noAvatarCount > 0 ? 'text-danger' : 'text-secondary'}"></i><span class="stat-number ${noAvatarCount > 0 ? 'text-danger' : ''}">${noAvatarCount}</span><span class="stat-label">Без Аватара</span></div></div>
-        `;
-
-        const today = new Date(); today.setHours(0,0,0,0);
-        const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
-        const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
-        
-        const tasksUpcoming = [];
-        const tasksProblem = [];
-        const tasksCooling = [];
-
+        dashboardContainer.innerHTML = `<div class="col-md-6"><div class="stat-card h-100"><i class="bi bi-shop stat-icon text-primary"></i><span class="stat-number">${totalDealers}</span><span class="stat-label">Всего дилеров</span></div></div><div class="col-md-6"><div class="stat-card h-100 ${noAvatarCount > 0 ? 'border-danger' : ''}"><i class="bi bi-camera-fill stat-icon ${noAvatarCount > 0 ? 'text-danger' : 'text-secondary'}"></i><span class="stat-number ${noAvatarCount > 0 ? 'text-danger' : ''}">${noAvatarCount}</span><span class="stat-label">Без Аватара</span></div></div>`;
+        const today = new Date(); today.setHours(0,0,0,0); const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1); const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
+        const tasksUpcoming = []; const tasksProblem = []; const tasksCooling = [];
         allDealers.forEach(d => {
-            if (d.status === 'archive') return; 
-            const isPotential = d.status === 'potential';
-            let lastVisitDate = null; let hasFutureTasks = false;
-
-            if (d.visits && Array.isArray(d.visits)) {
-                d.visits.forEach((v, index) => {
-                    const vDate = new Date(v.date);
-                    if (!v.date) return; 
-                    vDate.setHours(0,0,0,0);
-
-                    if (v.isCompleted && (!lastVisitDate || vDate > lastVisitDate)) { lastVisitDate = vDate; }
-                    
-                    if (!v.isCompleted) {
-                        const taskData = { dealerName: d.name, dealerId: d.id, date: vDate, comment: v.comment || "", visitIndex: index };
-                        if (vDate < today) { tasksProblem.push({...taskData, type: 'overdue'}); } 
-                        else if (vDate.getTime() === today.getTime() || vDate.getTime() === tomorrow.getTime()) {
-                            tasksUpcoming.push({...taskData, isToday: vDate.getTime() === today.getTime()});
-                            hasFutureTasks = true;
-                        } else { hasFutureTasks = true; }
-                    }
-                });
-            }
-
-            if (d.status === 'problem') {
-                if (!tasksProblem.some(t => t.dealerId === d.id && t.type === 'overdue')) {
-                    tasksProblem.push({ dealerName: d.name, dealerId: d.id, type: 'status' });
-                }
-            }
-
-            if (!hasFutureTasks && d.status !== 'problem' && !isPotential) {
-                if (!lastVisitDate) { tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: 999 }); } 
-                else if (lastVisitDate < thirtyDaysAgo) {
-                    const days = Math.floor((today - lastVisitDate) / (1000 * 60 * 60 * 24));
-                    tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: days });
-                }
-            }
+            if (d.status === 'archive') return; const isPotential = d.status === 'potential'; let lastVisitDate = null; let hasFutureTasks = false;
+            if (d.visits && Array.isArray(d.visits)) { d.visits.forEach((v, index) => { const vDate = new Date(v.date); if (!v.date) return; vDate.setHours(0,0,0,0); if (v.isCompleted && (!lastVisitDate || vDate > lastVisitDate)) { lastVisitDate = vDate; } if (!v.isCompleted) { const taskData = { dealerName: d.name, dealerId: d.id, date: vDate, comment: v.comment || "", visitIndex: index }; if (vDate < today) { tasksProblem.push({...taskData, type: 'overdue'}); } else if (vDate.getTime() === today.getTime() || vDate.getTime() === tomorrow.getTime()) { tasksUpcoming.push({...taskData, isToday: vDate.getTime() === today.getTime()}); hasFutureTasks = true; } else { hasFutureTasks = true; } } }); }
+            if (d.status === 'problem') { if (!tasksProblem.some(t => t.dealerId === d.id && t.type === 'overdue')) { tasksProblem.push({ dealerName: d.name, dealerId: d.id, type: 'status' }); } }
+            if (!hasFutureTasks && d.status !== 'problem' && !isPotential) { if (!lastVisitDate) { tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: 999 }); } else if (lastVisitDate < thirtyDaysAgo) { const days = Math.floor((today - lastVisitDate) / (1000 * 60 * 60 * 24)); tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: days }); } }
         });
-
-        tasksUpcoming.sort((a, b) => a.date - b.date);
-        tasksProblem.sort((a, b) => (a.date || 0) - (b.date || 0));
-        tasksCooling.sort((a, b) => b.days - a.days);
-
-        renderTaskList(tasksListUpcoming, tasksUpcoming, 'upcoming');
-        renderTaskList(tasksListProblem, tasksProblem, 'problem');
-        renderTaskList(tasksListCooling, tasksCooling, 'cooling');
+        tasksUpcoming.sort((a, b) => a.date - b.date); tasksProblem.sort((a, b) => (a.date || 0) - (b.date || 0)); tasksCooling.sort((a, b) => b.days - a.days);
+        renderTaskList(tasksListUpcoming, tasksUpcoming, 'upcoming'); renderTaskList(tasksListProblem, tasksProblem, 'problem'); renderTaskList(tasksListCooling, tasksCooling, 'cooling');
     }
-
-    function renderTaskList(container, tasks, type) {
-        if (!container) return;
-        if (tasks.length === 0) {
-            const message = type === 'cooling' ? 'Нет таких' : 'Нет задач';
-            container.innerHTML = `<p class="text-muted text-center p-3">${message}</p>`;
-            return;
-        }
-        container.innerHTML = tasks.map(t => {
-            let badge = ''; let comment = safeText(t.comment);
-            if (type === 'upcoming') {
-                badge = `<span class="badge ${t.isToday ? 'bg-danger' : 'bg-primary'} rounded-pill me-2">${t.isToday ? 'Сегодня' : t.date.toLocaleDateString('ru-RU')}</span>`;
-            } else if (type === 'problem') {
-                badge = t.type === 'overdue' ? `<span class="badge bg-danger rounded-pill me-2">Просрочено: ${t.date.toLocaleDateString('ru-RU')}</span>` : `<span class="badge bg-danger rounded-pill me-2">Статус: Проблемный</span>`;
-                if(t.type !== 'overdue') comment = '<i>Требует внимания</i>';
-            } else if (type === 'cooling') {
-                badge = `<span class="badge bg-warning text-dark rounded-pill me-2">Нет визитов: ${t.days === 999 ? 'Никогда' : `${t.days} дн.`}</span>`;
-                comment = '<i>Нужно связаться</i>';
-            }
-            return `<div class="list-group-item task-item d-flex justify-content-between align-items-center"><div class="me-auto"><div class="d-flex align-items-center mb-1">${badge}<a href="dealer.html?id=${t.dealerId}" target="_blank" class="fw-bold text-decoration-none text-dark">${t.dealerName}</a></div><small class="text-muted" style="white-space: pre-wrap;">${comment}</small></div>${(type === 'upcoming' || (type === 'problem' && t.type === 'overdue')) ? `<button class="btn btn-sm btn-success btn-complete-task ms-2" title="Выполнено" data-id="${t.dealerId}" data-index="${t.visitIndex}"><i class="bi bi-check-lg"></i></button>` : ''}</div>`;
-        }).join('');
-    }
-
-    if(document.body) {
-        document.body.addEventListener('click', (e) => {
-            const taskBtn = e.target.closest('.btn-complete-task');
-            if (taskBtn) { 
-                taskBtn.disabled = true; 
-                completeTask(taskBtn, taskBtn.dataset.id, taskBtn.dataset.index);
-            }
-        });
-    }
+    function renderTaskList(container, tasks, type) { if (!container) return; if (tasks.length === 0) { container.innerHTML = `<p class="text-muted text-center p-3">${type === 'cooling' ? 'Нет таких' : 'Нет задач'}</p>`; return; } container.innerHTML = tasks.map(t => { let badge = ''; let comment = safeText(t.comment); if (type === 'upcoming') { badge = `<span class="badge ${t.isToday ? 'bg-danger' : 'bg-primary'} rounded-pill me-2">${t.isToday ? 'Сегодня' : t.date.toLocaleDateString('ru-RU')}</span>`; } else if (type === 'problem') { badge = t.type === 'overdue' ? `<span class="badge bg-danger rounded-pill me-2">Просрочено: ${t.date.toLocaleDateString('ru-RU')}</span>` : `<span class="badge bg-danger rounded-pill me-2">Статус: Проблемный</span>`; if(t.type !== 'overdue') comment = '<i>Требует внимания</i>'; } else if (type === 'cooling') { badge = `<span class="badge bg-warning text-dark rounded-pill me-2">Нет визитов: ${t.days === 999 ? 'Никогда' : `${t.days} дн.`}</span>`; comment = '<i>Нужно связаться</i>'; } return `<div class="list-group-item task-item d-flex justify-content-between align-items-center"><div class="me-auto"><div class="d-flex align-items-center mb-1">${badge}<a href="dealer.html?id=${t.dealerId}" target="_blank" class="fw-bold text-decoration-none text-dark">${t.dealerName}</a></div><small class="text-muted" style="white-space: pre-wrap;">${comment}</small></div>${(type === 'upcoming' || (type === 'problem' && t.type === 'overdue')) ? `<button class="btn btn-sm btn-success btn-complete-task ms-2" title="Выполнено" data-id="${t.dealerId}" data-index="${t.visitIndex}"><i class="bi bi-check-lg"></i></button>` : ''}</div>`; }).join(''); }
+    if(document.body) { document.body.addEventListener('click', (e) => { const taskBtn = e.target.closest('.btn-complete-task'); if (taskBtn) { taskBtn.disabled = true; completeTask(taskBtn, taskBtn.dataset.id, taskBtn.dataset.index); } }); }
 
     // --- Генераторы HTML ---
-    
-    // Конкуренты с Выпадающим Списком
     function createCompetitorEntryHTML(c={}) { 
         let brandOpts = `<option value="">-- Бренд --</option>`;
         competitorsRef.forEach(ref => {
@@ -303,24 +214,14 @@ document.addEventListener('DOMContentLoaded', () => {
                  collOpts += `<option value="${c.collection}" selected>${c.collection}</option>`;
             }
         }
-
-        return `
-        <div class="competitor-entry">
-            <select class="form-select competitor-brand" onchange="updateCollections(this)">${brandOpts}</select>
-            <select class="form-select competitor-collection">${collOpts}</select>
-            <input type="text" class="form-control competitor-price-opt" placeholder="ОПТ" value="${c.price_opt||''}">
-            <input type="text" class="form-control competitor-price-retail" placeholder="Розница" value="${c.price_retail||''}">
-            <button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button>
-        </div>`; 
+        return `<div class="competitor-entry"><select class="form-select competitor-brand" onchange="updateCollections(this)">${brandOpts}</select><select class="form-select competitor-collection">${collOpts}</select><input type="text" class="form-control competitor-price-opt" placeholder="ОПТ" value="${c.price_opt||''}"><input type="text" class="form-control competitor-price-retail" placeholder="Розница" value="${c.price_retail||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; 
     }
 
     window.updateCollections = function(select) {
         const brandName = select.value;
         const row = select.closest('.competitor-entry');
         const collSelect = row.querySelector('.competitor-collection');
-        
         let html = `<option value="">-- Коллекция --</option>`;
-        
         const ref = competitorsRef.find(r => r.name === brandName);
         if (ref && ref.collections) {
              const sortedCols = [...ref.collections].sort((a, b) => {
@@ -330,7 +231,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (typeA !== 'standard' && typeB === 'standard') return -1;
                 return 0;
              });
-
              html += sortedCols.map(col => {
                 const colName = (typeof col === 'string') ? col : col.name;
                 const colType = (typeof col === 'object') ? col.type : 'standard';
@@ -349,7 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function createPosEntryHTML(p={}) { const opts = posMaterialsList.map(n => `<option value="${n}" ${n===p.name?'selected':''}>${n}</option>`).join(''); return `<div class="pos-entry input-group mb-2"><select class="form-select pos-name"><option value="">-- Выбор --</option>${opts}</select><input type="number" class="form-control pos-quantity" value="${p.quantity||1}" min="1"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
     function createVisitEntryHTML(v={}) { return `<div class="visit-entry input-group mb-2"><input type="date" class="form-control visit-date" value="${v.date||''}"><input type="text" class="form-control visit-comment w-50" placeholder="Результат визита..." value="${v.comment||''}"><input type="hidden" class="visit-completed" value="${v.isCompleted || 'false'}"><button type="button" class="btn btn-outline-danger btn-remove-entry"><i class="bi bi-trash"></i></button></div>`; }
     function renderPhotoPreviews(container, photosArray) { if(container) container.innerHTML = photosArray.map((p, index) => `<div class="photo-preview-item"><img src="${p.photo_url}"><button type="button" class="btn-remove-photo" data-index="${index}">×</button></div>`).join(''); }
-
+    
     // Handlers
     if(addAvatarInput) addAvatarInput.addEventListener('change', async (e) => { const file = e.target.files[0]; if (file) { newAvatarBase64 = await compressImage(file, 800, 0.8); addAvatarPreview.src = newAvatarBase64; } });
     if(editAvatarInput) editAvatarInput.addEventListener('change', async (e) => { const file = e.target.files[0]; if (file) { newAvatarBase64 = await compressImage(file, 800, 0.8); editAvatarPreview.src = newAvatarBase64; } });
@@ -401,21 +301,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pendingId) { localStorage.removeItem('pendingEditDealerId'); openEditModal(pendingId); }
     }
 
-    // Listeners ADD (Wizard)
+    // --- LISTENERS ADD ---
     if(document.getElementById('add-contact-btn-add-modal')) document.getElementById('add-contact-btn-add-modal').onclick = () => addContactList.insertAdjacentHTML('beforeend', createContactEntryHTML());
     if(document.getElementById('add-address-btn-add-modal')) document.getElementById('add-address-btn-add-modal').onclick = () => addAddressList.insertAdjacentHTML('beforeend', createAddressEntryHTML());
     if(document.getElementById('add-pos-btn-add-modal')) document.getElementById('add-pos-btn-add-modal').onclick = () => addPosList.insertAdjacentHTML('beforeend', createPosEntryHTML());
     if(document.getElementById('add-visits-btn-add-modal')) document.getElementById('add-visits-btn-add-modal').onclick = () => addVisitsList.insertAdjacentHTML('beforeend', createVisitEntryHTML());
     if(document.getElementById('add-competitor-btn-add-modal')) document.getElementById('add-competitor-btn-add-modal').onclick = () => addCompetitorList.insertAdjacentHTML('beforeend', createCompetitorEntryHTML());
     
-    // Listeners EDIT (Tabs)
+    // --- LISTENERS EDIT ---
     if(document.getElementById('add-contact-btn-edit-modal')) document.getElementById('add-contact-btn-edit-modal').onclick = () => editContactList.insertAdjacentHTML('beforeend', createContactEntryHTML());
     if(document.getElementById('add-address-btn-edit-modal')) document.getElementById('add-address-btn-edit-modal').onclick = () => editAddressList.insertAdjacentHTML('beforeend', createAddressEntryHTML());
     if(document.getElementById('add-pos-btn-edit-modal')) document.getElementById('add-pos-btn-edit-modal').onclick = () => editPosList.insertAdjacentHTML('beforeend', createPosEntryHTML());
     if(document.getElementById('add-visits-btn-edit-modal')) document.getElementById('add-visits-btn-edit-modal').onclick = () => editVisitsList.insertAdjacentHTML('beforeend', createVisitEntryHTML());
     if(document.getElementById('add-competitor-btn-edit-modal')) document.getElementById('add-competitor-btn-edit-modal').onclick = () => editCompetitorList.insertAdjacentHTML('beforeend', createCompetitorEntryHTML());
 
-    // OPEN ADD
+    // OPEN ADD (WIZARD)
     if(openAddModalBtn) openAddModalBtn.onclick = () => {
         if(addForm) addForm.reset();
         currentStep = 1; showStep(1);
@@ -463,10 +363,39 @@ document.addEventListener('DOMContentLoaded', () => {
         try { const res = await fetch(API_DEALERS_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); if (!res.ok) throw new Error(await res.text()); const newD = await res.json(); const pIds = getSelectedProductIds('add-product-checklist'); if(pIds.length) await saveProducts(newD.id, pIds); addModal.hide(); initApp(); } catch (e) { alert("Ошибка при добавлении."); } finally { btn.disabled = false; btn.innerHTML = oldText; }
     });
 
+    // (ИСПРАВЛЕНО) Функция openEditModal должна быть здесь
+    async function openEditModal(id) {
+        try {
+            const res = await fetch(`${API_DEALERS_URL}/${id}`); if(!res.ok) throw new Error("Ошибка"); const d = await res.json();
+            document.getElementById('edit_db_id').value=d.id; document.getElementById('edit_dealer_id').value=d.dealer_id; document.getElementById('edit_name').value=d.name; document.getElementById('edit_organization').value=d.organization; document.getElementById('edit_price_type').value=d.price_type; document.getElementById('edit_city').value=d.city; document.getElementById('edit_address').value=d.address; document.getElementById('edit_delivery').value=d.delivery; document.getElementById('edit_website').value=d.website; document.getElementById('edit_instagram').value=d.instagram;
+            if(document.getElementById('edit_latitude')) document.getElementById('edit_latitude').value=d.latitude||'';
+            if(document.getElementById('edit_longitude')) document.getElementById('edit_longitude').value=d.longitude||'';
+            document.getElementById('edit_bonuses').value=d.bonuses;
+            if(document.getElementById('edit_status')) document.getElementById('edit_status').value = d.status || 'standard';
+            if(document.getElementById('edit_responsible')) document.getElementById('edit_responsible').value = d.responsible || '';
+
+            if(editAvatarPreview) editAvatarPreview.src = d.avatarUrl || '';
+            if(editCurrentAvatarUrl) editCurrentAvatarUrl.value = d.avatarUrl || '';
+            newAvatarBase64 = null;
+            renderList(editContactList, d.contacts, createContactEntryHTML); renderList(editAddressList, d.additional_addresses, createAddressEntryHTML); 
+            renderList(editPosList, d.pos_materials, createPosEntryHTML); 
+            renderList(editVisitsList, d.visits, createVisitEntryHTML);
+            renderList(editCompetitorList, d.competitors, createCompetitorEntryHTML);
+            renderProductChecklist(editProductChecklist, (d.products||[]).map(p=>p.id));
+            editPhotosData = d.photos||[]; renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData);
+            
+            const firstTabEl = document.querySelector('#editTabs button[data-bs-target="#tab-main"]');
+            if(firstTabEl) { const tab = new bootstrap.Tab(firstTabEl); tab.show(); }
+
+            editModal.show();
+        } catch(e){alert("Ошибка загрузки.");}
+    }
+
     // SAVE EDIT
     if(editForm) editForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const btn = document.querySelector('button[form="edit-dealer-form"]'); // (ИСПРАВЛЕНО)
+        // (ИСПРАВЛЕНО) Ищем кнопку по атрибуту form
+        const btn = document.querySelector('button[form="edit-dealer-form"]'); 
         const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
         const id = document.getElementById('edit_db_id').value;
         let avatarToSend = getVal('edit-current-avatar-url'); if (newAvatarBase64) avatarToSend = newAvatarBase64;
@@ -493,8 +422,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if(dealerListBody) dealerListBody.addEventListener('click', (e) => {
         const t = e.target;
         if (t.closest('a.dropdown-item')) e.preventDefault();
+        // (ИСПРАВЛЕНО) Вызов openEditModal из клика по таблице
         if (t.closest('.btn-view')) window.open(`dealer.html?id=${t.closest('.btn-view').dataset.id}`, '_blank');
-        if (t.closest('.btn-edit')) openEditModal(t.closest('.btn-edit').dataset.id);
+        if (t.closest('.btn-edit')) openEditModal(t.closest('.btn-edit').dataset.id); // <--- ЗДЕСЬ
         if (t.closest('.btn-delete') && confirm("Удалить?")) fetch(`${API_DEALERS_URL}/${t.closest('.btn-delete').dataset.id}`, {method:'DELETE'}).then(initApp);
     });
 
