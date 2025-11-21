@@ -1,18 +1,21 @@
-// competitors.js
 document.addEventListener('DOMContentLoaded', () => {
     const API_URL = '/api/competitors-ref';
     
+    // Элементы
     const gridContainer = document.getElementById('competitors-grid');
     const searchInput = document.getElementById('search-input');
     const filterType = document.getElementById('filter-type');
     const addBtn = document.getElementById('add-comp-btn');
+    const exportBtn = document.getElementById('export-comp-btn'); // Кнопка экспорта
 
+    // Модалка
     const modalEl = document.getElementById('comp-modal');
     const modal = new bootstrap.Modal(modalEl);
     const form = document.getElementById('comp-form');
     const modalTitle = document.getElementById('comp-modal-title');
     const delBtn = document.getElementById('btn-delete-comp');
 
+    // Поля внутри модалки
     const collectionsContainer = document.getElementById('collections-container');
     const addCollRowBtn = document.getElementById('add-coll-row-btn');
     const contactsContainer = document.getElementById('comp-contacts-list');
@@ -27,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const inpStock = document.getElementById('comp_stock');
     const inpReserve = document.getElementById('comp_reserve');
 
-    // (ИЗМЕНЕНО) Переименовали class -> badgeClass
+    // Типы и цвета (используем badgeClass вместо class)
     const collectionTypes = [
         { val: 'std', label: 'Стандарт', badgeClass: 'type-std' },
         { val: 'eng', label: 'Англ. Елка', badgeClass: 'type-eng' },
@@ -38,8 +41,20 @@ document.addEventListener('DOMContentLoaded', () => {
         { val: 'mix', label: 'Худ. Микс', badgeClass: 'type-mix' }
     ];
 
+    // Словарь для экспорта (чтобы в Excel было красиво)
+    const typeLabels = {
+        'std': 'Стандарт',
+        'eng': 'Англ. Елка',
+        'fr': 'Фр. Елка',
+        'art': 'Художественный',
+        'art_eng': 'Худ. Английская',
+        'art_fr': 'Худ. Французская',
+        'mix': 'Худ. Микс'
+    };
+
     let competitors = [];
 
+    // --- ЗАГРУЗКА ---
     async function loadList() {
         try {
             const res = await fetch(API_URL);
@@ -52,6 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // --- РЕНДЕР СЕТКИ ---
     function renderGrid() {
         const search = searchInput ? searchInput.value.toLowerCase() : '';
         const filter = filterType ? filterType.value : 'all';
@@ -88,7 +104,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 let frontBadges = '';
                 typesSet.forEach(type => {
                     const typeInfo = collectionTypes.find(x => x.val === type);
-                    // (ИЗМЕНЕНО) Используем badgeClass
                     if (typeInfo) frontBadges += `<span class="col-badge ${typeInfo.badgeClass}" style="font-size: 0.7rem;">${typeInfo.label}</span>`;
                 });
 
@@ -98,7 +113,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     const type = (typeof col === 'string') ? 'std' : (col.type || 'std');
                     const typeInfo = collectionTypes.find(x => x.val === type) || collectionTypes[0];
                     
-                    // Точка цвета
                     let dotColor = '#ccc';
                     if(type.includes('eng')) dotColor = '#198754';
                     else if(type.includes('fr')) dotColor = '#0d6efd';
@@ -207,7 +221,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function addCollectionRow(name = '', type = 'std') {
         const div = document.createElement('div');
         div.className = 'input-group mb-2 collection-row';
-        // (ИЗМЕНЕНО) Используем val, а не class
         let options = collectionTypes.map(t => `<option value="${t.val}" ${t.val === type ? 'selected' : ''}>${t.label}</option>`).join('');
         div.innerHTML = `
             <input type="text" class="form-control coll-name" placeholder="Название" value="${name}" required>
@@ -234,6 +247,49 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if(addCollRowBtn) addCollRowBtn.onclick = () => addCollectionRow();
     if(addContactBtn) addContactBtn.onclick = () => addContactRow();
+
+    // (ИСПРАВЛЕНО) ЛОГИКА ЭКСПОРТА
+    if(exportBtn) {
+        exportBtn.onclick = () => {
+            if (!competitors.length) return alert("Список пуст");
+
+            const clean = (text) => `"${String(text || '').replace(/"/g, '""')}"`;
+            
+            // Заголовки CSV (разделитель ;)
+            let csv = "\uFEFFБренд;Коллекция;Вид (Тип);Поставщик;Склад;Контакты;Инфо\n";
+
+            competitors.forEach(c => {
+                // Собираем контакты в одну строку
+                const contactsStr = (c.contacts || []).map(cnt => `${cnt.name} (${cnt.phone})`).join(', ');
+                
+                // 1. Строка бренда (основная)
+                csv += `${clean(c.name)};;;${clean(c.supplier)};${clean(c.warehouse)};${clean(contactsStr)};${clean(c.info)}\n`;
+
+                // 2. Строки коллекций (вложенные)
+                if (c.collections && c.collections.length > 0) {
+                    c.collections.forEach(col => {
+                        const colName = (typeof col === 'string') ? col : col.name;
+                        const colTypeVal = (typeof col === 'string') ? 'std' : col.type;
+                        // Переводим код типа в русское название
+                        const colTypeLabel = typeLabels[colTypeVal] || colTypeVal;
+
+                        // Пустая ячейка бренда, затем данные коллекции
+                        csv += `;${clean(colName)};${clean(colTypeLabel)};;;;\n`;
+                    });
+                }
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const date = new Date().toISOString().slice(0,10);
+            a.download = `Competitors_Ref_${date}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        };
+    }
 
     if(form) {
         form.onsubmit = async (e) => {
