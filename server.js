@@ -92,7 +92,7 @@ const additionalAddressSchema = new mongoose.Schema({ description: String, city:
 const visitSchema = new mongoose.Schema({ date: String, comment: String, isCompleted: { type: Boolean, default: false } }, { _id: false });
 const posMaterialSchema = new mongoose.Schema({ name: String, quantity: Number }, { _id: false });
 
-// Конкурент внутри Дилера (то, что мы вбиваем в карточке дилера)
+// Конкурент внутри Дилера
 const competitorSchema = new mongoose.Schema({ 
     brand: String, 
     collection: String, 
@@ -100,40 +100,30 @@ const competitorSchema = new mongoose.Schema({
     price_retail: String 
 }, { _id: false });
 
-
-// --- НОВЫЕ СХЕМЫ ДЛЯ СПРАВОЧНИКА КОНКУРЕНТОВ ---
-
-// 1. Элемент коллекции с типом (елочка, обычный и т.д.)
+// Справочник Конкурентов
 const collectionItemSchema = new mongoose.Schema({
     name: String,
     type: { type: String, default: 'standard' } 
 }, { _id: false });
 
-// 2. Контакт конкурента (Имя, Должность, Телефон)
 const compContactSchema = new mongoose.Schema({
-    name: String,
-    position: String,
-    phone: String
+    name: String, position: String, phone: String
 }, { _id: false });
 
-// 3. Глобальный Справочник Конкурентов (Бренд)
 const compRefSchema = new mongoose.Schema({
     name: String,        
     supplier: String,    
     warehouse: String,   
     info: String,
-    // Новые поля досье:
-    storage_days: String,    // Срок хранения
-    stock_info: String,      // Остатки
-    reserve_days: String,    // Резерв без оплаты
-    contacts: [compContactSchema], // Список контактов
-    
+    storage_days: String,
+    stock_info: String,
+    reserve_days: String,
+    contacts: [compContactSchema],
     collections: [collectionItemSchema],
     hasHerringbone: { type: Boolean, default: false }, 
     hasArtistic: { type: Boolean, default: false }
 });
 const CompRef = mongoose.model('CompRef', compRefSchema);
-
 
 // Дилер
 const dealerSchema = new mongoose.Schema({
@@ -190,10 +180,10 @@ function convertToClient(doc) {
 
 // --- API ENDPOINTS ---
 
-// Dealers
+// Dealers (ИЗМЕНЕНО: Добавлено поле competitors в выборку)
 app.get('/api/dealers', async (req, res) => {
     try {
-        const dealers = await Dealer.find({}, 'dealer_id name city price_type organization products pos_materials visits latitude longitude status avatarUrl responsible').lean();
+        const dealers = await Dealer.find({}, 'dealer_id name city price_type organization products pos_materials visits latitude longitude status avatarUrl responsible competitors').lean();
         res.json(dealers.map(d => ({
             id: d._id, dealer_id: d.dealer_id, name: d.name, city: d.city, price_type: d.price_type, organization: d.organization,
             photo_url: d.avatarUrl,
@@ -202,7 +192,8 @@ app.get('/api/dealers', async (req, res) => {
             has_pos: (d.pos_materials && d.pos_materials.length > 0), 
             visits: d.visits, latitude: d.latitude, longitude: d.longitude,
             status: d.status || 'standard',
-            responsible: d.responsible
+            responsible: d.responsible,
+            competitors: d.competitors // (ВАЖНО)
         }))); 
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -280,7 +271,7 @@ app.post('/api/sales', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Competitors Reference (Справочник)
+// Competitors Reference
 app.get('/api/competitors-ref', async (req, res) => {
     const list = await CompRef.find().sort({name: 1});
     res.json(list.map(c => ({ id: c._id, ...c.toObject() })));
