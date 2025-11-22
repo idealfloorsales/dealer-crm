@@ -241,8 +241,8 @@
 
                             <div class="tab-pane fade" id="tab-samples">
                                 <div class="row g-3">
-                                    <div class="col-12"><label class="form-label">Товары (Ламинат):</label><div id="edit-product-checklist" class="product-checklist"><p>Загрузка...</p></div></div>
-                                    <div class="col-12"><label class="form-label">Стенды (POS):</label><div id="edit-pos-list" class="list-container"></div><div class="text-end"><button type="button" id="add-pos-btn-edit-modal" class="btn btn-secondary btn-sm">Добавить</button></div></div>
+                                    <div class="col-12"><label class="form-label">Образцы (Ламинат):</label><div id="edit-product-checklist" class="product-checklist"><p>Загрузка...</p></div></div>
+                                    <div class="col-12"><label class="form-label">Стенды:</label><div id="edit-pos-list" class="list-container"></div><div class="text-end"><button type="button" id="add-pos-btn-edit-modal" class="btn btn-secondary btn-sm">Добавить</button></div></div>
                                 </div>
                             </div>
 
@@ -259,9 +259,32 @@
         </div>
     </div>
     
+<div class="modal fade" id="quick-visit-modal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Быстрый визит</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="quick-visit-form">
+                        <input type="hidden" id="qv_dealer_id">
+                        <div class="mb-3">
+                            <label class="form-label">Результат / Комментарий</label>
+                            <textarea class="form-control" id="qv_comment" rows="3" required placeholder="Был на точке, всё хорошо..."></textarea>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-success">Сохранить визит</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="script.js?v=58"></script>
+    <script src="script.js?v=61"></script>
     
     <script>
         if ('serviceWorker' in navigator) {
@@ -272,6 +295,7 @@
     </script>
 </body>
 </html>
+
 
 
 
