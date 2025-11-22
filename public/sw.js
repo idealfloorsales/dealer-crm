@@ -1,5 +1,5 @@
 // sw.js (Service Worker)
-const CACHE_NAME = 'dealer-crm-cache-v58'; 
+const CACHE_NAME = 'dealer-crm-cache-v60'; 
 
 const urlsToCache = [
     '/',
