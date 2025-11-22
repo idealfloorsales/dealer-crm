@@ -6,19 +6,15 @@
     <title>Матрица (Каталог)</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    
-    <link rel="stylesheet" href="style.css?v=28">
-    <link rel="icon" href="favicon.gif" type="image/gif">
-    
+    <link rel="stylesheet" href="style.css?v=65"> <link rel="icon" href="favicon.gif" type="image/gif">
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-4">
         <div class="container-fluid">
             <a class="navbar-brand" href="/"><img src="logo.png" alt="Logo" height="40"></a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"><span class="navbar-toggler-icon"></span></button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav">
-                  <li class="nav-item"><a class="nav-link" href="/">Дилеры</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/">Дилеры</a></li>
                     <li class="nav-item"><a class="nav-link" href="/map.html">Карта</a></li>
                     <li class="nav-item"><a class="nav-link active" href="/products.html">Матрица</a></li>
                     <li class="nav-item"><a class="nav-link" href="/report.html">Выставленность</a></li>
@@ -31,28 +27,67 @@
     </nav>
     
     <div class="container mt-4">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h1>Матрица</h1>
-            <button id="open-add-product-btn" class="btn btn-primary btn-lg"><i class="bi bi-plus-circle me-2"></i>Добавить товар</button>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>Наш Ассортимент (Матрица)</h1>
+            <button id="add-product-btn" class="btn btn-primary"><i class="bi bi-plus-lg me-2"></i>Добавить товар</button>
         </div>
-        <div class="toolbar bg-white p-3 rounded shadow-sm border mb-4"><input type="text" id="search-bar" class="form-control form-control-lg" placeholder="Поиск..."></div>
-        <div class="table-responsive bg-white rounded shadow-sm border">
-            <table id="products-table" class="table table-hover align-middle mb-0">
-                <thead class="table-light"><tr><th data-sort="sku">Артикул</th><th data-sort="name">Название</th><th style="width: 50px;"></th></tr></thead>
-                <tbody id="product-list-body"></tbody>
-            </table>
+
+        <div class="card shadow-sm mb-4 border-0">
+            <div class="card-body">
+                <div class="input-group">
+                    <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" id="product-search" class="form-control border-start-0" placeholder="Поиск по артикулу или названию...">
+                </div>
+            </div>
         </div>
-        <p id="no-data-msg" class="alert alert-info mt-3" style="display: none;"></p>
+
+        <div class="card shadow-sm border-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" id="products-table">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 150px;">Артикул</th>
+                            <th>Название / Декор</th>
+                            <th style="width: 120px; text-align: right;">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody id="products-list">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <p id="total-count" class="text-muted mt-3 ms-1 small">Всего товаров: 0</p>
     </div>
-    
-    <div class="modal fade" id="add-product-modal" tabindex="-1">...</div>
-    <div class="modal fade" id="edit-product-modal" tabindex="-1">...</div>
-    
+
+    <div class="modal fade" id="product-modal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="product-modal-title">Товар</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="product-form">
+                        <input type="hidden" id="prod_id">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Артикул (SKU) *</label>
+                            <input type="text" class="form-control" id="prod_sku" required placeholder="Например: 8EH34-701">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Название *</label>
+                            <input type="text" class="form-control" id="prod_name" required placeholder="Например: Дуб Снежный">
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-success">Сохранить</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="products.js"></script>
+    <script src="products.js?v=65"></script>
 </body>
 </html>
-
-
-
-
