@@ -72,6 +72,8 @@ const posMaterialsList = [
     "С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры",
     "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"
 ];
+
+// Артикулы стендов, которые надо скрыть из основного списка товаров в Матрице
 const posSkusToExclude = ["С600", "С800", "РФ-2", "РФС-1", "Н600", "Н800", "Табличка"];
 
 // --- SCHEMAS ---
@@ -93,20 +95,26 @@ const competitorSchema = new mongoose.Schema({
     price_retail: String 
 }, { _id: false });
 
-// Справочник Конкурентов: Коллекция
+
+// --- НОВЫЕ СХЕМЫ ДЛЯ СПРАВОЧНИКА КОНКУРЕНТОВ ---
+
+// 1. Элемент коллекции с типом (елочка, обычный и т.д.)
 const collectionItemSchema = new mongoose.Schema({
     name: String,
     type: { type: String, default: 'standard' } 
 }, { _id: false });
 
-// Справочник Конкурентов: Контакт
+// 2. Контакт конкурента (Имя, Должность, Телефон)
 const compContactSchema = new mongoose.Schema({
-    name: String, position: String, phone: String
+    name: String,
+    position: String,
+    phone: String
 }, { _id: false });
 
-// Справочник Конкурентов: Бренд
+// 3. Глобальный Справочник Конкурентов (Бренд)
 const compRefSchema = new mongoose.Schema({
     name: String,        
+    country: String,     // (НОВОЕ) Страна
     supplier: String,    
     warehouse: String,   
     info: String,
@@ -119,6 +127,7 @@ const compRefSchema = new mongoose.Schema({
     hasArtistic: { type: Boolean, default: false }
 });
 const CompRef = mongoose.model('CompRef', compRefSchema);
+
 
 // Дилер
 const dealerSchema = new mongoose.Schema({
@@ -241,7 +250,7 @@ app.get('/api/matrix', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// (ИЗМЕНЕНО) API Продаж - теперь поддерживает поиск по dealerId
+// Sales
 app.get('/api/sales', async (req, res) => {
     try {
         const { month, dealerId } = req.query;
@@ -250,10 +259,9 @@ app.get('/api/sales', async (req, res) => {
         if (month) filter.month = month;
         if (dealerId) filter.dealerId = dealerId;
 
-        // Если фильтров нет - возвращаем пустоту (защита)
+        // Если фильтров нет - возвращаем пустоту
         if (Object.keys(filter).length === 0) return res.json([]);
 
-        // Сортируем по месяцу (сначала новые)
         const sales = await Sales.find(filter).sort({ month: -1 }).lean();
         res.json(sales);
     } catch (e) { res.status(500).json({ error: e.message }); }
