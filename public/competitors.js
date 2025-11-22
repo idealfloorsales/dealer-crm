@@ -1,14 +1,14 @@
 document.addEventListener('DOMContentLoaded', () => {
     const API_URL = '/api/competitors-ref';
     
-    // Элементы
+    // Элементы страницы
     const gridContainer = document.getElementById('competitors-grid');
     const searchInput = document.getElementById('search-input');
     const filterType = document.getElementById('filter-type');
     const addBtn = document.getElementById('add-comp-btn');
-    const exportBtn = document.getElementById('export-comp-btn'); // Кнопка экспорта
+    const exportBtn = document.getElementById('export-comp-btn');
 
-    // Модалка
+    // Модалка и Форма
     const modalEl = document.getElementById('comp-modal');
     const modal = new bootstrap.Modal(modalEl);
     const form = document.getElementById('comp-form');
@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const inpId = document.getElementById('comp_id');
     const inpName = document.getElementById('comp_name');
+    const inpCountry = document.getElementById('comp_country'); // (НОВОЕ)
     const inpSupplier = document.getElementById('comp_supplier');
     const inpWarehouse = document.getElementById('comp_warehouse');
     const inpInfo = document.getElementById('comp_info');
@@ -30,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const inpStock = document.getElementById('comp_stock');
     const inpReserve = document.getElementById('comp_reserve');
 
-    // Типы и цвета (используем badgeClass вместо class)
+    // Типы и цвета (используем badgeClass)
     const collectionTypes = [
         { val: 'std', label: 'Стандарт', badgeClass: 'type-std' },
         { val: 'eng', label: 'Англ. Елка', badgeClass: 'type-eng' },
@@ -41,7 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
         { val: 'mix', label: 'Худ. Микс', badgeClass: 'type-mix' }
     ];
 
-    // Словарь для экспорта (чтобы в Excel было красиво)
+    // Словарь для экспорта
     const typeLabels = {
         'std': 'Стандарт',
         'eng': 'Англ. Елка',
@@ -53,6 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     let competitors = [];
+    let isSaving = false; // Защита от двойного клика
 
     // --- ЗАГРУЗКА ---
     async function loadList() {
@@ -75,7 +77,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const filtered = competitors.filter(c => {
             const matchSearch = !search || 
                 c.name.toLowerCase().includes(search) || 
-                (c.supplier || '').toLowerCase().includes(search);
+                (c.supplier || '').toLowerCase().includes(search) ||
+                (c.warehouse || '').toLowerCase().includes(search) ||
+                (c.country || '').toLowerCase().includes(search); // (НОВОЕ) Поиск по стране
             
             let matchFilter = true;
             if (filter !== 'all') {
@@ -94,7 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if(gridContainer) {
             gridContainer.innerHTML = filtered.map(c => {
-                // 1. Бейджи для лицевой стороны
+                // 1. Бейджи типов коллекций (уникальные)
                 const typesSet = new Set();
                 (c.collections || []).forEach(col => {
                     const t = (typeof col === 'string') ? 'std' : (col.type || 'std');
@@ -107,16 +111,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (typeInfo) frontBadges += `<span class="col-badge ${typeInfo.badgeClass}" style="font-size: 0.7rem;">${typeInfo.label}</span>`;
                 });
 
-                // 2. Список для обратной стороны
+                // 2. Список коллекций для обратной стороны
                 const listHtml = (c.collections || []).map(col => {
                     const name = (typeof col === 'string') ? col : col.name;
                     const type = (typeof col === 'string') ? 'std' : (col.type || 'std');
                     const typeInfo = collectionTypes.find(x => x.val === type) || collectionTypes[0];
                     
                     let dotColor = '#ccc';
-                    if(type.includes('eng')) dotColor = '#198754';
-                    else if(type.includes('fr')) dotColor = '#0d6efd';
-                    else if(type.includes('art')) dotColor = '#ffc107';
+                    if(type.includes('eng')) dotColor = '#198754'; // Зеленый
+                    else if(type.includes('fr')) dotColor = '#0d6efd'; // Синий
+                    else if(type.includes('art')) dotColor = '#ffc107'; // Желтый
 
                     return `
                     <div class="comp-collection-item">
@@ -134,7 +138,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         <button class="btn-card-edit" onclick="event.stopPropagation(); openEditModal('${c.id}')" title="Редактировать"><i class="bi bi-pencil"></i></button>
                         
                         <div class="comp-card-front">
-                            <h5 class="comp-card-title text-truncate">${c.name}</h5>
+                            <div class="d-flex justify-content-between align-items-start mb-1">
+                                <h5 class="comp-card-title text-truncate mb-0" style="max-width:70%">${c.name}</h5>
+                                ${c.country ? `<span class="badge bg-light text-dark border" style="font-weight:normal; font-size:0.7rem;">${c.country}</span>` : ''} </div>
+
                             <div class="comp-card-supplier text-muted mb-2">
                                 <i class="bi bi-box-seam me-1"></i> ${c.supplier || '-'}<br>
                                 <i class="bi bi-geo-alt me-1"></i> ${c.warehouse || '-'}
@@ -162,6 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Переворот карточки
     window.toggleCard = (id) => {
         const card = document.getElementById(`card-${id}`);
         if (card) {
@@ -170,6 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    // Открытие модалки (Редактирование)
     window.openEditModal = (id) => {
         const c = competitors.find(x => x.id === id);
         if (!c) return;
@@ -179,6 +188,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(delBtn) delBtn.style.display = 'block';
         
         inpName.value = c.name;
+        inpCountry.value = c.country || ''; // (НОВОЕ)
         inpSupplier.value = c.supplier || '';
         inpWarehouse.value = c.warehouse || '';
         inpInfo.value = c.info || '';
@@ -186,6 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
         inpStock.value = c.stock_info || '';
         inpReserve.value = c.reserve_days || '';
 
+        // Коллекции
         collectionsContainer.innerHTML = '';
         if (c.collections && c.collections.length > 0) {
             c.collections.forEach(col => {
@@ -194,6 +205,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         } else { addCollectionRow(); }
 
+        // Контакты
         contactsContainer.innerHTML = '';
         if (c.contacts && c.contacts.length > 0) {
             c.contacts.forEach(cnt => addContactRow(cnt.name, cnt.position, cnt.phone));
@@ -202,6 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
         modal.show();
     };
 
+    // Кнопка Добавить
     if(addBtn) {
         addBtn.onclick = () => {
             inpId.value = '';
@@ -248,53 +261,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if(addCollRowBtn) addCollRowBtn.onclick = () => addCollectionRow();
     if(addContactBtn) addContactBtn.onclick = () => addContactRow();
 
-    // (ИСПРАВЛЕНО) ЛОГИКА ЭКСПОРТА
-    if(exportBtn) {
-        exportBtn.onclick = () => {
-            if (!competitors.length) return alert("Список пуст");
-
-            const clean = (text) => `"${String(text || '').replace(/"/g, '""')}"`;
-            
-            // Заголовки CSV (разделитель ;)
-            let csv = "\uFEFFБренд;Коллекция;Вид (Тип);Поставщик;Склад;Контакты;Инфо\n";
-
-            competitors.forEach(c => {
-                // Собираем контакты в одну строку
-                const contactsStr = (c.contacts || []).map(cnt => `${cnt.name} (${cnt.phone})`).join(', ');
-                
-                // 1. Строка бренда (основная)
-                csv += `${clean(c.name)};;;${clean(c.supplier)};${clean(c.warehouse)};${clean(contactsStr)};${clean(c.info)}\n`;
-
-                // 2. Строки коллекций (вложенные)
-                if (c.collections && c.collections.length > 0) {
-                    c.collections.forEach(col => {
-                        const colName = (typeof col === 'string') ? col : col.name;
-                        const colTypeVal = (typeof col === 'string') ? 'std' : col.type;
-                        // Переводим код типа в русское название
-                        const colTypeLabel = typeLabels[colTypeVal] || colTypeVal;
-
-                        // Пустая ячейка бренда, затем данные коллекции
-                        csv += `;${clean(colName)};${clean(colTypeLabel)};;;;\n`;
-                    });
-                }
-            });
-
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            const date = new Date().toISOString().slice(0,10);
-            a.download = `Competitors_Ref_${date}.csv`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        };
-    }
-
+    // Сохранение
     if(form) {
         form.onsubmit = async (e) => {
             e.preventDefault();
             
+            if(isSaving) return;
+            isSaving = true;
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const oldText = submitBtn.innerHTML;
+            submitBtn.disabled = true; submitBtn.innerHTML = '...';
+
             const collectionsData = [];
             document.querySelectorAll('.collection-row').forEach(row => {
                 const name = row.querySelector('.coll-name').value.trim();
@@ -312,6 +289,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const data = {
                 name: inpName.value,
+                country: inpCountry.value, // (НОВОЕ)
                 supplier: inpSupplier.value,
                 warehouse: inpWarehouse.value,
                 info: inpInfo.value,
@@ -331,9 +309,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const res = await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
                 if (res.ok) { await loadList(); modal.hide(); }
             } catch (e) { alert('Ошибка сохранения'); }
+            finally { isSaving = false; submitBtn.disabled = false; submitBtn.innerHTML = oldText; }
         };
     }
 
+    // Удаление
     if(delBtn) {
         delBtn.onclick = async () => {
             const id = inpId.value;
@@ -348,6 +328,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if(searchInput) searchInput.addEventListener('input', renderGrid);
     if(filterType) filterType.addEventListener('change', renderGrid);
+
+    // Экспорт
+    if(exportBtn) {
+        exportBtn.onclick = () => {
+            if (!competitors.length) return alert("Список пуст");
+
+            const clean = (text) => `"${String(text || '').replace(/"/g, '""')}"`;
+            let csv = "\uFEFFБренд;Страна;Коллекция;Вид (Тип);Поставщик;Склад;Контакты;Инфо\n";
+
+            competitors.forEach(c => {
+                const contactsStr = (c.contacts || []).map(cnt => `${cnt.name} (${cnt.phone})`).join(', ');
+                
+                // Строка бренда
+                csv += `${clean(c.name)};${clean(c.country)};;;${clean(c.supplier)};${clean(c.warehouse)};${clean(contactsStr)};${clean(c.info)}\n`;
+
+                // Строки коллекций
+                if (c.collections && c.collections.length > 0) {
+                    c.collections.forEach(col => {
+                        const colName = (typeof col === 'string') ? col : col.name;
+                        const colTypeVal = (typeof col === 'string') ? 'std' : col.type;
+                        const colTypeLabel = typeLabels[colTypeVal] || colTypeVal;
+
+                        csv += `;;${clean(colName)};${clean(colTypeLabel)};;;;\n`;
+                    });
+                }
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Competitors_Ref_${new Date().toISOString().slice(0,10)}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        };
+    }
 
     loadList();
 });
