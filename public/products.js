@@ -1,142 +1,147 @@
-// products.js
 document.addEventListener('DOMContentLoaded', () => {
-
+    
     const API_URL = '/api/products';
     
-    const productListBody = document.getElementById('product-list-body');
-    const productsTable = document.getElementById('products-table');
-    const noDataMsg = document.getElementById('no-data-msg');
-    const searchBar = document.getElementById('search-bar');
+    const tableBody = document.getElementById('products-list');
+    const searchInput = document.getElementById('product-search');
+    const totalLabel = document.getElementById('total-count');
     
-    const addModalEl = document.getElementById('add-product-modal');
-    const addModal = new bootstrap.Modal(addModalEl);
-    const openAddBtn = document.getElementById('open-add-product-btn');
-    const addForm = document.getElementById('add-product-form');
+    // Модалка
+    const modalEl = document.getElementById('product-modal');
+    const modal = new bootstrap.Modal(modalEl);
+    const form = document.getElementById('product-form');
+    const modalTitle = document.getElementById('product-modal-title');
+    const addBtn = document.getElementById('add-product-btn');
     
-    const editModalEl = document.getElementById('edit-product-modal');
-    const editModal = new bootstrap.Modal(editModalEl);
-    const editForm = document.getElementById('edit-product-form');
+    // Поля
+    const inpId = document.getElementById('prod_id');
+    const inpSku = document.getElementById('prod_sku');
+    const inpName = document.getElementById('prod_name');
 
-    let allProducts = []; 
-    let currentSort = { column: 'sku', direction: 'asc' }; 
+    let products = [];
 
-    const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
-    // (ИСПРАВЛЕНО) Добавлена функция safeAttr
-    const safeAttr = (text) => text ? text.replace(/"/g, '&quot;') : ''; 
-
-    async function fetchProducts(searchTerm = '') {
+    // --- Загрузка ---
+    async function loadProducts() {
         try {
-            const response = await fetch(`${API_URL}?search=${encodeURIComponent(searchTerm)}`);
-            if (!response.ok) throw new Error('Ошибка сети');
-            allProducts = await response.json(); 
-            renderProducts(); 
-        } catch (error) {
-            console.error(error);
-            if(productListBody) productListBody.innerHTML = `<tr><td colspan="3" class="text-danger">${error.message}</td></tr>`;
+            tableBody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-muted">Загрузка...</td></tr>';
+            const res = await fetch(API_URL);
+            if(res.ok) {
+                products = await res.json();
+                // Сортировка по SKU
+                products.sort((a, b) => a.sku.localeCompare(b.sku, undefined, {numeric: true}));
+                renderTable();
+            }
+        } catch(e) {
+            tableBody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-danger">Ошибка загрузки</td></tr>';
         }
     }
-    
-    function renderProducts() {
-        if (!allProducts) allProducts = [];
+
+    // --- Рендер ---
+    function renderTable() {
+        const search = searchInput.value.toLowerCase();
         
-        const sortedProducts = allProducts.sort((a, b) => {
-            const col = currentSort.column;
-            let valA = (a[col] || '').toString(); 
-            let valB = (b[col] || '').toString();
-            let comparison = valA.localeCompare(valB, 'ru', { numeric: true });
-            return currentSort.direction === 'asc' ? comparison : -comparison;
-        });
-        
-        if(!productListBody) return;
-        productListBody.innerHTML = '';
-        
-        if (sortedProducts.length === 0) {
-            if(productsTable) productsTable.style.display = 'none';
-            if(noDataMsg) { noDataMsg.style.display = 'block'; noDataMsg.textContent = 'Товары не найдены.'; }
+        const filtered = products.filter(p => 
+            p.sku.toLowerCase().includes(search) || 
+            p.name.toLowerCase().includes(search)
+        );
+
+        if (filtered.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-muted">Ничего не найдено</td></tr>';
+            totalLabel.textContent = 'Всего товаров: 0';
             return;
         }
-        if(productsTable) productsTable.style.display = 'table';
-        if(noDataMsg) noDataMsg.style.display = 'none';
 
-        sortedProducts.forEach(product => {
-            const row = productListBody.insertRow();
-            row.innerHTML = `
-                <td class="sku-cell">${safeText(product.sku)}</td>
-                <td>${safeText(product.name)}</td>
-                <td class="actions-cell">
-                    <div class="dropdown">
-                        <button class="btn btn-light btn-sm" type="button" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item btn-edit" data-id="${product.id}" data-sku="${safeAttr(product.sku)}" data-name="${safeAttr(product.name)}" href="#"><i class="bi bi-pencil me-2"></i>Редактировать</a></li>
-                            <li><a class="dropdown-item text-danger btn-delete" data-id="${product.id}" data-name="${safeAttr(product.name)}" href="#"><i class="bi bi-trash me-2"></i>Удалить</a></li>
-                        </ul>
-                    </div>
-                </td>`;
-        });
+        tableBody.innerHTML = filtered.map(p => `
+            <tr>
+                <td><span class="badge bg-light text-dark border fw-bold" style="font-size: 0.9rem;">${p.sku}</span></td>
+                <td class="fw-medium">${p.name}</td>
+                <td class="text-end">
+                    <button class="btn btn-sm btn-light border me-1" onclick="editProduct('${p.id}')" title="Редактировать">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light border text-danger" onclick="deleteProduct('${p.id}')" title="Удалить">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+
+        totalLabel.textContent = `Всего товаров: ${filtered.length}`;
     }
 
-    let debounceTimer;
-    if(searchBar) searchBar.addEventListener('input', (e) => {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => fetchProducts(e.target.value), 300);
-    });
+    // --- Добавление ---
+    addBtn.onclick = () => {
+        inpId.value = '';
+        form.reset();
+        modalTitle.textContent = 'Добавить товар';
+        modal.show();
+    };
 
-    if(openAddBtn) openAddBtn.onclick = () => { addForm.reset(); addModal.show(); };
-    
-    if(addForm) addForm.addEventListener('submit', async (e) => {
+    // --- Редактирование (Глобальная функция для onclick) ---
+    window.editProduct = (id) => {
+        const p = products.find(x => x.id === id);
+        if (!p) return;
+        
+        inpId.value = p.id;
+        inpSku.value = p.sku;
+        inpName.value = p.name;
+        
+        modalTitle.textContent = 'Редактировать товар';
+        modal.show();
+    };
+
+    // --- Сохранение ---
+    form.onsubmit = async (e) => {
         e.preventDefault();
-        try {
-            const response = await fetch(API_URL, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sku: document.getElementById('add_sku').value, name: document.getElementById('add_name').value })
-            });
-            if (response.ok) { addModal.hide(); await fetchProducts(searchBar.value); }
-            else { alert(`Ошибка: ${(await response.json()).error}`); }
-        } catch (error) { alert('Ошибка сети.'); }
-    });
+        
+        const data = {
+            sku: inpSku.value.trim(),
+            name: inpName.value.trim()
+        };
 
-    if(productListBody) productListBody.addEventListener('click', (e) => {
-        if (e.target.closest('.btn-edit')) {
-            e.preventDefault();
-            const btn = e.target.closest('.btn-edit');
-            document.getElementById('edit_product_id').value = btn.dataset.id;
-            document.getElementById('edit_sku').value = btn.dataset.sku;
-            document.getElementById('edit_name').value = btn.dataset.name;
-            editModal.show();
+        const id = inpId.value;
+        let url = API_URL;
+        let method = 'POST';
+
+        if (id) {
+            url = `${API_URL}/${id}`;
+            method = 'PUT';
         }
-        if (e.target.closest('.btn-delete')) {
-            e.preventDefault();
-            const btn = e.target.closest('.btn-delete');
-            if (confirm(`Удалить "${btn.dataset.name}"?`)) {
-                fetch(`${API_URL}/${btn.dataset.id}`, { method: 'DELETE' }).then(() => fetchProducts(searchBar.value));
-            }
-        }
-    });
 
-    if(editForm) editForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
         try {
-            const response = await fetch(`${API_URL}/${document.getElementById('edit_product_id').value}`, {
-                method: 'PUT', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sku: document.getElementById('edit_sku').value, name: document.getElementById('edit_name').value })
-            });
-            if (response.ok) { editModal.hide(); await fetchProducts(searchBar.value); }
-            else { alert('Ошибка.'); }
-        } catch (error) { alert('Ошибка сети.'); }
-    });
+            const btn = form.querySelector('button[type="submit"]');
+            const oldText = btn.innerHTML;
+            btn.disabled = true; btn.innerHTML = '...';
 
-    document.querySelectorAll('#products-table th[data-sort]').forEach(th => {
-        th.addEventListener('click', () => {
-            const column = th.dataset.sort;
-            if (currentSort.column === column) {
-                currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+            const res = await fetch(url, { 
+                method: method, 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify(data) 
+            });
+
+            if (res.ok) {
+                await loadProducts();
+                modal.hide();
             } else {
-                currentSort.column = column;
-                currentSort.direction = 'asc';
+                alert('Ошибка. Возможно, такой SKU уже есть.');
             }
-            renderProducts(); 
-        });
-    });
+            btn.disabled = false; btn.innerHTML = oldText;
 
-    fetchProducts();
+        } catch(e) { alert('Ошибка сети'); }
+    };
+
+    // --- Удаление ---
+    window.deleteProduct = async (id) => {
+        if(confirm('Удалить этот товар? Он пропадет из матрицы всех дилеров.')) {
+            try {
+                await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+                loadProducts();
+            } catch(e) { alert('Ошибка удаления'); }
+        }
+    };
+
+    // Поиск
+    searchInput.addEventListener('input', renderTable);
+
+    loadProducts();
 });
