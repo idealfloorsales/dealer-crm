@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const filterType = document.getElementById('filter-type');
     const addBtn = document.getElementById('add-comp-btn');
     const exportBtn = document.getElementById('export-comp-btn');
+    const dashboardContainer = document.getElementById('comp-dashboard'); // (НОВОЕ)
 
     const modalEl = document.getElementById('comp-modal');
     const modal = new bootstrap.Modal(modalEl);
@@ -44,18 +45,68 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     let competitors = [];
-    let isSaving = false; // LOCK
+    let isSaving = false; 
 
     async function loadList() {
         try {
             const res = await fetch(API_URL);
             if(res.ok) {
                 competitors = await res.json();
+                renderDashboard(); // (НОВОЕ)
                 renderGrid();
             }
         } catch(e) { 
             if(gridContainer) gridContainer.innerHTML = '<p class="text-danger p-5 text-center">Ошибка загрузки</p>'; 
         }
+    }
+
+    // (НОВОЕ) Рендер Дашборда
+    function renderDashboard() {
+        if (!dashboardContainer) return;
+
+        const totalBrands = competitors.length;
+        let totalCols = 0;
+        let countEng = 0;
+        let countFr = 0;
+        let countArt = 0;
+
+        competitors.forEach(c => {
+            (c.collections || []).forEach(col => {
+                totalCols++;
+                const t = (typeof col === 'string') ? 'std' : (col.type || 'std');
+                if (t.includes('eng')) countEng++;
+                if (t.includes('fr') || t.includes('french')) countFr++;
+                if (t.includes('art') || t.includes('mix')) countArt++;
+            });
+        });
+
+        dashboardContainer.innerHTML = `
+            <div class="col-md-3 col-6">
+                <div class="stat-card h-100 py-3">
+                    <span class="stat-number">${totalBrands}</span>
+                    <span class="stat-label">Брендов</span>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="stat-card h-100 py-3">
+                    <span class="stat-number">${totalCols}</span>
+                    <span class="stat-label">Коллекций</span>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="stat-card h-100 py-3 border-success" style="border-bottom-width: 3px;">
+                    <span class="stat-number text-success">${countEng + countFr}</span>
+                    <span class="stat-label">Елочка (Все)</span>
+                    <small class="text-muted" style="font-size:0.7em">🇬🇧 ${countEng} | 🇫🇷 ${countFr}</small>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="stat-card h-100 py-3 border-warning" style="border-bottom-width: 3px;">
+                    <span class="stat-number text-warning text-dark">${countArt}</span>
+                    <span class="stat-label">Художественный</span>
+                </div>
+            </div>
+        `;
     }
 
     function renderGrid() {
@@ -70,12 +121,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 (c.country || '').toLowerCase().includes(search);
             
             let matchFilter = true;
-            if (filter !== 'all') {
-                matchFilter = c.collections && c.collections.some(col => {
-                    const type = (typeof col === 'string') ? 'std' : (col.type || 'std');
-                    return type === filter;
+            if (filter === 'herringbone' || filter === 'eng' || filter === 'fr') { // Упростил фильтр
+                 matchFilter = c.collections && c.collections.some(col => {
+                    const t = (col.type || 'std');
+                    return t.includes('eng') || t.includes('fr');
                 });
+            } else if (filter === 'artistic' || filter === 'art') {
+                 matchFilter = c.collections && c.collections.some(col => (col.type || 'std').includes('art'));
             }
+
             return matchSearch && matchFilter;
         });
 
@@ -173,7 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(delBtn) delBtn.style.display = 'block';
         
         inpName.value = c.name;
-        inpCountry.value = c.country || '';
+        if(inpCountry) inpCountry.value = c.country || '';
         inpSupplier.value = c.supplier || '';
         inpWarehouse.value = c.warehouse || '';
         inpInfo.value = c.info || '';
@@ -247,14 +301,10 @@ document.addEventListener('DOMContentLoaded', () => {
         form.onsubmit = async (e) => {
             e.preventDefault();
             
-            if(isSaving) return;
-            isSaving = true;
-            
-            // (ИСПРАВЛЕНО) Поиск кнопки
+            if(isSaving) return; isSaving = true;
             const submitBtn = document.querySelector('button[form="comp-form"]');
             const oldText = submitBtn.innerHTML;
-            submitBtn.disabled = true; 
-            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+            submitBtn.disabled = true; submitBtn.innerHTML = '...';
 
             const collectionsData = [];
             document.querySelectorAll('.collection-row').forEach(row => {
@@ -291,23 +341,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             try {
                 const res = await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
-                if (res.ok) { 
-                    await loadList(); 
-                    if(!id) {
-                        // Если создан новый - закрываем
-                        modal.hide(); 
-                        alert('Бренд добавлен!');
-                    } else {
-                        // Если редакт - обновляем заголовок
-                        document.getElementById('comp-modal-title').textContent = data.name;
-                    }
-                }
+                if (res.ok) { await loadList(); modal.hide(); }
             } catch (e) { alert('Ошибка сохранения'); }
-            finally {
-                isSaving = false;
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = oldText;
-            }
+            finally { isSaving = false; submitBtn.disabled = false; submitBtn.innerHTML = oldText; }
         };
     }
 
