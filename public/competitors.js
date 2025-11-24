@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const filterType = document.getElementById('filter-type');
     const addBtn = document.getElementById('add-comp-btn');
     const exportBtn = document.getElementById('export-comp-btn');
-    const dashboardContainer = document.getElementById('comp-dashboard'); // (НОВОЕ)
+    const dashboardContainer = document.getElementById('comp-dashboard');
 
     const modalEl = document.getElementById('comp-modal');
     const modal = new bootstrap.Modal(modalEl);
@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await fetch(API_URL);
             if(res.ok) {
                 competitors = await res.json();
-                renderDashboard(); // (НОВОЕ)
+                renderDashboard();
                 renderGrid();
             }
         } catch(e) { 
@@ -60,7 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // (НОВОЕ) Рендер Дашборда
+    // (ИЗМЕНЕНО) Дашборд без иконок
     function renderDashboard() {
         if (!dashboardContainer) return;
 
@@ -97,7 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="stat-card h-100 py-3 border-success" style="border-bottom-width: 3px;">
                     <span class="stat-number text-success">${countEng + countFr}</span>
                     <span class="stat-label">Елочка (Все)</span>
-                    <small class="text-muted" style="font-size:0.7em">🇬🇧 ${countEng} | 🇫🇷 ${countFr}</small>
+                    <small class="text-muted" style="font-size:0.7em">Англ: ${countEng} | Фр: ${countFr}</small>
                 </div>
             </div>
             <div class="col-md-3 col-6">
@@ -121,7 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 (c.country || '').toLowerCase().includes(search);
             
             let matchFilter = true;
-            if (filter === 'herringbone' || filter === 'eng' || filter === 'fr') { // Упростил фильтр
+            if (filter === 'herringbone' || filter === 'eng' || filter === 'fr') { 
                  matchFilter = c.collections && c.collections.some(col => {
                     const t = (col.type || 'std');
                     return t.includes('eng') || t.includes('fr');
@@ -301,11 +301,14 @@ document.addEventListener('DOMContentLoaded', () => {
         form.onsubmit = async (e) => {
             e.preventDefault();
             
-            if(isSaving) return; isSaving = true;
+            if(isSaving) return;
+            isSaving = true;
+            
             const submitBtn = document.querySelector('button[form="comp-form"]');
             const oldText = submitBtn.innerHTML;
-            submitBtn.disabled = true; submitBtn.innerHTML = '...';
-
+            submitBtn.disabled = true; 
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...';
+            
             const collectionsData = [];
             document.querySelectorAll('.collection-row').forEach(row => {
                 const name = row.querySelector('.coll-name').value.trim();
@@ -341,9 +344,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
             try {
                 const res = await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
-                if (res.ok) { await loadList(); modal.hide(); }
+                if (res.ok) { 
+                    await loadList(); 
+                    if(!id) {
+                        modal.hide(); 
+                        alert('Бренд добавлен!');
+                    } else {
+                        document.getElementById('comp-modal-title').textContent = data.name;
+                        modal.hide();
+                    }
+                }
             } catch (e) { alert('Ошибка сохранения'); }
-            finally { isSaving = false; submitBtn.disabled = false; submitBtn.innerHTML = oldText; }
+            finally {
+                isSaving = false;
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = oldText;
+            }
         };
     }
 
