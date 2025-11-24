@@ -1,21 +1,18 @@
 document.addEventListener('DOMContentLoaded', () => {
     const API_URL = '/api/competitors-ref';
     
-    // Элементы страницы
     const gridContainer = document.getElementById('competitors-grid');
     const searchInput = document.getElementById('search-input');
     const filterType = document.getElementById('filter-type');
     const addBtn = document.getElementById('add-comp-btn');
     const exportBtn = document.getElementById('export-comp-btn');
 
-    // Модалка и Форма
     const modalEl = document.getElementById('comp-modal');
     const modal = new bootstrap.Modal(modalEl);
     const form = document.getElementById('comp-form');
     const modalTitle = document.getElementById('comp-modal-title');
     const delBtn = document.getElementById('btn-delete-comp');
 
-    // Поля внутри модалки
     const collectionsContainer = document.getElementById('collections-container');
     const addCollRowBtn = document.getElementById('add-coll-row-btn');
     const contactsContainer = document.getElementById('comp-contacts-list');
@@ -31,7 +28,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const inpStock = document.getElementById('comp_stock');
     const inpReserve = document.getElementById('comp_reserve');
 
-    // Типы и цвета
     const collectionTypes = [
         { val: 'std', label: 'Стандарт', badgeClass: 'type-std' },
         { val: 'eng', label: 'Англ. Елка', badgeClass: 'type-eng' },
@@ -42,16 +38,14 @@ document.addEventListener('DOMContentLoaded', () => {
         { val: 'mix', label: 'Худ. Микс', badgeClass: 'type-mix' }
     ];
 
-    // Словарь для экспорта
     const typeLabels = {
         'std': 'Стандарт', 'eng': 'Англ. Елка', 'fr': 'Фр. Елка',
         'art': 'Художественный', 'art_eng': 'Худ. Английская', 'art_fr': 'Худ. Французская', 'mix': 'Худ. Микс'
     };
 
     let competitors = [];
-    let isSaving = false; // Защита от двойного клика
+    let isSaving = false; // LOCK
 
-    // --- ЗАГРУЗКА ---
     async function loadList() {
         try {
             const res = await fetch(API_URL);
@@ -64,7 +58,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- РЕНДЕР СЕТКИ ---
     function renderGrid() {
         const search = searchInput ? searchInput.value.toLowerCase() : '';
         const filter = filterType ? filterType.value : 'all';
@@ -180,7 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(delBtn) delBtn.style.display = 'block';
         
         inpName.value = c.name;
-        if(inpCountry) inpCountry.value = c.country || '';
+        inpCountry.value = c.country || '';
         inpSupplier.value = c.supplier || '';
         inpWarehouse.value = c.warehouse || '';
         inpInfo.value = c.info || '';
@@ -227,7 +220,7 @@ document.addEventListener('DOMContentLoaded', () => {
         div.innerHTML = `
             <input type="text" class="form-control coll-name" placeholder="Название" value="${name}" required>
             <select class="form-select coll-type" style="max-width: 160px;">${options}</select>
-            <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()"><i class="bi bi-x-lg"></i></button>
+            <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()">×</button>
         `;
         collectionsContainer.appendChild(div);
     }
@@ -242,7 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <input type="text" class="form-control cont-name" placeholder="Имя" value="${name}">
             <input type="text" class="form-control cont-pos" placeholder="Должность" value="${pos}">
             <input type="text" class="form-control cont-phone" placeholder="Телефон" value="${phone}">
-            <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()"><i class="bi bi-x-lg"></i></button>
+            <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()">×</button>
         `;
         contactsContainer.appendChild(div);
     }
@@ -250,21 +243,19 @@ document.addEventListener('DOMContentLoaded', () => {
     if(addCollRowBtn) addCollRowBtn.onclick = () => addCollectionRow();
     if(addContactBtn) addContactBtn.onclick = () => addContactRow();
 
-    // СОХРАНЕНИЕ
-    if (form) {
+    if(form) {
         form.onsubmit = async (e) => {
             e.preventDefault();
-
-            // (ИЗМЕНЕНО) Правильный поиск кнопки (она снаружи формы в футере, связана через form="comp-form")
-            const submitBtn = document.querySelector('button[form="comp-form"]');
             
             if(isSaving) return;
             isSaving = true;
             
+            // (ИСПРАВЛЕНО) Поиск кнопки
+            const submitBtn = document.querySelector('button[form="comp-form"]');
             const oldText = submitBtn.innerHTML;
             submitBtn.disabled = true; 
-            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...';
-            
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
             const collectionsData = [];
             document.querySelectorAll('.collection-row').forEach(row => {
                 const name = row.querySelector('.coll-name').value.trim();
@@ -282,7 +273,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const data = {
                 name: inpName.value,
-                country: inpCountry ? inpCountry.value : '', // (НОВОЕ)
+                country: inpCountry ? inpCountry.value : '',
                 supplier: inpSupplier.value,
                 warehouse: inpWarehouse.value,
                 info: inpInfo.value,
@@ -302,7 +293,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 const res = await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
                 if (res.ok) { 
                     await loadList(); 
-                    modal.hide(); 
+                    if(!id) {
+                        // Если создан новый - закрываем
+                        modal.hide(); 
+                        alert('Бренд добавлен!');
+                    } else {
+                        // Если редакт - обновляем заголовок
+                        document.getElementById('comp-modal-title').textContent = data.name;
+                    }
                 }
             } catch (e) { alert('Ошибка сохранения'); }
             finally {
@@ -313,7 +311,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    if (delBtn) {
+    if(delBtn) {
         delBtn.onclick = async () => {
             const id = inpId.value;
             if (!id) return;
@@ -328,7 +326,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if(searchInput) searchInput.addEventListener('input', renderGrid);
     if(filterType) filterType.addEventListener('change', renderGrid);
 
-    // Экспорт
     if(exportBtn) {
         exportBtn.onclick = () => {
             if (!competitors.length) return alert("Список пуст");
