@@ -97,7 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="stat-card h-100 py-3 border-success" style="border-bottom-width: 3px;">
                     <span class="stat-number text-success">${countEng + countFr}</span>
                     <span class="stat-label">Елочка (Все)</span>
-                    <small class="text-muted" style="font-size:0.7em">Англ: ${countEng} | Фр: ${countFr}</small>
+                    <small class="text-muted" style="font-size:0.7em">Английская: ${countEng} | Французская: ${countFr}</small>
                 </div>
             </div>
             <div class="col-md-3 col-6">
