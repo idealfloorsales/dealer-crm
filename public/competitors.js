@@ -6,7 +6,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const filterType = document.getElementById('filter-type');
     const addBtn = document.getElementById('add-comp-btn');
     const exportBtn = document.getElementById('export-comp-btn');
-    const dashboardContainer = document.getElementById('comp-dashboard');
 
     const modalEl = document.getElementById('comp-modal');
     const modal = new bootstrap.Modal(modalEl);
@@ -60,8 +59,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // (ИЗМЕНЕНО) Дашборд без иконок
     function renderDashboard() {
+        const dashboardContainer = document.getElementById('comp-dashboard');
         if (!dashboardContainer) return;
 
         const totalBrands = competitors.length;
@@ -96,8 +95,8 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="col-md-3 col-6">
                 <div class="stat-card h-100 py-3 border-success" style="border-bottom-width: 3px;">
                     <span class="stat-number text-success">${countEng + countFr}</span>
-                    <span class="stat-label">Елочка (Все)</span>
-                    <small class="text-muted" style="font-size:0.7em">Английская: ${countEng} | Французская: ${countFr}</small>
+                    <span class="stat-label">Елочка</span>
+                    <small class="text-muted" style="font-size:0.75em; font-weight:500;">Англ: ${countEng} | Фр: ${countFr}</small>
                 </div>
             </div>
             <div class="col-md-3 col-6">
@@ -121,12 +120,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 (c.country || '').toLowerCase().includes(search);
             
             let matchFilter = true;
-            if (filter === 'herringbone' || filter === 'eng' || filter === 'fr') { 
-                 matchFilter = c.collections && c.collections.some(col => {
-                    const t = (col.type || 'std');
-                    return t.includes('eng') || t.includes('fr');
-                });
-            } else if (filter === 'artistic' || filter === 'art') {
+            if (filter === 'eng' || filter === 'fr') { 
+                 matchFilter = c.collections && c.collections.some(col => (col.type || 'std').includes(filter));
+            } else if (filter === 'art') {
                  matchFilter = c.collections && c.collections.some(col => (col.type || 'std').includes('art'));
             }
 
@@ -178,9 +174,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         <button class="btn-card-edit" onclick="event.stopPropagation(); openEditModal('${c.id}')" title="Редактировать"><i class="bi bi-pencil"></i></button>
                         
                         <div class="comp-card-front">
-                            <div class="d-flex justify-content-between align-items-start mb-1">
-                                <h5 class="comp-card-title text-truncate mb-0" style="max-width:70%">${c.name}</h5>
-                                ${c.country ? `<span class="badge bg-light text-dark border" style="font-weight:normal; font-size:0.7rem;">${c.country}</span>` : ''}
+                            <div class="comp-card-header">
+                                <div class="comp-card-title">${c.name}</div>
+                                ${c.country ? `<span class="badge bg-light text-dark border fw-normal">${c.country}</span>` : ''}
                             </div>
 
                             <div class="comp-card-supplier text-muted mb-2">
@@ -227,7 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(delBtn) delBtn.style.display = 'block';
         
         inpName.value = c.name;
-        if(inpCountry) inpCountry.value = c.country || '';
+        inpCountry.value = c.country || '';
         inpSupplier.value = c.supplier || '';
         inpWarehouse.value = c.warehouse || '';
         inpInfo.value = c.info || '';
