@@ -9,7 +9,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const dashboardContainer = document.getElementById('comp-dashboard');
 
     const modalEl = document.getElementById('comp-modal');
-    const modal = new bootstrap.Modal(modalEl);
+    // (ИЗМЕНЕНО) backdrop: 'static'
+    const modal = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: false });
     const form = document.getElementById('comp-form');
     const modalTitle = document.getElementById('comp-modal-title');
     const delBtn = document.getElementById('btn-delete-comp');
@@ -45,8 +46,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     let competitors = [];
-    
-    // ГЛОБАЛЬНЫЙ ФЛАГ ЗАЩИТЫ
     let isSaving = false; 
 
     async function loadList() {
@@ -122,12 +121,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 (c.country || '').toLowerCase().includes(search);
             
             let matchFilter = true;
-            if (filter === 'herringbone' || filter === 'eng' || filter === 'fr') { 
-                 matchFilter = c.collections && c.collections.some(col => {
-                    const t = (col.type || 'std');
-                    return t.includes('eng') || t.includes('fr');
-                });
-            } else if (filter === 'artistic' || filter === 'art') {
+            if (filter === 'eng' || filter === 'fr') { 
+                 matchFilter = c.collections && c.collections.some(col => (col.type || 'std').includes(filter));
+            } else if (filter === 'art') {
                  matchFilter = c.collections && c.collections.some(col => (col.type || 'std').includes('art'));
             }
 
@@ -298,19 +294,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if(addCollRowBtn) addCollRowBtn.onclick = () => addCollectionRow();
     if(addContactBtn) addContactBtn.onclick = () => addContactRow();
 
-    // === СОХРАНЕНИЕ (ИСПРАВЛЕННАЯ ЛОГИКА ЗАЩИТЫ) ===
     if(form) {
         form.onsubmit = async (e) => {
             e.preventDefault();
-            e.stopImmediatePropagation(); // Остановить повторные события
-
-            // 1. Проверка флага
-            if(isSaving) return;
             
-            // 2. Установка флага
+            if(isSaving) return;
             isSaving = true;
-
-            // 3. Блокировка кнопки
+            
             const submitBtn = document.querySelector('button[form="comp-form"]');
             const oldText = submitBtn.innerHTML;
             submitBtn.disabled = true; 
@@ -363,7 +353,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } catch (e) { alert('Ошибка сохранения'); }
             finally {
-                // 4. Снятие защиты только после завершения
                 isSaving = false;
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = oldText;
