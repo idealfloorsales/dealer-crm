@@ -1,18 +1,21 @@
 document.addEventListener('DOMContentLoaded', () => {
     const API_URL = '/api/competitors-ref';
     
+    // Элементы страницы
     const gridContainer = document.getElementById('competitors-grid');
     const searchInput = document.getElementById('search-input');
     const filterType = document.getElementById('filter-type');
     const addBtn = document.getElementById('add-comp-btn');
     const exportBtn = document.getElementById('export-comp-btn');
 
+    // Модалка и Форма
     const modalEl = document.getElementById('comp-modal');
     const modal = new bootstrap.Modal(modalEl);
     const form = document.getElementById('comp-form');
     const modalTitle = document.getElementById('comp-modal-title');
     const delBtn = document.getElementById('btn-delete-comp');
 
+    // Поля внутри модалки
     const collectionsContainer = document.getElementById('collections-container');
     const addCollRowBtn = document.getElementById('add-coll-row-btn');
     const contactsContainer = document.getElementById('comp-contacts-list');
@@ -28,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const inpStock = document.getElementById('comp_stock');
     const inpReserve = document.getElementById('comp_reserve');
 
+    // Типы и цвета (используем badgeClass)
     const collectionTypes = [
         { val: 'std', label: 'Стандарт', badgeClass: 'type-std' },
         { val: 'eng', label: 'Англ. Елка', badgeClass: 'type-eng' },
@@ -38,14 +42,16 @@ document.addEventListener('DOMContentLoaded', () => {
         { val: 'mix', label: 'Худ. Микс', badgeClass: 'type-mix' }
     ];
 
+    // Словарь для экспорта
     const typeLabels = {
         'std': 'Стандарт', 'eng': 'Англ. Елка', 'fr': 'Фр. Елка',
         'art': 'Художественный', 'art_eng': 'Худ. Английская', 'art_fr': 'Худ. Французская', 'mix': 'Худ. Микс'
     };
 
     let competitors = [];
-    let isSaving = false; 
+    let isSaving = false; // Защита от двойного клика
 
+    // --- ЗАГРУЗКА ---
     async function loadList() {
         try {
             const res = await fetch(API_URL);
@@ -59,6 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // --- ДАШБОРД ---
     function renderDashboard() {
         const dashboardContainer = document.getElementById('comp-dashboard');
         if (!dashboardContainer) return;
@@ -95,7 +102,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="col-md-3 col-6">
                 <div class="stat-card h-100 py-3 border-success" style="border-bottom-width: 3px;">
                     <span class="stat-number text-success">${countEng + countFr}</span>
-                    <span class="stat-label">Елочка</span>
+                    <span class="stat-label">Елочка (Все)</span>
                     <small class="text-muted" style="font-size:0.75em; font-weight:500;">Англ: ${countEng} | Фр: ${countFr}</small>
                 </div>
             </div>
@@ -108,6 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
+    // --- РЕНДЕР СЕТКИ ---
     function renderGrid() {
         const search = searchInput ? searchInput.value.toLowerCase() : '';
         const filter = filterType ? filterType.value : 'all';
@@ -120,12 +128,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 (c.country || '').toLowerCase().includes(search);
             
             let matchFilter = true;
-            if (filter === 'eng' || filter === 'fr') { 
-                 matchFilter = c.collections && c.collections.some(col => (col.type || 'std').includes(filter));
-            } else if (filter === 'art') {
-                 matchFilter = c.collections && c.collections.some(col => (col.type || 'std').includes('art'));
+            if (filter !== 'all') {
+                matchFilter = c.collections && c.collections.some(col => {
+                    const type = (typeof col === 'string') ? 'std' : (col.type || 'std');
+                    return type === filter;
+                });
             }
-
             return matchSearch && matchFilter;
         });
 
@@ -223,7 +231,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(delBtn) delBtn.style.display = 'block';
         
         inpName.value = c.name;
-        inpCountry.value = c.country || '';
+        if(inpCountry) inpCountry.value = c.country || '';
         inpSupplier.value = c.supplier || '';
         inpWarehouse.value = c.warehouse || '';
         inpInfo.value = c.info || '';
@@ -297,14 +305,13 @@ document.addEventListener('DOMContentLoaded', () => {
         form.onsubmit = async (e) => {
             e.preventDefault();
             
+            // Защита и анимация кнопки
             if(isSaving) return;
             isSaving = true;
-            
             const submitBtn = document.querySelector('button[form="comp-form"]');
             const oldText = submitBtn.innerHTML;
-            submitBtn.disabled = true; 
-            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...';
-            
+            submitBtn.disabled = true; submitBtn.innerHTML = '...';
+
             const collectionsData = [];
             document.querySelectorAll('.collection-row').forEach(row => {
                 const name = row.querySelector('.coll-name').value.trim();
@@ -374,6 +381,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(searchInput) searchInput.addEventListener('input', renderGrid);
     if(filterType) filterType.addEventListener('change', renderGrid);
 
+    // (ИЗМЕНЕНО) ЭКСПОРТ (Дублирование Бренда для каждой Коллекции)
     if(exportBtn) {
         exportBtn.onclick = () => {
             if (!competitors.length) return alert("Список пуст");
@@ -384,16 +392,23 @@ document.addEventListener('DOMContentLoaded', () => {
             competitors.forEach(c => {
                 const contactsStr = (c.contacts || []).map(cnt => `${cnt.name} (${cnt.phone})`).join(', ');
                 
-                csv += `${clean(c.name)};${clean(c.country)};;;${clean(c.supplier)};${clean(c.warehouse)};${clean(contactsStr)};${clean(c.info)}\n`;
+                // Подготовим общие данные бренда
+                const brandPart = `${clean(c.name)};${clean(c.country)}`;
+                const tailPart = `${clean(c.supplier)};${clean(c.warehouse)};${clean(contactsStr)};${clean(c.info)}`;
 
                 if (c.collections && c.collections.length > 0) {
+                    // Если есть коллекции, создаем строку для КАЖДОЙ
                     c.collections.forEach(col => {
                         const colName = (typeof col === 'string') ? col : col.name;
                         const colTypeVal = (typeof col === 'string') ? 'std' : col.type;
                         const colTypeLabel = typeLabels[colTypeVal] || colTypeVal;
 
-                        csv += `;;${clean(colName)};${clean(colTypeLabel)};;;;\n`;
+                        // Формат: Бренд; Страна; Коллекция; Тип; Поставщик; Склад; Контакты; Инфо
+                        csv += `${brandPart};${clean(colName)};${clean(colTypeLabel)};${tailPart}\n`;
                     });
+                } else {
+                    // Если коллекций нет, выводим бренд один раз с пустыми полями коллекции
+                    csv += `${brandPart};;;${tailPart}\n`;
                 }
             });
 
