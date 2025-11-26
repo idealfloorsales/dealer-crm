@@ -581,3 +581,53 @@ td a { text-decoration: none; color: var(--primary-color) !important; font-weigh
     border-bottom: 1px solid #f9f9f9;
     font-size: 0.85rem;
 }
+
+/* --- СТИЛИ ДЛЯ СПИСКОВ В МОДАЛКАХ --- */
+
+.list-container {
+    max-height: 300px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    background: #f8f9fa;
+    padding: 10px;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+}
+
+/* Обычные строки (Контакты, Адреса) */
+.contact-entry, .address-entry, .pos-entry, .visit-entry {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed #ddd;
+}
+
+/* (ИЗМЕНЕНО) Строка Конкурента - Жесткая сетка */
+.competitor-entry {
+    display: grid;
+    /* Бренд (25%) | Коллекция (25%) | Опт (20%) | Розн (20%) | Кнопка (Auto) */
+    grid-template-columns: 1.5fr 1.5fr 1fr 1fr auto; 
+    gap: 5px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed #ccc;
+    align-items: center;
+}
+
+/* На мобильных - в 2 этажа */
+@media (max-width: 768px) {
+    .competitor-entry {
+        grid-template-columns: 1fr 1fr auto; /* Бренд, Коллекция, Кнопка */
+    }
+    .competitor-entry input:nth-last-child(2), /* Опт */
+    .competitor-entry input:nth-last-child(3) { /* Розница */
+        grid-column: span 1; /* На второй строке */
+    }
+    .competitor-brand, .competitor-collection {
+        grid-column: span 1;
+    }
+    .btn-remove-entry {
+        grid-row: 1 / 3; /* Кнопка удаления на всю высоту */
+    }
+}
