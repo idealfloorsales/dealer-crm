@@ -146,6 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderTaskList(tasksListUpcoming, tasksUpcoming, 'upcoming'); renderTaskList(tasksListProblem, tasksProblem, 'problem'); renderTaskList(tasksListCooling, tasksCooling, 'cooling');
     }
     function renderTaskList(container, tasks, type) { if (!container) return; if (tasks.length === 0) { const msg = type === 'cooling' ? 'Нет таких' : 'Нет задач'; container.innerHTML = `<p class="text-muted text-center p-3">${msg}</p>`; return; } container.innerHTML = tasks.map(t => { let badge = ''; let comment = safeText(t.comment); if (type === 'upcoming') { badge = `<span class="badge ${t.isToday ? 'bg-danger' : 'bg-primary'} rounded-pill me-2">${t.isToday ? 'Сегодня' : t.date.toLocaleDateString('ru-RU')}</span>`; } else if (type === 'problem') { badge = t.type === 'overdue' ? `<span class="badge bg-danger rounded-pill me-2">Просрочено: ${t.date.toLocaleDateString('ru-RU')}</span>` : `<span class="badge bg-danger rounded-pill me-2">Статус: Проблемный</span>`; if(t.type !== 'overdue') comment = '<i>Требует внимания</i>'; } else if (type === 'cooling') { badge = `<span class="badge bg-warning text-dark rounded-pill me-2">Нет визитов: ${t.days === 999 ? 'Никогда' : `${t.days} дн.`}</span>`; comment = '<i>Нужно связаться</i>'; } return `<div class="list-group-item task-item d-flex justify-content-between align-items-center"><div class="me-auto"><div class="d-flex align-items-center mb-1">${badge}<a href="dealer.html?id=${t.dealerId}" target="_blank" class="fw-bold text-decoration-none text-dark">${t.dealerName}</a></div><small class="text-muted" style="white-space: pre-wrap;">${comment}</small></div>${(type === 'upcoming' || (type === 'problem' && t.type === 'overdue')) ? `<button class="btn btn-sm btn-success btn-complete-task" data-id="${t.dealerId}" data-index="${t.visitIndex}">✔</button>` : ''}</div>`; }).join(''); }
+    
     if(document.body) { document.body.addEventListener('click', (e) => { const taskBtn = e.target.closest('.btn-complete-task'); if (taskBtn) { taskBtn.disabled = true; completeTask(taskBtn, taskBtn.dataset.id, taskBtn.dataset.index); } }); }
 
     // --- GENERATORS ---
@@ -413,13 +414,15 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(e) { alert("Ошибка"); } finally { isSaving = false; btn.disabled = false; }
     });
 
+    // (ИСПРАВЛЕНО) НОВАЯ ЛОГИКА ЭКСПОРТА: БЕРЕМ ИЗ МАССИВА, А НЕ HTML
     if(exportBtn) {
         exportBtn.onclick = async () => {
-            if (!allDealers.length) return alert("Пусто. Нечего экспортировать.");
-            exportBtn.disabled = true; exportBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Загрузка...';
+            if (!allDealers.length) return alert("Пусто.");
+            exportBtn.disabled = true; exportBtn.innerHTML = 'Загрузка...';
+            
             const clean = (text) => `"${String(text || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`;
             
-            // (ИЗМЕНЕНО) Список дилеров берется из фильтра, а не из HTML, чтобы не было дублей
+            // Фильтруем массив дилеров, используя те же параметры, что и для таблицы
             const city = filterCity.value;
             const type = filterPriceType.value;
             const status = filterStatus.value;
@@ -431,13 +434,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (status) statusMatch = s === status; else statusMatch = s !== 'potential';
                 return (!city||d.city===city) && (!type||d.price_type===type) && (!responsible||d.responsible===responsible) && statusMatch && (!search || ((d.name||'').toLowerCase().includes(search)||(d.dealer_id||'').toLowerCase().includes(search)||(d.organization||'').toLowerCase().includes(search)));
             });
-            
-            // (ИЗМЕНЕНО) Убраны конкуренты из заголовков
+
+            // Убрана колонка Конкуренты, Стенды
             let csv = "\uFEFFID;Название;Статус;Ответственный;Город;Адрес;Тип цен;Организация;Доставка;Сайт;Инстаграм;Контакты;Доп. Адреса;Бонусы\n";
             
             try {
                 for (const dealer of filteredForExport) {
-                    const contactsName = (dealer.contacts || []).map(c => c.name).join('; ');
+                    const contactsName = (dealer.contacts || []).map(c => `${c.name} (${c.contactInfo})`).join('; ');
                     const addresses = (dealer.additional_addresses || []).map(a => `${a.description || ''}: ${a.city || ''} ${a.address || ''}`).join('; ');
                     
                     const row = [
