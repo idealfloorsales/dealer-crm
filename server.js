@@ -24,12 +24,13 @@ if (ADMIN_USER && ADMIN_PASSWORD) {
     app.get('/sales.html', authMiddleware, (req, res) => res.sendFile(__dirname + '/public/sales.html'));
     app.get('/competitors.html', authMiddleware, (req, res) => res.sendFile(__dirname + '/public/competitors.html'));
     app.get('/products.html', authMiddleware, (req, res) => res.sendFile(__dirname + '/public/products.html'));
+    app.get('/knowledge.html', authMiddleware, (req, res) => res.sendFile(__dirname + '/public/knowledge.html'));
     app.use(express.static('public'));
 } else { app.use(express.static('public')); }
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// --- СПИСОК ТОВАРОВ (ПОЛНЫЙ) ---
+// --- СПИСОК ТОВАРОВ ---
 const productsToImport = [
     { sku: "CD-507", name: "Дуб Беленый" }, { sku: "CD-508", name: "Дуб Пепельный" },
     { sku: "8EH34-701", name: "Дуб Снежный" }, { sku: "8EH34-702", name: "Дуб Арабика" },
@@ -111,13 +112,14 @@ const salesSchema = new mongoose.Schema({
     plan: Number, fact: Number, isCustom: { type: Boolean, default: false }
 });
 const Sales = mongoose.model('Sales', salesSchema);
-const Knowledge = mongoose.model('Knowledge', new mongoose.Schema({ title: String, content: String }, { timestamps: true }));
+
+const Knowledge = mongoose.model('Knowledge', new mongoose.Schema({ title: String, category: { type: String, default: 'other' }, link: String, content: String }, { timestamps: true }));
 
 async function hardcodedImportProducts() {
     try {
         const operations = productsToImport.map(p => ({ updateOne: { filter: { sku: p.sku }, update: { $set: p }, upsert: true } }));
         await Product.bulkWrite(operations);
-        console.log("Каталог обновлен при старте.");
+        console.log("Каталог обновлен.");
     } catch (e) { console.warn(e.message); }
 }
 
@@ -134,14 +136,20 @@ function convertToClient(doc) {
     return obj;
 }
 
-// --- API ---
+// --- API (ИСПРАВЛЕННОЕ - ВОЗВРАЩАЕМ ВСЕ ПОЛЯ) ---
 app.get('/api/dealers', async (req, res) => {
     try {
-        const dealers = await Dealer.find({}, 'dealer_id name city price_type organization products pos_materials visits latitude longitude status avatarUrl responsible competitors').lean();
+        // (ИЗМЕНЕНО) Убран второй аргумент (список полей). Теперь возвращается ВЕСЬ объект целиком.
+        // Это гарантирует, что address, delivery, contacts и т.д. дойдут до клиента.
+        const dealers = await Dealer.find({}).lean();
+        
         res.json(dealers.map(d => ({
-            id: d._id, dealer_id: d.dealer_id, name: d.name, city: d.city, price_type: d.price_type, organization: d.organization,
-            photo_url: d.avatarUrl, has_photos: (d.photos && d.photos.length > 0), products_count: (d.products ? d.products.length : 0), has_pos: (d.pos_materials && d.pos_materials.length > 0), 
-            visits: d.visits, latitude: d.latitude, longitude: d.longitude, status: d.status || 'standard', responsible: d.responsible, competitors: d.competitors
+            id: d._id, 
+            ...d, // Разворачиваем все поля (address, contacts, delivery...)
+            photo_url: d.avatarUrl,
+            has_photos: (d.photos && d.photos.length > 0),
+            products_count: (d.products ? d.products.length : 0),
+            has_pos: (d.pos_materials && d.pos_materials.length > 0)
         }))); 
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -159,7 +167,7 @@ app.put('/api/products/:id', async (req, res) => { try { const p = await Product
 app.delete('/api/products/:id', async (req, res) => { await Product.findByIdAndDelete(req.params.id); await Dealer.updateMany({ products: req.params.id }, { $pull: { products: req.params.id } }); res.json({}); });
 app.get('/api/products/:id/dealers', async (req, res) => { const dlrs = await Dealer.find({ products: req.params.id }, 'dealer_id name city').sort({name:1}).lean(); res.json(dlrs.map(d=>{d.id=d._id; return d;})); });
 
-// (НОВОЕ) Ручной импорт каталога (если база пустая)
+// Admin Import
 app.post('/api/admin/import-catalog', async (req, res) => {
     await hardcodedImportProducts();
     res.json({status: 'ok', message: 'Catalog imported'});
