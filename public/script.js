@@ -101,8 +101,23 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- DATA ---
     async function initApp() {
         await fetchProductCatalog();
-        try { const compRes = await fetch(API_COMPETITORS_REF_URL); if (compRes.ok) { competitorsRef = await compRes.json(); updateBrandsDatalist(); } } catch(e){}
-        try { const response = await fetch(API_DEALERS_URL); if (!response.ok) throw new Error(response.statusText); allDealers = await response.json(); populateFilters(allDealers); renderDealerList(); renderDashboard(); } catch (error) { if(dealerListBody) dealerListBody.innerHTML = `<tr><td colspan="8" class="text-danger text-center">Ошибка загрузки.</td></tr>`; }
+        try { 
+            const compRes = await fetch(API_COMPETITORS_REF_URL); 
+            if (compRes.ok) {
+                competitorsRef = await compRes.json();
+                updateBrandsDatalist(); 
+            }
+        } catch(e){}
+        try { 
+            const response = await fetch(API_DEALERS_URL); 
+            if (!response.ok) throw new Error(response.statusText); 
+            allDealers = await response.json(); 
+            populateFilters(allDealers); 
+            renderDealerList(); 
+            renderDashboard(); 
+        } catch (error) { 
+            if(dealerListBody) dealerListBody.innerHTML = `<tr><td colspan="8" class="text-danger text-center">Ошибка загрузки.</td></tr>`; 
+        }
         const pendingId = localStorage.getItem('pendingEditDealerId');
         if (pendingId) { localStorage.removeItem('pendingEditDealerId'); openEditModal(pendingId); }
     }
@@ -131,10 +146,9 @@ document.addEventListener('DOMContentLoaded', () => {
         renderTaskList(tasksListUpcoming, tasksUpcoming, 'upcoming'); renderTaskList(tasksListProblem, tasksProblem, 'problem'); renderTaskList(tasksListCooling, tasksCooling, 'cooling');
     }
     function renderTaskList(container, tasks, type) { if (!container) return; if (tasks.length === 0) { const msg = type === 'cooling' ? 'Нет таких' : 'Нет задач'; container.innerHTML = `<p class="text-muted text-center p-3">${msg}</p>`; return; } container.innerHTML = tasks.map(t => { let badge = ''; let comment = safeText(t.comment); if (type === 'upcoming') { badge = `<span class="badge ${t.isToday ? 'bg-danger' : 'bg-primary'} rounded-pill me-2">${t.isToday ? 'Сегодня' : t.date.toLocaleDateString('ru-RU')}</span>`; } else if (type === 'problem') { badge = t.type === 'overdue' ? `<span class="badge bg-danger rounded-pill me-2">Просрочено: ${t.date.toLocaleDateString('ru-RU')}</span>` : `<span class="badge bg-danger rounded-pill me-2">Статус: Проблемный</span>`; if(t.type !== 'overdue') comment = '<i>Требует внимания</i>'; } else if (type === 'cooling') { badge = `<span class="badge bg-warning text-dark rounded-pill me-2">Нет визитов: ${t.days === 999 ? 'Никогда' : `${t.days} дн.`}</span>`; comment = '<i>Нужно связаться</i>'; } return `<div class="list-group-item task-item d-flex justify-content-between align-items-center"><div class="me-auto"><div class="d-flex align-items-center mb-1">${badge}<a href="dealer.html?id=${t.dealerId}" target="_blank" class="fw-bold text-decoration-none text-dark">${t.dealerName}</a></div><small class="text-muted" style="white-space: pre-wrap;">${comment}</small></div>${(type === 'upcoming' || (type === 'problem' && t.type === 'overdue')) ? `<button class="btn btn-sm btn-success btn-complete-task" data-id="${t.dealerId}" data-index="${t.visitIndex}">✔</button>` : ''}</div>`; }).join(''); }
-    
     if(document.body) { document.body.addEventListener('click', (e) => { const taskBtn = e.target.closest('.btn-complete-task'); if (taskBtn) { taskBtn.disabled = true; completeTask(taskBtn, taskBtn.dataset.id, taskBtn.dataset.index); } }); }
 
-    // --- ГЕНЕРАТОРЫ HTML ---
+    // --- GENERATORS ---
     function createCompetitorEntryHTML(c={}) { 
         let brandOpts = `<option value="">-- Бренд --</option>`;
         competitorsRef.forEach(ref => { const sel = ref.name === c.brand ? 'selected' : ''; brandOpts += `<option value="${ref.name}" ${sel}>${ref.name}</option>`; });
@@ -244,7 +258,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(document.getElementById('add_latitude')) { document.getElementById('add_latitude').value = ''; document.getElementById('add_longitude').value = ''; }
         addPhotosData = []; renderPhotoPreviews(addPhotoPreviewContainer, []);
         if(addAvatarPreview) addAvatarPreview.src = ''; newAvatarBase64 = null;
-        addModal.show();
+        if(addModal) addModal.show();
     };
 
     // WIZARD
@@ -368,6 +382,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(dealerListBody) dealerListBody.addEventListener('click', (e) => {
         const t = e.target;
         if (t.closest('a.dropdown-item')) e.preventDefault();
+        
         if (t.closest('.btn-view')) window.open(`dealer.html?id=${t.closest('.btn-view').dataset.id}`, '_blank');
         if (t.closest('.btn-edit')) openEditModal(t.closest('.btn-edit').dataset.id);
         if (t.closest('.btn-delete') && confirm("Удалить?")) fetch(`${API_DEALERS_URL}/${t.closest('.btn-delete').dataset.id}`, {method:'DELETE'}).then(initApp);
@@ -403,34 +418,41 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!allDealers.length) return alert("Пусто. Нечего экспортировать.");
             exportBtn.disabled = true; exportBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Загрузка...';
             const clean = (text) => `"${String(text || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`;
-            const headers = ["ID", "Название", "Статус", "Ответственный", "Город", "Адрес", "Тип цен", "Организация", "Доставка", "Сайт", "Инстаграм", "Контакты (Имя)", "Контакты (Должность)", "Контакты (Телефон)", "Доп. Адреса", "Стенды", "Бонусы"];
-            let csv = "\uFEFF" + headers.join(";") + "\r\n";
+            
+            // (ИЗМЕНЕНО) Список дилеров берется из фильтра, а не из HTML, чтобы не было дублей
+            const city = filterCity.value;
+            const type = filterPriceType.value;
+            const status = filterStatus.value;
+            const responsible = filterResponsible.value;
+            const search = searchBar.value.toLowerCase();
+            
+            const filteredForExport = allDealers.filter(d => {
+                let statusMatch = false; const s = d.status || 'standard';
+                if (status) statusMatch = s === status; else statusMatch = s !== 'potential';
+                return (!city||d.city===city) && (!type||d.price_type===type) && (!responsible||d.responsible===responsible) && statusMatch && (!search || ((d.name||'').toLowerCase().includes(search)||(d.dealer_id||'').toLowerCase().includes(search)||(d.organization||'').toLowerCase().includes(search)));
+            });
+            
+            // (ИЗМЕНЕНО) Убраны конкуренты из заголовков
+            let csv = "\uFEFFID;Название;Статус;Ответственный;Город;Адрес;Тип цен;Организация;Доставка;Сайт;Инстаграм;Контакты;Доп. Адреса;Бонусы\n";
+            
             try {
-                const visibleDealerIds = Array.from(dealerListBody.querySelectorAll('tr .btn-view')).map(btn => btn.dataset.id);
-                for (const id of visibleDealerIds) {
-                    const res = await fetch(`${API_DEALERS_URL}/${id}`);
-                    if (!res.ok) continue;
-                    const dealer = await res.json();
+                for (const dealer of filteredForExport) {
                     const contactsName = (dealer.contacts || []).map(c => c.name).join('; ');
-                    const contactsPos = (dealer.contacts || []).map(c => c.position).join('; ');
-                    const contactsInfo = (dealer.contacts || []).map(c => c.contactInfo).join('; ');
                     const addresses = (dealer.additional_addresses || []).map(a => `${a.description || ''}: ${a.city || ''} ${a.address || ''}`).join('; ');
-                    const stands = (dealer.pos_materials || []).map(p => `${p.name} (${p.quantity} шт)`).join('; '); 
                     
                     const row = [
                         clean(dealer.dealer_id), clean(dealer.name), clean(dealer.status), clean(dealer.responsible),
                         clean(dealer.city), clean(dealer.address), clean(dealer.price_type),
                         clean(dealer.organization), clean(dealer.delivery), clean(dealer.website), clean(dealer.instagram),
-                        clean(contactsName), clean(contactsPos), clean(contactsInfo),
-                        clean(addresses), clean(stands), clean(dealer.bonuses)
+                        clean(contactsName), clean(addresses), clean(dealer.bonuses)
                     ];
                     csv += row.join(";") + "\r\n";
                 }
                 const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'})); a.download = 'dealers_export.csv'; a.click();
-            } catch (e) { alert("Ошибка: " + e.message); } finally { exportBtn.disabled = false; exportBtn.innerHTML = '<i class="bi bi-file-earmark-excel me-2"></i>Экспорт'; }
+            } catch (e) { alert("Ошибка: " + e.message); } finally { exportBtn.disabled = false; exportBtn.innerHTML = '<i class="bi bi-file-earmark-excel me-2"></i>База'; }
         };
     }
-
+    
     if(document.getElementById('export-competitors-prices-btn')) {
         document.getElementById('export-competitors-prices-btn').onclick = async () => {
             if (!allDealers.length) return alert("Пусто");
