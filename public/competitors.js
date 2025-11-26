@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     const API_URL = '/api/competitors-ref';
     
+    // Элементы страницы
     const gridContainer = document.getElementById('competitors-grid');
     const searchInput = document.getElementById('search-input');
     const filterType = document.getElementById('filter-type');
@@ -8,18 +9,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const exportBtn = document.getElementById('export-comp-btn');
     const dashboardContainer = document.getElementById('comp-dashboard');
 
+    // Модалка и Форма
     const modalEl = document.getElementById('comp-modal');
-    // (ИЗМЕНЕНО) backdrop: 'static'
+    // Используем static backdrop, чтобы не закрывалось случайно
     const modal = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: false });
     const form = document.getElementById('comp-form');
     const modalTitle = document.getElementById('comp-modal-title');
     const delBtn = document.getElementById('btn-delete-comp');
 
+    // Поля внутри модалки (Контейнеры списков)
     const collectionsContainer = document.getElementById('collections-container');
     const addCollRowBtn = document.getElementById('add-coll-row-btn');
     const contactsContainer = document.getElementById('comp-contacts-list');
     const addContactBtn = document.getElementById('btn-add-contact');
 
+    // Инпуты
     const inpId = document.getElementById('comp_id');
     const inpName = document.getElementById('comp_name');
     const inpCountry = document.getElementById('comp_country');
@@ -30,6 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const inpStock = document.getElementById('comp_stock');
     const inpReserve = document.getElementById('comp_reserve');
 
+    // Типы коллекций (цвета)
     const collectionTypes = [
         { val: 'std', label: 'Стандарт', badgeClass: 'type-std' },
         { val: 'eng', label: 'Англ. Елка', badgeClass: 'type-eng' },
@@ -40,14 +45,16 @@ document.addEventListener('DOMContentLoaded', () => {
         { val: 'mix', label: 'Худ. Микс', badgeClass: 'type-mix' }
     ];
 
+    // Словарь для экспорта
     const typeLabels = {
         'std': 'Стандарт', 'eng': 'Англ. Елка', 'fr': 'Фр. Елка',
         'art': 'Художественный', 'art_eng': 'Худ. Английская', 'art_fr': 'Худ. Французская', 'mix': 'Худ. Микс'
     };
 
     let competitors = [];
-    let isSaving = false; 
+    let isSaving = false; // Защита от дублей
 
+    // --- 1. ЗАГРУЗКА ---
     async function loadList() {
         try {
             const res = await fetch(API_URL);
@@ -61,6 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // --- 2. ДАШБОРД ---
     function renderDashboard() {
         if (!dashboardContainer) return;
 
@@ -96,7 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="col-md-3 col-6">
                 <div class="stat-card h-100 py-3 border-success" style="border-bottom-width: 3px;">
                     <span class="stat-number text-success">${countEng + countFr}</span>
-                    <span class="stat-label">Елочка (Все)</span>
+                    <span class="stat-label">Елочка</span>
                     <small class="text-muted" style="font-size:0.75em; font-weight:500;">Англ: ${countEng} | Фр: ${countFr}</small>
                 </div>
             </div>
@@ -109,6 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
+    // --- 3. РЕНДЕР СЕТКИ (С ПОИСКОМ) ---
     function renderGrid() {
         const search = searchInput ? searchInput.value.toLowerCase() : '';
         const filter = filterType ? filterType.value : 'all';
@@ -137,6 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if(gridContainer) {
             gridContainer.innerHTML = filtered.map(c => {
+                // Бейджи для лицевой стороны
                 const typesSet = new Set();
                 (c.collections || []).forEach(col => {
                     const t = (typeof col === 'string') ? 'std' : (col.type || 'std');
@@ -149,6 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (typeInfo) frontBadges += `<span class="col-badge ${typeInfo.badgeClass}" style="font-size: 0.7rem;">${typeInfo.label}</span>`;
                 });
 
+                // Список для обратной стороны
                 const listHtml = (c.collections || []).map(col => {
                     const name = (typeof col === 'string') ? col : col.name;
                     const type = (typeof col === 'string') ? 'std' : (col.type || 'std');
@@ -215,6 +226,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    // --- 4. МОДАЛЬНОЕ ОКНО ---
     window.openEditModal = (id) => {
         const c = competitors.find(x => x.id === id);
         if (!c) return;
@@ -264,14 +276,17 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    // --- 5. КОНСТРУКТОРЫ СТРОК (С РАБОЧИМ УДАЛЕНИЕМ) ---
+    
     function addCollectionRow(name = '', type = 'std') {
         const div = document.createElement('div');
         div.className = 'input-group mb-2 collection-row';
         let options = collectionTypes.map(t => `<option value="${t.val}" ${t.val === type ? 'selected' : ''}>${t.label}</option>`).join('');
+        // ВАЖНО: onclick="this.closest(...) remove()"
         div.innerHTML = `
             <input type="text" class="form-control coll-name" placeholder="Название" value="${name}" required>
             <select class="form-select coll-type" style="max-width: 160px;">${options}</select>
-            <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()">×</button>
+            <button type="button" class="btn btn-outline-danger" onclick="this.closest('.collection-row').remove()">×</button>
         `;
         collectionsContainer.appendChild(div);
     }
@@ -282,11 +297,12 @@ document.addEventListener('DOMContentLoaded', () => {
         div.style.display = 'grid';
         div.style.gridTemplateColumns = '1fr 1fr 1fr auto';
         div.style.gap = '5px';
+        // ВАЖНО: onclick="this.closest(...) remove()"
         div.innerHTML = `
             <input type="text" class="form-control cont-name" placeholder="Имя" value="${name}">
             <input type="text" class="form-control cont-pos" placeholder="Должность" value="${pos}">
             <input type="text" class="form-control cont-phone" placeholder="Телефон" value="${phone}">
-            <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()">×</button>
+            <button type="button" class="btn btn-outline-danger" onclick="this.closest('.comp-contact-row').remove()">×</button>
         `;
         contactsContainer.appendChild(div);
     }
@@ -294,6 +310,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(addCollRowBtn) addCollRowBtn.onclick = () => addCollectionRow();
     if(addContactBtn) addContactBtn.onclick = () => addContactRow();
 
+    // --- 6. СОХРАНЕНИЕ (С ЗАЩИТОЙ) ---
     if(form) {
         form.onsubmit = async (e) => {
             e.preventDefault();
@@ -301,7 +318,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if(isSaving) return;
             isSaving = true;
             
-            const submitBtn = document.querySelector('button[form="comp-form"]');
+            // Ищем кнопку через форму
+            const submitBtn = form.querySelector('button[type="submit"]');
             const oldText = submitBtn.innerHTML;
             submitBtn.disabled = true; 
             submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
@@ -360,6 +378,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    // --- УДАЛЕНИЕ ---
     if(delBtn) {
         delBtn.onclick = async () => {
             const id = inpId.value;
@@ -375,6 +394,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(searchInput) searchInput.addEventListener('input', renderGrid);
     if(filterType) filterType.addEventListener('change', renderGrid);
 
+    // --- 7. ЭКСПОРТ (ПЛОСКИЙ ФОРМАТ) ---
     if(exportBtn) {
         exportBtn.onclick = () => {
             if (!competitors.length) return alert("Список пуст");
@@ -397,6 +417,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         csv += `${brandPart};${clean(colName)};${clean(colTypeLabel)};${tailPart}\n`;
                     });
                 } else {
+                    // Если коллекций нет, просто бренд
                     csv += `${brandPart};;;${tailPart}\n`;
                 }
             });
