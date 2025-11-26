@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
         "Табличка - Табличка орг.стекло"
     ];
 
-    // --- Модалки ---
+    // --- МОДАЛКИ (С ЗАЩИТОЙ) ---
     const addModalEl = document.getElementById('add-modal'); 
     const addModal = new bootstrap.Modal(addModalEl, { backdrop: 'static', keyboard: false });
     const addForm = document.getElementById('add-dealer-form');
@@ -29,11 +29,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const qvModal = new bootstrap.Modal(qvModalEl, { backdrop: 'static', keyboard: false });
     const qvForm = document.getElementById('quick-visit-form');
 
-    // --- Элементы ---
+    // --- ЭЛЕМЕНТЫ ---
     const openAddModalBtn = document.getElementById('open-add-modal-btn');
     const brandsDatalist = document.getElementById('brands-datalist');
+    const dealerListBody = document.getElementById('dealer-list-body');
+    const dealerTable = document.getElementById('dealer-table');
+    const noDataMsg = document.getElementById('no-data-msg');
+    const filterCity = document.getElementById('filter-city');
+    const filterPriceType = document.getElementById('filter-price-type');
+    const filterStatus = document.getElementById('filter-status');
+    const filterResponsible = document.getElementById('filter-responsible');
+    const searchBar = document.getElementById('search-bar'); 
+    const exportBtn = document.getElementById('export-dealers-btn'); 
+    const dashboardContainer = document.getElementById('dashboard-container');
+    const tasksListUpcoming = document.getElementById('tasks-list-upcoming');
+    const tasksListProblem = document.getElementById('tasks-list-problem');
+    const tasksListCooling = document.getElementById('tasks-list-cooling');
 
-    // Списки
+    // Списки ADD
     const addProductChecklist = document.getElementById('add-product-checklist'); 
     const addContactList = document.getElementById('add-contact-list'); 
     const addAddressList = document.getElementById('add-address-list'); 
@@ -45,6 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const addAvatarInput = document.getElementById('add-avatar-input');
     const addAvatarPreview = document.getElementById('add-avatar-preview');
     
+    // Списки EDIT
     const editProductChecklist = document.getElementById('edit-product-checklist'); 
     const editContactList = document.getElementById('edit-contact-list'); 
     const editAddressList = document.getElementById('edit-address-list'); 
@@ -58,40 +72,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const editAvatarPreview = document.getElementById('edit-avatar-preview');
     const editCurrentAvatarUrl = document.getElementById('edit-current-avatar-url');
 
-    const dealerListBody = document.getElementById('dealer-list-body');
-    const dealerTable = document.getElementById('dealer-table');
-    const noDataMsg = document.getElementById('no-data-msg');
-    const filterCity = document.getElementById('filter-city');
-    const filterPriceType = document.getElementById('filter-price-type');
-    const filterStatus = document.getElementById('filter-status');
-    const filterResponsible = document.getElementById('filter-responsible');
-    const searchBar = document.getElementById('search-bar'); 
-    const exportBtn = document.getElementById('export-dealers-btn'); 
-    
-    const dashboardContainer = document.getElementById('dashboard-container');
-    const tasksListUpcoming = document.getElementById('tasks-list-upcoming');
-    const tasksListProblem = document.getElementById('tasks-list-problem');
-    const tasksListCooling = document.getElementById('tasks-list-cooling');
-
     let addPhotosData = []; let editPhotosData = []; let newAvatarBase64 = null; 
 
-    // Utils
+    // --- UTILS ---
     const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
     const safeText = (text) => (text || '').toString().replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const safeAttr = (text) => (text || '').toString().replace(/"/g, '&quot;');
     const toBase64 = file => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => resolve(reader.result); reader.onerror = error => reject(error); });
-    const compressImage = (file, maxWidth = 1000, quality = 0.7) => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = event => { const img = new Image(); img.src = event.target.result; img.onload = () => { const elem = document.createElement('canvas'); let width = img.width; let height = img.height; if (width > maxWidth) { height *= maxWidth / width; width = maxWidth; } elem.width = width; elem.height = height; const ctx = elem.getContext('2d'); ctx.drawImage(img, 0, 0, width, height); resolve(elem.toDataURL('image/jpeg', quality)); }; img.onerror = error => reject(error); }; reader.onerror = error => reject(error); });
+    const compressImage = (file, w, q) => new Promise((resolve) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = e => { const img = new Image(); img.src = e.target.result; img.onload = () => { const c = document.createElement('canvas'); let width = img.width; let height = img.height; if (width > w) { height *= w / width; width = w; } c.width = width; c.height = height; c.getContext('2d').drawImage(img, 0, 0, width, height); resolve(c.toDataURL('image/jpeg', q)); }; }; });
 
-    // --- MAP ---
+    // --- MAPS ---
     const DEFAULT_LAT = 51.1605; const DEFAULT_LNG = 71.4704;
     let addMap, editMap;
 
     function initMap(mapId) { const el = document.getElementById(mapId); if (!el) return null; if (typeof L === 'undefined') return null; const map = L.map(mapId).setView([DEFAULT_LAT, DEFAULT_LNG], 13); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: 'OSM' }).addTo(map); return map; }
     function setupMapClick(map, latId, lngId, markerRef) { if (!map) return; map.on('click', function(e) { const lat = e.latlng.lat; const lng = e.latlng.lng; const latIn = document.getElementById(latId); const lngIn = document.getElementById(lngId); if(latIn) latIn.value = lat; if(lngIn) lngIn.value = lng; if (markerRef.current) markerRef.current.setLatLng([lat, lng]); else markerRef.current = L.marker([lat, lng]).addTo(map); }); }
+    
     function setupMapSearch(map, inputId, suggestionsId, latId, lngId, markerRef) {
         const input = document.getElementById(inputId); const suggestionsBox = document.getElementById(suggestionsId); const latInput = document.getElementById(latId); const lngInput = document.getElementById(lngId);
         if (!input || !suggestionsBox) return; let debounceTimer;
-        input.addEventListener('input', async () => { clearTimeout(debounceTimer); const query = input.value.trim(); if (query.length < 3) { suggestionsBox.style.display = 'none'; return; } debounceTimer = setTimeout(async () => { try { const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=kz`); const data = await res.json(); suggestionsBox.innerHTML = ''; if (data.length > 0) { suggestionsBox.style.display = 'block'; data.slice(0, 5).forEach(place => { const div = document.createElement('div'); div.className = 'address-suggestion-item'; div.textContent = place.display_name; div.onclick = () => { const lat = parseFloat(place.lat); const lon = parseFloat(place.lon); if (markerRef.current) markerRef.current.setLatLng([lat, lon]); else markerRef.current = L.marker([lat, lon]).addTo(map); map.setView([lat, lon], 16); if (latInput) latInput.value = lat; if (lngInput) lngInput.value = lon; input.value = place.display_name; suggestionsBox.style.display = 'none'; }; suggestionsBox.appendChild(div); }); } else { suggestionsBox.style.display = 'none'; } } catch (e) { console.error(e); } }, 500); });
+        input.addEventListener('input', async () => { clearTimeout(debounceTimer); const query = input.value.trim(); if (query.length < 3) { suggestionsBox.style.display = 'none'; return; } debounceTimer = setTimeout(async () => { try { const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=kz`); const data = await res.json(); suggestionsBox.innerHTML = ''; if (data.length > 0) { suggestionsBox.style.display = 'block'; data.slice(0, 5).forEach(place => { const div = document.createElement('div'); div.className = 'address-suggestion-item'; div.textContent = place.display_name; div.onclick = () => { const lat = parseFloat(place.lat); const lon = parseFloat(place.lon); if (markerRef.current) markerRef.current.setLatLng([lat, lon]); else markerRef.current = L.marker([lat, lon]).addTo(map); map.setView([lat, lon], 16); if (latInput) latInput.value = lat; if (lngInput) lngInput.value = lon; input.value = place.display_name; suggestionsBox.style.display = 'none'; }; suggestionsBox.appendChild(div); }); } else { suggestionsBox.style.display = 'none'; } } catch (e) {} }, 500); });
         document.addEventListener('click', (e) => { if (!e.target.closest('.map-search-container')) suggestionsBox.style.display = 'none'; });
     }
 
@@ -166,6 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             } else if (c.collection) { collOpts += `<option value="${c.collection}" selected>${c.collection}</option>`; }
         }
+        // Используем SELECT, как просили
         return `<div class="competitor-entry"><select class="form-select competitor-brand" onchange="updateCollections(this)">${brandOpts}</select><select class="form-select competitor-collection">${collOpts}</select><input type="text" class="form-control competitor-price-opt" placeholder="ОПТ" value="${c.price_opt||''}"><input type="text" class="form-control competitor-price-retail" placeholder="Розница" value="${c.price_retail||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry" onclick="this.closest('.competitor-entry').remove()">×</button></div>`; 
     }
 
@@ -259,10 +260,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if(document.getElementById('add_latitude')) { document.getElementById('add_latitude').value = ''; document.getElementById('add_longitude').value = ''; }
         addPhotosData = []; renderPhotoPreviews(addPhotoPreviewContainer, []);
         if(addAvatarPreview) addAvatarPreview.src = ''; newAvatarBase64 = null;
-        if(addModal) addModal.show();
+        addModal.show();
     };
 
-    // WIZARD
+    // WIZARD LOGIC
     let currentStep = 1; const totalSteps = 4;
     const prevBtn = document.getElementById('btn-prev-step'); const nextBtn = document.getElementById('btn-next-step'); const finishBtn = document.getElementById('btn-finish-step');
     function showStep(step) {
@@ -305,6 +306,11 @@ document.addEventListener('DOMContentLoaded', () => {
     async function openEditModal(id) {
         try {
             const res = await fetch(`${API_DEALERS_URL}/${id}`); if(!res.ok) throw new Error("Ошибка"); const d = await res.json();
+            
+            // Добавляем ID и Название в заголовок модалки
+            const titleEl = document.querySelector('#edit-modal .modal-title');
+            if(titleEl) titleEl.innerHTML = `Редактирование: <strong>${d.name}</strong> <span class="text-muted small">(ID: ${d.dealer_id})</span>`;
+
             document.getElementById('edit_db_id').value=d.id; document.getElementById('edit_dealer_id').value=d.dealer_id; document.getElementById('edit_name').value=d.name; document.getElementById('edit_organization').value=d.organization; document.getElementById('edit_price_type').value=d.price_type; document.getElementById('edit_city').value=d.city; document.getElementById('edit_address').value=d.address; document.getElementById('edit_delivery').value=d.delivery; document.getElementById('edit_website').value=d.website; document.getElementById('edit_instagram').value=d.instagram;
             if(document.getElementById('edit_latitude')) document.getElementById('edit_latitude').value=d.latitude||'';
             if(document.getElementById('edit_longitude')) document.getElementById('edit_longitude').value=d.longitude||'';
@@ -383,7 +389,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if(dealerListBody) dealerListBody.addEventListener('click', (e) => {
         const t = e.target;
         if (t.closest('a.dropdown-item')) e.preventDefault();
-        
         if (t.closest('.btn-view')) window.open(`dealer.html?id=${t.closest('.btn-view').dataset.id}`, '_blank');
         if (t.closest('.btn-edit')) openEditModal(t.closest('.btn-edit').dataset.id);
         if (t.closest('.btn-delete') && confirm("Удалить?")) fetch(`${API_DEALERS_URL}/${t.closest('.btn-delete').dataset.id}`, {method:'DELETE'}).then(initApp);
@@ -414,15 +419,14 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(e) { alert("Ошибка"); } finally { isSaving = false; btn.disabled = false; }
     });
 
-    // (ИСПРАВЛЕНО) НОВАЯ ЛОГИКА ЭКСПОРТА: БЕРЕМ ИЗ МАССИВА, А НЕ HTML
+    // (ИСПРАВЛЕНО) НОВАЯ ЛОГИКА ЭКСПОРТА: ИЗ МАССИВА ДАННЫХ, БЕЗ ДУБЛЕЙ
     if(exportBtn) {
         exportBtn.onclick = async () => {
-            if (!allDealers.length) return alert("Пусто.");
-            exportBtn.disabled = true; exportBtn.innerHTML = 'Загрузка...';
-            
+            if (!allDealers.length) return alert("Пусто. Нечего экспортировать.");
+            exportBtn.disabled = true; exportBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Загрузка...';
             const clean = (text) => `"${String(text || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`;
             
-            // Фильтруем массив дилеров, используя те же параметры, что и для таблицы
+            // Фильтруем массив в памяти (а не DOM элементы), чтобы избежать дублей
             const city = filterCity.value;
             const type = filterPriceType.value;
             const status = filterStatus.value;
@@ -434,25 +438,36 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (status) statusMatch = s === status; else statusMatch = s !== 'potential';
                 return (!city||d.city===city) && (!type||d.price_type===type) && (!responsible||d.responsible===responsible) && statusMatch && (!search || ((d.name||'').toLowerCase().includes(search)||(d.dealer_id||'').toLowerCase().includes(search)||(d.organization||'').toLowerCase().includes(search)));
             });
-
-            // Убрана колонка Конкуренты, Стенды
+            
+            // Убрана колонка Конкуренты и Стенды
             let csv = "\uFEFFID;Название;Статус;Ответственный;Город;Адрес;Тип цен;Организация;Доставка;Сайт;Инстаграм;Контакты;Доп. Адреса;Бонусы\n";
             
             try {
                 for (const dealer of filteredForExport) {
-                    const contactsName = (dealer.contacts || []).map(c => `${c.name} (${c.contactInfo})`).join('; ');
-                    const addresses = (dealer.additional_addresses || []).map(a => `${a.description || ''}: ${a.city || ''} ${a.address || ''}`).join('; ');
+                    // Формируем полную строку контактов
+                    const contactsName = (dealer.contacts || []).map(c => {
+                        let info = c.name || '';
+                        if (c.position) info += ` (${c.position})`;
+                        if (c.contactInfo) info += ` - ${c.contactInfo}`;
+                        return info;
+                    }).join('; ');
+
+                    const addresses = (dealer.additional_addresses || []).map(a => 
+                        `${a.description || ''}: ${a.city || ''}, ${a.address || ''}`
+                    ).join('; ');
                     
                     const row = [
                         clean(dealer.dealer_id), clean(dealer.name), clean(dealer.status), clean(dealer.responsible),
                         clean(dealer.city), clean(dealer.address), clean(dealer.price_type),
                         clean(dealer.organization), clean(dealer.delivery), clean(dealer.website), clean(dealer.instagram),
-                        clean(contactsName), clean(addresses), clean(dealer.bonuses)
+                        clean(contactsName), 
+                        clean(addresses), 
+                        clean(dealer.bonuses)
                     ];
                     csv += row.join(";") + "\r\n";
                 }
                 const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'})); a.download = 'dealers_export.csv'; a.click();
-            } catch (e) { alert("Ошибка: " + e.message); } finally { exportBtn.disabled = false; exportBtn.innerHTML = '<i class="bi bi-file-earmark-excel me-2"></i>База'; }
+            } catch (e) { alert("Ошибка: " + e.message); } finally { exportBtn.disabled = false; exportBtn.innerHTML = '<i class="bi bi-file-earmark-excel me-2"></i>Экспорт'; }
         };
     }
     
