@@ -1,25 +1,25 @@
 // sw.js (Service Worker)
-const CACHE_NAME = 'dealer-crm-cache-v98'; // (ОБНОВЛЕНО)
+const CACHE_NAME = 'dealer-crm-cache-v100'; // (ОБНОВЛЕНО)
 
 const urlsToCache = [
     '/',
-    '/index.html?v=98', // (ОБНОВЛЕНО)
-    '/style.css?v=98', // (ОБНОВЛЕНО)
-    '/script.js?v=98', // (ОБНОВЛЕНО)
-    '/dealer.html?v=98',
-    '/dealer.js?v=98',
-    '/map.html?v=98',
-    '/map.js?v=98',
-    '/products.html?v=98',
-    '/products.js?v=98',
-    '/report.html?v=98',
-    '/report.js?v=98',
-    '/sales.html?v=98',
-    '/sales.js?v=98',
-    '/competitors.html?v=98',
-    '/competitors.js?v=98',
-    '/knowledge.html?v=98',
-    '/knowledge.js?v=98',
+    '/index.html?v=100', // (ОБНОВЛЕНО)
+    '/style.css?v=100', // (ОБНОВЛЕНО)
+    '/script.js?v=100', // (ОБНОВЛЕНО)
+    '/dealer.html?v=100',
+    '/dealer.js?v=100',
+    '/map.html?v=100',
+    '/map.js?v=100',
+    '/products.html?v=100',
+    '/products.js?v=100',
+    '/report.html?v=100',
+    '/report.js?v=100',
+    '/sales.html?v=100',
+    '/sales.js?v=100',
+    '/competitors.html?v=100',
+    '/competitors.js?v=100',
+    '/knowledge.html?v=100',
+    '/knowledge.js?v=100',
     '/logo.png',
     '/favicon.gif',
     'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css',
