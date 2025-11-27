@@ -16,25 +16,20 @@ document.addEventListener('DOMContentLoaded', () => {
         "Табличка - Табличка орг.стекло"
     ];
 
-    // --- МОДАЛКИ ---
-    const addModalEl = document.getElementById('add-modal'); 
-    const addModal = new bootstrap.Modal(addModalEl, { backdrop: 'static', keyboard: false });
+    // --- MODALS ---
+    const addModalEl = document.getElementById('add-modal'); const addModal = new bootstrap.Modal(addModalEl, { backdrop: 'static', keyboard: false });
     const addForm = document.getElementById('add-dealer-form');
-    
-    const editModalEl = document.getElementById('edit-modal'); 
-    const editModal = new bootstrap.Modal(editModalEl, { backdrop: 'static', keyboard: false });
+    const editModalEl = document.getElementById('edit-modal'); const editModal = new bootstrap.Modal(editModalEl, { backdrop: 'static', keyboard: false });
     const editForm = document.getElementById('edit-dealer-form');
-
-    const qvModalEl = document.getElementById('quick-visit-modal'); 
-    const qvModal = new bootstrap.Modal(qvModalEl, { backdrop: 'static', keyboard: false });
+    const qvModalEl = document.getElementById('quick-visit-modal'); const qvModal = new bootstrap.Modal(qvModalEl, { backdrop: 'static', keyboard: false });
     const qvForm = document.getElementById('quick-visit-form');
 
-    // --- ЭЛЕМЕНТЫ ---
+    // --- ELEMENTS ---
     const openAddModalBtn = document.getElementById('open-add-modal-btn');
     const brandsDatalist = document.getElementById('brands-datalist');
     const posDatalist = document.getElementById('pos-materials-datalist');
 
-    // ГЛАВНЫЙ КОНТЕЙНЕР (КАРТОЧКИ)
+    // !!! КОНТЕЙНЕР ДЛЯ КАРТОЧЕК !!!
     const dealerListContainer = document.getElementById('dealer-list-container');
 
     const noDataMsg = document.getElementById('no-data-msg');
@@ -45,35 +40,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchBar = document.getElementById('search-bar'); 
     const exportBtn = document.getElementById('export-dealers-btn'); 
     
-    // ЭЛЕМЕНТЫ ДАШБОРДА
     const dashboardContainer = document.getElementById('dashboard-container');
     const tasksListUpcoming = document.getElementById('tasks-list-upcoming');
     const tasksListProblem = document.getElementById('tasks-list-problem');
     const tasksListCooling = document.getElementById('tasks-list-cooling');
 
-    // Списки
+    // List Containers
     const addProductChecklist = document.getElementById('add-product-checklist'); 
-    const addContactList = document.getElementById('add-contact-list'); 
-    const addAddressList = document.getElementById('add-address-list'); 
-    const addPosList = document.getElementById('add-pos-list'); 
-    const addVisitsList = document.getElementById('add-visits-list'); 
-    const addCompetitorList = document.getElementById('add-competitor-list');
-    const addPhotoInput = document.getElementById('add-photo-input');
-    const addPhotoPreviewContainer = document.getElementById('add-photo-preview-container');
-    const addAvatarInput = document.getElementById('add-avatar-input');
-    const addAvatarPreview = document.getElementById('add-avatar-preview');
-    
+    const addContactList = document.getElementById('add-contact-list'); const addAddressList = document.getElementById('add-address-list'); const addPosList = document.getElementById('add-pos-list'); const addVisitsList = document.getElementById('add-visits-list'); const addCompetitorList = document.getElementById('add-competitor-list');
     const editProductChecklist = document.getElementById('edit-product-checklist'); 
-    const editContactList = document.getElementById('edit-contact-list'); 
-    const editAddressList = document.getElementById('edit-address-list'); 
-    const editPosList = document.getElementById('edit-pos-list'); 
-    const editVisitsList = document.getElementById('edit-visits-list'); 
-    const editCompetitorList = document.getElementById('edit-competitor-list');
-    const editPhotoList = document.getElementById('edit-photo-list'); 
-    const editPhotoInput = document.getElementById('edit-photo-input');
-    const editPhotoPreviewContainer = document.getElementById('edit-photo-preview-container');
-    const editAvatarInput = document.getElementById('edit-avatar-input');
-    const editAvatarPreview = document.getElementById('edit-avatar-preview');
+    const editContactList = document.getElementById('edit-contact-list'); const editAddressList = document.getElementById('edit-address-list'); const editPosList = document.getElementById('edit-pos-list'); const editVisitsList = document.getElementById('edit-visits-list'); const editCompetitorList = document.getElementById('edit-competitor-list');
+    
+    const addPhotoInput = document.getElementById('add-photo-input'); const addPhotoPreviewContainer = document.getElementById('add-photo-preview-container');
+    const addAvatarInput = document.getElementById('add-avatar-input'); const addAvatarPreview = document.getElementById('add-avatar-preview');
+    const editPhotoInput = document.getElementById('edit-photo-input'); const editPhotoPreviewContainer = document.getElementById('edit-photo-preview-container');
+    const editAvatarInput = document.getElementById('edit-avatar-input'); const editAvatarPreview = document.getElementById('edit-avatar-preview');
     const editCurrentAvatarUrl = document.getElementById('edit-current-avatar-url');
 
     let addPhotosData = []; let editPhotosData = []; let newAvatarBase64 = null; 
@@ -81,15 +62,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // UTILS
     const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
     const safeText = (text) => (text || '').toString().replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    const toBase64 = file => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => resolve(reader.result); reader.onerror = error => reject(error); });
-    const compressImage = (file, w, q) => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = event => { const img = new Image(); img.src = event.target.result; img.onload = () => { const c = document.createElement('canvas'); let width = img.width; let height = img.height; if (width > w) { height *= w / width; width = w; } c.width = width; c.height = height; c.getContext('2d').drawImage(img, 0, 0, width, height); resolve(c.toDataURL('image/jpeg', q)); }; }; });
+    const toBase64 = file => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => resolve(reader.result); });
+    const compressImage = (file, w, q) => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = e => { const img = new Image(); img.src = e.target.result; img.onload = () => { const c = document.createElement('canvas'); let width = img.width; let height = img.height; if (width > w) { height *= w / width; width = w; } c.width = width; c.height = height; c.getContext('2d').drawImage(img, 0, 0, width, height); resolve(c.toDataURL('image/jpeg', q)); }; }; });
 
     // MAPS
     const DEFAULT_LAT = 51.1605; const DEFAULT_LNG = 71.4704;
     let addMap, editMap;
-    function initMap(id) { const el = document.getElementById(id); if(!el) return null; if(typeof L==='undefined') return null; const m=L.map(id).setView([DEFAULT_LAT,DEFAULT_LNG],13); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'OSM'}).addTo(m); return m; }
+    function initMap(id) { const el = document.getElementById(id); if(!el) return null; if(typeof L==='undefined') return null; const m=L.map(id).setView([51.1605,71.4704],13); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'OSM'}).addTo(m); return m; }
     function setupMapClick(m,latId,lngId,ref) { if(!m)return; m.on('click',e=>{ const{lat,lng}=e.latlng; document.getElementById(latId).value=lat; document.getElementById(lngId).value=lng; if(ref.current)ref.current.setLatLng([lat,lng]); else ref.current=L.marker([lat,lng]).addTo(m); }); }
     function setupMapSearch(m,inputId,boxId,latId,lngId,ref) { const i=document.getElementById(inputId),b=document.getElementById(boxId); if(!i||!b)return; let t; i.addEventListener('input',()=>{ clearTimeout(t); const q=i.value.trim(); if(q.length<3){b.style.display='none';return;} t=setTimeout(async()=>{ try{ const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=kz`); const d=await r.json(); b.innerHTML=''; if(d.length){ b.style.display='block'; d.slice(0,5).forEach(p=>{ const div=document.createElement('div'); div.className='address-suggestion-item'; div.textContent=p.display_name; div.onclick=()=>{ const lat=parseFloat(p.lat),lon=parseFloat(p.lon); if(ref.current)ref.current.setLatLng([lat,lon]); else ref.current=L.marker([lat,lon]).addTo(m); m.setView([lat,lon],16); document.getElementById(latId).value=lat; document.getElementById(lngId).value=lon; i.value=p.display_name; b.style.display='none'; }; b.appendChild(div); }); } else b.style.display='none'; }catch(e){} },500); }); document.addEventListener('click',e=>{ if(!e.target.closest('.map-search-container')) b.style.display='none'; }); }
+
     if (addModalEl) { addModalEl.addEventListener('shown.bs.modal', () => { if(!addMap) { addMap=initMap('add-map'); addModalEl.markerRef={current:null}; setupMapClick(addMap,'add_latitude','add_longitude',addModalEl.markerRef); setupMapSearch(addMap,'add-map-search','add-map-suggestions','add_latitude','add_longitude',addModalEl.markerRef); } else addMap.invalidateSize(); }); }
     if (editModalEl) { editModalEl.addEventListener('shown.bs.modal', () => { const t=document.querySelector('button[data-bs-target="#tab-map"]'); if(t) t.addEventListener('shown.bs.tab', () => { if(!editMap) { editMap=initMap('edit-map'); editModalEl.markerRef={current:null}; setupMapClick(editMap,'edit_latitude','edit_longitude',editModalEl.markerRef); setupMapSearch(editMap,'edit-map-search','edit-map-suggestions','edit_latitude','edit_longitude',editModalEl.markerRef); } if(editMap) { editMap.invalidateSize(); const lat=parseFloat(document.getElementById('edit_latitude').value),lng=parseFloat(document.getElementById('edit_longitude').value); if(!isNaN(lat)) { editMap.setView([lat,lng],15); if(editModalEl.markerRef.current) editModalEl.markerRef.current.setLatLng([lat,lng]); else editModalEl.markerRef.current=L.marker([lat,lng]).addTo(editMap); } } }); }); }
 
@@ -104,19 +86,45 @@ document.addEventListener('DOMContentLoaded', () => {
                 allDealers=await r.json(); 
                 populateFilters(allDealers); 
                 renderDealerList(); 
-                renderDashboard(); // <--- ВАШ КОД ДАШБОРДА БУДЕТ ЗДЕСЬ
+                renderDashboard(); 
             } 
         } catch(e) { 
-            if(dealerListContainer) dealerListContainer.innerHTML='<p class="text-danger p-5 text-center">Ошибка загрузки</p>'; 
+            if(dealerListContainer) dealerListContainer.innerHTML='<p class="text-danger p-5 text-center">Ошибка загрузки списка</p>'; 
         }
         const pid=localStorage.getItem('pendingEditDealerId'); if(pid){localStorage.removeItem('pendingEditDealerId');openEditModal(pid);}
     }
 
+    // --- HELPER FUNCTIONS (КОТОРЫЕ БЫЛИ ПОТЕРЯНЫ) ---
     function updateBrandsDatalist(){ if(brandsDatalist) brandsDatalist.innerHTML=competitorsRef.map(r=>`<option value="${r.name}">`).join(''); }
     function updatePosDatalist(){ if(posDatalist) posDatalist.innerHTML=posMaterialsList.map(s=>`<option value="${s}">`).join(''); }
     async function fetchProductCatalog(){ if(!fullProductCatalog.length) try{const r=await fetch(API_PRODUCTS_URL);if(r.ok){fullProductCatalog=await r.json();fullProductCatalog.sort((a,b)=>a.sku.localeCompare(b.sku,'ru',{numeric:true}));}}catch(e){} }
     
-    // TASK COMPLETE (С АНИМАЦИЕЙ)
+    // (ВОССТАНОВЛЕНО) Функция рендера обычных списков
+    function renderList(container, data, htmlGen) { 
+        if(container) container.innerHTML = (data || []).map(htmlGen).join(''); 
+    }
+    
+    // (ВОССТАНОВЛЕНО) Функция рендера чеклиста товаров
+    function renderProductChecklist(container, selectedIds=[]) { 
+        if(!container) return; 
+        const set = new Set(selectedIds); 
+        container.innerHTML = fullProductCatalog.map(p => 
+            `<div class="checklist-item form-check">
+                <input type="checkbox" class="form-check-input" value="${p.id}" ${set.has(p.id)?'checked':''}>
+                <label class="form-check-label">${p.sku} - ${p.name}</label>
+            </div>`
+        ).join(''); 
+    }
+    
+    // (ВОССТАНОВЛЕНО) Функция сбора ID выбранных товаров
+    function getSelectedProductIds(containerId) { 
+        const el = document.getElementById(containerId); 
+        if(!el) return []; 
+        return Array.from(el.querySelectorAll('input:checked')).map(cb=>cb.value); 
+    }
+
+    async function saveProducts(dealerId, ids) { await fetch(`${API_DEALERS_URL}/${dealerId}/products`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({productIds: ids})}); }
+
     async function completeTask(btn, id, idx) { 
         try { 
             btn.disabled=true; 
@@ -128,50 +136,48 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(e){btn.disabled=false;btn.innerHTML='✔';} 
     }
 
-    // --- ВАШ ЛЮБИМЫЙ ДАШБОРД (ВСТАВЛЕНО) ---
+    // --- DASHBOARD (2x2) ---
     function renderDashboard() {
-        if (!dashboardContainer) { if(tasksListUpcoming) tasksListUpcoming.innerHTML = '<p class="text-muted text-center p-3">Нет задач</p>'; return; }
+        if (!dashboardContainer) return;
         if (!allDealers || allDealers.length === 0) { dashboardContainer.innerHTML = ''; return; }
         
-        const activeDealers = allDealers.filter(d => d.status !== 'potential' && d.status !== 'archive');
-        const totalDealers = activeDealers.length;
-        const noAvatarCount = activeDealers.filter(d => !d.photo_url).length; 
+        const total = allDealers.filter(d => d.status !== 'potential' && d.status !== 'archive').length;
+        const noPhoto = allDealers.filter(d => !d.photo_url && d.status!=='potential').length;
         
-        dashboardContainer.innerHTML = `<div class="col-md-6"><div class="stat-card h-100"><i class="bi bi-shop stat-icon text-primary"></i><span class="stat-number">${totalDealers}</span><span class="stat-label">Всего дилеров</span></div></div><div class="col-md-6"><div class="stat-card h-100 ${noAvatarCount > 0 ? 'border-danger' : ''}"><i class="bi bi-camera-fill stat-icon ${noAvatarCount > 0 ? 'text-danger' : 'text-secondary'}"></i><span class="stat-number ${noAvatarCount > 0 ? 'text-danger' : ''}">${noAvatarCount}</span><span class="stat-label">Без Аватара</span></div></div>`;
+        dashboardContainer.innerHTML = `
+            <div class="col-6 col-md-6"><div class="stat-card h-100 p-3 bg-white rounded shadow-sm border border-primary text-center d-flex align-items-center justify-content-center flex-column"><i class="bi bi-shop stat-icon text-primary fs-1 mb-2"></i><span class="fs-2 fw-bold text-primary">${total}</span><span class="text-muted small text-uppercase fw-bold">Всего дилеров</span></div></div>
+            <div class="col-6 col-md-6"><div class="stat-card h-100 p-3 bg-white rounded shadow-sm border border-danger text-center d-flex align-items-center justify-content-center flex-column"><i class="bi bi-camera-fill stat-icon text-danger fs-1 mb-2"></i><span class="fs-2 fw-bold text-danger">${noPhoto}</span><span class="text-muted small text-uppercase fw-bold">Без фото</span></div></div>
+        `;
         
         const today = new Date(); today.setHours(0,0,0,0); 
-        const tasksUpcoming = [], tasksProblem = [], tasksCooling = [];
+        const upcoming = [], problem = [], cooling = [];
         const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
 
         allDealers.forEach(d => {
-            if (d.status === 'archive') return; const isPotential = d.status === 'potential'; let lastVisitDate = null; let hasFutureTasks = false;
-            if (d.visits && Array.isArray(d.visits)) { d.visits.forEach((v, index) => { if(!v.date) return; const dDate = new Date(v.date); dDate.setHours(0,0,0,0); if(v.isCompleted) { if(!lastVisitDate || dDate > lastVisitDate) lastVisitDate = dDate; } else { const t = { dealerName: d.name, dealerId: d.id, date: dDate, comment: v.comment, visitIndex: index }; if (dDate < today) { tasksProblem.push({...t, type: 'overdue'}); } else { tasksUpcoming.push({...t, isToday: dDate.getTime() === today.getTime()}); hasFutureTasks = true; } } }); }
-            if (d.status === 'problem') { if (!tasksProblem.some(t => t.dealerId === d.id && t.type === 'overdue')) { tasksProblem.push({ dealerName: d.name, dealerId: d.id, type: 'status' }); } }
-            if (!hasFutureTasks && d.status !== 'problem' && !isPotential) { if (!lastVisitDate) { tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: 999 }); } else if (lastVisitDate < thirtyDaysAgo) { const days = Math.floor((today - lastVisitDate) / (1000 * 60 * 60 * 24)); tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: days }); } }
+            if (d.status === 'archive' || d.status === 'potential') return; 
+            let lastVisitDate = null; let hasFutureTasks = false;
+            if (d.visits && Array.isArray(d.visits)) { d.visits.forEach((v, index) => { if(!v.date) return; const dDate = new Date(v.date); dDate.setHours(0,0,0,0); if(v.isCompleted) { if(!lastVisitDate || dDate > lastVisitDate) lastVisitDate = dDate; } else { const t = { dealerName: d.name, dealerId: d.id, date: dDate, comment: v.comment, visitIndex: index }; if (dDate < today) { problem.push({...t, type: 'overdue'}); } else { upcoming.push({...t, isToday: dDate.getTime() === today.getTime()}); hasFutureTasks = true; } } }); }
+            if (d.status === 'problem' && !problem.some(x=>x.dealerId===d.id)) problem.push({ dealerName: d.name, dealerId: d.id, type: 'status' });
+            if (!hasFuture && d.status !== 'problem') { if(!lastVisitDate) cooling.push({ dealerName: d.name, dealerId: d.id, days: 999 }); else if(lastVisitDate < thirtyDaysAgo) cooling.push({ dealerName: d.name, dealerId: d.id, days: Math.floor((today - lastVisitDate)/(1000*60*60*24)) }); }
         });
-        
-        tasksUpcoming.sort((a, b) => a.date - b.date); tasksProblem.sort((a, b) => (a.date || 0) - (b.date || 0)); tasksCooling.sort((a, b) => b.days - a.days);
-        renderTaskList(document.getElementById('tasks-list-upcoming'), tasksUpcoming, 'upcoming');
-        renderTaskList(document.getElementById('tasks-list-problem'), tasksProblem, 'problem');
-        renderTaskList(document.getElementById('tasks-list-cooling'), tasksCooling, 'cooling');
-    }
-    
-    function renderTaskList(container, tasks, type) { 
-        if (!container) return; 
-        if (tasks.length === 0) { container.innerHTML = `<p class="text-muted text-center p-3">Нет задач</p>`; return; } 
-        container.innerHTML = tasks.map(t => { 
-            let badge = ''; 
-            let comment = safeText(t.comment); 
-            if (type === 'upcoming') { badge = `<span class="badge ${t.isToday ? 'bg-danger' : 'bg-primary'} rounded-pill me-2">${t.isToday ? 'Сегодня' : t.date.toLocaleDateString('ru-RU')}</span>`; } 
-            else if (type === 'problem') { badge = t.type === 'overdue' ? `<span class="badge bg-danger rounded-pill me-2">Просрочено: ${t.date.toLocaleDateString('ru-RU')}</span>` : `<span class="badge bg-danger rounded-pill me-2">Статус: Проблемный</span>`; if(t.type !== 'overdue') comment = '<i>Требует внимания</i>'; } 
-            else if (type === 'cooling') { badge = `<span class="badge bg-warning text-dark rounded-pill me-2">Нет визитов: ${t.days === 999 ? 'Никогда' : `${t.days} дн.`}</span>`; comment = '<i>Нужно связаться</i>'; } 
-            
-            return `<div class="list-group-item task-item d-flex justify-content-between align-items-center"><div class="me-auto"><div class="d-flex align-items-center mb-1">${badge}<a href="dealer.html?id=${t.dealerId}" target="_blank" class="fw-bold text-decoration-none text-dark">${t.dealerName}</a></div><small class="text-muted" style="white-space: pre-wrap;">${comment}</small></div>${(type === 'upcoming' || (type === 'problem' && t.type === 'overdue')) ? `<button class="btn btn-sm btn-success btn-complete-task ms-2" title="Выполнено" data-id="${t.dealerId}" data-index="${t.visitIndex}">✔</button>` : ''}</div>`; 
-        }).join(''); 
+
+        renderTaskList(document.getElementById('tasks-list-upcoming'), upcoming.sort((a,b)=>a.date-b.date), 'upcoming');
+        renderTaskList(document.getElementById('tasks-list-problem'), problem, 'problem');
+        renderTaskList(document.getElementById('tasks-list-cooling'), cooling.sort((a,b)=>b.days-a.days), 'cooling');
     }
 
-    // LISTENER FOR DASHBOARD CLICKS
-    if(document.body) { document.body.addEventListener('click', (e) => { const btn = e.target.closest('.btn-complete-task'); if (btn) { completeTask(btn, btn.dataset.id, btn.dataset.index); } }); }
+    function renderTaskList(container, tasks, type) {
+        if(!container) return;
+        if(!tasks.length) { container.innerHTML = `<p class="text-muted text-center p-2 small">Пусто</p>`; return; }
+        container.innerHTML = tasks.map(t => {
+            let badge = ''; let comment = safeText(t.comment);
+            if (type === 'upcoming') badge = `<span class="badge ${t.isToday?'bg-danger':'bg-primary'} rounded-pill me-2">${t.isToday?'Сегодня':t.date.toLocaleDateString()}</span>`;
+            if (type === 'problem') { badge = t.type==='overdue' ? `<span class="badge bg-danger me-2">Просрочено</span>` : `<span class="badge bg-danger me-2">Статус</span>`; if(t.type !== 'overdue') comment = '<i>Требует внимания</i>'; }
+            if (type === 'cooling') { badge = `<span class="badge bg-warning text-dark me-2">Не были: ${t.days} дн.</span>`; comment = '<i>Связаться</i>'; }
+            
+            return `<div class="list-group-item d-flex justify-content-between align-items-center p-2"><div>${badge}<a href="dealer.html?id=${t.dealerId}" target="_blank" class="fw-bold text-dark text-decoration-none">${t.dealerName}</a><div class="small text-muted text-truncate" style="max-width: 250px;">${comment}</div></div>${(type === 'upcoming' || (type==='problem' && t.type==='overdue')) ? `<button class="btn btn-sm btn-success btn-complete-task" data-id="${t.dealerId}" data-index="${t.visitIndex}">✔</button>` : ''}</div>`;
+        }).join('');
+    }
 
     // --- RENDER LIST (CARDS) ---
     function renderDealerList() {
@@ -221,8 +227,26 @@ document.addEventListener('DOMContentLoaded', () => {
                     <button class="dealer-mobile-btn text-dark btn-quick-visit"><i class="bi bi-calendar-check"></i></button>
                     <button class="dealer-mobile-btn text-warning btn-edit"><i class="bi bi-pencil"></i></button>
                 </div>
-            </div>`;
+            </div>
+            `;
         }).join('');
+    }
+
+    // --- ACTION HANDLERS ---
+    if(dealerListContainer) {
+        dealerListContainer.addEventListener('click', (e) => {
+            const btnEdit = e.target.closest('.btn-edit');
+            const btnDel = e.target.closest('.btn-delete');
+            const btnDup = e.target.closest('.btn-duplicate');
+            const btnVisit = e.target.closest('.btn-quick-visit');
+            const item = e.target.closest('.dealer-item');
+            if (!item) return;
+            const id = item.dataset.id;
+            if (btnEdit) openEditModal(id);
+            else if (btnDel && confirm('Удалить?')) fetch(`${API_DEALERS_URL}/${id}`, {method:'DELETE'}).then(initApp);
+            else if (btnDup) duplicateDealer(id);
+            else if (btnVisit) { document.getElementById('qv_dealer_id').value = id; document.getElementById('qv_comment').value = ''; qvModal.show(); }
+        });
     }
 
     function populateFilters(dealers) {
@@ -250,7 +274,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // OPEN ADD
     if(openAddModalBtn) openAddModalBtn.onclick = () => {
         if(addForm) addForm.reset();
-        currentStep = 1; showStep(1);
         renderProductChecklist(addProductChecklist);
         renderList(addContactList, [], createContactEntryHTML); renderList(addAddressList, [], createAddressEntryHTML);
         renderList(addPosList, [], createPosEntryHTML); renderList(addVisitsList, [], createVisitEntryHTML);
@@ -260,20 +283,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if(addAvatarPreview) addAvatarPreview.src = ''; newAvatarBase64 = null;
         addModal.show();
     };
-
-    // WIZARD
-    let currentStep = 1; const totalSteps = 4;
-    const prevBtn = document.getElementById('btn-prev-step'); const nextBtn = document.getElementById('btn-next-step'); const finishBtn = document.getElementById('btn-finish-step');
-    function showStep(step) {
-        document.querySelectorAll('.wizard-step').forEach(s => s.classList.remove('active'));
-        document.querySelectorAll('.step-indicator').forEach(i => i.classList.remove('active'));
-        const stepEl = document.getElementById(`step-${step}`); if(stepEl) stepEl.classList.add('active');
-        for (let i = 1; i <= totalSteps; i++) { const ind = document.getElementById(`step-ind-${i}`); if(!ind) continue; if (i < step) { ind.classList.add('completed'); ind.innerHTML = '✔'; } else { ind.classList.remove('completed'); ind.innerHTML = i; if (i === step) ind.classList.add('active'); else ind.classList.remove('active'); } }
-        if (prevBtn) prevBtn.style.display = step === 1 ? 'none' : 'inline-block';
-        if (nextBtn && finishBtn) { if (step === totalSteps) { nextBtn.style.display = 'none'; finishBtn.style.display = 'inline-block'; } else { nextBtn.style.display = 'inline-block'; finishBtn.style.display = 'none'; } }
-    }
-    if(nextBtn) nextBtn.onclick = () => { if (currentStep === 1) { if (!document.getElementById('dealer_id').value || !document.getElementById('name').value) { alert("Заполните ID и Название"); return; } if (addMap) setTimeout(() => addMap.invalidateSize(), 200); } if (currentStep < totalSteps) { currentStep++; showStep(currentStep); } };
-    if(prevBtn) prevBtn.onclick = () => { if (currentStep > 1) { currentStep--; showStep(currentStep); } };
 
     // SAVE ADD
     if(addForm) addForm.addEventListener('submit', async (e) => {
@@ -320,77 +329,43 @@ document.addEventListener('DOMContentLoaded', () => {
             renderList(addContactList, d.contacts || [], createContactEntryHTML); renderList(addAddressList, d.additional_addresses || [], createAddressEntryHTML);
             renderList(addPosList, d.pos_materials || [], createPosEntryHTML); renderList(addCompetitorList, d.competitors || [], createCompetitorEntryHTML);
             const pIds = (d.products || []).map(p => p.id); renderProductChecklist(addProductChecklist, pIds);
-            currentStep = 1; showStep(1); addModal.show(); alert("Данные скопированы. Введите новый ID.");
+            addModal.show(); alert("Данные скопированы. Введите новый ID.");
         } catch (e) { alert("Ошибка дублирования"); }
     }
 
-    // CLICK DELEGATION
-    if(dealerListContainer) {
-        dealerListContainer.addEventListener('click', (e) => {
-            const btnEdit = e.target.closest('.btn-edit'); const btnDel = e.target.closest('.btn-delete'); const btnDup = e.target.closest('.btn-duplicate'); const btnVisit = e.target.closest('.btn-quick-visit'); const item = e.target.closest('.dealer-item');
-            if (!item) return; const id = item.dataset.id;
-            if (btnEdit) openEditModal(id);
-            else if (btnDel && confirm('Удалить?')) fetch(`${API_DEALERS_URL}/${id}`, {method:'DELETE'}).then(initApp);
-            else if (btnDup) duplicateDealer(id);
-            else if (btnVisit) { document.getElementById('qv_dealer_id').value = id; document.getElementById('qv_comment').value = ''; qvModal.show(); }
-        });
-    }
-
     if(qvForm) qvForm.addEventListener('submit', async (e) => {
-        e.preventDefault(); if(isSaving)return; isSaving=true; const id=document.getElementById('qv_dealer_id').value; const comment=document.getElementById('qv_comment').value; const btn=qvForm.querySelector('button'); if(!id||!comment){isSaving=false;return;} try{btn.disabled=true; const r=await fetch(`${API_DEALERS_URL}/${id}`); const d=await r.json(); const v=[...(d.visits||[]), {date:new Date().toISOString().slice(0,10),comment,isCompleted:true}]; await fetch(`${API_DEALERS_URL}/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({visits:v})}); qvModal.hide(); alert("Визит добавлен!"); }catch(e){}finally{isSaving=false;btn.disabled=false;}
+        e.preventDefault(); if(isSaving)return; isSaving=true; const id=document.getElementById('qv_dealer_id').value; const comment=document.getElementById('qv_comment').value; const btn=qvForm.querySelector('button'); if(!id||!comment){isSaving=false;return;} try{btn.disabled=true; const r=await fetch(`${API_DEALERS_URL}/${id}`); const d=await r.json(); const v=[...(d.visits||[]), {date:new Date().toISOString().slice(0,10),comment,isCompleted:true}]; await fetch(`${API_DEALERS_URL}/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({visits:v})});qvModal.hide();alert("Визит добавлен!");}catch(e){}finally{isSaving=false;btn.disabled=false;}
     });
 
-    if(exportBtn) {
-        exportBtn.onclick = async () => {
-            if (!allDealers.length) return alert("Пусто. Нечего экспортировать.");
-            exportBtn.disabled = true; exportBtn.innerHTML = 'Загрузка...';
-            const clean = (text) => `"${String(text || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`;
-            const city = filterCity.value; const type = filterPriceType.value; const status = filterStatus.value; const responsible = filterResponsible.value; const search = searchBar.value.toLowerCase();
-            const filteredForExport = allDealers.filter(d => {
-                let statusMatch = false; const s = d.status || 'standard'; if (status) statusMatch = s === status; else statusMatch = s !== 'potential';
-                return (!city||d.city===city) && (!type||d.price_type===type) && (!responsible||d.responsible===responsible) && statusMatch && (!search || ((d.name||'').toLowerCase().includes(search)||(d.dealer_id||'').toLowerCase().includes(search)||(d.organization||'').toLowerCase().includes(search)));
-            });
-            let csv = "\uFEFFID;Название;Статус;Ответственный;Город;Адрес;Тип цен;Организация;Доставка;Сайт;Инстаграм;Контакты;Доп. Адреса;Бонусы\n";
-            try {
-                for (const dealer of filteredForExport) {
-                    const contactsName = (dealer.contacts || []).map(c => { let info = c.name || ''; if (c.position) info += ` (${c.position})`; if (c.contactInfo) info += ` - ${c.contactInfo}`; return info; }).join('; ');
-                    const addresses = (dealer.additional_addresses || []).map(a => `${a.description || ''}: ${a.city || ''}, ${a.address || ''}`).join('; ');
-                    const row = [clean(dealer.dealer_id), clean(dealer.name), clean(dealer.status), clean(dealer.responsible), clean(dealer.city), clean(dealer.address), clean(dealer.price_type), clean(dealer.organization), clean(dealer.delivery), clean(dealer.website), clean(dealer.instagram), clean(contactsName), clean(addresses), clean(dealer.bonuses)];
-                    csv += row.join(";") + "\r\n";
-                }
-                const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'})); a.download = 'dealers_export.csv'; a.click();
-            } catch (e) { alert("Ошибка: " + e.message); } finally { exportBtn.disabled = false; exportBtn.innerHTML = 'База'; }
-        };
-    }
-    
-    if(document.getElementById('export-competitors-prices-btn')) {
-        document.getElementById('export-competitors-prices-btn').onclick = async () => {
-            if (!allDealers.length) return alert("Пусто");
-            const typeMap = { 'std': 'Стандарт', 'eng': 'Англ. Елка', 'fr': 'Фр. Елка', 'art': 'Художественный', 'art_eng': 'Худ. Английская', 'art_fr': 'Худ. Французская', 'mix': 'Худ. Микс' };
-            let csv = "\uFEFFДилер;Город;Бренд;Коллекция;Тип;Цена ОПТ;Цена Розница\n";
-            allDealers.forEach(d => {
-                if(d.competitors) {
-                    d.competitors.forEach(c => {
-                        let typeLabel = 'Стандарт';
-                        const refBrand = competitorsRef.find(r => r.name === c.brand);
-                        if (refBrand && refBrand.collections) {
-                            const refCol = refBrand.collections.find(col => (typeof col === 'string' ? col : col.name) === c.collection);
-                            if (refCol) { const typeCode = (typeof refCol === 'string') ? 'std' : refCol.type; typeLabel = typeMap[typeCode] || 'Стандарт'; }
-                        }
-                        csv += `"${d.name}";"${d.city}";"${c.brand||''}";"${c.collection||''}";"${typeLabel}";"${c.price_opt||''}";"${c.price_retail||''}"\n`;
-                    });
-                }
-            });
-            const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'})); a.download = 'competitor_prices.csv'; a.click();
-        };
-    }
-    
+    if(exportBtn) exportBtn.onclick = async () => {
+        if (!allDealers.length) return alert("Пусто. Нечего экспортировать.");
+        exportBtn.disabled = true; exportBtn.innerHTML = 'Загрузка...';
+        const clean = (text) => `"${String(text || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`;
+        const city = filterCity.value; const type = filterPriceType.value; const status = filterStatus.value; const responsible = filterResponsible.value; const search = searchBar.value.toLowerCase();
+        const filteredForExport = allDealers.filter(d => {
+            let statusMatch = false; const s = d.status || 'standard'; if (status) statusMatch = s === status; else statusMatch = s !== 'potential';
+            return (!city||d.city===city) && (!type||d.price_type===type) && (!responsible||d.responsible===responsible) && statusMatch && (!search || ((d.name||'').toLowerCase().includes(search)||(d.dealer_id||'').toLowerCase().includes(search)||(d.organization||'').toLowerCase().includes(search)));
+        });
+        let csv = "\uFEFFID;Название;Статус;Ответственный;Город;Адрес;Тип цен;Организация;Доставка;Сайт;Инстаграм;Контакты;Доп. Адреса;Бонусы\n";
+        try {
+            for (const dealer of filteredForExport) {
+                const contactsName = (dealer.contacts || []).map(c => { let info = c.name || ''; if (c.position) info += ` (${c.position})`; if (c.contactInfo) info += ` - ${c.contactInfo}`; return info; }).join('; ');
+                const addresses = (dealer.additional_addresses || []).map(a => `${a.description || ''}: ${a.city || ''}, ${a.address || ''}`).join('; ');
+                const row = [clean(dealer.dealer_id), clean(dealer.name), clean(dealer.status), clean(dealer.responsible), clean(dealer.city), clean(dealer.address), clean(dealer.price_type), clean(dealer.organization), clean(dealer.delivery), clean(dealer.website), clean(dealer.instagram), clean(contactsName), clean(addresses), clean(dealer.bonuses)];
+                csv += row.join(";") + "\r\n";
+            }
+            const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'})); a.download = 'dealers_export.csv'; a.click();
+        } catch (e) { alert("Ошибка: " + e.message); } finally { exportBtn.disabled = false; exportBtn.innerHTML = 'База'; }
+    };
+
     if(filterCity) filterCity.onchange = renderDealerList; 
     if(filterPriceType) filterPriceType.onchange = renderDealerList; 
     if(filterStatus) filterStatus.onchange = renderDealerList;
     if(filterResponsible) filterResponsible.onchange = renderDealerList;
     if(searchBar) searchBar.oninput = renderDealerList;
-    
+
+    if(document.body) { document.body.addEventListener('click', (e) => { const taskBtn = e.target.closest('.btn-complete-task'); if (taskBtn) { completeTask(taskBtn, taskBtn.dataset.id, taskBtn.dataset.index); } }); }
+
     function collectFormData(form, prefix) {
         const list = prefix === 'add' ? [addContactList, addAddressList, addPosList, addVisitsList, addCompetitorList] : [editContactList, editAddressList, editPosList, editVisitsList, editCompetitorList];
         return {
