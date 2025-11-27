@@ -46,26 +46,21 @@
             </div>
         </div>
 
-        <div id="dashboard-container" class="row g-3 mb-4">
-            </div>
-
-        <div class="row mb-4">
-            <div class="col-md-4 mb-3">
-                <div class="card shadow-sm h-100 border-0 bg-white">
-                    <div class="card-header bg-primary text-white fw-bold">🔥 Задачи на сегодня</div>
-                    <div class="list-group list-group-flush" id="tasks-list-upcoming"></div>
+        <div class="row g-4 mb-4">
+            <div class="col-lg-6 d-flex flex-column gap-4">
+                <div id="dashboard-container" class="row g-3"></div> <div class="card task-card shadow-sm border-0 h-100 task-card-problem">
+                    <div class="card-header bg-white"><h5 class="card-title text-danger"><i class="bi bi-fire me-2"></i>Проблемные / Просрочено</h5></div>
+                    <div class="card-body"><div id="tasks-list-problem" class="list-group list-group-flush task-list"><p class="text-muted text-center p-3">Загрузка...</p></div></div>
                 </div>
             </div>
-            <div class="col-md-4 mb-3">
-                <div class="card shadow-sm h-100 border-0 bg-white">
-                    <div class="card-header bg-danger text-white fw-bold">⚠️ Проблемные</div>
-                    <div class="list-group list-group-flush" id="tasks-list-problem"></div>
+            <div class="col-lg-6 d-flex flex-column gap-4">
+                <div class="card task-card shadow-sm border-0 h-100 task-card-upcoming">
+                    <div class="card-header bg-white"><h5 class="card-title text-primary"><i class="bi bi-calendar-check me-2"></i>Ближайшие задачи</h5></div>
+                    <div class="card-body"><div id="tasks-list-upcoming" class="list-group list-group-flush task-list"><p class="text-muted text-center p-3">Загрузка...</p></div></div>
                 </div>
-            </div>
-            <div class="col-md-4 mb-3">
-                <div class="card shadow-sm h-100 border-0 bg-white">
-                    <div class="card-header bg-warning text-dark fw-bold">❄️ Остывающие (>30 дн)</div>
-                    <div class="list-group list-group-flush" id="tasks-list-cooling"></div>
+                <div class="card task-card shadow-sm border-0 h-100 task-card-cooling">
+                    <div class="card-header bg-white"><h5 class="card-title text-warning"><i class="bi bi-snow2 me-2"></i>"Остывающие" (> 30 дн.)</h5></div>
+                    <div class="card-body"><div id="tasks-list-cooling" class="list-group list-group-flush task-list"><p class="text-muted text-center p-3">Загрузка...</p></div></div>
                 </div>
             </div>
         </div>
@@ -155,3 +150,4 @@
     <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(console.error);</script>
 </body>
 </html>
+
