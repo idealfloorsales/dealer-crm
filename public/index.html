@@ -7,7 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-    <link rel="stylesheet" href="style.css?v=100">
+    <link rel="stylesheet" href="style.css?v=101">
     <link rel="icon" href="favicon.gif" type="image/gif">
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -38,7 +38,7 @@
         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
             <h1>Рабочий стол</h1>
             <div class="d-flex gap-2">
-                <a href="sales.html" class="btn btn-warning btn-lg"><i class="bi bi-cash-coin me-2"></i>Продажи</a>
+                
                 <button id="export-competitors-prices-btn" class="btn btn-info btn-lg text-white" title="Цены"><i class="bi bi-tags-fill me-2"></i>Цены</button>
                 <button id="export-dealers-btn" class="btn btn-success btn-lg"><i class="bi bi-file-earmark-excel me-2"></i>База</button>
                 <button id="open-add-modal-btn" class="btn btn-primary btn-lg"><i class="bi bi-plus-circle me-2"></i>Добавить</button>
@@ -48,34 +48,11 @@
         <div id="dashboard-container" class="row g-3 mb-4"></div>
 
         <div class="row g-3 mb-3 bg-white p-3 rounded shadow-sm border mx-0">
-            <div class="col-md-3">
-                <select id="filter-city" class="form-select"><option value="">-- Город --</option></select>
-            </div>
-            <div class="col-md-3">
-                <select id="filter-price-type" class="form-select"><option value="">-- Тип цен --</option></select>
-            </div>
-            <div class="col-md-3">
-                <select id="filter-responsible" class="form-select">
-                    <option value="">-- Ответственный --</option>
-                    <option value="regional_astana">Региональный Астана</option>
-                    <option value="regional_regions">Региональный Регионы</option>
-                    <option value="michael">Отдел продаж Михаил</option>
-                    <option value="alexander">Отдел продаж Александр</option>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <select id="filter-status" class="form-select">
-                    <option value="">-- Статус --</option>
-                    <option value="active">Активный</option>
-                    <option value="standard">Стандарт</option>
-                    <option value="problem">Проблемный</option>
-                    <option value="potential">Потенциальный</option>
-                    <option value="archive">Архив</option>
-                </select>
-            </div>
-            <div class="col-12 mt-2">
-                <input type="text" id="search-bar" class="form-control" placeholder="Поиск по названию, ID или юр. лицу...">
-            </div>
+            <div class="col-md-3"><select id="filter-city" class="form-select"><option value="">-- Город --</option></select></div>
+            <div class="col-md-3"><select id="filter-price-type" class="form-select"><option value="">-- Тип цен --</option></select></div>
+            <div class="col-md-3"><select id="filter-responsible" class="form-select"><option value="">-- Ответственный --</option><option value="regional_astana">Региональный Астана</option><option value="regional_regions">Региональный Регионы</option><option value="michael">Отдел продаж Михаил</option><option value="alexander">Отдел продаж Александр</option></select></div>
+            <div class="col-md-3"><select id="filter-status" class="form-select"><option value="">-- Статус --</option><option value="active">Активный</option><option value="standard">Стандарт</option><option value="problem">Проблемный</option><option value="potential">Потенциальный</option><option value="archive">Архив</option></select></div>
+            <div class="col-12 mt-2"><input type="text" id="search-bar" class="form-control" placeholder="Поиск по названию, ID или юр. лицу..."></div>
         </div>
 
         <div id="no-data-msg" class="alert alert-info text-center" style="display: none;">Ничего не найдено</div>
@@ -85,24 +62,9 @@
         </div>
         
         <div class="row mt-5">
-            <div class="col-md-4 mb-3">
-                <div class="card shadow-sm h-100 border-0 bg-white">
-                    <div class="card-header bg-primary text-white fw-bold">🔥 Задачи на сегодня</div>
-                    <div class="list-group list-group-flush" id="tasks-list-upcoming"></div>
-                </div>
-            </div>
-            <div class="col-md-4 mb-3">
-                <div class="card shadow-sm h-100 border-0 bg-white">
-                    <div class="card-header bg-danger text-white fw-bold">⚠️ Проблемные</div>
-                    <div class="list-group list-group-flush" id="tasks-list-problem"></div>
-                </div>
-            </div>
-            <div class="col-md-4 mb-3">
-                <div class="card shadow-sm h-100 border-0 bg-white">
-                    <div class="card-header bg-warning text-dark fw-bold">❄️ Давно не были</div>
-                    <div class="list-group list-group-flush" id="tasks-list-cooling"></div>
-                </div>
-            </div>
+            <div class="col-md-4 mb-3"><div class="card shadow-sm h-100 border-0 bg-white"><div class="card-header bg-primary text-white fw-bold">🔥 Задачи на сегодня</div><div class="list-group list-group-flush" id="tasks-list-upcoming"></div></div></div>
+            <div class="col-md-4 mb-3"><div class="card shadow-sm h-100 border-0 bg-white"><div class="card-header bg-danger text-white fw-bold">⚠️ Проблемные</div><div class="list-group list-group-flush" id="tasks-list-problem"></div></div></div>
+            <div class="col-md-4 mb-3"><div class="card shadow-sm h-100 border-0 bg-white"><div class="card-header bg-warning text-dark fw-bold">❄️ Давно не были</div><div class="list-group list-group-flush" id="tasks-list-cooling"></div></div></div>
         </div>
     </div>
 
@@ -125,7 +87,7 @@
                                 <div class="col-md-6"><label class="form-label">Город</label><input type="text" class="form-control" id="city"></div>
                                 <div class="col-md-6"><label class="form-label">Адрес</label><input type="text" class="form-control" id="address"></div>
                                 <div class="col-md-6"><label class="form-label">Статус</label><select class="form-select" id="status"><option value="potential">Потенциальный</option><option value="active">Активный</option><option value="standard">Стандарт</option><option value="problem">Проблемный</option></select></div>
-                                <div class="col-md-6"><label class="form-label">Ответственный</label><select class="form-select" id="responsible"><option value="regional_astana">Региональный Астана</option><option value="regional_regions">Региональный Регионы</option><option value="michael">Отдел продаж Михаил</option><option value="alexander">Отдел продаж Александр</option></select></div>
+                                <div class="col-md-6"><label class="form-label">Ответственный</label><select class="form-select" id="responsible"><option value="regional_astana">Региональный Астана</option><option value="regional_regions">Региональный Регионы</option></select></div>
                                 <div class="col-12"><label class="form-label">Местоположение</label><div class="map-search-container"><input type="text" class="form-control mb-2" id="add-map-search" placeholder="Поиск адреса..."><div id="add-map-suggestions" class="address-suggestions"></div></div><div id="add-map" style="height: 250px;" class="rounded border"></div><div class="row mt-2"><div class="col"><input type="text" class="form-control form-control-sm" id="add_latitude" readonly></div><div class="col"><input type="text" class="form-control form-control-sm" id="add_longitude" readonly></div></div></div>
                             </div>
                         </div>
@@ -184,7 +146,7 @@
                             <div class="tab-pane fade" id="tab-contacts">
                                 <div class="row g-3"><div class="col-md-6"><label class="form-label">Город</label><input type="text" class="form-control" id="edit_city"></div><div class="col-md-6"><label class="form-label">Адрес</label><input type="text" class="form-control" id="edit_address"></div><div class="col-md-6"><label class="form-label">Сайт</label><input type="text" class="form-control" id="edit_website"></div><div class="col-md-6"><label class="form-label">Instagram</label><input type="text" class="form-control" id="edit_instagram"></div><div class="col-12"><label class="form-label fw-bold">Контакты</label><div id="edit-contact-list"></div><button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-contact-btn-edit-modal">+ Контакт</button></div><div class="col-12"><label class="form-label fw-bold">Доп. адреса</label><div id="edit-address-list"></div><button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-address-btn-edit-modal">+ Адрес</button></div></div>
                             </div>
-                            <div class="tab-pane fade" id="tab-map"><div class="map-search-container"><input type="text" class="form-control mb-2" id="edit-map-search" placeholder="Поиск адреса..."><div id="edit-map-suggestions" class="address-suggestions"></div></div><div id="edit-map" class="mini-map" style="height:400px"></div><div class="row mt-2"><div class="col"><input type="text" class="form-control form-control-sm" id="edit_latitude" readonly></div><div class="col"><input type="text" class="form-control form-control-sm" id="edit_longitude" readonly></div></div></div>
+                            <div class="tab-pane fade" id="tab-map"><div class="map-search-container"><input type="text" class="form-control mb-2" id="edit-map-search" placeholder="Поиск адреса..."><div id="edit-map-suggestions" class="address-suggestions"></div></div><div id="edit-map" class="mini-map" style="height:400px"></div><div class="row mt-2"><div class="col"><input type="text" class="form-control form-control-sm" id="edit_latitude" placeholder="Lat" readonly></div><div class="col"><input type="text" class="form-control form-control-sm" id="edit_longitude" placeholder="Lng" readonly></div></div></div>
                             <div class="tab-pane fade" id="tab-marketing"><div class="mb-3"><label class="form-label fw-bold">Визиты</label><div id="edit-visits-list"></div><button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-visits-btn-edit-modal">+ Визит</button></div><div class="mb-3"><label class="form-label">Доставка</label><textarea class="form-control" id="edit_delivery" rows="2"></textarea></div><div class="mb-3"><label class="form-label">Бонусы</label><textarea class="form-control" id="edit_bonuses" rows="2"></textarea></div><div class="mb-3"><label class="form-label fw-bold">Фото</label><input type="file" class="form-control mb-2" id="edit-photo-input" multiple accept="image/*"><div id="edit-photo-preview-container" class="photo-preview-grid"></div></div></div>
                             <div class="tab-pane fade" id="tab-samples"><div class="col-12 mb-3"><label class="form-label fw-bold">Стенды</label><div id="edit-pos-list"></div><button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-pos-btn-edit-modal">+ Стенд</button></div><div class="col-12"><label class="form-label fw-bold">Товары</label><div id="edit-product-checklist" class="product-checklist border rounded p-3" style="max-height: 400px; overflow-y: auto;"></div></div></div>
                             <div class="tab-pane fade" id="tab-competitors"><div class="col-12"><label class="form-label fw-bold">Мониторинг</label><div id="edit-competitor-list"></div><button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-competitor-btn-edit-modal">+ Конкурент</button></div></div>
@@ -212,7 +174,7 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="script.js?v=100"></script>
+    <script src="script.js?v=101"></script>
     
     <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(console.error);</script>
 </body>
