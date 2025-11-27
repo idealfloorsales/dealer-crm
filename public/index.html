@@ -7,7 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-    <link rel="stylesheet" href="style.css?v=99">
+    <link rel="stylesheet" href="style.css?v=100">
     <link rel="icon" href="favicon.gif" type="image/gif">
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -45,8 +45,7 @@
             </div>
         </div>
 
-        <div id="dashboard-container" class="row g-3 mb-4">
-            </div>
+        <div id="dashboard-container" class="row g-3 mb-4"></div>
 
         <div class="row g-3 mb-3 bg-white p-3 rounded shadow-sm border mx-0">
             <div class="col-md-3">
@@ -60,6 +59,8 @@
                     <option value="">-- Ответственный --</option>
                     <option value="regional_astana">Региональный Астана</option>
                     <option value="regional_regions">Региональный Регионы</option>
+                    <option value="michael">Отдел продаж Михаил</option>
+                    <option value="alexander">Отдел продаж Александр</option>
                 </select>
             </div>
             <div class="col-md-3">
@@ -124,7 +125,7 @@
                                 <div class="col-md-6"><label class="form-label">Город</label><input type="text" class="form-control" id="city"></div>
                                 <div class="col-md-6"><label class="form-label">Адрес</label><input type="text" class="form-control" id="address"></div>
                                 <div class="col-md-6"><label class="form-label">Статус</label><select class="form-select" id="status"><option value="potential">Потенциальный</option><option value="active">Активный</option><option value="standard">Стандарт</option><option value="problem">Проблемный</option></select></div>
-                                <div class="col-md-6"><label class="form-label">Ответственный</label><select class="form-select" id="responsible"><option value="regional_astana">Региональный Астана</option><option value="regional_regions">Региональный Регионы</option></select></div>
+                                <div class="col-md-6"><label class="form-label">Ответственный</label><select class="form-select" id="responsible"><option value="regional_astana">Региональный Астана</option><option value="regional_regions">Региональный Регионы</option><option value="michael">Отдел продаж Михаил</option><option value="alexander">Отдел продаж Александр</option></select></div>
                                 <div class="col-12"><label class="form-label">Местоположение</label><div class="map-search-container"><input type="text" class="form-control mb-2" id="add-map-search" placeholder="Поиск адреса..."><div id="add-map-suggestions" class="address-suggestions"></div></div><div id="add-map" style="height: 250px;" class="rounded border"></div><div class="row mt-2"><div class="col"><input type="text" class="form-control form-control-sm" id="add_latitude" readonly></div><div class="col"><input type="text" class="form-control form-control-sm" id="add_longitude" readonly></div></div></div>
                             </div>
                         </div>
@@ -177,16 +178,16 @@
                             <div class="tab-pane fade show active" id="tab-main">
                                 <div class="row g-3">
                                     <div class="col-md-2"><div class="text-center mb-2"><img id="edit-avatar-preview" src="" class="avatar-preview rounded border mb-2" style="width: 100%; height: 120px; object-fit: cover; background: #f8f9fa;"><label class="btn btn-sm btn-outline-secondary w-100">Изменить <input type="file" id="edit-avatar-input" hidden accept="image/*"></label></div></div>
-                                    <div class="col-md-10"><div class="row g-3"><div class="col-md-3"><label class="form-label">ID</label><input type="text" class="form-control fw-bold" id="edit_dealer_id"></div><div class="col-md-9"><label class="form-label">Название</label><input type="text" class="form-control fw-bold" id="edit_name"></div><div class="col-md-4"><label class="form-label">Организация</label><input type="text" class="form-control" id="edit_organization"></div><div class="col-md-4"><label class="form-label">Тип цен</label><select class="form-select" id="edit_price_type"><option value="opt">Опт</option><option value="retail">Розница</option><option value="vip">VIP</option></select></div><div class="col-md-4"><label class="form-label">Статус</label><select class="form-select" id="edit_status"><option value="potential">Потенциальный</option><option value="active">Активный</option><option value="standard">Стандарт</option><option value="problem">Проблемный</option><option value="archive">Архив</option></select></div><div class="col-12"><label class="form-label">Ответственный</label><select class="form-select" id="edit_responsible"><option value="regional_astana">Региональный Астана</option><option value="regional_regions">Региональный Регионы</option></select></div></div></div>
+                                    <div class="col-md-10"><div class="row g-3"><div class="col-md-3"><label class="form-label">ID</label><input type="text" class="form-control fw-bold" id="edit_dealer_id"></div><div class="col-md-9"><label class="form-label">Название</label><input type="text" class="form-control fw-bold" id="edit_name"></div><div class="col-md-4"><label class="form-label">Организация</label><input type="text" class="form-control" id="edit_organization"></div><div class="col-md-4"><label class="form-label">Тип цен</label><select class="form-select" id="edit_price_type"><option value="opt">Опт</option><option value="retail">Розница</option><option value="vip">VIP</option></select></div><div class="col-md-4"><label class="form-label">Статус</label><select class="form-select" id="edit_status"><option value="potential">Потенциальный</option><option value="active">Активный</option><option value="standard">Стандарт</option><option value="problem">Проблемный</option><option value="archive">Архив</option></select></div><div class="col-12"><label class="form-label">Ответственный</label><select class="form-select" id="edit_responsible"><option value="regional_astana">Региональный Астана</option><option value="regional_regions">Региональный Регионы</option><option value="michael">Отдел продаж Михаил</option><option value="alexander">Отдел продаж Александр</option></select></div></div></div>
                                 </div>
                             </div>
                             <div class="tab-pane fade" id="tab-contacts">
                                 <div class="row g-3"><div class="col-md-6"><label class="form-label">Город</label><input type="text" class="form-control" id="edit_city"></div><div class="col-md-6"><label class="form-label">Адрес</label><input type="text" class="form-control" id="edit_address"></div><div class="col-md-6"><label class="form-label">Сайт</label><input type="text" class="form-control" id="edit_website"></div><div class="col-md-6"><label class="form-label">Instagram</label><input type="text" class="form-control" id="edit_instagram"></div><div class="col-12"><label class="form-label fw-bold">Контакты</label><div id="edit-contact-list"></div><button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-contact-btn-edit-modal">+ Контакт</button></div><div class="col-12"><label class="form-label fw-bold">Доп. адреса</label><div id="edit-address-list"></div><button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-address-btn-edit-modal">+ Адрес</button></div></div>
                             </div>
-                            <div class="tab-pane fade" id="tab-map"><div class="map-search-container"><input type="text" class="form-control mb-2" id="edit-map-search" placeholder="Поиск..."><div id="edit-map-suggestions" class="address-suggestions"></div></div><div id="edit-map" class="mini-map" style="height:400px"></div><div class="row mt-2"><div class="col"><input type="text" class="form-control form-control-sm" id="edit_latitude" readonly></div><div class="col"><input type="text" class="form-control form-control-sm" id="edit_longitude" readonly></div></div></div>
+                            <div class="tab-pane fade" id="tab-map"><div class="map-search-container"><input type="text" class="form-control mb-2" id="edit-map-search" placeholder="Поиск адреса..."><div id="edit-map-suggestions" class="address-suggestions"></div></div><div id="edit-map" class="mini-map" style="height:400px"></div><div class="row mt-2"><div class="col"><input type="text" class="form-control form-control-sm" id="edit_latitude" readonly></div><div class="col"><input type="text" class="form-control form-control-sm" id="edit_longitude" readonly></div></div></div>
                             <div class="tab-pane fade" id="tab-marketing"><div class="mb-3"><label class="form-label fw-bold">Визиты</label><div id="edit-visits-list"></div><button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-visits-btn-edit-modal">+ Визит</button></div><div class="mb-3"><label class="form-label">Доставка</label><textarea class="form-control" id="edit_delivery" rows="2"></textarea></div><div class="mb-3"><label class="form-label">Бонусы</label><textarea class="form-control" id="edit_bonuses" rows="2"></textarea></div><div class="mb-3"><label class="form-label fw-bold">Фото</label><input type="file" class="form-control mb-2" id="edit-photo-input" multiple accept="image/*"><div id="edit-photo-preview-container" class="photo-preview-grid"></div></div></div>
                             <div class="tab-pane fade" id="tab-samples"><div class="col-12 mb-3"><label class="form-label fw-bold">Стенды</label><div id="edit-pos-list"></div><button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-pos-btn-edit-modal">+ Стенд</button></div><div class="col-12"><label class="form-label fw-bold">Товары</label><div id="edit-product-checklist" class="product-checklist border rounded p-3" style="max-height: 400px; overflow-y: auto;"></div></div></div>
-                            <div class="tab-pane fade" id="tab-competitors"><div class="col-12"><label class="form-label fw-bold">Мониторинг</label><div id="edit-competitor-list" class="list-scrollable"></div><button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-competitor-btn-edit-modal">+ Конкурент</button></div></div>
+                            <div class="tab-pane fade" id="tab-competitors"><div class="col-12"><label class="form-label fw-bold">Мониторинг</label><div id="edit-competitor-list"></div><button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-competitor-btn-edit-modal">+ Конкурент</button></div></div>
                         </div>
                     </form>
                 </div>
@@ -205,13 +206,13 @@
             </div>
         </div>
     </div>
-    
+
     <datalist id="brands-datalist"></datalist>
     <datalist id="pos-materials-datalist"></datalist>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="script.js?v=99"></script>
+    <script src="script.js?v=100"></script>
     
     <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(console.error);</script>
 </body>
