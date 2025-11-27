@@ -7,7 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-    <link rel="stylesheet" href="style.css?v=115">
+    <link rel="stylesheet" href="style.css?v=120">
     <link rel="icon" href="favicon.gif" type="image/gif">
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -45,8 +45,7 @@
             </div>
         </div>
 
-        <div id="dashboard-container" class="row g-3 mb-4">
-            </div>
+        <div id="dashboard-container" class="row g-3 mb-4"></div>
 
         <div class="row g-3 mb-3 bg-white p-3 rounded shadow-sm border mx-0">
             <div class="col-md-3">
@@ -65,10 +64,10 @@
             <div class="col-md-3">
                 <select id="filter-status" class="form-select">
                     <option value="">-- Статус --</option>
+                    <option value="potential">Потенциальный</option>
                     <option value="active">Активный</option>
                     <option value="standard">Стандарт</option>
                     <option value="problem">Проблемный</option>
-                    <option value="potential">Потенциальный</option>
                     <option value="archive">Архив</option>
                 </select>
             </div>
@@ -79,8 +78,23 @@
 
         <div id="no-data-msg" class="alert alert-info text-center" style="display: none;">Ничего не найдено</div>
 
-        <div id="dealer-list-container" class="dealer-list-container">
-            <p class="text-center p-5 text-muted">Загрузка...</p>
+        <div class="table-responsive bg-white rounded shadow-sm border" id="dealer-table">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 50px;">#</th>
+                        <th style="width: 80px;">Фото</th>
+                        <th data-sort="dealer_id" style="cursor: pointer;">ID</th>
+                        <th data-sort="name" style="cursor: pointer;">Название</th>
+                        <th>Город</th>
+                        <th>Тип цен</th>
+                        <th>Организация</th>
+                        <th style="width: 60px;"></th>
+                    </tr>
+                </thead>
+                <tbody id="dealer-list-body">
+                    </tbody>
+            </table>
         </div>
         
         <div class="row mt-5">
@@ -211,7 +225,7 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="script.js?v=115"></script>
+    <script src="script.js?v=120"></script>
     
     <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(console.error);</script>
 </body>
