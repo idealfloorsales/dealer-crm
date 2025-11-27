@@ -46,6 +46,9 @@
             </div>
         </div>
 
+        <div id="dashboard-container" class="row g-3 mb-4">
+            </div>
+
         <div class="row g-4 mb-4">
             <div class="col-lg-6 d-flex flex-column gap-4">
                 <div id="dashboard-container" class="row g-3"></div> <div class="card task-card shadow-sm border-0 h-100 task-card-problem">
@@ -65,36 +68,17 @@
             </div>
         </div>
 
-        <h3 class="mt-5">Список дилеров</h3>
-        
-        <div class="row g-3 mb-4 p-3 bg-white rounded shadow-sm border">
-            <div class="col-md-4 col-lg-2">
-                <select id="filter-status" class="form-select">
-                    <option value="">-- Статус --</option>
-                    <option value="potential">🔵 Потенциальный</option>
-                    <option value="active">🟢 Активный</option>
-                    <option value="standard">🟡 Стандарт</option>
-                    <option value="problem">🔴 Проблемный</option>
-                    <option value="archive">⚫ Архив</option>
-                </select>
-            </div>
-            <div class="col-md-4 col-lg-2">
-                <select id="filter-city" class="form-select"><option value="">-- Город --</option></select>
-            </div>
-            <div class="col-md-4 col-lg-3">
-                <select id="filter-responsible" class="form-select">
-                    <option value="">-- Ответственный --</option>
-                    <option value="regional_astana">Региональный Астана</option>
-                    <option value="regional_regions">Региональный Регионы</option>
-                </select>
-            </div>
-            <div class="col-md-6 col-lg-2">
-                <select id="filter-price-type" class="form-select"><option value="">-- Тип цен --</option></select>
-            </div>
-            <div class="col-md-6 col-lg-3">
-                <input type="text" id="search-bar" class="form-control" placeholder="Поиск...">
-            </div>
+        <hr class="my-4">
+
+        <div class="row g-3 mb-3 bg-white p-3 rounded shadow-sm border mx-0">
+            <div class="col-md-3"><select id="filter-city" class="form-select"><option value="">-- Город --</option></select></div>
+            <div class="col-md-3"><select id="filter-price-type" class="form-select"><option value="">-- Тип цен --</option></select></div>
+            <div class="col-md-3"><select id="filter-responsible" class="form-select"><option value="">-- Ответственный --</option><option value="regional_astana">Региональный Астана</option><option value="regional_regions">Региональный Регионы</option></select></div>
+            <div class="col-md-3"><select id="filter-status" class="form-select"><option value="">-- Статус --</option><option value="active">Активный</option><option value="standard">Стандарт</option><option value="problem">Проблемный</option><option value="potential">Потенциальный</option><option value="archive">Архив</option></select></div>
+            <div class="col-12 mt-2"><input type="text" id="search-bar" class="form-control" placeholder="Поиск по названию, ID или юр. лицу..."></div>
         </div>
+
+        <div id="no-data-msg" class="alert alert-info text-center" style="display: none;">Ничего не найдено</div>
 
         <div id="dealer-list-container" class="dealer-list-container">
             <p class="text-center p-5 text-muted">Загрузка...</p>
@@ -169,5 +153,3 @@
     <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(console.error);</script>
 </body>
 </html>
-
-
