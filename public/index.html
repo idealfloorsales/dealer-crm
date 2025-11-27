@@ -39,7 +39,7 @@
         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
             <h1>Рабочий стол</h1>
             <div class="d-flex gap-2">
-                <a href="sales.html" class="btn btn-warning btn-lg"><i class="bi bi-cash-coin me-2"></i>Продажи</a>
+               
                 <button id="export-competitors-prices-btn" class="btn btn-info btn-lg text-white" title="Цены"><i class="bi bi-tags-fill me-2"></i>Цены</button>
                 <button id="export-dealers-btn" class="btn btn-success btn-lg"><i class="bi bi-file-earmark-excel me-2"></i>База</button>
                 <button id="open-add-modal-btn" class="btn btn-primary btn-lg"><i class="bi bi-plus-circle me-2"></i>Добавить</button>
@@ -58,7 +58,16 @@
                     <option value="regional_regions">Региональный Регионы</option>
                 </select>
             </div>
-            <div class="col-md-3"><select id="filter-status" class="form-select"><option value="">-- Статус --</option><option value="active">Активный</option><option value="standard">Стандарт</option><option value="problem">Проблемный</option><option value="potential">Потенциальный</option><option value="archive">Архив</option></select></div>
+            <div class="col-md-3">
+                <select id="filter-status" class="form-select">
+                    <option value="">-- Статус --</option>
+                    <option value="active">Активный</option>
+                    <option value="standard">Стандарт</option>
+                    <option value="problem">Проблемный</option>
+                    <option value="potential">Потенциальный</option>
+                    <option value="archive">Архив</option>
+                </select>
+            </div>
             <div class="col-12 mt-2"><input type="text" id="search-bar" class="form-control" placeholder="Поиск..."></div>
         </div>
 
