@@ -16,12 +16,11 @@ document.addEventListener('DOMContentLoaded', () => {
         "Табличка - Табличка орг.стекло"
     ];
 
-    // --- 1. ГЕНЕРАТОРЫ (ДОЛЖНЫ БЫТЬ В НАЧАЛЕ) ---
+    // 1. ГЕНЕРАТОРЫ (ВАЖНО: В НАЧАЛЕ)
     function createContactEntryHTML(c={}) { return `<div class="contact-entry input-group mb-2"><input type="text" class="form-control contact-name" placeholder="Имя" value="${c.name||''}"><input type="text" class="form-control contact-position" placeholder="Должность" value="${c.position||''}"><input type="text" class="form-control contact-info" placeholder="Телефон" value="${c.contactInfo||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry" onclick="this.closest('.contact-entry').remove()">×</button></div>`; }
     function createAddressEntryHTML(a={}) { return `<div class="address-entry input-group mb-2"><input type="text" class="form-control address-description" placeholder="Описание" value="${a.description||''}"><input type="text" class="form-control address-city" placeholder="Город" value="${a.city||''}"><input type="text" class="form-control address-address" placeholder="Адрес" value="${a.address||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry" onclick="this.closest('.address-entry').remove()">×</button></div>`; }
     function createPosEntryHTML(p={}) { return `<div class="pos-entry input-group mb-2"><input type="text" class="form-control pos-name" list="pos-materials-datalist" placeholder="Стенд (ввод)" value="${p.name||''}"><input type="number" class="form-control pos-quantity" value="${p.quantity||1}" min="1" style="max-width:80px" placeholder="Кол"><button type="button" class="btn btn-outline-danger btn-remove-entry" onclick="this.closest('.pos-entry').remove()">×</button></div>`; }
     function createVisitEntryHTML(v={}) { return `<div class="visit-entry input-group mb-2"><input type="date" class="form-control visit-date" value="${v.date||''}"><input type="text" class="form-control visit-comment w-50" placeholder="Результат..." value="${v.comment||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry" onclick="this.closest('.visit-entry').remove()">×</button></div>`; }
-    
     function createCompetitorEntryHTML(c={}) { 
         let brandOpts = `<option value="">-- Бренд --</option>`; competitorsRef.forEach(ref => { const sel = ref.name === c.brand ? 'selected' : ''; brandOpts += `<option value="${ref.name}" ${sel}>${ref.name}</option>`; });
         let collOpts = `<option value="">-- Коллекция --</option>`; if(c.brand) { const ref = competitorsRef.find(r => r.name === c.brand); if(ref&&ref.collections) ref.collections.forEach(cl=>collOpts+=`<option value="${cl.name||cl}" ${cl.name===c.collection||cl===c.collection?'selected':''}>${cl.name||cl}</option>`); }
@@ -29,17 +28,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     window.updateCollections = function(s) { const b=s.value; const c=s.closest('.competitor-entry').querySelector('.competitor-collection'); let h='<option value="">-- Коллекция --</option>'; const r=competitorsRef.find(x=>x.name===b); if(r&&r.collections) r.collections.forEach(cl=>h+=`<option value="${cl.name||cl}">${cl.name||cl}</option>`); c.innerHTML=h; };
 
-    // --- 2. ЭЛЕМЕНТЫ И МОДАЛКИ ---
+    // 2. ELEMENTS
     const addModalEl = document.getElementById('add-modal'); const addModal = new bootstrap.Modal(addModalEl, { backdrop: 'static', keyboard: false });
     const addForm = document.getElementById('add-dealer-form');
     const editModalEl = document.getElementById('edit-modal'); const editModal = new bootstrap.Modal(editModalEl, { backdrop: 'static', keyboard: false });
     const editForm = document.getElementById('edit-dealer-form');
     const qvModalEl = document.getElementById('quick-visit-modal'); const qvModal = new bootstrap.Modal(qvModalEl, { backdrop: 'static', keyboard: false });
     const qvForm = document.getElementById('quick-visit-form');
-
     const openAddModalBtn = document.getElementById('open-add-modal-btn');
-    const brandsDatalist = document.getElementById('brands-datalist');
-    const posDatalist = document.getElementById('pos-materials-datalist');
     const dealerListContainer = document.getElementById('dealer-list-container'); 
 
     const noDataMsg = document.getElementById('no-data-msg');
@@ -51,25 +47,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const exportBtn = document.getElementById('export-dealers-btn'); 
     const dashboardContainer = document.getElementById('dashboard-container');
 
-    // СПИСКИ (ADD)
     const addProductChecklist = document.getElementById('add-product-checklist'); 
     const addContactList = document.getElementById('add-contact-list'); const addAddressList = document.getElementById('add-address-list'); const addPosList = document.getElementById('add-pos-list'); const addVisitsList = document.getElementById('add-visits-list'); const addCompetitorList = document.getElementById('add-competitor-list');
-    const addPhotoInput = document.getElementById('add-photo-input'); const addPhotoPreviewContainer = document.getElementById('add-photo-preview-container');
-    const addAvatarInput = document.getElementById('add-avatar-input'); const addAvatarPreview = document.getElementById('add-avatar-preview');
-    
-    // СПИСКИ (EDIT)
     const editProductChecklist = document.getElementById('edit-product-checklist'); 
     const editContactList = document.getElementById('edit-contact-list'); const editAddressList = document.getElementById('edit-address-list'); const editPosList = document.getElementById('edit-pos-list'); const editVisitsList = document.getElementById('edit-visits-list'); const editCompetitorList = document.getElementById('edit-competitor-list');
+    
+    const addPhotoInput = document.getElementById('add-photo-input'); const addPhotoPreviewContainer = document.getElementById('add-photo-preview-container');
+    const addAvatarInput = document.getElementById('add-avatar-input'); const addAvatarPreview = document.getElementById('add-avatar-preview');
     const editPhotoInput = document.getElementById('edit-photo-input'); const editPhotoPreviewContainer = document.getElementById('edit-photo-preview-container');
     const editAvatarInput = document.getElementById('edit-avatar-input'); const editAvatarPreview = document.getElementById('edit-avatar-preview');
     const editCurrentAvatarUrl = document.getElementById('edit-current-avatar-url');
+    const brandsDatalist = document.getElementById('brands-datalist'); const posDatalist = document.getElementById('pos-materials-datalist');
 
     let addPhotosData = []; let editPhotosData = []; let newAvatarBase64 = null; 
 
-    // --- 3. UTILS & MAPS ---
+    // 3. UTILS & MAPS
     const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
     const safeText = (text) => (text || '').toString().replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    const toBase64 = file => new Promise((resolve) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => resolve(reader.result); });
+    const toBase64 = file => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => resolve(reader.result); });
     const compressImage = (file, w, q) => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = e => { const img = new Image(); img.src = e.target.result; img.onload = () => { const c = document.createElement('canvas'); let width = img.width; let height = img.height; if (width > w) { height *= w / width; width = w; } c.width = width; c.height = height; c.getContext('2d').drawImage(img, 0, 0, width, height); resolve(c.toDataURL('image/jpeg', q)); }; }; });
 
     let addMap, editMap;
@@ -79,26 +74,22 @@ document.addEventListener('DOMContentLoaded', () => {
     if (addModalEl) { addModalEl.addEventListener('shown.bs.modal', () => { if(!addMap) { addMap=initMap('add-map'); addModalEl.markerRef={current:null}; setupMapClick(addMap,'add_latitude','add_longitude',addModalEl.markerRef); setupMapSearch(addMap,'add-map-search','add-map-suggestions','add_latitude','add_longitude',addModalEl.markerRef); } else addMap.invalidateSize(); }); }
     if (editModalEl) { editModalEl.addEventListener('shown.bs.modal', () => { const t=document.querySelector('button[data-bs-target="#tab-map"]'); if(t) t.addEventListener('shown.bs.tab', () => { if(!editMap) { editMap=initMap('edit-map'); editModalEl.markerRef={current:null}; setupMapClick(editMap,'edit_latitude','edit_longitude',editModalEl.markerRef); setupMapSearch(editMap,'edit-map-search','edit-map-suggestions','edit_latitude','edit_longitude',editModalEl.markerRef); } if(editMap) { editMap.invalidateSize(); const lat=parseFloat(document.getElementById('edit_latitude').value),lng=parseFloat(document.getElementById('edit_longitude').value); if(!isNaN(lat)) { editMap.setView([lat,lng],15); if(editModalEl.markerRef.current) editModalEl.markerRef.current.setLatLng([lat,lng]); else editModalEl.markerRef.current=L.marker([lat,lng]).addTo(editMap); } } }); }); }
 
-    // --- 4. КНОПКИ (ИСПРАВЛЕНО: ПРЯМОЕ НАЗНАЧЕНИЕ) ---
-    
-    // Кнопки в модалке ДОБАВЛЕНИЯ
+    // 4. BUTTON HANDLERS (ЯВНОЕ НАЗНАЧЕНИЕ)
     document.getElementById('add-contact-btn-add-modal').onclick = () => addContactList.insertAdjacentHTML('beforeend', createContactEntryHTML());
     document.getElementById('add-address-btn-add-modal').onclick = () => addAddressList.insertAdjacentHTML('beforeend', createAddressEntryHTML());
     document.getElementById('add-pos-btn-add-modal').onclick = () => addPosList.insertAdjacentHTML('beforeend', createPosEntryHTML());
     document.getElementById('add-visits-btn-add-modal').onclick = () => addVisitsList.insertAdjacentHTML('beforeend', createVisitEntryHTML());
     document.getElementById('add-competitor-btn-add-modal').onclick = () => addCompetitorList.insertAdjacentHTML('beforeend', createCompetitorEntryHTML());
-
-    // Кнопки в модалке РЕДАКТИРОВАНИЯ (ТУТ БЫЛА ОШИБКА, ТЕПЕРЬ ИСПРАВЛЕНО)
+    
     document.getElementById('add-contact-btn-edit-modal').onclick = () => editContactList.insertAdjacentHTML('beforeend', createContactEntryHTML());
     document.getElementById('add-address-btn-edit-modal').onclick = () => editAddressList.insertAdjacentHTML('beforeend', createAddressEntryHTML());
     document.getElementById('add-pos-btn-edit-modal').onclick = () => editPosList.insertAdjacentHTML('beforeend', createPosEntryHTML());
     document.getElementById('add-visits-btn-edit-modal').onclick = () => editVisitsList.insertAdjacentHTML('beforeend', createVisitEntryHTML());
     document.getElementById('add-competitor-btn-edit-modal').onclick = () => editCompetitorList.insertAdjacentHTML('beforeend', createCompetitorEntryHTML());
-
+    
     document.addEventListener('click', e => { if(e.target.closest('.btn-remove-entry')) e.target.closest('.contact-entry,.address-entry,.pos-entry,.visit-entry,.competitor-entry').remove(); });
 
-    // --- 5. ОСНОВНАЯ ЛОГИКА ---
-
+    // 5. LOGIC
     async function initApp() {
         await fetchProductCatalog();
         updatePosDatalist();
@@ -125,10 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(!container) return;
         const set = new Set(selectedIds);
         container.innerHTML = fullProductCatalog.map(p => 
-            `<div class="checklist-item form-check">
-                <input type="checkbox" class="form-check-input" value="${p.id}" ${set.has(p.id)?'checked':''}>
-                <label class="form-check-label">${p.sku} - ${p.name}</label>
-            </div>`
+            `<div class="checklist-item form-check"><input type="checkbox" class="form-check-input" value="${p.id}" ${set.has(p.id)?'checked':''}><label class="form-check-label">${p.sku} - ${p.name}</label></div>`
         ).join('');
     }
     function getSelectedProductIds(containerId) { const el=document.getElementById(containerId); if(!el) return []; return Array.from(el.querySelectorAll('input:checked')).map(cb=>cb.value); }
@@ -136,13 +124,18 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderList(container, data, htmlGen) { if(container) container.innerHTML = (data || []).map(htmlGen).join(''); }
     function renderPhotoPreviews(container, photosArray) { if(container) container.innerHTML = photosArray.map((p, index) => `<div class="photo-preview-item"><img src="${p.photo_url}"><button type="button" class="btn-remove-photo" data-index="${index}">×</button></div>`).join(''); }
 
-    // --- 6. ДАШБОРД 2X2 + 3 СПИСКА ---
+    // --- DASHBOARD (2 СТАТИСТИКИ + 3 СПИСКА) ---
     function renderDashboard() {
-        if(!dashboardContainer) return;
-        if(!allDealers.length) { dashboardContainer.innerHTML=''; return; }
-        const total = allDealers.filter(d=>d.status!=='potential'&&d.status!=='archive').length;
-        const noPhoto = allDealers.filter(d=>!d.photo_url && d.status!=='potential').length;
-        dashboardContainer.innerHTML=`<div class="col-6 col-md-6"><div class="stat-card h-100 p-3 bg-white rounded shadow-sm border border-primary text-center d-flex align-items-center justify-content-center flex-column"><i class="bi bi-shop stat-icon text-primary fs-1 mb-2"></i><span class="fs-2 fw-bold text-primary">${total}</span><span class="text-muted small text-uppercase fw-bold">Всего дилеров</span></div></div><div class="col-6 col-md-6"><div class="stat-card h-100 p-3 bg-white rounded shadow-sm border border-danger text-center d-flex align-items-center justify-content-center flex-column"><i class="bi bi-camera-fill stat-icon text-danger fs-1 mb-2"></i><span class="fs-2 fw-bold text-danger">${noPhoto}</span><span class="text-muted small text-uppercase fw-bold">Без фото</span></div></div>`;
+        if (!dashboardContainer) return;
+        if (!allDealers || allDealers.length === 0) { dashboardContainer.innerHTML = ''; return; }
+        const total = allDealers.filter(d => d.status !== 'potential' && d.status !== 'archive').length;
+        const noPhoto = allDealers.filter(d => !d.photo_url && d.status!=='potential').length;
+        
+        // Вставляем только верхнюю часть, так как нижняя жестко в HTML
+        dashboardContainer.innerHTML = `
+            <div class="col-6 col-md-6"><div class="stat-card h-100 p-3 bg-white rounded shadow-sm border border-primary text-center d-flex align-items-center justify-content-center flex-column"><i class="bi bi-shop stat-icon text-primary fs-1 mb-2"></i><span class="fs-2 fw-bold text-primary">${total}</span><span class="text-muted small text-uppercase fw-bold">Активных дилеров</span></div></div>
+            <div class="col-6 col-md-6"><div class="stat-card h-100 p-3 bg-white rounded shadow-sm border border-danger text-center d-flex align-items-center justify-content-center flex-column"><i class="bi bi-camera-fill stat-icon text-danger fs-1 mb-2"></i><span class="fs-2 fw-bold text-danger">${noPhoto}</span><span class="text-muted small text-uppercase fw-bold">Без фото</span></div></div>
+        `;
         
         const today=new Date(); today.setHours(0,0,0,0); const upcoming=[], problem=[], cooling=[]; const monthAgo=new Date(today.getTime()-(30*24*60*60*1000));
         allDealers.forEach(d=>{
@@ -155,6 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderTasks(document.getElementById('tasks-list-problem'), problem, 'problem');
         renderTasks(document.getElementById('tasks-list-cooling'), cooling.sort((a,b)=>b.days-a.days), 'cooling');
     }
+
     function renderTasks(c, tasks, type) {
         if(!c) return; if(!tasks.length) { c.innerHTML=`<p class="text-muted text-center p-2 small">Пусто</p>`; return; }
         c.innerHTML=tasks.map(t=>{
@@ -164,7 +158,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return `<div class="list-group-item d-flex justify-content-between align-items-center p-2"><div>${b}<a href="dealer.html?id=${t.dealerId}" target="_blank" class="fw-bold text-dark text-decoration-none">${t.dealerName}</a></div>${type!=='cooling'?`<button class="btn btn-sm btn-success btn-complete-task" data-id="${t.dealerId}" data-index="${t.visitIndex}">✔</button>`:''}</div>`;
         }).join('');
     }
-    async function completeTask(btn, id, idx) { try { btn.disabled=true; btn.innerHTML='...'; const r=await fetch(`${API_DEALERS_URL}/${id}`); const d=await r.json(); if(d.visits&&d.visits[idx]) d.visits[idx].isCompleted=true; await fetch(`${API_DEALERS_URL}/${id}`, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({visits:d.visits})}); initApp(); } catch(e){btn.disabled=false;btn.innerHTML='✔';} }
+
+    async function completeTask(btn, id, idx) { try { btn.disabled=true; btn.innerHTML='<span class="spinner-border spinner-border-sm"></span>'; const r=await fetch(`${API_DEALERS_URL}/${id}`); const d=await r.json(); if(d.visits&&d.visits[idx]) d.visits[idx].isCompleted=true; await fetch(`${API_DEALERS_URL}/${id}`, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({visits:d.visits})}); initApp(); } catch(e){btn.disabled=false;btn.innerHTML='✔';} }
     if(document.body) { document.body.addEventListener('click', (e) => { const btn = e.target.closest('.btn-complete-task'); if (btn) { completeTask(btn, btn.dataset.id, btn.dataset.index); } }); }
 
     // --- RENDER CARDS ---
@@ -173,22 +168,32 @@ document.addEventListener('DOMContentLoaded', () => {
         const city = filterCity.value; const type = filterPriceType.value; const status = filterStatus.value; const responsible = filterResponsible.value; const search = searchBar.value.toLowerCase();
         const filtered = allDealers.filter(d => {
             let statusMatch = false; const s = d.status || 'standard'; if (status) statusMatch = s === status; else statusMatch = s !== 'potential';
-            return (!city||d.city===city) && (!type||d.price_type===type) && (!responsible||d.responsible===responsible) && statusMatch && (!search || ((d.name||'').toLowerCase().includes(search)||(d.dealer_id||'').toLowerCase().includes(search)||(d.organization||'').toLowerCase().includes(search)));
+            return (!city||d.city===city) && (!type||d.price_type===type) && (!status||d.status===status) && (!responsible||d.responsible===responsible) && 
+                   (!search || (d.name||'').toLowerCase().includes(search)||(d.dealer_id||'').toLowerCase().includes(search)||(d.organization||'').toLowerCase().includes(search));
         });
         if (filtered.length === 0) { dealerListContainer.innerHTML = ''; noDataMsg.style.display = 'block'; return; }
         noDataMsg.style.display = 'none';
+
         dealerListContainer.innerHTML = filtered.map(d => {
             const avatarHtml = d.photo_url ? `<img src="${d.photo_url}" alt="${d.name}">` : `<i class="bi bi-shop"></i>`;
             let statusClass = 'st-standard'; let statusText = 'Стандарт';
             if(d.status==='active'){statusClass='st-active';statusText='Активный';} else if(d.status==='problem'){statusClass='st-problem';statusText='Проблема';} else if(d.status==='potential'){statusClass='st-potential';statusText='Лид';} else if(d.status==='archive'){statusClass='st-archive';statusText='Архив';}
+            
             let phoneClean = ''; if(d.contacts && d.contacts.length) phoneClean = d.contacts[0].contactInfo?.replace(/[^0-9]/g,'') || '';
-            const hasWA = phoneClean.length >= 10; let hasMap = (d.latitude && d.longitude); const mapLink = hasMap ? `https://yandex.kz/maps/?pt=${d.longitude},${d.latitude}&z=17&l=map` : '#';
+            const hasWA = phoneClean.length >= 10;
+            let hasMap = (d.latitude && d.longitude);
+            const mapLink = hasMap ? `https://yandex.kz/maps/?pt=${d.longitude},${d.latitude}&z=17&l=map` : '#';
+
             return `
             <div class="dealer-item" data-id="${d.id}" data-name="${safeText(d.name)}">
                 <div class="dealer-item-avatar">${avatarHtml}</div>
                 <div class="dealer-item-info" onclick="window.open('dealer.html?id=${d.id}', '_blank')">
                     <div class="dealer-item-name text-truncate">${safeText(d.name)}</div>
-                    <div class="dealer-item-meta"><span class="status-badge ${statusClass}">${statusText}</span><span><i class="bi bi-geo-alt"></i> ${safeText(d.city)}</span><span class="text-muted small">${safeText(d.price_type)}</span></div>
+                    <div class="dealer-item-meta">
+                        <span class="status-badge ${statusClass}">${statusText}</span>
+                        <span><i class="bi bi-geo-alt"></i> ${safeText(d.city)}</span>
+                        <span class="text-muted small">${safeText(d.price_type)}</span>
+                    </div>
                 </div>
                 <div class="dealer-item-actions d-none d-md-flex">
                     ${hasWA ? `<a href="https://wa.me/${phoneClean}" target="_blank" class="btn btn-outline-success btn-sm" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>` : ''}
@@ -208,6 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
     }
 
+    // --- CLICK DELEGATION ---
     if(dealerListContainer) {
         dealerListContainer.addEventListener('click', (e) => {
             const btnEdit = e.target.closest('.btn-edit'); const btnDel = e.target.closest('.btn-delete'); const btnDup = e.target.closest('.btn-duplicate'); const btnVisit = e.target.closest('.btn-quick-visit'); const item = e.target.closest('.dealer-item');
@@ -221,6 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if(openAddModalBtn) openAddModalBtn.onclick = () => {
         if(addForm) addForm.reset();
+        currentStep = 1; showStep(1);
         renderProductChecklist(addProductChecklist);
         renderList(addContactList, [], createContactEntryHTML); renderList(addAddressList, [], createAddressEntryHTML);
         renderList(addPosList, [], createPosEntryHTML); renderList(addVisitsList, [], createVisitEntryHTML);
@@ -276,8 +283,13 @@ document.addEventListener('DOMContentLoaded', () => {
             currentStep = 1; showStep(1); addModal.show(); alert("Данные скопированы. Введите новый ID.");
         } catch (e) { alert("Ошибка дублирования"); }
     }
-    
-    if(qvForm) qvForm.addEventListener('submit', async (e) => { e.preventDefault(); if(isSaving)return; isSaving=true; const id=document.getElementById('qv_dealer_id').value; const comment=document.getElementById('qv_comment').value; if(!id||!comment){isSaving=false;return;} try{const r=await fetch(`${API_DEALERS_URL}/${id}`);const d=await r.json();const v=[...(d.visits||[]),{date:new Date().toISOString().slice(0,10),comment,isCompleted:true}];await fetch(`${API_DEALERS_URL}/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({visits:v})});qvModal.hide();alert("OK");}catch(e){}finally{isSaving=false;} });
+
+    if(qvForm) qvForm.addEventListener('submit', async (e) => {
+        e.preventDefault(); if(isSaving)return; isSaving=true; const id=document.getElementById('qv_dealer_id').value; const comment=document.getElementById('qv_comment').value; const btn=qvForm.querySelector('button'); if(!id||!comment){isSaving=false;return;} try{const r=await fetch(`${API_DEALERS_URL}/${id}`);const d=await r.json();const v=[...(d.visits||[]), {date:new Date().toISOString().slice(0,10),comment,isCompleted:true}]; await fetch(`${API_DEALERS_URL}/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({visits:v})});qvModal.hide();alert("Визит добавлен!");}catch(e){}finally{isSaving=false;btn.disabled=false;}
+    });
+
+    if(exportBtn) exportBtn.onclick = async () => { /* ... */ };
+    if(document.getElementById('export-competitors-prices-btn')) document.getElementById('export-competitors-prices-btn').onclick = async () => { /* ... */ };
 
     if(filterCity) filterCity.onchange = renderDealerList; 
     if(filterPriceType) filterPriceType.onchange = renderDealerList; 
@@ -285,8 +297,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if(filterResponsible) filterResponsible.onchange = renderDealerList;
     if(searchBar) searchBar.oninput = renderDealerList;
 
-    if(document.getElementById('export-competitors-prices-btn')) document.getElementById('export-competitors-prices-btn').onclick = async () => { if(!allDealers.length) return alert("Пусто"); /* ...export logic... */ alert("Экспорт цен..."); };
-    if(exportBtn) exportBtn.onclick = async () => { if(!allDealers.length) return alert("Пусто"); /* ...export logic... */ alert("Экспорт базы..."); };
+    function collectFormData(form, prefix) {
+        const list = prefix === 'add' ? [addContactList, addAddressList, addPosList, addVisitsList, addCompetitorList] : [editContactList, editAddressList, editPosList, editVisitsList, editCompetitorList];
+        return {
+            dealer_id: document.getElementById(`${prefix}_dealer_id`).value, name: document.getElementById(`${prefix}_name`).value, organization: document.getElementById(`${prefix}_organization`)?.value, price_type: document.getElementById(`${prefix}_price_type`)?.value, city: document.getElementById(`${prefix}_city`)?.value, address: document.getElementById(`${prefix}_address`)?.value, delivery: document.getElementById(`${prefix}_delivery`)?.value, website: document.getElementById(`${prefix}_website`)?.value, instagram: document.getElementById(`${prefix}_instagram`)?.value, latitude: document.getElementById(`${prefix}_latitude`)?.value, longitude: document.getElementById(`${prefix}_longitude`)?.value, bonuses: document.getElementById(`${prefix === 'add' ? 'bonuses' : 'edit_bonuses'}`)?.value, status: document.getElementById(`${prefix}_status`)?.value, responsible: document.getElementById(`${prefix}_responsible`)?.value,
+            contacts: collectData(list[0], '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]),
+            additional_addresses: collectData(list[1], '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]),
+            pos_materials: collectData(list[2], '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]),
+            visits: collectData(list[3], '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'}]),
+            competitors: collectData(list[4], '.competitor-entry', [{key:'brand',class:'.competitor-brand'},{key:'collection',class:'.competitor-collection'},{key:'price_opt',class:'.competitor-price-opt'},{key:'price_retail',class:'.competitor-price-retail'}])
+        };
+    }
 
     // WIZARD
     let currentStep = 1; const totalSteps = 4;
@@ -302,25 +323,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if(nextBtn) nextBtn.onclick = () => { if (currentStep === 1) { if (!document.getElementById('dealer_id').value || !document.getElementById('name').value) { alert("Заполните ID и Название"); return; } if (addMap) setTimeout(() => addMap.invalidateSize(), 200); } if (currentStep < totalSteps) { currentStep++; showStep(currentStep); } };
     if(prevBtn) prevBtn.onclick = () => { if (currentStep > 1) { currentStep--; showStep(currentStep); } };
 
-    function collectFormData(form, prefix) {
-        const list = prefix === 'add' ? [addContactList, addAddressList, addPosList, addVisitsList, addCompetitorList] : [editContactList, editAddressList, editPosList, editVisitsList, editCompetitorList];
-        return {
-            dealer_id: document.getElementById(`${prefix}_dealer_id`).value, name: document.getElementById(`${prefix}_name`).value, organization: document.getElementById(`${prefix}_organization`)?.value, price_type: document.getElementById(`${prefix}_price_type`)?.value, city: document.getElementById(`${prefix}_city`)?.value, address: document.getElementById(`${prefix}_address`)?.value, delivery: document.getElementById(`${prefix}_delivery`)?.value, website: document.getElementById(`${prefix}_website`)?.value, instagram: document.getElementById(`${prefix}_instagram`)?.value, latitude: document.getElementById(`${prefix}_latitude`)?.value, longitude: document.getElementById(`${prefix}_longitude`)?.value, bonuses: document.getElementById(`${prefix === 'add' ? 'bonuses' : 'edit_bonuses'}`)?.value, status: document.getElementById(`${prefix}_status`)?.value, responsible: document.getElementById(`${prefix}_responsible`)?.value,
-            contacts: collectData(list[0], '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]),
-            additional_addresses: collectData(list[1], '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]),
-            pos_materials: collectData(list[2], '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]),
-            visits: collectData(list[3], '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'}]),
-            competitors: collectData(list[4], '.competitor-entry', [{key:'brand',class:'.competitor-brand'},{key:'collection',class:'.competitor-collection'},{key:'price_opt',class:'.competitor-price-opt'},{key:'price_retail',class:'.competitor-price-retail'}])
-        };
-    }
-
-    // Handlers for Add Modal Inputs
+    // Handlers
     if(addAvatarInput) addAvatarInput.addEventListener('change', async (e) => { const file = e.target.files[0]; if (file) { newAvatarBase64 = await compressImage(file, 800, 0.8); addAvatarPreview.src = newAvatarBase64; } });
+    if(editAvatarInput) editAvatarInput.addEventListener('change', async (e) => { const file = e.target.files[0]; if (file) { newAvatarBase64 = await compressImage(file, 800, 0.8); editAvatarPreview.src = newAvatarBase64; } });
     if(addPhotoInput) addPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) addPhotosData.push({ photo_url: await compressImage(file, 1000, 0.7) }); renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData); addPhotoInput.value = ''; });
     if(addPhotoPreviewContainer) addPhotoPreviewContainer.addEventListener('click', (e) => { if(e.target.classList.contains('btn-remove-photo')) { addPhotosData.splice(e.target.dataset.index, 1); renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData); }});
-    
-    // Handlers for Edit Modal Inputs
-    if(editAvatarInput) editAvatarInput.addEventListener('change', async (e) => { const file = e.target.files[0]; if (file) { newAvatarBase64 = await compressImage(file, 800, 0.8); editAvatarPreview.src = newAvatarBase64; } });
     if(editPhotoInput) editPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) editPhotosData.push({ photo_url: await compressImage(file, 1000, 0.7) }); renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData); editPhotoInput.value = ''; });
     if(editPhotoPreviewContainer) editPhotoPreviewContainer.addEventListener('click', (e) => { if(e.target.classList.contains('btn-remove-photo')) { editPhotosData.splice(e.target.dataset.index, 1); renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData); }});
 
