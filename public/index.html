@@ -7,7 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-    <link rel="stylesheet" href="style.css?v=505">
+    <link rel="stylesheet" href="style.css?v=606">
     <link rel="icon" href="favicon.gif" type="image/gif">
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -40,7 +40,7 @@
             <h1>Рабочий стол</h1>
             <div class="d-flex gap-2">
                 <a href="sales.html" class="btn btn-warning btn-lg"><i class="bi bi-cash-coin me-2"></i>Продажи</a>
-                <button id="export-competitors-prices-btn" class="btn btn-info btn-lg text-white" title="Цены конкурентов"><i class="bi bi-tags-fill me-2"></i>Цены</button>
+                <button id="export-competitors-prices-btn" class="btn btn-info btn-lg text-white" title="Цены"><i class="bi bi-tags-fill me-2"></i>Цены</button>
                 <button id="export-dealers-btn" class="btn btn-success btn-lg"><i class="bi bi-file-earmark-excel me-2"></i>База</button>
                 <button id="open-add-modal-btn" class="btn btn-primary btn-lg"><i class="bi bi-plus-circle me-2"></i>Добавить</button>
             </div>
@@ -49,11 +49,13 @@
         <div class="row g-4 mb-4">
             <div class="col-lg-6 d-flex flex-column gap-4">
                 <div id="dashboard-container" class="row g-3"></div> 
+                
                 <div class="card task-card shadow-sm border-0 h-100 task-card-problem">
                     <div class="card-header bg-white"><h5 class="card-title text-danger"><i class="bi bi-fire me-2"></i>Проблемные / Просрочено</h5></div>
                     <div class="card-body"><div id="tasks-list-problem" class="list-group list-group-flush task-list"><p class="text-muted text-center p-3">Загрузка...</p></div></div>
                 </div>
             </div>
+            
             <div class="col-lg-6 d-flex flex-column gap-4">
                 <div class="card task-card shadow-sm border-0 h-100 task-card-upcoming">
                     <div class="card-header bg-white"><h5 class="card-title text-primary"><i class="bi bi-calendar-check me-2"></i>Ближайшие задачи</h5></div>
@@ -69,24 +71,9 @@
         <h3 class="mt-5">Список дилеров</h3>
         
         <div class="row g-3 mb-4 p-3 bg-white rounded shadow-sm border">
-            <div class="col-md-4 col-lg-2">
-                <select id="filter-status" class="form-select">
-                    <option value="">-- Статус --</option>
-                    <option value="potential">🔵 Потенциальный</option>
-                    <option value="active">🟢 Активный</option>
-                    <option value="standard">🟡 Стандарт</option>
-                    <option value="problem">🔴 Проблемный</option>
-                    <option value="archive">⚫ Архив</option>
-                </select>
-            </div>
+            <div class="col-md-4 col-lg-2"><select id="filter-status" class="form-select"><option value="">-- Статус --</option><option value="potential">🔵 Потенциальный</option><option value="active">🟢 Активный</option><option value="standard">🟡 Стандарт</option><option value="problem">🔴 Проблемный</option><option value="archive">⚫ Архив</option></select></div>
             <div class="col-md-4 col-lg-2"><select id="filter-city" class="form-select"><option value="">-- Город --</option></select></div>
-            <div class="col-md-4 col-lg-3">
-                <select id="filter-responsible" class="form-select">
-                    <option value="">-- Ответственный --</option>
-                    <option value="regional_astana">Региональный Астана</option>
-                    <option value="regional_regions">Региональный Регионы</option>
-                </select>
-            </div>
+            <div class="col-md-4 col-lg-3"><select id="filter-responsible" class="form-select"><option value="">-- Ответственный --</option><option value="regional_astana">Региональный Астана</option><option value="regional_regions">Региональный Регионы</option></select></div>
             <div class="col-md-6 col-lg-2"><select id="filter-price-type" class="form-select"><option value="">-- Тип цен --</option></select></div>
             <div class="col-md-6 col-lg-3"><input type="text" id="search-bar" class="form-control" placeholder="Поиск..."></div>
         </div>
@@ -109,7 +96,7 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="script.js?v=505"></script>
+    <script src="script.js?v=606"></script>
     
     <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(console.error);</script>
 </body>
