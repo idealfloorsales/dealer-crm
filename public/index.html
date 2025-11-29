@@ -6,8 +6,8 @@
     <title>CRM Дилеры</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-    <link rel="stylesheet" href="style.css?v=80">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="style.css?v=999">
     <link rel="icon" href="favicon.gif" type="image/gif">
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -15,92 +15,18 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#b9040a">
     <style>
-        /* Стили для карточек (добавлены, чтобы вид сразу был плиточным) */
+        .dealer-item { cursor: pointer; }
+        
+        /* --- ИЗМЕНЕНИЕ ЗДЕСЬ: ОДНА КОЛОНКА --- */
         .dealer-list-container {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            grid-template-columns: 1fr; /* Одна колонка на всю ширину */
             gap: 15px;
             padding-bottom: 20px;
         }
-        .dealer-item {
-            background: white;
-            border: 1px solid #e9ecef;
-            border-radius: 12px;
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            position: relative;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            transition: transform 0.2s, box-shadow 0.2s;
-            cursor: pointer;
-        }
-        .dealer-item:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-        .dealer-item-header {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-        .dealer-item-avatar {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            background-color: #f8f9fa;
-            overflow: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            color: #adb5bd;
-            flex-shrink: 0;
-        }
-        .dealer-item-avatar img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        .dealer-item-info {
-            flex-grow: 1;
-            min-width: 0;
-        }
-        .dealer-item-name {
-            font-weight: bold;
-            font-size: 1.1rem;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            color: #333;
-        }
-        .dealer-item-meta {
-            font-size: 0.85rem;
-            color: #6c757d;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            align-items: center;
-        }
-        .dealer-item-actions {
-            display: flex;
-            gap: 5px;
-            margin-top: auto;
-            padding-top: 10px;
-            border-top: 1px solid #f1f1f1;
-            justify-content: flex-end;
-        }
-        .status-badge {
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-        .st-active { background: #d1e7dd; color: #0f5132; }
-        .st-problem { background: #f8d7da; color: #842029; }
-        .st-potential { background: #cff4fc; color: #055160; }
-        .st-archive { background: #e2e3e5; color: #41464b; }
-        .st-standard { background: #fff3cd; color: #664d03; }
+
+        .list-scrollable::-webkit-scrollbar { width: 6px; }
+        .list-scrollable::-webkit-scrollbar-thumb { background-color: #ccc; border-radius: 4px; }
     </style>
 </head>
 <body>
@@ -127,147 +53,48 @@
             <h1>Рабочий стол</h1>
             <div class="d-flex gap-2">
                 <a href="sales.html" class="btn btn-warning btn-lg"><i class="bi bi-cash-coin me-2"></i>Продажи</a>
-                <button id="export-competitors-prices-btn" class="btn btn-info btn-lg text-white" title="Цены конкурентов"><i class="bi bi-tags-fill me-2"></i>Цены</button>
+                <button id="export-competitors-prices-btn" class="btn btn-info btn-lg text-white" title="Цены"><i class="bi bi-tags-fill me-2"></i>Цены</button>
                 <button id="export-dealers-btn" class="btn btn-success btn-lg"><i class="bi bi-file-earmark-excel me-2"></i>База</button>
                 <button id="open-add-modal-btn" class="btn btn-primary btn-lg"><i class="bi bi-plus-circle me-2"></i>Добавить</button>
             </div>
         </div>
 
-        <div class="row g-4 mb-4">
-            <div class="col-lg-6 d-flex flex-column gap-4">
-                <div id="dashboard-container" class="row g-3"></div> 
-                <div class="card task-card shadow-sm border-0 h-100 task-card-problem">
-                    <div class="card-header bg-white"><h5 class="card-title text-danger"><i class="bi bi-fire me-2"></i>Проблемные / Просрочено</h5></div>
-                    <div class="card-body"><div id="tasks-list-problem" class="list-group list-group-flush task-list"><p class="text-muted text-center p-3">Загрузка...</p></div></div>
-                </div>
-            </div>
-            <div class="col-lg-6 d-flex flex-column gap-4">
-                <div class="card task-card shadow-sm border-0 h-100 task-card-upcoming">
-                    <div class="card-header bg-white"><h5 class="card-title text-primary"><i class="bi bi-calendar-check me-2"></i>Ближайшие задачи</h5></div>
-                    <div class="card-body"><div id="tasks-list-upcoming" class="list-group list-group-flush task-list"><p class="text-muted text-center p-3">Загрузка...</p></div></div>
-                </div>
-                <div class="card task-card shadow-sm border-0 h-100 task-card-cooling">
-                    <div class="card-header bg-white"><h5 class="card-title text-warning"><i class="bi bi-snow2 me-2"></i>"Остывающие" (> 30 дн.)</h5></div>
-                    <div class="card-body"><div id="tasks-list-cooling" class="list-group list-group-flush task-list"><p class="text-muted text-center p-3">Загрузка...</p></div></div>
-                </div>
-            </div>
+        <div id="dashboard-container" class="row g-3 mb-4"></div>
+
+        <div class="row mb-4">
+            <div class="col-md-4 mb-3"><div class="card shadow-sm h-100 border-0 bg-white"><div class="card-header bg-primary text-white fw-bold">🔥 Задачи на сегодня</div><div class="list-group list-group-flush" id="tasks-list-upcoming"></div></div></div>
+            <div class="col-md-4 mb-3"><div class="card shadow-sm h-100 border-0 bg-white"><div class="card-header bg-danger text-white fw-bold">⚠️ Проблемные</div><div class="list-group list-group-flush" id="tasks-list-problem"></div></div></div>
+            <div class="col-md-4 mb-3"><div class="card shadow-sm h-100 border-0 bg-white"><div class="card-header bg-warning text-dark fw-bold">❄️ Остывающие (> 30 дн)</div><div class="list-group list-group-flush" id="tasks-list-cooling"></div></div></div>
         </div>
 
-        <h3 class="mt-5">Список дилеров</h3>
-        
-        <div class="row g-3 mb-4 p-3 bg-white rounded shadow-sm border">
-            <div class="col-md-4 col-lg-2">
-                <select id="filter-status" class="form-select">
-                    <option value="">-- Статус --</option>
-                    <option value="potential">🔵 Потенциальный</option>
-                    <option value="active">🟢 Активный</option>
-                    <option value="standard">🟡 Стандарт</option>
-                    <option value="problem">🔴 Проблемный</option>
-                    <option value="archive">⚫ Архив</option>
-                </select>
-            </div>
-            <div class="col-md-4 col-lg-2">
-                <select id="filter-city" class="form-select"><option value="">-- Город --</option></select>
-            </div>
-            <div class="col-md-4 col-lg-3">
-                <select id="filter-responsible" class="form-select">
-                    <option value="">-- Ответственный --</option>
-                    <option value="regional_astana">Региональный Астана</option>
-                    <option value="regional_regions">Региональный Регионы</option>
-                </select>
-            </div>
-            <div class="col-md-6 col-lg-2">
-                <select id="filter-price-type" class="form-select"><option value="">-- Тип цен --</option></select>
-            </div>
-            <div class="col-md-6 col-lg-3">
-                <input type="text" id="search-bar" class="form-control" placeholder="Поиск...">
-            </div>
+        <hr class="my-4">
+
+        <div class="row g-3 mb-3 bg-white p-3 rounded shadow-sm border mx-0">
+            <div class="col-md-3"><select id="filter-city" class="form-select"><option value="">-- Город --</option></select></div>
+            <div class="col-md-3"><select id="filter-price-type" class="form-select"><option value="">-- Тип цен --</option></select></div>
+            <div class="col-md-3"><select id="filter-responsible" class="form-select"><option value="">-- Ответственный --</option><option value="regional_astana">Региональный Астана</option><option value="regional_regions">Региональный Регионы</option></select></div>
+            <div class="col-md-3"><select id="filter-status" class="form-select"><option value="">-- Статус --</option><option value="active">Активный</option><option value="standard">Стандарт</option><option value="problem">Проблемный</option><option value="potential">Потенциальный</option><option value="archive">Архив</option></select></div>
+            <div class="col-12 mt-2"><input type="text" id="search-bar" class="form-control" placeholder="Поиск..."></div>
         </div>
+
+        <div id="no-data-msg" class="alert alert-info text-center" style="display: none;">Ничего не найдено</div>
 
         <div id="dealer-list-container" class="dealer-list-container">
-            <p class="text-center p-5 text-muted">Загрузка списка...</p>
-        </div>
-        
-        <p id="no-data-msg" class="alert alert-info mt-3" style="display: none;"></p>
-    </div>
-
-    <div class="modal fade" id="add-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-        <div class="modal-dialog modal-xl modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header"><h2 class="modal-title fs-5">Добавить дилера</h2><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-                <div class="modal-body p-0">
-                    <div class="wizard-progress px-5">
-                        <div class="step-indicator active" id="step-ind-1">1</div><div class="step-indicator" id="step-ind-2">2</div><div class="step-indicator" id="step-ind-3">3</div><div class="step-indicator" id="step-ind-4">4</div>
-                    </div>
-                    <form id="add-dealer-form" class="p-3">
-                        <div class="wizard-step active" id="step-1">
-                            <h4 class="mb-3 text-muted">Шаг 1: Основное</h4>
-                            <div class="row g-3">
-                                <div class="col-md-4"><label class="form-label">ID *</label><input type="text" id="dealer_id" class="form-control" required></div>
-                                <div class="col-md-8"><label class="form-label">Название *</label><input type="text" id="name" class="form-control" required></div>
-                                <div class="col-md-6"><label class="form-label">Аватар:</label><input type="file" id="add-avatar-input" class="form-control" accept="image/*"></div>
-                                <div class="col-md-6"><img id="add-avatar-preview" class="avatar-preview" src=""></div>
-                                <div class="col-md-6"><label class="form-label">Ответственный:</label><select id="responsible" class="form-select"><option value="">-- Не выбран --</option><option value="regional_astana">Региональный Астана</option><option value="regional_regions">Региональный Регионы</option></select></div>
-                                <div class="col-md-6"><label class="form-label">Статус:</label><select id="status" class="form-select"><option value="potential">🔵 Потенциальный</option><option value="active">🟢 Активный</option><option value="standard" selected>🟡 Стандарт</option><option value="problem">🔴 Проблемный</option></select></div>
-                                <div class="col-12"><label class="form-label">Адрес (Поиск):</label><div class="map-search-container"><div class="input-group"><input type="text" id="add-map-search" class="form-control"><button class="btn btn-outline-secondary" type="button"><i class="bi bi-search"></i></button></div><div id="add-map-suggestions" class="address-suggestions"></div></div><div id="add-map" class="mini-map"></div><div class="input-group mt-2"><span class="input-group-text">Lat</span><input type="text" id="add_latitude" class="form-control" readonly><span class="input-group-text">Lng</span><input type="text" id="add_longitude" class="form-control" readonly></div></div>
-                                <div class="col-md-6"><label class="form-label">Город</label><input type="text" id="city" class="form-control"></div>
-                                <div class="col-md-6"><label class="form-label">Адрес</label><input type="text" id="address" class="form-control"></div>
-                            </div>
-                        </div>
-                        <div class="wizard-step" id="step-2"><h4 class="mb-3 text-muted">Шаг 2: Контакты</h4><div class="row g-3"><div class="col-md-6"><label class="form-label">Организация</label><input type="text" id="organization" class="form-control"></div><div class="col-md-6"><label class="form-label">Тип цен</label><input type="text" id="price_type" class="form-control"></div><div class="col-md-4"><label class="form-label">Сайт</label><input type="text" id="website" class="form-control"></div><div class="col-md-4"><label class="form-label">Inst</label><input type="text" id="instagram" class="form-control"></div><div class="col-md-4"><label class="form-label">Доставка</label><input type="text" id="delivery" class="form-control"></div><div class="col-12"><label class="form-label">Контакты:</label><div id="add-contact-list" class="list-container"></div><button type="button" id="add-contact-btn-add-modal" class="btn btn-secondary btn-sm mt-2">+ Контакт</button></div><div class="col-12"><label class="form-label">Доп. адреса:</label><div id="add-address-list" class="list-container"></div><button type="button" id="add-address-btn-add-modal" class="btn btn-secondary btn-sm mt-2">+ Адрес</button></div></div></div>
-                        <div class="wizard-step" id="step-3"><h4 class="mb-3 text-muted">Шаг 3: Маркетинг</h4><div class="row g-3"><div class="col-12"><label class="form-label">Стенды:</label><div id="add-pos-list" class="list-container"></div><button type="button" id="add-pos-btn-add-modal" class="btn btn-secondary btn-sm mt-2">+ Стенд</button></div><div class="col-12"><label class="form-label">Конкуренты:</label><div id="add-competitor-list" class="list-container"></div><button type="button" id="add-competitor-btn-add-modal" class="btn btn-secondary btn-sm mt-2">+ Конкурент</button></div><div class="col-12"><label class="form-label">Галерея:</label><input type="file" id="add-photo-input" class="form-control mb-2" multiple accept="image/*"><div id="add-photo-preview-container" class="photo-preview-grid"></div></div><div class="col-12"><label class="form-label">Визиты:</label><div id="add-visits-list" class="list-container"></div><button type="button" id="add-visits-btn-add-modal" class="btn btn-secondary btn-sm mt-2">+ Визит</button></div></div></div>
-                        <div class="wizard-step" id="step-4"><h4 class="mb-3 text-muted">Шаг 4: Матрица</h4><div class="col-12"><label class="form-label">Бонусы:</label><textarea id="bonuses" class="form-control" rows="2"></textarea></div><div class="col-12 mt-3"><label class="form-label">Товары:</label><div id="add-product-checklist" class="product-checklist"><p>Загрузка...</p></div></div></div>
-                    </form>
-                </div>
-                <div class="modal-footer justify-content-between">
-                    <button type="button" class="btn btn-secondary" id="btn-prev-step" style="display:none;">Назад</button>
-                    <div><button type="button" class="btn btn-primary" id="btn-next-step">Далее</button><button type="submit" form="add-dealer-form" class="btn btn-success" id="btn-finish-step" style="display:none;">Сохранить</button></div>
-                </div>
-            </div>
+            <p class="text-center p-5 text-muted">Загрузка...</p>
         </div>
     </div>
 
-    <div class="modal fade" id="edit-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-        <div class="modal-dialog modal-xl modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header bg-light"><h5 class="modal-title">Редактирование</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-                <div class="modal-body p-0">
-                    <form id="edit-dealer-form">
-                        <input type="hidden" id="edit_db_id"><input type="hidden" id="edit-current-avatar-url">
-                        <ul class="nav nav-tabs modal-tabs" id="editTabs" role="tablist">
-                            <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-main" type="button">Основное</button></li>
-                            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-contacts" type="button">Контакты</button></li>
-                            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-map" type="button">Карта</button></li>
-                            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-marketing" type="button">Маркетинг</button></li>
-                            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-samples" type="button">Образцы</button></li>
-                            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-competitors" type="button">Конкуренты</button></li>
-                        </ul>
-                        <div class="tab-content p-2">
-                            <div class="tab-pane fade show active" id="tab-main"><div class="row g-3"><div class="col-md-6"><label class="form-label">ID</label><input type="text" id="edit_dealer_id" class="form-control" required></div><div class="col-md-6"><label class="form-label">Название</label><input type="text" id="edit_name" class="form-control" required></div><div class="col-md-6"><label class="form-label">Аватар:</label><input type="file" id="edit-avatar-input" class="form-control"></div><div class="col-md-6"><img id="edit-avatar-preview" class="avatar-preview" src=""></div><div class="col-md-6"><label class="form-label">Ответственный:</label><select id="edit_responsible" class="form-select"><option value="">-- Не выбран --</option><option value="regional_astana">Региональный Астана</option><option value="regional_regions">Региональный Регионы</option></select></div><div class="col-md-6"><label class="form-label">Статус:</label><select id="edit_status" class="form-select"><option value="standard">🟡 Стандарт</option><option value="active">🟢 Активный</option><option value="problem">🔴 Проблемный</option><option value="potential">🔵 Потенциальный</option><option value="archive">⚫ Архив</option></select></div><div class="col-md-6"><label class="form-label">Город</label><input type="text" id="edit_city" class="form-control"></div><div class="col-md-6"><label class="form-label">Адрес</label><input type="text" id="edit_address" class="form-control"></div><div class="col-12"><label class="form-label">Бонусы:</label><textarea id="edit_bonuses" class="form-control" rows="2"></textarea></div></div></div>
-                            <div class="tab-pane fade" id="tab-contacts"><div class="row g-3"><div class="col-md-6"><label class="form-label">Организация</label><input type="text" id="edit_organization" class="form-control"></div><div class="col-md-6"><label class="form-label">Тип цен</label><input type="text" id="edit_price_type" class="form-control"></div><div class="col-md-4"><label class="form-label">Сайт</label><input type="text" id="edit_website" class="form-control"></div><div class="col-md-4"><label class="form-label">Inst</label><input type="text" id="edit_instagram" class="form-control"></div><div class="col-md-4"><label class="form-label">Доставка</label><input type="text" id="edit_delivery" class="form-control"></div><div class="col-12"><label class="form-label">Контакты:</label><div id="edit-contact-list" class="list-container"></div><button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-contact-btn-edit-modal">+ Контакт</button></div><div class="col-12"><label class="form-label">Доп. адреса:</label><div id="edit-address-list" class="list-container"></div><button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-address-btn-edit-modal">+ Адрес</button></div></div></div>
-                            <div class="tab-pane fade" id="tab-map"><div class="col-12"><div class="map-search-container"><div class="input-group"><input type="text" id="edit-map-search" class="form-control"><button class="btn btn-outline-secondary" type="button"><i class="bi bi-search"></i></button></div><div id="edit-map-suggestions" class="address-suggestions"></div></div><div id="edit-map" class="mini-map" style="height:400px"></div><div class="input-group mt-2"><span class="input-group-text">Lat</span><input type="text" id="edit_latitude" class="form-control" readonly><span class="input-group-text">Lng</span><input type="text" id="edit_longitude" class="form-control" readonly></div></div></div>
-                            <div class="tab-pane fade" id="tab-marketing"><div class="col-12"><label class="form-label">Визиты:</label><div id="edit-visits-list" class="list-container"></div><button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-visits-btn-edit-modal">+ Визит</button></div><div class="col-12 mt-3"><label class="form-label">Галерея:</label><input type="file" id="edit-photo-input" class="form-control mb-2" multiple accept="image/*"><div id="edit-photo-preview-container" class="photo-preview-grid"></div></div></div>
-                            <div class="tab-pane fade" id="tab-samples"><div class="col-12 mb-3"><label class="form-label">Стенды:</label><div id="edit-pos-list" class="list-container"></div><button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-pos-btn-edit-modal">+ Стенд</button></div><div class="col-12"><label class="form-label">Товары (Ламинат):</label><div id="edit-product-checklist" class="product-checklist"><p>Загрузка...</p></div></div></div>
-                            <div class="tab-pane fade" id="tab-competitors"><div class="col-12"><label class="form-label">Мониторинг:</label><div id="edit-competitor-list" class="list-scrollable"></div><button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-competitor-btn-edit-modal">+ Конкурент</button></div></div>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button><button type="submit" form="edit-dealer-form" class="btn btn-primary px-4">Сохранить</button></div>
-            </div>
-        </div>
-    </div>
+    <div class="modal fade" id="add-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h2 class="modal-title fs-5">Добавить дилера</h2><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body p-0"><div class="wizard-steps d-flex justify-content-between p-3 bg-light border-bottom"><div class="step-indicator active" id="step-ind-1">1</div><div class="step-indicator" id="step-ind-2">2</div><div class="step-indicator" id="step-ind-3">3</div><div class="step-indicator" id="step-ind-4">4</div></div><form id="add-dealer-form" class="p-3"><div class="wizard-step active" id="step-1"><h5 class="mb-3 text-primary">Основное</h5><div class="row g-3"><div class="col-md-4"><label class="form-label">ID *</label><input type="text" id="dealer_id" class="form-control" required></div><div class="col-md-8"><label class="form-label">Название *</label><input type="text" id="name" class="form-control" required></div><div class="col-md-6"><label class="form-label">Организация</label><input type="text" class="form-control" id="organization"></div><div class="col-md-6"><label class="form-label">Тип цен</label><select class="form-select" id="price_type"><option value="opt">Опт</option><option value="retail">Розница</option><option value="vip">VIP</option></select></div><div class="col-md-6"><label class="form-label">Город</label><input type="text" class="form-control" id="city"></div><div class="col-md-6"><label class="form-label">Адрес</label><input type="text" class="form-control" id="address"></div><div class="col-md-6"><label class="form-label">Статус</label><select class="form-select" id="status"><option value="potential">Потенциальный</option><option value="active">Активный</option><option value="standard">Стандарт</option><option value="problem">Проблемный</option></select></div><div class="col-md-6"><label class="form-label">Ответственный</label><select class="form-select" id="responsible"><option value="regional_astana">Региональный Астана</option><option value="regional_regions">Региональный Регионы</option></select></div><div class="col-12"><label class="form-label">Карта</label><div class="map-search-container"><input type="text" class="form-control mb-2" id="add-map-search" placeholder="Поиск..."><div id="add-map-suggestions" class="address-suggestions"></div></div><div id="add-map" style="height:250px" class="rounded border"></div><div class="row mt-2"><div class="col"><input type="text" class="form-control form-control-sm" id="add_latitude" readonly></div><div class="col"><input type="text" class="form-control form-control-sm" id="add_longitude" readonly></div></div></div></div></div><div class="wizard-step" id="step-2"><h5 class="mb-3 text-primary">Контакты</h5><div class="mb-3"><label class="form-label">Аватар</label><input type="file" class="form-control" id="add-avatar-input" accept="image/*"><img id="add-avatar-preview" src="" class="avatar-preview mt-2" style="width:80px;height:80px;display:none"></div><div class="mb-3"><label class="form-label fw-bold">Контакты</label><div id="add-contact-list"></div><button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-contact-btn-add-modal">+ Контакт</button></div><div class="mb-3"><label class="form-label fw-bold">Доп. Адреса</label><div id="add-address-list"></div><button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-address-btn-add-modal">+ Адрес</button></div><div class="row g-3"><div class="col-md-6"><label class="form-label">Сайт</label><input type="text" class="form-control" id="website"></div><div class="col-md-6"><label class="form-label">Instagram</label><input type="text" class="form-control" id="instagram"></div><div class="col-12"><label class="form-label">Доставка</label><textarea class="form-control" id="delivery" rows="2"></textarea></div><div class="col-12"><label class="form-label">Бонусы</label><textarea class="form-control" id="bonuses" rows="2"></textarea></div></div></div><div class="wizard-step" id="step-3"><h5 class="mb-3 text-primary">Маркетинг</h5><div class="mb-3"><label class="form-label fw-bold">Стенды</label><div id="add-pos-list"></div><button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-pos-btn-add-modal">+ Стенд</button></div><div class="mb-3"><label class="form-label fw-bold">Матрица</label><div class="product-checklist border rounded p-2" id="add-product-checklist" style="max-height:200px;overflow-y:auto"></div></div><div class="mb-3"><label class="form-label fw-bold">Конкуренты</label><div id="add-competitor-list"></div><button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-competitor-btn-add-modal">+ Конкурент</button></div></div><div class="wizard-step" id="step-4"><h5 class="mb-3 text-primary">Фото</h5><div class="mb-3"><label class="form-label fw-bold">Фото</label><input type="file" class="form-control mb-2" id="add-photo-input" multiple accept="image/*"><div id="add-photo-preview-container" class="photo-preview-grid"></div></div><div class="mb-3"><label class="form-label fw-bold">Визиты</label><div id="add-visits-list"></div><button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-visits-btn-add-modal">+ Визит</button></div></div></form></div><div class="modal-footer justify-content-between"><button type="button" class="btn btn-secondary" id="btn-prev-step" style="display:none">Назад</button><div><button type="button" class="btn btn-primary" id="btn-next-step">Далее</button><button type="submit" form="add-dealer-form" class="btn btn-success" id="btn-finish-step" style="display:none">Сохранить</button></div></div></div></div></div>
+
+    <div class="modal fade" id="edit-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header bg-light"><h5 class="modal-title">Редактирование</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body p-0"><form id="edit-dealer-form"><input type="hidden" id="edit_db_id"><input type="hidden" id="edit-current-avatar-url"><ul class="nav nav-tabs modal-tabs" id="editTabs" role="tablist"><li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-main" type="button">Основное</button></li><li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-contacts" type="button">Контакты</button></li><li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-map" type="button">Карта</button></li><li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-marketing" type="button">Маркетинг</button></li><li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-samples" type="button">Образцы</button></li><li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-competitors" type="button">Конкуренты</button></li></ul><div class="tab-content p-2"><div class="tab-pane fade show active" id="tab-main"><div class="row g-3"><div class="col-md-6"><label class="form-label">ID</label><input type="text" id="edit_dealer_id" class="form-control" required></div><div class="col-md-6"><label class="form-label">Название</label><input type="text" id="edit_name" class="form-control" required></div><div class="col-md-6"><label class="form-label">Аватар:</label><input type="file" id="edit-avatar-input" class="form-control"></div><div class="col-md-6"><img id="edit-avatar-preview" class="avatar-preview" src=""></div><div class="col-md-6"><label class="form-label">Ответственный:</label><select id="edit_responsible" class="form-select"><option value="">-- Не выбран --</option><option value="regional_astana">Региональный Астана</option><option value="regional_regions">Региональный Регионы</option></select></div><div class="col-md-6"><label class="form-label">Статус:</label><select id="edit_status" class="form-select"><option value="standard">🟡 Стандарт</option><option value="active">🟢 Активный</option><option value="problem">🔴 Проблемный</option><option value="potential">🔵 Потенциальный</option><option value="archive">⚫ Архив</option></select></div><div class="col-md-6"><label class="form-label">Город</label><input type="text" id="edit_city" class="form-control"></div><div class="col-md-6"><label class="form-label">Адрес</label><input type="text" id="edit_address" class="form-control"></div><div class="col-12"><label class="form-label">Бонусы:</label><textarea id="edit_bonuses" class="form-control" rows="2"></textarea></div></div></div><div class="tab-pane fade" id="tab-contacts"><div class="row g-3"><div class="col-md-6"><label class="form-label">Организация</label><input type="text" id="edit_organization" class="form-control"></div><div class="col-md-6"><label class="form-label">Тип цен</label><select class="form-select" id="edit_price_type"><option value="opt">Опт</option><option value="retail">Розница</option><option value="vip">VIP</option></select></div><div class="col-md-4"><label class="form-label">Сайт</label><input type="text" id="edit_website" class="form-control"></div><div class="col-md-4"><label class="form-label">Inst</label><input type="text" id="edit_instagram" class="form-control"></div><div class="col-md-4"><label class="form-label">Доставка</label><input type="text" id="edit_delivery" class="form-control"></div><div class="col-12"><label class="form-label">Контакты:</label><div id="edit-contact-list" class="list-container"></div><button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-contact-btn-edit-modal">+ Контакт</button></div><div class="col-12"><label class="form-label">Доп. адреса:</label><div id="edit-address-list" class="list-container"></div><button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-address-btn-edit-modal">+ Адрес</button></div></div></div><div class="tab-pane fade" id="tab-map"><div class="col-12"><div class="map-search-container"><div class="input-group"><input type="text" id="edit-map-search" class="form-control"><button class="btn btn-outline-secondary" type="button"><i class="bi bi-search"></i></button></div><div id="edit-map-suggestions" class="address-suggestions"></div></div><div id="edit-map" class="mini-map" style="height:400px"></div><div class="input-group mt-2"><span class="input-group-text">Lat</span><input type="text" id="edit_latitude" class="form-control" readonly><span class="input-group-text">Lng</span><input type="text" id="edit_longitude" class="form-control" readonly></div></div></div><div class="tab-pane fade" id="tab-marketing"><div class="col-12"><label class="form-label">Визиты:</label><div id="edit-visits-list" class="list-container"></div><button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-visits-btn-edit-modal">+ Визит</button></div><div class="col-12 mt-3"><label class="form-label">Галерея:</label><input type="file" id="edit-photo-input" class="form-control mb-2" multiple accept="image/*"><div id="edit-photo-preview-container" class="photo-preview-grid"></div></div></div><div class="tab-pane fade" id="tab-samples"><div class="col-12 mb-3"><label class="form-label">Стенды:</label><div id="edit-pos-list" class="list-container"></div><button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-pos-btn-edit-modal">+ Стенд</button></div><div class="col-12"><label class="form-label">Товары (Ламинат):</label><div id="edit-product-checklist" class="product-checklist"><p>Загрузка...</p></div></div></div><div class="tab-pane fade" id="tab-competitors"><div class="col-12"><label class="form-label">Мониторинг:</label><div id="edit-competitor-list" class="list-scrollable"></div><button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-competitor-btn-edit-modal">+ Конкурент</button></div></div></div></form></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button><button type="submit" form="edit-dealer-form" class="btn btn-primary px-4">Сохранить</button></div></div></div></div>
 
     <div class="modal fade" id="quick-visit-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Быстрый визит</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="quick-visit-form"><input type="hidden" id="qv_dealer_id"><div class="mb-3"><textarea class="form-control" id="qv_comment" rows="3" required placeholder="Комментарий..."></textarea></div><div class="d-grid"><button type="submit" class="btn btn-success">Сохранить</button></div></form></div></div></div></div>
-    
+
     <datalist id="brands-datalist"></datalist>
     <datalist id="pos-materials-datalist"></datalist>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="script.js?v=81"></script> <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js').catch(err => console.error(err));
-        }
-    </script>
+    <script src="script.js?v=1000"></script> <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(console.error);</script>
 </body>
 </html>
