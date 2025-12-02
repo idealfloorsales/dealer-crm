@@ -202,3 +202,92 @@ nav a.nav-link.active { background: var(--primary-color) !important; color: whit
 .checklist-item { break-inside: avoid; margin-bottom: 5px; }
 .avatar-preview { width: 100px; height: 100px; object-fit: cover; border-radius: 50%; border: 3px solid #e2e8f0; background-color: #f8fafc; }
 .avatar-preview[src=""] { display: none; }
+
+/* Списки в модалке (Серый фон контейнера) */
+.list-container {
+    background-color: #f8f9fa; /* Серый фон */
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 10px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+/* Строки внутри списков (Белые карточки) */
+.contact-entry, .address-entry, .pos-entry, .visit-entry {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 8px;
+    margin-bottom: 8px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    display: flex; 
+    gap: 8px; 
+    align-items: center;
+}
+
+/* --- КОНКУРЕНТЫ: ЖЕСТКАЯ СТРОКА --- */
+.competitor-entry {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 8px;
+    margin-bottom: 8px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    
+    /* Сетка: Бренд(2) Коллекция(2) Опт(1) Розн(1) Удалить(Auto) */
+    display: grid;
+    grid-template-columns: 2fr 2fr 1fr 1fr auto; 
+    gap: 8px; 
+    align-items: center;
+}
+
+/* Поля ввода внутри списков (делаем их компактнее) */
+.list-container input.form-control, 
+.list-container select.form-select {
+    font-size: 0.85rem;
+    padding: 0.4rem 0.6rem;
+    height: auto; /* Чтобы не растягивались */
+    margin: 0; /* Убираем лишние отступы */
+}
+
+/* Кнопка удаления (крестик) */
+.btn-remove-entry {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    line-height: 1;
+    color: #dc3545;
+    border-color: #dc3545;
+}
+.btn-remove-entry:hover {
+    background-color: #dc3545;
+    color: white;
+}
+
+/* ПОС: Стенды */
+.pos-entry {
+    /* Тоже в одну строку */
+    display: grid;
+    grid-template-columns: 1fr 80px auto; /* Имя, Кол-во, Кнопка */
+}
+
+/* Адаптив для телефонов (там в одну строку не влезет, делаем стопкой) */
+@media (max-width: 768px) {
+    .competitor-entry {
+        grid-template-columns: 1fr 1fr auto; /* Бренд, Коллекция, Кнопка */
+        grid-template-rows: auto auto;
+    }
+    /* Цены переносим на вторую строку */
+    .competitor-price-opt, .competitor-price-retail {
+        grid-column: span 1; 
+    }
+    .btn-remove-entry {
+        grid-row: 1 / 3; /* Кнопка на всю высоту */
+        height: 100%;
+    }
+}
