@@ -59,168 +59,146 @@ label { font-weight: 600; color: #555; margin-top: 5px; display: block; }
 .filter-group select, .filter-container input[type="text"] { padding: 8px; min-width: 220px; margin-top: 0; height: 38px; }
 #search-bar { padding: 8px 12px !important; height: 38px !important; font-size: 1rem !important; }
 
-/* --- ТАБЛИЦЫ (Общие для Дилеров и Товаров) --- */
-#dealer-table, #products-table { width: 100%; border-collapse: separate; border-spacing: 0 5px; background: transparent; box-shadow: none; border-radius: 0; }
-#dealer-table td, #dealer-table th, #products-table td, #products-table th { padding: 12px 15px; vertical-align: middle; background: #fff; border-bottom: none; }
-#dealer-table th, #products-table th { background: var(--light-gray); color: #333; font-weight: 600; white-space: nowrap; border-bottom: 2px solid var(--border-color); }
-#dealer-table tbody tr, #products-table tbody tr { border: none; box-shadow: var(--shadow); border-radius: 8px; overflow: hidden; }
-#dealer-table tbody tr:hover td, #products-table tbody tr:hover td { background: var(--medium-gray); }
-th[data-sort]:hover { background: #dde1e5; cursor: pointer; } 
-#dealer-table tbody tr td:first-child, #dealer-table tbody tr th:first-child { border-radius: 8px 0 0 8px; }
-#dealer-table tbody tr td:last-child, #dealer-table tbody tr th:last-child { border-radius: 0 8px 8px 0; }
-
-/* Статусы */
-tr.row-status-active td { background-color: #f0fff9 !important; border-bottom: 2px solid #198754 !important; }
-tr.row-status-problem td { background-color: #fff5f5 !important; border-bottom: 2px solid #dc3545 !important; }
-tr.row-status-archive { opacity: 0.7; }
-tr.row-status-archive td { background-color: #f2f2f2 !important; border-bottom: 2px solid #6c757d !important; }
-tr.row-status-standard td { border-bottom: 2px solid #ffc107 !important; }
-tr.row-status-potential td { border-bottom: 2px solid #0d6efd !important; background-color: #f8fbff !important; }
-
-.column-number, .cell-number { width: 40px; text-align: center; font-weight: bold; color: #555; }
-.table-photo { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border-color); }
-.no-photo { width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; background: var(--medium-gray); color: #aaa; font-size: 12px; border-radius: 4px; }
-td a { text-decoration: none; color: var(--primary-color) !important; font-weight: 500; }
-.actions-cell { text-align: center; }
-.actions-cell .btn-light { background: #fff !important; border: 1px solid #ccc !important; color: #333 !important; }
-
-/* --- (НОВОЕ) ТАБЛИЦА ВЫСТАВЛЕННОСТИ (МАТРИЦА) --- */
-/* Это специальные стили для report.html, чтобы таблица была красивой и не разваливалась */
-
-#matrix-container {
-    max-height: 75vh; 
-    overflow: auto;   
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    box-shadow: var(--shadow);
+/* --- КАРТОЧКА ДИЛЕРА (Вместо таблицы) --- */
+.dealer-card {
     background: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 15px;
+    position: relative;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    transition: transform 0.2s, box-shadow 0.2s;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    /* Цветная полоса статуса слева */
+    border-left: 5px solid #ccc;
 }
-#matrix-table {
-    width: 100%;
-    border-collapse: separate; /* Важно для sticky */
-    border-spacing: 0;
-    font-size: 0.9rem;
+.dealer-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
 }
-#matrix-table th, #matrix-table td {
-    padding: 10px 12px;
-    border-bottom: 1px solid #eee;
-    border-right: 1px solid #eee; /* Тонкие разделители */
-    vertical-align: middle;
+
+/* Статусы (Цвет полоски) */
+.status-active { border-left-color: #198754 !important; }   /* Зеленый */
+.status-problem { border-left-color: #dc3545 !important; }  /* Красный */
+.status-potential { border-left-color: #0d6efd !important; } /* Синий */
+.status-standard { border-left-color: #ffc107 !important; } /* Желтый */
+.status-archive { border-left-color: #6c757d !important; opacity: 0.7; }
+
+.dealer-card-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 10px;
 }
-/* Шапка */
-#matrix-table thead th {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    background-color: #f8f9fa;
-    color: #444;
+.dealer-card-avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: #f8f9fa;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+.dealer-card-avatar.no-photo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #adb5bd;
+    font-size: 1.5rem;
+}
+.dealer-card-title {
     font-weight: 700;
-    border-bottom: 2px solid var(--primary-color);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    white-space: nowrap;
-    text-align: center;
+    font-size: 1.1rem;
+    line-height: 1.2;
+    color: #333;
+    text-decoration: none;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
-/* ЛИПКИЕ КОЛОНКИ (Левые) */
-/* 1. Артикул */
-#matrix-table th:nth-child(1), #matrix-table td:nth-child(1) {
-    position: sticky;
-    left: 0;
-    z-index: 5;
-    background-color: #fff;
-    width: 130px;
-    min-width: 130px;
-    white-space: nowrap;
-    border-right: 1px solid #e9ecef; /* Тонкая линия */
-    font-weight: 700;
+.dealer-card-title:hover {
     color: var(--primary-color);
 }
-#matrix-table thead th:nth-child(1) { z-index: 20; }
-
-/* 2. Название */
-#matrix-table th:nth-child(2), #matrix-table td:nth-child(2) {
-    position: sticky;
-    left: 130px; /* Отступ равен ширине 1-й колонки */
-    z-index: 5;
-    background-color: #fff;
-    border-right: none; 
-    box-shadow: 4px 0 5px -2px rgba(0,0,0,0.1); /* КРАСИВАЯ ТЕНЬ вместо полосы */
-    width: 200px;
-    min-width: 200px;
-    max-width: 200px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+.dealer-card-subtitle {
+    font-size: 0.85rem;
+    color: #6c757d;
 }
-#matrix-table thead th:nth-child(2) { z-index: 20; }
 
-/* Зебра и Ховер для Матрицы */
-#matrix-table tbody tr:nth-child(even) td { background-color: #fafafa; }
-/* Липкие колонки должны оставаться белыми/своим цветом, чтобы не просвечивать */
-#matrix-table tbody tr:nth-child(even) td:nth-child(1), 
-#matrix-table tbody tr:nth-child(even) td:nth-child(2) { background-color: #fdfdfd; }
+.dealer-card-body {
+    flex-grow: 1;
+    font-size: 0.9rem;
+    color: #555;
+    margin-bottom: 15px;
+}
+.dealer-info-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+}
+.dealer-info-row i {
+    color: var(--secondary-color);
+    width: 16px;
+    text-align: center;
+}
 
-#matrix-table tbody tr:hover td { background-color: #fff8f8; }
-#matrix-table tbody tr:hover td:nth-child(1), 
-#matrix-table tbody tr:hover td:nth-child(2) { background-color: #fff8f8; }
+.dealer-card-footer {
+    border-top: 1px solid #f0f0f0;
+    padding-top: 10px;
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+.btn-card-action {
+    flex: 1;
+    font-size: 0.85rem;
+    padding: 6px 4px;
+    border-radius: 6px;
+    text-align: center;
+    background: #f8f9fa;
+    color: #333;
+    text-decoration: none;
+    border: 1px solid #e9ecef;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+}
+.btn-card-action:hover {
+    background: #e9ecef;
+    color: var(--primary-color);
+}
+/* Кнопка WhatsApp зеленая */
+.btn-wa { color: #198754; background: #e8f5e9; border-color: #c8e6c9; }
+.btn-wa:hover { background: #198754; color: white; }
+/* Кнопка Позвонить синяя */
+.btn-call { color: #0d6efd; background: #e7f1ff; border-color: #cce5ff; }
+.btn-call:hover { background: #0d6efd; color: white; }
 
-/* Значки в матрице */
-.matrix-check { color: #198754; font-size: 1.2rem; font-weight: 900; display: block; text-align: center; }
-.matrix-empty { color: #eee; text-align: center; font-size: 1.5rem; line-height: 0.5; }
-
-/* --- МОДАЛКИ И СПИСКИ --- */
+/* Остальные стили (Модалки, Дашборд) без изменений или чуть адаптированы */
 .modal-content { border: none; border-radius: 0.5rem; }
 .modal-header { background: var(--light-gray); border-bottom: 1px solid var(--border-color); }
 .modal-footer { background: var(--light-gray); border-top: 1px solid var(--border-color); }
 
 .list-container { display: flex; flex-direction: column; gap: 10px; border: 1px solid var(--border-color); border-radius: 4px; padding: 15px; background: var(--light-gray); max-height: 250px; overflow-y: auto; }
 .btn-remove-entry { padding: 0.375rem 0.75rem; margin-top: 0 !important; line-height: 1.5; }
-.preview-thumb { width: 100px; height: 38px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border-color); }
 .contact-entry, .address-entry, .pos-entry, .visit-entry { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; background: #fff; padding: 10px; border-radius: 4px; border: 1px solid var(--border-color); }
 .contact-entry input, .address-entry input, .pos-entry input, .pos-entry select, .visit-entry input { flex: 1 1 150px; margin: 0; }
 .visit-date { flex: 1; max-width: 150px; } .visit-comment { flex: 3; }
 .competitor-entry { display: grid; grid-template-columns: 1fr 1fr 0.75fr 0.75fr auto; gap: 10px; align-items: center; background: #fff; padding: 10px; border-radius: 4px; border: 1px solid var(--border-color); }
 .competitor-entry input { margin: 0; }
-.photo-entry { display: grid; grid-template-columns: 100px 1fr 1fr auto; gap: 10px; align-items: center; background: #fff; padding: 10px; border: 1px solid var(--border-color); }
-.photo-entry.new { grid-template-columns: 1fr 1fr auto; }
-.photo-entry input { margin-top: 0; }
 .photo-preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; margin-top: 10px; border: 1px solid var(--border-color); padding: 10px; border-radius: 4px; background: var(--light-gray); }
 .photo-preview-item { position: relative; border: 1px solid #ddd; border-radius: 4px; overflow: hidden; background: #fff; height: 80px; }
 .photo-preview-item img { width: 100%; height: 100%; object-fit: cover; }
-.photo-preview-item .btn-remove-photo { position: absolute; top: 2px; right: 2px; background: rgba(220, 53, 69, 0.9); color: white; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 14px; line-height: 1; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .product-checklist { max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 4px; padding: 1.25rem; background: var(--light-gray); columns: 2; column-gap: 20px; }
 .checklist-item { break-inside: avoid; }
 
-/* Детали дилера */
-.details-container { max-width: 900px; margin: 20px auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: var(--shadow); border: 1px solid var(--border-color); }
-.products-display { background: var(--light-gray); border: 1px solid var(--border-color); padding: 15px; border-radius: 4px; white-space: pre-wrap; font-family: monospace; }
-.products-list-detailed { padding-left: 20px; }
-.dealer-links-container { display: flex; gap: 10px; margin: 15px 0; border-bottom: 1px solid var(--medium-gray); padding-bottom: 20px; flex-wrap: wrap; }
-.gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
-.gallery-item { border: 1px solid var(--border-color); border-radius: 4px; background: #fff; text-align: center; overflow: hidden; cursor: pointer; transition: transform 0.2s; }
-.gallery-item:hover { transform: scale(1.03); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-.gallery-item img { width: 100%; height: 150px; object-fit: cover; display: block; }
-.gallery-card { border: 1px solid var(--border-color); border-radius: 4px; background: #fff; text-align: center; overflow: hidden; cursor: pointer; transition: transform 0.2s; }
-.gallery-card:hover { transform: scale(1.03); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-.gallery-date { background: var(--light-gray); padding: 5px 10px; font-size: 0.85rem; font-weight: 600; color: #555; border-bottom: 1px solid var(--border-color); }
-.gallery-img-wrapper { width: 100%; height: 150px; }
-.gallery-img-wrapper img { width: 100%; height: 100%; object-fit: cover; }
-
-/* Вкладки */
-.details-container .nav-tabs { border-bottom: 2px solid var(--border-color); }
-.details-container .nav-tabs .nav-link { font-weight: 600; color: var(--secondary-color); border: none; border-bottom: 3px solid transparent; margin-bottom: -2px; border-radius: 0 !important; }
-.details-container .nav-tabs .nav-link.active { color: var(--primary-color); border-bottom: 3px solid var(--primary-color); background: none; }
-.details-container .tab-pane { padding-top: 20px; }
-.details-container .table-responsive { margin-top: 10px; border: 1px solid var(--border-color); border-radius: 8px; }
-
-/* Аватар */
+/* Аватар в модалке */
 .avatar-preview { width: 100px; height: 100px; object-fit: cover; border-radius: 50%; border: 2px solid var(--border-color); background-color: var(--light-gray); }
 .avatar-preview[src=""] { display: none; }
-.dealer-header { display: flex; align-items: center; gap: 20px; margin-bottom: 15px; flex-wrap: wrap; }
-.dealer-avatar { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 3px solid var(--border-color); background-color: var(--light-gray); cursor: pointer; transition: transform 0.2s ease-in-out, box-shadow 0.2s; }
-.dealer-avatar:hover { transform: scale(1.05); box-shadow: 0 4px 10px rgba(0,0,0,0.15); border-color: var(--primary-color); }
-.dealer-avatar[src=""] { display: none; }
-.dealer-header-info h1 { border-bottom: none; margin-bottom: 0; }
-.dealer-header-info .lead { font-size: 1.2rem; color: var(--secondary-color); margin-bottom: 0; }
 
 /* Дашборд */
 .stat-card { background: #fff; border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; box-shadow: var(--shadow); text-align: center; height: 100%; transition: transform 0.2s; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 155px; }
@@ -239,6 +217,27 @@ td a { text-decoration: none; color: var(--primary-color) !important; font-weigh
 .task-card-cooling { border-top: 4px solid var(--warning-color); }
 @media (min-width: 992px) { .task-list { min-height: 155px; } }
 
+/* Матрица */
+#matrix-container { max-height: 75vh; overflow: auto; border: 1px solid var(--border-color); border-radius: 8px; box-shadow: var(--shadow); background: #fff; }
+#matrix-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.9rem; }
+#matrix-table th, #matrix-table td { padding: 10px 12px; border-bottom: 1px solid #eee; border-right: 1px solid #eee; vertical-align: middle; }
+#matrix-table thead th { position: sticky; top: 0; z-index: 10; background-color: #f8f9fa; color: #444; font-weight: 700; border-bottom: 2px solid var(--primary-color); box-shadow: 0 2px 4px rgba(0,0,0,0.05); white-space: nowrap; text-align: center; }
+#matrix-table th:nth-child(1), #matrix-table td:nth-child(1) { position: sticky; left: 0; z-index: 5; background-color: #fff; width: 130px; min-width: 130px; white-space: nowrap; border-right: 1px solid #e9ecef; font-weight: 700; color: var(--primary-color); }
+#matrix-table thead th:nth-child(1) { z-index: 20; }
+#matrix-table th:nth-child(2), #matrix-table td:nth-child(2) { position: sticky; left: 130px; z-index: 5; background-color: #fff; border-right: none; box-shadow: 4px 0 5px -2px rgba(0,0,0,0.1); width: 200px; min-width: 200px; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#matrix-table thead th:nth-child(2) { z-index: 20; }
+.matrix-check { color: #198754; font-size: 1.2rem; font-weight: 900; display: block; text-align: center; }
+.matrix-empty { color: #eee; text-align: center; font-size: 1.5rem; line-height: 0.5; }
+
+/* Детали дилера */
+.details-container { max-width: 900px; margin: 20px auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: var(--shadow); border: 1px solid var(--border-color); }
+.products-display { background: var(--light-gray); border: 1px solid var(--border-color); padding: 15px; border-radius: 4px; white-space: pre-wrap; font-family: monospace; }
+.gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.gallery-item { border: 1px solid var(--border-color); border-radius: 4px; background: #fff; text-align: center; overflow: hidden; cursor: pointer; transition: transform 0.2s; }
+.gallery-item:hover { transform: scale(1.03); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.gallery-item img { width: 100%; height: 150px; object-fit: cover; display: block; }
+.dealer-avatar { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 3px solid var(--border-color); background-color: var(--light-gray); cursor: pointer; transition: transform 0.2s ease-in-out, box-shadow 0.2s; }
+.dealer-avatar:hover { transform: scale(1.05); box-shadow: 0 4px 10px rgba(0,0,0,0.15); border-color: var(--primary-color); }
 #map { height: calc(100vh - 150px); min-height: 500px; width: 100%; border: 1px solid var(--border-color); border-radius: 8px; z-index: 1; }
 .mini-map { height: 250px; width: 100%; border: 1px solid var(--border-color); border-radius: 4px; margin-bottom: 10px; z-index: 1; }
 #no-data-msg { text-align: center; font-size: 1.2em; color: #555; padding: 30px; background: #fff; border-radius: 8px; box-shadow: var(--shadow); }
@@ -262,539 +261,43 @@ td a { text-decoration: none; color: var(--primary-color) !important; font-weigh
 .product-sku { font-weight: 700; color: #333; }
 .product-name { color: #666; font-size: 0.85rem; }
 
-.btn-contact-call { color: #0d6efd; border-color: #0d6efd; }
-.btn-contact-call:hover { background-color: #0d6efd; color: white; }
-.btn-contact-wa { color: #198754; border-color: #198754; }
-.btn-contact-wa:hover { background-color: #198754; color: white; }
+/* Дополнительные стили */
+.address-suggestions { position: absolute; background: white; border: 1px solid #ccc; border-radius: 4px; max-height: 200px; overflow-y: auto; z-index: 2000; width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: none; }
+.address-suggestion-item { padding: 8px 12px; cursor: pointer; font-size: 0.9rem; border-bottom: 1px solid #eee; }
+.address-suggestion-item:hover { background-color: #f0f0f0; }
+.map-search-container { position: relative; margin-bottom: 10px; }
+.wizard-step { display: none; } .wizard-step.active { display: block; animation: fadeIn 0.3s; }
+.wizard-progress { display: flex; justify-content: space-between; margin-bottom: 20px; position: relative; }
+.wizard-progress::before { content: ''; position: absolute; top: 50%; left: 0; right: 0; height: 2px; background: #e9ecef; z-index: 0; }
+.step-indicator { width: 30px; height: 30px; background: #e9ecef; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #6c757d; position: relative; z-index: 1; cursor: default; }
+.step-indicator.active { background: var(--primary-color); color: white; }
+.step-indicator.completed { background: #198754; color: white; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.modal-tabs .nav-link { color: var(--secondary-color); font-weight: 600; border: none; border-bottom: 3px solid transparent; border-radius: 0 !important; }
+.modal-tabs .nav-link.active { color: var(--primary-color); border-bottom: 3px solid var(--primary-color); background: none; }
+.modal-tabs { border-bottom: 1px solid var(--border-color); margin-bottom: 20px; }
+.badge-type { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; margin-right: 4px; margin-bottom: 2px; color: #333; }
+.type-standard { background-color: #f0f0f0; color: #666; }
+.comp-contact-row { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 10px; margin-bottom: 10px; }
+.comp-card { background: #fff; border: 1px solid var(--border-color); border-radius: 8px; height: 280px; position: relative; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; }
+.comp-card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+.comp-card-front { padding: 15px; height: 100%; display: flex; flex-direction: column; }
+.comp-card-back { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #fff; padding: 15px; transform: translateY(100%); transition: transform 0.3s ease-in-out; display: flex; flex-direction: column; z-index: 10; }
+.comp-card.show-collections .comp-card-back { transform: translateY(0); }
+.btn-card-edit { position: absolute; top: 10px; right: 10px; z-index: 5; background: white; border: 1px solid #ddd; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color: #666; transition: all 0.2s; }
+.btn-card-edit:hover { background: var(--primary-color); color: white; border-color: var(--primary-color); }
+.comp-card-list { flex-grow: 1; overflow-y: auto; margin-top: 10px; border-top: 1px solid #eee; padding-top: 5px; }
+.comp-collection-item { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #f9f9f9; font-size: 0.85rem; }
 @media (max-width: 768px) {
     .contact-entry, .address-entry, .pos-entry, .competitor-entry { grid-template-columns: 1fr 1fr auto; }
     .contact-entry input:nth-of-type(3), .address-entry input:nth-of-type(3), .pos-entry input, .competitor-entry input { grid-column: 1 / span 2; }
-    .photo-entry { grid-template-columns: 1fr auto; }
-    .photo-entry.existing { grid-template-columns: 100px 1fr auto; }
+    .competitor-entry input:nth-last-child(2), .competitor-entry input:nth-last-child(3) { grid-column: span 1; }
+    .competitor-brand, .competitor-collection { grid-column: span 1; }
+    .btn-remove-entry { grid-row: 1 / 3; }
 }
 @media (max-width: 600px) {
     .product-checklist { columns: 1; }
     .filter-container { flex-direction: column; }
     .contact-entry, .address-entry, .pos-entry, .competitor-entry { grid-template-columns: 1fr auto; }
     .contact-entry input, .address-entry input, .pos-entry input, .pos-entry select, .competitor-entry input { grid-column: 1; }
-}
-
-/* style.css */
-
-/* ... (весь ваш код) ... */
-
-/* (НОВОЕ) Автодополнение адреса на карте */
-.address-suggestions {
-    position: absolute;
-    background: white;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    max-height: 200px;
-    overflow-y: auto;
-    z-index: 2000; /* Поверх карты */
-    width: 100%;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    display: none; /* Скрыто по умолчанию */
-}
-
-.address-suggestion-item {
-    padding: 8px 12px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    border-bottom: 1px solid #eee;
-}
-
-.address-suggestion-item:hover {
-    background-color: #f0f0f0;
-}
-
-/* Контейнер поиска над картой */
-.map-search-container {
-    position: relative; 
-    margin-bottom: 10px;
-}
-/* (НОВОЕ) Стили для Wizard (Добавление) */
-.wizard-step {
-    display: none; /* Скрываем все шаги по умолчанию */
-}
-.wizard-step.active {
-    display: block; /* Показываем активный */
-    animation: fadeIn 0.3s;
-}
-.wizard-progress {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 20px;
-    position: relative;
-}
-.wizard-progress::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: #e9ecef;
-    z-index: 0;
-}
-.step-indicator {
-    width: 30px;
-    height: 30px;
-    background: #e9ecef;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    color: #6c757d;
-    position: relative;
-    z-index: 1;
-    cursor: default;
-}
-.step-indicator.active {
-    background: var(--primary-color);
-    color: white;
-}
-.step-indicator.completed {
-    background: #198754; /* Зеленый */
-    color: white;
-}
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-
-/* (НОВОЕ) Стили для Вкладок в Модалке (Редактирование) */
-.modal-tabs .nav-link {
-    color: var(--secondary-color);
-    font-weight: 600;
-    border: none;
-    border-bottom: 3px solid transparent;
-    border-radius: 0 !important; /* Квадратные */
-}
-.modal-tabs .nav-link.active {
-    color: var(--primary-color);
-    border-bottom: 3px solid var(--primary-color);
-    background: none;
-}
-.modal-tabs {
-    border-bottom: 1px solid var(--border-color);
-    margin-bottom: 20px;
-}
-/* (НОВОЕ) Цвета типов коллекций */
-.badge-type {
-    display: inline-block;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    margin-right: 4px;
-    margin-bottom: 2px;
-    color: #333;
-}
-
-.type-standard { background-color: #f0f0f0; color: #666; } /* Серый */
-.type-english { background-color: rgba(25, 135, 84, 0.2); color: #0f5132; } /* Зеленый */
-.type-french { background-color: rgba(13, 110, 253, 0.2); color: #084298; } /* Синий */
-.type-artistic { background-color: rgba(255, 193, 7, 0.3); color: #664d03; } /* Желтый */
-.type-art-eng { background-color: rgba(253, 126, 20, 0.2); color: #663300; } /* Оранжевый */
-.type-art-french { background-color: rgba(111, 66, 193, 0.2); color: #432874; } /* Фиолетовый */
-.type-art-mix { background-color: rgba(220, 53, 69, 0.2); color: #842029; } /* Красный */
-/* Конкуренты: Контакты (в ряд) */
-.comp-contact-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr auto;
-    gap: 10px;
-    margin-bottom: 10px;
-}
-
-/* Конкуренты: Список-Аккордеон */
-.comp-item-header {
-    cursor: pointer;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-}
-.comp-item-body {
-    display: none;
-    padding-top: 10px;
-    margin-top: 10px;
-    border-top: 1px solid #eee;
-    font-size: 0.85rem;
-}
-/* Когда активен - показываем тело */
-.list-group-item.active .comp-item-body {
-    display: block;
-}
-/* Цвет текста внутри активного элемента */
-.list-group-item.active .comp-item-body, 
-.list-group-item.active .text-muted {
-    color: rgba(255,255,255, 0.9) !important;
-}
-.list-group-item.active .badge-type {
-    border: 1px solid white; /* Чтобы бейджи было видно на синем фоне */
-}
-/* --- КАРТОТЕКА КОНКУРЕНТОВ --- */
-
-/* Карточка конкурента */
-.comp-card {
-    background: #fff;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 15px;
-    height: 100%;
-    transition: transform 0.2s, box-shadow 0.2s;
-    cursor: pointer;
-    position: relative;
-    overflow: hidden;
-}
-
-/* Бордовая полоска слева для красоты */
-.comp-card::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 4px;
-    background-color: var(--primary-color);
-    opacity: 0;
-    transition: opacity 0.2s;
-}
-
-.comp-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-}
-
-.comp-card:hover::before {
-    opacity: 1;
-}
-
-.comp-card-title {
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: #333;
-    margin-bottom: 5px;
-}
-
-.comp-card-supplier {
-    font-size: 0.85rem;
-    color: #666;
-    margin-bottom: 10px;
-}
-
-.comp-card-badges {
-    margin-top: 10px;
-    display: flex;
-    gap: 5px;
-    flex-wrap: wrap;
-}
-
-/* Фильтры (Бордовый акцент при фокусе) */
-.search-bar-container input:focus, 
-.search-bar-container select:focus {
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(185, 4, 10, 0.15);
-}
-/* --- КАРТОЧКА КОНКУРЕНТА (ОБНОВЛЕННАЯ) --- */
-.comp-card {
-    background: #fff;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    height: 280px; /* Фиксированная высота, чтобы список влезал */
-    position: relative; /* Для позиционирования шторки */
-    overflow: hidden;   /* Чтобы шторка не вылезала */
-    transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.comp-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-}
-
-/* Лицевая сторона */
-.comp-card-front {
-    padding: 15px;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-}
-
-/* Обратная сторона (Список коллекций) */
-.comp-card-back {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: #fff;
-    padding: 15px;
-    transform: translateY(100%); /* Спрятано снизу */
-    transition: transform 0.3s ease-in-out;
-    display: flex;
-    flex-direction: column;
-    z-index: 10;
-}
-
-/* Класс для открытия шторки */
-.comp-card.show-collections .comp-card-back {
-    transform: translateY(0); /* Выезжает вверх */
-}
-
-/* Кнопка редактирования (Карандаш) */
-.btn-card-edit {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    z-index: 5;
-    background: white;
-    border: 1px solid #ddd;
-    border-radius: 50%;
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #666;
-    transition: all 0.2s;
-}
-.btn-card-edit:hover {
-    background: var(--primary-color);
-    color: white;
-    border-color: var(--primary-color);
-}
-
-/* Список внутри карточки */
-.comp-card-list {
-    flex-grow: 1;
-    overflow-y: auto; /* Скролл, если коллекций много */
-    margin-top: 10px;
-    border-top: 1px solid #eee;
-    padding-top: 5px;
-}
-
-.comp-collection-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 4px 0;
-    border-bottom: 1px solid #f9f9f9;
-    font-size: 0.85rem;
-}
-
-/* --- СТИЛИ ДЛЯ СПИСКОВ В МОДАЛКАХ --- */
-
-.list-container {
-    max-height: 300px;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    background: #f8f9fa;
-    padding: 10px;
-    border: 1px solid #dee2e6;
-    border-radius: 6px;
-}
-
-/* Обычные строки (Контакты, Адреса) */
-.contact-entry, .address-entry, .pos-entry, .visit-entry {
-    display: flex;
-    gap: 5px;
-    margin-bottom: 8px;
-    padding-bottom: 8px;
-    border-bottom: 1px dashed #ddd;
-}
-
-/* (ИЗМЕНЕНО) Строка Конкурента - Жесткая сетка */
-.competitor-entry {
-    display: grid;
-    /* Бренд (25%) | Коллекция (25%) | Опт (20%) | Розн (20%) | Кнопка (Auto) */
-    grid-template-columns: 1.5fr 1.5fr 1fr 1fr auto; 
-    gap: 5px;
-    margin-bottom: 8px;
-    padding-bottom: 8px;
-    border-bottom: 1px dashed #ccc;
-    align-items: center;
-}
-
-/* На мобильных - в 2 этажа */
-@media (max-width: 768px) {
-    .competitor-entry {
-        grid-template-columns: 1fr 1fr auto; /* Бренд, Коллекция, Кнопка */
-    }
-    .competitor-entry input:nth-last-child(2), /* Опт */
-    .competitor-entry input:nth-last-child(3) { /* Розница */
-        grid-column: span 1; /* На второй строке */
-    }
-    .competitor-brand, .competitor-collection {
-        grid-column: span 1;
-    }
-    .btn-remove-entry {
-        grid-row: 1 / 3; /* Кнопка удаления на всю высоту */
-    }
-}
-
-/* --- НОВЫЙ СПИСОК ДИЛЕРОВ (КАРТОЧКИ) --- */
-
-/* Контейнер списка */
-.dealer-list-container {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-/* Сама карточка */
-.dealer-item {
-    background: #fff;
-    border: 1px solid #e9ecef;
-    border-radius: 12px;
-    padding: 15px;
-    display: flex;
-    align-items: center;
-    transition: all 0.2s ease;
-    position: relative;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-}
-
-.dealer-item:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 16px rgba(0,0,0,0.08);
-    border-color: var(--primary-color);
-}
-
-/* Левая часть: Аватар */
-.dealer-item-avatar {
-    width: 60px;
-    height: 60px;
-    flex-shrink: 0;
-    border-radius: 50%;
-    overflow: hidden;
-    background-color: #f8f9fa;
-    margin-right: 15px;
-    border: 2px solid #fff;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #adb5bd;
-    font-size: 1.5rem;
-}
-
-.dealer-item-avatar img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-/* Центральная часть: Инфо */
-.dealer-item-info {
-    flex-grow: 1;
-    min-width: 0; /* Фикс для text-truncate */
-    margin-right: 10px;
-}
-
-.dealer-item-name {
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: #212529;
-    margin-bottom: 2px;
-    text-decoration: none;
-    display: block;
-}
-.dealer-item-name:hover {
-    color: var(--primary-color);
-}
-
-.dealer-item-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    font-size: 0.85rem;
-    color: #6c757d;
-    align-items: center;
-}
-
-.dealer-item-meta i {
-    margin-right: 3px;
-}
-
-/* Правая часть: Кнопки (Desktop) */
-.dealer-item-actions {
-    display: flex;
-    gap: 5px;
-    opacity: 0.8;
-}
-.dealer-item:hover .dealer-item-actions {
-    opacity: 1;
-}
-
-/* Статусы (Бейджи) */
-.status-badge {
-    padding: 3px 8px;
-    border-radius: 6px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-}
-.st-active { background: #d1e7dd; color: #0f5132; }
-.st-problem { background: #f8d7da; color: #842029; }
-.st-potential { background: #cfe2ff; color: #084298; }
-.st-archive { background: #e2e3e5; color: #41464b; }
-.st-standard { background: #fff3cd; color: #664d03; }
-
-/* --- МОБИЛЬНАЯ ВЕРСИЯ (АДАПТИВ) --- */
-@media (max-width: 768px) {
-    .dealer-item {
-        flex-direction: column; /* Всё в колонку */
-        align-items: flex-start;
-        padding: 15px;
-    }
-
-    .dealer-item-avatar {
-        width: 50px;
-        height: 50px;
-        position: absolute; /* Аватар в угол */
-        top: 15px;
-        left: 15px;
-    }
-
-    .dealer-item-info {
-        margin-left: 65px; /* Отступ под аватар */
-        width: calc(100% - 65px);
-        margin-bottom: 10px;
-    }
-
-    /* Панель быстрых действий на мобильном */
-    .dealer-mobile-actions {
-        display: flex;
-        width: 100%;
-        justify-content: space-between;
-        border-top: 1px solid #eee;
-        padding-top: 10px;
-        margin-top: 5px;
-    }
-    
-    .dealer-mobile-btn {
-        flex: 1;
-        text-align: center;
-        padding: 5px;
-        border-radius: 6px;
-        background: #f8f9fa;
-        margin: 0 2px;
-        color: #333;
-        text-decoration: none;
-        font-size: 1.2rem;
-    }
-    .dealer-mobile-btn:active {
-        background: #e9ecef;
-    }
-
-    /* Скрываем десктопные кнопки на мобильном */
-    .dealer-item-actions {
-        display: none;
-    }
-}
-
-@media (min-width: 769px) {
-    .dealer-mobile-actions {
-        display: none; /* Скрываем мобильные кнопки на ПК */
-    }
 }
