@@ -49,15 +49,65 @@
         </div>
 
         <div class="row g-4 mb-5">
-            <div class="col-lg-8">
-                <div id="dashboard-container" class="row g-3"></div> 
+            
+            <div class="col-xl-4 col-lg-5 d-flex flex-column gap-4">
+                
+                <div id="dashboard-stats" class="row g-3">
+                    </div>
+
+                <div class="card border-0 shadow-sm rounded-4 h-100 overflow-hidden">
+                    <div class="card-header bg-white border-0 pt-4 px-4 pb-0">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <div class="icon-circle bg-danger-subtle text-danger">
+                                <i class="bi bi-exclamation-triangle-fill"></i>
+                            </div>
+                            <h6 class="fw-bold mb-0">Проблемы / Просрочено</h6>
+                        </div>
+                    </div>
+                    <div class="card-body px-2">
+                        <div id="tasks-list-problem" class="task-list-modern">
+                            <p class="text-center text-muted py-3 small">Загрузка...</p>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="col-lg-4">
-                 <div class="card border-0 shadow-sm h-100" style="background: #fff0f0;">
-                    <div class="card-body">
-                        <h6 class="text-danger fw-bold mb-3"><i class="bi bi-exclamation-circle me-2"></i>Требуют внимания</h6>
-                        <div id="tasks-list-problem" class="list-group list-group-flush bg-transparent">
-                            <p class="text-muted small">Загрузка...</p>
+
+            <div class="col-xl-8 col-lg-7">
+                <div class="row g-4 h-100">
+                    
+                    <div class="col-md-6">
+                        <div class="card border-0 shadow-sm rounded-4 h-100">
+                            <div class="card-header bg-white border-0 pt-4 px-4 pb-0">
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <div class="icon-circle bg-primary-subtle text-primary">
+                                        <i class="bi bi-calendar-check-fill"></i>
+                                    </div>
+                                    <h6 class="fw-bold mb-0">План на сегодня</h6>
+                                </div>
+                            </div>
+                            <div class="card-body px-2">
+                                <div id="tasks-list-upcoming" class="task-list-modern">
+                                    <p class="text-center text-muted py-3 small">Загрузка...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="card border-0 shadow-sm rounded-4 h-100">
+                            <div class="card-header bg-white border-0 pt-4 px-4 pb-0">
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <div class="icon-circle bg-warning-subtle text-warning">
+                                        <i class="bi bi-hourglass-split"></i>
+                                    </div>
+                                    <h6 class="fw-bold mb-0">Давно не были (>30 дн)</h6>
+                                </div>
+                            </div>
+                            <div class="card-body px-2">
+                                <div id="tasks-list-cooling" class="task-list-modern">
+                                    <p class="text-center text-muted py-3 small">Загрузка...</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -262,3 +312,4 @@
     </script>
 </body>
 </html>
+
