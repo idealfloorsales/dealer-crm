@@ -196,7 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function getSelectedProductIds(containerId) { const el=document.getElementById(containerId); if(!el) return []; return Array.from(el.querySelectorAll('input:checked')).map(cb=>cb.value); }
     async function saveProducts(dealerId, ids) { await fetch(`${API_DEALERS_URL}/${dealerId}/products`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({productIds: ids})}); }
 
-    // --- (НОВОЕ) RENDER LIST (GRID VIEW) ---
+    // --- RENDER LIST (MODERN LIST VIEW) ---
     function renderDealerList() {
         if (!dealerGrid) return;
 
@@ -210,7 +210,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let statusMatch = false; 
             const s = d.status || 'standard';
             if (status) statusMatch = s === status; 
-            else statusMatch = s !== 'potential'; // По умолчанию скрываем потенциальных
+            else statusMatch = s !== 'potential'; 
             
             return (!city || d.city === city) && 
                    (!type || d.price_type === type) && 
@@ -223,7 +223,6 @@ document.addEventListener('DOMContentLoaded', () => {
         filtered.sort((a, b) => {
             let valA = (a[currentSort.column] || '').toString();
             let valB = (b[currentSort.column] || '').toString();
-            // ID сортируем как числа, остальное как текст
             let res = currentSort.column === 'dealer_id' 
                 ? valA.localeCompare(valB, undefined, {numeric:true}) 
                 : valA.toLowerCase().localeCompare(valB.toLowerCase(), 'ru');
@@ -238,72 +237,74 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if(noDataMsg) noDataMsg.style.display = 'none';
 
+        // Словарь названий статусов
+        const statusLabels = {
+            'active': 'Активный',
+            'standard': 'Стандарт',
+            'problem': 'Проблемный',
+            'potential': 'Потенциальный',
+            'archive': 'Архив'
+        };
+
         dealerGrid.innerHTML = filtered.map(d => {
             const statusClass = `status-${d.status || 'standard'}`;
+            const statusText = statusLabels[d.status] || 'Стандарт';
             
-            // Телефон (первый найденный)
+            // Кнопки действий
             let phoneBtn = '';
             let waBtn = '';
             if (d.contacts && d.contacts.length > 0) {
                 const phone = d.contacts.find(c => c.contactInfo)?.contactInfo || '';
                 const cleanPhone = phone.replace(/[^0-9]/g, '');
                 if (cleanPhone.length >= 10) {
-                    phoneBtn = `<a href="tel:+${cleanPhone}" class="btn-card-action btn-call" onclick="event.stopPropagation()"><i class="bi bi-telephone-fill"></i>Звонок</a>`;
-                    waBtn = `<a href="https://wa.me/${cleanPhone}" target="_blank" class="btn-card-action btn-wa" onclick="event.stopPropagation()"><i class="bi bi-whatsapp"></i>WA</a>`;
+                    phoneBtn = `<a href="tel:+${cleanPhone}" class="btn-icon-action btn-action-call" onclick="event.stopPropagation()" title="Позвонить"><i class="bi bi-telephone-fill"></i></a>`;
+                    waBtn = `<a href="https://wa.me/${cleanPhone}" target="_blank" class="btn-icon-action btn-action-wa" onclick="event.stopPropagation()" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>`;
                 }
             }
 
-            // Карта
             let mapBtn = '';
             if (d.latitude && d.longitude) {
-                mapBtn = `<a href="https://yandex.kz/maps/?pt=${d.longitude},${d.latitude}&z=17&l=map" target="_blank" class="btn-card-action" onclick="event.stopPropagation()"><i class="bi bi-map"></i></a>`;
+                mapBtn = `<a href="https://yandex.kz/maps/?pt=${d.longitude},${d.latitude}&z=17&l=map" target="_blank" class="btn-icon-action" onclick="event.stopPropagation()" title="Маршрут"><i class="bi bi-geo-alt-fill"></i></a>`;
             }
 
             // Аватар
             const avatarHtml = d.photo_url 
-                ? `<img src="${d.photo_url}" class="dealer-card-avatar" alt="${d.name}">` 
-                : `<div class="dealer-card-avatar no-photo"><i class="bi bi-shop"></i></div>`;
-
-            // Ответственный (коротко)
-            let respShort = '';
-            if(d.responsible === 'regional_astana') respShort = 'Рег. Астана';
-            else if(d.responsible === 'regional_regions') respShort = 'Рег. Регионы';
+                ? `<img src="${d.photo_url}" alt="${d.name}">` 
+                : `<i class="bi bi-shop"></i>`;
 
             return `
-            <div class="col-md-6 col-lg-4 col-xl-3">
-                <div class="dealer-card ${statusClass}" onclick="window.open('dealer.html?id=${d.id}', '_blank')">
+            <div class="dealer-item ${statusClass}" onclick="window.open('dealer.html?id=${d.id}', '_blank')">
+                
+                <div class="dealer-item-avatar">
+                    ${avatarHtml}
+                </div>
+
+                <div class="dealer-item-info">
+                    <a href="dealer.html?id=${d.id}" class="dealer-item-name" target="_blank">${safeText(d.name)}</a>
                     
-                    <button class="btn-card-edit" onclick="event.stopPropagation(); openEditModal('${d.id}')" title="Редактировать">
-                        <i class="bi bi-pencil"></i>
-                    </button>
-
-                    <div class="dealer-card-header">
-                        ${avatarHtml}
-                        <div>
-                            <div class="dealer-card-title">${safeText(d.name)}</div>
-                            <div class="dealer-card-subtitle">ID: ${safeText(d.dealer_id)}</div>
-                        </div>
-                    </div>
-
-                    <div class="dealer-card-body">
-                        <div class="dealer-info-row"><i class="bi bi-geo-alt"></i> <span>${safeText(d.city)}</span></div>
-                        <div class="dealer-info-row"><i class="bi bi-tag"></i> <span>${safeText(d.price_type)}</span></div>
-                        ${respShort ? `<div class="dealer-info-row"><i class="bi bi-person"></i> <span>${respShort}</span></div>` : ''}
-                    </div>
-
-                    <div class="dealer-card-footer">
-                        ${waBtn}
-                        ${phoneBtn}
-                        ${mapBtn}
-                        <button class="btn-card-action btn-quick-visit" onclick="event.stopPropagation(); showQuickVisit('${d.id}')">
-                            <i class="bi bi-calendar-check"></i>
-                        </button>
+                    <div class="dealer-item-details">
+                        <span class="status-badge">${statusText}</span>
+                        <span><i class="bi bi-hash"></i>${safeText(d.dealer_id)}</span>
+                        <span><i class="bi bi-geo-alt"></i>${safeText(d.city)}</span>
+                        ${d.price_type ? `<span><i class="bi bi-tag"></i>${safeText(d.price_type)}</span>` : ''}
                     </div>
                 </div>
+
+                <div class="dealer-item-actions">
+                    ${waBtn}
+                    ${phoneBtn}
+                    ${mapBtn}
+                    <button class="btn-icon-action" onclick="event.stopPropagation(); showQuickVisit('${d.id}')" title="Быстрый визит">
+                        <i class="bi bi-calendar-check"></i>
+                    </button>
+                    <button class="btn-icon-action" onclick="event.stopPropagation(); openEditModal('${d.id}')" title="Редактировать">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                </div>
+
             </div>`;
         }).join('');
     }
-
     // Вспомогательная функция для Quick Visit (чтобы работало из HTML onclick)
     window.showQuickVisit = (id) => {
         document.getElementById('qv_dealer_id').value = id;
@@ -510,3 +511,4 @@ document.addEventListener('DOMContentLoaded', () => {
     
     initApp();
 });
+
