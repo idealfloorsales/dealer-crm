@@ -196,7 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function getSelectedProductIds(containerId) { const el=document.getElementById(containerId); if(!el) return []; return Array.from(el.querySelectorAll('input:checked')).map(cb=>cb.value); }
     async function saveProducts(dealerId, ids) { await fetch(`${API_DEALERS_URL}/${dealerId}/products`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({productIds: ids})}); }
 
-    // --- RENDER LIST (MODERN LIST VIEW) ---
+   // --- RENDER LIST (PREMIUM MODERN LOOK) ---
     function renderDealerList() {
         if (!dealerGrid) return;
 
@@ -231,77 +231,75 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (filtered.length === 0) {
             dealerGrid.innerHTML = '';
-            if(noDataMsg) { noDataMsg.style.display = 'block'; noDataMsg.textContent = 'Ничего не найдено.'; }
+            if(noDataMsg) { noDataMsg.style.display = 'block'; noDataMsg.textContent = 'Ничего не найдено'; }
             return;
         }
-
         if(noDataMsg) noDataMsg.style.display = 'none';
 
-        // Словарь названий статусов
-        const statusLabels = {
-            'active': 'Активный',
-            'standard': 'Стандарт',
-            'problem': 'Проблемный',
-            'potential': 'Потенциальный',
-            'archive': 'Архив'
+        // Настройки для Soft Badges
+        const statusConfig = {
+            'active': { label: 'Active', class: 'sp-active' },
+            'standard': { label: 'Standard', class: 'sp-standard' },
+            'problem': { label: 'Problem', class: 'sp-problem' },
+            'potential': { label: 'Potential', class: 'sp-potential' },
+            'archive': { label: 'Archive', class: 'sp-archive' }
         };
 
         dealerGrid.innerHTML = filtered.map(d => {
-            const statusClass = `status-${d.status || 'standard'}`;
-            const statusText = statusLabels[d.status] || 'Стандарт';
+            const st = statusConfig[d.status] || statusConfig['standard'];
             
-            // Кнопки действий
+            // Кнопки
             let phoneBtn = '';
             let waBtn = '';
             if (d.contacts && d.contacts.length > 0) {
                 const phone = d.contacts.find(c => c.contactInfo)?.contactInfo || '';
                 const cleanPhone = phone.replace(/[^0-9]/g, '');
                 if (cleanPhone.length >= 10) {
-                    phoneBtn = `<a href="tel:+${cleanPhone}" class="btn-icon-action btn-action-call" onclick="event.stopPropagation()" title="Позвонить"><i class="bi bi-telephone-fill"></i></a>`;
-                    waBtn = `<a href="https://wa.me/${cleanPhone}" target="_blank" class="btn-icon-action btn-action-wa" onclick="event.stopPropagation()" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>`;
+                    phoneBtn = `<a href="tel:+${cleanPhone}" class="btn-circle btn-circle-call" onclick="event.stopPropagation()" title="Позвонить"><i class="bi bi-telephone-fill"></i></a>`;
+                    waBtn = `<a href="https://wa.me/${cleanPhone}" target="_blank" class="btn-circle btn-circle-wa" onclick="event.stopPropagation()" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>`;
                 }
             }
 
             let mapBtn = '';
             if (d.latitude && d.longitude) {
-                mapBtn = `<a href="https://yandex.kz/maps/?pt=${d.longitude},${d.latitude}&z=17&l=map" target="_blank" class="btn-icon-action" onclick="event.stopPropagation()" title="Маршрут"><i class="bi bi-geo-alt-fill"></i></a>`;
+                mapBtn = `<a href="https://yandex.kz/maps/?pt=${d.longitude},${d.latitude}&z=17&l=map" target="_blank" class="btn-circle" onclick="event.stopPropagation()" title="Маршрут"><i class="bi bi-geo-alt-fill"></i></a>`;
             }
 
-            // Аватар
             const avatarHtml = d.photo_url 
                 ? `<img src="${d.photo_url}" alt="${d.name}">` 
                 : `<i class="bi bi-shop"></i>`;
 
             return `
-            <div class="dealer-item ${statusClass}" onclick="window.open('dealer.html?id=${d.id}', '_blank')">
+            <div class="dealer-item" onclick="window.open('dealer.html?id=${d.id}', '_blank')">
                 
-                <div class="dealer-item-avatar">
+                <div class="dealer-avatar-box">
                     ${avatarHtml}
                 </div>
 
-                <div class="dealer-item-info">
-                    <a href="dealer.html?id=${d.id}" class="dealer-item-name" target="_blank">${safeText(d.name)}</a>
+                <div class="dealer-content">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <a href="dealer.html?id=${d.id}" class="dealer-name" target="_blank">${safeText(d.name)}</a>
+                        <span class="status-pill ${st.class}">${st.label}</span>
+                    </div>
                     
-                    <div class="dealer-item-details">
-                        <span class="status-badge">${statusText}</span>
+                    <div class="dealer-meta">
                         <span><i class="bi bi-hash"></i>${safeText(d.dealer_id)}</span>
                         <span><i class="bi bi-geo-alt"></i>${safeText(d.city)}</span>
                         ${d.price_type ? `<span><i class="bi bi-tag"></i>${safeText(d.price_type)}</span>` : ''}
                     </div>
                 </div>
 
-                <div class="dealer-item-actions">
+                <div class="dealer-actions">
                     ${waBtn}
                     ${phoneBtn}
                     ${mapBtn}
-                    <button class="btn-icon-action" onclick="event.stopPropagation(); showQuickVisit('${d.id}')" title="Быстрый визит">
+                    <button class="btn-circle" onclick="event.stopPropagation(); showQuickVisit('${d.id}')" title="Быстрый визит">
                         <i class="bi bi-calendar-check"></i>
                     </button>
-                    <button class="btn-icon-action" onclick="event.stopPropagation(); openEditModal('${d.id}')" title="Редактировать">
+                    <button class="btn-circle" onclick="event.stopPropagation(); openEditModal('${d.id}')" title="Редактировать">
                         <i class="bi bi-pencil"></i>
                     </button>
                 </div>
-
             </div>`;
         }).join('');
     }
@@ -511,4 +509,5 @@ document.addEventListener('DOMContentLoaded', () => {
     
     initApp();
 });
+
 
