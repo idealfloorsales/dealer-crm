@@ -301,3 +301,178 @@ label { font-weight: 600; color: #555; margin-top: 5px; display: block; }
     .contact-entry, .address-entry, .pos-entry, .competitor-entry { grid-template-columns: 1fr auto; }
     .contact-entry input, .address-entry input, .pos-entry input, .pos-entry select, .competitor-entry input { grid-column: 1; }
 }
+
+/* --- НОВЫЙ СПИСОК ДИЛЕРОВ (КАРТОЧКИ В СТРОКУ) --- */
+
+/* Контейнер списка */
+.dealer-list-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* Сама карточка-строка */
+.dealer-item {
+    background: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 15px;
+    display: flex;
+    align-items: center;
+    transition: all 0.2s ease;
+    position: relative;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    /* Цветная полоска статуса слева */
+    border-left: 5px solid #ccc; 
+}
+
+.dealer-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.08);
+}
+
+/* Статусы (Цвета левой полоски) */
+.status-active { border-left-color: #198754 !important; }   
+.status-problem { border-left-color: #dc3545 !important; }  
+.status-potential { border-left-color: #0d6efd !important; } 
+.status-standard { border-left-color: #ffc107 !important; } 
+.status-archive { border-left-color: #6c757d !important; opacity: 0.7; background: #f8f9fa; }
+
+/* Левая часть: Аватар */
+.dealer-item-avatar {
+    width: 60px;
+    height: 60px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    overflow: hidden;
+    background-color: #f8f9fa;
+    margin-right: 20px;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #adb5bd;
+    font-size: 1.5rem;
+}
+
+.dealer-item-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Центральная часть: Инфо */
+.dealer-item-info {
+    flex-grow: 1;
+    min-width: 0; /* Чтобы текст сокращался троеточием */
+    margin-right: 15px;
+}
+
+.dealer-item-name {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #212529;
+    margin-bottom: 4px;
+    text-decoration: none;
+    display: block;
+}
+.dealer-item-name:hover {
+    color: var(--primary-color);
+}
+
+.dealer-item-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    font-size: 0.85rem;
+    color: #6c757d;
+    align-items: center;
+}
+
+.dealer-item-details i {
+    color: #adb5bd;
+    margin-right: 4px;
+}
+
+/* Правая часть: Кнопки */
+.dealer-item-actions {
+    display: flex;
+    gap: 8px;
+    opacity: 0.9;
+}
+
+.btn-icon-action {
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+    background: #fff;
+    color: #555;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+.btn-icon-action:hover {
+    background: #f8f9fa;
+    color: var(--primary-color);
+    border-color: #dee2e6;
+}
+
+/* Спец цвета для кнопок */
+.btn-action-wa { color: #198754; background: #f0fff4; border-color: #d1e7dd; }
+.btn-action-wa:hover { background: #198754; color: white; }
+
+.btn-action-call { color: #0d6efd; background: #f0f7ff; border-color: #cfe2ff; }
+.btn-action-call:hover { background: #0d6efd; color: white; }
+
+/* Бейдж статуса текстом */
+.status-badge {
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-right: 10px;
+    background: #eee;
+    color: #555;
+}
+
+/* --- МОБИЛЬНАЯ ВЕРСИЯ --- */
+@media (max-width: 768px) {
+    .dealer-item {
+        flex-direction: column; /* На телефоне блоки друг под другом */
+        align-items: flex-start;
+        padding: 15px;
+    }
+
+    .dealer-item-avatar {
+        width: 50px;
+        height: 50px;
+        position: absolute;
+        top: 15px;
+        left: 15px;
+    }
+
+    .dealer-item-info {
+        margin-left: 65px; /* Отступ под аватар */
+        width: calc(100% - 65px);
+        margin-bottom: 10px;
+        margin-right: 0;
+    }
+
+    .dealer-item-actions {
+        width: 100%;
+        justify-content: space-between; /* Кнопки на всю ширину */
+        border-top: 1px solid #eee;
+        padding-top: 10px;
+        margin-top: 5px;
+    }
+    
+    .btn-icon-action {
+        flex: 1; /* Растягиваем кнопки */
+        border-radius: 6px;
+    }
+}
