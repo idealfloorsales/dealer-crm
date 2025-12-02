@@ -298,10 +298,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join(''); 
     }
 
-    // --- ГЕНЕРАТОРЫ ---
+    // 1. КОНКУРЕНТЫ (Строгая структура для CSS Grid)
     function createCompetitorEntryHTML(c={}) { 
         let brandOpts = `<option value="">-- Бренд --</option>`;
         competitorsRef.forEach(ref => { const sel = ref.name === c.brand ? 'selected' : ''; brandOpts += `<option value="${ref.name}" ${sel}>${ref.name}</option>`; });
+        
         let collOpts = `<option value="">-- Коллекция --</option>`;
         if (c.brand) {
             const ref = competitorsRef.find(r => r.name === c.brand);
@@ -310,18 +311,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 sortedCols.forEach(col => { const colName = (typeof col === 'string') ? col : col.name; const colType = (typeof col === 'object') ? col.type : 'std'; const sel = colName === c.collection ? 'selected' : ''; let label = ''; if(colType.includes('eng')) label = ' (Елка)'; else if(colType.includes('french')) label = ' (Фр. Елка)'; else if(colType.includes('art')) label = ' (Арт)'; collOpts += `<option value="${colName}" ${sel}>${colName}${label}</option>`; });
             }
         }
-        return `<div class="competitor-entry"><select class="form-select competitor-brand" onchange="updateCollections(this)">${brandOpts}</select><select class="form-select competitor-collection">${collOpts}</select><input type="text" class="form-control competitor-price-opt" placeholder="ОПТ" value="${c.price_opt||''}"><input type="text" class="form-control competitor-price-retail" placeholder="Розница" value="${c.price_retail||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry" onclick="this.closest('.competitor-entry').remove()">×</button></div>`; 
+        
+        // Убрал лишние div-обертки, чтобы Grid работал напрямую
+        return `
+        <div class="competitor-entry">
+            <select class="form-select competitor-brand" onchange="updateCollections(this)">${brandOpts}</select>
+            <select class="form-select competitor-collection">${collOpts}</select>
+            <input type="text" class="form-control competitor-price-opt" placeholder="ОПТ" value="${c.price_opt||''}">
+            <input type="text" class="form-control competitor-price-retail" placeholder="Розн" value="${c.price_retail||''}">
+            <button type="button" class="btn btn-outline-danger btn-remove-entry" onclick="this.closest('.competitor-entry').remove()">×</button>
+        </div>`; 
     }
-    window.updateCollections = function(select) {
-        const brandName = select.value; const row = select.closest('.competitor-entry'); const collSelect = row.querySelector('.competitor-collection');
-        let html = `<option value="">-- Коллекция --</option>`;
-        const ref = competitorsRef.find(r => r.name === brandName);
-        if (ref && ref.collections) {
-             const sortedCols = [...ref.collections].sort((a, b) => { const typeA = (typeof a === 'object') ? a.type : 'std'; const typeB = (typeof b === 'object') ? b.type : 'std'; if (typeA === 'std' && typeB !== 'std') return 1; if (typeA !== 'std' && typeB === 'std') return -1; return 0; });
-             html += sortedCols.map(col => { const colName = (typeof col === 'string') ? col : col.name; const colType = (typeof col === 'object') ? col.type : 'std'; let label = ''; if(colType.includes('eng')) label = ' (Елка)'; else if(colType.includes('french')) label = ' (Фр. Елка)'; else if(colType.includes('art')) label = ' (Арт)'; return `<option value="${colName}">${colName}${label}</option>`; }).join('');
-        }
-        collSelect.innerHTML = html;
-    };
+
+    // 2. СТЕНДЫ (POS) - Исправлено для Datalist
+    function createPosEntryHTML(p={}) { 
+        return `
+        <div class="pos-entry">
+            <input type="text" class="form-control pos-name" list="pos-materials-datalist" placeholder="Название стенда (выберите или введите)" value="${p.name||''}">
+            <input type="number" class="form-control pos-quantity" value="${p.quantity||1}" min="1" placeholder="Кол-во">
+            <button type="button" class="btn btn-outline-danger btn-remove-entry" onclick="this.closest('.pos-entry').remove()">×</button>
+        </div>`; 
+    }
+
+    // Остальные генераторы (можно оставить как были, они простые)
+    function createContactEntryHTML(c={}) { return `<div class="contact-entry"><input type="text" class="form-control contact-name" placeholder="Имя" value="${c.name||''}"><input type="text" class="form-control contact-position" placeholder="Должность" value="${c.position||''}"><input type="text" class="form-control contact-info" placeholder="Телефон" value="${c.contactInfo||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry" onclick="this.closest('.contact-entry').remove()">×</button></div>`; }
+    function createAddressEntryHTML(a={}) { return `<div class="address-entry"><input type="text" class="form-control address-description" placeholder="Описание" value="${a.description||''}"><input type="text" class="form-control address-city" placeholder="Город" value="${a.city||''}"><input type="text" class="form-control address-address" placeholder="Адрес" value="${a.address||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry" onclick="this.closest('.address-entry').remove()">×</button></div>`; }
+    function createVisitEntryHTML(v={}) { return `<div class="visit-entry"><input type="date" class="form-control visit-date" value="${v.date||''}"><input type="text" class="form-control visit-comment w-50" placeholder="Результат..." value="${v.comment||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry" onclick="this.closest('.visit-entry').remove()">×</button></div>`; }
     function createPosEntryHTML(p={}) { return `<div class="pos-entry input-group mb-2"><input type="text" class="form-control pos-name" list="pos-materials-datalist" placeholder="Название стенда" value="${p.name||''}"><input type="number" class="form-control pos-quantity" value="${p.quantity||1}" min="1" style="max-width: 100px;"><button type="button" class="btn btn-outline-danger btn-remove-entry" onclick="this.closest('.pos-entry').remove()">×</button></div>`; }
     function createContactEntryHTML(c={}) { return `<div class="contact-entry input-group mb-2"><input type="text" class="form-control contact-name" placeholder="Имя" value="${c.name||''}"><input type="text" class="form-control contact-position" placeholder="Должность" value="${c.position||''}"><input type="text" class="form-control contact-info" placeholder="Телефон" value="${c.contactInfo||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry" onclick="this.closest('.contact-entry').remove()">×</button></div>`; }
     function createAddressEntryHTML(a={}) { return `<div class="address-entry input-group mb-2"><input type="text" class="form-control address-description" placeholder="Описание" value="${a.description||''}"><input type="text" class="form-control address-city" placeholder="Город" value="${a.city||''}"><input type="text" class="form-control address-address" placeholder="Адрес" value="${a.address||''}"><button type="button" class="btn btn-outline-danger btn-remove-entry" onclick="this.closest('.address-entry').remove()">×</button></div>`; }
@@ -655,6 +670,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     initApp();
 });
+
 
 
 
