@@ -205,11 +205,11 @@ nav a.nav-link.active { background: var(--primary-color) !important; color: whit
 
 /* Списки в модалке (Серый фон контейнера) */
 .list-container {
-    background-color: #f8f9fa; /* Серый фон */
+    background-color: #f8f9fa;
     border: 1px solid #e9ecef;
     border-radius: 12px;
-    padding: 10px;
-    max-height: 300px;
+    padding: 12px;
+    max-height: 350px; /* Чуть выше */
     overflow-y: auto;
 }
 
@@ -269,25 +269,76 @@ nav a.nav-link.active { background: var(--primary-color) !important; color: whit
     color: white;
 }
 
-/* ПОС: Стенды */
+/* --- СТЕНДЫ (POS) --- */
 .pos-entry {
-    /* Тоже в одну строку */
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 8px;
+    margin-bottom: 8px;
+    
+    /* Сетка: Название (растягивается) | Кол-во (80px) | Кнопка (30px) */
     display: grid;
-    grid-template-columns: 1fr 80px auto; /* Имя, Кол-во, Кнопка */
+    grid-template-columns: 1fr 90px 32px; 
+    gap: 10px;
+    align-items: center;
 }
 
-/* Адаптив для телефонов (там в одну строку не влезет, делаем стопкой) */
+/* --- КОНКУРЕНТЫ --- */
+.competitor-entry {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 8px;
+    margin-bottom: 8px;
+    
+    /* Сетка: Бренд(30%) | Коллекция(30%) | Опт(15%) | Розн(15%) | Кнопка */
+    display: grid;
+    grid-template-columns: 2fr 2fr 1fr 1fr 32px; 
+    gap: 8px; 
+    align-items: center;
+}
+
+/* Общие стили полей внутри списков */
+.list-container input.form-control, 
+.list-container select.form-select {
+    font-size: 0.9rem;
+    padding: 0.4rem 0.6rem;
+    height: 36px; /* Фиксированная высота для красоты */
+    margin: 0;
+}
+
+/* Кнопка удаления */
+.btn-remove-entry {
+    width: 32px;
+    height: 36px; /* Высота как у полей */
+    padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 6px;
+    border: 1px solid #fee2e2;
+    background-color: #fff;
+    color: #ef4444;
+    transition: all 0.2s;
+}
+.btn-remove-entry:hover {
+    background-color: #dc3545;
+    border-color: #dc3545;
+    color: white;
+}
+
+/* Адаптив для телефонов */
 @media (max-width: 768px) {
     .competitor-entry {
-        grid-template-columns: 1fr 1fr auto; /* Бренд, Коллекция, Кнопка */
+        /* На телефоне в две строки */
+        grid-template-columns: 1fr 1fr 32px; 
         grid-template-rows: auto auto;
     }
-    /* Цены переносим на вторую строку */
-    .competitor-price-opt, .competitor-price-retail {
-        grid-column: span 1; 
-    }
-    .btn-remove-entry {
-        grid-row: 1 / 3; /* Кнопка на всю высоту */
-        height: 100%;
-    }
+    .competitor-brand { grid-column: 1 / 2; grid-row: 1; }
+    .competitor-collection { grid-column: 2 / 3; grid-row: 1; }
+    .btn-remove-entry { grid-column: 3; grid-row: 1 / 3; height: 100%; } /* Кнопка на всю высоту */
+    
+    /* Цены на вторую строку */
+    .competitor-price-opt { grid-column: 1; grid-row: 2; }
+    .competitor-price-retail { grid-column: 2; grid-row: 2; }
 }
+
