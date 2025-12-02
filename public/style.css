@@ -1,14 +1,17 @@
 /* style.css */
-/* Modern CRM Design - 2025 Look */
+/* Modern CRM Design - Brand Edition (#b9040a) */
 
 :root {
+    /* ГЛАВНЫЙ ЦВЕТ БРЕНДА */
     --primary-color: #b9040a;   
-    --primary-hover: #a00309;
+    --primary-hover: #900308; /* Чуть темнее для наведения */
+    
     --text-dark: #1e293b;
     --text-gray: #64748b;
-    --bg-light: #f3f4f6; /* Мягкий серый фон для всего сайта */
+    --bg-light: #f3f4f6;
     --card-bg: #ffffff;
     
+    /* Статусные цвета (оставляем стандартными для логики, но приглушенными) */
     --success-bg: #dcfce7; --success-text: #166534;
     --danger-bg: #fee2e2;  --danger-text: #991b1b;
     --warning-bg: #fef3c7; --warning-text: #92400e;
@@ -24,60 +27,88 @@ body {
 }
 
 h1, h2, h3, h4, h5, h6 { font-weight: 700; color: var(--text-dark); margin-bottom: 0.5rem; }
-h1 { font-size: 1.75rem; border: none; } /* Убрал подчеркивание заголовков */
+h1 { font-size: 1.75rem; border: none; }
 
 /* --- Навигация --- */
 nav.navbar { background: #fff !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05); padding: 0.75rem 1rem; border-bottom: 1px solid #e2e8f0; }
 nav .navbar-brand { font-weight: 700; color: var(--primary-color) !important; }
 nav a.nav-link { color: var(--text-gray) !important; font-weight: 500; font-size: 0.95rem; border-radius: 8px; padding: 8px 16px !important; transition: 0.2s; }
-nav a.nav-link:hover { background: #f1f5f9; color: var(--text-dark) !important; }
-nav a.nav-link.active { background: #fff0f0; color: var(--primary-color) !important; font-weight: 600; }
+nav a.nav-link:hover { background: #fff1f2; color: var(--primary-color) !important; } /* Светло-красный фон при наведении */
+nav a.nav-link.active { background: var(--primary-color) !important; color: white !important; font-weight: 600; box-shadow: 0 4px 6px -1px rgba(185, 4, 10, 0.3); }
 
 /* --- Кнопки и формы --- */
 .btn { font-weight: 500; padding: 0.5rem 1rem; border-radius: 8px; transition: all 0.2s; border: 1px solid transparent; }
-.btn-primary { background-color: var(--primary-color); border-color: var(--primary-color); box-shadow: 0 4px 6px -1px rgba(185, 4, 10, 0.2); }
-.btn-primary:hover { background-color: var(--primary-hover); transform: translateY(-1px); }
-.btn-light { background: #fff; border: 1px solid #e2e8f0; color: var(--text-dark); }
-.btn-light:hover { background: #f8fafc; border-color: #cbd5e1; }
-.form-control, .form-select { border-radius: 8px; border: 1px solid #e2e8f0; padding: 0.6rem 1rem; font-size: 0.95rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
-.form-control:focus, .form-select:focus { border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(185, 4, 10, 0.1); }
 
-/* --- НОВЫЙ СПИСОК ДИЛЕРОВ (PREMIUM CARDS) --- */
-.dealer-item {
-    background: var(--card-bg);
-    border: 1px solid #fff; /* Граница почти невидима */
-    border-radius: 16px; /* Большие скругления */
-    padding: 18px 24px;
-    display: flex;
-    align-items: center;
-    margin-bottom: 0;
-    transition: all 0.2s ease-in-out;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.02); /* Очень мягкая тень */
+/* Главная кнопка - БРЕНДОВАЯ */
+.btn-primary { 
+    background-color: var(--primary-color); 
+    border-color: var(--primary-color); 
+    box-shadow: 0 4px 10px rgba(185, 4, 10, 0.25); 
+}
+.btn-primary:hover, .btn-primary:active, .btn-primary:focus { 
+    background-color: var(--primary-hover) !important; 
+    border-color: var(--primary-hover) !important; 
+    transform: translateY(-1px);
 }
 
+.btn-light { background: #fff; border: 1px solid #e2e8f0; color: var(--text-dark); }
+.btn-light:hover { background: #f8fafc; border-color: #cbd5e1; color: var(--primary-color); }
+
+.btn-success { background-color: #10b981; border-color: #10b981; color: white; } /* Для Excel оставим зеленым */
+
+.form-control, .form-select { border-radius: 8px; border: 1px solid #e2e8f0; padding: 0.6rem 1rem; font-size: 0.95rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
+.form-control:focus, .form-select:focus { border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(185, 4, 10, 0.15); outline: none; }
+.form-check-input:checked { background-color: var(--primary-color); border-color: var(--primary-color); }
+
+/* --- WIZARD (Шаги в модалке) --- */
+.wizard-progress-container { position: relative; padding: 0 10px; }
+.wizard-progress-bar { position: absolute; top: 20px; left: 20px; right: 20px; height: 4px; background: #e9ecef; z-index: 0; border-radius: 4px; }
+.wizard-steps-wrapper { position: relative; display: flex; justify-content: space-between; z-index: 1; }
+
+.step-circle {
+    width: 44px; height: 44px; border-radius: 50%; background: #fff; border: 3px solid #e9ecef;
+    display: flex; align-items: center; justify-content: center; font-weight: 700; color: #94a3b8;
+    transition: all 0.3s; font-size: 1.1rem;
+}
+/* Активный шаг - БРЕНДОВЫЙ */
+.step-circle.active {
+    border-color: var(--primary-color);
+    background: var(--primary-color);
+    color: white;
+    box-shadow: 0 0 0 4px rgba(185, 4, 10, 0.15);
+}
+/* Пройденный шаг - ТОЖЕ БРЕНДОВЫЙ (вместо зеленого) */
+.step-circle.completed {
+    border-color: var(--primary-color);
+    background: var(--primary-color);
+    color: white;
+    opacity: 0.8; 
+}
+.wizard-step { display: none; animation: fadeIn 0.3s; }
+.wizard-step.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* --- СПИСОК ДИЛЕРОВ (Premium Cards) --- */
+.dealer-item {
+    background: var(--card-bg);
+    border: 1px solid #fff;
+    border-radius: 16px;
+    padding: 18px 24px;
+    display: flex; align-items: center;
+    margin-bottom: 0; transition: all 0.2s ease-in-out;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+}
 .dealer-item:hover {
     transform: translateY(-3px);
-    box-shadow: 0 10px 30px -5px rgba(0,0,0,0.08); /* Красивая тень при наведении */
-    border-color: #e2e8f0;
-    z-index: 10;
+    box-shadow: 0 10px 30px -5px rgba(0,0,0,0.08);
+    border-color: #e2e8f0; z-index: 10;
 }
 
 /* Аватар */
 .dealer-avatar-box {
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    background: #f1f5f9;
-    margin-right: 20px;
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #94a3b8;
-    font-size: 1.5rem;
-    border: 2px solid #fff;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    width: 56px; height: 56px; border-radius: 50%; flex-shrink: 0; background: #f1f5f9; margin-right: 20px;
+    overflow: hidden; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 1.5rem;
+    border: 2px solid #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
 }
 .dealer-avatar-box img { width: 100%; height: 100%; object-fit: cover; }
 
@@ -90,38 +121,22 @@ nav a.nav-link.active { background: #fff0f0; color: var(--primary-color) !import
 .dealer-meta i { color: #94a3b8; }
 
 /* Статус (Soft Badge) */
-.status-pill {
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-size: 0.75rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    display: inline-block;
-}
+.status-pill { padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; display: inline-block; }
 .sp-active { background: var(--success-bg); color: var(--success-text); }
-.sp-problem { background: var(--danger-bg); color: var(--danger-text); }
+.sp-problem { background: var(--danger-bg); color: var(--danger-text); } /* Красный фон для проблемных */
 .sp-standard { background: var(--warning-bg); color: var(--warning-text); }
 .sp-potential { background: var(--info-bg); color: var(--info-text); }
 .sp-archive { background: var(--gray-bg); color: var(--gray-text); }
 
-/* Действия (Круглые кнопки) */
+/* Действия */
 .dealer-actions { display: flex; gap: 10px; align-items: center; }
 .btn-circle {
-    width: 40px; 
-    height: 40px; 
-    border-radius: 50%; 
-    background: #fff; 
-    border: 1px solid #e2e8f0; 
-    color: var(--text-gray);
-    display: flex; align-items: center; justify-content: center;
-    transition: all 0.2s;
-    font-size: 1.1rem;
-    text-decoration: none;
+    width: 40px; height: 40px; border-radius: 50%; background: #fff; border: 1px solid #e2e8f0; color: var(--text-gray);
+    display: flex; align-items: center; justify-content: center; transition: all 0.2s; font-size: 1.1rem; text-decoration: none;
 }
-.btn-circle:hover { background: #f8fafc; color: var(--primary-color); border-color: #cbd5e1; transform: scale(1.05); }
+.btn-circle:hover { background: #fff1f2; color: var(--primary-color); border-color: #fda4af; transform: scale(1.05); }
 
-/* Спец цвета для кнопок */
+/* Спец цвета кнопок (WhatsApp и Звонок оставляем зеленым/синим, так привычнее пользователю, но Редактирование - красным при наведении) */
 .btn-circle-wa { color: #166534; background: #f0fdf4; border-color: #bbf7d0; }
 .btn-circle-wa:hover { background: #166534; color: #fff; border-color: #166534; }
 .btn-circle-call { color: #0369a1; background: #f0f9ff; border-color: #bae6fd; }
@@ -137,172 +152,53 @@ nav a.nav-link.active { background: #fff0f0; color: var(--primary-color) !import
     .status-pill { position: absolute; top: 16px; right: 16px; }
 }
 
-/* --- Остальные элементы (Дашборд, Таблицы) --- */
-.stat-card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #f1f5f9; text-align: center; }
-.stat-number { font-size: 2rem; font-weight: 800; color: var(--primary-color); display: block; }
-.stat-label { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-gray); font-weight: 600; }
-
-.container { max-width: 1100px; padding-top: 20px; padding-bottom: 40px; }
-
-/* Карта и модалки */
-#map { border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; }
-.modal-content { border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); border: none; }
-.modal-header { border-bottom: 1px solid #f1f5f9; padding: 1.5rem; }
-.modal-footer { border-top: 1px solid #f1f5f9; background: #f8fafc; padding: 1rem 1.5rem; border-bottom-left-radius: 16px; border-bottom-right-radius: 16px; }
-.list-container { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; }
-.contact-entry, .address-entry, .pos-entry { border: 1px solid #f1f5f9; background: #fafafa; }
-/* --- MODERN DASHBOARD --- */
-
-/* Круглая иконка в заголовке карточки */
-.icon-circle {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1rem;
-}
-/* Цвета для фонов иконок (Bootstrap-subtle аналоги) */
+/* --- DASHBOARD ICONS --- */
+.icon-circle { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
 .bg-danger-subtle { background-color: #fef2f2; }
 .bg-primary-subtle { background-color: #f0f9ff; }
 .bg-warning-subtle { background-color: #fffbeb; }
 .bg-success-subtle { background-color: #f0fdf4; }
 
-/* Карточка статистики (Маленькая) */
 .stat-card-modern {
-    background: #fff;
-    border-radius: 16px;
-    padding: 20px;
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    border: 1px solid #f1f5f9;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.02);
-    height: 100%;
-    transition: transform 0.2s;
+    background: #fff; border-radius: 16px; padding: 20px; display: flex; align-items: center; gap: 15px;
+    border: 1px solid #f1f5f9; box-shadow: 0 2px 5px rgba(0,0,0,0.02); height: 100%; transition: transform 0.2s;
 }
-.stat-card-modern:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
-}
-.stat-icon-box {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.5rem;
-}
+.stat-card-modern:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05); }
+.stat-icon-box { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; }
 .stat-info h3 { font-size: 1.5rem; font-weight: 800; margin: 0; line-height: 1; color: var(--text-dark); }
 .stat-info p { margin: 0; font-size: 0.85rem; color: var(--text-gray); font-weight: 500; }
 
-/* Список задач */
-.task-list-modern {
-    max-height: 300px;
-    overflow-y: auto;
-    padding: 0 10px;
-}
-.task-item-modern {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px;
-    margin-bottom: 8px;
-    background: #f8fafc;
-    border-radius: 10px;
-    border: 1px solid transparent;
-    transition: all 0.2s;
-}
-.task-item-modern:hover {
-    background: #fff;
-    border-color: #e2e8f0;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-}
+.task-list-modern { max-height: 300px; overflow-y: auto; padding: 0 10px; }
+.task-item-modern { display: flex; align-items: center; justify-content: space-between; padding: 12px; margin-bottom: 8px; background: #f8fafc; border-radius: 10px; border: 1px solid transparent; transition: all 0.2s; }
+.task-item-modern:hover { background: #fff; border-color: #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
 .task-content { flex-grow: 1; min-width: 0; margin-right: 10px; }
 .task-title { font-weight: 600; font-size: 0.95rem; color: var(--text-dark); text-decoration: none; display: block; margin-bottom: 2px; }
 .task-title:hover { color: var(--primary-color); }
 .task-meta { font-size: 0.8rem; color: var(--text-gray); display: flex; align-items: center; gap: 8px; }
-.task-badge {
-    padding: 2px 8px;
-    border-radius: 6px;
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: uppercase;
-}
-.tb-today { background: #fee2e2; color: #991b1b; } /* Красный */
-.tb-future { background: #e0f2fe; color: #075985; } /* Синий */
-.tb-overdue { background: #450a0a; color: #fff; } /* Темно-красный */
-.tb-cooling { background: #fef3c7; color: #92400e; } /* Желтый */
+.task-badge { padding: 2px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
+.tb-today { background: #fee2e2; color: #991b1b; }
+.tb-future { background: #e0f2fe; color: #075985; }
+.tb-overdue { background: #450a0a; color: #fff; }
+.tb-cooling { background: #fef3c7; color: #92400e; }
+.btn-task-check { width: 32px; height: 32px; border-radius: 50%; border: 1px solid #cbd5e1; background: #fff; color: #cbd5e1; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+.btn-task-check:hover { border-color: #166534; color: #166534; background: #f0fdf4; }
 
-/* Кнопка "Галочка" */
-.btn-task-check {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    border: 1px solid #cbd5e1;
-    background: #fff;
-    color: #cbd5e1;
-    display: flex; align-items: center; justify-content: center;
-    transition: all 0.2s;
-}
-.btn-task-check:hover {
-    border-color: #166534;
-    color: #166534;
-    background: #f0fdf4;
-}
+/* Модалки и карты */
+.container { max-width: 1100px; padding-top: 20px; padding-bottom: 40px; }
+#map { border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; }
+.modal-content { border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); border: none; }
+.modal-header { border-bottom: 1px solid #f1f5f9; padding: 1.5rem; }
+.modal-footer { border-top: 1px solid #f1f5f9; background: #f8fafc; padding: 1rem 1.5rem; border-bottom-left-radius: 16px; border-bottom-right-radius: 16px; }
+.modal-tabs .nav-link { color: var(--text-gray); font-weight: 600; border: none; border-bottom: 3px solid transparent; border-radius: 0 !important; }
+.modal-tabs .nav-link.active { color: var(--primary-color); border-bottom: 3px solid var(--primary-color); background: none; }
+.modal-tabs { border-bottom: 1px solid #e2e8f0; margin-bottom: 20px; }
 
-/* --- WIZARD STYLES (Добавление дилера) --- */
-.wizard-progress-container {
-    position: relative;
-    padding: 0 10px;
-}
-.wizard-progress-bar {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    right: 20px;
-    height: 4px;
-    background: #e9ecef;
-    z-index: 0;
-    border-radius: 4px;
-}
-.wizard-steps-wrapper {
-    position: relative;
-    display: flex;
-    justify-content: space-between;
-    z-index: 1;
-}
-.step-circle {
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    background: #fff;
-    border: 3px solid #e9ecef;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    color: #94a3b8;
-    transition: all 0.3s;
-    font-size: 1.1rem;
-}
-.step-circle.active {
-    border-color: var(--primary-color);
-    background: var(--primary-color);
-    color: white;
-    box-shadow: 0 0 0 4px rgba(185, 4, 10, 0.15);
-}
-.step-circle.completed {
-    border-color: #166534;
-    background: #166534;
-    color: white;
-}
-.wizard-step {
-    display: none;
-    animation: fadeIn 0.3s;
-}
-.wizard-step.active {
-    display: block;
-}
+/* Мелочи (списки, фото превью) */
+.list-container { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; }
+.contact-entry, .address-entry, .pos-entry { border: 1px solid #f1f5f9; background: #fafafa; }
+.photo-preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; margin-top: 10px; border: 1px solid #e2e8f0; padding: 10px; border-radius: 8px; background: #f8fafc; }
+.photo-preview-item { position: relative; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background: #fff; height: 80px; }
+.product-checklist { max-height: 200px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.25rem; background: #fff; columns: 2; column-gap: 20px; }
+.checklist-item { break-inside: avoid; margin-bottom: 5px; }
+.avatar-preview { width: 100px; height: 100px; object-fit: cover; border-radius: 50%; border: 3px solid #e2e8f0; background-color: #f8fafc; }
+.avatar-preview[src=""] { display: none; }
