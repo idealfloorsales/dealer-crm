@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     
+    // --- 1. CONFIG & STATE ---
     const API_DEALERS_URL = '/api/dealers';
     const API_PRODUCTS_URL = '/api/products'; 
     const API_COMPETITORS_REF_URL = '/api/competitors-ref';
@@ -9,14 +10,18 @@ document.addEventListener('DOMContentLoaded', () => {
     let allDealers = [];
     let currentSort = { column: 'name', direction: 'asc' };
     let isSaving = false; 
+    let addPhotosData = []; 
+    let editPhotosData = []; 
+    let newAvatarBase64 = null; 
     
+    // Списки для автодополнения
     const posMaterialsList = [
         "С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры",
         "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка",
         "Табличка - Табличка орг.стекло"
     ];
 
-    // --- Модалки (С защитой) ---
+    // --- 2. ELEMENTS & MODALS ---
     const addModalEl = document.getElementById('add-modal'); 
     const addModal = new bootstrap.Modal(addModalEl, { backdrop: 'static', keyboard: false });
     const addForm = document.getElementById('add-dealer-form');
@@ -29,12 +34,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const qvModal = new bootstrap.Modal(qvModalEl, { backdrop: 'static', keyboard: false });
     const qvForm = document.getElementById('quick-visit-form');
 
-    // --- Элементы ---
+    // Кнопки и списки
     const openAddModalBtn = document.getElementById('open-add-modal-btn');
     const brandsDatalist = document.getElementById('brands-datalist');
     const posDatalist = document.getElementById('pos-materials-datalist');
-
-    // Списки
+    
+    const dealerGrid = document.getElementById('dealer-grid'); // Наш новый список
+    const noDataMsg = document.getElementById('no-data-msg');
+    
+    // Контейнеры списков в модалках
     const addProductChecklist = document.getElementById('add-product-checklist'); 
     const addContactList = document.getElementById('add-contact-list'); 
     const addAddressList = document.getElementById('add-address-list'); 
@@ -58,49 +66,168 @@ document.addEventListener('DOMContentLoaded', () => {
     const editAvatarPreview = document.getElementById('edit-avatar-preview');
     const editCurrentAvatarUrl = document.getElementById('edit-current-avatar-url');
 
-    // GRID Container (Вместо таблицы)
-    const dealerGrid = document.getElementById('dealer-grid');
-    const noDataMsg = document.getElementById('no-data-msg');
-    
+    // Фильтры
     const filterCity = document.getElementById('filter-city');
-    const filterPriceType = document.getElementById('filter-price-type'); // Скрытый, но нужен для логики
+    const filterPriceType = document.getElementById('filter-price-type');
     const filterStatus = document.getElementById('filter-status');
     const filterResponsible = document.getElementById('filter-responsible');
     const searchBar = document.getElementById('search-bar'); 
     const exportBtn = document.getElementById('export-dealers-btn'); 
     
-    // Дашборд элементы
+    // Дашборд
     const dashboardStats = document.getElementById('dashboard-stats');
     const tasksListUpcoming = document.getElementById('tasks-list-upcoming');
     const tasksListProblem = document.getElementById('tasks-list-problem');
     const tasksListCooling = document.getElementById('tasks-list-cooling');
 
-    let addPhotosData = []; let editPhotosData = []; let newAvatarBase64 = null; 
+    // --- 3. CORE FUNCTIONS (HOISTED) ---
+    // Эти функции вынесены вверх, чтобы они были доступны везде
 
-    // Utils
+    // Вспомогательные
     const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
     const safeText = (text) => (text || '').toString().replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const safeAttr = (text) => (text || '').toString().replace(/"/g, '&quot;');
-    const toBase64 = file => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => resolve(reader.result); reader.onerror = error => reject(error); });
     const compressImage = (file, maxWidth = 1000, quality = 0.7) => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = event => { const img = new Image(); img.src = event.target.result; img.onload = () => { const elem = document.createElement('canvas'); let width = img.width; let height = img.height; if (width > maxWidth) { height *= maxWidth / width; width = maxWidth; } elem.width = width; elem.height = height; const ctx = elem.getContext('2d'); ctx.drawImage(img, 0, 0, width, height); resolve(elem.toDataURL('image/jpeg', quality)); }; img.onerror = error => reject(error); }; reader.onerror = error => reject(error); });
 
-    // --- MAP ---
-    const DEFAULT_LAT = 51.1605; const DEFAULT_LNG = 71.4704;
+    // === ФУНКЦИЯ ОТКРЫТИЯ РЕДАКТИРОВАНИЯ (ВАЖНАЯ) ===
+    async function openEditModal(id) {
+        try {
+            const res = await fetch(`${API_DEALERS_URL}/${id}`); 
+            if(!res.ok) throw new Error("Ошибка"); 
+            const d = await res.json();
+            
+            // Заполняем поля
+            const titleEl = document.querySelector('#edit-modal .modal-title'); if(titleEl) titleEl.textContent = `Редактировать: ${d.name}`;
+            document.getElementById('edit_db_id').value=d.id; 
+            document.getElementById('edit_dealer_id').value=d.dealer_id; 
+            document.getElementById('edit_name').value=d.name; 
+            document.getElementById('edit_organization').value=d.organization; 
+            document.getElementById('edit_price_type').value=d.price_type; 
+            document.getElementById('edit_city').value=d.city; 
+            document.getElementById('edit_address').value=d.address; 
+            document.getElementById('edit_delivery').value=d.delivery; 
+            document.getElementById('edit_website').value=d.website; 
+            document.getElementById('edit_instagram').value=d.instagram;
+            if(document.getElementById('edit_latitude')) document.getElementById('edit_latitude').value=d.latitude||'';
+            if(document.getElementById('edit_longitude')) document.getElementById('edit_longitude').value=d.longitude||'';
+            document.getElementById('edit_bonuses').value=d.bonuses;
+            if(document.getElementById('edit_status')) document.getElementById('edit_status').value = d.status || 'standard';
+            if(document.getElementById('edit_responsible')) document.getElementById('edit_responsible').value = d.responsible || '';
+
+            // Аватар
+            if(editAvatarPreview) {
+                editAvatarPreview.src = d.avatarUrl || '';
+                editAvatarPreview.style.display = d.avatarUrl ? 'block' : 'none';
+            }
+            if(editCurrentAvatarUrl) editCurrentAvatarUrl.value = d.avatarUrl || '';
+            newAvatarBase64 = null;
+
+            // Списки
+            renderList(editContactList, d.contacts, createContactEntryHTML); 
+            renderList(editAddressList, d.additional_addresses, createAddressEntryHTML); 
+            renderList(editPosList, d.pos_materials, createPosEntryHTML); 
+            renderList(editVisitsList, d.visits, createVisitEntryHTML);
+            renderList(editCompetitorList, d.competitors, createCompetitorEntryHTML);
+            
+            // Товары и Фото
+            renderProductChecklist(editProductChecklist, (d.products||[]).map(p=>p.id));
+            editPhotosData = d.photos||[]; 
+            renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData);
+            
+            // Сброс вкладок на первую
+            const firstTabEl = document.querySelector('#editTabs button[data-bs-target="#tab-main"]');
+            if(firstTabEl) { const tab = new bootstrap.Tab(firstTabEl); tab.show(); }
+
+            editModal.show();
+        } catch(e){ alert("Ошибка загрузки данных дилера."); console.error(e); }
+    }
+    // Делаем функцию глобальной СРАЗУ
+    window.openEditModal = openEditModal;
+
+    // === ФУНКЦИЯ БЫСТРОГО ВИЗИТА ===
+    window.showQuickVisit = (id) => { 
+        document.getElementById('qv_dealer_id').value = id; 
+        document.getElementById('qv_comment').value = ''; 
+        qvModal.show(); 
+    };
+
+    // --- 4. MAP LOGIC ---
+    const DEFAULT_LAT_MAP = 51.1605; const DEFAULT_LNG_MAP = 71.4704;
     let addMap, editMap;
 
-    function initMap(mapId) { const el = document.getElementById(mapId); if (!el) return null; if (typeof L === 'undefined') return null; const map = L.map(mapId).setView([DEFAULT_LAT, DEFAULT_LNG], 13); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: 'OSM' }).addTo(map); return map; }
-    function setupMapClick(map, latId, lngId, markerRef) { if (!map) return; map.on('click', function(e) { const lat = e.latlng.lat; const lng = e.latlng.lng; const latIn = document.getElementById(latId); const lngIn = document.getElementById(lngId); if(latIn) latIn.value = lat; if(lngIn) lngIn.value = lng; if (markerRef.current) markerRef.current.setLatLng([lat, lng]); else markerRef.current = L.marker([lat, lng]).addTo(map); }); }
+    function initMap(mapId) { 
+        const el = document.getElementById(mapId); if (!el) return null; 
+        if (typeof L === 'undefined') return null; 
+        const map = L.map(mapId).setView([DEFAULT_LAT_MAP, DEFAULT_LNG_MAP], 13); 
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: 'OSM' }).addTo(map); 
+        return map; 
+    }
+    
+    function setupMapClick(map, latId, lngId, markerRef) { 
+        if (!map) return; 
+        map.on('click', function(e) { 
+            const lat = e.latlng.lat; const lng = e.latlng.lng; 
+            const latIn = document.getElementById(latId); const lngIn = document.getElementById(lngId); 
+            if(latIn) latIn.value = lat; if(lngIn) lngIn.value = lng; 
+            if (markerRef.current) markerRef.current.setLatLng([lat, lng]); 
+            else markerRef.current = L.marker([lat, lng]).addTo(map); 
+        }); 
+    }
+    
     function setupMapSearch(map, inputId, suggestionsId, latId, lngId, markerRef) {
-        const input = document.getElementById(inputId); const suggestionsBox = document.getElementById(suggestionsId); const latInput = document.getElementById(latId); const lngInput = document.getElementById(lngId);
-        if (!input || !suggestionsBox) return; let debounceTimer;
-        input.addEventListener('input', async () => { clearTimeout(debounceTimer); const query = input.value.trim(); if (query.length < 3) { suggestionsBox.style.display = 'none'; return; } debounceTimer = setTimeout(async () => { try { const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=kz`); const data = await res.json(); suggestionsBox.innerHTML = ''; if (data.length > 0) { suggestionsBox.style.display = 'block'; data.slice(0, 5).forEach(place => { const div = document.createElement('div'); div.className = 'address-suggestion-item'; div.textContent = place.display_name; div.onclick = () => { const lat = parseFloat(place.lat); const lon = parseFloat(place.lon); if (markerRef.current) markerRef.current.setLatLng([lat, lon]); else markerRef.current = L.marker([lat, lon]).addTo(map); map.setView([lat, lon], 16); if (latInput) latInput.value = lat; if (lngInput) lngInput.value = lon; input.value = place.display_name; suggestionsBox.style.display = 'none'; }; suggestionsBox.appendChild(div); }); } else { suggestionsBox.style.display = 'none'; } } catch (e) { console.error(e); } }, 500); });
+        const input = document.getElementById(inputId); 
+        const suggestionsBox = document.getElementById(suggestionsId); 
+        const latInput = document.getElementById(latId); 
+        const lngInput = document.getElementById(lngId);
+        if (!input || !suggestionsBox) return; 
+        let debounceTimer;
+        
+        input.addEventListener('input', async () => { 
+            clearTimeout(debounceTimer); 
+            const query = input.value.trim(); 
+            if (query.length < 3) { suggestionsBox.style.display = 'none'; return; } 
+            
+            debounceTimer = setTimeout(async () => { 
+                try { 
+                    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=kz`); 
+                    const data = await res.json(); 
+                    suggestionsBox.innerHTML = ''; 
+                    if (data.length > 0) { 
+                        suggestionsBox.style.display = 'block'; 
+                        data.slice(0, 5).forEach(place => { 
+                            const div = document.createElement('div'); 
+                            div.className = 'address-suggestion-item'; 
+                            div.textContent = place.display_name; 
+                            div.onclick = () => { 
+                                const lat = parseFloat(place.lat); const lon = parseFloat(place.lon); 
+                                if (markerRef.current) markerRef.current.setLatLng([lat, lon]); 
+                                else markerRef.current = L.marker([lat, lon]).addTo(map); 
+                                map.setView([lat, lon], 16); 
+                                if (latInput) latInput.value = lat; if (lngInput) lngInput.value = lon; 
+                                input.value = place.display_name; 
+                                suggestionsBox.style.display = 'none'; 
+                                // Автозаполнение города и адреса, если поля пустые
+                                if(document.getElementById('city') && !document.getElementById('city').value) {
+                                    const addr = place.address || {};
+                                    document.getElementById('city').value = addr.city || addr.town || addr.village || '';
+                                }
+                                if(document.getElementById('address') && !document.getElementById('address').value) {
+                                    document.getElementById('address').value = place.display_name.split(',')[0];
+                                }
+                            }; 
+                            suggestionsBox.appendChild(div); 
+                        }); 
+                    } else { suggestionsBox.style.display = 'none'; } 
+                } catch (e) { console.error(e); } 
+            }, 500); 
+        });
         document.addEventListener('click', (e) => { if (!e.target.closest('.map-search-container')) suggestionsBox.style.display = 'none'; });
     }
 
-    if (addModalEl) { addModalEl.addEventListener('shown.bs.modal', () => { if (!addMap) { addMap = initMap('add-map'); addModalEl.markerRef = { current: null }; setupMapClick(addMap, 'add_latitude', 'add_longitude', addModalEl.markerRef); setupMapSearch(addMap, 'add-map-search', 'add-map-suggestions', 'add_latitude', 'add_longitude', addModalEl.markerRef); } else { addMap.invalidateSize(); } if (addMap && addModalEl.markerRef && addModalEl.markerRef.current) { addMap.removeLayer(addModalEl.markerRef.current); addModalEl.markerRef.current = null; } if (addMap) addMap.setView([DEFAULT_LAT, DEFAULT_LNG], 13); }); }
-    if (editModalEl) { editModalEl.addEventListener('shown.bs.modal', () => { const tabMapBtn = document.querySelector('button[data-bs-target="#tab-map"]'); if(tabMapBtn) { tabMapBtn.addEventListener('shown.bs.tab', () => { if (!editMap) { editMap = initMap('edit-map'); editModalEl.markerRef = { current: null }; setupMapClick(editMap, 'edit_latitude', 'edit_longitude', editModalEl.markerRef); setupMapSearch(editMap, 'edit-map-search', 'edit-map-suggestions', 'edit_latitude', 'edit_longitude', editModalEl.markerRef); } if(editMap) { editMap.invalidateSize(); const lat = parseFloat(document.getElementById('edit_latitude').value); const lng = parseFloat(document.getElementById('edit_longitude').value); if (!isNaN(lat) && !isNaN(lng)) { editMap.setView([lat, lng], 15); if(editModalEl.markerRef.current) editModalEl.markerRef.current.setLatLng([lat, lng]); else editModalEl.markerRef.current = L.marker([lat, lng]).addTo(editMap); } else { editMap.setView([DEFAULT_LAT, DEFAULT_LNG], 13); } } }); } }); }
+    if (addModalEl) { addModalEl.addEventListener('shown.bs.modal', () => { if (!addMap) { addMap = initMap('add-map'); addModalEl.markerRef = { current: null }; setupMapClick(addMap, 'add_latitude', 'add_longitude', addModalEl.markerRef); setupMapSearch(addMap, 'add-map-search', 'add-map-suggestions', 'add_latitude', 'add_longitude', addModalEl.markerRef); } else { addMap.invalidateSize(); } if (addMap && addModalEl.markerRef && addModalEl.markerRef.current) { addMap.removeLayer(addModalEl.markerRef.current); addModalEl.markerRef.current = null; } if (addMap) addMap.setView([DEFAULT_LAT_MAP, DEFAULT_LNG_MAP], 13); }); }
+    if (editModalEl) { editModalEl.addEventListener('shown.bs.modal', () => { const tabMapBtn = document.querySelector('button[data-bs-target="#tab-map"]'); if(tabMapBtn) { tabMapBtn.addEventListener('shown.bs.tab', () => { if (!editMap) { editMap = initMap('edit-map'); editModalEl.markerRef = { current: null }; setupMapClick(editMap, 'edit_latitude', 'edit_longitude', editModalEl.markerRef); setupMapSearch(editMap, 'edit-map-search', 'edit-map-suggestions', 'edit_latitude', 'edit_longitude', editModalEl.markerRef); } if(editMap) { editMap.invalidateSize(); const lat = parseFloat(document.getElementById('edit_latitude').value); const lng = parseFloat(document.getElementById('edit_longitude').value); if (!isNaN(lat) && !isNaN(lng)) { editMap.setView([lat, lng], 15); if(editModalEl.markerRef.current) editModalEl.markerRef.current.setLatLng([lat, lng]); else editModalEl.markerRef.current = L.marker([lat, lng]).addTo(editMap); } else { editMap.setView([DEFAULT_LAT_MAP, DEFAULT_LNG_MAP], 13); } } }); } }); }
 
-    // --- DATA ---
+    // --- 5. INITIALIZATION ---
     async function initApp() {
         await fetchProductCatalog();
         updatePosDatalist(); 
@@ -121,8 +248,13 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) { 
             if(dealerGrid) dealerGrid.innerHTML = `<div class="col-12"><p class="text-danger text-center">Ошибка загрузки.</p></div>`; 
         }
+        
+        // Обработка "отложенного" открытия (например, если обновили страницу)
         const pendingId = localStorage.getItem('pendingEditDealerId');
-        if (pendingId) { localStorage.removeItem('pendingEditDealerId'); openEditModal(pendingId); }
+        if (pendingId) { 
+            localStorage.removeItem('pendingEditDealerId'); 
+            openEditModal(pendingId); 
+        }
     }
 
     function updateBrandsDatalist() { if (!brandsDatalist) return; let html = ''; competitorsRef.forEach(ref => { html += `<option value="${ref.name}">`; }); brandsDatalist.innerHTML = html; }
@@ -131,20 +263,15 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchProductCatalog() { if (fullProductCatalog.length > 0) return; try { const response = await fetch(API_PRODUCTS_URL); if (!response.ok) throw new Error(`Ошибка: ${response.status}`); fullProductCatalog = await response.json(); fullProductCatalog.sort((a, b) => a.sku.localeCompare(b.sku, 'ru', { numeric: true })); } catch (error) {} }
     async function completeTask(btn, dealerId, visitIndex) { try { btn.disabled = true; const res = await fetch(`${API_DEALERS_URL}/${dealerId}`); if(!res.ok) throw new Error('Err'); const dealer = await res.json(); if (dealer.visits && dealer.visits[visitIndex]) { dealer.visits[visitIndex].isCompleted = true; } await fetch(`${API_DEALERS_URL}/${dealerId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visits: dealer.visits }) }); initApp(); } catch (e) { alert("Ошибка"); btn.disabled = false; } }
 
-    // --- MODERN DASHBOARD ---
+    // --- 6. RENDER DASHBOARD ---
     function renderDashboard() {
         if (!dashboardStats) return; 
-
-        if (!allDealers || allDealers.length === 0) {
-            dashboardStats.innerHTML = '';
-            return;
-        }
+        if (!allDealers || allDealers.length === 0) { dashboardStats.innerHTML = ''; return; }
 
         const activeDealers = allDealers.filter(d => d.status !== 'potential');
         const totalDealers = activeDealers.length;
         const noAvatarCount = activeDealers.filter(d => !d.photo_url).length; 
 
-        // 1. Статистика
         dashboardStats.innerHTML = `
             <div class="col-6">
                 <div class="stat-card-modern">
@@ -160,10 +287,8 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
 
-        // 2. Задачи
         const today = new Date(); today.setHours(0,0,0,0);
         const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
-        
         const tasksUpcoming = [], tasksProblem = [], tasksCooling = [];
 
         allDealers.forEach(d => {
@@ -174,12 +299,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (d.visits && Array.isArray(d.visits)) { 
                 d.visits.forEach((v, index) => { 
-                    const vDate = new Date(v.date); 
-                    if (!v.date) return; 
-                    vDate.setHours(0,0,0,0); 
-                    
+                    const vDate = new Date(v.date); if (!v.date) return; vDate.setHours(0,0,0,0); 
                     if (v.isCompleted && (!lastVisitDate || vDate > lastVisitDate)) lastVisitDate = vDate; 
-                    
                     if (!v.isCompleted) { 
                         const taskData = { dealerName: d.name, dealerId: d.id, date: vDate, comment: v.comment || "Без комментария", visitIndex: index }; 
                         if (vDate < today) tasksProblem.push({...taskData, type: 'overdue'}); 
@@ -187,13 +308,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     } 
                 }); 
             }
-
-            if (d.status === 'problem') { 
-                if (!tasksProblem.some(t => t.dealerId === d.id && t.type === 'overdue')) { 
-                    tasksProblem.push({ dealerName: d.name, dealerId: d.id, type: 'status', comment: 'Статус: Проблемный' }); 
-                } 
-            }
-
+            if (d.status === 'problem') { if (!tasksProblem.some(t => t.dealerId === d.id && t.type === 'overdue')) tasksProblem.push({ dealerName: d.name, dealerId: d.id, type: 'status', comment: 'Статус: Проблемный' }); }
             if (!hasFutureTasks && d.status !== 'problem' && !isPotential) { 
                 if (!lastVisitDate) tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: 999 }); 
                 else if (lastVisitDate < thirtyDaysAgo) { 
@@ -223,18 +338,14 @@ document.addEventListener('DOMContentLoaded', () => {
             let badgeHtml = ''; let metaHtml = '';
             if (type === 'upcoming') { 
                 const dateStr = t.date.toLocaleDateString('ru-RU', {day:'numeric', month:'short'});
-                if (t.isToday) badgeHtml = `<span class="task-badge tb-today">Сегодня</span>`;
-                else badgeHtml = `<span class="task-badge tb-future">${dateStr}</span>`;
+                badgeHtml = t.isToday ? `<span class="task-badge tb-today">Сегодня</span>` : `<span class="task-badge tb-future">${dateStr}</span>`;
                 metaHtml = `<span>${safeText(t.comment)}</span>`;
             } else if (type === 'problem') { 
                 if (t.type === 'overdue') {
                     const dateStr = t.date.toLocaleDateString('ru-RU');
                     badgeHtml = `<span class="task-badge tb-overdue">Просрок: ${dateStr}</span>`;
                     metaHtml = `<span class="text-danger">${safeText(t.comment)}</span>`;
-                } else {
-                    badgeHtml = `<span class="task-badge tb-overdue">Проблема</span>`;
-                    metaHtml = `<span>Внимание!</span>`;
-                }
+                } else { badgeHtml = `<span class="task-badge tb-overdue">Проблема</span>`; metaHtml = `<span>Внимание!</span>`; }
             } else if (type === 'cooling') { 
                 const daysStr = t.days === 999 ? 'Никогда' : `${t.days} дн.`;
                 badgeHtml = `<span class="task-badge tb-cooling">Без визитов: ${daysStr}</span>`;
@@ -248,8 +359,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if(document.body) { document.body.addEventListener('click', (e) => { const taskBtn = e.target.closest('.btn-complete-task'); if (taskBtn) { taskBtn.disabled = true; completeTask(taskBtn, taskBtn.dataset.id, taskBtn.dataset.index); } }); }
 
-    // --- ГЕНЕРАТОРЫ (ИСПРАВЛЕННЫЕ ДЛЯ GRID) ---
+    // --- 7. HTML GENERATORS (FIXED) ---
     
+    // КОНКУРЕНТЫ
     function createCompetitorEntryHTML(c={}) { 
         let brandOpts = `<option value="">-- Бренд --</option>`;
         competitorsRef.forEach(ref => { const sel = ref.name === c.brand ? 'selected' : ''; brandOpts += `<option value="${ref.name}" ${sel}>${ref.name}</option>`; });
@@ -273,15 +385,13 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>`; 
     }
 
-    // Глобальная функция обновления (чтобы работала из onchange)
+    // Глобальная функция обновления коллекций
     window.updateCollections = function(select) {
         const brandName = select.value; 
         const row = select.closest('.competitor-entry'); 
         const collSelect = row.querySelector('.competitor-collection');
-        
         let html = `<option value="">-- Коллекция --</option>`;
         const ref = competitorsRef.find(r => r.name === brandName);
-        
         if (ref && ref.collections) {
              const sortedCols = [...ref.collections].sort((a, b) => { const typeA = (typeof a === 'object') ? a.type : 'std'; const typeB = (typeof b === 'object') ? b.type : 'std'; if (typeA === 'std' && typeB !== 'std') return 1; if (typeA !== 'std' && typeB === 'std') return -1; return 0; });
              html += sortedCols.map(col => { const colName = (typeof col === 'string') ? col : col.name; const colType = (typeof col === 'object') ? col.type : 'std'; let label = ''; if(colType.includes('eng')) label = ' (Елка)'; else if(colType.includes('french')) label = ' (Фр. Елка)'; else if(colType.includes('art')) label = ' (Арт)'; return `<option value="${colName}">${colName}${label}</option>`; }).join('');
@@ -289,6 +399,7 @@ document.addEventListener('DOMContentLoaded', () => {
         collSelect.innerHTML = html;
     };
 
+    // СТЕНДЫ (POS)
     function createPosEntryHTML(p={}) { 
         return `
         <div class="pos-entry">
@@ -303,7 +414,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function createVisitEntryHTML(v={}) { return `<div class="visit-entry"><input type="date" class="form-control visit-date" value="${v.date||''}"><input type="text" class="form-control visit-comment w-50" placeholder="Результат..." value="${v.comment||''}"><button type="button" class="btn-remove-entry" onclick="this.closest('.visit-entry').remove()"><i class="bi bi-x-lg"></i></button></div>`; }
     function renderPhotoPreviews(container, photosArray) { if(container) container.innerHTML = photosArray.map((p, index) => `<div class="photo-preview-item"><img src="${p.photo_url}"><button type="button" class="btn-remove-photo" data-index="${index}">×</button></div>`).join(''); }
 
-    // Handlers
+    // Handlers для фото
     if(addAvatarInput) addAvatarInput.addEventListener('change', async (e) => { const file = e.target.files[0]; if (file) { newAvatarBase64 = await compressImage(file, 800, 0.8); addAvatarPreview.src = newAvatarBase64; addAvatarPreview.style.display='block'; } });
     if(editAvatarInput) editAvatarInput.addEventListener('change', async (e) => { const file = e.target.files[0]; if (file) { newAvatarBase64 = await compressImage(file, 800, 0.8); editAvatarPreview.src = newAvatarBase64; editAvatarPreview.style.display='block'; } });
     if(addPhotoInput) addPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) addPhotosData.push({ photo_url: await compressImage(file, 1000, 0.7) }); renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData); addPhotoInput.value = ''; });
@@ -317,7 +428,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function getSelectedProductIds(containerId) { const el=document.getElementById(containerId); if(!el) return []; return Array.from(el.querySelectorAll('input:checked')).map(cb=>cb.value); }
     async function saveProducts(dealerId, ids) { await fetch(`${API_DEALERS_URL}/${dealerId}/products`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({productIds: ids})}); }
 
-    // --- RENDER LIST (MODERN LIST VIEW) ---
+    // --- 8. RENDER LIST (MAIN PAGE) ---
     function renderDealerList() {
         if (!dealerGrid) return;
 
@@ -328,89 +439,44 @@ document.addEventListener('DOMContentLoaded', () => {
         const search = searchBar ? searchBar.value.toLowerCase() : '';
 
         const filtered = allDealers.filter(d => {
-            let statusMatch = false; 
-            const s = d.status || 'standard';
-            if (status) statusMatch = s === status; 
-            else statusMatch = s !== 'potential'; 
-            
-            return (!city || d.city === city) && 
-                   (!type || d.price_type === type) && 
-                   (!responsible || d.responsible === responsible) && 
-                   statusMatch && 
-                   (!search || ((d.name||'').toLowerCase().includes(search) || (d.dealer_id||'').toLowerCase().includes(search)));
+            let statusMatch = false; const s = d.status || 'standard';
+            if (status) statusMatch = s === status; else statusMatch = s !== 'potential'; 
+            return (!city || d.city === city) && (!type || d.price_type === type) && (!responsible || d.responsible === responsible) && statusMatch && (!search || ((d.name||'').toLowerCase().includes(search) || (d.dealer_id||'').toLowerCase().includes(search)));
         });
 
         // Сортировка
         filtered.sort((a, b) => {
-            let valA = (a[currentSort.column] || '').toString();
-            let valB = (b[currentSort.column] || '').toString();
-            let res = currentSort.column === 'dealer_id' 
-                ? valA.localeCompare(valB, undefined, {numeric:true}) 
-                : valA.toLowerCase().localeCompare(valB.toLowerCase(), 'ru');
+            let valA = (a[currentSort.column] || '').toString(); let valB = (b[currentSort.column] || '').toString();
+            let res = currentSort.column === 'dealer_id' ? valA.localeCompare(valB, undefined, {numeric:true}) : valA.toLowerCase().localeCompare(valB.toLowerCase(), 'ru');
             return currentSort.direction === 'asc' ? res : -res;
         });
 
         if (filtered.length === 0) {
             dealerGrid.innerHTML = '';
-            if(noDataMsg) { noDataMsg.style.display = 'block'; noDataMsg.textContent = 'Ничего не найдено.'; }
+            if(noDataMsg) { noDataMsg.style.display = 'block'; noDataMsg.textContent = 'Ничего не найдено'; }
             return;
         }
-
         if(noDataMsg) noDataMsg.style.display = 'none';
 
-        const statusConfig = {
-            'active': { label: 'Active', class: 'sp-active' },
-            'standard': { label: 'Standard', class: 'sp-standard' },
-            'problem': { label: 'Problem', class: 'sp-problem' },
-            'potential': { label: 'Potential', class: 'sp-potential' },
-            'archive': { label: 'Archive', class: 'sp-archive' }
-        };
+        const statusConfig = { 'active': { label: 'Active', class: 'sp-active' }, 'standard': { label: 'Standard', class: 'sp-standard' }, 'problem': { label: 'Problem', class: 'sp-problem' }, 'potential': { label: 'Potential', class: 'sp-potential' }, 'archive': { label: 'Archive', class: 'sp-archive' } };
 
         dealerGrid.innerHTML = filtered.map(d => {
             const st = statusConfig[d.status] || statusConfig['standard'];
             
             let phoneBtn = ''; let waBtn = '';
             if (d.contacts && d.contacts.length > 0) {
-                const phone = d.contacts.find(c => c.contactInfo)?.contactInfo || '';
-                const cleanPhone = phone.replace(/[^0-9]/g, '');
+                const phone = d.contacts.find(c => c.contactInfo)?.contactInfo || ''; const cleanPhone = phone.replace(/[^0-9]/g, '');
                 if (cleanPhone.length >= 10) {
                     phoneBtn = `<a href="tel:+${cleanPhone}" class="btn-circle btn-circle-call" onclick="event.stopPropagation()" title="Позвонить"><i class="bi bi-telephone-fill"></i></a>`;
                     waBtn = `<a href="https://wa.me/${cleanPhone}" target="_blank" class="btn-circle btn-circle-wa" onclick="event.stopPropagation()" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>`;
                 }
             }
-
-            let mapBtn = '';
-            if (d.latitude && d.longitude) {
-                mapBtn = `<a href="https://yandex.kz/maps/?pt=${d.longitude},${d.latitude}&z=17&l=map" target="_blank" class="btn-circle" onclick="event.stopPropagation()" title="Маршрут"><i class="bi bi-geo-alt-fill"></i></a>`;
-            }
-
+            let mapBtn = ''; if (d.latitude && d.longitude) mapBtn = `<a href="https://yandex.kz/maps/?pt=${d.longitude},${d.latitude}&z=17&l=map" target="_blank" class="btn-circle" onclick="event.stopPropagation()" title="Маршрут"><i class="bi bi-geo-alt-fill"></i></a>`;
             const avatarHtml = d.photo_url ? `<img src="${d.photo_url}" alt="${d.name}">` : `<i class="bi bi-shop"></i>`;
 
-            return `
-            <div class="dealer-item" onclick="window.open('dealer.html?id=${d.id}', '_blank')">
-                <div class="dealer-avatar-box">${avatarHtml}</div>
-                <div class="dealer-content">
-                    <div class="d-flex align-items-center gap-2 mb-1">
-                        <a href="dealer.html?id=${d.id}" class="dealer-name" target="_blank">${safeText(d.name)}</a>
-                        <span class="status-pill ${st.class}">${st.label}</span>
-                    </div>
-                    <div class="dealer-meta">
-                        <span><i class="bi bi-hash"></i>${safeText(d.dealer_id)}</span>
-                        <span><i class="bi bi-geo-alt"></i>${safeText(d.city)}</span>
-                        ${d.price_type ? `<span><i class="bi bi-tag"></i>${safeText(d.price_type)}</span>` : ''}
-                    </div>
-                </div>
-                <div class="dealer-actions">
-                    ${waBtn} ${phoneBtn} ${mapBtn}
-                    <button class="btn-circle" onclick="event.stopPropagation(); showQuickVisit('${d.id}')" title="Быстрый визит"><i class="bi bi-calendar-check"></i></button>
-                    <button class="btn-circle" onclick="event.stopPropagation(); openEditModal('${d.id}')" title="Редактировать"><i class="bi bi-pencil"></i></button>
-                </div>
-            </div>`;
+            return `<div class="dealer-item" onclick="window.open('dealer.html?id=${d.id}', '_blank')"><div class="dealer-avatar-box">${avatarHtml}</div><div class="dealer-content"><div class="d-flex align-items-center gap-2 mb-1"><a href="dealer.html?id=${d.id}" class="dealer-name" target="_blank">${safeText(d.name)}</a><span class="status-pill ${st.class}">${st.label}</span></div><div class="dealer-meta"><span><i class="bi bi-hash"></i>${safeText(d.dealer_id)}</span><span><i class="bi bi-geo-alt"></i>${safeText(d.city)}</span>${d.price_type ? `<span><i class="bi bi-tag"></i>${safeText(d.price_type)}</span>` : ''}</div></div><div class="dealer-actions">${waBtn} ${phoneBtn} ${mapBtn}<button class="btn-circle" onclick="event.stopPropagation(); showQuickVisit('${d.id}')" title="Быстрый визит"><i class="bi bi-calendar-check"></i></button><button class="btn-circle" onclick="event.stopPropagation(); openEditModal('${d.id}')" title="Редактировать"><i class="bi bi-pencil"></i></button></div></div>`;
         }).join('');
     }
-
-    // Вспомогательная для Quick Visit
-    window.showQuickVisit = (id) => { document.getElementById('qv_dealer_id').value = id; document.getElementById('qv_comment').value = ''; qvModal.show(); };
 
     function populateFilters(dealers) {
         if(!filterCity || !filterPriceType) return;
@@ -422,7 +488,7 @@ document.addEventListener('DOMContentLoaded', () => {
         filterCity.value = sc; filterPriceType.value = st;
     }
 
-    // LISTENER SETUP
+    // --- 9. BUTTON LISTENERS ---
     const setupListBtn = (id, list, genFunc) => { const btn = document.getElementById(id); if(btn) btn.onclick = () => list.insertAdjacentHTML('beforeend', genFunc()); };
     setupListBtn('add-contact-btn-add-modal', addContactList, createContactEntryHTML);
     setupListBtn('add-address-btn-add-modal', addAddressList, createAddressEntryHTML);
@@ -436,7 +502,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setupListBtn('add-visits-btn-edit-modal', editVisitsList, createVisitEntryHTML);
     setupListBtn('add-competitor-btn-edit-modal', editCompetitorList, createCompetitorEntryHTML);
 
-    // OPEN ADD
     if(openAddModalBtn) openAddModalBtn.onclick = () => {
         if(addForm) addForm.reset();
         currentStep = 1; showStep(1);
@@ -482,9 +547,6 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         try { const res = await fetch(API_DEALERS_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); if (!res.ok) throw new Error(await res.text()); const newD = await res.json(); const pIds = getSelectedProductIds('add-product-checklist'); if(pIds.length) await saveProducts(newD.id, pIds); addModal.hide(); initApp(); } catch (e) { alert("Ошибка при добавлении."); } finally { isSaving = false; btn.disabled = false; btn.innerHTML = oldText; }
     });
-
-    // OPEN EDIT
-    window.openEditModal = openEditModal; // Make global
 
     // SAVE EDIT
     if(editForm) editForm.addEventListener('submit', async (e) => {
