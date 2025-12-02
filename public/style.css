@@ -252,3 +252,57 @@ nav a.nav-link.active { background: #fff0f0; color: var(--primary-color) !import
     color: #166534;
     background: #f0fdf4;
 }
+
+/* --- WIZARD STYLES (Добавление дилера) --- */
+.wizard-progress-container {
+    position: relative;
+    padding: 0 10px;
+}
+.wizard-progress-bar {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    right: 20px;
+    height: 4px;
+    background: #e9ecef;
+    z-index: 0;
+    border-radius: 4px;
+}
+.wizard-steps-wrapper {
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    z-index: 1;
+}
+.step-circle {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #fff;
+    border: 3px solid #e9ecef;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    color: #94a3b8;
+    transition: all 0.3s;
+    font-size: 1.1rem;
+}
+.step-circle.active {
+    border-color: var(--primary-color);
+    background: var(--primary-color);
+    color: white;
+    box-shadow: 0 0 0 4px rgba(185, 4, 10, 0.15);
+}
+.step-circle.completed {
+    border-color: #166534;
+    background: #166534;
+    color: white;
+}
+.wizard-step {
+    display: none;
+    animation: fadeIn 0.3s;
+}
+.wizard-step.active {
+    display: block;
+}
