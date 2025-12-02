@@ -298,19 +298,101 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join(''); 
     }
 
-    // 1. КОНКУРЕНТЫ (Строгая структура для CSS Grid)
+   // 2. КОНКУРЕНТЫ
+    // Исправлено: Возвращен onchange="updateCollections(this)" для работы автоподгрузки
     function createCompetitorEntryHTML(c={}) { 
+        // 1. Собираем список брендов
         let brandOpts = `<option value="">-- Бренд --</option>`;
-        competitorsRef.forEach(ref => { const sel = ref.name === c.brand ? 'selected' : ''; brandOpts += `<option value="${ref.name}" ${sel}>${ref.name}</option>`; });
+        competitorsRef.forEach(ref => { 
+            const sel = ref.name === c.brand ? 'selected' : ''; 
+            brandOpts += `<option value="${ref.name}" ${sel}>${ref.name}</option>`; 
+        });
         
+        // 2. Если бренд уже выбран (при редактировании), сразу собираем коллекции
         let collOpts = `<option value="">-- Коллекция --</option>`;
         if (c.brand) {
             const ref = competitorsRef.find(r => r.name === c.brand);
             if (ref && ref.collections) {
-                const sortedCols = [...ref.collections].sort((a, b) => { const typeA = (typeof a === 'object') ? a.type : 'std'; const typeB = (typeof b === 'object') ? b.type : 'std'; if (typeA === 'std' && typeB !== 'std') return 1; if (typeA !== 'std' && typeB === 'std') return -1; return 0; });
-                sortedCols.forEach(col => { const colName = (typeof col === 'string') ? col : col.name; const colType = (typeof col === 'object') ? col.type : 'std'; const sel = colName === c.collection ? 'selected' : ''; let label = ''; if(colType.includes('eng')) label = ' (Елка)'; else if(colType.includes('french')) label = ' (Фр. Елка)'; else if(colType.includes('art')) label = ' (Арт)'; collOpts += `<option value="${colName}" ${sel}>${colName}${label}</option>`; });
+                // Сортировка коллекций
+                const sortedCols = [...ref.collections].sort((a, b) => { 
+                    const typeA = (typeof a === 'object') ? a.type : 'std'; 
+                    const typeB = (typeof b === 'object') ? b.type : 'std'; 
+                    if (typeA === 'std' && typeB !== 'std') return 1; 
+                    if (typeA !== 'std' && typeB === 'std') return -1; 
+                    return 0; 
+                });
+                
+                // Генерация опций
+                sortedCols.forEach(col => {
+                    const colName = (typeof col === 'string') ? col : col.name;
+                    // Если у коллекции есть тип (елка/арт), добавляем пометку
+                    const colType = (typeof col === 'object') ? col.type : 'std'; 
+                    let label = ''; 
+                    if(colType.includes('eng')) label = ' (Елка)'; 
+                    else if(colType.includes('french')) label = ' (Фр. Елка)'; 
+                    else if(colType.includes('art')) label = ' (Арт)';
+                    
+                    const sel = colName === c.collection ? 'selected' : '';
+                    collOpts += `<option value="${colName}" ${sel}>${colName}${label}</option>`;
+                });
             }
         }
+        
+        return `
+        <div class="competitor-entry">
+            <select class="form-select competitor-brand" onchange="updateCollections(this)">
+                ${brandOpts}
+            </select>
+            
+            <select class="form-select competitor-collection">
+                ${collOpts}
+            </select>
+            
+            <input type="text" class="form-control competitor-price-opt" placeholder="ОПТ" value="${c.price_opt||''}">
+            <input type="text" class="form-control competitor-price-retail" placeholder="Розн" value="${c.price_retail||''}">
+            
+            <button type="button" class="btn-remove-entry" onclick="this.closest('.competitor-entry').remove()" title="Удалить">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>`; 
+    }
+
+    // 3. ФУНКЦИЯ ОБНОВЛЕНИЯ КОЛЛЕКЦИЙ (Глобальная)
+    window.updateCollections = function(select) {
+        const brandName = select.value; 
+        const row = select.closest('.competitor-entry'); // Находим строку
+        const collSelect = row.querySelector('.competitor-collection'); // Находим соседний селект
+        
+        let html = `<option value="">-- Коллекция --</option>`;
+        
+        // Ищем бренд в справочнике
+        const ref = competitorsRef.find(r => r.name === brandName);
+        
+        if (ref && ref.collections) {
+             const sortedCols = [...ref.collections].sort((a, b) => { 
+                 const typeA = (typeof a === 'object') ? a.type : 'std'; 
+                 const typeB = (typeof b === 'object') ? b.type : 'std'; 
+                 if (typeA === 'std' && typeB !== 'std') return 1; 
+                 if (typeA !== 'std' && typeB === 'std') return -1; 
+                 return 0; 
+             });
+             
+             html += sortedCols.map(col => { 
+                const colName = (typeof col === 'string') ? col : col.name; 
+                const colType = (typeof col === 'object') ? col.type : 'std'; 
+                let label = ''; 
+                if(colType.includes('eng')) label = ' (Елка)'; 
+                else if(colType.includes('french')) label = ' (Фр. Елка)'; 
+                else if(colType.includes('art')) label = ' (Арт)'; 
+                return `<option value="${colName}">${colName}${label}</option>`; 
+            }).join('');
+        }
+        
+        collSelect.innerHTML = html;
+    };
+    
+    // Вспомогательная функция (если её не было) для безопасного вывода текста в value
+    const safeAttr = (text) => (text || '').toString().replace(/"/g, '&quot;');
         
         // Убрал лишние div-обертки, чтобы Grid работал напрямую
         return `
@@ -323,13 +405,18 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>`; 
     }
 
-    // 2. СТЕНДЫ (POS) - Исправлено для Datalist
+    // 1. СТЕНДЫ (POS)
+    // Исправлено: добавлена правильная структура для Grid + Datalist
     function createPosEntryHTML(p={}) { 
         return `
         <div class="pos-entry">
-            <input type="text" class="form-control pos-name" list="pos-materials-datalist" placeholder="Название стенда (выберите или введите)" value="${p.name||''}">
-            <input type="number" class="form-control pos-quantity" value="${p.quantity||1}" min="1" placeholder="Кол-во">
-            <button type="button" class="btn btn-outline-danger btn-remove-entry" onclick="this.closest('.pos-entry').remove()">×</button>
+            <input type="text" class="form-control pos-name" list="pos-materials-datalist" placeholder="Название стенда" value="${safeAttr(p.name||'')}" autocomplete="off">
+            
+            <input type="number" class="form-control pos-quantity" value="${p.quantity||1}" min="1" placeholder="Шт">
+            
+            <button type="button" class="btn-remove-entry" onclick="this.closest('.pos-entry').remove()" title="Удалить">
+                <i class="bi bi-x-lg"></i>
+            </button>
         </div>`; 
     }
 
@@ -670,6 +757,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     initApp();
 });
+
 
 
 
