@@ -85,7 +85,6 @@ function convertToClient(doc) {
 // --- API ---
 app.get('/api/dealers', async (req, res) => {
     try {
-        // Берем ВСЕХ дилеров без фильтрации полей
         const dealers = await Dealer.find({}).lean();
         res.json(dealers.map(d => ({
             id: d._id, 
@@ -95,10 +94,7 @@ app.get('/api/dealers', async (req, res) => {
             products_count: (d.products ? d.products.length : 0),
             has_pos: (d.pos_materials && d.pos_materials.length > 0)
         }))); 
-    } catch (e) { 
-        console.error("API Error:", e); // Логируем ошибку в консоль сервера
-        res.status(500).json({ error: e.message }); 
-    }
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.get('/api/dealers/:id', async (req, res) => { try { const dealer = await Dealer.findById(req.params.id).populate('products'); res.json(convertToClient(dealer)); } catch (e) { res.status(500).json({ error: e.message }); } });
