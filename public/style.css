@@ -151,3 +151,104 @@ nav a.nav-link.active { background: #fff0f0; color: var(--primary-color) !import
 .modal-footer { border-top: 1px solid #f1f5f9; background: #f8fafc; padding: 1rem 1.5rem; border-bottom-left-radius: 16px; border-bottom-right-radius: 16px; }
 .list-container { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; }
 .contact-entry, .address-entry, .pos-entry { border: 1px solid #f1f5f9; background: #fafafa; }
+/* --- MODERN DASHBOARD --- */
+
+/* Круглая иконка в заголовке карточки */
+.icon-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+}
+/* Цвета для фонов иконок (Bootstrap-subtle аналоги) */
+.bg-danger-subtle { background-color: #fef2f2; }
+.bg-primary-subtle { background-color: #f0f9ff; }
+.bg-warning-subtle { background-color: #fffbeb; }
+.bg-success-subtle { background-color: #f0fdf4; }
+
+/* Карточка статистики (Маленькая) */
+.stat-card-modern {
+    background: #fff;
+    border-radius: 16px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    border: 1px solid #f1f5f9;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+    height: 100%;
+    transition: transform 0.2s;
+}
+.stat-card-modern:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+}
+.stat-icon-box {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+.stat-info h3 { font-size: 1.5rem; font-weight: 800; margin: 0; line-height: 1; color: var(--text-dark); }
+.stat-info p { margin: 0; font-size: 0.85rem; color: var(--text-gray); font-weight: 500; }
+
+/* Список задач */
+.task-list-modern {
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 0 10px;
+}
+.task-item-modern {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px;
+    margin-bottom: 8px;
+    background: #f8fafc;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    transition: all 0.2s;
+}
+.task-item-modern:hover {
+    background: #fff;
+    border-color: #e2e8f0;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+.task-content { flex-grow: 1; min-width: 0; margin-right: 10px; }
+.task-title { font-weight: 600; font-size: 0.95rem; color: var(--text-dark); text-decoration: none; display: block; margin-bottom: 2px; }
+.task-title:hover { color: var(--primary-color); }
+.task-meta { font-size: 0.8rem; color: var(--text-gray); display: flex; align-items: center; gap: 8px; }
+.task-badge {
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+.tb-today { background: #fee2e2; color: #991b1b; } /* Красный */
+.tb-future { background: #e0f2fe; color: #075985; } /* Синий */
+.tb-overdue { background: #450a0a; color: #fff; } /* Темно-красный */
+.tb-cooling { background: #fef3c7; color: #92400e; } /* Желтый */
+
+/* Кнопка "Галочка" */
+.btn-task-check {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    color: #cbd5e1;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+}
+.btn-task-check:hover {
+    border-color: #166534;
+    color: #166534;
+    background: #f0fdf4;
+}
