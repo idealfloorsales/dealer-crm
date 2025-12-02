@@ -129,28 +129,174 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchProductCatalog() { if (fullProductCatalog.length > 0) return; try { const response = await fetch(API_PRODUCTS_URL); if (!response.ok) throw new Error(`Ошибка: ${response.status}`); fullProductCatalog = await response.json(); fullProductCatalog.sort((a, b) => a.sku.localeCompare(b.sku, 'ru', { numeric: true })); } catch (error) {} }
     async function completeTask(btn, dealerId, visitIndex) { try { btn.disabled = true; const res = await fetch(`${API_DEALERS_URL}/${dealerId}`); if(!res.ok) throw new Error('Err'); const dealer = await res.json(); if (dealer.visits && dealer.visits[visitIndex]) { dealer.visits[visitIndex].isCompleted = true; } await fetch(`${API_DEALERS_URL}/${dealerId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visits: dealer.visits }) }); initApp(); } catch (e) { alert("Ошибка"); btn.disabled = false; } }
 
-    // --- DASHBOARD (Без изменений) ---
+// --- MODERN DASHBOARD LOGIC ---
+    
     function renderDashboard() {
-        if (!dashboardContainer) { if(tasksListUpcoming) tasksListUpcoming.innerHTML = '<p class="text-muted text-center p-3">Нет задач</p>'; return; }
-        if (!allDealers || allDealers.length === 0) { dashboardContainer.innerHTML = ''; return; }
+        const statsContainer = document.getElementById('dashboard-stats');
+        
+        // Если контейнера нет, значит мы не на главной, выходим (чтобы не было ошибок)
+        if (!statsContainer) return;
+
+        if (!allDealers || allDealers.length === 0) {
+            statsContainer.innerHTML = '';
+            return;
+        }
+
         const activeDealers = allDealers.filter(d => d.status !== 'potential');
         const totalDealers = activeDealers.length;
         const noAvatarCount = activeDealers.filter(d => !d.photo_url).length; 
-        dashboardContainer.innerHTML = `<div class="col-md-6"><div class="stat-card h-100"><i class="bi bi-shop stat-icon text-primary"></i><span class="stat-number">${totalDealers}</span><span class="stat-label">Всего дилеров</span></div></div><div class="col-md-6"><div class="stat-card h-100 ${noAvatarCount > 0 ? 'border-danger' : ''}"><i class="bi bi-camera-fill stat-icon ${noAvatarCount > 0 ? 'text-danger' : 'text-secondary'}"></i><span class="stat-number ${noAvatarCount > 0 ? 'text-danger' : ''}">${noAvatarCount}</span><span class="stat-label">Без Аватара</span></div></div>`;
-        const today = new Date(); today.setHours(0,0,0,0); const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1); const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
+
+        // 1. Рендерим Статистику (Верхние карточки)
+        statsContainer.innerHTML = `
+            <div class="col-6">
+                <div class="stat-card-modern">
+                    <div class="stat-icon-box bg-primary-subtle text-primary">
+                        <i class="bi bi-shop"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>${totalDealers}</h3>
+                        <p>Дилеров</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="stat-card-modern">
+                    <div class="stat-icon-box ${noAvatarCount > 0 ? 'bg-danger-subtle text-danger' : 'bg-success-subtle text-success'}">
+                        <i class="bi bi-camera-fill"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 class="${noAvatarCount > 0 ? 'text-danger' : ''}">${noAvatarCount}</h3>
+                        <p>Без фото</p>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // 2. Готовим задачи
+        const today = new Date(); today.setHours(0,0,0,0);
+        const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
+        
         const tasksUpcoming = [], tasksProblem = [], tasksCooling = [];
+
         allDealers.forEach(d => {
-            if (d.status === 'archive') return; const isPotential = d.status === 'potential'; let lastVisitDate = null; let hasFutureTasks = false;
-            if (d.visits && Array.isArray(d.visits)) { d.visits.forEach((v, index) => { const vDate = new Date(v.date); if (!v.date) return; vDate.setHours(0,0,0,0); if (v.isCompleted && (!lastVisitDate || vDate > lastVisitDate)) { lastVisitDate = vDate; } if (!v.isCompleted) { const taskData = { dealerName: d.name, dealerId: d.id, date: vDate, comment: v.comment || "", visitIndex: index }; if (vDate < today) { tasksProblem.push({...taskData, type: 'overdue'}); } else { tasksUpcoming.push({...taskData, isToday: vDate.getTime() === today.getTime()}); hasFutureTasks = true; } } }); }
-            if (d.status === 'problem') { if (!tasksProblem.some(t => t.dealerId === d.id && t.type === 'overdue')) { tasksProblem.push({ dealerName: d.name, dealerId: d.id, type: 'status' }); } }
-            if (!hasFutureTasks && d.status !== 'problem' && !isPotential) { if (!lastVisitDate) { tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: 999 }); } else if (lastVisitDate < thirtyDaysAgo) { const days = Math.floor((today - lastVisitDate) / (1000 * 60 * 60 * 24)); tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: days }); } }
+            if (d.status === 'archive') return; 
+            const isPotential = d.status === 'potential'; 
+            let lastVisitDate = null; 
+            let hasFutureTasks = false;
+
+            if (d.visits && Array.isArray(d.visits)) { 
+                d.visits.forEach((v, index) => { 
+                    const vDate = new Date(v.date); 
+                    if (!v.date) return; 
+                    vDate.setHours(0,0,0,0); 
+                    
+                    if (v.isCompleted && (!lastVisitDate || vDate > lastVisitDate)) { 
+                        lastVisitDate = vDate; 
+                    } 
+                    
+                    if (!v.isCompleted) { 
+                        const taskData = { 
+                            dealerName: d.name, 
+                            dealerId: d.id, 
+                            date: vDate, 
+                            comment: v.comment || "Без комментария", 
+                            visitIndex: index 
+                        }; 
+                        
+                        if (vDate < today) { 
+                            tasksProblem.push({...taskData, type: 'overdue'}); 
+                        } else { 
+                            tasksUpcoming.push({...taskData, isToday: vDate.getTime() === today.getTime()}); 
+                            hasFutureTasks = true; 
+                        } 
+                    } 
+                }); 
+            }
+
+            // Проблемный статус
+            if (d.status === 'problem') { 
+                if (!tasksProblem.some(t => t.dealerId === d.id && t.type === 'overdue')) { 
+                    tasksProblem.push({ dealerName: d.name, dealerId: d.id, type: 'status', comment: 'Статус: Проблемный' }); 
+                } 
+            }
+
+            // Остывающие
+            if (!hasFutureTasks && d.status !== 'problem' && !isPotential) { 
+                if (!lastVisitDate) { 
+                    tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: 999 }); 
+                } else if (lastVisitDate < thirtyDaysAgo) { 
+                    const days = Math.floor((today - lastVisitDate) / (1000 * 60 * 60 * 24)); 
+                    tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: days }); 
+                } 
+            }
         });
-        tasksUpcoming.sort((a, b) => a.date - b.date); tasksProblem.sort((a, b) => (a.date || 0) - (b.date || 0)); tasksCooling.sort((a, b) => b.days - a.days);
-        renderTaskList(tasksListUpcoming, tasksUpcoming, 'upcoming'); renderTaskList(tasksListProblem, tasksProblem, 'problem'); renderTaskList(tasksListCooling, tasksCooling, 'cooling');
+
+        tasksUpcoming.sort((a, b) => a.date - b.date); 
+        tasksProblem.sort((a, b) => (a.date || 0) - (b.date || 0)); 
+        tasksCooling.sort((a, b) => b.days - a.days);
+
+        renderTaskList(tasksListUpcoming, tasksUpcoming, 'upcoming'); 
+        renderTaskList(tasksListProblem, tasksProblem, 'problem'); 
+        renderTaskList(tasksListCooling, tasksCooling, 'cooling');
     }
-    function renderTaskList(container, tasks, type) { if (!container) return; if (tasks.length === 0) { const msg = type === 'cooling' ? 'Нет таких' : 'Нет задач'; container.innerHTML = `<p class="text-muted text-center p-3">${msg}</p>`; return; } container.innerHTML = tasks.map(t => { let badge = ''; let comment = safeText(t.comment); if (type === 'upcoming') { badge = `<span class="badge ${t.isToday ? 'bg-danger' : 'bg-primary'} rounded-pill me-2">${t.isToday ? 'Сегодня' : t.date.toLocaleDateString('ru-RU')}</span>`; } else if (type === 'problem') { badge = t.type === 'overdue' ? `<span class="badge bg-danger rounded-pill me-2">Просрочено: ${t.date.toLocaleDateString('ru-RU')}</span>` : `<span class="badge bg-danger rounded-pill me-2">Статус: Проблемный</span>`; if(t.type !== 'overdue') comment = '<i>Требует внимания</i>'; } else if (type === 'cooling') { badge = `<span class="badge bg-warning text-dark rounded-pill me-2">Нет визитов: ${t.days === 999 ? 'Никогда' : `${t.days} дн.`}</span>`; comment = '<i>Нужно связаться</i>'; } return `<div class="list-group-item task-item d-flex justify-content-between align-items-center"><div class="me-auto"><div class="d-flex align-items-center mb-1">${badge}<a href="dealer.html?id=${t.dealerId}" target="_blank" class="fw-bold text-dark text-decoration-none">${t.dealerName}</a></div><small class="text-muted" style="white-space: pre-wrap;">${comment}</small></div>${(type === 'upcoming' || (type === 'problem' && t.type === 'overdue')) ? `<button class="btn btn-sm btn-success btn-complete-task" data-id="${t.dealerId}" data-index="${t.visitIndex}">✔</button>` : ''}</div>`; }).join(''); }
-    
-    if(document.body) { document.body.addEventListener('click', (e) => { const taskBtn = e.target.closest('.btn-complete-task'); if (taskBtn) { taskBtn.disabled = true; completeTask(taskBtn, taskBtn.dataset.id, taskBtn.dataset.index); } }); }
+
+    // --- Функция отрисовки красивого списка ---
+    function renderTaskList(container, tasks, type) { 
+        if (!container) return; 
+        
+        if (tasks.length === 0) { 
+            const msg = type === 'cooling' ? 'Все посещены недавно' : 'Задач нет'; 
+            container.innerHTML = `<div class="text-center py-4 text-muted"><i class="bi bi-check-circle display-6 d-block mb-2 text-success opacity-50"></i><small>${msg}</small></div>`; 
+            return; 
+        } 
+        
+        container.innerHTML = tasks.map(t => { 
+            let badgeHtml = ''; 
+            let metaHtml = '';
+            
+            if (type === 'upcoming') { 
+                const dateStr = t.date.toLocaleDateString('ru-RU', {day:'numeric', month:'short'});
+                if (t.isToday) badgeHtml = `<span class="task-badge tb-today">Сегодня</span>`;
+                else badgeHtml = `<span class="task-badge tb-future">${dateStr}</span>`;
+                metaHtml = `<span>${safeText(t.comment)}</span>`;
+            } 
+            else if (type === 'problem') { 
+                if (t.type === 'overdue') {
+                    const dateStr = t.date.toLocaleDateString('ru-RU');
+                    badgeHtml = `<span class="task-badge tb-overdue">Просрок: ${dateStr}</span>`;
+                    metaHtml = `<span class="text-danger">${safeText(t.comment)}</span>`;
+                } else {
+                    badgeHtml = `<span class="task-badge tb-overdue">Проблема</span>`;
+                    metaHtml = `<span>Внимание!</span>`;
+                }
+            } 
+            else if (type === 'cooling') { 
+                const daysStr = t.days === 999 ? 'Никогда' : `${t.days} дн.`;
+                badgeHtml = `<span class="task-badge tb-cooling">Без визитов: ${daysStr}</span>`;
+                metaHtml = `<span class="text-muted">Пора навестить</span>`;
+            } 
+
+            // Кнопка выполнения (только для визитов)
+            const showCheckBtn = (type === 'upcoming' || (type === 'problem' && t.type === 'overdue'));
+            const btnHtml = showCheckBtn 
+                ? `<button class="btn-task-check btn-complete-task" data-id="${t.dealerId}" data-index="${t.visitIndex}" title="Выполнить"><i class="bi bi-check-lg"></i></button>`
+                : '';
+
+            return `
+            <div class="task-item-modern">
+                <div class="task-content">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <a href="dealer.html?id=${t.dealerId}" target="_blank" class="task-title">${safeText(t.dealerName)}</a>
+                        ${badgeHtml}
+                    </div>
+                    <div class="task-meta">
+                        ${metaHtml}
+                    </div>
+                </div>
+                ${btnHtml}
+            </div>`; 
+        }).join(''); 
+    }
 
     // --- ГЕНЕРАТОРЫ ---
     function createCompetitorEntryHTML(c={}) { 
@@ -509,5 +655,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     initApp();
 });
+
 
 
