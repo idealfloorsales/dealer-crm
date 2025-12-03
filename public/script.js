@@ -237,8 +237,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (authRes.ok) {
                 const authData = await authRes.json();
                 currentUserRole = authData.role;
-                console.log('Logged in as:', currentUserRole);
                 
+                // Отображаем роль в меню (если добавил badge в HTML)
+                const badge = document.getElementById('user-role-badge');
+                if(badge) {
+                    const names = { 'admin': 'Админ', 'astana': 'Астана', 'regions': 'Регионы', 'guest': 'Гость' };
+                    badge.textContent = names[currentUserRole] || currentUserRole;
+                }
+
                 // Если гость - скрываем кнопку добавления
                 if (currentUserRole === 'guest') {
                     if (openAddModalBtn) openAddModalBtn.style.display = 'none';
@@ -246,7 +252,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (e) { console.error('Auth check failed', e); }
 
-        // 2. Грузим данные
+        // ... (Остальной код загрузки без изменений) ...
         await fetchProductCatalog();
         updatePosDatalist(); 
         try { const compRes = await fetch(API_COMPETITORS_REF_URL); if (compRes.ok) { competitorsRef = await compRes.json(); updateBrandsDatalist(); } } catch(e){}
@@ -255,6 +261,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const pendingId = localStorage.getItem('pendingEditDealerId'); if (pendingId) { localStorage.removeItem('pendingEditDealerId'); openEditModal(pendingId); }
     }
 
+    // --- ЛОГИКА ВЫХОДА (НОВОЕ) ---
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+        logoutBtn.onclick = () => {
+            // Хитрость: перенаправляем на тот же адрес, но с заведомо неверным паролем в URL.
+            // Браузер поймет, что старый пароль не подходит, и сбросит сессию.
+            const url = window.location.protocol + "//" + "logout:logout@" + window.location.host + window.location.pathname;
+            window.location.href = url;
+        };
+    }
     function updateBrandsDatalist() { if (!brandsDatalist) return; let html = ''; competitorsRef.forEach(ref => { html += `<option value="${ref.name}">`; }); brandsDatalist.innerHTML = html; }
     function updatePosDatalist() { if (!posDatalist) return; let html = ''; posMaterialsList.forEach(s => { html += `<option value="${s}">`; }); posDatalist.innerHTML = html; }
 
@@ -674,6 +690,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     initApp();
 });
+
 
 
 
