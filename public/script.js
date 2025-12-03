@@ -412,7 +412,43 @@ document.addEventListener('DOMContentLoaded', () => {
     function createContactEntryHTML(c={}) { return `<div class="contact-entry"><input type="text" class="form-control contact-name" placeholder="Имя" value="${c.name||''}"><input type="text" class="form-control contact-position" placeholder="Должность" value="${c.position||''}"><input type="text" class="form-control contact-info" placeholder="Телефон" value="${c.contactInfo||''}"><button type="button" class="btn-remove-entry" onclick="this.closest('.contact-entry').remove()"><i class="bi bi-x-lg"></i></button></div>`; }
     function createAddressEntryHTML(a={}) { return `<div class="address-entry"><input type="text" class="form-control address-description" placeholder="Описание" value="${a.description||''}"><input type="text" class="form-control address-city" placeholder="Город" value="${a.city||''}"><input type="text" class="form-control address-address" placeholder="Адрес" value="${a.address||''}"><button type="button" class="btn-remove-entry" onclick="this.closest('.address-entry').remove()"><i class="bi bi-x-lg"></i></button></div>`; }
     function createVisitEntryHTML(v={}) { return `<div class="visit-entry"><input type="date" class="form-control visit-date" value="${v.date||''}"><input type="text" class="form-control visit-comment w-50" placeholder="Результат..." value="${v.comment||''}"><button type="button" class="btn-remove-entry" onclick="this.closest('.visit-entry').remove()"><i class="bi bi-x-lg"></i></button></div>`; }
-    function renderPhotoPreviews(container, photosArray) { if(container) container.innerHTML = photosArray.map((p, index) => `<div class="photo-preview-item"><img src="${p.photo_url}"><button type="button" class="btn-remove-photo" data-index="${index}">×</button></div>`).join(''); }
+// --- ИСПРАВЛЕННЫЙ БЛОК ФОТО (HANDLERS) ---
+    
+    // Функция отрисовки (теперь с иконкой bi-x и правильным классом)
+    function renderPhotoPreviews(container, photosArray) { 
+        if(container) container.innerHTML = photosArray.map((p, index) => `
+            <div class="photo-preview-item">
+                <img src="${p.photo_url}">
+                <button type="button" class="btn-remove-photo" data-index="${index}">
+                    <i class="bi bi-x"></i>
+                </button>
+            </div>`).join(''); 
+    }
+
+    // Слушатели загрузки (ADD и EDIT)
+    if(addAvatarInput) addAvatarInput.addEventListener('change', async (e) => { const file = e.target.files[0]; if (file) { newAvatarBase64 = await compressImage(file, 800, 0.8); addAvatarPreview.src = newAvatarBase64; addAvatarPreview.style.display='block'; } });
+    if(editAvatarInput) editAvatarInput.addEventListener('change', async (e) => { const file = e.target.files[0]; if (file) { newAvatarBase64 = await compressImage(file, 800, 0.8); editAvatarPreview.src = newAvatarBase64; editAvatarPreview.style.display='block'; } });
+    
+    if(addPhotoInput) addPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) addPhotosData.push({ photo_url: await compressImage(file, 1000, 0.7) }); renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData); addPhotoInput.value = ''; });
+    if(editPhotoInput) editPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) editPhotosData.push({ photo_url: await compressImage(file, 1000, 0.7) }); renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData); editPhotoInput.value = ''; });
+
+    // Слушатели удаления (ADD) - используем .closest() для надежности
+    if(addPhotoPreviewContainer) addPhotoPreviewContainer.addEventListener('click', (e) => { 
+        const btn = e.target.closest('.btn-remove-photo');
+        if(btn) { 
+            addPhotosData.splice(btn.dataset.index, 1); 
+            renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData); 
+        }
+    });
+
+    // Слушатели удаления (EDIT) - используем .closest()
+    if(editPhotoPreviewContainer) editPhotoPreviewContainer.addEventListener('click', (e) => { 
+        const btn = e.target.closest('.btn-remove-photo');
+        if(btn) { 
+            editPhotosData.splice(btn.dataset.index, 1); 
+            renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData); 
+        }
+    });
 
     // Handlers для фото
     if(addAvatarInput) addAvatarInput.addEventListener('change', async (e) => { const file = e.target.files[0]; if (file) { newAvatarBase64 = await compressImage(file, 800, 0.8); addAvatarPreview.src = newAvatarBase64; addAvatarPreview.style.display='block'; } });
@@ -683,4 +719,5 @@ document.addEventListener('DOMContentLoaded', () => {
     
     initApp();
 });
+
 
