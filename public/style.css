@@ -342,3 +342,26 @@ nav a.nav-link.active { background: var(--primary-color) !important; color: whit
     .competitor-price-retail { grid-column: 2; grid-row: 2; }
 }
 
+/* ... (ВЕСЬ ПРЕДЫДУЩИЙ CSS ОСТАВЛЯЕМ) ... */
+
+/* --- ФИНАЛЬНЫЙ ШТРИХ: ЛИПКИЕ ФИЛЬТРЫ --- */
+.sticky-filters {
+    position: sticky;
+    top: 10px; /* Отступ от верха экрана */
+    z-index: 100; /* Чтобы было поверх списка */
+    backdrop-filter: blur(10px); /* Эффект матового стекла */
+    background-color: rgba(255, 255, 255, 0.95) !important; /* Чуть прозрачный белый */
+    transition: all 0.3s ease;
+}
+
+/* Красивая заглушка "Ничего не найдено" */
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-gray);
+}
+.empty-state-icon {
+    font-size: 4rem;
+    color: #cbd5e1;
+    margin-bottom: 15px;
+}
