@@ -984,3 +984,27 @@ nav a.nav-link.active { background: var(--primary-color) !important; color: whit
         padding-top: 10px;
     }
 }
+
+/* --- FIXES FOR DASHBOARD V223 --- */
+
+/* Статистика: квадратные карточки */
+.stat-card-modern {
+    padding: 15px;
+    gap: 10px;
+}
+.stat-icon-box {
+    width: 40px; height: 40px; font-size: 1.2rem;
+}
+
+/* Задачи: Вертикальное выравнивание */
+.task-item-modern {
+    padding: 10px 12px;
+}
+.task-title {
+    line-height: 1.2;
+}
+/* Бейджи чуть меньше */
+.task-badge {
+    font-size: 0.65rem;
+    padding: 2px 6px;
+}
