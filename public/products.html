@@ -3,11 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Наша Матрица (Каталог)</title>
+    <title>Матрица</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="style.css?v=80">
-    <link rel="icon" href="favicon.gif" type="image/gif">
+    <link rel="stylesheet" href="style.css?v=221"> <link rel="icon" href="favicon.gif" type="image/gif">
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
@@ -33,65 +37,51 @@
         </div>
     </nav>
     
-    <div class="container mt-4">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h1>Наш Ассортимент (Матрица)</h1>
-            <div>
-                <button id="reset-catalog-btn" class="btn btn-outline-secondary me-2" title="Загрузить стандартный список (72 товара)">
-                    <i class="bi bi-arrow-clockwise me-2"></i>Загрузить базу
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+            <h1 class="mb-0 border-0 pt-0 mt-0">Каталог товаров</h1>
+            <div class="d-flex gap-2">
+                <button id="reset-catalog-btn" class="btn btn-light shadow-sm text-secondary" title="Загрузить стандартный список">
+                    <i class="bi bi-arrow-clockwise me-2"></i>Сброс
                 </button>
-                <button id="add-product-btn" class="btn btn-primary"><i class="bi bi-plus-lg me-2"></i>Добавить товар</button>
+                <button id="add-product-btn" class="btn btn-primary shadow-sm px-4"><i class="bi bi-plus-lg me-2"></i>Добавить</button>
             </div>
         </div>
 
-        <div class="card shadow-sm mb-4 border-0">
-            <div class="card-body">
-                <div class="input-group">
-                    <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
-                    <input type="text" id="product-search" class="form-control border-start-0" placeholder="Поиск по артикулу или названию...">
-                </div>
+        <div class="bg-white p-3 rounded-4 shadow-sm mb-4 border border-light sticky-filters">
+            <div class="input-group">
+                <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-search"></i></span>
+                <input type="text" id="product-search" class="form-control border-start-0 ps-0" placeholder="Поиск по артикулу или названию...">
             </div>
         </div>
 
-        <div class="card shadow-sm border-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0" id="products-table">
-                    <thead class="table-light">
-                        <tr>
-                            <th style="width: 150px;">Артикул</th>
-                            <th>Название / Декор</th>
-                            <th style="width: 120px; text-align: right;">Действия</th>
-                        </tr>
-                    </thead>
-                    <tbody id="products-list">
-                        </tbody>
-                </table>
-            </div>
+        <div id="products-list-container" class="d-flex flex-column gap-2">
+            <p class="text-center text-muted p-5">Загрузка...</p>
         </div>
         
-        <p id="total-count" class="text-muted mt-3 ms-1 small">Всего товаров: 0</p>
+        <p id="total-count" class="text-center text-muted mt-4 small">Всего товаров: 0</p>
     </div>
 
     <div class="modal fade" id="product-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="product-modal-title">Товар</h5>
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold" id="product-modal-title">Товар</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <form id="product-form">
                         <input type="hidden" id="prod_id">
                         <div class="mb-3">
-                            <label class="form-label fw-bold">Артикул (SKU) *</label>
-                            <input type="text" class="form-control" id="prod_sku" required placeholder="Например: 8EH34-701">
+                            <label class="form-label text-secondary small fw-bold">Артикул (SKU) *</label>
+                            <input type="text" class="form-control fw-bold" id="prod_sku" required placeholder="Например: 8EH34-701">
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Название *</label>
+                        <div class="mb-4">
+                            <label class="form-label text-secondary small fw-bold">Название / Декор *</label>
                             <input type="text" class="form-control" id="prod_name" required placeholder="Например: Дуб Снежный">
                         </div>
                         <div class="d-grid">
-                            <button type="submit" class="btn btn-success">Сохранить</button>
+                            <button type="submit" class="btn btn-primary rounded-pill">Сохранить</button>
                         </div>
                     </form>
                 </div>
@@ -100,13 +90,9 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="products.js?v=80"></script>
-    
-    <script>
+    <script src="products.js?v=221"></script> <script>
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js')
-                .then(reg => console.log('Service Worker registered.', reg))
-                .catch(err => console.error('Service Worker registration failed:', err));
+            navigator.serviceWorker.register('/sw.js').catch(err => console.error(err));
         }
     </script>
 </body>
