@@ -770,3 +770,138 @@ nav a.nav-link.active { background: var(--primary-color) !important; color: whit
     padding: 8px 0; border-bottom: 1px dashed #e2e8f0; font-size: 0.9rem; color: var(--text-dark);
 }
 .comp-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+
+/* --- REPORT / MATRIX STYLES --- */
+
+/* Контейнер таблицы */
+#matrix-container {
+    border: 1px solid #f1f5f9;
+}
+
+/* Сама таблица */
+#matrix-table {
+    border-collapse: separate; 
+    border-spacing: 0;
+    font-size: 0.85rem;
+}
+
+#matrix-table th, #matrix-table td {
+    padding: 12px 15px;
+    border-bottom: 1px solid #f1f5f9;
+    border-right: 1px solid #f8fafc;
+}
+
+/* Шапка таблицы (Sticky Top) */
+#matrix-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background-color: #f8fafc; /* Светло-серый фон шапки */
+    color: var(--text-dark);
+    font-weight: 700;
+    border-bottom: 2px solid #e2e8f0;
+    white-space: nowrap;
+    text-align: center;
+    vertical-align: middle;
+}
+
+/* ЛИПКИЕ КОЛОНКИ (Sticky Left) */
+/* 1. Артикул */
+#matrix-table th:nth-child(1), #matrix-table td:nth-child(1) {
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    background-color: #fff;
+    width: 120px;
+    min-width: 120px;
+    border-right: 1px solid #e2e8f0;
+    font-weight: 700;
+    color: var(--text-dark);
+}
+#matrix-table thead th:nth-child(1) { z-index: 30; background-color: #f8fafc; } /* Шапка поверх контента */
+
+/* 2. Название */
+#matrix-table th:nth-child(2), #matrix-table td:nth-child(2) {
+    position: sticky;
+    left: 120px;
+    z-index: 10;
+    background-color: #fff;
+    width: 200px;
+    min-width: 200px;
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-right: 1px solid #e2e8f0;
+    box-shadow: 4px 0 10px rgba(0,0,0,0.05); /* Тень справа от названия */
+}
+#matrix-table thead th:nth-child(2) { z-index: 30; background-color: #f8fafc; }
+
+/* Ховер эффект для строки */
+#matrix-table tbody tr:hover td {
+    background-color: #f8fafc;
+}
+/* Чтобы липкие колонки не просвечивали при ховере */
+#matrix-table tbody tr:hover td:nth-child(1),
+#matrix-table tbody tr:hover td:nth-child(2) {
+    background-color: #fff;
+}
+
+/* Строки Стендов (POS) */
+.row-pos td {
+    background-color: #fefce8 !important; /* Светло-желтый */
+}
+.pos-value {
+    font-weight: 800;
+    color: var(--text-dark);
+    font-size: 1rem;
+}
+
+/* Иконки в ячейках */
+.matrix-check {
+    color: #10b981; /* Зеленый */
+    font-size: 1.2rem;
+}
+.matrix-empty {
+    width: 6px;
+    height: 6px;
+    background-color: #e2e8f0;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+/* --- Multi-Select Dropdowns (Modern) --- */
+.multi-select-menu {
+    display: none;
+    position: absolute;
+    background-color: #fff;
+    width: 100%;
+    max-width: 400px; /* Чтобы не был слишком широким */
+    z-index: 1000;
+    padding: 10px;
+    top: 110%;
+    left: 0;
+}
+.multi-select-menu.show { display: block; }
+
+.list-scroll {
+    max-height: 250px;
+    overflow-y: auto;
+    padding-right: 5px;
+}
+
+.multi-select-item {
+    padding: 6px 8px;
+    border-radius: 6px;
+    transition: background 0.2s;
+}
+.multi-select-item:hover {
+    background-color: #f1f5f9;
+}
+.multi-select-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #f1f5f9;
+    padding-bottom: 5px;
+}
