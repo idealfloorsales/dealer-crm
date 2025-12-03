@@ -54,13 +54,27 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- ГЛАВНАЯ ФУНКЦИЯ ЗАГРУЗКИ ---
+ let currentUserRole = 'guest';
+
+    // --- ГЛАВНАЯ ФУНКЦИЯ ЗАГРУЗКИ (ОБНОВЛЕННАЯ) ---
     async function fetchDealerDetails() {
         try {
+            // 1. Узнаем права
+            const authRes = await fetch('/api/auth/me');
+            if (authRes.ok) {
+                const authData = await authRes.json();
+                currentUserRole = authData.role;
+                
+                // Если гость, скрываем кнопки управления
+                if (currentUserRole === 'guest') {
+                    if(editBtn) editBtn.style.display = 'none';
+                    if(deleteBtn) deleteBtn.style.display = 'none';
+                }
+            }
+// ... (Дальше код загрузки дилера как был) ...
             const dealerRes = await fetch(`${API_DEALERS_URL}/${dealerId}`);
-            if (!dealerRes.ok) throw new Error(`Дилер не найден.`);
-            const dealer = await dealerRes.json();
-            currentDealerName = dealer.name;
-
+            // ... и так далее
+            
             const productsRes = await fetch(API_PRODUCTS_URL);
             const allProducts = await productsRes.json();
             const totalProductsCount = allProducts.length;
@@ -361,3 +375,4 @@ document.addEventListener('DOMContentLoaded', () => {
     // Запуск
     fetchDealerDetails();
 });
+
