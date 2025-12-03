@@ -1,4 +1,3 @@
-// report.js
 document.addEventListener('DOMContentLoaded', () => {
     
     const API_MATRIX_URL = '/api/matrix';
@@ -38,22 +37,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const safeText = (text) => (text || '').toString().replace(/</g, "&lt;");
 
-    // === ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ФИЛЬТРАЦИИ ===
+    // === ФИЛЬТРАЦИЯ ===
     function getFilteredData() {
         const city = filterCity.value;
         const responsible = filterResponsible.value;
 
         // 1. Фильтруем Колонки (Дилеров)
         const filteredHeaders = fullData.headers.filter(h => {
-            const matchFilters = (!city || h.city === city) && 
-                                 (!responsible || h.responsible === responsible);
+            const matchFilters = (!city || h.city === city) && (!responsible || h.responsible === responsible);
             const matchCheckboxes = (selectedDealerIds.size === 0) || selectedDealerIds.has(h.id);
             return matchFilters && matchCheckboxes;
         });
 
         // 2. Фильтруем Строки (Товары)
         const filteredMatrix = fullData.matrix.filter(p => {
-            // Стенды фильтруем по имени, товары по SKU
             const key = p.type === 'pos' ? p.name : p.sku;
             return (selectedProductSkus.size === 0) || selectedProductSkus.has(key);
         });
@@ -61,51 +58,59 @@ document.addEventListener('DOMContentLoaded', () => {
         return { headers: filteredHeaders, matrix: filteredMatrix };
     }
 
-    // --- 1. Рендер Таблицы ---
+    // --- 1. RENDER MATRIX (MODERN TABLE) ---
     function renderMatrix() {
         const data = getFilteredData();
-        
-        // Индексы оригинальных колонок
         const visibleOriginalIndices = data.headers.map(h => fullData.headers.indexOf(h));
 
         if (!matrixHeader || !matrixBody) return;
 
-        // Шапка
+        // Шапка с красивым форматированием
         matrixHeader.innerHTML = `
             <tr>
                 <th>Артикул</th>
                 <th>Название</th>
-                ${data.headers.map(h => `<th>${safeText(h.name)}<br><small class="fw-normal text-muted" style="font-size:10px">${safeText(h.city)}</small></th>`).join('')}
+                ${data.headers.map(h => `
+                    <th class="text-center" title="${safeText(h.name)}">
+                        <div style="font-size:0.9rem; line-height:1.2; margin-bottom:2px;">${safeText(h.name)}</div>
+                        <span class="badge bg-light text-secondary border fw-normal" style="font-size:0.7rem">${safeText(h.city)}</span>
+                    </th>
+                `).join('')}
             </tr>
         `;
         
-        // Тело
-        matrixBody.innerHTML = data.matrix.map(row => `
-            <tr class="${row.type === 'pos' ? 'table-info' : ''}">
-                <td title="${safeText(row.sku)}">${safeText(row.sku)}</td>
+        // Тело таблицы
+        matrixBody.innerHTML = data.matrix.map(row => {
+            const isPos = row.type === 'pos';
+            const rowClass = isPos ? 'row-pos' : '';
+            const skuBadge = isPos ? '<span class="badge bg-warning text-dark">POS</span>' : `<span class="fw-bold text-dark">${safeText(row.sku)}</span>`;
+            
+            return `
+            <tr class="${rowClass}">
+                <td>${skuBadge}</td>
                 <td title="${safeText(row.name)}">${safeText(row.name)}</td>
                 ${visibleOriginalIndices.map(index => {
                     const cell = row.dealers[index];
                     
                     if (cell.is_pos) {
-                        // Стенды: просто цифра (черная) или пусто
-                        return cell.value > 0 ? `<td class="text-center fw-bold" style="color:#333;">${cell.value}</td>` : '<td></td>';
+                        // Стенды (Цифра)
+                        return cell.value > 0 ? `<td class="text-center"><span class="pos-value">${cell.value}</span></td>` : '<td></td>';
                     } else {
-                        // Товары: Зеленая галочка или серая точка
+                        // Товары (Галочка или точка)
                         if (cell.value === 1) {
-                            return '<td><span class="matrix-check">✔</span></td>';
+                            return '<td class="text-center"><i class="bi bi-check-circle-fill matrix-check"></i></td>';
                         } else {
-                            return '<td><span class="matrix-empty">·</span></td>';
+                            return '<td class="text-center"><span class="matrix-empty"></span></td>';
                         }
                     }
                 }).join('')}
-            </tr>
-        `).join('');
+            </tr>`;
+        }).join('');
 
         updateDropdownLabels();
     }
 
-    // --- 2. Инициализация ---
+    // --- 2. INIT ---
     async function initPage() {
         try {
             loadingMsg.style.display = 'block';
@@ -157,8 +162,8 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="multi-select-item">
                 <div class="form-check">
                     <input class="form-check-input dealer-checkbox" type="checkbox" value="${d.id}" id="d-${d.id}" ${isChecked}>
-                    <label class="form-check-label" for="d-${d.id}">
-                        ${safeText(d.name)} <small class="text-muted">(${safeText(d.city)})</small>
+                    <label class="form-check-label w-100" for="d-${d.id}" style="cursor:pointer">
+                        ${safeText(d.name)} <small class="text-muted ms-1">${safeText(d.city)}</small>
                     </label>
                 </div>
             </div>`;
@@ -172,14 +177,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function populateProductList() {
-        // Товары берем из МАТРИЦЫ (там уже есть и товары, и стенды)
         productListContainer.innerHTML = fullData.matrix.map(p => {
             const id = p.type === 'pos' ? p.name : p.sku;
             return `
             <div class="multi-select-item">
                 <div class="form-check">
                     <input class="form-check-input product-checkbox" type="checkbox" value="${id}" id="p-${id}">
-                    <label class="form-check-label" for="p-${id}">
+                    <label class="form-check-label w-100" for="p-${id}" style="cursor:pointer">
                         <strong>${safeText(p.sku)}</strong> ${safeText(p.name)}
                     </label>
                 </div>
@@ -201,11 +205,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateDropdownLabels() {
-        dealerBtn.textContent = selectedDealerIds.size > 0 ? `Выбрано: ${selectedDealerIds.size}` : 'Все дилеры';
-        productBtn.textContent = selectedProductSkus.size > 0 ? `Выбрано: ${selectedProductSkus.size}` : 'Все товары';
+        dealerBtn.textContent = selectedDealerIds.size > 0 ? `Дилеров: ${selectedDealerIds.size}` : 'Все дилеры';
+        productBtn.textContent = selectedProductSkus.size > 0 ? `Товаров: ${selectedProductSkus.size}` : 'Все товары';
     }
 
-    // --- UI ---
+    // --- UI HELPERS ---
     function toggleMenu(menu) { menu.classList.toggle('show'); }
     document.addEventListener('click', (e) => {
         if (!e.target.closest('#dealer-dropdown')) dealerMenu.classList.remove('show');
@@ -226,14 +230,8 @@ document.addEventListener('DOMContentLoaded', () => {
         renderMatrix();
     };
 
-    dealerSelectAll.onclick = () => {
-        document.querySelectorAll('.dealer-checkbox').forEach(cb => { cb.checked = true; selectedDealerIds.add(cb.value); });
-        renderMatrix();
-    };
-    dealerClear.onclick = () => {
-        document.querySelectorAll('.dealer-checkbox').forEach(cb => { cb.checked = false; selectedDealerIds.delete(cb.value); });
-        renderMatrix();
-    };
+    dealerSelectAll.onclick = () => { document.querySelectorAll('.dealer-checkbox').forEach(cb => { cb.checked = true; selectedDealerIds.add(cb.value); }); renderMatrix(); };
+    dealerClear.onclick = () => { document.querySelectorAll('.dealer-checkbox').forEach(cb => { cb.checked = false; selectedDealerIds.delete(cb.value); }); renderMatrix(); };
 
     productSelectAll.onclick = () => bulkAction(productListContainer, 'product-checkbox', selectedProductSkus, true);
     productClear.onclick = () => bulkAction(productListContainer, 'product-checkbox', selectedProductSkus, false);
@@ -241,13 +239,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if(filterCity) filterCity.onchange = () => { updateDealerListOptions(); renderMatrix(); };
     if(filterResponsible) filterResponsible.onchange = () => { updateDealerListOptions(); renderMatrix(); };
 
-    // --- ЭКСПОРТ ---
+    // --- EXPORT ---
     if(exportBtn) exportBtn.onclick = () => {
         if (!fullData.matrix.length) return alert("Нет данных для экспорта");
-        
         const data = getFilteredData();
         const visibleOriginalIndices = data.headers.map(h => fullData.headers.indexOf(h));
-
         const clean = (text) => `"${String(text || '').replace(/"/g, '""')}"`;
         
         let csv = "\uFEFFАртикул;Название;";
@@ -265,12 +261,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const a = document.createElement('a');
         a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-        const date = new Date().toISOString().slice(0,10);
-        a.download = `Matrix_Export_${date}.csv`;
-        
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        a.download = `Matrix_Report.csv`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
     };
 
     initPage();
