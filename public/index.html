@@ -53,14 +53,13 @@
             </div>
         </div>
 
-        <div class="row g-4 mb-5">
+       <div class="row g-4 mb-5">
             
-            <div class="col-xl-3 col-lg-6 col-md-6">
-                <div id="dashboard-stats" class="row g-2 h-100">
-                    </div>
+            <div class="col-md-6">
+                <div id="dashboard-stats" class="row g-3 h-100"></div>
             </div>
 
-            <div class="col-xl-3 col-lg-6 col-md-6">
+            <div class="col-md-6">
                 <div class="card border-0 shadow-sm rounded-4 h-100 overflow-hidden" style="background: #fff5f5;">
                     <div class="card-header bg-transparent border-0 pt-3 px-3 pb-0">
                         <div class="d-flex align-items-center gap-2 mb-2">
@@ -75,6 +74,39 @@
                     </div>
                 </div>
             </div>
+
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+                    <div class="card-header bg-white border-0 pt-3 px-3 pb-0">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <div class="icon-circle bg-primary-subtle text-primary"><i class="bi bi-calendar-check-fill"></i></div>
+                            <h6 class="fw-bold mb-0">План на сегодня</h6>
+                        </div>
+                    </div>
+                    <div class="card-body px-2 pt-0">
+                        <div id="tasks-list-upcoming" class="task-list-modern">
+                            <p class="text-center text-muted py-3 small">Загрузка...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+                    <div class="card-header bg-white border-0 pt-3 px-3 pb-0">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <div class="icon-circle bg-warning-subtle text-warning"><i class="bi bi-hourglass-split"></i></div>
+                            <h6 class="fw-bold mb-0">Давно не были</h6>
+                        </div>
+                    </div>
+                    <div class="card-body px-2 pt-0">
+                        <div id="tasks-list-cooling" class="task-list-modern">
+                            <p class="text-center text-muted py-3 small">Загрузка...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
             <div class="col-xl-3 col-lg-6 col-md-6">
                 <div class="card border-0 shadow-sm rounded-4 h-100">
@@ -303,3 +335,4 @@
     </script>
 </body>
 </html>
+
