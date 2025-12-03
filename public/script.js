@@ -429,7 +429,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function saveProducts(dealerId, ids) { await fetch(`${API_DEALERS_URL}/${dealerId}/products`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({productIds: ids})}); }
 
     // --- 8. RENDER LIST (MAIN PAGE) ---
-    function renderDealerList() {
+   function renderDealerList() {
         if (!dealerGrid) return;
 
         const city = filterCity ? filterCity.value : '';
@@ -439,42 +439,86 @@ document.addEventListener('DOMContentLoaded', () => {
         const search = searchBar ? searchBar.value.toLowerCase() : '';
 
         const filtered = allDealers.filter(d => {
-            let statusMatch = false; const s = d.status || 'standard';
-            if (status) statusMatch = s === status; else statusMatch = s !== 'potential'; 
-            return (!city || d.city === city) && (!type || d.price_type === type) && (!responsible || d.responsible === responsible) && statusMatch && (!search || ((d.name||'').toLowerCase().includes(search) || (d.dealer_id||'').toLowerCase().includes(search)));
+            let statusMatch = false; 
+            const s = d.status || 'standard';
+            if (status) statusMatch = s === status; 
+            else statusMatch = s !== 'potential'; 
+            
+            return (!city || d.city === city) && 
+                   (!type || d.price_type === type) && 
+                   (!responsible || d.responsible === responsible) && 
+                   statusMatch && 
+                   (!search || ((d.name||'').toLowerCase().includes(search) || (d.dealer_id||'').toLowerCase().includes(search)));
         });
 
-        // Сортировка
         filtered.sort((a, b) => {
-            let valA = (a[currentSort.column] || '').toString(); let valB = (b[currentSort.column] || '').toString();
-            let res = currentSort.column === 'dealer_id' ? valA.localeCompare(valB, undefined, {numeric:true}) : valA.toLowerCase().localeCompare(valB.toLowerCase(), 'ru');
+            let valA = (a[currentSort.column] || '').toString();
+            let valB = (b[currentSort.column] || '').toString();
+            let res = currentSort.column === 'dealer_id' 
+                ? valA.localeCompare(valB, undefined, {numeric:true}) 
+                : valA.toLowerCase().localeCompare(valB.toLowerCase(), 'ru');
             return currentSort.direction === 'asc' ? res : -res;
         });
 
         if (filtered.length === 0) {
-            dealerGrid.innerHTML = '';
-            if(noDataMsg) { noDataMsg.style.display = 'block'; noDataMsg.textContent = 'Ничего не найдено'; }
+            dealerGrid.innerHTML = `
+                <div class="empty-state">
+                    <i class="bi bi-search empty-state-icon"></i>
+                    <h5 class="text-muted">Ничего не найдено</h5>
+                    <p class="text-secondary small mb-3">Попробуйте изменить фильтры или запрос</p>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('search-bar').value=''; document.getElementById('filter-city').value=''; document.getElementById('filter-status').value=''; renderDealerList()">Сбросить фильтры</button>
+                </div>`;
             return;
         }
-        if(noDataMsg) noDataMsg.style.display = 'none';
 
-        const statusConfig = { 'active': { label: 'Active', class: 'sp-active' }, 'standard': { label: 'Standard', class: 'sp-standard' }, 'problem': { label: 'Problem', class: 'sp-problem' }, 'potential': { label: 'Potential', class: 'sp-potential' }, 'archive': { label: 'Archive', class: 'sp-archive' } };
+        const statusConfig = {
+            'active': { label: 'Active', class: 'sp-active' },
+            'standard': { label: 'Standard', class: 'sp-standard' },
+            'problem': { label: 'Problem', class: 'sp-problem' },
+            'potential': { label: 'Potential', class: 'sp-potential' },
+            'archive': { label: 'Archive', class: 'sp-archive' }
+        };
 
         dealerGrid.innerHTML = filtered.map(d => {
             const st = statusConfig[d.status] || statusConfig['standard'];
             
             let phoneBtn = ''; let waBtn = '';
             if (d.contacts && d.contacts.length > 0) {
-                const phone = d.contacts.find(c => c.contactInfo)?.contactInfo || ''; const cleanPhone = phone.replace(/[^0-9]/g, '');
+                const phone = d.contacts.find(c => c.contactInfo)?.contactInfo || '';
+                const cleanPhone = phone.replace(/[^0-9]/g, '');
                 if (cleanPhone.length >= 10) {
                     phoneBtn = `<a href="tel:+${cleanPhone}" class="btn-circle btn-circle-call" onclick="event.stopPropagation()" title="Позвонить"><i class="bi bi-telephone-fill"></i></a>`;
                     waBtn = `<a href="https://wa.me/${cleanPhone}" target="_blank" class="btn-circle btn-circle-wa" onclick="event.stopPropagation()" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>`;
                 }
             }
-            let mapBtn = ''; if (d.latitude && d.longitude) mapBtn = `<a href="https://yandex.kz/maps/?pt=${d.longitude},${d.latitude}&z=17&l=map" target="_blank" class="btn-circle" onclick="event.stopPropagation()" title="Маршрут"><i class="bi bi-geo-alt-fill"></i></a>`;
+
+            let mapBtn = '';
+            if (d.latitude && d.longitude) {
+                mapBtn = `<a href="https://yandex.kz/maps/?pt=${d.longitude},${d.latitude}&z=17&l=map" target="_blank" class="btn-circle" onclick="event.stopPropagation()" title="Маршрут"><i class="bi bi-geo-alt-fill"></i></a>`;
+            }
+
             const avatarHtml = d.photo_url ? `<img src="${d.photo_url}" alt="${d.name}">` : `<i class="bi bi-shop"></i>`;
 
-            return `<div class="dealer-item" onclick="window.open('dealer.html?id=${d.id}', '_blank')"><div class="dealer-avatar-box">${avatarHtml}</div><div class="dealer-content"><div class="d-flex align-items-center gap-2 mb-1"><a href="dealer.html?id=${d.id}" class="dealer-name" target="_blank">${safeText(d.name)}</a><span class="status-pill ${st.class}">${st.label}</span></div><div class="dealer-meta"><span><i class="bi bi-hash"></i>${safeText(d.dealer_id)}</span><span><i class="bi bi-geo-alt"></i>${safeText(d.city)}</span>${d.price_type ? `<span><i class="bi bi-tag"></i>${safeText(d.price_type)}</span>` : ''}</div></div><div class="dealer-actions">${waBtn} ${phoneBtn} ${mapBtn}<button class="btn-circle" onclick="event.stopPropagation(); showQuickVisit('${d.id}')" title="Быстрый визит"><i class="bi bi-calendar-check"></i></button><button class="btn-circle" onclick="event.stopPropagation(); openEditModal('${d.id}')" title="Редактировать"><i class="bi bi-pencil"></i></button></div></div>`;
+            return `
+            <div class="dealer-item" onclick="window.open('dealer.html?id=${d.id}', '_blank')">
+                <div class="dealer-avatar-box">${avatarHtml}</div>
+                <div class="dealer-content">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <a href="dealer.html?id=${d.id}" class="dealer-name" target="_blank">${safeText(d.name)}</a>
+                        <span class="status-pill ${st.class}">${st.label}</span>
+                    </div>
+                    <div class="dealer-meta">
+                        <span><i class="bi bi-hash"></i>${safeText(d.dealer_id)}</span>
+                        <span><i class="bi bi-geo-alt"></i>${safeText(d.city)}</span>
+                        ${d.price_type ? `<span><i class="bi bi-tag"></i>${safeText(d.price_type)}</span>` : ''}
+                    </div>
+                </div>
+                <div class="dealer-actions">
+                    ${waBtn} ${phoneBtn} ${mapBtn}
+                    <button class="btn-circle" onclick="event.stopPropagation(); showQuickVisit('${d.id}')" title="Быстрый визит"><i class="bi bi-calendar-check"></i></button>
+                    <button class="btn-circle" onclick="event.stopPropagation(); openEditModal('${d.id}')" title="Редактировать"><i class="bi bi-pencil"></i></button>
+                </div>
+            </div>`;
         }).join('');
     }
 
@@ -639,3 +683,4 @@ document.addEventListener('DOMContentLoaded', () => {
     
     initApp();
 });
+
