@@ -251,49 +251,32 @@ document.addEventListener('DOMContentLoaded', () => {
         competitorsListContainer.innerHTML = html + '</tbody></table></div>';
     }
 
-    function fetchDealerProducts(products) {
-        const c = document.getElementById('dealer-products-list'); if (!c) return;
-        if (!products || products.length === 0) { c.innerHTML = '<p class="text-muted">Нет выставленных товаров.</p>'; return; }
-        products.sort((a, b) => a.sku.localeCompare(b.sku, undefined, {numeric: true}));
+  function fetchDealerProducts(products) {
+        const c = document.getElementById('dealer-products-list'); 
+        if (!c) return;
+        
+        if (!products || products.length === 0) { 
+            c.innerHTML = '<div class="p-3 text-center text-muted border rounded bg-light small">Нет выставленных товаров</div>'; 
+            return; 
+        }
+        
+        // УМНАЯ СОРТИРОВКА
+        // Сортируем по Артикулу (SKU), учитывая числа внутри текста (чтобы 10 шло после 2)
+        products.sort((a, b) => {
+            return a.sku.localeCompare(b.sku, undefined, { numeric: true, sensitivity: 'base' });
+        });
+
         let html = '<div class="products-grid">';
-        html += products.map(p => `<div class="product-grid-item"><i class="bi bi-check-circle-fill text-success"></i><div class="product-info"><span class="product-sku">${safeText(p.sku)}</span><span class="product-name small">${safeText(p.name)}</span></div></div>`).join('');
+        html += products.map(p => `
+            <div class="product-grid-item" title="${safeText(p.name)}">
+                <i class="bi bi-check-circle-fill"></i>
+                <div class="product-info">
+                    <span class="product-sku">${safeText(p.sku)}</span>
+                    <span class="product-name">${safeText(p.name)}</span>
+                </div>
+            </div>`
+        ).join('');
         html += '</div>';
+        
         c.innerHTML = html;
     }
-
-    // Buttons
-    if(editBtn) editBtn.addEventListener('click', () => { localStorage.setItem('pendingEditDealerId', dealerId); window.location.href = 'index.html'; });
-    if(navigateBtn) navigateBtn.addEventListener('click', () => { if (dealerLat && dealerLng) window.open(`http://googleusercontent.com/maps/google.com/?q=${dealerLat},${dealerLng}`, '_blank'); else alert("Координаты не заданы."); });
-    if(deleteBtn) deleteBtn.addEventListener('click', async () => { if (confirm(`Удалить дилера ${currentDealerName}?`)) { try { const response = await fetch(`${API_DEALERS_URL}/${dealerId}`, { method: 'DELETE' }); if (response.ok) window.location.href = 'index.html'; } catch (error) { alert('Ошибка.'); } } });
-
-    // Export Logic
-    window.printDiv = (divId, title) => {
-        const content = document.getElementById(divId).innerHTML;
-        const win = window.open('', '', 'height=600,width=800');
-        win.document.write(`<html><head><title>${title}</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"></head><body class="p-4"><h3>${currentDealerName} - ${title}</h3>${content}</body></html>`);
-        setTimeout(() => { win.print(); }, 1000);
-    };
-
-    window.exportData = (type) => {
-        const clean = (text) => `"${String(text || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`;
-        let csv = ""; let filename = `${currentDealerName}_${type}.csv`;
-        if (type === 'sales') {
-            const table = document.querySelector('#dealer-sales-history table'); if(!table) return alert("Нет данных");
-            csv = "\uFEFFМесяц;Факт\n";
-            table.querySelectorAll('tbody tr').forEach(tr => { const tds = tr.querySelectorAll('td'); if(tds.length > 1) csv += `${clean(tds[0].innerText)};${clean(tds[1].innerText)}\n`; });
-        } else if (type === 'competitors') {
-            const table = document.querySelector('#dealer-competitors-list table'); if(!table) return alert("Нет данных");
-            csv = "\uFEFFБренд;Коллекция;ОПТ;Розница\n";
-            table.querySelectorAll('tbody tr').forEach(tr => { const tds = tr.querySelectorAll('td'); csv += `${clean(tds[0].innerText)};${clean(tds[1].innerText)};${clean(tds[2].innerText)};${clean(tds[3].innerText)}\n`; });
-        } else if (type === 'products') {
-            csv = "\uFEFFТип;Артикул/Название;Значение\n";
-            const posTable = document.querySelector('#dealer-pos-list table');
-            if(posTable) posTable.querySelectorAll('tbody tr').forEach(tr => { const tds = tr.querySelectorAll('td'); csv += `Стенд;${clean(tds[0].innerText)};${clean(tds[1].innerText)}\n`; });
-            const items = document.querySelectorAll('.product-grid-item');
-            items.forEach(item => { const sku = item.querySelector('.product-sku')?.innerText || ''; const name = item.querySelector('.product-name')?.innerText || ''; csv += `Товар;${clean(sku)};${clean(name)}\n`; });
-        }
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    };
-
-    fetchDealerDetails();
-});
