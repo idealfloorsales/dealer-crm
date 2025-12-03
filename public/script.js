@@ -277,7 +277,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchProductCatalog() { if (fullProductCatalog.length > 0) return; try { const response = await fetch(API_PRODUCTS_URL); if (!response.ok) throw new Error(`Ошибка: ${response.status}`); fullProductCatalog = await response.json(); fullProductCatalog.sort((a, b) => a.sku.localeCompare(b.sku, 'ru', { numeric: true })); } catch (error) {} }
     async function completeTask(btn, dealerId, visitIndex) { try { btn.disabled = true; const res = await fetch(`${API_DEALERS_URL}/${dealerId}`); if(!res.ok) throw new Error('Err'); const dealer = await res.json(); if (dealer.visits && dealer.visits[visitIndex]) { dealer.visits[visitIndex].isCompleted = true; } await fetch(`${API_DEALERS_URL}/${dealerId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visits: dealer.visits }) }); initApp(); } catch (e) { alert("Ошибка"); btn.disabled = false; } }
 
-    // --- 6. RENDER DASHBOARD ---
+    // --- 6. RENDER DASHBOARD (UPDATED GRID) ---
     function renderDashboard() {
         if (!dashboardStats) return; 
         if (!allDealers || allDealers.length === 0) { dashboardStats.innerHTML = ''; return; }
@@ -286,17 +286,25 @@ document.addEventListener('DOMContentLoaded', () => {
         const totalDealers = activeDealers.length;
         const noAvatarCount = activeDealers.filter(d => !d.photo_url).length; 
 
+        // 1. Статистика (В одной карточке с разделением или двумя карточками в столбик)
+        // Сделаем 2 карточки на всю высоту столбца
         dashboardStats.innerHTML = `
-            <div class="col-6">
-                <div class="stat-card-modern">
-                    <div class="stat-icon-box bg-primary-subtle text-primary"><i class="bi bi-shop"></i></div>
-                    <div class="stat-info"><h3>${totalDealers}</h3><p>Дилеров</p></div>
+            <div class="col-6 col-lg-6 col-xl-6 h-100">
+                <div class="stat-card-modern d-flex flex-column justify-content-center align-items-center text-center p-2 h-100">
+                    <div class="stat-icon-box bg-primary-subtle text-primary mb-2"><i class="bi bi-shop"></i></div>
+                    <div class="stat-info">
+                        <h3 class="fs-4">${totalDealers}</h3>
+                        <p class="small">Всего</p>
+                    </div>
                 </div>
             </div>
-            <div class="col-6">
-                <div class="stat-card-modern">
-                    <div class="stat-icon-box ${noAvatarCount > 0 ? 'bg-danger-subtle text-danger' : 'bg-success-subtle text-success'}"><i class="bi bi-camera-fill"></i></div>
-                    <div class="stat-info"><h3 class="${noAvatarCount > 0 ? 'text-danger' : ''}">${noAvatarCount}</h3><p>Без фото</p></div>
+            <div class="col-6 col-lg-6 col-xl-6 h-100">
+                <div class="stat-card-modern d-flex flex-column justify-content-center align-items-center text-center p-2 h-100">
+                    <div class="stat-icon-box ${noAvatarCount > 0 ? 'bg-danger-subtle text-danger' : 'bg-success-subtle text-success'} mb-2"><i class="bi bi-camera-fill"></i></div>
+                    <div class="stat-info">
+                        <h3 class="fs-4 ${noAvatarCount > 0 ? 'text-danger' : ''}">${noAvatarCount}</h3>
+                        <p class="small">Без фото</p>
+                    </div>
                 </div>
             </div>
         `;
@@ -341,6 +349,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderTaskList(tasksListCooling, tasksCooling, 'cooling');
     }
 
+    // --- RENDER TASK LIST (FIXED: BADGE UNDER NAME) ---
     function renderTaskList(container, tasks, type) { 
         if (!container) return; 
         if (tasks.length === 0) { 
@@ -350,24 +359,44 @@ document.addEventListener('DOMContentLoaded', () => {
         } 
         container.innerHTML = tasks.map(t => { 
             let badgeHtml = ''; let metaHtml = '';
+            
             if (type === 'upcoming') { 
                 const dateStr = t.date.toLocaleDateString('ru-RU', {day:'numeric', month:'short'});
-                badgeHtml = t.isToday ? `<span class="task-badge tb-today">Сегодня</span>` : `<span class="task-badge tb-future">${dateStr}</span>`;
-                metaHtml = `<span>${safeText(t.comment)}</span>`;
-            } else if (type === 'problem') { 
+                // Бейдж теперь отдельным блоком
+                badgeHtml = t.isToday 
+                    ? `<span class="task-badge tb-today mt-1 d-inline-block">Сегодня</span>` 
+                    : `<span class="task-badge tb-future mt-1 d-inline-block">${dateStr}</span>`;
+                metaHtml = `<span class="text-muted small">${safeText(t.comment)}</span>`;
+            } 
+            else if (type === 'problem') { 
                 if (t.type === 'overdue') {
                     const dateStr = t.date.toLocaleDateString('ru-RU');
-                    badgeHtml = `<span class="task-badge tb-overdue">Просрок: ${dateStr}</span>`;
-                    metaHtml = `<span class="text-danger">${safeText(t.comment)}</span>`;
-                } else { badgeHtml = `<span class="task-badge tb-overdue">Проблема</span>`; metaHtml = `<span>Внимание!</span>`; }
-            } else if (type === 'cooling') { 
-                const daysStr = t.days === 999 ? 'Никогда' : `${t.days} дн.`;
-                badgeHtml = `<span class="task-badge tb-cooling">Без визитов: ${daysStr}</span>`;
-                metaHtml = `<span class="text-muted">Пора навестить</span>`;
+                    badgeHtml = `<span class="task-badge tb-overdue mt-1 d-inline-block">Просрок: ${dateStr}</span>`;
+                    metaHtml = `<span class="text-danger small fw-bold">${safeText(t.comment)}</span>`;
+                } else { 
+                    badgeHtml = `<span class="task-badge tb-overdue mt-1 d-inline-block">Проблема</span>`; 
+                    metaHtml = `<span class="small text-muted">Внимание!</span>`; 
+                } 
             } 
+            else if (type === 'cooling') { 
+                const daysStr = t.days === 999 ? 'Никогда' : `${t.days} дн.`;
+                badgeHtml = `<span class="task-badge tb-cooling mt-1 d-inline-block">Без визитов: ${daysStr}</span>`;
+                metaHtml = `<span class="text-muted small">Пора навестить</span>`;
+            } 
+            
             const showCheckBtn = (type === 'upcoming' || (type === 'problem' && t.type === 'overdue'));
             const btnHtml = showCheckBtn ? `<button class="btn-task-check btn-complete-task" data-id="${t.dealerId}" data-index="${t.visitIndex}" title="Выполнить"><i class="bi bi-check-lg"></i></button>` : '';
-            return `<div class="task-item-modern"><div class="task-content"><div class="d-flex align-items-center gap-2 mb-1"><a href="dealer.html?id=${t.dealerId}" target="_blank" class="task-title">${safeText(t.dealerName)}</a>${badgeHtml}</div><div class="task-meta">${metaHtml}</div></div>${btnHtml}</div>`; 
+            
+            // НОВАЯ ВЕРСТКА: Стек (Имя -> Бейдж -> Мета)
+            return `
+            <div class="task-item-modern align-items-start">
+                <div class="task-content">
+                    <a href="dealer.html?id=${t.dealerId}" target="_blank" class="task-title text-truncate d-block" style="max-width: 200px;">${safeText(t.dealerName)}</a>
+                    ${badgeHtml}
+                    <div class="mt-1">${metaHtml}</div>
+                </div>
+                <div class="mt-1">${btnHtml}</div>
+            </div>`; 
         }).join(''); 
     }
     
@@ -690,6 +719,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     initApp();
 });
+
 
 
 
