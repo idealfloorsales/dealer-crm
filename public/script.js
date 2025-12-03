@@ -173,13 +173,25 @@ document.addEventListener('DOMContentLoaded', () => {
         const totalDealers = activeDealers.length;
         const noAvatarCount = activeDealers.filter(d => !d.photo_url).length; 
         dashboardStats.innerHTML = `<div class="col-6 col-lg-6 col-xl-6 h-100"><div class="stat-card-modern d-flex flex-column justify-content-center align-items-center text-center p-2 h-100"><div class="stat-icon-box bg-primary-subtle text-primary mb-2"><i class="bi bi-shop"></i></div><div class="stat-info"><h3 class="fs-4">${totalDealers}</h3><p class="small">Всего</p></div></div></div><div class="col-6 col-lg-6 col-xl-6 h-100"><div class="stat-card-modern d-flex flex-column justify-content-center align-items-center text-center p-2 h-100"><div class="stat-icon-box ${noAvatarCount > 0 ? 'bg-danger-subtle text-danger' : 'bg-success-subtle text-success'} mb-2"><i class="bi bi-camera-fill"></i></div><div class="stat-info"><h3 class="fs-4 ${noAvatarCount > 0 ? 'text-danger' : ''}">${noAvatarCount}</h3><p class="small">Без фото</p></div></div></div>`;
-        const today = new Date(); today.setHours(0,0,0,0); const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
+        const today = new Date(); today.setHours(0,0,0,0);
+        
+        // === ИЗМЕНЕНИЕ (15 ДНЕЙ) ===
+        const coolingLimit = new Date(today.getTime() - (15 * 24 * 60 * 60 * 1000));
+        
         const tasksUpcoming = [], tasksProblem = [], tasksCooling = [];
         allDealers.forEach(d => {
             if (d.status === 'archive') return; const isPotential = d.status === 'potential'; let lastVisitDate = null; let hasFutureTasks = false;
             if (d.visits && Array.isArray(d.visits)) { d.visits.forEach((v, index) => { const vDate = new Date(v.date); if (!v.date) return; vDate.setHours(0,0,0,0); if (v.isCompleted && (!lastVisitDate || vDate > lastVisitDate)) lastVisitDate = vDate; if (!v.isCompleted) { const taskData = { dealerName: d.name, dealerId: d.id, date: vDate, comment: v.comment || "Без комментария", visitIndex: index }; if (vDate < today) tasksProblem.push({...taskData, type: 'overdue'}); else { tasksUpcoming.push({...taskData, isToday: vDate.getTime() === today.getTime()}); hasFutureTasks = true; } } }); }
             if (d.status === 'problem') { if (!tasksProblem.some(t => t.dealerId === d.id && t.type === 'overdue')) tasksProblem.push({ dealerName: d.name, dealerId: d.id, type: 'status', comment: 'Статус: Проблемный' }); }
-            if (!hasFutureTasks && d.status !== 'problem' && !isPotential) { if (!lastVisitDate) tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: 999 }); else if (lastVisitDate < thirtyDaysAgo) { const days = Math.floor((today - lastVisitDate) / (1000 * 60 * 60 * 24)); tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: days }); } }
+            
+            // Проверка на остывание (15 дней)
+            if (!hasFutureTasks && d.status !== 'problem' && !isPotential) { 
+                if (!lastVisitDate) tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: 999 }); 
+                else if (lastVisitDate < coolingLimit) { 
+                    const days = Math.floor((today - lastVisitDate) / (1000 * 60 * 60 * 24)); 
+                    tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: days }); 
+                } 
+            }
         });
         tasksUpcoming.sort((a, b) => a.date - b.date); tasksProblem.sort((a, b) => (a.date || 0) - (b.date || 0)); tasksCooling.sort((a, b) => b.days - a.days);
         renderTaskList(tasksListUpcoming, tasksUpcoming, 'upcoming'); renderTaskList(tasksListProblem, tasksProblem, 'problem'); renderTaskList(tasksListCooling, tasksCooling, 'cooling');
@@ -246,16 +258,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const filtered = allDealers.filter(d => { let statusMatch = false; const s = d.status || 'standard'; if (status) statusMatch = s === status; else statusMatch = s !== 'potential'; return (!city || d.city === city) && (!type || d.price_type === type) && (!responsible || d.responsible === responsible) && statusMatch && (!search || ((d.name||'').toLowerCase().includes(search) || (d.dealer_id||'').toLowerCase().includes(search))); });
         filtered.sort((a, b) => { let valA = (a[currentSort.column] || '').toString(); let valB = (b[currentSort.column] || '').toString(); let res = currentSort.column === 'dealer_id' ? valA.localeCompare(valB, undefined, {numeric:true}) : valA.toLowerCase().localeCompare(valB.toLowerCase(), 'ru'); return currentSort.direction === 'asc' ? res : -res; });
         if (filtered.length === 0) { dealerGrid.innerHTML = ` <div class="empty-state"><i class="bi bi-search empty-state-icon"></i><h5 class="text-muted">Ничего не найдено</h5><p class="text-secondary small mb-3">Попробуйте изменить фильтры</p><button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('search-bar').value=''; document.getElementById('filter-city').value=''; document.getElementById('filter-status').value=''; renderDealerList()">Сбросить фильтры</button></div>`; return; }
-        const statusConfig = { 'active': { label: 'Active', class: 'sp-active' }, 'standard': { label: 'Standard', class: 'sp-standard' }, 'problem': { label: 'Problem', class: 'sp-problem' }, 'potential': { label: 'Potential', class: 'sp-potential' }, 'archive': { label: 'Archive', class: 'sp-archive' } };
+        // РУСИФИЦИРОВАННЫЕ БЕЙДЖИ
+        const statusConfig = { 'active': { label: 'Активный', class: 'sp-active' }, 'standard': { label: 'Стандарт', class: 'sp-standard' }, 'problem': { label: 'Проблемный', class: 'sp-problem' }, 'potential': { label: 'Потенциальный', class: 'sp-potential' }, 'archive': { label: 'Архив', class: 'sp-archive' } };
         dealerGrid.innerHTML = filtered.map(d => {
             const st = statusConfig[d.status] || statusConfig['standard'];
             let phoneBtn = ''; let waBtn = ''; if (d.contacts && d.contacts.length > 0) { const phone = d.contacts.find(c => c.contactInfo)?.contactInfo || ''; const cleanPhone = phone.replace(/[^0-9]/g, ''); if (cleanPhone.length >= 10) { phoneBtn = `<a href="tel:+${cleanPhone}" class="btn-circle btn-circle-call" onclick="event.stopPropagation()" title="Позвонить"><i class="bi bi-telephone-fill"></i></a>`; waBtn = `<a href="https://wa.me/${cleanPhone}" target="_blank" class="btn-circle btn-circle-wa" onclick="event.stopPropagation()" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>`; } }
             let mapBtn = ''; if (d.latitude && d.longitude) mapBtn = `<a href="https://yandex.kz/maps/?pt=${d.longitude},${d.latitude}&z=17&l=map" target="_blank" class="btn-circle" onclick="event.stopPropagation()" title="Маршрут"><i class="bi bi-geo-alt-fill"></i></a>`;
             const avatarHtml = d.photo_url ? `<img src="${d.photo_url}" alt="${d.name}">` : `<i class="bi bi-shop"></i>`;
-            
-            // Edit Button (Auth check)
             const editBtn = (currentUserRole !== 'guest') ? `<button class="btn-circle" onclick="event.stopPropagation(); openEditModal('${d.id}')" title="Редактировать"><i class="bi bi-pencil"></i></button>` : '';
-
             return `<div class="dealer-item" onclick="window.open('dealer.html?id=${d.id}', '_blank')"><div class="dealer-avatar-box">${avatarHtml}</div><div class="dealer-content"><div class="d-flex align-items-center gap-2 mb-1"><a href="dealer.html?id=${d.id}" class="dealer-name" target="_blank">${safeText(d.name)}</a><span class="status-pill ${st.class}">${st.label}</span></div><div class="dealer-meta"><span><i class="bi bi-hash"></i>${safeText(d.dealer_id)}</span><span><i class="bi bi-geo-alt"></i>${safeText(d.city)}</span>${d.price_type ? `<span><i class="bi bi-tag"></i>${safeText(d.price_type)}</span>` : ''}</div></div><div class="dealer-actions">${waBtn} ${phoneBtn} ${mapBtn}<button class="btn-circle" onclick="event.stopPropagation(); showQuickVisit('${d.id}')" title="Быстрый визит"><i class="bi bi-calendar-check"></i></button>${editBtn}</div></div>`;
         }).join('');
     }
