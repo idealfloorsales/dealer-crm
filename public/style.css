@@ -365,3 +365,135 @@ nav a.nav-link.active { background: var(--primary-color) !important; color: whit
     color: #cbd5e1;
     margin-bottom: 15px;
 }
+
+/* ... (ВЕСЬ ПРЕДЫДУЩИЙ CSS ОСТАВЛЯЕМ) ... */
+
+/* --- СТИЛИ ПРОФИЛЯ ДИЛЕРА (DEALER DETAILS) --- */
+
+/* 1. Карточка Шапки */
+.profile-header-card {
+    background: #fff;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+    border: 1px solid #e2e8f0;
+    position: relative;
+}
+.profile-cover {
+    height: 100px;
+    background: linear-gradient(135deg, var(--primary-color) 0%, #7a0206 100%);
+    opacity: 0.9;
+}
+.profile-body {
+    padding: 0 24px 24px 24px;
+    position: relative;
+}
+.profile-avatar-wrapper {
+    margin-top: -50px;
+    margin-bottom: 15px;
+    position: relative;
+    display: inline-block;
+}
+.profile-avatar {
+    width: 100px; height: 100px;
+    border-radius: 50%;
+    border: 4px solid #fff;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    object-fit: cover;
+    background-color: #f8fafc;
+}
+.profile-title { font-size: 1.75rem; font-weight: 800; color: var(--text-dark); }
+
+/* 2. Вкладки (Tabs) */
+.profile-nav-wrapper {
+    background: #fff;
+    border-radius: 12px;
+    padding: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    border: 1px solid #e2e8f0;
+}
+.profile-tabs .nav-link {
+    color: var(--text-gray);
+    font-weight: 600;
+    border-radius: 8px;
+    padding: 10px 16px;
+    transition: all 0.2s;
+}
+.profile-tabs .nav-link:hover {
+    background-color: #f1f5f9;
+    color: var(--text-dark);
+}
+.profile-tabs .nav-link.active {
+    background-color: var(--primary-color);
+    color: #fff !important;
+    box-shadow: 0 2px 6px rgba(185, 4, 10, 0.25);
+}
+
+/* 3. Карточки контента */
+.content-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    border: 1px solid #e2e8f0;
+    height: 100%;
+}
+.card-heading {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+/* Элементы списка "Инфо" */
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px dashed #f1f5f9;
+    font-size: 0.95rem;
+}
+.info-row:last-child { border-bottom: none; }
+.info-label { color: var(--text-gray); font-weight: 500; }
+.info-val { color: var(--text-dark); font-weight: 600; text-align: right; }
+
+/* Визитка сотрудника */
+.contact-card-modern {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.contact-card-info h6 { margin: 0; font-weight: 700; }
+.contact-card-info p { margin: 0; font-size: 0.85rem; color: var(--text-gray); }
+
+/* Лента визитов (Timeline) */
+.timeline-item {
+    padding-left: 20px;
+    border-left: 2px solid #e2e8f0;
+    position: relative;
+    padding-bottom: 20px;
+}
+.timeline-item::before {
+    content: ''; position: absolute; left: -6px; top: 0;
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--primary-color); border: 2px solid #fff;
+    box-shadow: 0 0 0 2px #e2e8f0;
+}
+.timeline-date { font-size: 0.8rem; color: var(--text-gray); font-weight: 600; margin-bottom: 4px; }
+.timeline-text { background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #f1f5f9; }
+
+/* Кнопки действий (белые) */
+.btn-white { background: #fff; border-color: #e2e8f0; color: var(--text-dark); }
+.btn-white:hover { background: #f8fafc; border-color: #cbd5e1; }
+
+@media (max-width: 768px) {
+    .profile-body { padding: 0 16px 20px 16px; }
+    .profile-title { font-size: 1.4rem; }
+    .profile-nav-wrapper { overflow-x: auto; white-space: nowrap; } /* Скролл табов на мобильном */
+}
