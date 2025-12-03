@@ -2,12 +2,13 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const API_URL = '/api/products';
     
-    const tableBody = document.getElementById('products-list');
+    // Элементы
+    const listContainer = document.getElementById('products-list-container'); // Новый контейнер
     const searchInput = document.getElementById('product-search');
     const totalLabel = document.getElementById('total-count');
     
+    // Модалка
     const modalEl = document.getElementById('product-modal');
-    // (ИЗМЕНЕНО) backdrop: 'static'
     const modal = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: false });
     const form = document.getElementById('product-form');
     const modalTitle = document.getElementById('product-modal-title');
@@ -21,56 +22,75 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let products = [];
 
+    // --- ЗАГРУЗКА ---
     async function loadProducts() {
         try {
-            tableBody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-muted">Загрузка...</td></tr>';
+            listContainer.innerHTML = '<p class="text-center mt-5 text-muted">Загрузка...</p>';
             const res = await fetch(API_URL);
             if(res.ok) {
                 products = await res.json();
-                products.sort((a, b) => a.sku.localeCompare(b.sku, undefined, {numeric: true}));
-                renderTable();
+                
+                // Умная сортировка (SKU)
+                products.sort((a, b) => a.sku.localeCompare(b.sku, undefined, {numeric: true, sensitivity: 'base'}));
+                
+                renderList();
             }
         } catch(e) {
-            tableBody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-danger">Ошибка загрузки</td></tr>';
+            listContainer.innerHTML = '<p class="text-center mt-5 text-danger">Ошибка загрузки данных</p>';
         }
     }
 
-    function renderTable() {
+    // --- РЕНДЕР СПИСКА (MODERN) ---
+    function renderList() {
         const search = searchInput.value.toLowerCase();
         const filtered = products.filter(p => p.sku.toLowerCase().includes(search) || p.name.toLowerCase().includes(search));
 
         if (filtered.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-muted">Ничего не найдено</td></tr>';
+            listContainer.innerHTML = `
+                <div class="empty-state">
+                    <i class="bi bi-box-seam empty-state-icon"></i>
+                    <h5 class="text-muted">Ничего не найдено</h5>
+                </div>`;
             totalLabel.textContent = 'Всего товаров: 0';
             return;
         }
 
-        tableBody.innerHTML = filtered.map(p => `
-            <tr>
-                <td><span class="badge bg-light text-dark border fw-bold" style="font-size: 0.9rem;">${p.sku}</span></td>
-                <td class="fw-medium">${p.name}</td>
-                <td class="text-end">
-                    <button class="btn btn-sm btn-light border me-1" onclick="editProduct('${p.id}')" title="Редактировать"><i class="bi bi-pencil"></i></button>
-                    <button class="btn btn-sm btn-light border text-danger" onclick="deleteProduct('${p.id}')" title="Удалить"><i class="bi bi-trash"></i></button>
-                </td>
-            </tr>
+        listContainer.innerHTML = filtered.map(p => `
+            <div class="product-item-modern">
+                <div class="product-content">
+                    <span class="product-sku-badge">${safeText(p.sku)}</span>
+                    <span class="product-title">${safeText(p.name)}</span>
+                </div>
+                <div class="product-actions">
+                    <button class="btn-circle" onclick="editProduct('${p.id}')" title="Редактировать">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn-circle text-danger" onclick="deleteProduct('${p.id}')" title="Удалить">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            </div>
         `).join('');
 
         totalLabel.textContent = `Всего товаров: ${filtered.length}`;
     }
 
+    // --- ВСПОМОГАТЕЛЬНЫЕ ---
+    const safeText = (text) => (text || '').toString().replace(/</g, "&lt;");
+
+    // --- КНОПКИ ---
     if(resetBtn) {
         resetBtn.onclick = async () => {
-            if(confirm("Это загрузит стандартный список из 72 товаров (Ламинат) в базу. \nУже существующие товары не дублируются.\nПродолжить?")) {
+            if(confirm("Это загрузит стандартный список товаров (Ламинат) в базу. \nУже существующие товары не дублируются.\nПродолжить?")) {
                 try {
                     resetBtn.disabled = true; 
-                    resetBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Загрузка...';
+                    resetBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
                     const res = await fetch('/api/admin/import-catalog', { method: 'POST' });
-                    if (res.ok) { alert('Каталог успешно обновлен!'); loadProducts(); } 
+                    if (res.ok) { await loadProducts(); } 
                     else { alert('Ошибка сервера при импорте.'); }
                 } catch(e) { alert('Ошибка соединения'); } finally { 
                     resetBtn.disabled = false; 
-                    resetBtn.innerHTML = '<i class="bi bi-arrow-clockwise me-2"></i>Загрузить базу';
+                    resetBtn.innerHTML = '<i class="bi bi-arrow-clockwise me-2"></i>Сброс';
                 }
             }
         };
@@ -95,6 +115,13 @@ document.addEventListener('DOMContentLoaded', () => {
         modal.show();
     };
 
+    window.deleteProduct = async (id) => {
+        if(confirm('Удалить этот товар? Он пропадет из матрицы всех дилеров.')) {
+            try { await fetch(`${API_URL}/${id}`, { method: 'DELETE' }); loadProducts(); } catch(e) { alert('Ошибка удаления'); }
+        }
+    };
+
+    // --- СОХРАНЕНИЕ ---
     if(form) {
         form.onsubmit = async (e) => {
             e.preventDefault();
@@ -108,19 +135,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 const btn = form.querySelector('button[type="submit"]');
                 const oldText = btn.innerHTML;
                 btn.disabled = true; btn.innerHTML = '...';
+                
                 const res = await fetch(url, { method: method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
                 if (res.ok) { await loadProducts(); modal.hide(); } else { alert('Ошибка. Возможно, такой SKU уже есть.'); }
+                
                 btn.disabled = false; btn.innerHTML = oldText;
             } catch(e) { alert('Ошибка сети'); }
         };
     }
 
-    window.deleteProduct = async (id) => {
-        if(confirm('Удалить этот товар? Он пропадет из матрицы всех дилеров.')) {
-            try { await fetch(`${API_URL}/${id}`, { method: 'DELETE' }); loadProducts(); } catch(e) { alert('Ошибка удаления'); }
-        }
-    };
-
-    if(searchInput) { searchInput.addEventListener('input', renderTable); }
+    if(searchInput) { searchInput.addEventListener('input', renderList); }
+    
     loadProducts();
 });
