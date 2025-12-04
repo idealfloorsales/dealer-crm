@@ -8,25 +8,41 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json({ limit: '50mb' })); 
 app.use(cors());
 
-// --- НАСТРОЙКА ПОЛЬЗОВАТЕЛЕЙ И ПРАВ ---
+// --- 1. НАСТРОЙКА ПОЛЬЗОВАТЕЛЕЙ ---
 const USERS = {
-    'admin': process.env.ADMIN_PASSWORD || 'admin',       // Все права
-    'astana': process.env.ASTANA_PASSWORD || 'astana',    // Только Астана
-    'regions': process.env.REGIONS_PASSWORD || 'regions', // Только Регионы
-    'guest': process.env.GUEST_PASSWORD || 'guest'        // Только чтение
+    'admin': process.env.ADMIN_PASSWORD || 'admin',
+    'astana': process.env.ASTANA_PASSWORD || 'astana',
+    'regions': process.env.REGIONS_PASSWORD || 'regions',
+    'guest': process.env.GUEST_PASSWORD || 'guest'
 };
 
-const authMiddleware = basicAuth({
-    users: USERS,
-    challenge: true,
-    unauthorizedResponse: 'Доступ запрещен. Проверьте логин/пароль.'
-});
+// --- 2. AUTH MIDDLEWARE (С ИСКЛЮЧЕНИЯМИ) ---
+const authMiddleware = (req, res, next) => {
+    // Разрешаем системные файлы и картинки без пароля
+    // Это важно для PWA (иконка на рабочий стол) и Service Worker
+    if (req.path === '/manifest.json' || 
+        req.path === '/sw.js' || 
+        req.path.endsWith('.png') || 
+        req.path.endsWith('.jpg') || 
+        req.path.endsWith('.jpeg') || 
+        req.path.endsWith('.ico') ||
+        req.path.endsWith('.gif')) {
+        return next();
+    }
 
-// Применяем авторизацию ко всем маршрутам (и статике, и API)
+    const user = basicAuth({
+        users: USERS,
+        challenge: true,
+        unauthorizedResponse: 'Доступ запрещен.'
+    });
+    user(req, res, next);
+};
+
 app.use(authMiddleware);
 
-// Раздача статики (Фронтенд)
+// --- 3. СТАТИКА ---
 app.use(express.static('public', { index: false }));
+// Явные маршруты для HTML файлов
 app.get('/', (req, res) => res.sendFile(__dirname + '/public/index.html'));
 app.get('/map.html', (req, res) => res.sendFile(__dirname + '/public/map.html'));
 app.get('/sales.html', (req, res) => res.sendFile(__dirname + '/public/sales.html'));
@@ -35,11 +51,12 @@ app.get('/products.html', (req, res) => res.sendFile(__dirname + '/public/produc
 app.get('/report.html', (req, res) => res.sendFile(__dirname + '/public/report.html'));
 app.get('/knowledge.html', (req, res) => res.sendFile(__dirname + '/public/knowledge.html'));
 app.get('/dealer.html', (req, res) => res.sendFile(__dirname + '/public/dealer.html'));
+// Фоллбэк для остальных файлов
 app.use(express.static('public'));
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// --- SCHEMAS (ОСТАЛИСЬ ТЕ ЖЕ) ---
+// --- 4. SCHEMAS (БАЗА ДАННЫХ) ---
 const productSchema = new mongoose.Schema({ sku: String, name: String });
 const Product = mongoose.model('Product', productSchema);
 
@@ -91,30 +108,33 @@ function convertToClient(doc) {
     return obj;
 }
 
-// --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ПРАВ ---
-// Узнаем роль пользователя из запроса
+// --- 5. HELPERS ДЛЯ ПРАВ ДОСТУПА ---
 function getUserRole(req) {
     return req.auth ? req.auth.user : 'guest';
 }
 
-// Проверка прав на запись (POST/PUT/DELETE)
 function canWrite(req) {
     const role = getUserRole(req);
     return role !== 'guest'; // Гость не может писать
 }
 
-// Фильтр для поиска дилеров
 function getDealerFilter(req) {
     const role = getUserRole(req);
     if (role === 'admin' || role === 'guest') return {}; // Видят всех
-    if (role === 'astana') return { responsible: 'regional_astana' }; // Только Астана
-    if (role === 'regions') return { responsible: 'regional_regions' }; // Только Регионы
-    return { _id: null }; // Если роль неизвестна - ничего не показываем
+    if (role === 'astana') return { responsible: 'regional_astana' }; // Только свои
+    if (role === 'regions') return { responsible: 'regional_regions' }; // Только свои
+    return { _id: null }; 
 }
 
-// --- API ---
+// Прослойка для защиты роутов записи
+const checkWrite = (req, res, next) => { 
+    if (canWrite(req)) next(); 
+    else res.status(403).json({error:'Read Only'}); 
+};
 
-// Узнать "Кто я?" (для фронтенда)
+// --- 6. API ROUTES ---
+
+// Auth Info
 app.get('/api/auth/me', (req, res) => {
     res.json({ role: getUserRole(req) });
 });
@@ -134,7 +154,6 @@ app.get('/api/dealers', async (req, res) => {
 
 app.get('/api/dealers/:id', async (req, res) => { 
     try { 
-        // При получении одного дилера тоже проверяем права (чтобы регионы не подсматривали по ID)
         const filter = { _id: req.params.id, ...getDealerFilter(req) };
         const dealer = await Dealer.findOne(filter).populate('products'); 
         if(!dealer) return res.status(404).json({error: "Не найдено или нет доступа"});
@@ -146,7 +165,6 @@ app.post('/api/dealers', async (req, res) => {
     if (!canWrite(req)) return res.status(403).json({ error: 'Только чтение' });
     try { 
         const role = getUserRole(req);
-        // Если создает регионал, принудительно ставим его ответственным
         if (role === 'astana') req.body.responsible = 'regional_astana';
         if (role === 'regions') req.body.responsible = 'regional_regions';
         
@@ -159,7 +177,7 @@ app.post('/api/dealers', async (req, res) => {
 app.put('/api/dealers/:id', async (req, res) => { 
     if (!canWrite(req)) return res.status(403).json({ error: 'Только чтение' });
     try { 
-        const filter = { _id: req.params.id, ...getDealerFilter(req) }; // Проверяем, что редактируем своего
+        const filter = { _id: req.params.id, ...getDealerFilter(req) };
         const updated = await Dealer.findOneAndUpdate(filter, req.body); 
         if(!updated) return res.status(404).json({error: "Не найдено или нет прав"});
         res.json({status:'ok'}); 
@@ -176,25 +194,24 @@ app.delete('/api/dealers/:id', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); } 
 });
 
-// PRODUCTS & OTHERS
-// Для простоты остальные справочники (товары, конкуренты) видны всем, 
-// но редактировать может только не-гость.
-const checkWrite = (req, res, next) => { if (canWrite(req)) next(); else res.status(403).json({error:'Read Only'}); };
+app.get('/api/dealers/:id/products', async (req, res) => { try { const dealer = await Dealer.findById(req.params.id).populate({path:'products',options:{sort:{'sku':1}}}); res.json(dealer.products.map(convertToClient)); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.put('/api/dealers/:id/products', async (req, res) => { try { await Dealer.findByIdAndUpdate(req.params.id, { products: req.body.productIds }); res.json({status:'ok'}); } catch (e) { res.status(500).json({ error: e.message }); } });
 
+// PRODUCTS
 app.get('/api/products', async (req, res) => { const search = new RegExp(req.query.search || '', 'i'); const products = await Product.find({$or:[{sku:search},{name:search}]}).sort({sku:1}).lean(); res.json(products.map(p=>{p.id=p._id; return p;})); });
 app.post('/api/products', checkWrite, async (req, res) => { try { const p = new Product(req.body); await p.save(); res.json(convertToClient(p)); } catch(e){res.status(409).json({});} });
 app.put('/api/products/:id', checkWrite, async (req, res) => { try { const p = await Product.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(p)); } catch(e){res.status(409).json({});} });
 app.delete('/api/products/:id', checkWrite, async (req, res) => { await Product.findByIdAndDelete(req.params.id); await Dealer.updateMany({ products: req.params.id }, { $pull: { products: req.params.id } }); res.json({}); });
 app.get('/api/products/:id/dealers', async (req, res) => { const dlrs = await Dealer.find({ products: req.params.id, ...getDealerFilter(req) }, 'dealer_id name city').sort({name:1}).lean(); res.json(dlrs.map(d=>{d.id=d._id; return d;})); });
 
-// Admin Import (Только админ)
+// ADMIN IMPORT
 app.post('/api/admin/import-catalog', async (req, res) => {
     if(getUserRole(req) !== 'admin') return res.status(403).json({error:'Admin only'});
-    // ... (код импорта, если он нужен)
+    // ... логика импорта если нужна
     res.json({status: 'ok', message: 'Catalog imported'});
 });
 
-// Matrix
+// MATRIX
 app.get('/api/matrix', async (req, res) => {
     try {
         const allProducts = await Product.find({}, 'sku name').sort({ sku: 1 }).lean();
@@ -216,6 +233,7 @@ app.get('/api/matrix', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// SALES
 app.get('/api/sales', async (req, res) => {
     try {
         const { month, dealerId } = req.query;
@@ -235,16 +253,18 @@ app.post('/api/sales', checkWrite, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// COMPETITORS
 app.get('/api/competitors-ref', async (req, res) => { const list = await CompRef.find().sort({name: 1}); res.json(list.map(c => ({ id: c._id, ...c.toObject() }))); });
 app.post('/api/competitors-ref', checkWrite, async (req, res) => { const c = new CompRef(req.body); await c.save(); res.json(c); });
 app.put('/api/competitors-ref/:id', checkWrite, async (req, res) => { await CompRef.findByIdAndUpdate(req.params.id, req.body); res.json({status: 'ok'}); });
 app.delete('/api/competitors-ref/:id', checkWrite, async (req, res) => { await CompRef.findByIdAndDelete(req.params.id); res.json({status: 'deleted'}); });
 
+// KNOWLEDGE
 app.get('/api/knowledge', async (req, res) => { const arts = await Knowledge.find({title: new RegExp(req.query.search||'', 'i')}).sort({title:1}).lean(); res.json(arts.map(a=>{a.id=a._id; return a;})); });
 app.get('/api/knowledge/:id', async (req, res) => { res.json(convertToClient(await Knowledge.findById(req.params.id))); });
 app.post('/api/knowledge', checkWrite, async (req, res) => { const a = new Knowledge(req.body); await a.save(); res.json(convertToClient(a)); });
 app.put('/api/knowledge/:id', checkWrite, async (req, res) => { const a = await Knowledge.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(a)); });
 app.delete('/api/knowledge/:id', checkWrite, async (req, res) => { await Knowledge.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
 
+// START
 app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
-
