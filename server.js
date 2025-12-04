@@ -247,3 +247,4 @@ app.put('/api/knowledge/:id', checkWrite, async (req, res) => { const a = await 
 app.delete('/api/knowledge/:id', checkWrite, async (req, res) => { await Knowledge.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
 
 app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
+
