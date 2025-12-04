@@ -15,7 +15,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let newAvatarBase64 = null; 
     let currentUserRole = 'guest';
 
-    // Списки
     const posMaterialsList = [
         "С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры",
         "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка",
@@ -23,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
 
     // --- 2. ELEMENTS ---
+    // Модалки
     const addModalEl = document.getElementById('add-modal'); 
     const addModal = new bootstrap.Modal(addModalEl, { backdrop: 'static', keyboard: false });
     const addForm = document.getElementById('add-dealer-form');
@@ -35,14 +35,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const qvModal = new bootstrap.Modal(qvModalEl, { backdrop: 'static', keyboard: false });
     const qvForm = document.getElementById('quick-visit-form');
 
+    // Кнопки
     const openAddModalBtn = document.getElementById('open-add-modal-btn');
     const brandsDatalist = document.getElementById('brands-datalist');
     const posDatalist = document.getElementById('pos-materials-datalist');
     
+    // Списки и фильтры
     const dealerGrid = document.getElementById('dealer-grid'); 
     const noDataMsg = document.getElementById('no-data-msg');
     
-    // Списки внутри модалок
+    // Внутренности модалок (Списки)
     const addProductChecklist = document.getElementById('add-product-checklist'); 
     const addContactList = document.getElementById('add-contact-list'); 
     const addAddressList = document.getElementById('add-address-list'); 
@@ -66,7 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const editAvatarPreview = document.getElementById('edit-avatar-preview');
     const editCurrentAvatarUrl = document.getElementById('edit-current-avatar-url');
 
-    // Фильтры
+    // Фильтры на главной
     const filterCity = document.getElementById('filter-city');
     const filterPriceType = document.getElementById('filter-price-type');
     const filterStatus = document.getElementById('filter-status');
@@ -75,62 +77,125 @@ document.addEventListener('DOMContentLoaded', () => {
     const exportBtn = document.getElementById('export-dealers-btn'); 
     const dashboardStats = document.getElementById('dashboard-stats');
 
-    // --- 3. UTILS ---
+    // --- 3. HELPER FUNCTIONS (Определяем ДО использования) ---
+    
     const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
     const safeText = (text) => (text || '').toString().replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const safeAttr = (text) => (text || '').toString().replace(/"/g, '&quot;');
-    const compressImage = (file, maxWidth = 1000, quality = 0.7) => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = event => { const img = new Image(); img.src = event.target.result; img.onload = () => { const elem = document.createElement('canvas'); let width = img.width; let height = img.height; if (width > maxWidth) { height *= maxWidth / width; width = maxWidth; } elem.width = width; elem.height = height; const ctx = elem.getContext('2d'); ctx.drawImage(img, 0, 0, width, height); resolve(elem.toDataURL('image/jpeg', quality)); }; img.onerror = error => reject(error); }; reader.onerror = error => reject(error); });
+    
+    const compressImage = (file, maxWidth = 1000, quality = 0.7) => new Promise((resolve, reject) => { 
+        const reader = new FileReader(); 
+        reader.readAsDataURL(file); 
+        reader.onload = event => { 
+            const img = new Image(); 
+            img.src = event.target.result; 
+            img.onload = () => { 
+                const elem = document.createElement('canvas'); 
+                let width = img.width; let height = img.height; 
+                if (width > maxWidth) { height *= maxWidth / width; width = maxWidth; } 
+                elem.width = width; elem.height = height; 
+                const ctx = elem.getContext('2d'); 
+                ctx.drawImage(img, 0, 0, width, height); 
+                resolve(elem.toDataURL('image/jpeg', quality)); 
+            }; 
+            img.onerror = error => reject(error); 
+        }; 
+        reader.onerror = error => reject(error); 
+    });
 
-    // --- 4. INITIALIZATION (ИСПРАВЛЕНО) ---
-    async function initApp() {
-        // 1. Авторизация
-        try {
-            const authRes = await fetch('/api/auth/me');
-            if (authRes.ok) {
-                const authData = await authRes.json();
-                currentUserRole = authData.role;
-                const badge = document.getElementById('user-role-badge');
-                if(badge) {
-                    const names = { 'admin': 'Админ', 'astana': 'Астана', 'regions': 'Регионы', 'guest': 'Гость' };
-                    badge.textContent = names[currentUserRole] || currentUserRole;
-                }
-                if (currentUserRole === 'guest') { if (openAddModalBtn) openAddModalBtn.style.display = 'none'; }
-            }
-        } catch (e) { console.warn('Auth check failed'); }
+    // --- API FUNCTIONS (Определяем ДО initApp) ---
 
-        // 2. Справочники
-        await fetchProductCatalog();
-        updatePosDatalist(); 
-        try { const compRes = await fetch(API_COMPETITORS_REF_URL); if (compRes.ok) { competitorsRef = await compRes.json(); updateBrandsDatalist(); } } catch(e){}
-        
-        // 3. Главные данные (Разделяем логику)
+    async function fetchProductCatalog() { 
+        if (fullProductCatalog.length > 0) return; 
         try { 
-            const response = await fetch(API_DEALERS_URL); 
-            if (!response.ok) throw new Error(response.statusText); 
-            
-            allDealers = await response.json(); 
-            
-            // Сначала фильтры и дашборд (они редко падают)
-            populateFilters(allDealers); 
-            renderDashboard(); 
-            
-            // Потом список (в отдельном блоке, чтобы поймать ошибку рендера)
-            try {
-                renderDealerList(); 
-            } catch (renderError) {
-                console.error("Render List Error:", renderError);
-                if(dealerGrid) dealerGrid.innerHTML = `<div class="col-12"><div class="alert alert-danger text-center">Ошибка отрисовки списка: ${renderError.message}</div></div>`;
-            }
-
-        } catch (error) { 
-            console.error("Fetch Error:", error);
-            if(dealerGrid) dealerGrid.innerHTML = `<div class="col-12"><div class="alert alert-danger text-center">Ошибка соединения с сервером.</div></div>`; 
-        }
-        
-        const pendingId = localStorage.getItem('pendingEditDealerId'); if (pendingId) { localStorage.removeItem('pendingEditDealerId'); openEditModal(pendingId); }
+            const response = await fetch(API_PRODUCTS_URL); 
+            if (!response.ok) throw new Error(`Ошибка: ${response.status}`); 
+            fullProductCatalog = await response.json(); 
+            fullProductCatalog.sort((a, b) => a.sku.localeCompare(b.sku, 'ru', { numeric: true })); 
+        } catch (error) { console.warn("Каталог не загружен", error); } 
     }
 
-    // --- 5. RENDER DASHBOARD (ИСПРАВЛЕН ГРАФИК) ---
+    function updateBrandsDatalist() { if (!brandsDatalist) return; let html = ''; competitorsRef.forEach(ref => { html += `<option value="${ref.name}">`; }); brandsDatalist.innerHTML = html; }
+    function updatePosDatalist() { if (!posDatalist) return; let html = ''; posMaterialsList.forEach(s => { html += `<option value="${s}">`; }); posDatalist.innerHTML = html; }
+
+    function populateFilters(dealers) {
+        if(!filterCity || !filterPriceType) return;
+        const cities = [...new Set(dealers.map(d => d.city).filter(Boolean))].sort();
+        const types = [...new Set(dealers.map(d => d.price_type).filter(Boolean))].sort();
+        
+        const sc = filterCity.value; const st = filterPriceType.value;
+        filterCity.innerHTML = '<option value="">Город</option>'; 
+        filterPriceType.innerHTML = '<option value="">Тип цен</option>';
+        cities.forEach(c => filterCity.add(new Option(c, c))); 
+        types.forEach(t => filterPriceType.add(new Option(t, t)));
+        filterCity.value = sc; filterPriceType.value = st;
+    }
+
+    async function completeTask(btn, dealerId, visitIndex) { 
+        try { 
+            btn.disabled = true; 
+            const res = await fetch(`${API_DEALERS_URL}/${dealerId}`); 
+            if(!res.ok) throw new Error('Err'); 
+            const dealer = await res.json(); 
+            if (dealer.visits && dealer.visits[visitIndex]) { dealer.visits[visitIndex].isCompleted = true; } 
+            await fetch(`${API_DEALERS_URL}/${dealerId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visits: dealer.visits }) }); 
+            initApp(); 
+        } catch (e) { alert("Ошибка"); btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg"></i>'; } 
+    }
+
+    // --- HTML GENERATORS ---
+    function createCompetitorEntryHTML(c={}) { 
+        let brandOpts = `<option value="">-- Бренд --</option>`; competitorsRef.forEach(ref => { const sel = ref.name === c.brand ? 'selected' : ''; brandOpts += `<option value="${ref.name}" ${sel}>${ref.name}</option>`; });
+        let collOpts = `<option value="">-- Коллекция --</option>`;
+        if (c.brand) { const ref = competitorsRef.find(r => r.name === c.brand); if (ref && ref.collections) { const sortedCols = [...ref.collections].sort((a, b) => { const typeA = (typeof a === 'object') ? a.type : 'std'; const typeB = (typeof b === 'object') ? b.type : 'std'; if (typeA === 'std' && typeB !== 'std') return 1; if (typeA !== 'std' && typeB === 'std') return -1; return 0; }); sortedCols.forEach(col => { const colName = (typeof col === 'string') ? col : col.name; const colType = (typeof col === 'object') ? col.type : 'std'; let label = ''; if(colType.includes('eng')) label = ' (Елка)'; else if(colType.includes('french')) label = ' (Фр. Елка)'; else if(colType.includes('art')) label = ' (Арт)'; const sel = colName === c.collection ? 'selected' : ''; collOpts += `<option value="${colName}" ${sel}>${colName}${label}</option>`; }); } }
+        return `<div class="competitor-entry"><select class="form-select competitor-brand" onchange="updateCollections(this)">${brandOpts}</select><select class="form-select competitor-collection">${collOpts}</select><input type="text" class="form-control competitor-price-opt" placeholder="ОПТ" value="${c.price_opt||''}"><input type="text" class="form-control competitor-price-retail" placeholder="Розн" value="${c.price_retail||''}"><button type="button" class="btn-remove-entry" onclick="this.closest('.competitor-entry').remove()" title="Удалить"><i class="bi bi-x-lg"></i></button></div>`; 
+    }
+    window.updateCollections = function(select) { const brandName = select.value; const row = select.closest('.competitor-entry'); const collSelect = row.querySelector('.competitor-collection'); let html = `<option value="">-- Коллекция --</option>`; const ref = competitorsRef.find(r => r.name === brandName); if (ref && ref.collections) { const sortedCols = [...ref.collections].sort((a, b) => { const typeA = (typeof a === 'object') ? a.type : 'std'; const typeB = (typeof b === 'object') ? b.type : 'std'; if (typeA === 'std' && typeB !== 'std') return 1; if (typeA !== 'std' && typeB === 'std') return -1; return 0; }); html += sortedCols.map(col => { const colName = (typeof col === 'string') ? col : col.name; const colType = (typeof col === 'object') ? col.type : 'std'; let label = ''; if(colType.includes('eng')) label = ' (Елка)'; else if(colType.includes('french')) label = ' (Фр. Елка)'; else if(colType.includes('art')) label = ' (Арт)'; return `<option value="${colName}">${colName}${label}</option>`; }).join(''); } collSelect.innerHTML = html; };
+    function createPosEntryHTML(p={}) { return `<div class="pos-entry"><input type="text" class="form-control pos-name" list="pos-materials-datalist" placeholder="Название стенда" value="${safeAttr(p.name||'')}" autocomplete="off"><input type="number" class="form-control pos-quantity" value="${p.quantity||1}" min="1" placeholder="Шт"><button type="button" class="btn-remove-entry" onclick="this.closest('.pos-entry').remove()" title="Удалить"><i class="bi bi-x-lg"></i></button></div>`; }
+    function createContactEntryHTML(c={}) { return `<div class="contact-entry"><input type="text" class="form-control contact-name" placeholder="Имя" value="${c.name||''}"><input type="text" class="form-control contact-position" placeholder="Должность" value="${c.position||''}"><input type="text" class="form-control contact-info" placeholder="Телефон" value="${c.contactInfo||''}"><button type="button" class="btn-remove-entry" onclick="this.closest('.contact-entry').remove()"><i class="bi bi-x-lg"></i></button></div>`; }
+    function createAddressEntryHTML(a={}) { return `<div class="address-entry"><input type="text" class="form-control address-description" placeholder="Описание" value="${a.description||''}"><input type="text" class="form-control address-city" placeholder="Город" value="${a.city||''}"><input type="text" class="form-control address-address" placeholder="Адрес" value="${a.address||''}"><button type="button" class="btn-remove-entry" onclick="this.closest('.address-entry').remove()"><i class="bi bi-x-lg"></i></button></div>`; }
+    function createVisitEntryHTML(v={}) { return `<div class="visit-entry"><input type="date" class="form-control visit-date" value="${v.date||''}"><input type="text" class="form-control visit-comment w-50" placeholder="Результат..." value="${v.comment||''}"><button type="button" class="btn-remove-entry" onclick="this.closest('.visit-entry').remove()"><i class="bi bi-x-lg"></i></button></div>`; }
+    function renderPhotoPreviews(container, photosArray) { if(container) container.innerHTML = photosArray.map((p, index) => `<div class="photo-preview-item"><img src="${p.photo_url}"><button type="button" class="btn-remove-photo" data-index="${index}"><i class="bi bi-x"></i></button></div>`).join(''); }
+
+    // --- RENDER LIST ---
+    function renderDealerList() {
+        if (!dealerGrid) return;
+        const city = filterCity ? filterCity.value : '';
+        const type = filterPriceType ? filterPriceType.value : '';
+        const status = filterStatus ? filterStatus.value : '';
+        const responsible = filterResponsible ? filterResponsible.value : '';
+        const search = searchBar ? searchBar.value.toLowerCase() : '';
+
+        const filtered = allDealers.filter(d => {
+            let statusMatch = false; const s = d.status || 'standard';
+            if (status) statusMatch = s === status; else statusMatch = s !== 'potential';
+            return (!city || d.city === city) && (!type || d.price_type === type) && (!responsible || d.responsible === responsible) && statusMatch && (!search || ((d.name||'').toLowerCase().includes(search) || (d.dealer_id||'').toLowerCase().includes(search)));
+        });
+
+        filtered.sort((a, b) => {
+            let valA = (a[currentSort.column] || '').toString(); let valB = (b[currentSort.column] || '').toString();
+            let res = currentSort.column === 'dealer_id' ? valA.localeCompare(valB, undefined, {numeric:true}) : valA.toLowerCase().localeCompare(valB.toLowerCase(), 'ru');
+            return currentSort.direction === 'asc' ? res : -res;
+        });
+
+        if (filtered.length === 0) {
+            dealerGrid.innerHTML = ` <div class="empty-state"><i class="bi bi-search empty-state-icon"></i><h5 class="text-muted">Ничего не найдено</h5><p class="text-secondary small mb-3">Попробуйте изменить фильтры</p><button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('search-bar').value=''; document.getElementById('filter-city').value=''; document.getElementById('filter-status').value=''; renderDealerList()">Сбросить фильтры</button></div>`;
+            return;
+        }
+
+        const statusConfig = { 'active': { label: 'Активный', class: 'sp-active' }, 'standard': { label: 'Стандарт', class: 'sp-standard' }, 'problem': { label: 'Проблемный', class: 'sp-problem' }, 'potential': { label: 'Потенциальный', class: 'sp-potential' }, 'archive': { label: 'Архив', class: 'sp-archive' } };
+
+        dealerGrid.innerHTML = filtered.map(d => {
+            const st = statusConfig[d.status] || statusConfig['standard'];
+            let phoneBtn = ''; let waBtn = ''; if (d.contacts && d.contacts.length > 0) { const phone = d.contacts.find(c => c.contactInfo)?.contactInfo || ''; const cleanPhone = phone.replace(/[^0-9]/g, ''); if (cleanPhone.length >= 10) { phoneBtn = `<a href="tel:+${cleanPhone}" class="btn-circle btn-circle-call" onclick="event.stopPropagation()" title="Позвонить"><i class="bi bi-telephone-fill"></i></a>`; waBtn = `<a href="https://wa.me/${cleanPhone}" target="_blank" class="btn-circle btn-circle-wa" onclick="event.stopPropagation()" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>`; } }
+            let mapBtn = ''; if (d.latitude && d.longitude) mapBtn = `<a href="https://yandex.kz/maps/?pt=${d.longitude},${d.latitude}&z=17&l=map" target="_blank" class="btn-circle" onclick="event.stopPropagation()" title="Маршрут"><i class="bi bi-geo-alt-fill"></i></a>`;
+            const avatarHtml = d.photo_url ? `<img src="${d.photo_url}" alt="${d.name}">` : `<i class="bi bi-shop"></i>`;
+            const editBtn = (currentUserRole !== 'guest') ? `<button class="btn-circle" onclick="event.stopPropagation(); openEditModal('${d.id}')" title="Редактировать"><i class="bi bi-pencil"></i></button>` : '';
+            return `<div class="dealer-item" onclick="window.open('dealer.html?id=${d.id}', '_blank')"><div class="dealer-avatar-box">${avatarHtml}</div><div class="dealer-content"><div class="d-flex align-items-center gap-2 mb-1"><a href="dealer.html?id=${d.id}" class="dealer-name" target="_blank">${safeText(d.name)}</a><span class="status-pill ${st.class}">${st.label}</span></div><div class="dealer-meta"><span><i class="bi bi-hash"></i>${safeText(d.dealer_id)}</span><span><i class="bi bi-geo-alt"></i>${safeText(d.city)}</span>${d.price_type ? `<span><i class="bi bi-tag"></i>${safeText(d.price_type)}</span>` : ''}</div></div><div class="dealer-actions">${waBtn} ${phoneBtn} ${mapBtn}<button class="btn-circle" onclick="event.stopPropagation(); showQuickVisit('${d.id}')" title="Быстрый визит"><i class="bi bi-calendar-check"></i></button>${editBtn}</div></div>`;
+        }).join('');
+    }
+
+    // --- RENDER DASHBOARD ---
     function renderDashboard() {
         if (!dashboardStats) return; 
         if (!allDealers || allDealers.length === 0) { dashboardStats.innerHTML = ''; return; }
@@ -149,45 +214,17 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         const totalAll = allDealers.length; 
-        // ИСПРАВЛЕНО: Теперь считаем процент для потенциальных честно
         const pctActive = totalAll > 0 ? (countActive / totalAll) * 100 : 0;
         const pctStandard = totalAll > 0 ? (countStandard / totalAll) * 100 : 0;
         const pctProblem = totalAll > 0 ? (countProblem / totalAll) * 100 : 0;
         const pctPotential = totalAll > 0 ? (countPotential / totalAll) * 100 : 0;
 
         dashboardStats.innerHTML = `
-            <div class="col-6">
-                <div class="stat-card-modern">
-                    <div class="stat-icon-box bg-primary-subtle text-primary"><i class="bi bi-shop"></i></div>
-                    <div class="stat-info"><h3>${totalDealers}</h3><p>Дилеров</p></div>
-                </div>
-            </div>
-            <div class="col-6">
-                <div class="stat-card-modern">
-                    <div class="stat-icon-box ${noAvatarCount > 0 ? 'bg-danger-subtle text-danger' : 'bg-success-subtle text-success'}"><i class="bi bi-camera-fill"></i></div>
-                    <div class="stat-info"><h3 class="${noAvatarCount > 0 ? 'text-danger' : ''}">${noAvatarCount}</h3><p>Без фото</p></div>
-                </div>
-            </div>
-            <div class="col-12 mt-2">
-                <div class="stat-card-modern d-block p-3">
-                    <h6 class="text-muted fw-bold small mb-3 text-uppercase" style="letter-spacing:1px;">Структура базы</h6>
-                    <div class="progress mb-3" style="height: 12px; border-radius: 6px;">
-                        <div class="progress-bar bg-success" role="progressbar" style="width: ${pctActive}%"></div>
-                        <div class="progress-bar bg-warning" role="progressbar" style="width: ${pctStandard}%"></div>
-                        <div class="progress-bar bg-danger" role="progressbar" style="width: ${pctProblem}%"></div>
-                        <div class="progress-bar bg-primary" role="progressbar" style="width: ${pctPotential}%"></div>
-                    </div>
-                    <div class="d-flex justify-content-between text-center small">
-                        <div><span class="badge rounded-pill text-bg-success mb-1">${countActive}</span><br><span class="text-muted" style="font-size:0.75rem">VIP</span></div>
-                        <div><span class="badge rounded-pill text-bg-warning mb-1">${countStandard}</span><br><span class="text-muted" style="font-size:0.75rem">Станд.</span></div>
-                        <div><span class="badge rounded-pill text-bg-danger mb-1">${countProblem}</span><br><span class="text-muted" style="font-size:0.75rem">Пробл.</span></div>
-                        <div><span class="badge rounded-pill text-bg-primary mb-1">${countPotential}</span><br><span class="text-muted" style="font-size:0.75rem">Потенц.</span></div>
-                    </div>
-                </div>
-            </div>
+            <div class="col-6"><div class="stat-card-modern"><div class="stat-icon-box bg-primary-subtle text-primary"><i class="bi bi-shop"></i></div><div class="stat-info"><h3>${totalDealers}</h3><p>Дилеров</p></div></div></div>
+            <div class="col-6"><div class="stat-card-modern"><div class="stat-icon-box ${noAvatarCount > 0 ? 'bg-danger-subtle text-danger' : 'bg-success-subtle text-success'}"><i class="bi bi-camera-fill"></i></div><div class="stat-info"><h3 class="${noAvatarCount > 0 ? 'text-danger' : ''}">${noAvatarCount}</h3><p>Без фото</p></div></div></div>
+            <div class="col-12 mt-2"><div class="stat-card-modern d-block p-3"><h6 class="text-muted fw-bold small mb-3 text-uppercase" style="letter-spacing:1px;">Структура базы</h6><div class="progress mb-3" style="height: 12px; border-radius: 6px;"><div class="progress-bar bg-success" role="progressbar" style="width: ${pctActive}%"></div><div class="progress-bar bg-warning" role="progressbar" style="width: ${pctStandard}%"></div><div class="progress-bar bg-danger" role="progressbar" style="width: ${pctProblem}%"></div><div class="progress-bar bg-primary" role="progressbar" style="width: ${pctPotential}%"></div></div><div class="d-flex justify-content-between text-center small"><div><span class="badge rounded-pill text-bg-success mb-1">${countActive}</span><br><span class="text-muted" style="font-size:0.75rem">VIP</span></div><div><span class="badge rounded-pill text-bg-warning mb-1">${countStandard}</span><br><span class="text-muted" style="font-size:0.75rem">Станд.</span></div><div><span class="badge rounded-pill text-bg-danger mb-1">${countProblem}</span><br><span class="text-muted" style="font-size:0.75rem">Пробл.</span></div><div><span class="badge rounded-pill text-bg-primary mb-1">${countPotential}</span><br><span class="text-muted" style="font-size:0.75rem">Потенц.</span></div></div></div></div>
         `;
 
-        // Расчет задач (Оставляем как было, код рабочий)
         const today = new Date(); today.setHours(0,0,0,0);
         const coolingLimit = new Date(today.getTime() - (15 * 24 * 60 * 60 * 1000));
         
@@ -238,113 +275,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return `<div class="task-item-modern align-items-start"><div class="task-content"><a href="dealer.html?id=${t.dealerId}" target="_blank" class="task-title text-truncate d-block" style="max-width: 200px;">${safeText(t.dealerName)}</a>${badgeHtml}<div class="mt-1">${metaHtml}</div></div><div class="mt-1">${btnHtml}</div></div>`; 
         }).join(''); 
     }
-    
-    // --- 6. RENDER LIST (SAFE) ---
-    function renderDealerList() {
-        if (!dealerGrid) return;
 
-        const city = filterCity ? filterCity.value : '';
-        const type = filterPriceType ? filterPriceType.value : '';
-        const status = filterStatus ? filterStatus.value : '';
-        const responsible = filterResponsible ? filterResponsible.value : '';
-        const search = searchBar ? searchBar.value.toLowerCase() : '';
-
-        const filtered = allDealers.filter(d => {
-            let statusMatch = false; 
-            const s = d.status || 'standard';
-            if (status) statusMatch = s === status; 
-            else statusMatch = s !== 'potential'; // Скрываем потенциальных, если статус не выбран
-            
-            return (!city || d.city === city) && 
-                   (!type || d.price_type === type) && 
-                   (!responsible || d.responsible === responsible) && 
-                   statusMatch && 
-                   (!search || ((d.name||'').toLowerCase().includes(search) || (d.dealer_id||'').toLowerCase().includes(search)));
-        });
-
-        // Safe Sort
-        filtered.sort((a, b) => {
-            let valA = (a[currentSort.column] || '').toString(); 
-            let valB = (b[currentSort.column] || '').toString();
-            let res = currentSort.column === 'dealer_id' 
-                ? valA.localeCompare(valB, undefined, {numeric:true}) 
-                : valA.toLowerCase().localeCompare(valB.toLowerCase(), 'ru');
-            return currentSort.direction === 'asc' ? res : -res;
-        });
-
-        if (filtered.length === 0) {
-            dealerGrid.innerHTML = ` <div class="empty-state"><i class="bi bi-search empty-state-icon"></i><h5 class="text-muted">Ничего не найдено</h5><p class="text-secondary small mb-3">Попробуйте изменить фильтры</p><button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('search-bar').value=''; document.getElementById('filter-city').value=''; document.getElementById('filter-status').value=''; renderDealerList()">Сбросить фильтры</button></div>`;
-            return;
-        }
-
-        const statusConfig = { 'active': { label: 'Активный', class: 'sp-active' }, 'standard': { label: 'Стандарт', class: 'sp-standard' }, 'problem': { label: 'Проблемный', class: 'sp-problem' }, 'potential': { label: 'Потенциальный', class: 'sp-potential' }, 'archive': { label: 'Архив', class: 'sp-archive' } };
-
-        dealerGrid.innerHTML = filtered.map(d => {
-            const st = statusConfig[d.status] || statusConfig['standard'];
-            
-            let phoneBtn = ''; let waBtn = '';
-            if (d.contacts && Array.isArray(d.contacts) && d.contacts.length > 0) {
-                const contact = d.contacts.find(c => c.contactInfo) || d.contacts[0];
-                const phone = contact.contactInfo || '';
-                const cleanPhone = phone.replace(/[^0-9]/g, '');
-                if (cleanPhone.length >= 10) {
-                    phoneBtn = `<a href="tel:+${cleanPhone}" class="btn-circle btn-circle-call" onclick="event.stopPropagation()" title="Позвонить"><i class="bi bi-telephone-fill"></i></a>`;
-                    waBtn = `<a href="https://wa.me/${cleanPhone}" target="_blank" class="btn-circle btn-circle-wa" onclick="event.stopPropagation()" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>`;
-                }
-            }
-
-            let mapBtn = '';
-            if (d.latitude && d.longitude) {
-                mapBtn = `<a href="https://yandex.kz/maps/?pt=${d.longitude},${d.latitude}&z=17&l=map" target="_blank" class="btn-circle" onclick="event.stopPropagation()" title="Маршрут"><i class="bi bi-geo-alt-fill"></i></a>`;
-            }
-
-            const avatarHtml = d.photo_url ? `<img src="${d.photo_url}" alt="${d.name}">` : `<i class="bi bi-shop"></i>`;
-            const editBtn = (currentUserRole !== 'guest') ? `<button class="btn-circle" onclick="event.stopPropagation(); openEditModal('${d.id}')" title="Редактировать"><i class="bi bi-pencil"></i></button>` : '';
-
-            return `
-            <div class="dealer-item" onclick="window.open('dealer.html?id=${d.id}', '_blank')">
-                <div class="dealer-avatar-box">${avatarHtml}</div>
-                <div class="dealer-content">
-                    <div class="d-flex align-items-center gap-2 mb-1">
-                        <a href="dealer.html?id=${d.id}" class="dealer-name" target="_blank">${safeText(d.name)}</a>
-                        <span class="status-pill ${st.class}">${st.label}</span>
-                    </div>
-                    <div class="dealer-meta">
-                        <span><i class="bi bi-hash"></i>${safeText(d.dealer_id)}</span>
-                        <span><i class="bi bi-geo-alt"></i>${safeText(d.city)}</span>
-                        ${d.price_type ? `<span><i class="bi bi-tag"></i>${safeText(d.price_type)}</span>` : ''}
-                    </div>
-                </div>
-                <div class="dealer-actions">
-                    ${waBtn} ${phoneBtn} ${mapBtn}
-                    <button class="btn-circle" onclick="event.stopPropagation(); showQuickVisit('${d.id}')" title="Быстрый визит"><i class="bi bi-calendar-check"></i></button>
-                    ${editBtn}
-                </div>
-            </div>`;
-        }).join('');
-    }
-
-    function populateFilters(dealers) {
-        if(!filterCity || !filterPriceType) return;
-        const cities = [...new Set(dealers.map(d => d.city).filter(Boolean))].sort();
-        const types = [...new Set(dealers.map(d => d.price_type).filter(Boolean))].sort();
-        
-        // Save current selection
-        const sc = filterCity.value; 
-        const st = filterPriceType.value;
-        
-        filterCity.innerHTML = '<option value="">-- Все города --</option>'; 
-        filterPriceType.innerHTML = '<option value="">-- Все типы --</option>';
-        
-        cities.forEach(c => filterCity.add(new Option(c, c))); 
-        types.forEach(t => filterPriceType.add(new Option(t, t)));
-        
-        // Restore
-        filterCity.value = sc; 
-        filterPriceType.value = st;
-    }
-
-    // --- 7. BUTTON HANDLERS ---
+    // --- BUTTONS ---
     const setupListBtn = (id, list, genFunc) => { const btn = document.getElementById(id); if(btn) btn.onclick = () => list.insertAdjacentHTML('beforeend', genFunc()); };
     setupListBtn('add-contact-btn-add-modal', addContactList, createContactEntryHTML); setupListBtn('add-address-btn-add-modal', addAddressList, createAddressEntryHTML); setupListBtn('add-pos-btn-add-modal', addPosList, createPosEntryHTML); setupListBtn('add-visits-btn-add-modal', addVisitsList, createVisitEntryHTML); setupListBtn('add-competitor-btn-add-modal', addCompetitorList, createCompetitorEntryHTML);
     setupListBtn('add-contact-btn-edit-modal', editContactList, createContactEntryHTML); setupListBtn('add-address-btn-edit-modal', editAddressList, createAddressEntryHTML); setupListBtn('add-pos-btn-edit-modal', editPosList, createPosEntryHTML); setupListBtn('add-visits-btn-edit-modal', editVisitsList, createVisitEntryHTML); setupListBtn('add-competitor-btn-edit-modal', editCompetitorList, createCompetitorEntryHTML);
@@ -366,49 +298,28 @@ document.addEventListener('DOMContentLoaded', () => {
     if(qvForm) qvForm.addEventListener('submit', async (e) => { e.preventDefault(); if (isSaving) return; isSaving = true; const id = document.getElementById('qv_dealer_id').value; const comment = document.getElementById('qv_comment').value; const btn = qvForm.querySelector('button'); if(!id || !comment) { isSaving = false; return; } try { btn.disabled = true; const getRes = await fetch(`${API_DEALERS_URL}/${id}`); const dealer = await getRes.json(); const newVisit = { date: new Date().toISOString().slice(0,10), comment: comment, isCompleted: true }; const visits = [...(dealer.visits || []), newVisit]; await fetch(`${API_DEALERS_URL}/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ visits }) }); qvModal.hide(); alert("Визит добавлен!"); } catch(e) { alert("Ошибка"); } finally { isSaving = false; btn.disabled = false; } });
 
     if(exportBtn) { exportBtn.onclick = async () => { if (!allDealers.length) return alert("Пусто. Нечего экспортировать."); exportBtn.disabled = true; exportBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Загрузка...'; const clean = (text) => `"${String(text || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`; let csv = "\uFEFFID;Название;Статус;Ответственный;Город;Адрес;Тип цен;Организация;Доставка;Сайт;Инстаграм;Контакты;Доп. Адреса;Бонусы\n"; try { const city = filterCity.value; const type = filterPriceType.value; const status = filterStatus.value; const responsible = filterResponsible.value; const search = searchBar.value.toLowerCase(); const filteredForExport = allDealers.filter(d => { let statusMatch = false; const s = d.status || 'standard'; if (status) statusMatch = s === status; else statusMatch = s !== 'potential'; return (!city||d.city===city) && (!type||d.price_type===type) && (!responsible||d.responsible===responsible) && statusMatch && (!search || ((d.name||'').toLowerCase().includes(search)||(d.dealer_id||'').toLowerCase().includes(search))); }); for (const dealer of filteredForExport) { const contactsName = (dealer.contacts || []).map(c => { let info = c.name || ''; if (c.position) info += ` (${c.position})`; if (c.contactInfo) info += ` - ${c.contactInfo}`; return info; }).join('; '); const addresses = (dealer.additional_addresses || []).map(a => `${a.description || ''}: ${a.city || ''}, ${a.address || ''}`).join('; '); const row = [ clean(dealer.dealer_id), clean(dealer.name), clean(dealer.status), clean(dealer.responsible), clean(dealer.city), clean(dealer.address), clean(dealer.price_type), clean(dealer.organization), clean(dealer.delivery), clean(dealer.website), clean(dealer.instagram), clean(contactsName), clean(addresses), clean(dealer.bonuses) ]; csv += row.join(";") + "\r\n"; } const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'})); a.download = 'dealers_export.csv'; a.click(); } catch (e) { alert("Ошибка: " + e.message); } finally { exportBtn.disabled = false; exportBtn.innerHTML = '<i class="bi bi-file-earmark-excel me-2"></i>База'; } }; }
+    
     if(document.getElementById('export-competitors-prices-btn')) { document.getElementById('export-competitors-prices-btn').onclick = async () => { if (!allDealers.length) return alert("Пусто"); const typeMap = { 'std': 'Стандарт', 'eng': 'Англ. Елка', 'fr': 'Фр. Елка', 'art': 'Художественный', 'art_eng': 'Худ. Английская', 'art_fr': 'Худ. Французская', 'mix': 'Худ. Микс' }; let csv = "\uFEFFДилер;Город;Бренд;Коллекция;Тип;Цена ОПТ;Цена Розница\n"; allDealers.forEach(d => { if(d.competitors) { d.competitors.forEach(c => { let typeLabel = 'Стандарт'; const refBrand = competitorsRef.find(r => r.name === c.brand); if (refBrand && refBrand.collections) { const refCol = refBrand.collections.find(col => (typeof col === 'string' ? col : col.name) === c.collection); if (refCol) { const typeCode = (typeof refCol === 'string') ? 'std' : refCol.type; typeLabel = typeMap[typeCode] || 'Стандарт'; } } csv += `"${d.name}";"${d.city}";"${c.brand||''}";"${c.collection||''}";"${typeLabel}";"${c.price_opt||''}";"${c.price_retail||''}"\n`; }); } }); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'})); a.download = 'competitor_prices.csv'; a.click(); }; }
     
-    // Listeners
-    if(filterCity) filterCity.onchange = renderDealerList; 
-    if(filterPriceType) filterPriceType.onchange = renderDealerList; 
-    if(filterStatus) filterStatus.onchange = renderDealerList; 
-    if(filterResponsible) filterResponsible.onchange = renderDealerList; 
-    if(searchBar) searchBar.oninput = renderDealerList;
+    if(filterCity) filterCity.onchange = renderDealerList; if(filterPriceType) filterPriceType.onchange = renderDealerList; if(filterStatus) filterStatus.onchange = renderDealerList; if(filterResponsible) filterResponsible.onchange = renderDealerList; if(searchBar) searchBar.oninput = renderDealerList;
+    document.querySelectorAll('.sort-btn').forEach(btn => { btn.onclick = (e) => { const sortKey = e.currentTarget.dataset.sort; if(currentSort.column === sortKey) currentSort.direction = (currentSort.direction === 'asc' ? 'desc' : 'asc'); else { currentSort.column = sortKey; currentSort.direction = 'asc'; } renderDealerList(); }; });
     
-    document.querySelectorAll('.sort-btn').forEach(btn => { 
-        btn.onclick = (e) => { 
-            const sortKey = e.currentTarget.dataset.sort; 
-            if(currentSort.column === sortKey) currentSort.direction = (currentSort.direction === 'asc' ? 'desc' : 'asc'); 
-            else { currentSort.column = sortKey; currentSort.direction = 'asc'; } 
-            renderDealerList(); 
-        }; 
-    });
-    
+    // --- 9. DIRECT CLICK (IMPORTANT) ---
     if(document.body) { 
         document.body.addEventListener('click', (e) => { 
             const taskBtn = e.target.closest('.btn-complete-task'); 
-            if (taskBtn) { taskBtn.disabled = true; taskBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; completeTask(taskBtn, taskBtn.dataset.id, taskBtn.dataset.index); } 
+            if (taskBtn) { 
+                taskBtn.disabled = true; 
+                taskBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; 
+                completeTask(taskBtn, taskBtn.dataset.id, taskBtn.dataset.index); 
+            } 
         }); 
     }
 
-    // HTML GENERATORS
-    function createCompetitorEntryHTML(c={}) { 
-        let brandOpts = `<option value="">-- Бренд --</option>`; competitorsRef.forEach(ref => { const sel = ref.name === c.brand ? 'selected' : ''; brandOpts += `<option value="${ref.name}" ${sel}>${ref.name}</option>`; });
-        let collOpts = `<option value="">-- Коллекция --</option>`;
-        if (c.brand) { const ref = competitorsRef.find(r => r.name === c.brand); if (ref && ref.collections) { const sortedCols = [...ref.collections].sort((a, b) => { const typeA = (typeof a === 'object') ? a.type : 'std'; const typeB = (typeof b === 'object') ? b.type : 'std'; if (typeA === 'std' && typeB !== 'std') return 1; if (typeA !== 'std' && typeB === 'std') return -1; return 0; }); sortedCols.forEach(col => { const colName = (typeof col === 'string') ? col : col.name; const colType = (typeof col === 'object') ? col.type : 'std'; let label = ''; if(colType.includes('eng')) label = ' (Елка)'; else if(colType.includes('french')) label = ' (Фр. Елка)'; else if(colType.includes('art')) label = ' (Арт)'; const sel = colName === c.collection ? 'selected' : ''; collOpts += `<option value="${colName}" ${sel}>${colName}${label}</option>`; }); } }
-        return `<div class="competitor-entry"><select class="form-select competitor-brand" onchange="updateCollections(this)">${brandOpts}</select><select class="form-select competitor-collection">${collOpts}</select><input type="text" class="form-control competitor-price-opt" placeholder="ОПТ" value="${c.price_opt||''}"><input type="text" class="form-control competitor-price-retail" placeholder="Розн" value="${c.price_retail||''}"><button type="button" class="btn-remove-entry" onclick="this.closest('.competitor-entry').remove()" title="Удалить"><i class="bi bi-x-lg"></i></button></div>`; 
-    }
-    window.updateCollections = function(select) { const brandName = select.value; const row = select.closest('.competitor-entry'); const collSelect = row.querySelector('.competitor-collection'); let html = `<option value="">-- Коллекция --</option>`; const ref = competitorsRef.find(r => r.name === brandName); if (ref && ref.collections) { const sortedCols = [...ref.collections].sort((a, b) => { const typeA = (typeof a === 'object') ? a.type : 'std'; const typeB = (typeof b === 'object') ? b.type : 'std'; if (typeA === 'std' && typeB !== 'std') return 1; if (typeA !== 'std' && typeB === 'std') return -1; return 0; }); html += sortedCols.map(col => { const colName = (typeof col === 'string') ? col : col.name; const colType = (typeof col === 'object') ? col.type : 'std'; let label = ''; if(colType.includes('eng')) label = ' (Елка)'; else if(colType.includes('french')) label = ' (Фр. Елка)'; else if(colType.includes('art')) label = ' (Арт)'; return `<option value="${colName}">${colName}${label}</option>`; }).join(''); } collSelect.innerHTML = html; };
-    function createPosEntryHTML(p={}) { return `<div class="pos-entry"><input type="text" class="form-control pos-name" list="pos-materials-datalist" placeholder="Название стенда" value="${safeAttr(p.name||'')}" autocomplete="off"><input type="number" class="form-control pos-quantity" value="${p.quantity||1}" min="1" placeholder="Шт"><button type="button" class="btn-remove-entry" onclick="this.closest('.pos-entry').remove()" title="Удалить"><i class="bi bi-x-lg"></i></button></div>`; }
-    function createContactEntryHTML(c={}) { return `<div class="contact-entry"><input type="text" class="form-control contact-name" placeholder="Имя" value="${c.name||''}"><input type="text" class="form-control contact-position" placeholder="Должность" value="${c.position||''}"><input type="text" class="form-control contact-info" placeholder="Телефон" value="${c.contactInfo||''}"><button type="button" class="btn-remove-entry" onclick="this.closest('.contact-entry').remove()"><i class="bi bi-x-lg"></i></button></div>`; }
-    function createAddressEntryHTML(a={}) { return `<div class="address-entry"><input type="text" class="form-control address-description" placeholder="Описание" value="${a.description||''}"><input type="text" class="form-control address-city" placeholder="Город" value="${a.city||''}"><input type="text" class="form-control address-address" placeholder="Адрес" value="${a.address||''}"><button type="button" class="btn-remove-entry" onclick="this.closest('.address-entry').remove()"><i class="bi bi-x-lg"></i></button></div>`; }
-    function createVisitEntryHTML(v={}) { return `<div class="visit-entry"><input type="date" class="form-control visit-date" value="${v.date||''}"><input type="text" class="form-control visit-comment w-50" placeholder="Результат..." value="${v.comment||''}"><button type="button" class="btn-remove-entry" onclick="this.closest('.visit-entry').remove()"><i class="bi bi-x-lg"></i></button></div>`; }
-    function renderPhotoPreviews(container, photosArray) { if(container) container.innerHTML = photosArray.map((p, index) => `<div class="photo-preview-item"><img src="${p.photo_url}"><button type="button" class="btn-remove-photo" data-index="${index}"><i class="bi bi-x"></i></button></div>`).join(''); }
-
-    // --- RUN ---
+    // --- 10. OPEN EDIT (HOISTED COPY) ---
     async function openEditModal(id) { try { const res = await fetch(`${API_DEALERS_URL}/${id}`); if(!res.ok) throw new Error("Ошибка"); const d = await res.json(); const titleEl = document.querySelector('#edit-modal .modal-title'); if(titleEl) titleEl.textContent = `Редактировать: ${d.name}`; document.getElementById('edit_db_id').value=d.id; document.getElementById('edit_dealer_id').value=d.dealer_id; document.getElementById('edit_name').value=d.name; document.getElementById('edit_organization').value=d.organization; document.getElementById('edit_price_type').value=d.price_type; document.getElementById('edit_city').value=d.city; document.getElementById('edit_address').value=d.address; document.getElementById('edit_delivery').value=d.delivery; document.getElementById('edit_website').value=d.website; document.getElementById('edit_instagram').value=d.instagram; if(document.getElementById('edit_latitude')) document.getElementById('edit_latitude').value=d.latitude||''; if(document.getElementById('edit_longitude')) document.getElementById('edit_longitude').value=d.longitude||''; document.getElementById('edit_bonuses').value=d.bonuses; if(document.getElementById('edit_status')) document.getElementById('edit_status').value = d.status || 'standard'; if(document.getElementById('edit_responsible')) document.getElementById('edit_responsible').value = d.responsible || ''; if(editAvatarPreview) { editAvatarPreview.src = d.avatarUrl || ''; editAvatarPreview.style.display = d.avatarUrl ? 'block' : 'none'; } if(editCurrentAvatarUrl) editCurrentAvatarUrl.value = d.avatarUrl || ''; newAvatarBase64 = null; renderList(editContactList, d.contacts, createContactEntryHTML); renderList(editAddressList, d.additional_addresses, createAddressEntryHTML); renderList(editPosList, d.pos_materials, createPosEntryHTML); renderList(editVisitsList, d.visits, createVisitEntryHTML); renderList(editCompetitorList, d.competitors, createCompetitorEntryHTML); renderProductChecklist(editProductChecklist, (d.products||[]).map(p=>p.id)); editPhotosData = d.photos||[]; renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData); const firstTabEl = document.querySelector('#editTabs button[data-bs-target="#tab-main"]'); if(firstTabEl) { const tab = new bootstrap.Tab(firstTabEl); tab.show(); } editModal.show(); } catch(e){ alert("Ошибка загрузки."); console.error(e); } }
     window.openEditModal = openEditModal;
-    window.showQuickVisit = (id) => { document.getElementById('qv_dealer_id').value = id; document.getElementById('qv_comment').value = ''; qvModal.show(); };
 
+    // --- 11. START ---
     initApp();
 });
