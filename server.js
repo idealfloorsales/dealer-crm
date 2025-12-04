@@ -268,3 +268,4 @@ app.delete('/api/knowledge/:id', checkWrite, async (req, res) => { await Knowled
 
 // START
 app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
+
