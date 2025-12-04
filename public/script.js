@@ -166,6 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function completeTask(btn, dealerId, visitIndex) { try { btn.disabled = true; const res = await fetch(`${API_DEALERS_URL}/${dealerId}`); if(!res.ok) throw new Error('Err'); const dealer = await res.json(); if (dealer.visits && dealer.visits[visitIndex]) { dealer.visits[visitIndex].isCompleted = true; } await fetch(`${API_DEALERS_URL}/${dealerId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visits: dealer.visits }) }); initApp(); } catch (e) { alert("Ошибка"); btn.disabled = false; } }
 
   // --- 6. RENDER DASHBOARD (FIXED STATS) ---
+  // --- 6. RENDER DASHBOARD (С НОВЫМ БЛОКОМ СТРУКТУРЫ) ---
     function renderDashboard() {
         if (!dashboardStats) return; 
         
@@ -174,13 +175,32 @@ document.addEventListener('DOMContentLoaded', () => {
             return; 
         }
 
+        // 1. Подсчет цифр
         const activeDealers = allDealers.filter(d => d.status !== 'potential');
-        const totalDealers = activeDealers.length;
+        const totalDealers = activeDealers.length; // Всего реальных
         const noAvatarCount = activeDealers.filter(d => !d.photo_url).length; 
+        
+        // Подсчет для графика (Структура)
+        // Считаем всех, включая потенциальных, чтобы видеть полную воронку
+        let countActive = 0, countStandard = 0, countPotential = 0, countProblem = 0;
+        
+        allDealers.forEach(d => {
+            if (d.status === 'active') countActive++;
+            else if (d.status === 'standard') countStandard++;
+            else if (d.status === 'problem') countProblem++;
+            else if (d.status === 'potential') countPotential++;
+        });
 
-        // 1. Статистика (Компактные горизонтальные карточки)
+        const totalAll = allDealers.length; // Вообще все записи
+        // Проценты для ширины полосок
+        const pctActive = totalAll > 0 ? (countActive / totalAll) * 100 : 0;
+        const pctStandard = totalAll > 0 ? (countStandard / totalAll) * 100 : 0;
+        const pctProblem = totalAll > 0 ? (countProblem / totalAll) * 100 : 0;
+        // Потенциальные занимают остаток
+
+        // 2. Рендер HTML
         dashboardStats.innerHTML = `
-            <div class="col-12 col-sm-6">
+            <div class="col-6">
                 <div class="stat-card-modern">
                     <div class="stat-icon-box bg-primary-subtle text-primary">
                         <i class="bi bi-shop"></i>
@@ -191,7 +211,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
             </div>
-            <div class="col-12 col-sm-6">
+            <div class="col-6">
                 <div class="stat-card-modern">
                     <div class="stat-icon-box ${noAvatarCount > 0 ? 'bg-danger-subtle text-danger' : 'bg-success-subtle text-success'}">
                         <i class="bi bi-camera-fill"></i>
@@ -202,12 +222,30 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
             </div>
+
+            <div class="col-12 mt-2">
+                <div class="stat-card-modern d-block p-3">
+                    <h6 class="text-muted fw-bold small mb-3 text-uppercase" style="letter-spacing:1px;">Структура базы</h6>
+                    
+                    <div class="progress mb-3" style="height: 12px; border-radius: 6px;">
+                        <div class="progress-bar bg-success" role="progressbar" style="width: ${pctActive}%" title="Активные"></div>
+                        <div class="progress-bar bg-warning" role="progressbar" style="width: ${pctStandard}%" title="Стандарт"></div>
+                        <div class="progress-bar bg-danger" role="progressbar" style="width: ${pctProblem}%" title="Проблемные"></div>
+                        <div class="progress-bar bg-primary" role="progressbar" style="width: 100%" title="Потенциальные"></div> </div>
+
+                    <div class="d-flex justify-content-between text-center small">
+                        <div><span class="badge rounded-pill text-bg-success mb-1">${countActive}</span><br><span class="text-muted" style="font-size:0.75rem">VIP</span></div>
+                        <div><span class="badge rounded-pill text-bg-warning mb-1">${countStandard}</span><br><span class="text-muted" style="font-size:0.75rem">Станд.</span></div>
+                        <div><span class="badge rounded-pill text-bg-danger mb-1">${countProblem}</span><br><span class="text-muted" style="font-size:0.75rem">Пробл.</span></div>
+                        <div><span class="badge rounded-pill text-bg-primary mb-1">${countPotential}</span><br><span class="text-muted" style="font-size:0.75rem">Потенц.</span></div>
+                    </div>
+                </div>
+            </div>
         `;
 
-        // 2. Расчет дат
+        // 3. Расчет задач (Остается как было)
         const today = new Date(); today.setHours(0,0,0,0);
-        // 15 дней для остывающих
-        const coolingLimit = new Date(today.getTime() - (15 * 24 * 60 * 60 * 1000));
+        const coolingLimit = new Date(today.getTime() - (15 * 24 * 60 * 60 * 1000)); // 15 дней
         
         const tasksUpcoming = [], tasksProblem = [], tasksCooling = [];
 
@@ -219,39 +257,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (d.visits && Array.isArray(d.visits)) { 
                 d.visits.forEach((v, index) => { 
-                    const vDate = new Date(v.date); 
-                    if (!v.date) return; 
-                    vDate.setHours(0,0,0,0); 
-                    
+                    const vDate = new Date(v.date); if (!v.date) return; vDate.setHours(0,0,0,0); 
                     if (v.isCompleted && (!lastVisitDate || vDate > lastVisitDate)) lastVisitDate = vDate; 
-                    
                     if (!v.isCompleted) { 
-                        const taskData = { 
-                            dealerName: d.name, 
-                            dealerId: d.id, 
-                            date: vDate, 
-                            comment: v.comment || "Без комментария", 
-                            visitIndex: index 
-                        }; 
-                        
-                        if (vDate < today) {
-                            tasksProblem.push({...taskData, type: 'overdue'}); 
-                        } else { 
-                            tasksUpcoming.push({...taskData, isToday: vDate.getTime() === today.getTime()}); 
-                            hasFutureTasks = true; 
-                        } 
+                        const taskData = { dealerName: d.name, dealerId: d.id, date: vDate, comment: v.comment || "Без комментария", visitIndex: index }; 
+                        if (vDate < today) tasksProblem.push({...taskData, type: 'overdue'}); 
+                        else { tasksUpcoming.push({...taskData, isToday: vDate.getTime() === today.getTime()}); hasFutureTasks = true; } 
                     } 
                 }); 
             }
 
-            // Статус Проблемный
             if (d.status === 'problem') { 
                 if (!tasksProblem.some(t => t.dealerId === d.id && t.type === 'overdue')) {
                     tasksProblem.push({ dealerName: d.name, dealerId: d.id, type: 'status', comment: 'Статус: Проблемный' }); 
                 } 
             }
 
-            // Остывающие (15 дней)
             if (!hasFutureTasks && d.status !== 'problem' && !isPotential) { 
                 if (!lastVisitDate) {
                     tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: 999 }); 
@@ -270,21 +291,6 @@ document.addEventListener('DOMContentLoaded', () => {
         renderTaskList(tasksListProblem, tasksProblem, 'problem'); 
         renderTaskList(tasksListCooling, tasksCooling, 'cooling');
     }
-
-    function renderTaskList(container, tasks, type) { 
-        if (!container) return; 
-        if (tasks.length === 0) { const msg = type === 'cooling' ? 'Все посещены недавно' : 'Задач нет'; container.innerHTML = `<div class="text-center py-4 text-muted"><i class="bi bi-check-circle display-6 d-block mb-2 text-success opacity-50"></i><small>${msg}</small></div>`; return; } 
-        container.innerHTML = tasks.map(t => { 
-            let badgeHtml = ''; let metaHtml = '';
-            if (type === 'upcoming') { const dateStr = t.date.toLocaleDateString('ru-RU', {day:'numeric', month:'short'}); badgeHtml = t.isToday ? `<span class="task-badge tb-today mt-1 d-inline-block">Сегодня</span>` : `<span class="task-badge tb-future mt-1 d-inline-block">${dateStr}</span>`; metaHtml = `<span class="text-muted small">${safeText(t.comment)}</span>`; } 
-            else if (type === 'problem') { if (t.type === 'overdue') { const dateStr = t.date.toLocaleDateString('ru-RU'); badgeHtml = `<span class="task-badge tb-overdue mt-1 d-inline-block">Просрок: ${dateStr}</span>`; metaHtml = `<span class="text-danger small fw-bold">${safeText(t.comment)}</span>`; } else { badgeHtml = `<span class="task-badge tb-overdue mt-1 d-inline-block">Проблема</span>`; metaHtml = `<span class="small text-muted">Внимание!</span>`; } } 
-            else if (type === 'cooling') { const daysStr = t.days === 999 ? 'Никогда' : `${t.days} дн.`; badgeHtml = `<span class="task-badge tb-cooling mt-1 d-inline-block">Без визитов: ${daysStr}</span>`; metaHtml = `<span class="text-muted small">Пора навестить</span>`; } 
-            const showCheckBtn = (type === 'upcoming' || (type === 'problem' && t.type === 'overdue'));
-            const btnHtml = showCheckBtn ? `<button class="btn-task-check btn-complete-task" data-id="${t.dealerId}" data-index="${t.visitIndex}" title="Выполнить"><i class="bi bi-check-lg"></i></button>` : '';
-            return `<div class="task-item-modern align-items-start"><div class="task-content"><a href="dealer.html?id=${t.dealerId}" target="_blank" class="task-title text-truncate d-block" style="max-width: 200px;">${safeText(t.dealerName)}</a>${badgeHtml}<div class="mt-1">${metaHtml}</div></div><div class="mt-1">${btnHtml}</div></div>`; 
-        }).join(''); 
-    }
-    
     // --- 7. BUTTON CLICK HANDLER (WITH SPINNER) ---
     if(document.body) { 
         document.body.addEventListener('click', (e) => { 
@@ -374,4 +380,5 @@ document.addEventListener('DOMContentLoaded', () => {
     
     initApp();
 });
+
 
