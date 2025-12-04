@@ -1052,3 +1052,19 @@ nav a.nav-link.active { background: var(--primary-color) !important; color: whit
     padding: 2px 6px;
 }
 
+
+/* --- СТИЛИ ДЛЯ ГРАФИКА СТРУКТУРЫ --- */
+.progress-bar {
+    /* Убираем старый 3D эффект бутстрапа, делаем flat design */
+    box-shadow: none; 
+    border-right: 2px solid #fff; /* Разделители между цветами */
+}
+.progress-bar:last-child {
+    border-right: none;
+}
+
+/* Цвет фона бейджиков (чуть мягче стандартных) */
+.text-bg-success { background-color: #10b981 !important; }
+.text-bg-warning { background-color: #f59e0b !important; color: #fff !important; }
+.text-bg-danger  { background-color: #ef4444 !important; }
+.text-bg-primary { background-color: #3b82f6 !important; }
