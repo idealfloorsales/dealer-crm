@@ -165,36 +165,110 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchProductCatalog() { if (fullProductCatalog.length > 0) return; try { const response = await fetch(API_PRODUCTS_URL); if (!response.ok) throw new Error(`Ошибка: ${response.status}`); fullProductCatalog = await response.json(); fullProductCatalog.sort((a, b) => a.sku.localeCompare(b.sku, 'ru', { numeric: true })); } catch (error) {} }
     async function completeTask(btn, dealerId, visitIndex) { try { btn.disabled = true; const res = await fetch(`${API_DEALERS_URL}/${dealerId}`); if(!res.ok) throw new Error('Err'); const dealer = await res.json(); if (dealer.visits && dealer.visits[visitIndex]) { dealer.visits[visitIndex].isCompleted = true; } await fetch(`${API_DEALERS_URL}/${dealerId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visits: dealer.visits }) }); initApp(); } catch (e) { alert("Ошибка"); btn.disabled = false; } }
 
-    // --- 6. RENDER DASHBOARD ---
+  // --- 6. RENDER DASHBOARD (FIXED STATS) ---
     function renderDashboard() {
         if (!dashboardStats) return; 
-        if (!allDealers || allDealers.length === 0) { dashboardStats.innerHTML = ''; return; }
+        
+        if (!allDealers || allDealers.length === 0) { 
+            dashboardStats.innerHTML = ''; 
+            return; 
+        }
+
         const activeDealers = allDealers.filter(d => d.status !== 'potential');
         const totalDealers = activeDealers.length;
         const noAvatarCount = activeDealers.filter(d => !d.photo_url).length; 
-        dashboardStats.innerHTML = `<div class="col-6 col-lg-6 col-xl-6 h-100"><div class="stat-card-modern d-flex flex-column justify-content-center align-items-center text-center p-2 h-100"><div class="stat-icon-box bg-primary-subtle text-primary mb-2"><i class="bi bi-shop"></i></div><div class="stat-info"><h3 class="fs-4">${totalDealers}</h3><p class="small">Всего</p></div></div></div><div class="col-6 col-lg-6 col-xl-6 h-100"><div class="stat-card-modern d-flex flex-column justify-content-center align-items-center text-center p-2 h-100"><div class="stat-icon-box ${noAvatarCount > 0 ? 'bg-danger-subtle text-danger' : 'bg-success-subtle text-success'} mb-2"><i class="bi bi-camera-fill"></i></div><div class="stat-info"><h3 class="fs-4 ${noAvatarCount > 0 ? 'text-danger' : ''}">${noAvatarCount}</h3><p class="small">Без фото</p></div></div></div>`;
+
+        // 1. Статистика (Компактные горизонтальные карточки)
+        dashboardStats.innerHTML = `
+            <div class="col-12 col-sm-6">
+                <div class="stat-card-modern">
+                    <div class="stat-icon-box bg-primary-subtle text-primary">
+                        <i class="bi bi-shop"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>${totalDealers}</h3>
+                        <p>Дилеров</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-sm-6">
+                <div class="stat-card-modern">
+                    <div class="stat-icon-box ${noAvatarCount > 0 ? 'bg-danger-subtle text-danger' : 'bg-success-subtle text-success'}">
+                        <i class="bi bi-camera-fill"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 class="${noAvatarCount > 0 ? 'text-danger' : ''}">${noAvatarCount}</h3>
+                        <p>Без фото</p>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // 2. Расчет дат
         const today = new Date(); today.setHours(0,0,0,0);
-        
-        // === ИЗМЕНЕНИЕ (15 ДНЕЙ) ===
+        // 15 дней для остывающих
         const coolingLimit = new Date(today.getTime() - (15 * 24 * 60 * 60 * 1000));
         
         const tasksUpcoming = [], tasksProblem = [], tasksCooling = [];
+
         allDealers.forEach(d => {
-            if (d.status === 'archive') return; const isPotential = d.status === 'potential'; let lastVisitDate = null; let hasFutureTasks = false;
-            if (d.visits && Array.isArray(d.visits)) { d.visits.forEach((v, index) => { const vDate = new Date(v.date); if (!v.date) return; vDate.setHours(0,0,0,0); if (v.isCompleted && (!lastVisitDate || vDate > lastVisitDate)) lastVisitDate = vDate; if (!v.isCompleted) { const taskData = { dealerName: d.name, dealerId: d.id, date: vDate, comment: v.comment || "Без комментария", visitIndex: index }; if (vDate < today) tasksProblem.push({...taskData, type: 'overdue'}); else { tasksUpcoming.push({...taskData, isToday: vDate.getTime() === today.getTime()}); hasFutureTasks = true; } } }); }
-            if (d.status === 'problem') { if (!tasksProblem.some(t => t.dealerId === d.id && t.type === 'overdue')) tasksProblem.push({ dealerName: d.name, dealerId: d.id, type: 'status', comment: 'Статус: Проблемный' }); }
-            
-            // Проверка на остывание (15 дней)
+            if (d.status === 'archive') return; 
+            const isPotential = d.status === 'potential'; 
+            let lastVisitDate = null; 
+            let hasFutureTasks = false;
+
+            if (d.visits && Array.isArray(d.visits)) { 
+                d.visits.forEach((v, index) => { 
+                    const vDate = new Date(v.date); 
+                    if (!v.date) return; 
+                    vDate.setHours(0,0,0,0); 
+                    
+                    if (v.isCompleted && (!lastVisitDate || vDate > lastVisitDate)) lastVisitDate = vDate; 
+                    
+                    if (!v.isCompleted) { 
+                        const taskData = { 
+                            dealerName: d.name, 
+                            dealerId: d.id, 
+                            date: vDate, 
+                            comment: v.comment || "Без комментария", 
+                            visitIndex: index 
+                        }; 
+                        
+                        if (vDate < today) {
+                            tasksProblem.push({...taskData, type: 'overdue'}); 
+                        } else { 
+                            tasksUpcoming.push({...taskData, isToday: vDate.getTime() === today.getTime()}); 
+                            hasFutureTasks = true; 
+                        } 
+                    } 
+                }); 
+            }
+
+            // Статус Проблемный
+            if (d.status === 'problem') { 
+                if (!tasksProblem.some(t => t.dealerId === d.id && t.type === 'overdue')) {
+                    tasksProblem.push({ dealerName: d.name, dealerId: d.id, type: 'status', comment: 'Статус: Проблемный' }); 
+                } 
+            }
+
+            // Остывающие (15 дней)
             if (!hasFutureTasks && d.status !== 'problem' && !isPotential) { 
-                if (!lastVisitDate) tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: 999 }); 
-                else if (lastVisitDate < coolingLimit) { 
+                if (!lastVisitDate) {
+                    tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: 999 }); 
+                } else if (lastVisitDate < coolingLimit) { 
                     const days = Math.floor((today - lastVisitDate) / (1000 * 60 * 60 * 24)); 
                     tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: days }); 
                 } 
             }
         });
-        tasksUpcoming.sort((a, b) => a.date - b.date); tasksProblem.sort((a, b) => (a.date || 0) - (b.date || 0)); tasksCooling.sort((a, b) => b.days - a.days);
-        renderTaskList(tasksListUpcoming, tasksUpcoming, 'upcoming'); renderTaskList(tasksListProblem, tasksProblem, 'problem'); renderTaskList(tasksListCooling, tasksCooling, 'cooling');
+
+        tasksUpcoming.sort((a, b) => a.date - b.date); 
+        tasksProblem.sort((a, b) => (a.date || 0) - (b.date || 0)); 
+        tasksCooling.sort((a, b) => b.days - a.days);
+
+        renderTaskList(tasksListUpcoming, tasksUpcoming, 'upcoming'); 
+        renderTaskList(tasksListProblem, tasksProblem, 'problem'); 
+        renderTaskList(tasksListCooling, tasksCooling, 'cooling');
     }
 
     function renderTaskList(container, tasks, type) { 
@@ -300,3 +374,4 @@ document.addEventListener('DOMContentLoaded', () => {
     
     initApp();
 });
+
