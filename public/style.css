@@ -1068,3 +1068,15 @@ nav a.nav-link.active { background: var(--primary-color) !important; color: whit
 .text-bg-warning { background-color: #f59e0b !important; color: #fff !important; }
 .text-bg-danger  { background-color: #ef4444 !important; }
 .text-bg-primary { background-color: #3b82f6 !important; }
+
+/* Кнопка Instagram (Розовая/Фиолетовая) */
+.btn-circle-insta { 
+    color: #c13584; 
+    background: #fdf2f8; /* Очень светло-розовый */
+    border-color: #fce7f3; 
+}
+.btn-circle-insta:hover { 
+    background: #c13584; 
+    color: #fff; 
+    border-color: #c13584; 
+}
