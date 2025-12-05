@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const addContactList = document.getElementById('add-contact-list'); 
     const addAddressList = document.getElementById('add-address-list'); 
     const addPosList = document.getElementById('add-pos-list'); 
-    const addVisitsList = document.getElementById('add-visits-list');
+    const addVisitsList = document.getElementById('add-visits-list'); 
     const addCompetitorList = document.getElementById('add-competitor-list');
     const addPhotoInput = document.getElementById('add-photo-input');
     const addPhotoPreviewContainer = document.getElementById('add-photo-preview-container');
@@ -105,37 +105,23 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Генераторы HTML
+    function createContactEntryHTML(c={}) { return `<div class="contact-entry"><input type="text" class="form-control contact-name" placeholder="Имя" value="${c.name||''}"><input type="text" class="form-control contact-position" placeholder="Должность" value="${c.position||''}"><input type="text" class="form-control contact-info" placeholder="Телефон" value="${c.contactInfo||''}"><button type="button" class="btn-remove-entry" onclick="this.closest('.contact-entry').remove()"><i class="bi bi-x-lg"></i></button></div>`; }
+    function createAddressEntryHTML(a={}) { return `<div class="address-entry"><input type="text" class="form-control address-description" placeholder="Описание" value="${a.description||''}"><input type="text" class="form-control address-city" placeholder="Город" value="${a.city||''}"><input type="text" class="form-control address-address" placeholder="Адрес" value="${a.address||''}"><button type="button" class="btn-remove-entry" onclick="this.closest('.address-entry').remove()"><i class="bi bi-x-lg"></i></button></div>`; }
+    function createVisitEntryHTML(v={}) { return `<div class="visit-entry"><input type="date" class="form-control visit-date" value="${v.date||''}"><input type="text" class="form-control visit-comment w-50" placeholder="Результат..." value="${v.comment||''}"><button type="button" class="btn-remove-entry" onclick="this.closest('.visit-entry').remove()"><i class="bi bi-x-lg"></i></button></div>`; }
+    function renderPhotoPreviews(container, photosArray) { if(container) container.innerHTML = photosArray.map((p, index) => `<div class="photo-preview-item"><img src="${p.photo_url}"><button type="button" class="btn-remove-photo" data-index="${index}"><i class="bi bi-x"></i></button></div>`).join(''); }
+    
+    function createPosEntryHTML(p={}) { 
+        return `<div class="pos-entry"><input type="text" class="form-control pos-name" list="pos-materials-datalist" placeholder="Название стенда" value="${safeAttr(p.name||'')}" autocomplete="off"><input type="number" class="form-control pos-quantity" value="${p.quantity||1}" min="1" placeholder="Шт"><button type="button" class="btn-remove-entry" onclick="this.closest('.pos-entry').remove()" title="Удалить"><i class="bi bi-x-lg"></i></button></div>`; 
+    }
+
     function createCompetitorEntryHTML(c={}) { 
-        let brandOpts = `<option value="">-- Бренд --</option>`;
-        competitorsRef.forEach(ref => { const sel = ref.name === c.brand ? 'selected' : ''; brandOpts += `<option value="${ref.name}" ${sel}>${ref.name}</option>`; });
-        
+        let brandOpts = `<option value="">-- Бренд --</option>`; competitorsRef.forEach(ref => { const sel = ref.name === c.brand ? 'selected' : ''; brandOpts += `<option value="${ref.name}" ${sel}>${ref.name}</option>`; });
         let collOpts = `<option value="">-- Коллекция --</option>`;
-        if (c.brand) {
-            const ref = competitorsRef.find(r => r.name === c.brand);
-            if (ref && ref.collections) {
-                const sortedCols = [...ref.collections].sort((a, b) => { 
-                    const typeA = (typeof a === 'object') ? a.type : 'std'; 
-                    const typeB = (typeof b === 'object') ? b.type : 'std'; 
-                    if (typeA === 'std' && typeB !== 'std') return 1; 
-                    if (typeA !== 'std' && typeB === 'std') return -1; 
-                    return 0; 
-                });
-                sortedCols.forEach(col => { 
-                    const colName = (typeof col === 'string') ? col : col.name; 
-                    const colType = (typeof col === 'object') ? col.type : 'std'; 
-                    let label = ''; 
-                    if(colType.includes('eng')) label = ' (Елка)'; 
-                    else if(colType.includes('french')) label = ' (Фр. Елка)'; 
-                    else if(colType.includes('art')) label = ' (Арт)'; 
-                    const sel = colName === c.collection ? 'selected' : ''; 
-                    collOpts += `<option value="${colName}" ${sel}>${colName}${label}</option>`; 
-                });
-            }
-        }
+        if (c.brand) { const ref = competitorsRef.find(r => r.name === c.brand); if (ref && ref.collections) { const sortedCols = [...ref.collections].sort((a, b) => { const typeA = (typeof a === 'object') ? a.type : 'std'; const typeB = (typeof b === 'object') ? b.type : 'std'; if (typeA === 'std' && typeB !== 'std') return 1; if (typeA !== 'std' && typeB === 'std') return -1; return 0; }); sortedCols.forEach(col => { const colName = (typeof col === 'string') ? col : col.name; const colType = (typeof col === 'object') ? col.type : 'std'; let label = ''; if(colType.includes('eng')) label = ' (Елка)'; else if(colType.includes('french')) label = ' (Фр. Елка)'; else if(colType.includes('art')) label = ' (Арт)'; const sel = colName === c.collection ? 'selected' : ''; collOpts += `<option value="${colName}" ${sel}>${colName}${label}</option>`; }); } }
         return `<div class="competitor-entry"><select class="form-select competitor-brand" onchange="updateCollections(this)">${brandOpts}</select><select class="form-select competitor-collection">${collOpts}</select><input type="text" class="form-control competitor-price-opt" placeholder="ОПТ" value="${c.price_opt||''}"><input type="text" class="form-control competitor-price-retail" placeholder="Розн" value="${c.price_retail||''}"><button type="button" class="btn-remove-entry" onclick="this.closest('.competitor-entry').remove()" title="Удалить"><i class="bi bi-x-lg"></i></button></div>`; 
     }
 
-    // Глобальная функция для onchange
+    // Глобальная функция
     window.updateCollections = function(select) {
         const brandName = select.value; 
         const row = select.closest('.competitor-entry'); 
@@ -162,20 +148,55 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         collSelect.innerHTML = html;
     };
-
-    function createPosEntryHTML(p={}) { return `<div class="pos-entry"><input type="text" class="form-control pos-name" list="pos-materials-datalist" placeholder="Название стенда" value="${safeAttr(p.name||'')}" autocomplete="off"><input type="number" class="form-control pos-quantity" value="${p.quantity||1}" min="1" placeholder="Шт"><button type="button" class="btn-remove-entry" onclick="this.closest('.pos-entry').remove()" title="Удалить"><i class="bi bi-x-lg"></i></button></div>`; }
-    function createContactEntryHTML(c={}) { return `<div class="contact-entry"><input type="text" class="form-control contact-name" placeholder="Имя" value="${c.name||''}"><input type="text" class="form-control contact-position" placeholder="Должность" value="${c.position||''}"><input type="text" class="form-control contact-info" placeholder="Телефон" value="${c.contactInfo||''}"><button type="button" class="btn-remove-entry" onclick="this.closest('.contact-entry').remove()"><i class="bi bi-x-lg"></i></button></div>`; }
-    function createAddressEntryHTML(a={}) { return `<div class="address-entry"><input type="text" class="form-control address-description" placeholder="Описание" value="${a.description||''}"><input type="text" class="form-control address-city" placeholder="Город" value="${a.city||''}"><input type="text" class="form-control address-address" placeholder="Адрес" value="${a.address||''}"><button type="button" class="btn-remove-entry" onclick="this.closest('.address-entry').remove()"><i class="bi bi-x-lg"></i></button></div>`; }
-    function createVisitEntryHTML(v={}) { return `<div class="visit-entry"><input type="date" class="form-control visit-date" value="${v.date||''}"><input type="text" class="form-control visit-comment w-50" placeholder="Результат..." value="${v.comment||''}"><button type="button" class="btn-remove-entry" onclick="this.closest('.visit-entry').remove()"><i class="bi bi-x-lg"></i></button></div>`; }
-    function renderPhotoPreviews(container, photosArray) { if(container) container.innerHTML = photosArray.map((p, index) => `<div class="photo-preview-item"><img src="${p.photo_url}"><button type="button" class="btn-remove-photo" data-index="${index}"><i class="bi bi-x"></i></button></div>`).join(''); }
-
-    function collectData(container, selector, fields) { if (!container) return []; const data = []; container.querySelectorAll(selector).forEach(entry => { const item = {}; let hasData = false; fields.forEach(f => { const inp = entry.querySelector(f.class); if(inp){item[f.key]=inp.value; if(item[f.key]) hasData=true;} }); if(hasData) data.push(item); }); return data; }
-    function renderList(container, data, htmlGen) { if(container) container.innerHTML = (data && data.length > 0) ? data.map(htmlGen).join('') : htmlGen(); }
+    
     function renderProductChecklist(container, selectedIds=[]) { if(!container) return; const set = new Set(selectedIds); container.innerHTML = fullProductCatalog.map(p => `<div class="checklist-item form-check"><input type="checkbox" class="form-check-input" id="prod-${container.id}-${p.id}" value="${p.id}" ${set.has(p.id)?'checked':''}><label class="form-check-label" for="prod-${container.id}-${p.id}"><strong>${p.sku}</strong> - ${p.name}</label></div>`).join(''); }
     function getSelectedProductIds(containerId) { const el=document.getElementById(containerId); if(!el) return []; return Array.from(el.querySelectorAll('input:checked')).map(cb=>cb.value); }
+    function collectData(container, selector, fields) { if (!container) return []; const data = []; container.querySelectorAll(selector).forEach(entry => { const item = {}; let hasData = false; fields.forEach(f => { const inp = entry.querySelector(f.class); if(inp){item[f.key]=inp.value; if(item[f.key]) hasData=true;} }); if(hasData) data.push(item); }); return data; }
+    function renderList(container, data, htmlGen) { if(container) container.innerHTML = (data && data.length > 0) ? data.map(htmlGen).join('') : htmlGen(); }
 
     // ==========================================
-    // 4. API ФУНКЦИИ
+    // 4. ГЛОБАЛЬНЫЕ ФУНКЦИИ (ВАЖНО!)
+    // ==========================================
+
+    async function openEditModal(id) {
+        try {
+            const res = await fetch(`${API_DEALERS_URL}/${id}`); 
+            if(!res.ok) throw new Error("Ошибка"); 
+            const d = await res.json();
+            const titleEl = document.querySelector('#edit-modal .modal-title'); if(titleEl) titleEl.textContent = `Редактировать: ${d.name}`;
+            document.getElementById('edit_db_id').value=d.id; document.getElementById('edit_dealer_id').value=d.dealer_id; document.getElementById('edit_name').value=d.name; document.getElementById('edit_organization').value=d.organization; document.getElementById('edit_price_type').value=d.price_type; document.getElementById('edit_city').value=d.city; document.getElementById('edit_address').value=d.address; document.getElementById('edit_delivery').value=d.delivery; document.getElementById('edit_website').value=d.website; document.getElementById('edit_instagram').value=d.instagram;
+            if(document.getElementById('edit_latitude')) document.getElementById('edit_latitude').value=d.latitude||'';
+            if(document.getElementById('edit_longitude')) document.getElementById('edit_longitude').value=d.longitude||'';
+            document.getElementById('edit_bonuses').value=d.bonuses;
+            if(document.getElementById('edit_status')) document.getElementById('edit_status').value = d.status || 'standard';
+            if(document.getElementById('edit_responsible')) document.getElementById('edit_responsible').value = d.responsible || '';
+
+            if(editAvatarPreview) { editAvatarPreview.src = d.avatarUrl || ''; editAvatarPreview.style.display = d.avatarUrl ? 'block' : 'none'; }
+            if(editCurrentAvatarUrl) editCurrentAvatarUrl.value = d.avatarUrl || '';
+            newAvatarBase64 = null;
+
+            renderList(editContactList, d.contacts, createContactEntryHTML); renderList(editAddressList, d.additional_addresses, createAddressEntryHTML); renderList(editPosList, d.pos_materials, createPosEntryHTML); renderList(editVisitsList, d.visits, createVisitEntryHTML); renderList(editCompetitorList, d.competitors, createCompetitorEntryHTML);
+            renderProductChecklist(editProductChecklist, (d.products||[]).map(p=>p.id));
+            editPhotosData = d.photos||[]; renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData);
+            
+            const firstTabEl = document.querySelector('#editTabs button[data-bs-target="#tab-main"]');
+            if(firstTabEl) { const tab = new bootstrap.Tab(firstTabEl); tab.show(); }
+            editModal.show();
+        } catch(e){ alert("Ошибка загрузки."); console.error(e); }
+    }
+    // Делаем функцию глобальной
+    window.openEditModal = openEditModal;
+
+    function showQuickVisit(id) { 
+        document.getElementById('qv_dealer_id').value = id; 
+        document.getElementById('qv_comment').value = ''; 
+        qvModal.show(); 
+    }
+    // Делаем функцию глобальной
+    window.showQuickVisit = showQuickVisit;
+
+    // ==========================================
+    // 5. API ФУНКЦИИ
     // ==========================================
 
     async function fetchProductCatalog() { 
@@ -195,9 +216,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if(!filterCity || !filterPriceType) return;
         const cities = [...new Set(dealers.map(d => d.city).filter(Boolean))].sort();
         const types = [...new Set(dealers.map(d => d.price_type).filter(Boolean))].sort();
+        
         const sc = filterCity.value; const st = filterPriceType.value;
-        filterCity.innerHTML = '<option value="">Город</option>'; filterPriceType.innerHTML = '<option value="">Тип цен</option>';
-        cities.forEach(c => filterCity.add(new Option(c, c))); types.forEach(t => filterPriceType.add(new Option(t, t)));
+        filterCity.innerHTML = '<option value="">Город</option>'; 
+        filterPriceType.innerHTML = '<option value="">Тип цен</option>';
+        cities.forEach(c => filterCity.add(new Option(c, c))); 
+        types.forEach(t => filterPriceType.add(new Option(t, t)));
         filterCity.value = sc; filterPriceType.value = st;
     }
 
@@ -216,7 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==========================================
-    // 5. ЛОГИКА ОТРИСОВКИ (DASHBOARD & LIST)
+    // 6. RENDER DASHBOARD
     // ==========================================
 
     function renderDashboard() {
@@ -299,6 +323,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join(''); 
     }
 
+    // --- 7. RENDER LIST ---
     function renderDealerList() {
         if (!dealerGrid) return;
         const city = filterCity ? filterCity.value : '';
@@ -336,9 +361,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
     }
 
-    // --- 6. EVENT LISTENERS ---
-    
-    // Handlers для фото (Upload / Remove)
+    // --- 8. HANDLERS ---
+
+    // Фото
     if(addAvatarInput) addAvatarInput.addEventListener('change', async (e) => { const file = e.target.files[0]; if (file) { newAvatarBase64 = await compressImage(file, 800, 0.8); addAvatarPreview.src = newAvatarBase64; addAvatarPreview.style.display='block'; } });
     if(editAvatarInput) editAvatarInput.addEventListener('change', async (e) => { const file = e.target.files[0]; if (file) { newAvatarBase64 = await compressImage(file, 800, 0.8); editAvatarPreview.src = newAvatarBase64; editAvatarPreview.style.display='block'; } });
     if(addPhotoInput) addPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) addPhotosData.push({ photo_url: await compressImage(file, 1000, 0.7) }); renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData); addPhotoInput.value = ''; });
@@ -346,23 +371,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if(editPhotoInput) editPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) editPhotosData.push({ photo_url: await compressImage(file, 1000, 0.7) }); renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData); editPhotoInput.value = ''; });
     if(editPhotoPreviewContainer) editPhotoPreviewContainer.addEventListener('click', (e) => { const btn = e.target.closest('.btn-remove-photo'); if(btn) { editPhotosData.splice(btn.dataset.index, 1); renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData); } });
 
-    // Buttons & Filters
-    if(filterCity) filterCity.onchange = renderDealerList; 
-    if(filterPriceType) filterPriceType.onchange = renderDealerList; 
-    if(filterStatus) filterStatus.onchange = renderDealerList; 
-    if(filterResponsible) filterResponsible.onchange = renderDealerList; 
-    if(searchBar) searchBar.oninput = renderDealerList;
-    
-    document.querySelectorAll('.sort-btn').forEach(btn => { 
-        btn.onclick = (e) => { 
-            const sortKey = e.currentTarget.dataset.sort; 
-            if(currentSort.column === sortKey) currentSort.direction = (currentSort.direction === 'asc' ? 'desc' : 'asc'); 
-            else { currentSort.column = sortKey; currentSort.direction = 'asc'; } 
-            renderDealerList(); 
-        }; 
-    });
-    
-    // Quick Task Completion
+    // Фильтры
+    if(filterCity) filterCity.onchange = renderDealerList; if(filterPriceType) filterPriceType.onchange = renderDealerList; if(filterStatus) filterStatus.onchange = renderDealerList; if(filterResponsible) filterResponsible.onchange = renderDealerList; if(searchBar) searchBar.oninput = renderDealerList;
+    document.querySelectorAll('.sort-btn').forEach(btn => { btn.onclick = (e) => { const sortKey = e.currentTarget.dataset.sort; if(currentSort.column === sortKey) currentSort.direction = (currentSort.direction === 'asc' ? 'desc' : 'asc'); else { currentSort.column = sortKey; currentSort.direction = 'asc'; } renderDealerList(); }; });
+
+    // Клик по кнопкам списка
     if(document.body) { 
         document.body.addEventListener('click', (e) => { 
             const taskBtn = e.target.closest('.btn-complete-task'); 
@@ -374,53 +387,29 @@ document.addEventListener('DOMContentLoaded', () => {
         }); 
     }
 
-    // Modal Triggers (Lists)
     const setupListBtn = (id, list, genFunc) => { const btn = document.getElementById(id); if(btn) btn.onclick = () => list.insertAdjacentHTML('beforeend', genFunc()); };
     setupListBtn('add-contact-btn-add-modal', addContactList, createContactEntryHTML); setupListBtn('add-address-btn-add-modal', addAddressList, createAddressEntryHTML); setupListBtn('add-pos-btn-add-modal', addPosList, createPosEntryHTML); setupListBtn('add-visits-btn-add-modal', addVisitsList, createVisitEntryHTML); setupListBtn('add-competitor-btn-add-modal', addCompetitorList, createCompetitorEntryHTML);
     setupListBtn('add-contact-btn-edit-modal', editContactList, createContactEntryHTML); setupListBtn('add-address-btn-edit-modal', editAddressList, createAddressEntryHTML); setupListBtn('add-pos-btn-edit-modal', editPosList, createPosEntryHTML); setupListBtn('add-visits-btn-edit-modal', editVisitsList, createVisitEntryHTML); setupListBtn('add-competitor-btn-edit-modal', editCompetitorList, createCompetitorEntryHTML);
 
-    // Open Add Modal
-    if(openAddModalBtn) openAddModalBtn.onclick = () => { 
-        if(addForm) addForm.reset(); 
-        currentStep = 1; showStep(1); 
-        renderProductChecklist(addProductChecklist); 
-        renderList(addContactList, [], createContactEntryHTML); renderList(addAddressList, [], createAddressEntryHTML); renderList(addPosList, [], createPosEntryHTML); renderList(addVisitsList, [], createVisitEntryHTML); renderList(addCompetitorList, [], createCompetitorEntryHTML); 
-        if(document.getElementById('add_latitude')) { document.getElementById('add_latitude').value = ''; document.getElementById('add_longitude').value = ''; } 
-        addPhotosData = []; renderPhotoPreviews(addPhotoPreviewContainer, []); 
-        if(addAvatarPreview) { addAvatarPreview.src = ''; addAvatarPreview.style.display='none'; } 
-        newAvatarBase64 = null; 
-        addModal.show(); 
-    };
+    if(openAddModalBtn) openAddModalBtn.onclick = () => { if(addForm) addForm.reset(); currentStep = 1; showStep(1); renderProductChecklist(addProductChecklist); renderList(addContactList, [], createContactEntryHTML); renderList(addAddressList, [], createAddressEntryHTML); renderList(addPosList, [], createPosEntryHTML); renderList(addVisitsList, [], createVisitEntryHTML); renderList(addCompetitorList, [], createCompetitorEntryHTML); if(document.getElementById('add_latitude')) { document.getElementById('add_latitude').value = ''; document.getElementById('add_longitude').value = ''; } addPhotosData = []; renderPhotoPreviews(addPhotoPreviewContainer, []); if(addAvatarPreview) { addAvatarPreview.src = ''; addAvatarPreview.style.display='none'; } newAvatarBase64 = null; addModal.show(); };
 
-    // Wizard
     let currentStep = 1; const totalSteps = 4;
     const prevBtn = document.getElementById('btn-prev-step'); const nextBtn = document.getElementById('btn-next-step'); const finishBtn = document.getElementById('btn-finish-step');
     function showStep(step) { document.querySelectorAll('.wizard-step').forEach(s => s.classList.remove('active')); document.querySelectorAll('.step-circle').forEach(i => i.classList.remove('active')); const stepEl = document.getElementById(`step-${step}`); if(stepEl) stepEl.classList.add('active'); for (let i = 1; i <= totalSteps; i++) { const ind = document.getElementById(`step-ind-${i}`); if(!ind) continue; if (i < step) { ind.classList.add('completed'); ind.innerHTML = '✔'; } else { ind.classList.remove('completed'); ind.innerHTML = i; if (i === step) ind.classList.add('active'); else ind.classList.remove('active'); } } if (prevBtn) prevBtn.style.display = step === 1 ? 'none' : 'inline-block'; if (nextBtn && finishBtn) { if (step === totalSteps) { nextBtn.style.display = 'none'; finishBtn.style.display = 'inline-block'; } else { nextBtn.style.display = 'inline-block'; finishBtn.style.display = 'none'; } } }
     if(nextBtn) nextBtn.onclick = () => { if (currentStep === 1) { if (!document.getElementById('dealer_id').value || !document.getElementById('name').value) { alert("Заполните ID и Название"); return; } if (addMap) setTimeout(() => addMap.invalidateSize(), 200); } if (currentStep < totalSteps) { currentStep++; showStep(currentStep); } };
     if(prevBtn) prevBtn.onclick = () => { if (currentStep > 1) { currentStep--; showStep(currentStep); } };
 
-    // Save Add
     if(addForm) addForm.addEventListener('submit', async (e) => { e.preventDefault(); if (isSaving) return; isSaving = true; const btn = document.getElementById('btn-finish-step'); const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; const data = { dealer_id: getVal('dealer_id'), name: getVal('name'), organization: getVal('organization'), price_type: getVal('price_type'), city: getVal('city'), address: getVal('address'), delivery: getVal('delivery'), website: getVal('website'), instagram: getVal('instagram'), latitude: getVal('add_latitude'), longitude: getVal('add_longitude'), bonuses: getVal('bonuses'), status: getVal('status'), responsible: document.getElementById('responsible') ? document.getElementById('responsible').value : '', contacts: collectData(addContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]), additional_addresses: collectData(addAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]), pos_materials: collectData(addPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]), visits: collectData(addVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'}]), photos: addPhotosData, avatarUrl: newAvatarBase64, competitors: collectData(addCompetitorList, '.competitor-entry', [{key:'brand',class:'.competitor-brand'},{key:'collection',class:'.competitor-collection'},{key:'price_opt',class:'.competitor-price-opt'},{key:'price_retail',class:'.competitor-price-retail'}]) }; try { const res = await fetch(API_DEALERS_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); if (!res.ok) throw new Error(await res.text()); const newD = await res.json(); const pIds = getSelectedProductIds('add-product-checklist'); if(pIds.length) await saveProducts(newD.id, pIds); addModal.hide(); initApp(); } catch (e) { alert("Ошибка при добавлении."); } finally { isSaving = false; btn.disabled = false; btn.innerHTML = oldText; } });
-
-    // Save Edit
     if(editForm) editForm.addEventListener('submit', async (e) => { e.preventDefault(); if (isSaving) return; isSaving = true; const btn = document.querySelector('button[form="edit-dealer-form"]'); const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; const id = document.getElementById('edit_db_id').value; let avatarToSend = getVal('edit-current-avatar-url'); if (newAvatarBase64) avatarToSend = newAvatarBase64; const data = { dealer_id: getVal('edit_dealer_id'), name: getVal('edit_name'), organization: getVal('edit_organization'), price_type: getVal('edit_price_type'), city: getVal('edit_city'), address: getVal('edit_address'), delivery: getVal('edit_delivery'), website: getVal('edit_website'), instagram: getVal('edit_instagram'), latitude: getVal('edit_latitude'), longitude: getVal('edit_longitude'), bonuses: getVal('edit_bonuses'), status: getVal('edit_status'), responsible: document.getElementById('edit_responsible') ? document.getElementById('edit_responsible').value : '', avatarUrl: avatarToSend, contacts: collectData(editContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]), additional_addresses: collectData(editAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]), pos_materials: collectData(editPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]), visits: collectData(editVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'},{key:'isCompleted',class:'.visit-completed'}]), photos: editPhotosData, competitors: collectData(editCompetitorList, '.competitor-entry', [{key:'brand',class:'.competitor-brand'},{key:'collection',class:'.competitor-collection'},{key:'price_opt',class:'.competitor-price-opt'},{key:'price_retail',class:'.competitor-price-retail'}]) }; try { await fetch(`${API_DEALERS_URL}/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); await saveProducts(id, getSelectedProductIds('edit-product-checklist')); editModal.hide(); initApp(); } catch (e) { alert("Ошибка при сохранении."); } finally { isSaving = false; if(btn) { btn.disabled = false; btn.innerHTML = oldText; } } });
-
-    // Quick Visit
     if(qvForm) qvForm.addEventListener('submit', async (e) => { e.preventDefault(); if (isSaving) return; isSaving = true; const id = document.getElementById('qv_dealer_id').value; const comment = document.getElementById('qv_comment').value; const btn = qvForm.querySelector('button'); if(!id || !comment) { isSaving = false; return; } try { btn.disabled = true; const getRes = await fetch(`${API_DEALERS_URL}/${id}`); const dealer = await getRes.json(); const newVisit = { date: new Date().toISOString().slice(0,10), comment: comment, isCompleted: true }; const visits = [...(dealer.visits || []), newVisit]; await fetch(`${API_DEALERS_URL}/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ visits }) }); qvModal.hide(); alert("Визит добавлен!"); } catch(e) { alert("Ошибка"); } finally { isSaving = false; btn.disabled = false; } });
 
-    // Export
     if(exportBtn) { exportBtn.onclick = async () => { if (!allDealers.length) return alert("Пусто. Нечего экспортировать."); exportBtn.disabled = true; exportBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Загрузка...'; const clean = (text) => `"${String(text || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`; let csv = "\uFEFFID;Название;Статус;Ответственный;Город;Адрес;Тип цен;Организация;Доставка;Сайт;Инстаграм;Контакты;Доп. Адреса;Бонусы\n"; try { const city = filterCity.value; const type = filterPriceType.value; const status = filterStatus.value; const responsible = filterResponsible.value; const search = searchBar.value.toLowerCase(); const filteredForExport = allDealers.filter(d => { let statusMatch = false; const s = d.status || 'standard'; if (status) statusMatch = s === status; else statusMatch = s !== 'potential'; return (!city||d.city===city) && (!type||d.price_type===type) && (!responsible||d.responsible===responsible) && statusMatch && (!search || ((d.name||'').toLowerCase().includes(search)||(d.dealer_id||'').toLowerCase().includes(search))); }); for (const dealer of filteredForExport) { const contactsName = (dealer.contacts || []).map(c => { let info = c.name || ''; if (c.position) info += ` (${c.position})`; if (c.contactInfo) info += ` - ${c.contactInfo}`; return info; }).join('; '); const addresses = (dealer.additional_addresses || []).map(a => `${a.description || ''}: ${a.city || ''}, ${a.address || ''}`).join('; '); const row = [ clean(dealer.dealer_id), clean(dealer.name), clean(dealer.status), clean(dealer.responsible), clean(dealer.city), clean(dealer.address), clean(dealer.price_type), clean(dealer.organization), clean(dealer.delivery), clean(dealer.website), clean(dealer.instagram), clean(contactsName), clean(addresses), clean(dealer.bonuses) ]; csv += row.join(";") + "\r\n"; } const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'})); a.download = 'dealers_export.csv'; a.click(); } catch (e) { alert("Ошибка: " + e.message); } finally { exportBtn.disabled = false; exportBtn.innerHTML = '<i class="bi bi-file-earmark-excel me-2"></i>База'; } }; }
     if(document.getElementById('export-competitors-prices-btn')) { document.getElementById('export-competitors-prices-btn').onclick = async () => { if (!allDealers.length) return alert("Пусто"); const typeMap = { 'std': 'Стандарт', 'eng': 'Англ. Елка', 'fr': 'Фр. Елка', 'art': 'Художественный', 'art_eng': 'Худ. Английская', 'art_fr': 'Худ. Французская', 'mix': 'Худ. Микс' }; let csv = "\uFEFFДилер;Город;Бренд;Коллекция;Тип;Цена ОПТ;Цена Розница\n"; allDealers.forEach(d => { if(d.competitors) { d.competitors.forEach(c => { let typeLabel = 'Стандарт'; const refBrand = competitorsRef.find(r => r.name === c.brand); if (refBrand && refBrand.collections) { const refCol = refBrand.collections.find(col => (typeof col === 'string' ? col : col.name) === c.collection); if (refCol) { const typeCode = (typeof refCol === 'string') ? 'std' : refCol.type; typeLabel = typeMap[typeCode] || 'Стандарт'; } } csv += `"${d.name}";"${d.city}";"${c.brand||''}";"${c.collection||''}";"${typeLabel}";"${c.price_opt||''}";"${c.price_retail||''}"\n`; }); } }); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'})); a.download = 'competitor_prices.csv'; a.click(); }; }
 
-    // Logout
-    const logoutBtn = document.getElementById('logout-btn');
-    if (logoutBtn) { logoutBtn.onclick = () => { const url = window.location.protocol + "//" + "logout:logout@" + window.location.host + window.location.pathname; window.location.href = url; }; }
+    const logoutBtn = document.getElementById('logout-btn'); if (logoutBtn) { logoutBtn.onclick = () => { const url = window.location.protocol + "//" + "logout:logout@" + window.location.host + window.location.pathname; window.location.href = url; }; }
 
-    // --- 7. OPEN EDIT (HOISTED COPY) ---
-    // Это копия функции, чтобы она была доступна в глобальной области видимости для onclick
-    window.openEditModal = openEditModal; 
-    window.showQuickVisit = (id) => { document.getElementById('qv_dealer_id').value = id; document.getElementById('qv_comment').value = ''; qvModal.show(); };
-
-    // --- 8. START APP ---
+    // ==========================================
+    // 9. START
+    // ==========================================
     initApp();
 });
