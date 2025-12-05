@@ -232,8 +232,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pendingId) { localStorage.removeItem('pendingEditDealerId'); openEditModal(pendingId); }
     }
 
-    // --- RENDER FUNCTIONS ---
-    
+   // --- RENDER LIST (С кнопкой Instagram) ---
     function renderDealerList() {
         if (!dealerGrid) return;
         const city = filterCity ? filterCity.value : '';
@@ -249,8 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         filtered.sort((a, b) => {
-            let valA = (a[currentSort.column] || '').toString(); 
-            let valB = (b[currentSort.column] || '').toString();
+            let valA = (a[currentSort.column] || '').toString(); let valB = (b[currentSort.column] || '').toString();
             let res = currentSort.column === 'dealer_id' ? valA.localeCompare(valB, undefined, {numeric:true}) : valA.toLowerCase().localeCompare(valB.toLowerCase(), 'ru');
             return currentSort.direction === 'asc' ? res : -res;
         });
@@ -264,33 +262,63 @@ document.addEventListener('DOMContentLoaded', () => {
 
         dealerGrid.innerHTML = filtered.map(d => {
             const st = statusConfig[d.status] || statusConfig['standard'];
+            
+            // Телефон и WhatsApp
             let phoneBtn = ''; let waBtn = ''; 
             if (d.contacts && d.contacts.length > 0) { 
-                const contact = d.contacts.find(c => c.contactInfo) || d.contacts[0];
-                const phone = contact.contactInfo || '';
+                const phone = d.contacts.find(c => c.contactInfo)?.contactInfo || ''; 
                 const cleanPhone = phone.replace(/[^0-9]/g, ''); 
                 if (cleanPhone.length >= 10) { 
                     phoneBtn = `<a href="tel:+${cleanPhone}" class="btn-circle btn-circle-call" onclick="event.stopPropagation()" title="Позвонить"><i class="bi bi-telephone-fill"></i></a>`; 
                     waBtn = `<a href="https://wa.me/${cleanPhone}" target="_blank" class="btn-circle btn-circle-wa" onclick="event.stopPropagation()" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>`; 
                 } 
             }
+            
+            // Карта
             let mapBtn = ''; 
-            if (d.latitude && d.longitude) mapBtn = `<a href="https://yandex.kz/maps/?pt=${d.longitude},${d.latitude}&z=17&l=map" target="_blank" class="btn-circle" onclick="event.stopPropagation()" title="Маршрут"><i class="bi bi-geo-alt-fill"></i></a>`;
+            if (d.latitude && d.longitude) {
+                mapBtn = `<a href="https://yandex.kz/maps/?pt=${d.longitude},${d.latitude}&z=17&l=map" target="_blank" class="btn-circle" onclick="event.stopPropagation()" title="Маршрут"><i class="bi bi-geo-alt-fill"></i></a>`;
+            }
+
+            // Instagram (НОВОЕ)
+            let instaBtn = '';
+            if (d.instagram) {
+                let url = d.instagram.trim();
+                // Если введено просто имя (без http), добавляем ссылку
+                if (!url.startsWith('http')) {
+                    if (url.startsWith('@')) url = 'https://instagram.com/' + url.substring(1);
+                    else url = 'https://instagram.com/' + url;
+                }
+                instaBtn = `<a href="${url}" target="_blank" class="btn-circle btn-circle-insta" onclick="event.stopPropagation()" title="Instagram"><i class="bi bi-instagram"></i></a>`;
+            }
+
             const avatarHtml = d.photo_url ? `<img src="${d.photo_url}" alt="${d.name}">` : `<i class="bi bi-shop"></i>`;
             
+            // Кнопка редактирования
             const editBtn = (currentUserRole !== 'guest') ? `<button class="btn-circle" onclick="event.stopPropagation(); openEditModal('${d.id}')" title="Редактировать"><i class="bi bi-pencil"></i></button>` : '';
 
-            return `<div class="dealer-item" onclick="window.open('dealer.html?id=${d.id}', '_blank')">
+            return `
+            <div class="dealer-item" onclick="window.open('dealer.html?id=${d.id}', '_blank')">
                 <div class="dealer-avatar-box">${avatarHtml}</div>
                 <div class="dealer-content">
-                    <div class="d-flex align-items-center gap-2 mb-1"><a href="dealer.html?id=${d.id}" class="dealer-name" target="_blank">${safeText(d.name)}</a><span class="status-pill ${st.class}">${st.label}</span></div>
-                    <div class="dealer-meta"><span><i class="bi bi-hash"></i>${safeText(d.dealer_id)}</span><span><i class="bi bi-geo-alt"></i>${safeText(d.city)}</span>${d.price_type ? `<span><i class="bi bi-tag"></i>${safeText(d.price_type)}</span>` : ''}</div>
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <a href="dealer.html?id=${d.id}" class="dealer-name" target="_blank">${safeText(d.name)}</a>
+                        <span class="status-pill ${st.class}">${st.label}</span>
+                    </div>
+                    <div class="dealer-meta">
+                        <span><i class="bi bi-hash"></i>${safeText(d.dealer_id)}</span>
+                        <span><i class="bi bi-geo-alt"></i>${safeText(d.city)}</span>
+                        ${d.price_type ? `<span><i class="bi bi-tag"></i>${safeText(d.price_type)}</span>` : ''}
+                    </div>
                 </div>
-                <div class="dealer-actions">${waBtn} ${phoneBtn} ${mapBtn}<button class="btn-circle" onclick="event.stopPropagation(); showQuickVisit('${d.id}')" title="Быстрый визит"><i class="bi bi-calendar-check"></i></button>${editBtn}</div>
+                <div class="dealer-actions">
+                    ${instaBtn} ${waBtn} ${phoneBtn} ${mapBtn}
+                    <button class="btn-circle" onclick="event.stopPropagation(); showQuickVisit('${d.id}')" title="Быстрый визит"><i class="bi bi-calendar-check"></i></button>
+                    ${editBtn}
+                </div>
             </div>`;
         }).join('');
     }
-
     function renderDashboard() {
         if (!dashboardStats) return; 
         if (!allDealers || allDealers.length === 0) { dashboardStats.innerHTML = ''; return; }
@@ -477,3 +505,4 @@ document.addEventListener('DOMContentLoaded', () => {
     // Запуск
     initApp();
 });
+
