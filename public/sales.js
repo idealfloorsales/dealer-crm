@@ -80,7 +80,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- LOGIC ---
     function getDealerGroup(d) {
         if (d.responsible === 'regional_astana') return 'regional_astana';
-        if (d.responsible === 'regional_regions' || (!d.responsible && d.city)) {
+        if (d.responsible === 'regional_regions') return 'regional_regions';
+        // Если ответственного нет, считаем "Прочие"
+        if (!d.responsible) return 'other';
+
+        if (d.city) {
             const cityKey = (d.city || '').trim().toLowerCase();
             if (cityKey === 'астана') return 'regional_astana';
             if (cityToRegion[cityKey]) return cityToRegion[cityKey];
@@ -112,9 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return { diff: fact - plan, forecast, percent };
     }
 
-    // Сохраняем состояние инпутов перед ререндером
     function captureState() {
-        // Факты
         document.querySelectorAll('.sales-input.inp-fact').forEach(inp => {
             const row = inp.closest('.sales-row');
             const dealerId = row.dataset.id === "null" ? null : row.dataset.id;
@@ -134,7 +136,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         
-        // Планы
         document.querySelectorAll('.plan-input').forEach(inp => {
             const planKey = inp.dataset.planKey;
             const val = parseFloat(inp.value) || 0;
@@ -175,7 +176,10 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const customSales = currentSales.filter(s => s.isCustom && s.group === grp.key);
 
-            if (groupDealers.length === 0 && customSales.length === 0) return;
+            // ВАЖНОЕ ИЗМЕНЕНИЕ: 
+            // Если группа "other", мы её НЕ скрываем, даже если она пустая.
+            // Это нужно, чтобы была кнопка "+ Добавить" для разовых продаж.
+            if (groupDealers.length === 0 && customSales.length === 0 && grp.key !== 'other') return;
 
             let rowsHtml = '';
             const items = [
@@ -183,14 +187,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 ...customSales.map(s => ({ id: null, name: s.dealerName, isCustom: true }))
             ];
             
-            // Сортировка по имени
             items.sort((a,b) => a.name.localeCompare(b.name));
 
             items.forEach(item => {
                 const sale = currentSales.find(s => (item.isCustom && s.isCustom && s.dealerName === item.name) || (!item.isCustom && !s.isCustom && s.dealerId === item.id)) || {};
                 const fact = parseFloat(sale.fact) || 0;
                 
-                // Агрегация фактов
                 const majorKey = getMajorKey(item.name);
                 if (majorKey) facts[majorKey] += fact;
                 else if (grp.key === 'regional_astana') facts.regional_astana += fact;
@@ -200,18 +202,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 rowsHtml += `
                     <div class="sales-row" data-id="${item.id || ''}" data-name="${item.name}" data-custom="${item.isCustom}">
                         <div class="sales-dealer-name text-truncate">
-                            ${item.isCustom ? '<i class="bi bi-asterisk text-warning me-1" style="font-size:0.7em"></i>' : ''}
+                            ${item.isCustom ? '<i class="bi bi-asterisk text-warning me-1" style="font-size:0.7em" title="Разовый"></i>' : ''}
                             ${item.name}
                         </div>
                         <div class="d-flex align-items-center gap-2">
                             <div class="sales-input-group">
                                 <input type="number" step="0.01" class="form-control form-control-sm sales-input inp-fact" value="${fact || ''}" placeholder="0">
                             </div>
-                            ${item.isCustom ? `<button class="btn btn-sm text-danger btn-del-row p-0"><i class="bi bi-x-circle"></i></button>` : ''}
+                            ${item.isCustom ? `<button class="btn btn-sm text-danger btn-del-row p-0" title="Удалить строку"><i class="bi bi-x-circle"></i></button>` : ''}
                         </div>
                     </div>
                 `;
             });
+            
+            if (!rowsHtml) {
+                rowsHtml = `<div class="text-center text-muted small py-3">Нет записей. Нажмите "+ Добавить" для ввода разовой продажи.</div>`;
+            }
 
             container.innerHTML += `
                 <div class="region-card" data-group="${grp.key}">
@@ -226,7 +232,7 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         });
 
-        // 2. Render Summary (Leaderboard)
+        // 2. Render Summary
         const plans = {};
         const keys = ["regional_regions", "north", "south", "west", "east", "center", "regional_astana", "mir_laminata", "twelve_months", "total_all"];
         keys.forEach(k => {
@@ -237,12 +243,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const totalRegionsFact = facts.north + facts.south + facts.west + facts.east + facts.center;
         const totalFactAll = totalRegionsFact + facts.regional_astana + facts.mir_laminata + facts.twelve_months + facts.other;
         
-        // Helper to render one summary item
         const renderSumItem = (title, planKey, factVal, isSubItem = false) => {
             const plan = plans[planKey] || 0;
             const { diff, forecast, percent } = calculateKPI(plan, factVal, daysInMonth, currentDay);
             
-            // Color Logic
             let colorClass = 'p-mid'; let bgClass = 'bg-mid';
             if (percent >= 90) { colorClass = 'p-high'; bgClass = 'bg-high'; }
             if (percent < 70) { colorClass = 'p-low'; bgClass = 'bg-low'; }
@@ -266,19 +270,13 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         let summaryHtml = '';
-        
-        // Grand Total
         summaryHtml += `<div class="p-3 bg-primary-subtle border-bottom"><h6 class="fw-bold mb-3 text-primary text-uppercase small ls-1">Общий результат</h6>${renderSumItem("ВСЕГО ПО КОМПАНИИ", "total_all", totalFactAll)}</div>`;
-        
-        // Regions Block
         summaryHtml += renderSumItem("Регионы (Общее)", "regional_regions", totalRegionsFact);
         summaryHtml += renderSumItem("Север", "north", facts.north, true);
         summaryHtml += renderSumItem("Восток", "east", facts.east, true);
         summaryHtml += renderSumItem("Юг", "south", facts.south, true);
         summaryHtml += renderSumItem("Запад", "west", facts.west, true);
         summaryHtml += renderSumItem("Центр", "center", facts.center, true);
-        
-        // Others
         summaryHtml += renderSumItem("Астана (Региональный)", "regional_astana", facts.regional_astana);
         summaryHtml += renderSumItem("Мир Ламината", "mir_laminata", facts.mir_laminata);
         summaryHtml += renderSumItem("12 Месяцев Алаш", "twelve_months", facts.twelve_months);
@@ -288,12 +286,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         summaryList.innerHTML = summaryHtml;
-        
         setupEventListeners();
     }
 
     function setupEventListeners() {
-        // Custom rows adding
         document.querySelectorAll('.btn-add-custom').forEach(btn => {
             btn.onclick = () => {
                 captureState();
@@ -305,7 +301,6 @@ document.addEventListener('DOMContentLoaded', () => {
             };
         });
         
-        // Custom rows deleting
         document.querySelectorAll('.btn-del-row').forEach(btn => {
             btn.onclick = (e) => {
                 if(confirm('Удалить строку?')) {
@@ -334,11 +329,9 @@ document.addEventListener('DOMContentLoaded', () => {
         finally { saveBtn.disabled = false; }
     };
     
-    // Logout Logic
     if (logoutBtn) { logoutBtn.onclick = () => { const url = window.location.protocol + "//" + "logout:logout@" + window.location.host + window.location.pathname; window.location.href = url; }; }
 
     monthPicker.addEventListener('change', loadData);
     
-    // Start
     init();
 });
