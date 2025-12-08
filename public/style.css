@@ -1080,3 +1080,61 @@ nav a.nav-link.active { background: var(--primary-color) !important; color: whit
     color: #fff; 
     border-color: #c13584; 
 }
+/* --- СВОДКА В МАТРИЦЕ (НОВОЕ) --- */
+
+/* Колонка "Итого" (Справа) */
+#matrix-table th:last-child, 
+#matrix-table td:last-child {
+    position: sticky;
+    right: 0;
+    z-index: 15;
+    background-color: #fff;
+    border-left: 2px solid #e2e8f0; /* Отделяем чертой */
+    font-weight: 700;
+    text-align: center;
+    color: var(--text-dark);
+    min-width: 100px;
+}
+
+/* Шапка "Итого" должна быть выше всех */
+#matrix-table thead th:last-child {
+    z-index: 30;
+    background-color: #f8fafc;
+}
+
+/* Подвал таблицы (Снизу) */
+#matrix-table tfoot th, 
+#matrix-table tfoot td {
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+    background-color: #fffbeb; /* Светло-желтый фон для итогов */
+    border-top: 2px solid #e2e8f0;
+    font-weight: 700;
+    padding: 12px;
+    text-align: center;
+    box-shadow: 0 -2px 5px rgba(0,0,0,0.05);
+}
+
+/* Пересечение (Нижний правый угол) - самый высокий приоритет */
+#matrix-table tfoot td:last-child {
+    z-index: 40;
+    background-color: #fef3c7; /* Чуть темнее желтый */
+    border-left: 2px solid #e2e8f0;
+}
+
+/* Липкие левые колонки в футере */
+#matrix-table tfoot td:nth-child(1),
+#matrix-table tfoot td:nth-child(2) {
+    position: sticky;
+    left: 0;
+    z-index: 25;
+    background-color: #fffbeb;
+    text-align: right;
+    padding-right: 15px;
+    color: var(--primary-color);
+}
+#matrix-table tfoot td:nth-child(2) {
+    left: 120px;
+    border-right: 1px solid #e2e8f0;
+}
