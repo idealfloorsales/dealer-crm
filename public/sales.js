@@ -42,7 +42,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- INIT ---
     async function init() {
-        // Auth check
         try {
             const authRes = await fetch('/api/auth/me');
             if (authRes.ok) {
@@ -53,7 +52,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     const names = { 'admin': 'Админ', 'astana': 'Астана', 'regions': 'Регионы', 'guest': 'Гость' };
                     badge.textContent = names[currentUserRole] || currentUserRole;
                 }
-                // Если гость, блокируем кнопку сохранения
                 if (currentUserRole === 'guest') {
                     saveBtn.disabled = true;
                     saveBtn.innerHTML = '<i class="bi bi-lock"></i> Только чтение';
@@ -77,18 +75,22 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) { alert('Ошибка загрузки данных: ' + e.message); }
     }
 
-    // --- LOGIC ---
+    // --- LOGIC (ИСПРАВЛЕНО РАСПРЕДЕЛЕНИЕ) ---
     function getDealerGroup(d) {
+        // 1. Астана всегда отдельно
         if (d.responsible === 'regional_astana') return 'regional_astana';
-        if (d.responsible === 'regional_regions') return 'regional_regions';
-        // Если ответственного нет, считаем "Прочие"
-        if (!d.responsible) return 'other';
-
+        
+        // 2. Если есть город, ПРИОРИТЕТНО ищем регион по городу
+        // (даже если ответственный "regional_regions", мы должны понять - Север это или Юг)
         if (d.city) {
             const cityKey = (d.city || '').trim().toLowerCase();
             if (cityKey === 'астана') return 'regional_astana';
             if (cityToRegion[cityKey]) return cityToRegion[cityKey];
         }
+
+        // 3. Если город неизвестен, но назначен ответственный - кидаем в "Остальные" (или можно сделать default регион)
+        if (d.responsible === 'regional_regions') return 'other';
+
         return 'other';
     }
 
@@ -176,9 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const customSales = currentSales.filter(s => s.isCustom && s.group === grp.key);
 
-            // ВАЖНОЕ ИЗМЕНЕНИЕ: 
-            // Если группа "other", мы её НЕ скрываем, даже если она пустая.
-            // Это нужно, чтобы была кнопка "+ Добавить" для разовых продаж.
+            // Показываем группу если есть дилеры, ИЛИ продажи, ИЛИ это "Остальные"
             if (groupDealers.length === 0 && customSales.length === 0 && grp.key !== 'other') return;
 
             let rowsHtml = '';
@@ -215,9 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
             });
             
-            if (!rowsHtml) {
-                rowsHtml = `<div class="text-center text-muted small py-3">Нет записей. Нажмите "+ Добавить" для ввода разовой продажи.</div>`;
-            }
+            if (!rowsHtml) rowsHtml = `<div class="text-center text-muted small py-3">Нет записей.</div>`;
 
             container.innerHTML += `
                 <div class="region-card" data-group="${grp.key}">
@@ -225,14 +223,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span class="region-title">${grp.title}</span>
                         <button class="btn btn-sm btn-light border-0 text-primary py-0 btn-add-custom" data-group="${grp.key}" style="font-size:0.8rem">+ Добавить</button>
                     </div>
-                    <div class="region-body">
-                        ${rowsHtml}
-                    </div>
+                    <div class="region-body">${rowsHtml}</div>
                 </div>
             `;
         });
 
-        // 2. Render Summary
+        // 2. Render Summary (Leaderboard)
         const plans = {};
         const keys = ["regional_regions", "north", "south", "west", "east", "center", "regional_astana", "mir_laminata", "twelve_months", "total_all"];
         keys.forEach(k => {
@@ -243,6 +239,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const totalRegionsFact = facts.north + facts.south + facts.west + facts.east + facts.center;
         const totalFactAll = totalRegionsFact + facts.regional_astana + facts.mir_laminata + facts.twelve_months + facts.other;
         
+        // Вспомогательная функция для строки сводки
+        // ИСПРАВЛЕНО: План (input) теперь показывается ВСЕГДА
         const renderSumItem = (title, planKey, factVal, isSubItem = false) => {
             const plan = plans[planKey] || 0;
             const { diff, forecast, percent } = calculateKPI(plan, factVal, daysInMonth, currentDay);
@@ -255,7 +253,10 @@ document.addEventListener('DOMContentLoaded', () => {
             return `
             <div class="summary-item ${isSubItem ? 'ps-4 bg-light bg-opacity-25' : ''}">
                 <div class="summary-header">
-                    <span class="summary-title">${title} ${isSubItem ? '' : `<input type="number" class="plan-input" data-plan-key="${planKey}" value="${plan || ''}" placeholder="План">`}</span>
+                    <span class="summary-title">
+                        ${title}
+                        <input type="number" class="plan-input" data-plan-key="${planKey}" value="${plan || ''}" placeholder="План">
+                    </span>
                     <span class="summary-percent ${colorClass}">${fmt(percent)}%</span>
                 </div>
                 <div class="summary-progress">
@@ -271,12 +272,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let summaryHtml = '';
         summaryHtml += `<div class="p-3 bg-primary-subtle border-bottom"><h6 class="fw-bold mb-3 text-primary text-uppercase small ls-1">Общий результат</h6>${renderSumItem("ВСЕГО ПО КОМПАНИИ", "total_all", totalFactAll)}</div>`;
+        
+        // Регионы с планами
         summaryHtml += renderSumItem("Регионы (Общее)", "regional_regions", totalRegionsFact);
         summaryHtml += renderSumItem("Север", "north", facts.north, true);
         summaryHtml += renderSumItem("Восток", "east", facts.east, true);
         summaryHtml += renderSumItem("Юг", "south", facts.south, true);
         summaryHtml += renderSumItem("Запад", "west", facts.west, true);
         summaryHtml += renderSumItem("Центр", "center", facts.center, true);
+        
         summaryHtml += renderSumItem("Астана (Региональный)", "regional_astana", facts.regional_astana);
         summaryHtml += renderSumItem("Мир Ламината", "mir_laminata", facts.mir_laminata);
         summaryHtml += renderSumItem("12 Месяцев Алаш", "twelve_months", facts.twelve_months);
