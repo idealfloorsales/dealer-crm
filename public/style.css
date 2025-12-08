@@ -1138,3 +1138,115 @@ nav a.nav-link.active { background: var(--primary-color) !important; color: whit
     left: 120px;
     border-right: 1px solid #e2e8f0;
 }
+/* --- SALES PAGE (MODERN) --- */
+
+/* Карточка Региона (Ввод) */
+.region-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+    transition: box-shadow 0.2s;
+}
+.region-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+.region-header {
+    background-color: #f8fafc;
+    padding: 12px 15px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.region-title {
+    font-weight: 700;
+    color: var(--text-dark);
+    margin: 0;
+    font-size: 0.95rem;
+}
+.region-body {
+    padding: 10px 15px;
+}
+
+/* Строка ввода дилера */
+.sales-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px dashed #f1f5f9;
+}
+.sales-row:last-child { border-bottom: none; }
+
+.sales-dealer-name {
+    font-size: 0.9rem;
+    color: var(--text-dark);
+    font-weight: 500;
+}
+.sales-input-group {
+    width: 110px;
+    flex-shrink: 0;
+}
+.sales-input {
+    text-align: right;
+    font-weight: 600;
+    color: var(--primary-color);
+    border-radius: 6px;
+    font-size: 0.95rem;
+    padding: 6px 10px;
+}
+
+/* Сводка (Лидерборд) */
+.summary-item {
+    padding: 15px 20px;
+    border-bottom: 1px solid #f1f5f9;
+}
+.summary-item:last-child { border-bottom: none; }
+
+.summary-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+.summary-title { font-weight: 700; font-size: 0.95rem; color: var(--text-dark); }
+.summary-percent { font-weight: 800; font-size: 0.95rem; }
+
+/* Цвета процентов */
+.p-high { color: #166534; }   /* > 90% */
+.p-mid { color: #d97706; }    /* 70-90% */
+.p-low { color: #dc2626; }    /* < 70% */
+
+.summary-progress {
+    height: 8px;
+    background-color: #f1f5f9;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+.summary-bar { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+.bg-high { background-color: #22c55e; }
+.bg-mid { background-color: #f59e0b; }
+.bg-low { background-color: #ef4444; }
+
+.summary-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    color: var(--text-gray);
+}
+.summary-meta span strong { color: var(--text-dark); }
+
+/* План (Инпут в сводке) */
+.plan-input {
+    width: 70px;
+    padding: 2px 5px;
+    font-size: 0.8rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    background: #ffffff;
+    text-align: right;
+    margin-left: 5px;
+}
+
+.ls-1 { letter-spacing: 1px; }
