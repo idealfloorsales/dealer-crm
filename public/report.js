@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Элементы
     const matrixHeader = document.getElementById('matrix-header');
     const matrixBody = document.getElementById('matrix-body');
+    const matrixFooter = document.getElementById('matrix-footer'); // НОВОЕ
     const matrixContainer = document.getElementById('matrix-container');
     const loadingMsg = document.getElementById('loading-msg');
     const exportBtn = document.getElementById('export-csv-btn');
@@ -58,54 +59,97 @@ document.addEventListener('DOMContentLoaded', () => {
         return { headers: filteredHeaders, matrix: filteredMatrix };
     }
 
-    // --- 1. RENDER MATRIX (MODERN TABLE) ---
+    // --- 1. RENDER MATRIX (С ПОДСЧЕТАМИ) ---
     function renderMatrix() {
         const data = getFilteredData();
+        
+        // Маппинг индексов (так как мы фильтруем колонки, индексы смещаются)
         const visibleOriginalIndices = data.headers.map(h => fullData.headers.indexOf(h));
+        const totalDealersCount = data.headers.length;
 
-        if (!matrixHeader || !matrixBody) return;
+        if (!matrixHeader || !matrixBody || !matrixFooter) return;
 
-        // Шапка с красивым форматированием
+        // --- ШАПКА ---
         matrixHeader.innerHTML = `
             <tr>
                 <th>Артикул</th>
                 <th>Название</th>
                 ${data.headers.map(h => `
                     <th class="text-center" title="${safeText(h.name)}">
-                        <div style="font-size:0.9rem; line-height:1.2; margin-bottom:2px;">${safeText(h.name)}</div>
+                        <div style="font-size:0.85rem; line-height:1.2; margin-bottom:2px; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${safeText(h.name)}</div>
                         <span class="badge bg-light text-secondary border fw-normal" style="font-size:0.7rem">${safeText(h.city)}</span>
                     </th>
                 `).join('')}
-            </tr>
+                <th>Сводка</th> </tr>
         `;
         
-        // Тело таблицы
+        // Массив для подсчета суммы по каждому дилеру (вертикально)
+        // Инициализируем нулями
+        const dealerTotals = new Array(totalDealersCount).fill(0);
+        let totalProductRows = 0; // Считаем только товары (не стенды)
+
+        // --- ТЕЛО ---
         matrixBody.innerHTML = data.matrix.map(row => {
             const isPos = row.type === 'pos';
             const rowClass = isPos ? 'row-pos' : '';
             const skuBadge = isPos ? '<span class="badge bg-warning text-dark">POS</span>' : `<span class="fw-bold text-dark">${safeText(row.sku)}</span>`;
             
-            return `
-            <tr class="${rowClass}">
-                <td>${skuBadge}</td>
-                <td title="${safeText(row.name)}">${safeText(row.name)}</td>
-                ${visibleOriginalIndices.map(index => {
-                    const cell = row.dealers[index];
-                    
-                    if (cell.is_pos) {
-                        // Стенды (Цифра)
-                        return cell.value > 0 ? `<td class="text-center"><span class="pos-value">${cell.value}</span></td>` : '<td></td>';
+            // Если это товар, увеличиваем счетчик "всего товаров" для футера
+            if (!isPos) totalProductRows++;
+
+            let rowPresenceCount = 0; // Счетчик по горизонтали
+
+            const cellsHtml = visibleOriginalIndices.map((index, i) => {
+                const cell = row.dealers[index];
+                
+                // Считаем сумму
+                if (cell.value > 0) {
+                    rowPresenceCount++; // Горизонтально
+                    if (!isPos) dealerTotals[i]++; // Вертикально (только если это товар, не стенд)
+                }
+
+                if (cell.is_pos) {
+                    return cell.value > 0 ? `<td class="text-center"><span class="pos-value">${cell.value}</span></td>` : '<td></td>';
+                } else {
+                    if (cell.value === 1) {
+                        return '<td class="text-center"><i class="bi bi-check-circle-fill matrix-check"></i></td>';
                     } else {
-                        // Товары (Галочка или точка)
-                        if (cell.value === 1) {
-                            return '<td class="text-center"><i class="bi bi-check-circle-fill matrix-check"></i></td>';
-                        } else {
-                            return '<td class="text-center"><span class="matrix-empty"></span></td>';
-                        }
+                        return '<td class="text-center"><span class="matrix-empty"></span></td>';
                     }
-                }).join('')}
-            </tr>`;
+                }
+            }).join('');
+
+            // Ячейка сводки по строке (Справа)
+            const rowPercent = totalDealersCount > 0 ? Math.round((rowPresenceCount / totalDealersCount) * 100) : 0;
+            const rowSummary = `<td class="text-center text-muted small">
+                <div class="fw-bold text-dark">${rowPresenceCount} / ${totalDealersCount}</div>
+                <div>${rowPercent}%</div>
+            </td>`;
+
+            return `<tr class="${rowClass}"><td>${skuBadge}</td><td title="${safeText(row.name)}">${safeText(row.name)}</td>${cellsHtml}${rowSummary}</tr>`;
         }).join('');
+
+        // --- ФУТЕР (ИТОГИ ПО ДИЛЕРАМ) ---
+        const footerCells = dealerTotals.map(count => {
+            const percent = totalProductRows > 0 ? Math.round((count / totalProductRows) * 100) : 0;
+            // Цвет процента
+            let colorClass = 'text-danger';
+            if(percent > 40) colorClass = 'text-warning';
+            if(percent > 70) colorClass = 'text-success';
+
+            return `<td>
+                <div class="fw-bold text-dark" style="font-size:0.9rem;">${count} / ${totalProductRows}</div>
+                <div class="${colorClass} small fw-bold">${percent}%</div>
+            </td>`;
+        }).join('');
+
+        matrixFooter.innerHTML = `
+            <tr>
+                <td colspan="2" class="text-end fw-bold text-uppercase text-secondary">Загрузка матрицы:</td>
+                ${footerCells}
+                <td>-</td>
+            </tr>
+        `;
 
         updateDropdownLabels();
     }
@@ -247,16 +291,21 @@ document.addEventListener('DOMContentLoaded', () => {
         const clean = (text) => `"${String(text || '').replace(/"/g, '""')}"`;
         
         let csv = "\uFEFFАртикул;Название;";
-        csv += data.headers.map(h => clean(`${h.name} (${h.city})`)).join(";") + "\r\n";
+        // Заголовки дилеров
+        csv += data.headers.map(h => clean(`${h.name} (${h.city})`)).join(";") + ";Итого\r\n";
 
         data.matrix.forEach(row => {
             csv += `${clean(row.sku)};${clean(row.name)};`;
+            
+            let rowCount = 0;
             const cells = visibleOriginalIndices.map(index => {
                 const cell = row.dealers[index];
+                if (cell.value > 0) rowCount++;
                 if (cell.is_pos) return cell.value > 0 ? cell.value : "";
                 return cell.value === 1 ? "1" : "";
             });
-            csv += cells.join(";") + "\r\n";
+            
+            csv += cells.join(";") + `;${rowCount}\r\n`;
         });
 
         const a = document.createElement('a');
