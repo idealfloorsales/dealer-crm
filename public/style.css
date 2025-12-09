@@ -1510,3 +1510,52 @@ nav a.nav-link.active { background: var(--primary-color) !important; color: whit
 .btn-circle-map:hover { transform: scale(1.1); color: var(--primary-color); }
 .btn-circle-map.active { background: var(--primary-color); color: white; }
 
+
+/* --- TOAST NOTIFICATIONS (ВСПЛЫВАШКИ) --- */
+
+.toast-container-custom {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none; /* Чтобы клики проходили сквозь пустое место */
+}
+
+.toast-modern {
+    background: #fff;
+    padding: 14px 20px;
+    border-radius: 12px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    border-left: 6px solid #ccc;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 280px;
+    max-width: 350px;
+    animation: toastSlideIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    pointer-events: auto;
+    font-size: 0.95rem;
+}
+
+/* Типы уведомлений */
+.toast-success { border-left-color: #198754; }
+.toast-success i { color: #198754; }
+
+.toast-error { border-left-color: #dc3545; }
+.toast-error i { color: #dc3545; }
+
+.toast-info { border-left-color: #0d6efd; }
+.toast-info i { color: #0d6efd; }
+
+@keyframes toastSlideIn {
+    from { transform: translateX(120%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes toastFadeOut {
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(-20px); }
+}
