@@ -20,11 +20,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const dealerListContainer = document.getElementById('dealer-list-container');
     const btnShowListMobile = document.getElementById('btn-show-list-mobile');
     const btnToggleSidebar = document.getElementById('btn-toggle-sidebar'); 
-    const visibleCountBadge = document.getElementById('map-visible-count');
+    const visibleCountBadge = document.getElementById('map-visible-count'); 
 
     // --- 1. Инициализация карты ---
     const container = L.DomUtil.get('main-map');
-    if(container != null){ if(container._leaflet_id != null){ container._leaflet_id = null; } }
+    if(container != null){
+      if(container._leaflet_id != null){
+        container._leaflet_id = null;
+      }
+    }
     
     const map = L.map('main-map', { zoomControl: false }).setView([DEFAULT_LAT, DEFAULT_LNG], 5);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OSM', maxZoom: 18 }).addTo(map);
@@ -49,7 +53,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const statusColors = { 'active': '#198754', 'standard': '#ffc107', 'problem': '#dc3545', 'potential': '#0d6efd', 'archive': '#6c757d' };
-    
     function createPinIcon(status) {
         const color = statusColors[status] || '#ffc107';
         const svgHtml = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${color}" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="pin-svg"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>`;
@@ -107,6 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (heatLayer) map.removeLayer(heatLayer);
 
         if (!isHeatmapMode) {
+            // РЕЖИМ МАРКЕРОВ
             filtered.forEach(d => {
                 const marker = L.marker([d.latitude, d.longitude], { icon: createPinIcon(d.status || 'standard') });
                 const phone = d.contacts && d.contacts[0] && d.contacts[0].contactInfo ? d.contacts[0].contactInfo.replace(/[^0-9]/g, '') : null;
@@ -130,10 +134,20 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             map.addLayer(markersCluster);
         } else {
+            // РЕЖИМ ТЕПЛОВОЙ КАРТЫ (ИСПРАВЛЕНО: ДЕЛАЕМ ЯРЧЕ И КРУПНЕЕ)
             const heatPoints = filtered.map(d => [d.latitude, d.longitude, 1]);
-            if(L.heatLayer) heatLayer = L.heatLayer(heatPoints, { radius: 25, blur: 15, maxZoom: 17 }).addTo(map);
+            
+            if(L.heatLayer) {
+                heatLayer = L.heatLayer(heatPoints, { 
+                    radius: 50,        // Увеличили радиус (было 25)
+                    blur: 35,          // Больше размытия для плавности
+                    minOpacity: 0.6,   // Важно: Минимальная яркость (0.6 делает точки видимыми сразу)
+                    maxZoom: 12        // Зум, на котором интенсивность максимальна
+                }).addTo(map);
+            }
         }
         
+        // Обновляем счетчик
         if (visibleCountBadge) visibleCountBadge.textContent = `Дилеров на карте: ${filtered.length}`;
     }
 
@@ -141,7 +155,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!dealerListContainer) return;
         if (filtered.length === 0) { dealerListContainer.innerHTML = '<p class="text-center text-muted mt-5">Ничего не найдено</p>'; return; }
 
-        // ИСПРАВЛЕННЫЙ СЛОВАРЬ (РУССКИЙ)
         const statusNames = { 'active': 'Активный', 'standard': 'Стандарт', 'problem': 'Проблемный', 'potential': 'Потенциальный', 'archive': 'Архив' };
 
         dealerListContainer.innerHTML = filtered.map(d => {
