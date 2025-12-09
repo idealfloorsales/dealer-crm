@@ -16,7 +16,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
 
-    <link rel="stylesheet" href="style.css?v=242"> <link rel="icon" href="favicon.gif" type="image/gif">
+    <link rel="stylesheet" href="style.css?v=243"> <link rel="icon" href="favicon.gif" type="image/gif">
     <link rel="manifest" href="manifest.json">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -60,10 +60,12 @@
                 <div class="d-flex gap-2">
                     <select id="map-filter-city" class="form-select form-select-sm border-0 bg-light"><option value="">Все города</option></select>
                     <select id="map-filter-status" class="form-select form-select-sm border-0 bg-light">
-                        <option value="">Статус</option>
-                        <option value="active">🟢 Active</option>
-                        <option value="standard">🟡 Standard</option>
-                        <option value="problem">🔴 Problem</option>
+                        <option value="">Все статусы</option>
+                        <option value="active">🟢 Активный</option>
+                        <option value="standard">🟡 Стандарт</option>
+                        <option value="problem">🔴 Проблемный</option>
+                        <option value="potential">🔵 Потенциальный</option>
+                        <option value="archive">⚫ Архив</option>
                     </select>
                 </div>
             </div>
@@ -81,6 +83,10 @@
              <button id="btn-my-location" class="btn-circle-map shadow" title="Сортировать по расстоянию"><i class="bi bi-geo-alt-fill"></i></button>
         </div>
 
+        <div id="map-visible-count" class="map-counter-pill shadow-sm">
+            Загрузка...
+        </div>
+
         <button id="btn-show-list-mobile" class="btn btn-primary rounded-pill shadow px-4 py-2 mobile-list-toggle d-md-none">
             <i class="bi bi-list-ul me-2"></i>Список
         </button>
@@ -92,5 +98,5 @@
     <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
     <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="map.js?v=242"></script> </body>
+    <script src="map.js?v=243"></script> </body>
 </html>
