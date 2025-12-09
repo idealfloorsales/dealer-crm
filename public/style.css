@@ -1468,13 +1468,14 @@ nav a.nav-link.active { background: var(--primary-color) !important; color: whit
     font-size: 0.75rem;
 }
 
-/* Мобильная адаптация */
+/* Мобильная кнопка "Список" */
 .mobile-list-toggle {
     position: absolute;
-    bottom: 30px;
+    bottom: 90px; /* Было 30px, подняли выше, чтобы не перекрывалось меню телефона */
     left: 50%;
     transform: translateX(-50%);
     z-index: 1100;
+    box-shadow: 0 4px 15px rgba(185, 4, 10, 0.4) !important; /* Добавил красивую тень */
 }
 
 @media (max-width: 768px) {
@@ -1494,7 +1495,7 @@ nav a.nav-link.active { background: var(--primary-color) !important; color: whit
 /* Кнопки справа */
 .map-actions-right {
     position: absolute;
-    bottom: 30px;
+    bottom: 90px;
     right: 20px;
     z-index: 1000;
     display: flex; flex-direction: column; gap: 10px;
@@ -1508,3 +1509,4 @@ nav a.nav-link.active { background: var(--primary-color) !important; color: whit
 }
 .btn-circle-map:hover { transform: scale(1.1); color: var(--primary-color); }
 .btn-circle-map.active { background: var(--primary-color); color: white; }
+
