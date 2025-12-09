@@ -191,3 +191,254 @@ document.addEventListener('DOMContentLoaded', () => {
 
     loadDealers();
 });
+
+document.addEventListener('DOMContentLoaded', () => {
+    
+    const API_URL = '/api/dealers';
+    const DEFAULT_LAT = 51.1605; 
+    const DEFAULT_LNG = 71.4704;
+
+    // Элементы
+    const filterCity = document.getElementById('map-filter-city');
+    const filterStatus = document.getElementById('map-filter-status');
+    const searchInput = document.getElementById('map-search');
+    const suggestionsBox = document.getElementById('map-search-suggestions');
+    
+    // Кнопки
+    const btnMyLocation = document.getElementById('btn-my-location');
+    const btnToggleHeat = document.getElementById('btn-toggle-heat');
+    const btnFullscreen = document.getElementById('btn-fullscreen');
+    
+    // Сайдбар и список
+    const sidebar = document.getElementById('map-sidebar');
+    const dealerListContainer = document.getElementById('dealer-list-container');
+    const btnShowListMobile = document.getElementById('btn-show-list-mobile');
+    const btnToggleSidebar = document.getElementById('btn-toggle-sidebar'); // Кнопка "Показать карту" внутри списка
+
+    // Карта
+    const map = L.map('main-map', { zoomControl: false }).setView([DEFAULT_LAT, DEFAULT_LNG], 5);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OSM', maxZoom: 18 }).addTo(map);
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+    let allDealers = [];
+    let userLat = null; 
+    let userLng = null;
+    
+    let markersCluster = L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 50 });
+    let heatLayer = null;
+    let isHeatmapMode = false;
+
+    // --- UTILS: Расчет дистанции (Haversine Formula) ---
+    function getDistanceKm(lat1, lon1, lat2, lon2) {
+        const R = 6371; // Радиус Земли
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                  Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+    }
+
+    const statusColors = { 'active': '#198754', 'standard': '#ffc107', 'problem': '#dc3545', 'potential': '#0d6efd', 'archive': '#6c757d' };
+    function createPinIcon(status) {
+        const color = statusColors[status] || '#ffc107';
+        const svgHtml = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${color}" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="pin-svg"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>`;
+        return L.divIcon({ className: 'custom-pin', html: svgHtml, iconSize: [36, 36], iconAnchor: [18, 36], popupAnchor: [0, -32] });
+    }
+
+    async function loadDealers() {
+        try {
+            const res = await fetch(API_URL);
+            if(!res.ok) throw new Error('Error');
+            allDealers = await res.json();
+            
+            const cities = [...new Set(allDealers.map(d => d.city).filter(Boolean))].sort();
+            filterCity.innerHTML = '<option value="">Все города</option>';
+            cities.forEach(c => filterCity.add(new Option(c, c)));
+
+            updateMapAndList();
+        } catch (e) { console.error(e); if(dealerListContainer) dealerListContainer.innerHTML = '<p class="text-center text-danger mt-4">Ошибка загрузки</p>'; }
+    }
+
+    function updateMapAndList() {
+        const city = filterCity.value;
+        const status = filterStatus.value;
+
+        // Фильтрация
+        let filtered = allDealers.filter(d => {
+            if (!d.latitude || !d.longitude) return false;
+            let statusMatch = true;
+            if (status) statusMatch = (d.status === status);
+            else statusMatch = (d.status !== 'archive'); 
+            return (!city || d.city === city) && statusMatch;
+        });
+
+        // СОРТИРОВКА ПО ДИСТАНЦИИ (Если есть координаты юзера)
+        if (userLat && userLng) {
+            filtered.forEach(d => {
+                d._distance = getDistanceKm(userLat, userLng, d.latitude, d.longitude);
+            });
+            filtered.sort((a, b) => a._distance - b._distance);
+        } else {
+            // Иначе по имени
+            filtered.sort((a, b) => a.name.localeCompare(b.name));
+        }
+
+        // Рендер Карты
+        renderMapMarkers(filtered);
+        
+        // Рендер Списка
+        renderSideList(filtered);
+    }
+
+    function renderMapMarkers(filtered) {
+        markersCluster.clearLayers();
+        if (heatLayer) map.removeLayer(heatLayer);
+
+        if (!isHeatmapMode) {
+            filtered.forEach(d => {
+                const marker = L.marker([d.latitude, d.longitude], { icon: createPinIcon(d.status || 'standard') });
+                const phone = d.contacts && d.contacts[0] && d.contacts[0].contactInfo ? d.contacts[0].contactInfo.replace(/[^0-9]/g, '') : null;
+                const waLink = phone ? `https://wa.me/${phone}` : '#';
+                const navLink = `https://yandex.kz/maps/?pt=${d.longitude},${d.latitude}&z=17&l=map`;
+                const distBadge = (d._distance !== undefined) ? `<span class="badge bg-light text-dark border mb-2">${d._distance.toFixed(1)} км</span><br>` : '';
+
+                marker.bindPopup(`
+                    <div class="popup-header">${d.name}</div>
+                    <div class="popup-body">
+                        ${distBadge}
+                        <div style="margin-bottom:5px;"><i class="bi bi-geo-alt text-muted"></i> ${d.address || ''}</div>
+                    </div>
+                    <div class="popup-footer">
+                        <a href="dealer.html?id=${d.id}" class="btn btn-sm btn-primary flex-fill" target="_blank">Профиль</a>
+                        ${phone ? `<a href="${waLink}" class="btn btn-sm btn-success" target="_blank"><i class="bi bi-whatsapp"></i></a>` : ''}
+                        <a href="${navLink}" class="btn btn-sm btn-outline-secondary" target="_blank"><i class="bi bi-map"></i></a>
+                    </div>
+                `);
+                
+                // Связываем маркер с ID дилера для клика из списка
+                marker.dealerId = d.id;
+                markersCluster.addLayer(marker);
+            });
+            map.addLayer(markersCluster);
+        } else {
+            const heatPoints = filtered.map(d => [d.latitude, d.longitude, 1]);
+            heatLayer = L.heatLayer(heatPoints, { radius: 25, blur: 15, maxZoom: 17 }).addTo(map);
+        }
+    }
+
+    function renderSideList(filtered) {
+        if (!dealerListContainer) return;
+        if (filtered.length === 0) { dealerListContainer.innerHTML = '<p class="text-center text-muted mt-5">Ничего не найдено</p>'; return; }
+
+        dealerListContainer.innerHTML = filtered.map(d => {
+            const dist = (d._distance !== undefined) ? `<span class="dist-badge"><i class="bi bi-cursor-fill me-1"></i>${d._distance.toFixed(1)} км</span>` : '';
+            return `
+            <div class="map-list-item" onclick="flyToDealer(${d.latitude}, ${d.longitude}, '${d.id}')">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="map-item-title">${d.name}</div>
+                    ${dist}
+                </div>
+                <div class="map-item-addr">${d.address || d.city || ''}</div>
+                <div class="map-item-meta">
+                    <span class="text-uppercase" style="font-size:0.7rem; font-weight:700; color:${statusColors[d.status||'standard']}">${d.status||'standard'}</span>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    // Глобальная функция для клика из списка
+    window.flyToDealer = (lat, lng, id) => {
+        map.flyTo([lat, lng], 16);
+        
+        // На мобильном закрываем список
+        if (window.innerWidth < 768 && sidebar) sidebar.classList.remove('open');
+
+        // Пытаемся открыть попап
+        // (Это сложнее с кластерами, но flyTo хотя бы приблизит)
+    };
+
+    // --- HANDLERS (С защитой от null) ---
+    if(filterCity) filterCity.onchange = updateMapAndList;
+    if(filterStatus) filterStatus.onchange = updateMapAndList;
+
+    if(btnToggleHeat) btnToggleHeat.onclick = () => {
+        isHeatmapMode = !isHeatmapMode;
+        btnToggleHeat.classList.toggle('active');
+        updateMapAndList();
+    };
+
+    // ГЕОЛОКАЦИЯ + СОРТИРОВКА
+    if(btnMyLocation) btnMyLocation.onclick = () => {
+        if (navigator.geolocation) {
+            const oldHtml = btnMyLocation.innerHTML;
+            btnMyLocation.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+            
+            navigator.geolocation.getCurrentPosition(pos => {
+                userLat = pos.coords.latitude;
+                userLng = pos.coords.longitude;
+                
+                // Рисуем юзера
+                map.setView([userLat, userLng], 13);
+                L.circleMarker([userLat, userLng], {radius: 8, color: '#3388ff', fillOpacity: 0.8}).addTo(map).bindPopup("Вы здесь").openPopup();
+                
+                // ПЕРЕСОРТИРОВКА СПИСКА
+                updateMapAndList(); 
+
+                btnMyLocation.innerHTML = '<i class="bi bi-geo-alt-fill"></i>';
+            }, () => {
+                alert("Ошибка геопозиции");
+                btnMyLocation.innerHTML = oldHtml;
+            });
+        }
+    };
+
+    // FULLSCREEN
+    if(btnFullscreen) btnFullscreen.onclick = () => {
+        const elem = document.getElementById('map-container-fullscreen');
+        if (!document.fullscreenElement) {
+            elem.requestFullscreen().catch(err => { alert(`Ошибка: ${err.message}`); });
+        } else { document.exitFullscreen(); }
+    };
+
+    // SEARCH
+    let debounceTimer;
+    if(searchInput) searchInput.addEventListener('input', () => {
+        clearTimeout(debounceTimer);
+        const query = searchInput.value.trim();
+        if (query.length < 3) { suggestionsBox.style.display = 'none'; return; }
+        debounceTimer = setTimeout(async () => {
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=kz`);
+                const data = await res.json();
+                suggestionsBox.innerHTML = '';
+                if (data.length > 0) {
+                    suggestionsBox.style.display = 'block';
+                    data.slice(0, 5).forEach(place => {
+                        const div = document.createElement('div');
+                        div.className = 'address-suggestion-item';
+                        div.textContent = place.display_name;
+                        div.onclick = () => {
+                            const lat = parseFloat(place.lat); const lon = parseFloat(place.lon);
+                            map.setView([lat, lon], 16);
+                            searchInput.value = place.display_name;
+                            suggestionsBox.style.display = 'none';
+                        };
+                        suggestionsBox.appendChild(div);
+                    });
+                } else { suggestionsBox.style.display = 'none'; }
+            } catch (e) { console.error(e); }
+        }, 500);
+    });
+
+    // SIDEBAR TOGGLE (MOBILE)
+    if(btnShowListMobile && sidebar) {
+        btnShowListMobile.onclick = () => { sidebar.classList.add('open'); };
+    }
+    if(btnToggleSidebar && sidebar) {
+        btnToggleSidebar.onclick = () => { sidebar.classList.remove('open'); };
+    }
+
+    loadDealers();
+});
