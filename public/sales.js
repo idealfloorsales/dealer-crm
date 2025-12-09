@@ -77,12 +77,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- LOGIC ---
     function getDealerGroup(d) {
+        // 1. Астана (по ответственному)
         if (d.responsible === 'regional_astana') return 'regional_astana';
+
+        // 2. Все остальные - строго по ГОРОДУ
         if (d.city) {
             const cityKey = (d.city || '').trim().toLowerCase();
             if (cityKey === 'астана') return 'regional_astana';
             if (cityToRegion[cityKey]) return cityToRegion[cityKey];
         }
+
+        // 3. Если город не найден или пустой - в "Остальные"
         return 'other';
     }
 
@@ -110,6 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return { diff: fact - plan, forecast, percent };
     }
 
+    // Сохранение (С поддержкой минусов)
     function captureState() {
         document.querySelectorAll('.sales-input.inp-fact').forEach(inp => {
             const row = inp.closest('.sales-row');
@@ -128,7 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (record) { 
                 record.fact = val; 
-            } else if (val !== 0) { 
+            } else if (val !== 0) { // Сохраняем всё, кроме нуля
                 currentSales.push({ month: monthPicker.value, group, dealerId, dealerName, isCustom, plan: 0, fact: val });
             }
         });
@@ -225,7 +231,7 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         });
 
-        // 2. Render Summary (С ИЗМЕНЕННЫМ ПОРЯДКОМ)
+        // 2. Render Summary
         const plans = {};
         const keys = ["regional_regions", "north", "south", "west", "east", "center", "regional_astana", "mir_laminata", "twelve_months", "total_all"];
         keys.forEach(k => {
@@ -244,6 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (percent >= 90) { colorClass = 'p-high'; bgClass = 'bg-high'; }
             if (percent < 70) { colorClass = 'p-low'; bgClass = 'bg-low'; }
             const width = Math.min(percent, 100);
+
             const planVal = plan !== 0 ? plan : '';
 
             return `
@@ -268,16 +275,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let summaryHtml = '';
         
-        // --- 1. ВСЕГО ---
+        // --- 1. Общий итог ---
         summaryHtml += `<div class="p-3 bg-primary-subtle border-bottom"><h6 class="fw-bold mb-3 text-primary text-uppercase small ls-1">Общий результат</h6>${renderSumItem("ВСЕГО ПО КОМПАНИИ", "total_all", totalFactAll)}</div>`;
         
-        // --- 2. КЛЮЧЕВЫЕ (АСТАНА И ТОПЫ) - ПОДНЯЛИ НАВЕРХ ---
+        // --- 2. Ключевые (Астана и Топы) ---
         summaryHtml += renderSumItem("Астана (Региональный)", "regional_astana", facts.regional_astana);
         summaryHtml += renderSumItem("Мир Ламината", "mir_laminata", facts.mir_laminata);
         summaryHtml += renderSumItem("12 Месяцев Алаш", "twelve_months", facts.twelve_months);
 
-        // --- 3. РЕГИОНЫ (ОБЩЕЕ + ДЕТАЛИ) ---
-        summaryHtml += `<div class="mt-2 border-top"></div>`; // Разделитель
+        // --- 3. Регионы ---
+        summaryHtml += `<div class="mt-2 border-top"></div>`;
         summaryHtml += renderSumItem("Регионы (Общее)", "regional_regions", totalRegionsFact);
         summaryHtml += renderSumItem("Север", "north", facts.north, true);
         summaryHtml += renderSumItem("Восток", "east", facts.east, true);
@@ -285,7 +292,7 @@ document.addEventListener('DOMContentLoaded', () => {
         summaryHtml += renderSumItem("Запад", "west", facts.west, true);
         summaryHtml += renderSumItem("Центр", "center", facts.center, true);
         
-        // --- 4. ПРОЧИЕ ---
+        // --- 4. Прочие ---
         if (facts.other !== 0) {
             summaryHtml += `<div class="summary-item"><div class="summary-header"><span class="summary-title text-muted">Прочие / Разовые</span><span class="summary-percent text-muted">-</span></div><div class="summary-meta"><span>Факт: <strong>${fmt(facts.other)}</strong></span></div></div>`;
         }
@@ -319,18 +326,30 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // --- SAVE BTN (TOAST UPDATED) ---
     saveBtn.onclick = async () => {
         captureState();
         try {
-            saveBtn.disabled = true; saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+            saveBtn.disabled = true; 
+            saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
             const res = await fetch(API_SALES, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ month: monthPicker.value, data: currentSales }) });
             if (res.ok) { 
+                // Вызываем тост из script.js, если он доступен
+                if (window.showToast) {
+                    window.showToast('Сохранено успешно!');
+                } else {
+                    alert('Сохранено!'); // Фоллбэк
+                }
+
                 saveBtn.className = 'btn btn-success shadow-sm px-4 rounded-pill';
                 saveBtn.innerHTML = '<i class="bi bi-check-lg"></i> Сохранено'; 
-                setTimeout(() => { saveBtn.innerHTML = '<i class="bi bi-save me-2"></i>Сохранить'; saveBtn.className = 'btn btn-success shadow-sm px-4 rounded-pill'; }, 2000);
+                setTimeout(() => { saveBtn.innerHTML = '<i class="bi bi-save me-2"></i>Сохранить'; }, 2000);
                 loadData(); 
             } else throw new Error('Ошибка');
-        } catch (e) { alert(e.message); saveBtn.disabled = false; }
+        } catch (e) { 
+            if (window.showToast) window.showToast(e.message, 'error'); else alert(e.message);
+            saveBtn.disabled = false; 
+        }
         finally { saveBtn.disabled = false; }
     };
     
