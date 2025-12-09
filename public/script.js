@@ -143,6 +143,39 @@ document.addEventListener('DOMContentLoaded', () => {
         collSelect.innerHTML = html;
     };
 
+// Функция показа уведомлений (НОВАЯ)
+    window.showToast = function(message, type = 'success') {
+        let container = document.getElementById('toast-container-custom');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'toast-container-custom';
+            container.className = 'toast-container-custom';
+            document.body.appendChild(container);
+        }
+
+        const toast = document.createElement('div');
+        toast.className = `toast-modern toast-${type}`;
+        
+        let iconClass = 'check-circle-fill';
+        if (type === 'error') iconClass = 'exclamation-triangle-fill';
+        if (type === 'info') iconClass = 'info-circle-fill';
+
+        toast.innerHTML = `<i class="bi bi-${iconClass} fs-5"></i><span class="fw-bold text-dark">${message}</span>`;
+        
+        container.appendChild(toast);
+
+        // Удаление через 3 сек
+        setTimeout(() => {
+            toast.style.animation = 'toastFadeOut 0.5s forwards';
+            setTimeout(() => toast.remove(), 500);
+        }, 3000);
+    };
+
+    const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
+    const safeText = (text) => (text || '').toString().replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const safeAttr = (text) => (text || '').toString().replace(/"/g, '&quot;');
+    const compressImage = (file, maxWidth = 1000, quality = 0.7) => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = event => { const img = new Image(); img.src = event.target.result; img.onload = () => { const elem = document.createElement('canvas'); let width = img.width; let height = img.height; if (width > maxWidth) { height *= maxWidth / width; width = maxWidth; } elem.width = width; elem.height = height; const ctx = elem.getContext('2d'); ctx.drawImage(img, 0, 0, width, height); resolve(elem.toDataURL('image/jpeg', quality)); }; img.onerror = error => reject(error); }; reader.onerror = error => reject(error); });
+    
     // ==========================================
     // 4. ОСНОВНЫЕ ФУНКЦИИ (ОПРЕДЕЛЯЕМ СНАЧАЛА)
     // ==========================================
@@ -505,4 +538,5 @@ document.addEventListener('DOMContentLoaded', () => {
     // Запуск
     initApp();
 });
+
 
