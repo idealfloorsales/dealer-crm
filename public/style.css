@@ -1416,3 +1416,95 @@ nav a.nav-link.active { background: var(--primary-color) !important; color: whit
 .d-active { background: #198754; } .d-standard { background: #ffc107; } .d-problem { background: #dc3545; } .d-potential { background: #0d6efd; }
 .custom-pin { filter: drop-shadow(0 3px 4px rgba(0,0,0,0.3)); transition: transform 0.2s; } .custom-pin:hover { transform: scale(1.1) translateY(-5px); z-index: 1000 !important; } .pin-svg { width: 100%; height: 100%; display: block; }
 @media (max-width: 768px) { .map-floating-panel { left: 10px; right: 10px; top: 10px; width: auto; } .map-counter-pill { top: 75px; } /* Чуть ниже на телефоне, чтобы не закрывать фильтры */ }
+
+
+/* --- MAP SIDEBAR & LIST (STORE LOCATOR) --- */
+
+.map-sidebar {
+    width: 360px;
+    height: 100%;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    z-index: 1005; /* Поверх карты */
+    position: relative;
+    border-right: 1px solid #ddd;
+}
+
+.sidebar-content {
+    flex-grow: 1;
+    overflow-y: auto;
+    background: #f8fafc;
+}
+
+/* Карточка дилера в списке */
+.map-list-item {
+    background: #fff;
+    padding: 15px;
+    border-bottom: 1px solid #eef2f6;
+    cursor: pointer;
+    transition: background 0.2s;
+    position: relative;
+}
+.map-list-item:hover {
+    background-color: #f1f5f9;
+}
+.map-list-item.active {
+    background-color: #fffbeb; /* Подсветка выбранного */
+    border-left: 4px solid var(--primary-color);
+}
+
+.map-item-title { font-weight: 700; color: var(--text-dark); margin-bottom: 4px; font-size: 0.95rem; }
+.map-item-addr { font-size: 0.85rem; color: #666; margin-bottom: 4px; }
+.map-item-meta { font-size: 0.75rem; color: #999; display: flex; gap: 10px; align-items: center; }
+
+/* Бейдж расстояния */
+.dist-badge {
+    background: #e0f2fe;
+    color: #0369a1;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 0.75rem;
+}
+
+/* Мобильная адаптация */
+.mobile-list-toggle {
+    position: absolute;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1100;
+}
+
+@media (max-width: 768px) {
+    .map-sidebar {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        transform: translateY(100%); /* Спрятан вниз */
+        transition: transform 0.3s ease-in-out;
+    }
+    .map-sidebar.open {
+        transform: translateY(0); /* Выезжает */
+    }
+    /* Убираем кнопку "Я тут" наверх, чтобы не мешала кнопке списка */
+    .map-actions-right { bottom: 90px; }
+}
+
+/* Кнопки справа */
+.map-actions-right {
+    position: absolute;
+    bottom: 30px;
+    right: 20px;
+    z-index: 1000;
+    display: flex; flex-direction: column; gap: 10px;
+}
+.btn-circle-map {
+    width: 44px; height: 44px;
+    background: white; border: none; border-radius: 50%;
+    color: #333; font-size: 1.2rem;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: 0.2s;
+}
+.btn-circle-map:hover { transform: scale(1.1); color: var(--primary-color); }
+.btn-circle-map.active { background: var(--primary-color); color: white; }
