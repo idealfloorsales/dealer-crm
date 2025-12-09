@@ -51,13 +51,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const formatResponsible = (val) => {
         if (val === 'regional_astana') return 'Региональный Астана';
         if (val === 'regional_regions') return 'Региональный Регионы';
+        if (val === 'office') return 'Офис / Прочее';
         return val || '---';
     };
 
     // --- MAIN FETCH ---
     async function fetchDealerDetails() {
         try {
-            // 1. Check Auth (Hide buttons if Guest)
+            // 1. Auth Check
             try {
                 const authRes = await fetch('/api/auth/me');
                 if (authRes.ok) {
@@ -70,9 +71,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } catch(e) { console.warn('Auth check skipped'); }
 
-            // 2. Load Dealer Data
+            // 2. Load Data
             const dealerRes = await fetch(`${API_DEALERS_URL}/${dealerId}`);
-            if (!dealerRes.ok) throw new Error(`Дилер не найден или нет доступа.`);
+            if (!dealerRes.ok) throw new Error(`Дилер не найден.`);
             const dealer = await dealerRes.json();
             currentDealerName = dealer.name;
 
@@ -85,7 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
             dealerLat = dealer.latitude;
             dealerLng = dealer.longitude;
             
-            // 3. Fill Header
+            // Header
             if(dealerNameEl) dealerNameEl.textContent = safeText(dealer.name);
             if(dealerIdEl) dealerIdEl.innerHTML = `<i class="bi bi-hash"></i> ${safeText(dealer.dealer_id)}`;
             if(dealerCityEl) dealerCityEl.innerHTML = `<i class="bi bi-geo-alt"></i> ${safeText(dealer.city)}`;
@@ -101,7 +102,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             document.title = `${dealer.name}`;
             
-            // 4. Info List
+            // Info List
             const infoEl = document.getElementById('dealer-info-main');
             if(infoEl) {
                 infoEl.innerHTML = `
@@ -119,7 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if(deliveryContainer) deliveryContainer.textContent = safeText(dealer.delivery) || 'Не указано';
             if(bonusesContainer) bonusesContainer.textContent = safeText(dealer.bonuses) || 'Нет примечаний';
             
-            // 5. Render Lists
+            // Lists
             renderDealerAddresses(dealer.additional_addresses || []); 
             renderDealerPos(dealer.pos_materials || []); 
             renderDealerLinks(dealer.website, dealer.instagram); 
@@ -128,16 +129,82 @@ document.addEventListener('DOMContentLoaded', () => {
             renderDealerCompetitors(dealer.competitors || []); 
             renderDealerPhotos(dealer.photos || []); 
             fetchDealerProducts(dealer.products); 
-            fetchDealerSales();
+            fetchDealerSales(); // Новая функция
 
         } catch (error) { 
             console.error(error); 
             if(dealerNameEl) dealerNameEl.textContent = 'Ошибка загрузки'; 
-            if(dealerIdEl) dealerIdEl.textContent = error.message; 
         }
     }
 
-    // --- RENDERERS ---
+    // --- RENDER FUNCTIONS ---
+
+    // 1. ПРОДАЖИ (С ИТОГАМИ ПО ГОДАМ)
+    async function fetchDealerSales() {
+        if (!salesHistoryContainer) return;
+        try {
+            const res = await fetch(`${API_SALES_URL}?dealerId=${dealerId}`); 
+            if (!res.ok) throw new Error();
+            const sales = await res.json();
+            
+            if (!sales || sales.length === 0) { 
+                salesHistoryContainer.innerHTML = '<div class="text-center py-4 text-muted bg-light rounded">Нет данных о продажах.</div>'; 
+                return; 
+            }
+
+            // Группировка по годам
+            const salesByYear = {};
+            let grandTotal = 0;
+
+            sales.forEach(s => {
+                const year = s.month.split('-')[0]; // "2024-11" -> "2024"
+                if (!salesByYear[year]) salesByYear[year] = [];
+                salesByYear[year].push(s);
+            });
+
+            // Сортируем годы по убыванию (2025, 2024...)
+            const years = Object.keys(salesByYear).sort().reverse();
+
+            let html = '<div class="table-responsive"><table class="table table-bordered table-sm mb-0">';
+            html += '<thead class="table-light"><tr><th>Период</th><th class="text-end">Факт (м²)</th></tr></thead><tbody>';
+
+            years.forEach(year => {
+                // Заголовок года
+                html += `<tr class="table-secondary"><td colspan="2" class="fw-bold ps-3 text-dark">${year} год</td></tr>`;
+
+                const yearSales = salesByYear[year];
+                // Сортируем месяцы внутри года (декабрь выше января)
+                yearSales.sort((a, b) => b.month.localeCompare(a.month));
+
+                let yearTotal = 0;
+
+                yearSales.forEach(s => {
+                    const date = new Date(s.month + '-01');
+                    const monthName = date.toLocaleString('ru-RU', { month: 'long' });
+                    // Первая буква заглавная
+                    const monthDisplay = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+                    const fact = parseFloat(s.fact) || 0;
+                    
+                    yearTotal += fact;
+                    grandTotal += fact;
+
+                    html += `<tr><td class="ps-4">${monthDisplay}</td><td class="text-end font-monospace">${fact}</td></tr>`;
+                });
+
+                // Итог за год
+                html += `<tr style="background-color: #fffbeb;"><td class="ps-3 fw-bold text-muted">Итого за ${year}:</td><td class="text-end fw-bold text-dark">${parseFloat(yearTotal.toFixed(2))}</td></tr>`;
+            });
+
+            html += '</tbody>';
+            
+            // ГРАНД ТОТАЛ
+            html += `<tfoot class="table-dark"><tr><td class="fw-bold ps-3 text-uppercase">Всего за все время</td><td class="text-end fw-bold fs-6">${parseFloat(grandTotal.toFixed(2))}</td></tr></tfoot>`;
+            
+            html += '</table></div>';
+            salesHistoryContainer.innerHTML = html;
+
+        } catch (e) { salesHistoryContainer.innerHTML = `<p class="text-danger">Ошибка загрузки продаж</p>`; }
+    }
 
     function renderDealerContacts(contacts) {
         if (!contactsListContainer) return;
@@ -182,19 +249,6 @@ document.addEventListener('DOMContentLoaded', () => {
         html += products.map(p => `<div class="product-grid-item" title="${safeText(p.name)}"><i class="bi bi-check-circle-fill"></i><div class="product-info"><span class="product-sku">${safeText(p.sku)}</span><span class="product-name">${safeText(p.name)}</span></div></div>`).join('');
         html += '</div>';
         c.innerHTML = html;
-    }
-
-    async function fetchDealerSales() {
-        if (!salesHistoryContainer) return;
-        try {
-            const res = await fetch(`${API_SALES_URL}?dealerId=${dealerId}`); if (!res.ok) throw new Error();
-            const sales = await res.json();
-            if (!sales || sales.length === 0) { salesHistoryContainer.innerHTML = '<p class="text-muted text-center">Нет данных о продажах.</p>'; return; }
-            sales.sort((a, b) => b.month.localeCompare(a.month));
-            let html = `<table class="table table-bordered table-sm"><thead><tr class="table-light"><th>Месяц</th><th>Факт (м²)</th></tr></thead><tbody>`;
-            sales.forEach(s => { const date = new Date(s.month + '-01'); const monthName = date.toLocaleString('ru-RU', { month: 'long', year: 'numeric' }); html += `<tr><td class="fw-bold">${monthName.charAt(0).toUpperCase() + monthName.slice(1)}</td><td class="text-success fw-bold text-end">${s.fact}</td></tr>`; });
-            html += `</tbody></table>`; salesHistoryContainer.innerHTML = html;
-        } catch (e) { salesHistoryContainer.innerHTML = `<p class="text-danger">Ошибка загрузки продаж</p>`; }
     }
 
     function renderDealerLinks(website, instagram) { 
@@ -261,7 +315,12 @@ document.addEventListener('DOMContentLoaded', () => {
         let csv = ""; let filename = `${currentDealerName}_${type}.csv`;
         if (type === 'sales') {
             const table = document.querySelector('#dealer-sales-history table'); if(!table) return alert("Нет данных");
-            csv = "\uFEFFМесяц;Факт\n"; table.querySelectorAll('tbody tr').forEach(tr => { const tds = tr.querySelectorAll('td'); if(tds.length > 1) csv += `${clean(tds[0].innerText)};${clean(tds[1].innerText)}\n`; });
+            // Простой парсер текста из таблицы, чтобы захватить и годы, и месяцы
+            table.querySelectorAll('tr').forEach(tr => {
+                const rowData = [];
+                tr.querySelectorAll('th, td').forEach(td => rowData.push(clean(td.innerText)));
+                csv += rowData.join(";") + "\n";
+            });
         } else if (type === 'competitors') {
             const table = document.querySelector('#dealer-competitors-list table'); if(!table) return alert("Нет данных");
             csv = "\uFEFFБренд;Коллекция;ОПТ;Розница\n"; table.querySelectorAll('tbody tr').forEach(tr => { const tds = tr.querySelectorAll('td'); csv += `${clean(tds[0].innerText)};${clean(tds[1].innerText)};${clean(tds[2].innerText)};${clean(tds[3].innerText)}\n`; });
