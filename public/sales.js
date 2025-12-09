@@ -75,22 +75,17 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) { alert('Ошибка загрузки данных: ' + e.message); }
     }
 
-    // --- LOGIC (ИСПРАВЛЕНО РАСПРЕДЕЛЕНИЕ) ---
+    // --- LOGIC ---
     function getDealerGroup(d) {
-        // 1. Астана всегда отдельно
         if (d.responsible === 'regional_astana') return 'regional_astana';
-        
-        // 2. Если есть город, ПРИОРИТЕТНО ищем регион по городу
-        // (даже если ответственный "regional_regions", мы должны понять - Север это или Юг)
+        if (d.responsible === 'regional_regions') return 'regional_regions';
+        if (!d.responsible) return 'other';
+
         if (d.city) {
             const cityKey = (d.city || '').trim().toLowerCase();
             if (cityKey === 'астана') return 'regional_astana';
             if (cityToRegion[cityKey]) return cityToRegion[cityKey];
         }
-
-        // 3. Если город неизвестен, но назначен ответственный - кидаем в "Остальные" (или можно сделать default регион)
-        if (d.responsible === 'regional_regions') return 'other';
-
         return 'other';
     }
 
@@ -118,32 +113,43 @@ document.addEventListener('DOMContentLoaded', () => {
         return { diff: fact - plan, forecast, percent };
     }
 
+    // ИСПРАВЛЕНИЕ: captureState теперь разрешает отрицательные числа
     function captureState() {
+        // 1. Факты
         document.querySelectorAll('.sales-input.inp-fact').forEach(inp => {
             const row = inp.closest('.sales-row');
             const dealerId = row.dataset.id === "null" ? null : row.dataset.id;
             const dealerName = row.dataset.name;
             const isCustom = row.dataset.custom === 'true';
             const group = row.closest('.region-card').dataset.group;
-            const val = parseFloat(inp.value) || 0;
+            
+            // Замена запятой на точку для надежности
+            const rawVal = inp.value.replace(',', '.');
+            const val = parseFloat(rawVal) || 0;
 
             let record = currentSales.find(s => 
                 (isCustom && s.isCustom && s.dealerName === dealerName) || 
                 (!isCustom && !s.isCustom && s.dealerId === dealerId)
             );
 
-            if (record) { record.fact = val; } 
-            else if (val > 0) {
+            if (record) { 
+                record.fact = val; // Обновляем всегда
+            } else if (val !== 0) { // ИСПРАВЛЕНО: Раньше было val > 0, теперь сохраняем всё кроме нуля
                 currentSales.push({ month: monthPicker.value, group, dealerId, dealerName, isCustom, plan: 0, fact: val });
             }
         });
         
+        // 2. Планы
         document.querySelectorAll('.plan-input').forEach(inp => {
             const planKey = inp.dataset.planKey;
-            const val = parseFloat(inp.value) || 0;
+            const rawVal = inp.value.replace(',', '.');
+            const val = parseFloat(rawVal) || 0;
+            
             let record = currentSales.find(s => s.dealerId === `PLAN_${planKey}`);
-            if (record) { record.plan = val; } 
-            else if (val > 0) {
+            
+            if (record) { 
+                record.plan = val; 
+            } else if (val !== 0) { // ИСПРАВЛЕНО
                 currentSales.push({ month: monthPicker.value, group: 'PLAN', dealerId: `PLAN_${planKey}`, dealerName: `Plan ${planKey}`, isCustom: false, plan: val, fact: 0 });
             }
         });
@@ -169,7 +175,6 @@ document.addEventListener('DOMContentLoaded', () => {
             regional_astana: 0, mir_laminata: 0, twelve_months: 0, other: 0
         };
 
-        // 1. Render Inputs (Cards)
         inputGroups.forEach(grp => {
             const groupDealers = allDealers.filter(d => {
                 const matchGroup = getDealerGroup(d) === grp.key;
@@ -178,7 +183,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const customSales = currentSales.filter(s => s.isCustom && s.group === grp.key);
 
-            // Показываем группу если есть дилеры, ИЛИ продажи, ИЛИ это "Остальные"
             if (groupDealers.length === 0 && customSales.length === 0 && grp.key !== 'other') return;
 
             let rowsHtml = '';
@@ -199,6 +203,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 else if (grp.key !== 'other') facts[grp.key] += fact;
                 else facts.other += fact;
 
+                // Для input value используем raw значение, но если 0 и нет фокуса, можно оставить пустым или 0
+                // Оставляем пустым если 0, чтобы плейсхолдер работал, НО если это возврат, он будет с минусом.
+                const displayVal = (fact !== 0) ? fact : '';
+
                 rowsHtml += `
                     <div class="sales-row" data-id="${item.id || ''}" data-name="${item.name}" data-custom="${item.isCustom}">
                         <div class="sales-dealer-name text-truncate">
@@ -207,7 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                         <div class="d-flex align-items-center gap-2">
                             <div class="sales-input-group">
-                                <input type="number" step="0.01" class="form-control form-control-sm sales-input inp-fact" value="${fact || ''}" placeholder="0">
+                                <input type="number" step="0.01" class="form-control form-control-sm sales-input inp-fact" value="${displayVal}" placeholder="0">
                             </div>
                             ${item.isCustom ? `<button class="btn btn-sm text-danger btn-del-row p-0" title="Удалить строку"><i class="bi bi-x-circle"></i></button>` : ''}
                         </div>
@@ -228,7 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         });
 
-        // 2. Render Summary (Leaderboard)
+        // 2. Render Summary
         const plans = {};
         const keys = ["regional_regions", "north", "south", "west", "east", "center", "regional_astana", "mir_laminata", "twelve_months", "total_all"];
         keys.forEach(k => {
@@ -239,8 +247,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const totalRegionsFact = facts.north + facts.south + facts.west + facts.east + facts.center;
         const totalFactAll = totalRegionsFact + facts.regional_astana + facts.mir_laminata + facts.twelve_months + facts.other;
         
-        // Вспомогательная функция для строки сводки
-        // ИСПРАВЛЕНО: План (input) теперь показывается ВСЕГДА
         const renderSumItem = (title, planKey, factVal, isSubItem = false) => {
             const plan = plans[planKey] || 0;
             const { diff, forecast, percent } = calculateKPI(plan, factVal, daysInMonth, currentDay);
@@ -250,12 +256,15 @@ document.addEventListener('DOMContentLoaded', () => {
             if (percent < 70) { colorClass = 'p-low'; bgClass = 'bg-low'; }
             const width = Math.min(percent, 100);
 
+            // Значение плана для инпута (пусто если 0)
+            const planVal = plan !== 0 ? plan : '';
+
             return `
             <div class="summary-item ${isSubItem ? 'ps-4 bg-light bg-opacity-25' : ''}">
                 <div class="summary-header">
                     <span class="summary-title">
                         ${title}
-                        <input type="number" class="plan-input" data-plan-key="${planKey}" value="${plan || ''}" placeholder="План">
+                        <input type="number" class="plan-input" data-plan-key="${planKey}" value="${planVal}" placeholder="План">
                     </span>
                     <span class="summary-percent ${colorClass}">${fmt(percent)}%</span>
                 </div>
@@ -272,20 +281,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let summaryHtml = '';
         summaryHtml += `<div class="p-3 bg-primary-subtle border-bottom"><h6 class="fw-bold mb-3 text-primary text-uppercase small ls-1">Общий результат</h6>${renderSumItem("ВСЕГО ПО КОМПАНИИ", "total_all", totalFactAll)}</div>`;
-        
-        // Регионы с планами
         summaryHtml += renderSumItem("Регионы (Общее)", "regional_regions", totalRegionsFact);
         summaryHtml += renderSumItem("Север", "north", facts.north, true);
         summaryHtml += renderSumItem("Восток", "east", facts.east, true);
         summaryHtml += renderSumItem("Юг", "south", facts.south, true);
         summaryHtml += renderSumItem("Запад", "west", facts.west, true);
         summaryHtml += renderSumItem("Центр", "center", facts.center, true);
-        
         summaryHtml += renderSumItem("Астана (Региональный)", "regional_astana", facts.regional_astana);
         summaryHtml += renderSumItem("Мир Ламината", "mir_laminata", facts.mir_laminata);
         summaryHtml += renderSumItem("12 Месяцев Алаш", "twelve_months", facts.twelve_months);
         
-        if (facts.other > 0) {
+        if (facts.other > 0 || facts.other < 0) { // Показываем даже если минус
             summaryHtml += `<div class="summary-item"><div class="summary-header"><span class="summary-title text-muted">Прочие / Разовые</span><span class="summary-percent text-muted">-</span></div><div class="summary-meta"><span>Факт: <strong>${fmt(facts.other)}</strong></span></div></div>`;
         }
 
@@ -304,7 +310,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             };
         });
-        
         document.querySelectorAll('.btn-del-row').forEach(btn => {
             btn.onclick = (e) => {
                 if(confirm('Удалить строку?')) {
@@ -326,7 +331,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (res.ok) { 
                 saveBtn.className = 'btn btn-success shadow-sm px-4 rounded-pill';
                 saveBtn.innerHTML = '<i class="bi bi-check-lg"></i> Сохранено'; 
-                setTimeout(() => { saveBtn.innerHTML = '<i class="bi bi-save me-2"></i>Сохранить'; }, 2000);
+                setTimeout(() => { saveBtn.innerHTML = '<i class="bi bi-save me-2"></i>Сохранить'; saveBtn.className = 'btn btn-success shadow-sm px-4 rounded-pill'; }, 2000);
                 loadData(); 
             } else throw new Error('Ошибка');
         } catch (e) { alert(e.message); saveBtn.disabled = false; }
