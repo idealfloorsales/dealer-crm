@@ -20,15 +20,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const dealerListContainer = document.getElementById('dealer-list-container');
     const btnShowListMobile = document.getElementById('btn-show-list-mobile');
     const btnToggleSidebar = document.getElementById('btn-toggle-sidebar'); 
-    const visibleCountBadge = document.getElementById('map-visible-count'); // Счетчик (если он есть)
+    const visibleCountBadge = document.getElementById('map-visible-count');
 
-    // --- 1. Инициализация карты (С ЗАЩИТОЙ ОТ ПОВТОРНОГО ЗАПУСКА) ---
+    // --- 1. Инициализация карты ---
     const container = L.DomUtil.get('main-map');
-    if(container != null){
-      if(container._leaflet_id != null){
-        container._leaflet_id = null;
-      }
-    }
+    if(container != null){ if(container._leaflet_id != null){ container._leaflet_id = null; } }
     
     const map = L.map('main-map', { zoomControl: false }).setView([DEFAULT_LAT, DEFAULT_LNG], 5);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OSM', maxZoom: 18 }).addTo(map);
@@ -53,6 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const statusColors = { 'active': '#198754', 'standard': '#ffc107', 'problem': '#dc3545', 'potential': '#0d6efd', 'archive': '#6c757d' };
+    
     function createPinIcon(status) {
         const color = statusColors[status] || '#ffc107';
         const svgHtml = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${color}" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="pin-svg"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>`;
@@ -137,7 +134,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if(L.heatLayer) heatLayer = L.heatLayer(heatPoints, { radius: 25, blur: 15, maxZoom: 17 }).addTo(map);
         }
         
-        // Обновляем счетчик, если он есть
         if (visibleCountBadge) visibleCountBadge.textContent = `Дилеров на карте: ${filtered.length}`;
     }
 
@@ -145,9 +141,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!dealerListContainer) return;
         if (filtered.length === 0) { dealerListContainer.innerHTML = '<p class="text-center text-muted mt-5">Ничего не найдено</p>'; return; }
 
+        // ИСПРАВЛЕННЫЙ СЛОВАРЬ (РУССКИЙ)
+        const statusNames = { 'active': 'Активный', 'standard': 'Стандарт', 'problem': 'Проблемный', 'potential': 'Потенциальный', 'archive': 'Архив' };
+
         dealerListContainer.innerHTML = filtered.map(d => {
             const dist = (d._distance !== undefined) ? `<span class="dist-badge"><i class="bi bi-cursor-fill me-1"></i>${d._distance.toFixed(1)} км</span>` : '';
-            const statusNames = { 'active': 'Активный', 'standard': 'Стандарт', 'problem': 'Проблема', 'potential': 'Потенциал', 'archive': 'Архив' };
             const stName = statusNames[d.status] || d.status;
 
             return `
@@ -180,6 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateMapAndList();
     };
 
+    // ГЕОЛОКАЦИЯ
     if(btnMyLocation) btnMyLocation.onclick = () => {
         if (navigator.geolocation) {
             const oldHtml = btnMyLocation.innerHTML;
@@ -189,18 +188,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 userLng = pos.coords.longitude;
                 map.setView([userLat, userLng], 13);
                 L.circleMarker([userLat, userLng], {radius: 8, color: '#3388ff', fillOpacity: 0.8}).addTo(map).bindPopup("Вы здесь").openPopup();
-                updateMapAndList(); 
+                updateMapAndList(); // Пересортировка списка
                 btnMyLocation.innerHTML = '<i class="bi bi-geo-alt-fill"></i>';
             }, () => { alert("Ошибка геопозиции"); btnMyLocation.innerHTML = oldHtml; });
         }
     };
 
+    // FULLSCREEN
     if(btnFullscreen) btnFullscreen.onclick = () => {
         const elem = document.getElementById('map-container-fullscreen');
-        if (!document.fullscreenElement) { elem.requestFullscreen().catch(err => { alert(`Ошибка: ${err.message}`); }); } 
-        else { document.exitFullscreen(); }
+        if (!document.fullscreenElement) {
+            elem.requestFullscreen().catch(err => { alert(`Ошибка: ${err.message}`); });
+        } else { document.exitFullscreen(); }
     };
 
+    // SEARCH
     let debounceTimer;
     if(searchInput) searchInput.addEventListener('input', () => {
         clearTimeout(debounceTimer);
