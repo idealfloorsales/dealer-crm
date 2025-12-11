@@ -8,7 +8,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json({ limit: '50mb' })); 
 app.use(cors());
 
-// 1. USERS
+// USERS
 const USERS = {
     'admin': process.env.ADMIN_PASSWORD || 'admin',
     'astana': process.env.ASTANA_PASSWORD || 'astana',
@@ -16,7 +16,7 @@ const USERS = {
     'guest': process.env.GUEST_PASSWORD || 'guest'
 };
 
-// 2. AUTH
+// AUTH
 const authMiddleware = (req, res, next) => {
     if (req.path === '/manifest.json' || req.path === '/sw.js' || req.path.endsWith('.png') || req.path.endsWith('.jpg') || req.path.endsWith('.jpeg') || req.path.endsWith('.ico') || req.path.endsWith('.gif')) {
         return next();
@@ -26,7 +26,7 @@ const authMiddleware = (req, res, next) => {
 };
 app.use(authMiddleware);
 
-// 3. STATIC
+// STATIC
 app.use(express.static('public', { index: false }));
 app.get('/', (req, res) => res.sendFile(__dirname + '/public/index.html'));
 app.get('/map.html', (req, res) => res.sendFile(__dirname + '/public/map.html'));
@@ -40,9 +40,16 @@ app.use(express.static('public'));
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// 4. SCHEMAS
-const statusSchema = new mongoose.Schema({ value: String, label: String, color: String, sortOrder: { type: Number, default: 0 } });
-const Status = mongoose.model('Status', statusSchema); // НОВАЯ МОДЕЛЬ
+// --- SCHEMAS ---
+// Добавили поле isVisible (по умолчанию true)
+const statusSchema = new mongoose.Schema({ 
+    value: String, 
+    label: String, 
+    color: String, 
+    isVisible: { type: Boolean, default: true }, 
+    sortOrder: { type: Number, default: 0 } 
+});
+const Status = mongoose.model('Status', statusSchema);
 
 const productSchema = new mongoose.Schema({ sku: String, name: String });
 const Product = mongoose.model('Product', productSchema);
@@ -62,13 +69,12 @@ const salesSchema = new mongoose.Schema({ month: String, group: String, dealerId
 const Sales = mongoose.model('Sales', salesSchema);
 const Knowledge = mongoose.model('Knowledge', new mongoose.Schema({ title: String, content: String }, { timestamps: true }));
 
-// DB & SEED
 async function connectToDB() {
     if (!DB_CONNECTION_STRING) return console.error("No DB String");
     try { 
         await mongoose.connect(DB_CONNECTION_STRING); 
         console.log('MongoDB Connected');
-        await seedStatuses(); // Создаем статусы если их нет
+        await seedStatuses(); 
     } catch (e) { console.error(e); }
 }
 
@@ -77,11 +83,11 @@ async function seedStatuses() {
     if (count === 0) {
         console.log("Seeding default statuses...");
         await Status.insertMany([
-            { value: 'active', label: 'Активный', color: '#198754', sortOrder: 1 },
-            { value: 'standard', label: 'Стандарт', color: '#ffc107', sortOrder: 2 },
-            { value: 'problem', label: 'Проблемный', color: '#dc3545', sortOrder: 3 },
-            { value: 'potential', label: 'Потенциальный', color: '#0d6efd', sortOrder: 4 },
-            { value: 'archive', label: 'Архив', color: '#6c757d', sortOrder: 5 }
+            { value: 'active', label: 'Активный', color: '#198754', isVisible: true, sortOrder: 1 },
+            { value: 'standard', label: 'Стандарт', color: '#ffc107', isVisible: true, sortOrder: 2 },
+            { value: 'problem', label: 'Проблемный', color: '#dc3545', isVisible: true, sortOrder: 3 },
+            { value: 'potential', label: 'Потенциальный', color: '#0d6efd', isVisible: true, sortOrder: 4 },
+            { value: 'archive', label: 'Архив', color: '#6c757d', isVisible: false, sortOrder: 5 } // Архив скрыт по умолчанию
         ]);
     }
 }
@@ -103,15 +109,15 @@ function getDealerFilter(req) {
 }
 const checkWrite = (req, res, next) => { if (canWrite(req)) next(); else res.status(403).json({error:'Read Only'}); };
 
-// --- ROUTES ---
+// ROUTES
 app.get('/api/auth/me', (req, res) => { res.json({ role: getUserRole(req) }); });
 
-// STATUS API
+// Statuses
 app.get('/api/statuses', async (req, res) => { const s = await Status.find().sort({sortOrder: 1}).lean(); res.json(s.map(convertToClient)); });
 app.post('/api/statuses', checkWrite, async (req, res) => { try { const s = new Status(req.body); await s.save(); res.json(convertToClient(s)); } catch(e){ res.status(500).json({error:e.message}); } });
 app.delete('/api/statuses/:id', checkWrite, async (req, res) => { await Status.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
 
-// Standard APIs
+// Dealers
 app.get('/api/dealers', async (req, res) => { try { const dealers = await Dealer.find(getDealerFilter(req)).lean(); res.json(dealers.map(d => ({ id: d._id, ...d, photo_url: d.avatarUrl }))); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.get('/api/dealers/:id', async (req, res) => { try { const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).populate('products'); res.json(convertToClient(d)); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.post('/api/dealers', checkWrite, async (req, res) => { try { const role = getUserRole(req); if (role === 'astana') req.body.responsible = 'regional_astana'; if (role === 'regions') req.body.responsible = 'regional_regions'; const d = new Dealer(req.body); await d.save(); res.status(201).json(convertToClient(d)); } catch (e) { res.status(500).json({ error: e.message }); } });
@@ -119,6 +125,8 @@ app.put('/api/dealers/:id', checkWrite, async (req, res) => { try { await Dealer
 app.delete('/api/dealers/:id', checkWrite, async (req, res) => { try { await Dealer.findOneAndDelete({ _id: req.params.id, ...getDealerFilter(req) }); res.json({status:'deleted'}); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.get('/api/dealers/:id/products', async (req, res) => { const d = await Dealer.findById(req.params.id).populate('products'); res.json(d.products.map(convertToClient)); });
 app.put('/api/dealers/:id/products', async (req, res) => { await Dealer.findByIdAndUpdate(req.params.id, { products: req.body.productIds }); res.json({status:'ok'}); });
+
+// Products, Matrix, Sales, Competitors, Knowledge (без изменений)
 app.get('/api/products', async (req, res) => { const s = new RegExp(req.query.search||'', 'i'); const p = await Product.find({$or:[{sku:s},{name:s}]}).sort({sku:1}).lean(); res.json(p.map(x=>{x.id=x._id;return x;})); });
 app.post('/api/products', checkWrite, async (req, res) => { const p = new Product(req.body); await p.save(); res.json(convertToClient(p)); });
 app.put('/api/products/:id', checkWrite, async (req, res) => { const p = await Product.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(p)); });
