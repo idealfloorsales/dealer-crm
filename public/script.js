@@ -76,7 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if(document.getElementById('edit_latitude')) document.getElementById('edit_latitude').value=d.latitude||'';
             if(document.getElementById('edit_longitude')) document.getElementById('edit_longitude').value=d.longitude||'';
             document.getElementById('edit_bonuses').value=d.bonuses;
-            populateStatusSelects(d.status); // Заполняем статусы
+            populateStatusSelects(d.status); 
             if(document.getElementById('edit_responsible')) document.getElementById('edit_responsible').value = d.responsible || '';
             if(editAvatarPreview) { editAvatarPreview.src = d.avatarUrl || ''; editAvatarPreview.style.display = d.avatarUrl ? 'block' : 'none'; }
             if(editCurrentAvatarUrl) editCurrentAvatarUrl.value = d.avatarUrl || '';
@@ -120,7 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const pendingId = localStorage.getItem('pendingEditDealerId'); if (pendingId) { localStorage.removeItem('pendingEditDealerId'); openEditModal(pendingId); }
     }
 
-    // --- STATUS LOGIC (NEW) ---
+    // --- STATUS LOGIC ---
     async function fetchStatuses() {
         try {
             const res = await fetch(API_STATUSES_URL);
@@ -132,45 +132,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function populateStatusSelects(selectedStatus = null) {
-        // Заполняем фильтр
         let filterHtml = '<option value="">Все статусы</option>';
-        statusList.forEach(s => {
-            filterHtml += `<option value="${s.value}">${s.label}</option>`;
-        });
+        statusList.forEach(s => { filterHtml += `<option value="${s.value}">${s.label}</option>`; });
         if(filterStatus) filterStatus.innerHTML = filterHtml;
 
-        // Заполняем модалки (здесь показываем ВСЕ, даже скрытые, чтобы можно было редактировать)
         const modalHtml = statusList.map(s => `<option value="${s.value}" ${selectedStatus === s.value ? 'selected' : ''}>${s.label}</option>`).join('');
-        
-        const addStatusSel = document.getElementById('status');
-        if(addStatusSel) addStatusSel.innerHTML = modalHtml;
-        
-        const editStatusSel = document.getElementById('edit_status');
-        if(editStatusSel) editStatusSel.innerHTML = modalHtml;
+        const addStatusSel = document.getElementById('status'); if(addStatusSel) addStatusSel.innerHTML = modalHtml;
+        const editStatusSel = document.getElementById('edit_status'); if(editStatusSel) editStatusSel.innerHTML = modalHtml;
     }
 
     async function addNewStatus() {
         const label = prompt("Введите название статуса (напр. Черный список):");
         if(!label) return;
         const color = prompt("Введите цвет (напр. #000000 или black):", "#6c757d");
-        
-        // ВОТ ЗДЕСЬ СПРАШИВАЕМ ПРО ВИДИМОСТЬ
         const isVisible = confirm("Показывать дилеров с этим статусом в ОБЩЕМ списке?\n(ОК = Да, Отмена = Скрыть)");
-
         const value = 'st_' + Math.random().toString(36).substr(2, 5);
-        
         try {
             const res = await fetch(API_STATUSES_URL, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ value, label, color, isVisible, sortOrder: statusList.length + 10 })
             });
-            if(res.ok) {
-                window.showToast("Статус добавлен!");
-                await fetchStatuses(); 
-            } else {
-                window.showToast("Ошибка", "error");
-            }
+            if(res.ok) { window.showToast("Статус добавлен!"); await fetchStatuses(); } 
+            else { window.showToast("Ошибка", "error"); }
         } catch(e) { console.error(e); }
     }
     if(btnAddStatus) btnAddStatus.onclick = addNewStatus;
@@ -182,37 +165,49 @@ document.addEventListener('DOMContentLoaded', () => {
     async function saveProducts(dealerId, ids) { await fetch(`${API_DEALERS_URL}/${dealerId}/products`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({productIds: ids})}); }
     async function completeTask(btn, dealerId, visitIndex) { try { btn.disabled = true; const res = await fetch(`${API_DEALERS_URL}/${dealerId}`); if(!res.ok) throw new Error('Err'); const dealer = await res.json(); if (dealer.visits && dealer.visits[visitIndex]) { dealer.visits[visitIndex].isCompleted = true; } await fetch(`${API_DEALERS_URL}/${dealerId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visits: dealer.visits }) }); initApp(); window.showToast("Задача выполнена!"); } catch (e) { window.showToast("Ошибка", "error"); btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg"></i>'; } }
 
-    // RENDER LIST (С УЧЕТОМ ВИДИМОСТИ)
+    // RENDER DASHBOARD (ВОССТАНОВЛЕНО)
+    function renderDashboard() {
+        if (!dashboardStats) return; 
+        if (!allDealers || allDealers.length === 0) { dashboardStats.innerHTML = ''; return; }
+        const activeDealers = allDealers.filter(d => d.status !== 'potential'); const totalDealers = activeDealers.length; const noAvatarCount = activeDealers.filter(d => !d.photo_url).length; 
+        let countActive = 0, countStandard = 0, countPotential = 0, countProblem = 0; 
+        allDealers.forEach(d => { 
+            if (d.status === 'active') countActive++; 
+            else if (d.status === 'standard') countStandard++; 
+            else if (d.status === 'problem') countProblem++; 
+            else if (d.status === 'potential') countPotential++; 
+        });
+        const totalAll = allDealers.length; const pctActive = totalAll > 0 ? (countActive / totalAll) * 100 : 0; const pctStandard = totalAll > 0 ? (countStandard / totalAll) * 100 : 0; const pctProblem = totalAll > 0 ? (countProblem / totalAll) * 100 : 0; const pctPotential = totalAll > 0 ? (countPotential / totalAll) * 100 : 0;
+        
+        dashboardStats.innerHTML = `
+            <div class="col-6"><div class="stat-card-modern"><div class="stat-icon-box bg-primary-subtle text-primary"><i class="bi bi-shop"></i></div><div class="stat-info"><h3>${totalDealers}</h3><p>Дилеров</p></div></div></div>
+            <div class="col-6"><div class="stat-card-modern"><div class="stat-icon-box ${noAvatarCount > 0 ? 'bg-danger-subtle text-danger' : 'bg-success-subtle text-success'}"><i class="bi bi-camera-fill"></i></div><div class="stat-info"><h3 class="${noAvatarCount > 0 ? 'text-danger' : ''}">${noAvatarCount}</h3><p>Без фото</p></div></div></div>
+            <div class="col-12 mt-2"><div class="stat-card-modern d-block p-3"><h6 class="text-muted fw-bold small mb-3 text-uppercase" style="letter-spacing:1px;">Структура базы</h6><div class="progress mb-3" style="height: 12px; border-radius: 6px;"><div class="progress-bar bg-success" role="progressbar" style="width: ${pctActive}%"></div><div class="progress-bar bg-warning" role="progressbar" style="width: ${pctStandard}%"></div><div class="progress-bar bg-danger" role="progressbar" style="width: ${pctProblem}%"></div><div class="progress-bar bg-primary" role="progressbar" style="width: ${pctPotential}%"></div></div><div class="d-flex justify-content-between text-center small"><div><span class="badge rounded-pill text-bg-success mb-1">${countActive}</span><br><span class="text-muted" style="font-size:0.75rem">VIP</span></div><div><span class="badge rounded-pill text-bg-warning mb-1">${countStandard}</span><br><span class="text-muted" style="font-size:0.75rem">Станд.</span></div><div><span class="badge rounded-pill text-bg-danger mb-1">${countProblem}</span><br><span class="text-muted" style="font-size:0.75rem">Пробл.</span></div><div><span class="badge rounded-pill text-bg-primary mb-1">${countPotential}</span><br><span class="text-muted" style="font-size:0.75rem">Потенц.</span></div></div></div></div>
+        `;
+        
+        const today = new Date(); today.setHours(0,0,0,0); const coolingLimit = new Date(today.getTime() - (15 * 24 * 60 * 60 * 1000));
+        const tasksUpcoming = [], tasksProblem = [], tasksCooling = [];
+        allDealers.forEach(d => { if (d.status === 'archive') return; const isPotential = d.status === 'potential'; let lastVisitDate = null; let hasFutureTasks = false; if (d.visits && Array.isArray(d.visits)) { d.visits.forEach((v, index) => { const vDate = new Date(v.date); if (!v.date) return; vDate.setHours(0,0,0,0); if (v.isCompleted && (!lastVisitDate || vDate > lastVisitDate)) lastVisitDate = vDate; if (!v.isCompleted) { const taskData = { dealerName: d.name, dealerId: d.id, date: vDate, comment: v.comment || "Без комментария", visitIndex: index }; if (vDate < today) tasksProblem.push({...taskData, type: 'overdue'}); else { tasksUpcoming.push({...taskData, isToday: vDate.getTime() === today.getTime()}); hasFutureTasks = true; } } }); } if (d.status === 'problem') { if (!tasksProblem.some(t => t.dealerId === d.id && t.type === 'overdue')) tasksProblem.push({ dealerName: d.name, dealerId: d.id, type: 'status', comment: 'Статус: Проблемный' }); } if (!hasFutureTasks && d.status !== 'problem' && !isPotential) { if (!lastVisitDate) tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: 999 }); else if (lastVisitDate < coolingLimit) { const days = Math.floor((today - lastVisitDate) / (1000 * 60 * 60 * 24)); tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: days }); } } });
+        tasksUpcoming.sort((a, b) => a.date - b.date); tasksProblem.sort((a, b) => (a.date || 0) - (b.date || 0)); tasksCooling.sort((a, b) => b.days - a.days);
+        renderTaskList(document.getElementById('tasks-list-upcoming'), tasksUpcoming, 'upcoming'); renderTaskList(document.getElementById('tasks-list-problem'), tasksProblem, 'problem'); renderTaskList(document.getElementById('tasks-list-cooling'), tasksCooling, 'cooling');
+    }
+
+    function renderTaskList(container, tasks, type) { if (!container) return; if (tasks.length === 0) { const msg = type === 'cooling' ? 'Все посещены недавно' : 'Задач нет'; container.innerHTML = `<div class="text-center py-4 text-muted"><i class="bi bi-check-circle display-6 d-block mb-2 text-success opacity-50"></i><small>${msg}</small></div>`; return; } container.innerHTML = tasks.map(t => { let badgeHtml = ''; let metaHtml = ''; if (type === 'upcoming') { const dateStr = t.date.toLocaleDateString('ru-RU', {day:'numeric', month:'short'}); badgeHtml = t.isToday ? `<span class="task-badge tb-today mt-1 d-inline-block">Сегодня</span>` : `<span class="task-badge tb-future mt-1 d-inline-block">${dateStr}</span>`; metaHtml = `<span class="text-muted small">${safeText(t.comment)}</span>`; } else if (type === 'problem') { if (t.type === 'overdue') { const dateStr = t.date.toLocaleDateString('ru-RU'); badgeHtml = `<span class="task-badge tb-overdue mt-1 d-inline-block">Просрок: ${dateStr}</span>`; metaHtml = `<span class="text-danger small fw-bold">${safeText(t.comment)}</span>`; } else { badgeHtml = `<span class="task-badge tb-overdue mt-1 d-inline-block">Проблема</span>`; metaHtml = `<span class="small text-muted">Внимание!</span>`; } } else if (type === 'cooling') { const daysStr = t.days === 999 ? 'Никогда' : `${t.days} дн.`; badgeHtml = `<span class="task-badge tb-cooling mt-1 d-inline-block">Без визитов: ${daysStr}</span>`; metaHtml = `<span class="text-muted small">Пора навестить</span>`; } const showCheckBtn = (type === 'upcoming' || (type === 'problem' && t.type === 'overdue')); const btnHtml = showCheckBtn ? `<button class="btn-task-check btn-complete-task" data-id="${t.dealerId}" data-index="${t.visitIndex}" title="Выполнить"><i class="bi bi-check-lg"></i></button>` : ''; return `<div class="task-item-modern align-items-start"><div class="task-content"><a href="dealer.html?id=${t.dealerId}" target="_blank" class="task-title text-truncate d-block" style="max-width: 200px;">${safeText(t.dealerName)}</a>${badgeHtml}<div class="mt-1">${metaHtml}</div></div><div class="mt-1">${btnHtml}</div></div>`; }).join(''); }
+
     function renderDealerList() {
         if (!dealerGrid) return;
         const city = filterCity ? filterCity.value : ''; const type = filterPriceType ? filterPriceType.value : ''; const status = filterStatus ? filterStatus.value : ''; const responsible = filterResponsible ? filterResponsible.value : ''; const search = searchBar ? searchBar.value.toLowerCase() : '';
-        
         const filtered = allDealers.filter(d => { 
-            // 1. Проверка видимости
-            // Если статус выбран в фильтре -> ПОКАЗЫВАЕМ ВСЕГДА
-            // Если статус НЕ выбран -> ПРОВЕРЯЕМ isVisible
             let isVisible = true;
-            if (!status) {
-                const statusObj = statusList.find(s => s.value === (d.status || 'standard'));
-                if (statusObj && statusObj.isVisible === false) isVisible = false;
-            } else {
-                isVisible = (d.status === status); // Фильтр по статусу
-            }
-
-            return isVisible && 
-                   (!city || d.city === city) && 
-                   (!type || d.price_type === type) && 
-                   (!responsible || d.responsible === responsible) && 
-                   (!search || ((d.name||'').toLowerCase().includes(search) || (d.dealer_id||'').toLowerCase().includes(search)));
+            if (!status) { const statusObj = statusList.find(s => s.value === (d.status || 'standard')); if (statusObj && statusObj.isVisible === false) isVisible = false; } else { isVisible = (d.status === status); }
+            return isVisible && (!city || d.city === city) && (!type || d.price_type === type) && (!responsible || d.responsible === responsible) && (!search || ((d.name||'').toLowerCase().includes(search) || (d.dealer_id||'').toLowerCase().includes(search)));
         });
-
         filtered.sort((a, b) => { let valA = (a[currentSort.column] || '').toString(); let valB = (b[currentSort.column] || '').toString(); let res = currentSort.column === 'dealer_id' ? valA.localeCompare(valB, undefined, {numeric:true}) : valA.toLowerCase().localeCompare(valB.toLowerCase(), 'ru'); return currentSort.direction === 'asc' ? res : -res; });
         if (filtered.length === 0) { dealerGrid.innerHTML = ` <div class="empty-state"><i class="bi bi-search empty-state-icon"></i><h5 class="text-muted">Ничего не найдено</h5><p class="text-secondary small mb-3">Попробуйте изменить фильтры</p><button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('search-bar').value=''; document.getElementById('filter-city').value=''; document.getElementById('filter-status').value=''; renderDealerList()">Сбросить фильтры</button></div>`; return; }
         
         dealerGrid.innerHTML = filtered.map(d => {
             const statusObj = statusList.find(s => s.value === (d.status || 'standard')) || { label: d.status, color: '#6c757d' };
             const statusStyle = `background-color: ${statusObj.color}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 500;`;
-
             let phoneBtn = ''; let waBtn = ''; if (d.contacts && d.contacts.length > 0) { const phone = d.contacts.find(c => c.contactInfo)?.contactInfo || ''; const cleanPhone = phone.replace(/[^0-9]/g, ''); if (cleanPhone.length >= 10) { phoneBtn = `<a href="tel:+${cleanPhone}" class="btn-circle btn-circle-call" onclick="event.stopPropagation()" title="Позвонить"><i class="bi bi-telephone-fill"></i></a>`; waBtn = `<a href="https://wa.me/${cleanPhone}" target="_blank" class="btn-circle btn-circle-wa" onclick="event.stopPropagation()" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>`; } }
             let mapBtn = ''; if (d.latitude && d.longitude) mapBtn = `<a href="https://yandex.kz/maps/?pt=${d.longitude},${d.latitude}&z=17&l=map" target="_blank" class="btn-circle" onclick="event.stopPropagation()" title="Маршрут"><i class="bi bi-geo-alt-fill"></i></a>`;
             let instaBtn = ''; if (d.instagram) { let url = d.instagram.trim(); if (!url.startsWith('http')) { if (url.startsWith('@')) url = 'https://instagram.com/' + url.substring(1); else url = 'https://instagram.com/' + url; } instaBtn = `<a href="${url}" target="_blank" class="btn-circle btn-circle-insta" onclick="event.stopPropagation()" title="Instagram"><i class="bi bi-instagram"></i></a>`; }
@@ -245,6 +240,148 @@ document.addEventListener('DOMContentLoaded', () => {
     if(editForm) editForm.addEventListener('submit', async (e) => { e.preventDefault(); if (isSaving) return; isSaving = true; const btn = document.querySelector('button[form="edit-dealer-form"]'); const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; const id = document.getElementById('edit_db_id').value; let avatarToSend = getVal('edit-current-avatar-url'); if (newAvatarBase64) avatarToSend = newAvatarBase64; const data = { dealer_id: getVal('edit_dealer_id'), name: getVal('edit_name'), organization: getVal('edit_organization'), price_type: getVal('edit_price_type'), city: getVal('edit_city'), address: getVal('edit_address'), delivery: getVal('edit_delivery'), website: getVal('edit_website'), instagram: getVal('edit_instagram'), latitude: getVal('edit_latitude'), longitude: getVal('edit_longitude'), bonuses: getVal('edit_bonuses'), status: getVal('edit_status'), responsible: document.getElementById('edit_responsible') ? document.getElementById('edit_responsible').value : '', avatarUrl: avatarToSend, contacts: collectData(editContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]), additional_addresses: collectData(editAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]), pos_materials: collectData(editPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]), visits: collectData(editVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'},{key:'isCompleted',class:'.visit-completed'}]), photos: editPhotosData, competitors: collectData(editCompetitorList, '.competitor-entry', [{key:'brand',class:'.competitor-brand'},{key:'collection',class:'.competitor-collection'},{key:'price_opt',class:'.competitor-price-opt'},{key:'price_retail',class:'.competitor-price-retail'}]) }; try { await fetch(`${API_DEALERS_URL}/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); await saveProducts(id, getSelectedProductIds('edit-product-checklist')); editModal.hide(); window.showToast("Изменения сохранены!"); initApp(); } catch (e) { window.showToast("Ошибка сохранения", "error"); } finally { isSaving = false; if(btn) { btn.disabled = false; btn.innerHTML = oldText; } } });
     if(qvForm) qvForm.addEventListener('submit', async (e) => { e.preventDefault(); if (isSaving) return; isSaving = true; const id = document.getElementById('qv_dealer_id').value; const comment = document.getElementById('qv_comment').value; const btn = qvForm.querySelector('button'); if(!id || !comment) { isSaving = false; return; } try { btn.disabled = true; const getRes = await fetch(`${API_DEALERS_URL}/${id}`); const dealer = await getRes.json(); const newVisit = { date: new Date().toISOString().slice(0,10), comment: comment, isCompleted: true }; const visits = [...(dealer.visits || []), newVisit]; await fetch(`${API_DEALERS_URL}/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ visits }) }); qvModal.hide(); alert("Визит добавлен!"); } catch(e) { alert("Ошибка"); } finally { isSaving = false; btn.disabled = false; } });
     const logoutBtn = document.getElementById('logout-btn'); if (logoutBtn) { logoutBtn.onclick = () => { const url = window.location.protocol + "//" + "logout:logout@" + window.location.host + window.location.pathname; window.location.href = url; }; }
+
+    // ==========================================
+    // 10. КАРТЫ В МОДАЛКАХ (FIXED & SMART)
+    // ==========================================
+
+    let mapInstances = { add: null, edit: null };
+    let markerInstances = { add: null, edit: null };
+
+    // Универсальная функция настройки карты
+    function setupMapLogic(mapId, latId, lngId, searchId, btnSearchId, btnLocId, instanceKey) {
+        const mapEl = document.getElementById(mapId);
+        if (!mapEl) return;
+
+        // 1. Создаем карту (если нет)
+        if (!mapInstances[instanceKey]) {
+            const map = L.map(mapId).setView([51.1605, 71.4704], 12);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: 'OSM' }).addTo(map);
+            mapInstances[instanceKey] = map;
+
+            // Клик по карте -> Ставим точку
+            map.on('click', (e) => {
+                setMarker(e.latlng.lat, e.latlng.lng, instanceKey, latId, lngId);
+            });
+        }
+
+        const map = mapInstances[instanceKey];
+
+        // 2. Функция установки маркера
+        function setMarker(lat, lng, key, latInputId, lngInputId) {
+            if (markerInstances[key]) map.removeLayer(markerInstances[key]);
+            markerInstances[key] = L.marker([lat, lng], { draggable: true }).addTo(map);
+            
+            // Обновляем инпуты
+            document.getElementById(latInputId).value = lat.toFixed(6);
+            document.getElementById(lngInputId).value = lng.toFixed(6);
+
+            // Если перетащили маркер
+            markerInstances[key].on('dragend', function(event) {
+                const pos = event.target.getLatLng();
+                document.getElementById(latInputId).value = pos.lat.toFixed(6);
+                document.getElementById(lngInputId).value = pos.lng.toFixed(6);
+            });
+
+            map.setView([lat, lng], 16);
+        }
+
+        // 3. Умный поиск (Адрес или Координаты)
+        const handleSearch = async () => {
+            const input = document.getElementById(searchId);
+            const query = input.value.trim();
+            if (!query) return;
+
+            // А. Проверяем, не координаты ли это (например "51.15, 71.45")
+            const coordsRegex = /^(-?\d+(\.\d+)?)[,\s]+(-?\d+(\.\d+)?)$/;
+            const match = query.match(coordsRegex);
+            
+            if (match) {
+                // Это координаты!
+                const lat = parseFloat(match[1]);
+                const lng = parseFloat(match[3]);
+                setMarker(lat, lng, instanceKey, latId, lngId);
+                window.showToast("Координаты приняты!");
+            } else {
+                // Б. Это адрес - ищем через API
+                try {
+                    const btn = document.getElementById(btnSearchId);
+                    const oldHtml = btn.innerHTML;
+                    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+                    
+                    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=kz&limit=1`);
+                    const data = await res.json();
+                    
+                    if (data && data.length > 0) {
+                        const lat = parseFloat(data[0].lat);
+                        const lng = parseFloat(data[0].lon);
+                        setMarker(lat, lng, instanceKey, latId, lngId);
+                    } else {
+                        alert("Адрес не найден. Попробуйте проще (например 'Астана Абая 10')");
+                    }
+                    btn.innerHTML = oldHtml;
+                } catch (e) { console.error(e); }
+            }
+        };
+
+        // Привязываем поиск к кнопке и Enter
+        const searchBtn = document.getElementById(btnSearchId);
+        const searchInp = document.getElementById(searchId);
+        if(searchBtn) searchBtn.onclick = handleSearch;
+        if(searchInp) searchInp.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); handleSearch(); } });
+
+        // 4. Геолокация
+        const locBtn = document.getElementById(btnLocId);
+        if(locBtn) {
+            locBtn.onclick = () => {
+                if (navigator.geolocation) {
+                    locBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+                    navigator.geolocation.getCurrentPosition(pos => {
+                        setMarker(pos.coords.latitude, pos.coords.longitude, instanceKey, latId, lngId);
+                        locBtn.innerHTML = '<i class="bi bi-geo-alt-fill"></i>';
+                    }, () => { alert("Нет доступа к геопозиции"); locBtn.innerHTML = '<i class="bi bi-geo-alt-fill"></i>'; });
+                }
+            };
+        }
+
+        // Возвращаем функцию обновления размера (нужна при открытии модалки)
+        return function invalidate() {
+            setTimeout(() => {
+                map.invalidateSize();
+                // Если координаты уже есть в полях, центрируем на них
+                const curLat = parseFloat(document.getElementById(latId).value);
+                const curLng = parseFloat(document.getElementById(lngId).value);
+                if (!isNaN(curLat) && !isNaN(curLng)) {
+                    setMarker(curLat, curLng, instanceKey, latId, lngId);
+                }
+            }, 300); // Небольшая задержка, чтобы модалка успела выехать
+        };
+    }
+
+    // Инициализируем логику (но не создаем карты сразу, чтобы не грузить память)
+    const refreshAddMap = setupMapLogic('add-map', 'add_latitude', 'add_longitude', 'add-smart-search', 'btn-search-add', 'btn-loc-add', 'add');
+    const refreshEditMap = setupMapLogic('edit-map', 'edit_latitude', 'edit_longitude', 'edit-smart-search', 'btn-search-edit', 'btn-loc-edit', 'edit');
+
+    // Слушатели открытия модалок (ВОТ ЧТО ЧИНИТ "СЕРУЮ КАРТУ")
+    if (addModalEl) {
+        addModalEl.addEventListener('shown.bs.modal', () => {
+            if (refreshAddMap) refreshAddMap();
+        });
+    }
+
+    if (editModalEl) {
+        // Для редактирования карта во вкладке, слушаем переключение вкладки
+        const tabMapBtn = document.querySelector('button[data-bs-target="#tab-map"]');
+        if (tabMapBtn) {
+            tabMapBtn.addEventListener('shown.bs.tab', () => {
+                if (refreshEditMap) refreshEditMap();
+            });
+        }
+        // На случай если модалка открылась сразу на вкладке карты (редко, но бывает)
+        editModalEl.addEventListener('shown.bs.modal', () => {
+             // Ждем клика по табу
+        });
+    }
 
     initApp();
 });
