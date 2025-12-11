@@ -105,15 +105,13 @@
                         <input type="text" id="search-bar" class="form-control border-start-0 ps-0" placeholder="Поиск дилера...">
                     </div>
                 </div>
-                <div class="col-xl-2 col-md-3 col-6">
-                    <select id="filter-status" class="form-select border-0 bg-light text-truncate">
-                        <option value="">Все статусы</option>
-                        <option value="active">🟢 Активный</option>
-                        <option value="standard">🟡 Стандарт</option>
-                        <option value="problem">🔴 Проблемный</option>
-                        <option value="potential">🔵 Потенциальный</option>
-                        <option value="archive">⚫ Архив</option>
-                    </select>
+             <div class="col-xl-2 col-md-3 col-6">
+                    <div class="input-group">
+                        <select id="filter-status" class="form-select border-0 bg-light text-truncate">
+                            <option value="">Загрузка...</option>
+                        </select>
+                        <button class="btn btn-light border-0" id="btn-add-status" title="Добавить статус" style="color: #bbb;">+</button>
+                    </div>
                 </div>
                 <div class="col-xl-2 col-md-3 col-6">
                     <select id="filter-city" class="form-select border-0 bg-light text-truncate"><option value="">Все города</option></select>
@@ -303,3 +301,4 @@
     </script>
 </body>
 </html>
+
