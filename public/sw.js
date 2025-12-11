@@ -1,81 +1,77 @@
-const CACHE_NAME = 'dealer-crm-cache-v230'; // ВЕРСИЯ 205
-
-const urlsToCache = [
+const CACHE_NAME = 'dealer-crm-cache-v251'; // ОБНОВИЛ ВЕРСИЮ
+const ASSETS = [
     '/',
-    '/index.html?v=230',
-    '/style.css?v=230',
-    '/script.js?v=230',
-    '/dealer.html?v=230',
-    '/dealer.js?v=230',
-    '/map.html?v=230',
-    '/map.js?v=230',
-    '/products.html?v=230',
-    '/products.js?v=230',
-    '/report.html?v=230',
-    '/report.js?v=230',
-    '/sales.html?v=230',
-    '/sales.js?v=230',
-    '/competitors.html?v=230',
-    '/competitors.js?v=230',
-    '/knowledge.html?v=230',
-    '/knowledge.js?v=230',
+    '/index.html',
+    '/map.html',
+    '/sales.html',
+    '/report.html',
+    '/products.html',
+    '/competitors.html',
+    '/knowledge.html',
+    '/dealer.html',
+    '/style.css',
+    '/script.js',
+    '/sales.js',
+    '/report.js',
+    '/products.js',
+    '/competitors.js',
+    '/knowledge.js',
+    '/dealer.js',
+    '/map.js',
     '/logo.png',
     '/favicon.gif',
     'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css',
     'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js',
+    'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css',
     'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
     'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
 ];
 
-// УСТАНОВКА (Кэширование)
-self.addEventListener('install', event => {
-    self.skipWaiting(); // Заставляет немедленно активировать новый SW
-    event.waitUntil(
-        caches.open(CACHE_NAME)
-            .then(cache => {
-                console.log('Opened cache v205');
-                // addAll может упасть, если одного файла нет, поэтому используем forEach для надежности
-                urlsToCache.forEach(url => {
-                    cache.add(url).catch(err => console.warn(`Failed to cache ${url}`, err));
-                });
-            })
-    );
+self.addEventListener('install', (e) => {
+    e.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)));
+    self.skipWaiting();
 });
 
-// АКТИВАЦИЯ (Удаление старого кэша)
-self.addEventListener('activate', event => {
-    event.waitUntil(clients.claim()); // Захватываем контроль над страницей сразу
-    const cacheWhitelist = [CACHE_NAME];
-    event.waitUntil(
-        caches.keys().then(cacheNames => {
-            return Promise.all(
-                cacheNames.map(cacheName => {
-                    if (cacheWhitelist.indexOf(cacheName) === -1) {
-                        console.log('Deleting old cache:', cacheName);
-                        return caches.delete(cacheName);
-                    }
-                })
-            );
-        })
-    );
+self.addEventListener('activate', (e) => {
+    e.waitUntil(caches.keys().then((keys) => Promise.all(keys.map((key) => {
+        if (key !== CACHE_NAME) return caches.delete(key);
+    }))));
+    self.clients.claim();
 });
 
-// ПЕРЕХВАТ ЗАПРОСОВ
-self.addEventListener('fetch', event => {
-    // API запросы всегда идут в сеть, не кэшируем их
-    if (event.request.url.includes('/api/')) {
-        return; 
-    }
+self.addEventListener('fetch', (e) => {
+    // 1. Игнорируем НЕ-GET запросы (POST, PUT, DELETE)
+    if (e.request.method !== 'GET') return;
 
-    event.respondWith(
-        caches.match(event.request)
-            .then(response => {
-                // Если есть в кэше - отдаем из кэша
-                if (response) {
+    // 2. Игнорируем запросы к чужим доменам (аналитика, трекеры, расширения)
+    // Разрешаем только свой домен и CDN из списка ASSETS
+    const url = new URL(e.request.url);
+    const isSelf = url.origin === location.origin;
+    const isCdn = url.hostname.includes('jsdelivr.net') || url.hostname.includes('unpkg.com');
+
+    if (!isSelf && !isCdn) return;
+
+    e.respondWith(
+        caches.match(e.request).then((cached) => {
+            // Если есть в кэше - отдаем
+            if (cached) return cached;
+
+            // Если нет - качаем
+            return fetch(e.request).then((response) => {
+                // Проверяем, что ответ валидный
+                if (!response || response.status !== 200 || response.type !== 'basic') {
                     return response;
                 }
-                // Если нет - качаем из сети
-                return fetch(event.request);
-            })
+                // Кэшируем новую копию
+                const responseToCache = response.clone();
+                caches.open(CACHE_NAME).then((cache) => {
+                    cache.put(e.request, responseToCache);
+                });
+                return response;
+            }).catch(() => {
+                // Если сеть упала, просто ничего не возвращаем (или можно вернуть заглушку)
+                // Главное - не крашить приложение
+            });
+        })
     );
 });
