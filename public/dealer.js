@@ -57,7 +57,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- MAIN FETCH ---
     async function fetchDealerDetails() {
         try {
-            // Auth Check
             try {
                 const authRes = await fetch('/api/auth/me');
                 if (authRes.ok) {
@@ -132,32 +131,35 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- RENDER SALES (ИСПРАВЛЕНО: АГРЕГАЦИЯ) ---
+    // --- RENDER SALES (СТРОГАЯ ФИЛЬТРАЦИЯ) ---
     async function fetchDealerSales() {
         if (!salesHistoryContainer) return;
         try {
+            // Запрашиваем все продажи (на всякий случай, если фильтр сервера барахлит)
+            // Но лучше добавить параметр, если сервер его поддерживает
             const res = await fetch(`${API_SALES_URL}?dealerId=${dealerId}`); 
             if (!res.ok) throw new Error();
             const rawSales = await res.json();
             
-            if (!rawSales || rawSales.length === 0) { 
+            // Фильтрация на клиенте (САМОЕ ВАЖНОЕ ИЗМЕНЕНИЕ)
+            // Оставляем только записи, где dealerId совпадает с текущим ID дилера
+            const mySales = rawSales.filter(s => s.dealerId === dealerId);
+
+            if (!mySales || mySales.length === 0) { 
                 salesHistoryContainer.innerHTML = '<div class="text-center py-4 text-muted bg-light rounded">Нет данных о продажах.</div>'; 
                 return; 
             }
 
-            // 1. АГРЕГАЦИЯ: Суммируем дубликаты по ключу "Год-Месяц"
+            // Агрегация (суммирование дубликатов по месяцам)
             const aggregatedData = {}; 
-            // Пример: { "2025": { "2025-12": 150.5, "2025-11": 200 } }
-
             let grandTotal = 0;
 
-            rawSales.forEach(s => {
+            mySales.forEach(s => {
                 if(!s.month) return;
                 const year = s.month.split('-')[0];
                 const fact = parseFloat(s.fact) || 0;
 
-                // Пропускаем чистые нули, если хотите (или оставьте, если нужно видеть нули)
-                if (fact === 0) return; 
+                if (fact === 0) return; // Игнорируем нули
 
                 if (!aggregatedData[year]) aggregatedData[year] = {};
                 if (!aggregatedData[year][s.month]) aggregatedData[year][s.month] = 0;
@@ -166,7 +168,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 grandTotal += fact;
             });
 
-            // Сортируем годы по убыванию
             const years = Object.keys(aggregatedData).sort().reverse();
 
             if (years.length === 0) {
@@ -180,9 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
             years.forEach(year => {
                 html += `<tr class="table-secondary"><td colspan="2" class="fw-bold ps-3 text-dark">${year} год</td></tr>`;
 
-                // Получаем месяцы этого года
                 const monthsData = aggregatedData[year];
-                // Сортируем месяцы (2025-12, 2025-11...)
                 const sortedMonths = Object.keys(monthsData).sort().reverse(); 
 
                 let yearTotal = 0;
@@ -192,15 +191,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     const date = new Date(monthKey + '-01');
                     const monthName = date.toLocaleString('ru-RU', { month: 'long' });
                     const monthDisplay = monthName.charAt(0).toUpperCase() + monthName.slice(1);
-                    
-                    // Округляем до 2 знаков, чтобы не было 150.00000001
                     const displayValue = parseFloat(value.toFixed(2));
                     yearTotal += value;
 
                     html += `<tr><td class="ps-4">${monthDisplay}</td><td class="text-end font-monospace">${displayValue}</td></tr>`;
                 });
 
-                // Итог за год
                 html += `<tr style="background-color: #fffbeb;"><td class="ps-3 fw-bold text-muted">Итого за ${year}:</td><td class="text-end fw-bold text-dark">${parseFloat(yearTotal.toFixed(2))}</td></tr>`;
             });
 
@@ -216,6 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // (Остальные функции рендера - без изменений)
     function renderDealerContacts(contacts) {
         if (!contactsListContainer) return;
         if (!contacts || contacts.length === 0) { contactsListContainer.innerHTML = '<p class="text-muted">Нет контактов.</p>'; return; }
