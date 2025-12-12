@@ -1,7 +1,48 @@
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("App Started v300: Bulletproof Mode");
+    console.log("App Started v999: FINAL CLEAN VERSION");
 
-    // --- 1. SETTINGS ---
+    // ==========================================
+    // 1. БЕЗОПАСНЫЕ УТИЛИТЫ (В САМОМ НАЧАЛЕ)
+    // ==========================================
+    const getEl = (id) => document.getElementById(id);
+    const getVal = (id) => { const el = getEl(id); return el ? el.value : ''; };
+    const safeText = (text) => (text || '').toString().replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const safeAttr = (text) => (text || '').toString().replace(/"/g, '&quot;');
+    
+    // Тосты
+    window.showToast = function(message, type = 'success') {
+        let container = getEl('toast-container-custom');
+        if (!container) { 
+            container = document.createElement('div'); 
+            container.id = 'toast-container-custom'; 
+            container.className = 'toast-container-custom'; 
+            document.body.appendChild(container); 
+        }
+        const toast = document.createElement('div'); toast.className = `toast-modern toast-${type}`;
+        const icon = type === 'success' ? 'check-circle-fill' : (type === 'error' ? 'exclamation-triangle-fill' : 'info-circle-fill');
+        toast.innerHTML = `<i class="bi bi-${icon} fs-5"></i><span class="fw-bold text-dark">${message}</span>`;
+        container.appendChild(toast);
+        setTimeout(() => { toast.style.animation = 'toastFadeOut 0.5s forwards'; setTimeout(() => toast.remove(), 500); }, 3000);
+    };
+
+    const compressImage = (file, maxWidth = 1000, quality = 0.7) => new Promise((resolve, reject) => { 
+        const reader = new FileReader(); reader.readAsDataURL(file); 
+        reader.onload = event => { 
+            const img = new Image(); img.src = event.target.result; 
+            img.onload = () => { 
+                const elem = document.createElement('canvas'); 
+                let width = img.width; let height = img.height; 
+                if (width > maxWidth) { height *= maxWidth / width; width = maxWidth; } 
+                elem.width = width; elem.height = height; 
+                const ctx = elem.getContext('2d'); ctx.drawImage(img, 0, 0, width, height); 
+                resolve(elem.toDataURL('image/jpeg', quality)); 
+            }; 
+        }; 
+    });
+
+    // ==========================================
+    // 2. CONFIG & STATE
+    // ==========================================
     const API_DEALERS_URL = '/api/dealers';
     const API_PRODUCTS_URL = '/api/products'; 
     const API_COMPETITORS_REF_URL = '/api/competitors-ref';
@@ -17,43 +58,52 @@ document.addEventListener('DOMContentLoaded', () => {
     let editPhotosData = []; 
     let newAvatarBase64 = null; 
     let currentUserRole = 'guest';
-    
-    // Map Vars
-    let mapInstances = { add: null, edit: null };
-    let markerInstances = { add: null, edit: null };
-    let refreshAddMap = null;
-    let refreshEditMap = null;
-    let currentStep = 1; 
-    const totalSteps = 4;
 
     const posMaterialsList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"];
 
-    // --- 2. SAFE GETTERS ---
-    const getEl = (id) => document.getElementById(id);
-    const getVal = (id) => { const el = getEl(id); return el ? el.value : ''; };
+    // ==========================================
+    // 3. ПОЛУЧЕНИЕ ВСЕХ ЭЛЕМЕНТОВ (ЗДЕСЬ, ЧТОБЫ ОНИ ТОЧНО БЫЛИ)
+    // ==========================================
+    const filterCity = getEl('filter-city');
+    const filterPriceType = getEl('filter-price-type');
+    const filterStatus = getEl('filter-status');
+    const filterResponsible = getEl('filter-responsible');
+    const searchBar = getEl('search-bar');
+    
+    const addModalEl = getEl('add-modal');
+    const addModal = addModalEl ? new bootstrap.Modal(addModalEl, { backdrop: 'static', keyboard: false }) : null;
+    const addForm = getEl('add-dealer-form');
+    
+    const editModalEl = getEl('edit-modal');
+    const editModal = editModalEl ? new bootstrap.Modal(editModalEl, { backdrop: 'static', keyboard: false }) : null;
+    const editForm = getEl('edit-dealer-form');
 
-    // --- 3. UTILS ---
-    window.showToast = function(message, type = 'success') {
-        let container = getEl('toast-container-custom');
-        if (!container) { 
-            container = document.createElement('div'); container.id = 'toast-container-custom'; container.className = 'toast-container-custom'; document.body.appendChild(container); 
-        }
-        const toast = document.createElement('div'); toast.className = `toast-modern toast-${type}`;
-        const icon = type === 'success' ? 'check-circle-fill' : (type === 'error' ? 'exclamation-triangle-fill' : 'info-circle-fill');
-        toast.innerHTML = `<i class="bi bi-${icon} fs-5"></i><span class="fw-bold text-dark">${message}</span>`;
-        container.appendChild(toast);
-        setTimeout(() => { toast.style.animation = 'toastFadeOut 0.5s forwards'; setTimeout(() => toast.remove(), 500); }, 3000);
-    };
+    const qvModalEl = getEl('quick-visit-modal');
+    const qvModal = qvModalEl ? new bootstrap.Modal(qvModalEl, { backdrop: 'static', keyboard: false }) : null;
+    const qvForm = getEl('quick-visit-form');
 
-    const safeText = (text) => (text || '').toString().replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    const safeAttr = (text) => (text || '').toString().replace(/"/g, '&quot;');
-    const compressImage = (file, maxWidth = 1000, quality = 0.7) => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = event => { const img = new Image(); img.src = event.target.result; img.onload = () => { const elem = document.createElement('canvas'); let width = img.width; let height = img.height; if (width > maxWidth) { height *= maxWidth / width; width = maxWidth; } elem.width = width; elem.height = height; const ctx = elem.getContext('2d'); ctx.drawImage(img, 0, 0, width, height); resolve(elem.toDataURL('image/jpeg', quality)); }; img.onerror = error => reject(error); }; reader.onerror = error => reject(error); });
+    const statusModalEl = getEl('status-manager-modal');
+    const statusModal = statusModalEl ? new bootstrap.Modal(statusModalEl) : null;
+    const statusForm = getEl('status-form');
 
-    // --- 4. HTML GENERATORS ---
+    // Кнопки
+    const openAddModalBtn = getEl('open-add-modal-btn');
+    const btnManageStatuses = getEl('btn-manage-statuses');
+    const btnAddStatus = getEl('btn-add-status');
+    const logoutBtn = getEl('logout-btn');
+    const prevBtn = getEl('btn-prev-step');
+    const nextBtn = getEl('btn-next-step');
+    const finishBtn = getEl('btn-finish-step');
+
+    // ==========================================
+    // 4. ФУНКЦИИ (ОПРЕДЕЛЯЕМ ДО ИСПОЛЬЗОВАНИЯ)
+    // ==========================================
+
     function createContactEntryHTML(c={}) { return `<div class="contact-entry"><input type="text" class="form-control contact-name" placeholder="Имя" value="${c.name||''}"><input type="text" class="form-control contact-position" placeholder="Должность" value="${c.position||''}"><input type="text" class="form-control contact-info" placeholder="Телефон" value="${c.contactInfo||''}"><button type="button" class="btn-remove-entry" onclick="this.closest('.contact-entry').remove()"><i class="bi bi-x-lg"></i></button></div>`; }
     function createAddressEntryHTML(a={}) { return `<div class="address-entry"><input type="text" class="form-control address-description" placeholder="Описание" value="${a.description||''}"><input type="text" class="form-control address-city" placeholder="Город" value="${a.city||''}"><input type="text" class="form-control address-address" placeholder="Адрес" value="${a.address||''}"><button type="button" class="btn-remove-entry" onclick="this.closest('.address-entry').remove()"><i class="bi bi-x-lg"></i></button></div>`; }
     function createVisitEntryHTML(v={}) { return `<div class="visit-entry"><input type="date" class="form-control visit-date" value="${v.date||''}"><input type="text" class="form-control visit-comment w-50" placeholder="Результат..." value="${v.comment||''}"><button type="button" class="btn-remove-entry" onclick="this.closest('.visit-entry').remove()"><i class="bi bi-x-lg"></i></button></div>`; }
     function createPosEntryHTML(p={}) { return `<div class="pos-entry"><input type="text" class="form-control pos-name" list="pos-materials-datalist" placeholder="Название стенда" value="${safeAttr(p.name||'')}" autocomplete="off"><input type="number" class="form-control pos-quantity" value="${p.quantity||1}" min="1" placeholder="Шт"><button type="button" class="btn-remove-entry" onclick="this.closest('.pos-entry').remove()" title="Удалить"><i class="bi bi-x-lg"></i></button></div>`; }
+    function renderPhotoPreviews(container, photosArray) { if(container) container.innerHTML = photosArray.map((p, index) => `<div class="photo-preview-item"><img src="${p.photo_url}"><button type="button" class="btn-remove-photo" data-index="${index}"><i class="bi bi-x"></i></button></div>`).join(''); }
     function createCompetitorEntryHTML(c={}) { 
         let brandOpts = `<option value="">-- Бренд --</option>`; competitorsRef.forEach(ref => { const sel = ref.name === c.brand ? 'selected' : ''; brandOpts += `<option value="${ref.name}" ${sel}>${ref.name}</option>`; });
         let collOpts = `<option value="">-- Коллекция --</option>`;
@@ -61,20 +111,47 @@ document.addEventListener('DOMContentLoaded', () => {
         return `<div class="competitor-entry"><select class="form-select competitor-brand" onchange="updateCollections(this)">${brandOpts}</select><select class="form-select competitor-collection">${collOpts}</select><input type="text" class="form-control competitor-price-opt" placeholder="ОПТ" value="${c.price_opt||''}"><input type="text" class="form-control competitor-price-retail" placeholder="Розн" value="${c.price_retail||''}"><button type="button" class="btn-remove-entry" onclick="this.closest('.competitor-entry').remove()" title="Удалить"><i class="bi bi-x-lg"></i></button></div>`; 
     }
     
-    // Global Window Functions
-    window.updateCollections = function(select) { 
-        const brandName = select.value; const row = select.closest('.competitor-entry'); const collSelect = row.querySelector('.competitor-collection'); 
-        let html = `<option value="">-- Коллекция --</option>`; const ref = competitorsRef.find(r => r.name === brandName); 
-        if (ref && ref.collections) { const sortedCols = [...ref.collections].sort((a, b) => { const typeA = (typeof a === 'object') ? a.type : 'std'; const typeB = (typeof b === 'object') ? b.type : 'std'; if (typeA === 'std' && typeB !== 'std') return 1; if (typeA !== 'std' && typeB === 'std') return -1; return 0; }); html += sortedCols.map(col => { const colName = (typeof col === 'string') ? col : col.name; const colType = (typeof col === 'object') ? col.type : 'std'; let label = ''; if(colType.includes('eng')) label = ' (Елка)'; else if(colType.includes('french')) label = ' (Фр. Елка)'; else if(colType.includes('art')) label = ' (Арт)'; return `<option value="${colName}">${colName}${label}</option>`; }).join(''); } collSelect.innerHTML = html; 
-    };
-
+    window.updateCollections = function(select) { const brandName = select.value; const row = select.closest('.competitor-entry'); const collSelect = row.querySelector('.competitor-collection'); let html = `<option value="">-- Коллекция --</option>`; const ref = competitorsRef.find(r => r.name === brandName); if (ref && ref.collections) { const sortedCols = [...ref.collections].sort((a, b) => { const typeA = (typeof a === 'object') ? a.type : 'std'; const typeB = (typeof b === 'object') ? b.type : 'std'; if (typeA === 'std' && typeB !== 'std') return 1; if (typeA !== 'std' && typeB === 'std') return -1; return 0; }); html += sortedCols.map(col => { const colName = (typeof col === 'string') ? col : col.name; const colType = (typeof col === 'object') ? col.type : 'std'; let label = ''; if(colType.includes('eng')) label = ' (Елка)'; else if(colType.includes('french')) label = ' (Фр. Елка)'; else if(colType.includes('art')) label = ' (Арт)'; return `<option value="${colName}">${colName}${label}</option>`; }).join(''); } collSelect.innerHTML = html; };
     function renderProductChecklist(container, selectedIds=[]) { if(!container) return; const set = new Set(selectedIds); container.innerHTML = fullProductCatalog.map(p => `<div class="checklist-item form-check"><input type="checkbox" class="form-check-input" id="prod-${container.id}-${p.id}" value="${p.id}" ${set.has(p.id)?'checked':''}><label class="form-check-label" for="prod-${container.id}-${p.id}"><strong>${p.sku}</strong> - ${p.name}</label></div>`).join(''); }
-    function renderPhotoPreviews(container, photosArray) { if(container) container.innerHTML = photosArray.map((p, index) => `<div class="photo-preview-item"><img src="${p.photo_url}"><button type="button" class="btn-remove-photo" data-index="${index}"><i class="bi bi-x"></i></button></div>`).join(''); }
     function getSelectedProductIds(containerId) { const el=getEl(containerId); if(!el) return []; return Array.from(el.querySelectorAll('input:checked')).map(cb=>cb.value); }
     function collectData(container, selector, fields) { if (!container) return []; const data = []; container.querySelectorAll(selector).forEach(entry => { const item = {}; let hasData = false; fields.forEach(f => { const inp = entry.querySelector(f.class); if(inp){item[f.key]=inp.value; if(item[f.key]) hasData=true;} }); if(hasData) data.push(item); }); return data; }
     function renderList(container, data, htmlGen) { if(container) container.innerHTML = (data && data.length > 0) ? data.map(htmlGen).join('') : htmlGen(); }
 
-    // --- 5. MAP LOGIC ---
+    function renderDealerList() {
+        const grid = getEl('dealer-grid'); if (!grid) return;
+        const city = filterCity ? filterCity.value : ''; 
+        const type = filterPriceType ? filterPriceType.value : ''; 
+        const status = filterStatus ? filterStatus.value : ''; 
+        const responsible = filterResponsible ? filterResponsible.value : ''; 
+        const search = searchBar ? searchBar.value.toLowerCase() : '';
+        
+        const filtered = allDealers.filter(d => { 
+            let isVisible = true;
+            if (!status) { const statusObj = statusList.find(s => s.value === (d.status || 'standard')); if (statusObj && statusObj.isVisible === false) isVisible = false; } else { isVisible = (d.status === status); }
+            return isVisible && (!city || d.city === city) && (!type || d.price_type === type) && (!responsible || d.responsible === responsible) && (!search || ((d.name||'').toLowerCase().includes(search) || (d.dealer_id||'').toLowerCase().includes(search)));
+        });
+        filtered.sort((a, b) => { let valA = (a[currentSort.column] || '').toString(); let valB = (b[currentSort.column] || '').toString(); let res = currentSort.column === 'dealer_id' ? valA.localeCompare(valB, undefined, {numeric:true}) : valA.toLowerCase().localeCompare(valB.toLowerCase(), 'ru'); return currentSort.direction === 'asc' ? res : -res; });
+        if (filtered.length === 0) { grid.innerHTML = ` <div class="empty-state"><i class="bi bi-search empty-state-icon"></i><h5 class="text-muted">Ничего не найдено</h5></div>`; return; }
+        
+        grid.innerHTML = filtered.map(d => {
+            const statusObj = statusList.find(s => s.value === (d.status || 'standard')) || { label: d.status, color: '#6c757d' };
+            const statusStyle = `background-color: ${statusObj.color}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 500;`;
+            let phoneBtn = ''; let waBtn = ''; if (d.contacts && d.contacts.length > 0) { const phone = d.contacts.find(c => c.contactInfo)?.contactInfo || ''; const cleanPhone = phone.replace(/[^0-9]/g, ''); if (cleanPhone.length >= 10) { phoneBtn = `<a href="tel:+${cleanPhone}" class="btn-circle btn-circle-call" onclick="event.stopPropagation()" title="Позвонить"><i class="bi bi-telephone-fill"></i></a>`; waBtn = `<a href="https://wa.me/${cleanPhone}" target="_blank" class="btn-circle btn-circle-wa" onclick="event.stopPropagation()" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>`; } }
+            let mapBtn = ''; if (d.latitude && d.longitude) mapBtn = `<a href="https://yandex.kz/maps/?pt=${d.longitude},${d.latitude}&z=17&l=map" target="_blank" class="btn-circle" onclick="event.stopPropagation()" title="Маршрут"><i class="bi bi-geo-alt-fill"></i></a>`;
+            const avatarHtml = d.photo_url ? `<img src="${d.photo_url}" alt="${d.name}">` : `<i class="bi bi-shop"></i>`;
+            const editBtn = (currentUserRole !== 'guest') ? `<button class="btn-circle" onclick="event.stopPropagation(); openEditModal('${d.id}')" title="Редактировать"><i class="bi bi-pencil"></i></button>` : '';
+            return `<div class="dealer-item" onclick="window.open('dealer.html?id=${d.id}', '_blank')"><div class="dealer-avatar-box">${avatarHtml}</div><div class="dealer-content"><div class="d-flex align-items-center gap-2 mb-1"><a href="dealer.html?id=${d.id}" class="dealer-name" target="_blank">${safeText(d.name)}</a><span style="${statusStyle}">${statusObj.label}</span></div><div class="dealer-meta"><span><i class="bi bi-hash"></i>${safeText(d.dealer_id)}</span><span><i class="bi bi-geo-alt"></i>${safeText(d.city)}</span>${d.price_type ? `<span><i class="bi bi-tag"></i>${safeText(d.price_type)}</span>` : ''}</div></div><div class="dealer-actions">${waBtn} ${phoneBtn} ${mapBtn} ${editBtn}</div></div>`;
+        }).join('');
+    }
+
+    // ==========================================
+    // 5. MAP LOGIC
+    // ==========================================
+    let mapInstances = { add: null, edit: null };
+    let markerInstances = { add: null, edit: null };
+    let refreshAddMap = null;
+    let refreshEditMap = null;
+
     function setupMapLogic(mapId, latId, lngId, searchId, btnSearchId, btnLocId, instanceKey) {
         const mapEl = getEl(mapId); if (!mapEl) return null;
         if (!mapInstances[instanceKey]) {
@@ -109,38 +186,29 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshAddMap = setupMapLogic('add-map', 'add_latitude', 'add_longitude', 'add-smart-search', 'btn-search-add', 'btn-loc-add', 'add');
     refreshEditMap = setupMapLogic('edit-map', 'edit_latitude', 'edit_longitude', 'edit-smart-search', 'btn-search-edit', 'btn-loc-edit', 'edit');
 
-    // --- 6. MAIN LOGIC ---
+    // ==========================================
+    // 6. MAIN LOGIC
+    // ==========================================
     async function openEditModal(id) {
         try {
-            const res = await fetch(`${API_DEALERS_URL}/${id}`); 
-            if(!res.ok) throw new Error("Ошибка"); 
-            const d = await res.json();
+            const res = await fetch(`${API_DEALERS_URL}/${id}`); if(!res.ok) throw new Error("Ошибка"); const d = await res.json();
             const titleEl = document.querySelector('#edit-modal .modal-title'); if(titleEl) titleEl.textContent = `Редактировать: ${d.name}`;
             getEl('edit_db_id').value=d.id; getEl('edit_dealer_id').value=d.dealer_id; getEl('edit_name').value=d.name; getEl('edit_organization').value=d.organization; getEl('edit_price_type').value=d.price_type; getEl('edit_city').value=d.city; getEl('edit_address').value=d.address; getEl('edit_delivery').value=d.delivery; getEl('edit_website').value=d.website; getEl('edit_instagram').value=d.instagram;
-            if(getEl('edit_latitude')) getEl('edit_latitude').value=d.latitude||'';
-            if(getEl('edit_longitude')) getEl('edit_longitude').value=d.longitude||'';
-            getEl('edit_bonuses').value=d.bonuses;
-            populateStatusSelects(d.status); 
+            if(getEl('edit_latitude')) getEl('edit_latitude').value=d.latitude||''; if(getEl('edit_longitude')) getEl('edit_longitude').value=d.longitude||'';
+            getEl('edit_bonuses').value=d.bonuses; populateStatusSelects(d.status); 
             if(getEl('edit_responsible')) getEl('edit_responsible').value = d.responsible || '';
-            const editAvatarPreview = getEl('edit-avatar-preview'); const editCurrentAvatarUrl = getEl('edit-current-avatar-url');
-            if(editAvatarPreview) { editAvatarPreview.src = d.avatarUrl || ''; editAvatarPreview.style.display = d.avatarUrl ? 'block' : 'none'; }
-            if(editCurrentAvatarUrl) editCurrentAvatarUrl.value = d.avatarUrl || '';
-            newAvatarBase64 = null;
+            const avPreview = getEl('edit-avatar-preview'); const avInputUrl = getEl('edit-current-avatar-url'); if(avPreview) { avPreview.src = d.avatarUrl || ''; avPreview.style.display = d.avatarUrl ? 'block' : 'none'; } if(avInputUrl) avInputUrl.value = d.avatarUrl || ''; newAvatarBase64 = null;
             renderList(getEl('edit-contact-list'), d.contacts, createContactEntryHTML); renderList(getEl('edit-address-list'), d.additional_addresses, createAddressEntryHTML); renderList(getEl('edit-pos-list'), d.pos_materials, createPosEntryHTML); renderList(getEl('edit-visits-list'), d.visits, createVisitEntryHTML); renderList(getEl('edit-competitor-list'), d.competitors, createCompetitorEntryHTML);
             renderProductChecklist(getEl('edit-product-checklist'), (d.products||[]).map(p=>p.id));
             editPhotosData = d.photos||[]; renderPhotoPreviews(getEl('edit-photo-preview-container'), editPhotosData);
             const firstTabEl = document.querySelector('#editTabs button[data-bs-target="#tab-main"]'); if(firstTabEl) { const tab = new bootstrap.Tab(firstTabEl); tab.show(); }
-            const editModalEl = getEl('edit-modal'); const editModal = editModalEl ? bootstrap.Modal.getOrCreateInstance(editModalEl) : null;
             if(editModal) editModal.show();
         } catch(e){ window.showToast("Ошибка загрузки данных", "error"); console.error(e); }
     }
     window.openEditModal = openEditModal;
 
-    window.showQuickVisit = function(id) { 
-        getEl('qv_dealer_id').value = id; getEl('qv_comment').value = ''; 
-        const qvEl = getEl('quick-visit-modal'); const qvM = qvEl ? bootstrap.Modal.getOrCreateInstance(qvEl) : null;
-        if(qvM) qvM.show(); 
-    };
+    function showQuickVisit(id) { getEl('qv_dealer_id').value = id; getEl('qv_comment').value = ''; if(qvModal) qvModal.show(); }
+    window.showQuickVisit = showQuickVisit;
 
     async function initApp() {
         try { const authRes = await fetch('/api/auth/me'); if (authRes.ok) { const authData = await authRes.json(); currentUserRole = authData.role; const badge = getEl('user-role-badge'); if(badge) { const names = { 'admin': 'Админ', 'astana': 'Астана', 'regions': 'Регионы', 'guest': 'Гость' }; badge.textContent = names[currentUserRole] || currentUserRole; } if (currentUserRole === 'guest') { const btn = getEl('open-add-modal-btn'); if (btn) btn.style.display = 'none'; } } } catch (e) {}
@@ -154,27 +222,24 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchStatuses() { try { const res = await fetch(API_STATUSES_URL); if(res.ok) { statusList = await res.json(); populateStatusSelects(); renderStatusManagerList(); } } catch(e) {} }
     function populateStatusSelects(selectedStatus = null) {
         let filterHtml = '<option value="">Все статусы</option>'; statusList.forEach(s => { filterHtml += `<option value="${s.value}">${s.label}</option>`; });
-        const filterStatus = getEl('filter-status'); if(filterStatus) filterStatus.innerHTML = filterHtml;
+        if(filterStatus) filterStatus.innerHTML = filterHtml;
         const modalHtml = statusList.map(s => `<option value="${s.value}" ${selectedStatus === s.value ? 'selected' : ''}>${s.label}</option>`).join('');
         const addStatusSel = getEl('status'); if(addStatusSel) addStatusSel.innerHTML = modalHtml;
         const editStatusSel = getEl('edit_status'); if(editStatusSel) editStatusSel.innerHTML = modalHtml;
     }
-    function renderStatusManagerList() { const container = getEl('status-manager-list'); if(!container) return; container.innerHTML = statusList.map(s => `<tr><td><div style="width:20px;height:20px;background:${s.color};border-radius:50%;"></div></td><td class="fw-bold">${s.label}</td><td class="text-muted small">${s.value}</td><td class="text-center">${s.isVisible!==false?'<i class="bi bi-eye-fill text-success"></i>':'<i class="bi bi-eye-slash-fill text-muted"></i>'}</td><td class="text-end"><button class="btn btn-sm btn-light border me-1" onclick="editStatus('${s.id}')"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-light border text-danger" onclick="deleteStatus('${s.id}')"><i class="bi bi-trash"></i></button></td></tr>`).join(''); }
-    
-    function resetStatusForm() { const form = getEl('status-form'); if(!form) return; form.reset(); getEl('st_id').value = ''; getEl('btn-save-status').textContent = 'Добавить'; getEl('btn-save-status').className = 'btn btn-primary w-100'; getEl('btn-cancel-edit-status').style.display = 'none'; getEl('st_color').value = '#0d6efd'; }
-    window.editStatus = (id) => { const s = statusList.find(i => i.id === id); if(!s) return; getEl('st_id').value = s.id; getEl('st_label').value = s.label; getEl('st_color').value = s.color; getEl('st_visible').checked = s.isVisible !== false; const btn = getEl('btn-save-status'); btn.textContent = 'Сохранить'; btn.className = 'btn btn-success w-100'; getEl('btn-cancel-edit-status').style.display = 'inline-block'; };
+    function renderStatusManagerList() { if(!statusListContainer) return; statusListContainer.innerHTML = statusList.map(s => `<tr><td><div style="width:20px;height:20px;background:${s.color};border-radius:50%;"></div></td><td class="fw-bold">${s.label}</td><td class="text-muted small">${s.value}</td><td class="text-center">${s.isVisible!==false?'<i class="bi bi-eye-fill text-success"></i>':'<i class="bi bi-eye-slash-fill text-muted"></i>'}</td><td class="text-end"><button class="btn btn-sm btn-light border me-1" onclick="editStatus('${s.id}')"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-light border text-danger" onclick="deleteStatus('${s.id}')"><i class="bi bi-trash"></i></button></td></tr>`).join(''); }
+    function resetStatusForm() { if(!statusForm) return; statusForm.reset(); getEl('st_id').value = ''; getEl('btn-save-status').textContent = 'Добавить'; getEl('btn-save-status').className = 'btn btn-primary w-100'; const cancel = getEl('btn-cancel-edit-status'); if(cancel) cancel.style.display = 'none'; getEl('st_color').value = '#0d6efd'; }
+    window.editStatus = (id) => { const s = statusList.find(i => i.id === id); if(!s) return; getEl('st_id').value = s.id; getEl('st_label').value = s.label; getEl('st_color').value = s.color; getEl('st_visible').checked = s.isVisible !== false; const btn = getEl('btn-save-status'); btn.textContent = 'Сохранить'; btn.className = 'btn btn-success w-100'; const cancel = getEl('btn-cancel-edit-status'); if(cancel) cancel.style.display = 'inline-block'; };
     window.deleteStatus = async (id) => { if(!confirm("Удалить этот статус?")) return; try { await fetch(`${API_STATUSES_URL}/${id}`, { method: 'DELETE' }); window.showToast("Удалено"); fetchStatuses(); } catch(e) { window.showToast("Ошибка", "error"); } };
     
     async function fetchProductCatalog() { if (fullProductCatalog.length > 0) return; try { const response = await fetch(API_PRODUCTS_URL); if (!response.ok) throw new Error(`Ошибка: ${response.status}`); fullProductCatalog = await response.json(); fullProductCatalog.sort((a, b) => a.sku.localeCompare(b.sku, 'ru', { numeric: true })); } catch (error) { console.warn(error); } }
     function populateFilters(dealers) { 
-        const filterCity = getEl('filter-city'); const filterPriceType = getEl('filter-price-type');
         if(!filterCity || !filterPriceType) return; const cities = [...new Set(dealers.map(d => d.city).filter(Boolean))].sort(); const types = [...new Set(dealers.map(d => d.price_type).filter(Boolean))].sort(); const sc = filterCity.value; const st = filterPriceType.value; filterCity.innerHTML = '<option value="">Город</option>'; filterPriceType.innerHTML = '<option value="">Тип цен</option>'; cities.forEach(c => filterCity.add(new Option(c, c))); types.forEach(t => filterPriceType.add(new Option(t, t))); filterCity.value = sc; filterPriceType.value = st; 
     }
     async function saveProducts(dealerId, ids) { await fetch(`${API_DEALERS_URL}/${dealerId}/products`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({productIds: ids})}); }
     async function completeTask(btn, dealerId, visitIndex) { try { btn.disabled = true; const res = await fetch(`${API_DEALERS_URL}/${dealerId}`); if(!res.ok) throw new Error('Err'); const dealer = await res.json(); if (dealer.visits && dealer.visits[visitIndex]) { dealer.visits[visitIndex].isCompleted = true; } await fetch(`${API_DEALERS_URL}/${dealerId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visits: dealer.visits }) }); initApp(); window.showToast("Задача выполнена!"); } catch (e) { window.showToast("Ошибка", "error"); btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg"></i>'; } }
-
     function renderDashboard() {
-        const dashboardStats = getEl('dashboard-stats'); if (!dashboardStats) return; 
+        if (!dashboardStats) return; 
         if (!allDealers || allDealers.length === 0) { dashboardStats.innerHTML = ''; return; }
         const activeDealers = allDealers.filter(d => d.status !== 'potential'); const totalDealers = activeDealers.length; const noAvatarCount = activeDealers.filter(d => !d.photo_url).length; 
         let countActive = 0, countStandard = 0, countPotential = 0, countProblem = 0; 
@@ -188,33 +253,11 @@ document.addEventListener('DOMContentLoaded', () => {
         renderTaskList(getEl('tasks-list-upcoming'), tasksUpcoming, 'upcoming'); renderTaskList(getEl('tasks-list-problem'), tasksProblem, 'problem'); renderTaskList(getEl('tasks-list-cooling'), tasksCooling, 'cooling');
     }
     function renderTaskList(container, tasks, type) { if (!container) return; if (tasks.length === 0) { const msg = type === 'cooling' ? 'Все посещены недавно' : 'Задач нет'; container.innerHTML = `<div class="text-center py-4 text-muted"><i class="bi bi-check-circle display-6 d-block mb-2 text-success opacity-50"></i><small>${msg}</small></div>`; return; } container.innerHTML = tasks.map(t => { let badgeHtml = ''; let metaHtml = ''; if (type === 'upcoming') { const dateStr = t.date.toLocaleDateString('ru-RU', {day:'numeric', month:'short'}); badgeHtml = t.isToday ? `<span class="task-badge tb-today mt-1 d-inline-block">Сегодня</span>` : `<span class="task-badge tb-future mt-1 d-inline-block">${dateStr}</span>`; metaHtml = `<span class="text-muted small">${safeText(t.comment)}</span>`; } else if (type === 'problem') { if (t.type === 'overdue') { const dateStr = t.date.toLocaleDateString('ru-RU'); badgeHtml = `<span class="task-badge tb-overdue mt-1 d-inline-block">Просрок: ${dateStr}</span>`; metaHtml = `<span class="text-danger small fw-bold">${safeText(t.comment)}</span>`; } else { badgeHtml = `<span class="task-badge tb-overdue mt-1 d-inline-block">Проблема</span>`; metaHtml = `<span class="small text-muted">Внимание!</span>`; } } else if (type === 'cooling') { const daysStr = t.days === 999 ? 'Никогда' : `${t.days} дн.`; badgeHtml = `<span class="task-badge tb-cooling mt-1 d-inline-block">Без визитов: ${daysStr}</span>`; metaHtml = `<span class="text-muted small">Пора навестить</span>`; } const showCheckBtn = (type === 'upcoming' || (type === 'problem' && t.type === 'overdue')); const btnHtml = showCheckBtn ? `<button class="btn-task-check btn-complete-task" data-id="${t.dealerId}" data-index="${t.visitIndex}" title="Выполнить"><i class="bi bi-check-lg"></i></button>` : ''; return `<div class="task-item-modern align-items-start"><div class="task-content"><a href="dealer.html?id=${t.dealerId}" target="_blank" class="task-title text-truncate d-block" style="max-width: 200px;">${safeText(t.dealerName)}</a>${badgeHtml}<div class="mt-1">${metaHtml}</div></div><div class="mt-1">${btnHtml}</div></div>`; }).join(''); }
-    
-    function renderDealerList() {
-        if (!dealerGrid) return;
-        const filterCity = getEl('filter-city'); const filterPriceType = getEl('filter-price-type'); const filterStatus = getEl('filter-status'); const filterResponsible = getEl('filter-responsible'); const searchBar = getEl('search-bar');
-        const city = filterCity ? filterCity.value : ''; const type = filterPriceType ? filterPriceType.value : ''; const status = filterStatus ? filterStatus.value : ''; const responsible = filterResponsible ? filterResponsible.value : ''; const search = searchBar ? searchBar.value.toLowerCase() : '';
-        const filtered = allDealers.filter(d => { 
-            let isVisible = true;
-            if (!status) { const statusObj = statusList.find(s => s.value === (d.status || 'standard')); if (statusObj && statusObj.isVisible === false) isVisible = false; } else { isVisible = (d.status === status); }
-            return isVisible && (!city || d.city === city) && (!type || d.price_type === type) && (!responsible || d.responsible === responsible) && (!search || ((d.name||'').toLowerCase().includes(search) || (d.dealer_id||'').toLowerCase().includes(search)));
-        });
-        filtered.sort((a, b) => { let valA = (a[currentSort.column] || '').toString(); let valB = (b[currentSort.column] || '').toString(); let res = currentSort.column === 'dealer_id' ? valA.localeCompare(valB, undefined, {numeric:true}) : valA.toLowerCase().localeCompare(valB.toLowerCase(), 'ru'); return currentSort.direction === 'asc' ? res : -res; });
-        if (filtered.length === 0) { dealerGrid.innerHTML = ` <div class="empty-state"><i class="bi bi-search empty-state-icon"></i><h5 class="text-muted">Ничего не найдено</h5><p class="text-secondary small mb-3">Попробуйте изменить фильтры</p><button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('search-bar').value=''; document.getElementById('filter-city').value=''; document.getElementById('filter-status').value=''; renderDealerList()">Сбросить фильтры</button></div>`; return; }
-        dealerGrid.innerHTML = filtered.map(d => {
-            const statusObj = statusList.find(s => s.value === (d.status || 'standard')) || { label: d.status, color: '#6c757d' };
-            const statusStyle = `background-color: ${statusObj.color}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 500;`;
-            let phoneBtn = ''; let waBtn = ''; if (d.contacts && d.contacts.length > 0) { const phone = d.contacts.find(c => c.contactInfo)?.contactInfo || ''; const cleanPhone = phone.replace(/[^0-9]/g, ''); if (cleanPhone.length >= 10) { phoneBtn = `<a href="tel:+${cleanPhone}" class="btn-circle btn-circle-call" onclick="event.stopPropagation()" title="Позвонить"><i class="bi bi-telephone-fill"></i></a>`; waBtn = `<a href="https://wa.me/${cleanPhone}" target="_blank" class="btn-circle btn-circle-wa" onclick="event.stopPropagation()" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>`; } }
-            let mapBtn = ''; if (d.latitude && d.longitude) mapBtn = `<a href="https://yandex.kz/maps/?pt=${d.longitude},${d.latitude}&z=17&l=map" target="_blank" class="btn-circle" onclick="event.stopPropagation()" title="Маршрут"><i class="bi bi-geo-alt-fill"></i></a>`;
-            let instaBtn = ''; if (d.instagram) { let url = d.instagram.trim(); if (!url.startsWith('http')) { if (url.startsWith('@')) url = 'https://instagram.com/' + url.substring(1); else url = 'https://instagram.com/' + url; } instaBtn = `<a href="${url}" target="_blank" class="btn-circle btn-circle-insta" onclick="event.stopPropagation()" title="Instagram"><i class="bi bi-instagram"></i></a>`; }
-            const avatarHtml = d.photo_url ? `<img src="${d.photo_url}" alt="${d.name}">` : `<i class="bi bi-shop"></i>`;
-            const editBtn = (currentUserRole !== 'guest') ? `<button class="btn-circle" onclick="event.stopPropagation(); openEditModal('${d.id}')" title="Редактировать"><i class="bi bi-pencil"></i></button>` : '';
-            return `<div class="dealer-item" onclick="window.open('dealer.html?id=${d.id}', '_blank')"><div class="dealer-avatar-box">${avatarHtml}</div><div class="dealer-content"><div class="d-flex align-items-center gap-2 mb-1"><a href="dealer.html?id=${d.id}" class="dealer-name" target="_blank">${safeText(d.name)}</a><span style="${statusStyle}">${statusObj.label}</span></div><div class="dealer-meta"><span><i class="bi bi-hash"></i>${safeText(d.dealer_id)}</span><span><i class="bi bi-geo-alt"></i>${safeText(d.city)}</span>${d.price_type ? `<span><i class="bi bi-tag"></i>${safeText(d.price_type)}</span>` : ''}</div></div><div class="dealer-actions">${instaBtn} ${waBtn} ${phoneBtn} ${mapBtn} ${editBtn}</div></div>`;
-        }).join('');
-    }
 
     // ==========================================
-    // 7. SETUP LISTENERS (SAFE)
+    // 8. EVENT LISTENERS SETUP
     // ==========================================
+
     const setupListBtn = (id, listId, genFunc) => { const btn = getEl(id); const list = getEl(listId); if(btn && list) btn.onclick = () => list.insertAdjacentHTML('beforeend', genFunc()); };
     setupListBtn('add-contact-btn-add-modal', 'add-contact-list', createContactEntryHTML); setupListBtn('add-address-btn-add-modal', 'add-address-list', createAddressEntryHTML); setupListBtn('add-pos-btn-add-modal', 'add-pos-list', createPosEntryHTML); setupListBtn('add-visits-btn-add-modal', 'add-visits-list', createVisitEntryHTML); setupListBtn('add-competitor-btn-add-modal', 'add-competitor-list', createCompetitorEntryHTML);
     setupListBtn('add-contact-btn-edit-modal', 'edit-contact-list', createContactEntryHTML); setupListBtn('add-address-btn-edit-modal', 'edit-address-list', createAddressEntryHTML); setupListBtn('add-pos-btn-edit-modal', 'edit-pos-list', createPosEntryHTML); setupListBtn('add-visits-btn-edit-modal', 'edit-visits-list', createVisitEntryHTML); setupListBtn('add-competitor-btn-edit-modal', 'edit-competitor-list', createCompetitorEntryHTML);
@@ -228,9 +271,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.sort-btn').forEach(btn => { btn.onclick = (e) => { const sortKey = e.currentTarget.dataset.sort; if(currentSort.column === sortKey) currentSort.direction = (currentSort.direction === 'asc' ? 'desc' : 'asc'); else { currentSort.column = sortKey; currentSort.direction = 'asc'; } renderDealerList(); }; });
     if(btnManageStatuses) { btnManageStatuses.onclick = () => { resetStatusForm(); statusModal.show(); }; }
     if(getEl('btn-cancel-edit-status')) getEl('btn-cancel-edit-status').onclick = resetStatusForm;
-    if(statusForm) { statusForm.addEventListener('submit', async (e) => { e.preventDefault(); const id = getEl('st_id').value; const label = getEl('st_label').value; const color = getEl('st_color').value; const isVisible = getEl('st_visible').checked; const body = { label, color, isVisible }; let url = API_STATUSES_URL; let method = 'POST'; if(id) { url += `/${id}`; method = 'PUT'; } else { body.value = 'st_' + Math.random().toString(36).substr(2, 5); body.sortOrder = statusList.length + 10; } try { const res = await fetch(url, { method: method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) }); if(res.ok) { window.showToast(id ? "Обновлено" : "Создано"); resetStatusForm(); fetchStatuses(); } else { throw new Error(); } } catch(e) { window.showToast("Ошибка сохранения", "error"); } }); }
 
-    // Photos
     if(addAvatarInput) addAvatarInput.addEventListener('change', async (e) => { const file = e.target.files[0]; if (file) { newAvatarBase64 = await compressImage(file, 800, 0.8); addAvatarPreview.src = newAvatarBase64; addAvatarPreview.style.display='block'; } });
     if(editAvatarInput) editAvatarInput.addEventListener('change', async (e) => { const file = e.target.files[0]; if (file) { newAvatarBase64 = await compressImage(file, 800, 0.8); editAvatarPreview.src = newAvatarBase64; editAvatarPreview.style.display='block'; } });
     if(addPhotoInput) addPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) addPhotosData.push({ photo_url: await compressImage(file, 1000, 0.7) }); renderPhotoPreviews(getEl('add-photo-preview-container'), addPhotosData); addPhotoInput.value = ''; });
@@ -238,18 +279,21 @@ document.addEventListener('DOMContentLoaded', () => {
     if(editPhotoInput) editPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) editPhotosData.push({ photo_url: await compressImage(file, 1000, 0.7) }); renderPhotoPreviews(getEl('edit-photo-preview-container'), editPhotosData); editPhotoInput.value = ''; });
     if(getEl('edit-photo-preview-container')) getEl('edit-photo-preview-container').addEventListener('click', (e) => { const btn = e.target.closest('.btn-remove-photo'); if(btn) { editPhotosData.splice(btn.dataset.index, 1); renderPhotoPreviews(getEl('edit-photo-preview-container'), editPhotosData); } });
 
-    // Wizard
-    if(openAddModalBtn) openAddModalBtn.onclick = () => { if(addForm) addForm.reset(); populateStatusSelects(); renderProductChecklist(getEl('add-product-checklist')); renderList(getEl('add-contact-list'), [], createContactEntryHTML); renderList(getEl('add-address-list'), [], createAddressEntryHTML); renderList(getEl('add-pos-list'), [], createPosEntryHTML); renderList(getEl('add-visits-list'), [], createVisitEntryHTML); renderList(getEl('add-competitor-list'), [], createCompetitorEntryHTML); if(getEl('add_latitude')) { getEl('add_latitude').value = ''; getEl('add_longitude').value = ''; } addPhotosData = []; renderPhotoPreviews(getEl('add-photo-preview-container'), []); const av = getEl('add-avatar-preview'); if(av) { av.src = ''; av.style.display='none'; } newAvatarBase64 = null; currentStep = 1; showStep(1); addModal.show(); };
+    // WIZARD
     function showStep(step) { document.querySelectorAll('.wizard-step').forEach(s => s.classList.remove('active')); document.querySelectorAll('.step-circle').forEach(i => i.classList.remove('active')); const stepEl = document.getElementById(`step-${step}`); if(stepEl) stepEl.classList.add('active'); for (let i = 1; i <= totalSteps; i++) { const ind = document.getElementById(`step-ind-${i}`); if(!ind) continue; if (i < step) { ind.classList.add('completed'); ind.innerHTML = '✔'; } else { ind.classList.remove('completed'); ind.innerHTML = i; if (i === step) ind.classList.add('active'); else ind.classList.remove('active'); } } if (prevBtn) prevBtn.style.display = step === 1 ? 'none' : 'inline-block'; if (nextBtn && finishBtn) { if (step === totalSteps) { nextBtn.style.display = 'none'; finishBtn.style.display = 'inline-block'; } else { nextBtn.style.display = 'inline-block'; finishBtn.style.display = 'none'; } } } 
     if(nextBtn) nextBtn.onclick = () => { if (currentStep === 1) { if (!getVal('dealer_id') || !getVal('name')) { window.showToast("Заполните ID и Название", "error"); return; } if (refreshAddMap) refreshAddMap(); } if (currentStep < totalSteps) { currentStep++; showStep(currentStep); } }; 
     if(prevBtn) prevBtn.onclick = () => { if (currentStep > 1) { currentStep--; showStep(currentStep); } };
     if (addModalEl) { addModalEl.addEventListener('shown.bs.modal', () => { if (refreshAddMap) refreshAddMap(); }); }
     if (editModalEl) { const tabMapBtn = document.querySelector('button[data-bs-target="#tab-map"]'); if (tabMapBtn) { tabMapBtn.addEventListener('shown.bs.tab', () => { if (refreshEditMap) refreshEditMap(); }); } }
 
-    // SAVE & LOGOUT
+    if(openAddModalBtn) openAddModalBtn.onclick = () => { if(addForm) addForm.reset(); populateStatusSelects(); renderProductChecklist(getEl('add-product-checklist')); renderList(getEl('add-contact-list'), [], createContactEntryHTML); renderList(getEl('add-address-list'), [], createAddressEntryHTML); renderList(getEl('add-pos-list'), [], createPosEntryHTML); renderList(getEl('add-visits-list'), [], createVisitEntryHTML); renderList(getEl('add-competitor-list'), [], createCompetitorEntryHTML); if(getEl('add_latitude')) { getEl('add_latitude').value = ''; getEl('add_longitude').value = ''; } addPhotosData = []; renderPhotoPreviews(getEl('add-photo-preview-container'), []); const av = getEl('add-avatar-preview'); if(av) { av.src = ''; av.style.display='none'; } newAvatarBase64 = null; currentStep = 1; showStep(1); addModal.show(); };
+    
+    // Forms Submit
     if(addForm) addForm.addEventListener('submit', async (e) => { e.preventDefault(); if (isSaving) return; isSaving = true; const btn = getEl('btn-finish-step'); const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; const data = { dealer_id: getVal('dealer_id'), name: getVal('name'), organization: getVal('organization'), price_type: getVal('price_type'), city: getVal('city'), address: getVal('address'), delivery: getVal('delivery'), website: getVal('website'), instagram: getVal('instagram'), latitude: getVal('add_latitude'), longitude: getVal('add_longitude'), bonuses: getVal('bonuses'), status: getVal('status'), responsible: getVal('responsible'), contacts: collectData(getEl('add-contact-list'), '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]), additional_addresses: collectData(getEl('add-address-list'), '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]), pos_materials: collectData(getEl('add-pos-list'), '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]), visits: collectData(getEl('add-visits-list'), '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'}]), photos: addPhotosData, avatarUrl: newAvatarBase64, competitors: collectData(getEl('add-competitor-list'), '.competitor-entry', [{key:'brand',class:'.competitor-brand'},{key:'collection',class:'.competitor-collection'},{key:'price_opt',class:'.competitor-price-opt'},{key:'price_retail',class:'.competitor-price-retail'}]) }; try { const res = await fetch(API_DEALERS_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); if (!res.ok) throw new Error(await res.text()); const newD = await res.json(); const pIds = getSelectedProductIds('add-product-checklist'); if(pIds.length) await saveProducts(newD.id, pIds); addModal.hide(); window.showToast("Дилер добавлен!"); initApp(); } catch (e) { window.showToast("Ошибка сохранения", "error"); } finally { isSaving = false; btn.disabled = false; btn.innerHTML = oldText; } });
     if(editForm) editForm.addEventListener('submit', async (e) => { e.preventDefault(); if (isSaving) return; isSaving = true; const btn = document.querySelector('button[form="edit-dealer-form"]'); const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; const id = getEl('edit_db_id').value; let avatarToSend = getVal('edit-current-avatar-url'); if (newAvatarBase64) avatarToSend = newAvatarBase64; const data = { dealer_id: getVal('edit_dealer_id'), name: getVal('edit_name'), organization: getVal('edit_organization'), price_type: getVal('edit_price_type'), city: getVal('edit_city'), address: getVal('edit_address'), delivery: getVal('edit_delivery'), website: getVal('edit_website'), instagram: getVal('edit_instagram'), latitude: getVal('edit_latitude'), longitude: getVal('edit_longitude'), bonuses: getVal('edit_bonuses'), status: getVal('edit_status'), responsible: getVal('edit_responsible'), avatarUrl: avatarToSend, contacts: collectData(getEl('edit-contact-list'), '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]), additional_addresses: collectData(getEl('edit-address-list'), '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]), pos_materials: collectData(getEl('edit-pos-list'), '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]), visits: collectData(getEl('edit-visits-list'), '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'},{key:'isCompleted',class:'.visit-completed'}]), photos: editPhotosData, competitors: collectData(getEl('edit-competitor-list'), '.competitor-entry', [{key:'brand',class:'.competitor-brand'},{key:'collection',class:'.competitor-collection'},{key:'price_opt',class:'.competitor-price-opt'},{key:'price_retail',class:'.competitor-price-retail'}]) }; try { await fetch(`${API_DEALERS_URL}/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); await saveProducts(id, getSelectedProductIds('edit-product-checklist')); editModal.hide(); window.showToast("Изменения сохранены!"); initApp(); } catch (e) { window.showToast("Ошибка сохранения", "error"); } finally { isSaving = false; if(btn) { btn.disabled = false; btn.innerHTML = oldText; } } });
+    if(statusForm) { statusForm.addEventListener('submit', async (e) => { e.preventDefault(); const id = getEl('st_id').value; const label = getEl('st_label').value; const color = getEl('st_color').value; const isVisible = getEl('st_visible').checked; const body = { label, color, isVisible }; let url = API_STATUSES_URL; let method = 'POST'; if(id) { url += `/${id}`; method = 'PUT'; } else { body.value = 'st_' + Math.random().toString(36).substr(2, 5); body.sortOrder = statusList.length + 10; } try { const res = await fetch(url, { method: method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) }); if(res.ok) { window.showToast(id ? "Обновлено" : "Создано"); resetStatusForm(); fetchStatuses(); } else { throw new Error(); } } catch(e) { window.showToast("Ошибка сохранения", "error"); } }); }
     if(qvForm) qvForm.addEventListener('submit', async (e) => { e.preventDefault(); if (isSaving) return; isSaving = true; const id = getEl('qv_dealer_id').value; const comment = getEl('qv_comment').value; const btn = qvForm.querySelector('button'); if(!id || !comment) { isSaving = false; return; } try { btn.disabled = true; const getRes = await fetch(`${API_DEALERS_URL}/${id}`); const dealer = await getRes.json(); const newVisit = { date: new Date().toISOString().slice(0,10), comment: comment, isCompleted: true }; const visits = [...(dealer.visits || []), newVisit]; await fetch(`${API_DEALERS_URL}/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ visits }) }); qvModal.hide(); window.showToast("Визит добавлен!"); } catch(e) { window.showToast("Ошибка", "error"); } finally { isSaving = false; btn.disabled = false; } });
+
     if (logoutBtn) { logoutBtn.onclick = (e) => { e.preventDefault(); localStorage.clear(); sessionStorage.clear(); logoutBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; const xhr = new XMLHttpRequest(); xhr.open("GET", "/?chk=" + Math.random(), true, "logout", "logout"); xhr.onreadystatechange = function () { if (xhr.readyState == 4) window.location.reload(); }; xhr.send(); }; }
 
     initApp();
