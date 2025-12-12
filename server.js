@@ -5,6 +5,7 @@ const basicAuth = require('express-basic-auth');
 
 const app = express();
 const PORT = process.env.PORT || 3000; 
+// Лимит увеличен, чтобы можно было сохранять фото, но отдавать мы будем умно
 app.use(express.json({ limit: '50mb' })); 
 app.use(cors());
 
@@ -40,17 +41,9 @@ app.use(express.static('public'));
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// --- SCHEMAS ---
-// Добавили поле isVisible (по умолчанию true)
-const statusSchema = new mongoose.Schema({ 
-    value: String, 
-    label: String, 
-    color: String, 
-    isVisible: { type: Boolean, default: true }, 
-    sortOrder: { type: Number, default: 0 } 
-});
+// SCHEMAS
+const statusSchema = new mongoose.Schema({ value: String, label: String, color: String, isVisible: { type: Boolean, default: true }, sortOrder: { type: Number, default: 0 } });
 const Status = mongoose.model('Status', statusSchema);
-
 const productSchema = new mongoose.Schema({ sku: String, name: String });
 const Product = mongoose.model('Product', productSchema);
 const contactSchema = new mongoose.Schema({ name: String, position: String, contactInfo: String }, { _id: false }); 
@@ -71,11 +64,7 @@ const Knowledge = mongoose.model('Knowledge', new mongoose.Schema({ title: Strin
 
 async function connectToDB() {
     if (!DB_CONNECTION_STRING) return console.error("No DB String");
-    try { 
-        await mongoose.connect(DB_CONNECTION_STRING); 
-        console.log('MongoDB Connected');
-        await seedStatuses(); 
-    } catch (e) { console.error(e); }
+    try { await mongoose.connect(DB_CONNECTION_STRING); console.log('MongoDB Connected'); await seedStatuses(); } catch (e) { console.error(e); }
 }
 
 async function seedStatuses() {
@@ -87,7 +76,7 @@ async function seedStatuses() {
             { value: 'standard', label: 'Стандарт', color: '#ffc107', isVisible: true, sortOrder: 2 },
             { value: 'problem', label: 'Проблемный', color: '#dc3545', isVisible: true, sortOrder: 3 },
             { value: 'potential', label: 'Потенциальный', color: '#0d6efd', isVisible: true, sortOrder: 4 },
-            { value: 'archive', label: 'Архив', color: '#6c757d', isVisible: false, sortOrder: 5 } // Архив скрыт по умолчанию
+            { value: 'archive', label: 'Архив', color: '#6c757d', isVisible: false, sortOrder: 5 }
         ]);
     }
 }
@@ -112,14 +101,22 @@ const checkWrite = (req, res, next) => { if (canWrite(req)) next(); else res.sta
 // ROUTES
 app.get('/api/auth/me', (req, res) => { res.json({ role: getUserRole(req) }); });
 
-// STATUS API
 app.get('/api/statuses', async (req, res) => { const s = await Status.find().sort({sortOrder: 1}).lean(); res.json(s.map(convertToClient)); });
 app.post('/api/statuses', checkWrite, async (req, res) => { try { const s = new Status(req.body); await s.save(); res.json(convertToClient(s)); } catch(e){ res.status(500).json({error:e.message}); } });
-// ДОБАВИЛИ ВОТ ЭТОТ МЕТОД PUT:
 app.put('/api/statuses/:id', checkWrite, async (req, res) => { try { await Status.findByIdAndUpdate(req.params.id, req.body); res.json({status:'ok'}); } catch(e){ res.status(500).json({error:e.message}); } });
 app.delete('/api/statuses/:id', checkWrite, async (req, res) => { await Status.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
-// Dealers
-app.get('/api/dealers', async (req, res) => { try { const dealers = await Dealer.find(getDealerFilter(req)).lean(); res.json(dealers.map(d => ({ id: d._id, ...d, photo_url: d.avatarUrl }))); } catch (e) { res.status(500).json({ error: e.message }); } });
+
+// --- DEALERS API (OPTIMIZED) ---
+app.get('/api/dealers', async (req, res) => {
+    try {
+        // ОПТИМИЗАЦИЯ: НЕ загружаем фото и тяжелые массивы для списка
+        const dealers = await Dealer.find(getDealerFilter(req))
+            .select('-photos -visits -pos_materials -competitors') 
+            .lean();
+        res.json(dealers.map(d => ({ id: d._id, ...d, photo_url: d.avatarUrl }))); 
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/dealers/:id', async (req, res) => { try { const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).populate('products'); res.json(convertToClient(d)); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.post('/api/dealers', checkWrite, async (req, res) => { try { const role = getUserRole(req); if (role === 'astana') req.body.responsible = 'regional_astana'; if (role === 'regions') req.body.responsible = 'regional_regions'; const d = new Dealer(req.body); await d.save(); res.status(201).json(convertToClient(d)); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.put('/api/dealers/:id', checkWrite, async (req, res) => { try { await Dealer.findOneAndUpdate({ _id: req.params.id, ...getDealerFilter(req) }, req.body); res.json({status:'ok'}); } catch (e) { res.status(500).json({ error: e.message }); } });
@@ -127,7 +124,7 @@ app.delete('/api/dealers/:id', checkWrite, async (req, res) => { try { await Dea
 app.get('/api/dealers/:id/products', async (req, res) => { const d = await Dealer.findById(req.params.id).populate('products'); res.json(d.products.map(convertToClient)); });
 app.put('/api/dealers/:id/products', async (req, res) => { await Dealer.findByIdAndUpdate(req.params.id, { products: req.body.productIds }); res.json({status:'ok'}); });
 
-// Products, Matrix, Sales, Competitors, Knowledge (без изменений)
+// Other APIs (Standard)
 app.get('/api/products', async (req, res) => { const s = new RegExp(req.query.search||'', 'i'); const p = await Product.find({$or:[{sku:s},{name:s}]}).sort({sku:1}).lean(); res.json(p.map(x=>{x.id=x._id;return x;})); });
 app.post('/api/products', checkWrite, async (req, res) => { const p = new Product(req.body); await p.save(); res.json(convertToClient(p)); });
 app.put('/api/products/:id', checkWrite, async (req, res) => { const p = await Product.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(p)); });
@@ -147,4 +144,3 @@ app.put('/api/knowledge/:id', checkWrite, async (req, res) => { const a = await 
 app.delete('/api/knowledge/:id', checkWrite, async (req, res) => { await Knowledge.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
 
 app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
-
