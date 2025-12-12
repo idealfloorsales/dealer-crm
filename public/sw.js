@@ -10,7 +10,7 @@ const ASSETS = [
     '/knowledge.html',
     '/dealer.html',
     '/style.css',
-    '/script.js',
+    '/main.js',
     '/sales.js',
     '/report.js',
     '/products.js',
