@@ -1,15 +1,89 @@
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("App Started v1001: Syntax Fixed");
+    console.log("App Started v2025: FINAL FIX");
 
     // ==========================================
-    // 1. БЕЗОПАСНЫЕ УТИЛИТЫ
+    // 1. ПЕРЕМЕННЫЕ И КОНСТАНТЫ
+    // ==========================================
+    const API_DEALERS_URL = '/api/dealers';
+    const API_PRODUCTS_URL = '/api/products'; 
+    const API_COMPETITORS_REF_URL = '/api/competitors-ref';
+    const API_STATUSES_URL = '/api/statuses';
+
+    let fullProductCatalog = [];
+    let competitorsRef = []; 
+    let allDealers = [];
+    let statusList = []; 
+    let currentSort = { column: 'name', direction: 'asc' };
+    let isSaving = false; 
+    let addPhotosData = []; 
+    let editPhotosData = []; 
+    let newAvatarBase64 = null; 
+    let currentUserRole = 'guest';
+
+    // Хранилище объектов карт (чтобы удалять их перед перерисовкой)
+    const mapInstances = { add: null, edit: null };
+    const markerInstances = { add: null, edit: null };
+
+    // Wizard
+    let currentStep = 1; 
+    const totalSteps = 4;
+
+    const posMaterialsList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"];
+
+    // ==========================================
+    // 2. ПОЛУЧЕНИЕ ЭЛЕМЕНТОВ (С ЗАЩИТОЙ)
     // ==========================================
     const getEl = (id) => document.getElementById(id);
+    
+    // Модалки
+    const addModalEl = getEl('add-modal');
+    const addModal = addModalEl ? new bootstrap.Modal(addModalEl, { backdrop: 'static', keyboard: false }) : null;
+    const addForm = getEl('add-dealer-form');
+    
+    const editModalEl = getEl('edit-modal');
+    const editModal = editModalEl ? new bootstrap.Modal(editModalEl, { backdrop: 'static', keyboard: false }) : null;
+    const editForm = getEl('edit-dealer-form');
+
+    const qvModalEl = getEl('quick-visit-modal');
+    const qvModal = qvModalEl ? new bootstrap.Modal(qvModalEl, { backdrop: 'static', keyboard: false }) : null;
+    const qvForm = getEl('quick-visit-form');
+
+    const statusModalEl = getEl('status-manager-modal');
+    const statusModal = statusModalEl ? new bootstrap.Modal(statusModalEl) : null;
+    const statusForm = getEl('status-form');
+
+    // Кнопки
+    const openAddModalBtn = getEl('open-add-modal-btn');
+    const btnManageStatuses = getEl('btn-manage-statuses');
+    const btnAddStatus = getEl('btn-add-status');
+    const logoutBtn = getEl('logout-btn');
+    
+    // Wizard buttons
+    const prevBtn = getEl('btn-prev-step');
+    const nextBtn = getEl('btn-next-step');
+    const finishBtn = getEl('btn-finish-step');
+
+    // Фильтры
+    const filterCity = getEl('filter-city');
+    const filterPriceType = getEl('filter-price-type');
+    const filterStatus = getEl('filter-status');
+    const filterResponsible = getEl('filter-responsible');
+    const searchBar = getEl('search-bar');
+    const dealerGrid = getEl('dealer-grid'); 
+
+    // Фото инпуты
+    const addAvatarInput = getEl('add-avatar-input');
+    const editAvatarInput = getEl('edit-avatar-input');
+    const addPhotoInput = getEl('add-photo-input');
+    const editPhotoInput = getEl('edit-photo-input');
+
+    // ==========================================
+    // 3. УТИЛИТЫ
+    // ==========================================
     const getVal = (id) => { const el = getEl(id); return el ? el.value : ''; };
     const safeText = (text) => (text || '').toString().replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const safeAttr = (text) => (text || '').toString().replace(/"/g, '&quot;');
-    
-    // Всплывающие уведомления
+
     window.showToast = function(message, type = 'success') {
         let container = getEl('toast-container-custom');
         if (!container) { 
@@ -38,64 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ==========================================
-    // 2. CONFIG & STATE
-    // ==========================================
-    const API_DEALERS_URL = '/api/dealers';
-    const API_PRODUCTS_URL = '/api/products'; 
-    const API_COMPETITORS_REF_URL = '/api/competitors-ref';
-    const API_STATUSES_URL = '/api/statuses';
-
-    let fullProductCatalog = [];
-    let competitorsRef = []; 
-    let allDealers = [];
-    let statusList = []; 
-    let currentSort = { column: 'name', direction: 'asc' };
-    let isSaving = false; 
-    let addPhotosData = []; 
-    let editPhotosData = []; 
-    let newAvatarBase64 = null; 
-    let currentUserRole = 'guest';
-
-    const posMaterialsList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"];
-
-    // ==========================================
-    // 3. ПОЛУЧЕНИЕ ЭЛЕМЕНТОВ
-    // ==========================================
-    const addModalEl = getEl('add-modal');
-    const addModal = addModalEl ? new bootstrap.Modal(addModalEl, { backdrop: 'static', keyboard: false }) : null;
-    const addForm = getEl('add-dealer-form');
-    
-    const editModalEl = getEl('edit-modal');
-    const editModal = editModalEl ? new bootstrap.Modal(editModalEl, { backdrop: 'static', keyboard: false }) : null;
-    const editForm = getEl('edit-dealer-form');
-
-    const qvModalEl = getEl('quick-visit-modal');
-    const qvModal = qvModalEl ? new bootstrap.Modal(qvModalEl, { backdrop: 'static', keyboard: false }) : null;
-    const qvForm = getEl('quick-visit-form');
-
-    const statusModalEl = getEl('status-manager-modal');
-    const statusModal = statusModalEl ? new bootstrap.Modal(statusModalEl) : null;
-    const statusForm = getEl('status-form');
-
-    // Кнопки
-    const openAddModalBtn = getEl('open-add-modal-btn');
-    const btnManageStatuses = getEl('btn-manage-statuses');
-    const btnAddStatus = getEl('btn-add-status');
-    const logoutBtn = getEl('logout-btn'); // <--- ОБЪЯВЛЕНО ЗДЕСЬ (ЕДИНСТВЕННЫЙ РАЗ)
-    const prevBtn = getEl('btn-prev-step');
-    const nextBtn = getEl('btn-next-step');
-    const finishBtn = getEl('btn-finish-step');
-
-    // Карта и Визард
-    let mapInstances = { add: null, edit: null };
-    let markerInstances = { add: null, edit: null };
-    let refreshAddMap = null;
-    let refreshEditMap = null;
-    let currentStep = 1; 
-    const totalSteps = 4;
-
-    // ==========================================
-    // 4. HTML GENERATORS
+    // 4. ГЕНЕРАТОРЫ HTML
     // ==========================================
     function createContactEntryHTML(c={}) { return `<div class="contact-entry"><input type="text" class="form-control contact-name" placeholder="Имя" value="${c.name||''}"><input type="text" class="form-control contact-position" placeholder="Должность" value="${c.position||''}"><input type="text" class="form-control contact-info" placeholder="Телефон" value="${c.contactInfo||''}"><button type="button" class="btn-remove-entry" onclick="this.closest('.contact-entry').remove()"><i class="bi bi-x-lg"></i></button></div>`; }
     function createAddressEntryHTML(a={}) { return `<div class="address-entry"><input type="text" class="form-control address-description" placeholder="Описание" value="${a.description||''}"><input type="text" class="form-control address-city" placeholder="Город" value="${a.city||''}"><input type="text" class="form-control address-address" placeholder="Адрес" value="${a.address||''}"><button type="button" class="btn-remove-entry" onclick="this.closest('.address-entry').remove()"><i class="bi bi-x-lg"></i></button></div>`; }
@@ -109,11 +126,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (c.brand) { const ref = competitorsRef.find(r => r.name === c.brand); if (ref && ref.collections) { const sortedCols = [...ref.collections].sort((a, b) => { const typeA = (typeof a === 'object') ? a.type : 'std'; const typeB = (typeof b === 'object') ? b.type : 'std'; if (typeA === 'std' && typeB !== 'std') return 1; if (typeA !== 'std' && typeB === 'std') return -1; return 0; }); sortedCols.forEach(col => { const colName = (typeof col === 'string') ? col : col.name; const colType = (typeof col === 'object') ? col.type : 'std'; let label = ''; if(colType.includes('eng')) label = ' (Елка)'; else if(colType.includes('french')) label = ' (Фр. Елка)'; else if(colType.includes('art')) label = ' (Арт)'; const sel = colName === c.collection ? 'selected' : ''; collOpts += `<option value="${colName}" ${sel}>${colName}${label}</option>`; }); } }
         return `<div class="competitor-entry"><select class="form-select competitor-brand" onchange="updateCollections(this)">${brandOpts}</select><select class="form-select competitor-collection">${collOpts}</select><input type="text" class="form-control competitor-price-opt" placeholder="ОПТ" value="${c.price_opt||''}"><input type="text" class="form-control competitor-price-retail" placeholder="Розн" value="${c.price_retail||''}"><button type="button" class="btn-remove-entry" onclick="this.closest('.competitor-entry').remove()" title="Удалить"><i class="bi bi-x-lg"></i></button></div>`; 
     }
-    
+
+    // Глобальная функция для onchange в HTML
     window.updateCollections = function(select) { 
         const brandName = select.value; const row = select.closest('.competitor-entry'); const collSelect = row.querySelector('.competitor-collection'); 
         let html = `<option value="">-- Коллекция --</option>`; const ref = competitorsRef.find(r => r.name === brandName); 
-        if (ref && ref.collections) { const sortedCols = [...ref.collections].sort((a, b) => { const typeA = (typeof a === 'object') ? a.type : 'std'; const typeB = (typeof b === 'object') ? b.type : 'std'; if (typeA === 'std' && typeB !== 'std') return 1; if (typeA !== 'std' && typeB === 'std') return -1; return 0; }); html += sortedCols.map(col => { const colName = (typeof col === 'string') ? col : col.name; const colType = (typeof col === 'object') ? col.type : 'std'; let label = ''; if(colType.includes('eng')) label = ' (Елка)'; else if(colType.includes('french')) label = ' (Фр. Елка)'; else if(colType.includes('art')) label = ' (Арт)'; return `<option value="${colName}">${colName}${label}</option>`; }).join(''); } collSelect.innerHTML = html; 
+        if (ref && ref.collections) { const sortedCols = [...ref.collections].sort((a, b) => { const typeA = (typeof a === 'object') ? a.type : 'std'; const typeB = (typeof b === 'object') ? b.type : 'std'; if (typeA === 'std' && typeB !== 'std') return 1; if (typeA !== 'std' && typeB === 'std') return -1; return 0; }); html += sortedCols.map(col => { const colName = (typeof col === 'string') ? col : col.name; const colType = (typeof col === 'object') ? col.type : 'std'; let label = ''; if(colType.includes('eng')) label = ' (Елка)'; else if(colType.includes('french')) label = ' (Фр. Елка)'; else if(colType.includes('art')) label = ' (Арт)'; return `<option value="${colName}">${colName}${label}</option>`; }).join(''); } 
+        collSelect.innerHTML = html; 
     };
 
     function renderProductChecklist(container, selectedIds=[]) { if(!container) return; const set = new Set(selectedIds); container.innerHTML = fullProductCatalog.map(p => `<div class="checklist-item form-check"><input type="checkbox" class="form-check-input" id="prod-${container.id}-${p.id}" value="${p.id}" ${set.has(p.id)?'checked':''}><label class="form-check-label" for="prod-${container.id}-${p.id}"><strong>${p.sku}</strong> - ${p.name}</label></div>`).join(''); }
@@ -122,44 +141,110 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderList(container, data, htmlGen) { if(container) container.innerHTML = (data && data.length > 0) ? data.map(htmlGen).join('') : htmlGen(); }
 
     // ==========================================
-    // 5. MAP LOGIC
+    // 5. ЛОГИКА КАРТ (ИСПРАВЛЕНАЯ)
     // ==========================================
+    
+    // Функция создания/обновления карты
     function setupMapLogic(mapId, latId, lngId, searchId, btnSearchId, btnLocId, instanceKey) {
-        const mapEl = getEl(mapId); if (!mapEl) return null;
-        if (!mapInstances[instanceKey]) {
-            const map = L.map(mapId).setView([51.1605, 71.4704], 12);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: 'OSM' }).addTo(map);
-            mapInstances[instanceKey] = map;
-            map.on('click', (e) => { setMarker(e.latlng.lat, e.latlng.lng, instanceKey, latId, lngId); });
+        const mapEl = getEl(mapId); 
+        if (!mapEl) return null;
+
+        // Если карта уже есть - УНИЧТОЖАЕМ её перед созданием новой
+        if (mapInstances[instanceKey]) {
+            mapInstances[instanceKey].remove(); // Важно: метод Leaflet .remove()
+            mapInstances[instanceKey] = null;
+            markerInstances[instanceKey] = null;
         }
-        const map = mapInstances[instanceKey];
-        function setMarker(lat, lng, key, latInputId, lngInputId) {
-            if (markerInstances[key]) map.removeLayer(markerInstances[key]);
-            markerInstances[key] = L.marker([lat, lng], { draggable: true }).addTo(map);
-            getEl(latInputId).value = lat.toFixed(6);
-            getEl(lngInputId).value = lng.toFixed(6);
-            markerInstances[key].on('dragend', function(event) { const pos = event.target.getLatLng(); getEl(latInputId).value = pos.lat.toFixed(6); getEl(lngInputId).value = pos.lng.toFixed(6); });
-            map.setView([lat, lng], 16);
-        }
+
+        // Создаем новую
+        const map = L.map(mapId).setView([51.1605, 71.4704], 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: 'OSM' }).addTo(map);
+        mapInstances[instanceKey] = map;
+        
+        // Клик по карте
+        map.on('click', (e) => { 
+            setMarker(e.latlng.lat, e.latlng.lng, instanceKey, latId, lngId); 
+        });
+
         const handleSearch = async () => {
             const input = getEl(searchId); const query = input.value.trim(); if (!query) return;
             const coordsRegex = /^(-?\d+(\.\d+)?)[,\s]+(-?\d+(\.\d+)?)$/; const match = query.match(coordsRegex);
-            if (match) { setMarker(parseFloat(match[1]), parseFloat(match[3]), instanceKey, latId, lngId); window.showToast("Координаты приняты!"); } 
-            else { try { const btn = getEl(btnSearchId); const oldHtml = btn.innerHTML; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=kz&limit=1`); const data = await res.json(); if (data && data.length > 0) { const lat = parseFloat(data[0].lat); const lng = parseFloat(data[0].lon); setMarker(lat, lng, instanceKey, latId, lngId); } else { window.showToast("Адрес не найден", "error"); } btn.innerHTML = oldHtml; } catch (e) { console.error(e); } }
+            if (match) { 
+                setMarker(parseFloat(match[1]), parseFloat(match[3]), instanceKey, latId, lngId); 
+                window.showToast("Координаты приняты!"); 
+            } else { 
+                try { 
+                    const btn = getEl(btnSearchId); 
+                    const oldHtml = btn.innerHTML; 
+                    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; 
+                    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=kz&limit=1`); 
+                    const data = await res.json(); 
+                    if (data && data.length > 0) { 
+                        setMarker(parseFloat(data[0].lat), parseFloat(data[0].lon), instanceKey, latId, lngId); 
+                    } else { 
+                        window.showToast("Адрес не найден", "error"); 
+                    } 
+                    btn.innerHTML = oldHtml; 
+                } catch (e) { console.error(e); } 
+            }
         };
-        const searchBtn = getEl(btnSearchId); const searchInp = getEl(searchId);
+
+        // Биндим кнопки
+        const searchBtn = getEl(btnSearchId); 
         if(searchBtn) searchBtn.onclick = handleSearch;
-        if(searchInp) searchInp.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); handleSearch(); } });
+        
+        const searchInp = getEl(searchId);
+        if(searchInp) {
+            // Удаляем старые листенеры (клон ноды)
+            const newInp = searchInp.cloneNode(true);
+            searchInp.parentNode.replaceChild(newInp, searchInp);
+            newInp.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); handleSearch(); } });
+        }
+
         const locBtn = getEl(btnLocId);
-        if(locBtn) { locBtn.onclick = () => { if (navigator.geolocation) { locBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; navigator.geolocation.getCurrentPosition(pos => { setMarker(pos.coords.latitude, pos.coords.longitude, instanceKey, latId, lngId); locBtn.innerHTML = '<i class="bi bi-geo-alt-fill"></i>'; }, () => { alert("Нет доступа к геопозиции"); locBtn.innerHTML = '<i class="bi bi-geo-alt-fill"></i>'; }); } }; }
-        return function invalidate() { setTimeout(() => { map.invalidateSize(); const curLat = parseFloat(getEl(latId).value); const curLng = parseFloat(getEl(lngId).value); if (!isNaN(curLat) && !isNaN(curLng)) { setMarker(curLat, curLng, instanceKey, latId, lngId); } }, 300); };
+        if(locBtn) { 
+            locBtn.onclick = () => { 
+                if (navigator.geolocation) { 
+                    locBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; 
+                    navigator.geolocation.getCurrentPosition(pos => { 
+                        setMarker(pos.coords.latitude, pos.coords.longitude, instanceKey, latId, lngId); 
+                        locBtn.innerHTML = '<i class="bi bi-geo-alt-fill"></i>'; 
+                    }, () => { alert("Нет доступа к геопозиции"); locBtn.innerHTML = '<i class="bi bi-geo-alt-fill"></i>'; }); 
+                } 
+            }; 
+        }
+
+        // Функция установки маркера (внутренняя)
+        function setMarker(lat, lng, key, latInputId, lngInputId) {
+            if (markerInstances[key]) map.removeLayer(markerInstances[key]);
+            markerInstances[key] = L.marker([lat, lng], { draggable: true }).addTo(map);
+            
+            getEl(latInputId).value = lat.toFixed(6);
+            getEl(lngInputId).value = lng.toFixed(6);
+            
+            markerInstances[key].on('dragend', function(event) { 
+                const pos = event.target.getLatLng(); 
+                getEl(latInputId).value = pos.lat.toFixed(6); 
+                getEl(lngInputId).value = pos.lng.toFixed(6); 
+            });
+            map.setView([lat, lng], 16);
+        }
+
+        // Возвращаем функцию обновления размера (для модалки)
+        return function invalidate() { 
+            setTimeout(() => { 
+                map.invalidateSize(); 
+                const curLat = parseFloat(getEl(latId).value); 
+                const curLng = parseFloat(getEl(lngId).value); 
+                if (!isNaN(curLat) && !isNaN(curLng)) { 
+                    setMarker(curLat, curLng, instanceKey, latId, lngId); 
+                } 
+            }, 300); 
+        };
     }
 
-    refreshAddMap = setupMapLogic('add-map', 'add_latitude', 'add_longitude', 'add-smart-search', 'btn-search-add', 'btn-loc-add', 'add');
-    refreshEditMap = setupMapLogic('edit-map', 'edit_latitude', 'edit_longitude', 'edit-smart-search', 'btn-search-edit', 'btn-loc-edit', 'edit');
-
     // ==========================================
-    // 6. MAIN FUNCTIONS (API & LOGIC)
+    // 6. ОСНОВНЫЕ ФУНКЦИИ (API)
     // ==========================================
 
     async function openEditModal(id) {
@@ -167,46 +252,95 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await fetch(`${API_DEALERS_URL}/${id}`); 
             if(!res.ok) throw new Error("Ошибка"); 
             const d = await res.json();
-            const titleEl = document.querySelector('#edit-modal .modal-title'); if(titleEl) titleEl.textContent = `Редактировать: ${d.name}`;
-            getEl('edit_db_id').value=d.id; getEl('edit_dealer_id').value=d.dealer_id; getEl('edit_name').value=d.name; getEl('edit_organization').value=d.organization; getEl('edit_price_type').value=d.price_type; getEl('edit_city').value=d.city; getEl('edit_address').value=d.address; getEl('edit_delivery').value=d.delivery; getEl('edit_website').value=d.website; getEl('edit_instagram').value=d.instagram;
+            
+            getEl('edit_db_id').value=d.id; 
+            getEl('edit_dealer_id').value=d.dealer_id; 
+            getEl('edit_name').value=d.name; 
+            getEl('edit_organization').value=d.organization; 
+            getEl('edit_price_type').value=d.price_type; 
+            getEl('edit_city').value=d.city; 
+            getEl('edit_address').value=d.address; 
+            getEl('edit_delivery').value=d.delivery; 
+            getEl('edit_website').value=d.website; 
+            getEl('edit_instagram').value=d.instagram;
+            
             if(getEl('edit_latitude')) getEl('edit_latitude').value=d.latitude||'';
             if(getEl('edit_longitude')) getEl('edit_longitude').value=d.longitude||'';
             getEl('edit_bonuses').value=d.bonuses;
             populateStatusSelects(d.status); 
             if(getEl('edit_responsible')) getEl('edit_responsible').value = d.responsible || '';
-            const editAvatarPreview = getEl('edit-avatar-preview'); const editCurrentAvatarUrl = getEl('edit-current-avatar-url');
-            if(editAvatarPreview) { editAvatarPreview.src = d.avatarUrl || ''; editAvatarPreview.style.display = d.avatarUrl ? 'block' : 'none'; }
-            if(editCurrentAvatarUrl) editCurrentAvatarUrl.value = d.avatarUrl || '';
+            
+            const avPreview = getEl('edit-avatar-preview'); 
+            const avInputUrl = getEl('edit-current-avatar-url');
+            if(avPreview) { avPreview.src = d.avatarUrl || ''; avPreview.style.display = d.avatarUrl ? 'block' : 'none'; }
+            if(avInputUrl) avInputUrl.value = d.avatarUrl || '';
             newAvatarBase64 = null;
-            renderList(getEl('edit-contact-list'), d.contacts, createContactEntryHTML); renderList(getEl('edit-address-list'), d.additional_addresses, createAddressEntryHTML); renderList(getEl('edit-pos-list'), d.pos_materials, createPosEntryHTML); renderList(getEl('edit-visits-list'), d.visits, createVisitEntryHTML); renderList(getEl('edit-competitor-list'), d.competitors, createCompetitorEntryHTML);
+            
+            renderList(getEl('edit-contact-list'), d.contacts, createContactEntryHTML); 
+            renderList(getEl('edit-address-list'), d.additional_addresses, createAddressEntryHTML); 
+            renderList(getEl('edit-pos-list'), d.pos_materials, createPosEntryHTML); 
+            renderList(getEl('edit-visits-list'), d.visits, createVisitEntryHTML); 
+            renderList(getEl('edit-competitor-list'), d.competitors, createCompetitorEntryHTML);
             renderProductChecklist(getEl('edit-product-checklist'), (d.products||[]).map(p=>p.id));
-            editPhotosData = d.photos||[]; renderPhotoPreviews(getEl('edit-photo-preview-container'), editPhotosData);
-            const firstTabEl = document.querySelector('#editTabs button[data-bs-target="#tab-main"]'); if(firstTabEl) { const tab = new bootstrap.Tab(firstTabEl); tab.show(); }
+            
+            editPhotosData = d.photos||[]; 
+            renderPhotoPreviews(getEl('edit-photo-preview-container'), editPhotosData);
+            
+            const firstTabEl = document.querySelector('#editTabs button[data-bs-target="#tab-main"]'); 
+            if(firstTabEl) { const tab = new bootstrap.Tab(firstTabEl); tab.show(); }
+            
             if(editModal) editModal.show();
+            
+            // Настройка карты только ПРИ ОТКРЫТИИ (чтобы не было конфликтов)
+            const mapFunc = setupMapLogic('edit-map', 'edit_latitude', 'edit_longitude', 'edit-smart-search', 'btn-search-edit', 'btn-loc-edit', 'edit');
+            
+            // Слушаем вкладку карты
+            const tabMapBtn = document.querySelector('button[data-bs-target="#tab-map"]'); 
+            if (tabMapBtn && mapFunc) { 
+                tabMapBtn.addEventListener('shown.bs.tab', mapFunc); 
+            }
+
         } catch(e){ window.showToast("Ошибка загрузки данных", "error"); console.error(e); }
     }
     window.openEditModal = openEditModal;
 
-    function showQuickVisit(id) { getEl('qv_dealer_id').value = id; getEl('qv_comment').value = ''; if(qvModal) qvModal.show(); }
-    window.showQuickVisit = showQuickVisit;
+    window.showQuickVisit = function(id) { 
+        getEl('qv_dealer_id').value = id; getEl('qv_comment').value = ''; 
+        if(qvModal) qvModal.show(); 
+    }
 
     async function initApp() {
         try { const authRes = await fetch('/api/auth/me'); if (authRes.ok) { const authData = await authRes.json(); currentUserRole = authData.role; const badge = getEl('user-role-badge'); if(badge) { const names = { 'admin': 'Админ', 'astana': 'Астана', 'regions': 'Регионы', 'guest': 'Гость' }; badge.textContent = names[currentUserRole] || currentUserRole; } if (currentUserRole === 'guest') { const btn = getEl('open-add-modal-btn'); if (btn) btn.style.display = 'none'; } } } catch (e) {}
-        await fetchStatuses(); await fetchProductCatalog();
+
+        await fetchStatuses(); 
+        await fetchProductCatalog();
         const posDatalist = getEl('pos-materials-datalist'); if(posDatalist) { let html = ''; posMaterialsList.forEach(s => { html += `<option value="${s}">`; }); posDatalist.innerHTML = html; }
+        
         try { const compRes = await fetch(API_COMPETITORS_REF_URL); if (compRes.ok) { competitorsRef = await compRes.json(); const brandsDatalist = getEl('brands-datalist'); if(brandsDatalist) { let html = ''; competitorsRef.forEach(ref => { html += `<option value="${ref.name}">`; }); brandsDatalist.innerHTML = html; } } } catch(e){}
-        try { const response = await fetch(API_DEALERS_URL); if (!response.ok) throw new Error(response.statusText); allDealers = await response.json(); populateFilters(allDealers); renderDashboard(); renderDealerList(); } catch (error) { const grid = getEl('dealer-grid'); if(grid) grid.innerHTML = `<div class="col-12"><div class="alert alert-danger text-center">Ошибка загрузки: ${error.message}</div></div>`; }
-        const pendingId = localStorage.getItem('pendingEditDealerId'); if (pendingId) { localStorage.removeItem('pendingEditDealerId'); openEditModal(pendingId); }
+        
+        try { 
+            const response = await fetch(API_DEALERS_URL); 
+            if (!response.ok) throw new Error(response.statusText); 
+            allDealers = await response.json(); 
+            populateFilters(allDealers); 
+            renderDashboard(); 
+            renderDealerList(); 
+        } catch (error) { 
+            const grid = getEl('dealer-grid'); 
+            if(grid) grid.innerHTML = `<div class="col-12"><div class="alert alert-danger text-center">Ошибка загрузки: ${error.message}</div></div>`; 
+        }
+        
+        const pendingId = localStorage.getItem('pendingEditDealerId'); 
+        if (pendingId) { localStorage.removeItem('pendingEditDealerId'); openEditModal(pendingId); }
     }
 
-    // Statuses
     async function fetchStatuses() { try { const res = await fetch(API_STATUSES_URL); if(res.ok) { statusList = await res.json(); populateStatusSelects(); renderStatusManagerList(); } } catch(e) {} }
     function populateStatusSelects(selectedStatus = null) {
         let filterHtml = '<option value="">Все статусы</option>'; statusList.forEach(s => { filterHtml += `<option value="${s.value}">${s.label}</option>`; });
-        const filterStatus = getEl('filter-status'); if(filterStatus) filterStatus.innerHTML = filterHtml;
+        const fs = getEl('filter-status'); if(fs) fs.innerHTML = filterHtml;
         const modalHtml = statusList.map(s => `<option value="${s.value}" ${selectedStatus === s.value ? 'selected' : ''}>${s.label}</option>`).join('');
-        const addStatusSel = getEl('status'); if(addStatusSel) addStatusSel.innerHTML = modalHtml;
-        const editStatusSel = getEl('edit_status'); if(editStatusSel) editStatusSel.innerHTML = modalHtml;
+        const addS = getEl('status'); if(addS) addS.innerHTML = modalHtml;
+        const editS = getEl('edit_status'); if(editS) editS.innerHTML = modalHtml;
     }
     function renderStatusManagerList() { if(!statusListContainer) return; statusListContainer.innerHTML = statusList.map(s => `<tr><td><div style="width:20px;height:20px;background:${s.color};border-radius:50%;"></div></td><td class="fw-bold">${s.label}</td><td class="text-muted small">${s.value}</td><td class="text-center">${s.isVisible!==false?'<i class="bi bi-eye-fill text-success"></i>':'<i class="bi bi-eye-slash-fill text-muted"></i>'}</td><td class="text-end"><button class="btn btn-sm btn-light border me-1" onclick="editStatus('${s.id}')"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-light border text-danger" onclick="deleteStatus('${s.id}')"><i class="bi bi-trash"></i></button></td></tr>`).join(''); }
     function resetStatusForm() { if(!statusForm) return; statusForm.reset(); getEl('st_id').value = ''; getEl('btn-save-status').textContent = 'Добавить'; getEl('btn-save-status').className = 'btn btn-primary w-100'; getEl('btn-cancel-edit-status').style.display = 'none'; getEl('st_color').value = '#0d6efd'; }
@@ -217,7 +351,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchProductCatalog() { if (fullProductCatalog.length > 0) return; try { const response = await fetch(API_PRODUCTS_URL); if (!response.ok) throw new Error(`Ошибка: ${response.status}`); fullProductCatalog = await response.json(); fullProductCatalog.sort((a, b) => a.sku.localeCompare(b.sku, 'ru', { numeric: true })); } catch (error) { console.warn(error); } }
     function populateFilters(dealers) { 
-        const filterCity = getEl('filter-city'); const filterPriceType = getEl('filter-price-type');
         if(!filterCity || !filterPriceType) return; const cities = [...new Set(dealers.map(d => d.city).filter(Boolean))].sort(); const types = [...new Set(dealers.map(d => d.price_type).filter(Boolean))].sort(); const sc = filterCity.value; const st = filterPriceType.value; filterCity.innerHTML = '<option value="">Город</option>'; filterPriceType.innerHTML = '<option value="">Тип цен</option>'; cities.forEach(c => filterCity.add(new Option(c, c))); types.forEach(t => filterPriceType.add(new Option(t, t))); filterCity.value = sc; filterPriceType.value = st; 
     }
     async function saveProducts(dealerId, ids) { await fetch(`${API_DEALERS_URL}/${dealerId}/products`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({productIds: ids})}); }
@@ -229,8 +362,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const activeDealers = allDealers.filter(d => d.status !== 'potential'); const totalDealers = activeDealers.length; const noAvatarCount = activeDealers.filter(d => !d.photo_url).length; 
         let countActive = 0, countStandard = 0, countPotential = 0, countProblem = 0; 
         allDealers.forEach(d => { if (d.status === 'active') countActive++; else if (d.status === 'standard') countStandard++; else if (d.status === 'problem') countProblem++; else if (d.status === 'potential') countPotential++; });
-        const totalAll = allDealers.length; const pctActive = totalAll > 0 ? (countActive / totalAll) * 100 : 0; const pctStandard = totalAll > 0 ? (countStandard / totalAll) * 100 : 0; const pctProblem = totalAll > 0 ? (countProblem / totalAll) * 100 : 0; const pctPotential = totalAll > 0 ? (countPotential / totalAll) * 100 : 0;
-        dashboardStats.innerHTML = `<div class="col-6"><div class="stat-card-modern"><div class="stat-icon-box bg-primary-subtle text-primary"><i class="bi bi-shop"></i></div><div class="stat-info"><h3>${totalDealers}</h3><p>Дилеров</p></div></div></div><div class="col-6"><div class="stat-card-modern"><div class="stat-icon-box ${noAvatarCount > 0 ? 'bg-danger-subtle text-danger' : 'bg-success-subtle text-success'}"><i class="bi bi-camera-fill"></i></div><div class="stat-info"><h3 class="${noAvatarCount > 0 ? 'text-danger' : ''}">${noAvatarCount}</h3><p>Без фото</p></div></div></div><div class="col-12 mt-2"><div class="stat-card-modern d-block p-3"><h6 class="text-muted fw-bold small mb-3 text-uppercase" style="letter-spacing:1px;">Структура базы</h6><div class="progress mb-3" style="height: 12px; border-radius: 6px;"><div class="progress-bar bg-success" role="progressbar" style="width: ${pctActive}%"></div><div class="progress-bar bg-warning" role="progressbar" style="width: ${pctStandard}%"></div><div class="progress-bar bg-danger" role="progressbar" style="width: ${pctProblem}%"></div><div class="progress-bar bg-primary" role="progressbar" style="width: ${pctPotential}%"></div></div><div class="d-flex justify-content-between text-center small"><div><span class="badge rounded-pill text-bg-success mb-1">${countActive}</span><br><span class="text-muted" style="font-size:0.75rem">VIP</span></div><div><span class="badge rounded-pill text-bg-warning mb-1">${countStandard}</span><br><span class="text-muted" style="font-size:0.75rem">Станд.</span></div><div><span class="badge rounded-pill text-bg-danger mb-1">${countProblem}</span><br><span class="text-muted" style="font-size:0.75rem">Пробл.</span></div><div><span class="badge rounded-pill text-bg-primary mb-1">${countPotential}</span><br><span class="text-muted" style="font-size:0.75rem">Потенц.</span></div></div></div></div>`;
+        const pctActive = totalAll = allDealers.length, pctStandard = totalAll > 0 ? (countStandard / totalAll) * 100 : 0, pctProblem = totalAll > 0 ? (countProblem / totalAll) * 100 : 0, pctPotential = totalAll > 0 ? (countPotential / totalAll) * 100 : 0, pctActiveVal = totalAll > 0 ? (countActive / totalAll) * 100 : 0;
+        dashboardStats.innerHTML = `<div class="col-6"><div class="stat-card-modern"><div class="stat-icon-box bg-primary-subtle text-primary"><i class="bi bi-shop"></i></div><div class="stat-info"><h3>${totalDealers}</h3><p>Дилеров</p></div></div></div><div class="col-6"><div class="stat-card-modern"><div class="stat-icon-box ${noAvatarCount > 0 ? 'bg-danger-subtle text-danger' : 'bg-success-subtle text-success'}"><i class="bi bi-camera-fill"></i></div><div class="stat-info"><h3 class="${noAvatarCount > 0 ? 'text-danger' : ''}">${noAvatarCount}</h3><p>Без фото</p></div></div></div><div class="col-12 mt-2"><div class="stat-card-modern d-block p-3"><h6 class="text-muted fw-bold small mb-3 text-uppercase" style="letter-spacing:1px;">Структура базы</h6><div class="progress mb-3" style="height: 12px; border-radius: 6px;"><div class="progress-bar bg-success" role="progressbar" style="width: ${pctActiveVal}%"></div><div class="progress-bar bg-warning" role="progressbar" style="width: ${pctStandard}%"></div><div class="progress-bar bg-danger" role="progressbar" style="width: ${pctProblem}%"></div><div class="progress-bar bg-primary" role="progressbar" style="width: ${pctPotential}%"></div></div><div class="d-flex justify-content-between text-center small"><div><span class="badge rounded-pill text-bg-success mb-1">${countActive}</span><br><span class="text-muted" style="font-size:0.75rem">VIP</span></div><div><span class="badge rounded-pill text-bg-warning mb-1">${countStandard}</span><br><span class="text-muted" style="font-size:0.75rem">Станд.</span></div><div><span class="badge rounded-pill text-bg-danger mb-1">${countProblem}</span><br><span class="text-muted" style="font-size:0.75rem">Пробл.</span></div><div><span class="badge rounded-pill text-bg-primary mb-1">${countPotential}</span><br><span class="text-muted" style="font-size:0.75rem">Потенц.</span></div></div></div></div>`;
         const today = new Date(); today.setHours(0,0,0,0); const coolingLimit = new Date(today.getTime() - (15 * 24 * 60 * 60 * 1000));
         const tasksUpcoming = [], tasksProblem = [], tasksCooling = [];
         allDealers.forEach(d => { if (d.status === 'archive') return; const isPotential = d.status === 'potential'; let lastVisitDate = null; let hasFutureTasks = false; if (d.visits && Array.isArray(d.visits)) { d.visits.forEach((v, index) => { const vDate = new Date(v.date); if (!v.date) return; vDate.setHours(0,0,0,0); if (v.isCompleted && (!lastVisitDate || vDate > lastVisitDate)) lastVisitDate = vDate; if (!v.isCompleted) { const taskData = { dealerName: d.name, dealerId: d.id, date: vDate, comment: v.comment || "Без комментария", visitIndex: index }; if (vDate < today) tasksProblem.push({...taskData, type: 'overdue'}); else { tasksUpcoming.push({...taskData, isToday: vDate.getTime() === today.getTime()}); hasFutureTasks = true; } } }); } if (d.status === 'problem') { if (!tasksProblem.some(t => t.dealerId === d.id && t.type === 'overdue')) tasksProblem.push({ dealerName: d.name, dealerId: d.id, type: 'status', comment: 'Статус: Проблемный' }); } if (!hasFutureTasks && d.status !== 'problem' && !isPotential) { if (!lastVisitDate) tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: 999 }); else if (lastVisitDate < coolingLimit) { const days = Math.floor((today - lastVisitDate) / (1000 * 60 * 60 * 24)); tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: days }); } } });
@@ -250,7 +383,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         filtered.sort((a, b) => { let valA = (a[currentSort.column] || '').toString(); let valB = (b[currentSort.column] || '').toString(); let res = currentSort.column === 'dealer_id' ? valA.localeCompare(valB, undefined, {numeric:true}) : valA.toLowerCase().localeCompare(valB.toLowerCase(), 'ru'); return currentSort.direction === 'asc' ? res : -res; });
         if (filtered.length === 0) { grid.innerHTML = ` <div class="empty-state"><i class="bi bi-search empty-state-icon"></i><h5 class="text-muted">Ничего не найдено</h5><p class="text-secondary small mb-3">Попробуйте изменить фильтры</p><button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('search-bar').value=''; document.getElementById('filter-city').value=''; document.getElementById('filter-status').value=''; renderDealerList()">Сбросить фильтры</button></div>`; return; }
-        
         grid.innerHTML = filtered.map(d => {
             const statusObj = statusList.find(s => s.value === (d.status || 'standard')) || { label: d.status, color: '#6c757d' };
             const statusStyle = `background-color: ${statusObj.color}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 500;`;
@@ -264,7 +396,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==========================================
-    // 8. EVENT LISTENERS SETUP
+    // 7. SETUP LISTENERS (SAFE BINDING)
     // ==========================================
     const setupListBtn = (id, listId, genFunc) => { const btn = getEl(id); const list = getEl(listId); if(btn && list) btn.onclick = () => list.insertAdjacentHTML('beforeend', genFunc()); };
     setupListBtn('add-contact-btn-add-modal', 'add-contact-list', createContactEntryHTML); setupListBtn('add-address-btn-add-modal', 'add-address-list', createAddressEntryHTML); setupListBtn('add-pos-btn-add-modal', 'add-pos-list', createPosEntryHTML); setupListBtn('add-visits-btn-add-modal', 'add-visits-list', createVisitEntryHTML); setupListBtn('add-competitor-btn-add-modal', 'add-competitor-list', createCompetitorEntryHTML);
@@ -275,19 +407,20 @@ document.addEventListener('DOMContentLoaded', () => {
     if(filterStatus) filterStatus.onchange = renderDealerList; 
     if(filterResponsible) filterResponsible.onchange = renderDealerList; 
     if(searchBar) searchBar.oninput = renderDealerList;
-    if(document.body) { document.body.addEventListener('click', (e) => { const taskBtn = e.target.closest('.btn-complete-task'); if (taskBtn) { taskBtn.disabled = true; taskBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; completeTask(taskBtn, taskBtn.dataset.id, taskBtn.dataset.index); } }); }
-    document.querySelectorAll('.sort-btn').forEach(btn => { btn.onclick = (e) => { const sortKey = e.currentTarget.dataset.sort; if(currentSort.column === sortKey) currentSort.direction = (currentSort.direction === 'asc' ? 'desc' : 'asc'); else { currentSort.column = sortKey; currentSort.direction = 'asc'; } renderDealerList(); }; });
-    if(btnManageStatuses) { btnManageStatuses.onclick = () => { resetStatusForm(); statusModal.show(); }; }
-    if(getEl('btn-cancel-edit-status')) getEl('btn-cancel-edit-status').onclick = resetStatusForm;
 
-    if(addAvatarInput) addAvatarInput.addEventListener('change', async (e) => { const file = e.target.files[0]; if (file) { newAvatarBase64 = await compressImage(file, 800, 0.8); addAvatarPreview.src = newAvatarBase64; addAvatarPreview.style.display='block'; } });
-    if(editAvatarInput) editAvatarInput.addEventListener('change', async (e) => { const file = e.target.files[0]; if (file) { newAvatarBase64 = await compressImage(file, 800, 0.8); editAvatarPreview.src = newAvatarBase64; editAvatarPreview.style.display='block'; } });
+    if(addAvatarInput) addAvatarInput.addEventListener('change', async (e) => { const file = e.target.files[0]; if (file) { newAvatarBase64 = await compressImage(file, 800, 0.8); const av = getEl('add-avatar-preview'); if(av) { av.src = newAvatarBase64; av.style.display='block'; } } });
+    if(editAvatarInput) editAvatarInput.addEventListener('change', async (e) => { const file = e.target.files[0]; if (file) { newAvatarBase64 = await compressImage(file, 800, 0.8); const av = getEl('edit-avatar-preview'); if(av) { av.src = newAvatarBase64; av.style.display='block'; } } });
     if(addPhotoInput) addPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) addPhotosData.push({ photo_url: await compressImage(file, 1000, 0.7) }); renderPhotoPreviews(getEl('add-photo-preview-container'), addPhotosData); addPhotoInput.value = ''; });
     if(getEl('add-photo-preview-container')) getEl('add-photo-preview-container').addEventListener('click', (e) => { const btn = e.target.closest('.btn-remove-photo'); if(btn) { addPhotosData.splice(btn.dataset.index, 1); renderPhotoPreviews(getEl('add-photo-preview-container'), addPhotosData); } });
     if(editPhotoInput) editPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) editPhotosData.push({ photo_url: await compressImage(file, 1000, 0.7) }); renderPhotoPreviews(getEl('edit-photo-preview-container'), editPhotosData); editPhotoInput.value = ''; });
     if(getEl('edit-photo-preview-container')) getEl('edit-photo-preview-container').addEventListener('click', (e) => { const btn = e.target.closest('.btn-remove-photo'); if(btn) { editPhotosData.splice(btn.dataset.index, 1); renderPhotoPreviews(getEl('edit-photo-preview-container'), editPhotosData); } });
 
-    // WIZARD
+    if(document.body) { document.body.addEventListener('click', (e) => { const taskBtn = e.target.closest('.btn-complete-task'); if (taskBtn) { taskBtn.disabled = true; taskBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; completeTask(taskBtn, taskBtn.dataset.id, taskBtn.dataset.index); } }); }
+    document.querySelectorAll('.sort-btn').forEach(btn => { btn.onclick = (e) => { const sortKey = e.currentTarget.dataset.sort; if(currentSort.column === sortKey) currentSort.direction = (currentSort.direction === 'asc' ? 'desc' : 'asc'); else { currentSort.column = sortKey; currentSort.direction = 'asc'; } renderDealerList(); }; });
+    if(btnManageStatuses) { btnManageStatuses.onclick = () => { resetStatusForm(); statusModal.show(); }; }
+    if(getEl('btn-cancel-edit-status')) getEl('btn-cancel-edit-status').onclick = resetStatusForm;
+    
+    // Wizard
     if(openAddModalBtn) openAddModalBtn.onclick = () => { if(addForm) addForm.reset(); populateStatusSelects(); renderProductChecklist(getEl('add-product-checklist')); renderList(getEl('add-contact-list'), [], createContactEntryHTML); renderList(getEl('add-address-list'), [], createAddressEntryHTML); renderList(getEl('add-pos-list'), [], createPosEntryHTML); renderList(getEl('add-visits-list'), [], createVisitEntryHTML); renderList(getEl('add-competitor-list'), [], createCompetitorEntryHTML); if(getEl('add_latitude')) { getEl('add_latitude').value = ''; getEl('add_longitude').value = ''; } addPhotosData = []; renderPhotoPreviews(getEl('add-photo-preview-container'), []); const av = getEl('add-avatar-preview'); if(av) { av.src = ''; av.style.display='none'; } newAvatarBase64 = null; currentStep = 1; showStep(1); addModal.show(); };
     function showStep(step) { document.querySelectorAll('.wizard-step').forEach(s => s.classList.remove('active')); document.querySelectorAll('.step-circle').forEach(i => i.classList.remove('active')); const stepEl = document.getElementById(`step-${step}`); if(stepEl) stepEl.classList.add('active'); for (let i = 1; i <= totalSteps; i++) { const ind = document.getElementById(`step-ind-${i}`); if(!ind) continue; if (i < step) { ind.classList.add('completed'); ind.innerHTML = '✔'; } else { ind.classList.remove('completed'); ind.innerHTML = i; if (i === step) ind.classList.add('active'); else ind.classList.remove('active'); } } if (prevBtn) prevBtn.style.display = step === 1 ? 'none' : 'inline-block'; if (nextBtn && finishBtn) { if (step === totalSteps) { nextBtn.style.display = 'none'; finishBtn.style.display = 'inline-block'; } else { nextBtn.style.display = 'inline-block'; finishBtn.style.display = 'none'; } } } 
     if(nextBtn) nextBtn.onclick = () => { if (currentStep === 1) { if (!getVal('dealer_id') || !getVal('name')) { window.showToast("Заполните ID и Название", "error"); return; } if (refreshAddMap) refreshAddMap(); } if (currentStep < totalSteps) { currentStep++; showStep(currentStep); } }; 
