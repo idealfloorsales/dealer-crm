@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dealer-crm-cache-v255'; // ОБНОВИЛ ВЕРСИЮ
+const CACHE_NAME = 'dealer-crm-cache-v2025'; // ВЕРСИЯ 2025!
 const ASSETS = [
     '/',
     '/index.html',
@@ -40,11 +40,7 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
-    // 1. Игнорируем НЕ-GET запросы (POST, PUT, DELETE)
     if (e.request.method !== 'GET') return;
-
-    // 2. Игнорируем запросы к чужим доменам (аналитика, трекеры, расширения)
-    // Разрешаем только свой домен и CDN из списка ASSETS
     const url = new URL(e.request.url);
     const isSelf = url.origin === location.origin;
     const isCdn = url.hostname.includes('jsdelivr.net') || url.hostname.includes('unpkg.com');
@@ -53,25 +49,13 @@ self.addEventListener('fetch', (e) => {
 
     e.respondWith(
         caches.match(e.request).then((cached) => {
-            // Если есть в кэше - отдаем
             if (cached) return cached;
-
-            // Если нет - качаем
             return fetch(e.request).then((response) => {
-                // Проверяем, что ответ валидный
-                if (!response || response.status !== 200 || response.type !== 'basic') {
-                    return response;
-                }
-                // Кэшируем новую копию
+                if (!response || response.status !== 200 || response.type !== 'basic') return response;
                 const responseToCache = response.clone();
-                caches.open(CACHE_NAME).then((cache) => {
-                    cache.put(e.request, responseToCache);
-                });
+                caches.open(CACHE_NAME).then((cache) => cache.put(e.request, responseToCache));
                 return response;
-            }).catch(() => {
-                // Если сеть упала, просто ничего не возвращаем (или можно вернуть заглушку)
-                // Главное - не крашить приложение
-            });
+            }).catch(() => {});
         })
     );
 });
