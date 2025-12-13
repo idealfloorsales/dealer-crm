@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("CRM Loaded: main.js v1.3 (Full Features)");
+    console.log("CRM Loaded: main.js v1.4 (Selects Fixed)");
 
     // ==========================================
     // 1. HELPERS
@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const posMaterialsList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"];
 
     // ==========================================
-    // 3. GENERATORS
+    // 3. UI GENERATORS
     // ==========================================
     const generators = {
         contact: (c={}) => `<div class="contact-entry"><input type="text" class="form-control contact-name" placeholder="Имя" value="${c.name||''}"><input type="text" class="form-control contact-position" placeholder="Должность" value="${c.position||''}"><input type="text" class="form-control contact-info" placeholder="Телефон" value="${c.contactInfo||''}"><button type="button" class="btn-remove-entry" onclick="this.closest('.contact-entry').remove()"><i class="bi bi-x-lg"></i></button></div>`,
@@ -91,7 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function initMapLogic(key, mapId, latId, lngId, searchId, btnSearchId, btnLocId) {
         const mapEl = getEl(mapId); if(!mapEl) return () => {};
-        if(maps[key]) { maps[key].remove(); maps[key] = null; markers[key] = null; } // FORCE RESET
+        if(maps[key]) { maps[key].remove(); maps[key] = null; markers[key] = null; } 
         
         const map = L.map(mapId).setView([51.1605, 71.4704], 12);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: 'OSM' }).addTo(map);
@@ -130,7 +130,43 @@ document.addEventListener('DOMContentLoaded', () => {
     const refreshEditMap = initMapLogic('edit', 'edit-map', 'edit_latitude', 'edit_longitude', 'edit-smart-search', 'btn-search-edit', 'btn-loc-edit');
 
     // ==========================================
-    // 5. MAIN LOGIC (API & RENDER)
+    // 5. DATA POPULATION (FIX FOR EMPTY FIELDS)
+    // ==========================================
+    function populateModalMenus(prefix) {
+        // Заполняем "Тип цен" и "Ответственный" на основе данных, которые уже есть в системе
+        const typeSelect = getEl(`${prefix}_price_type`);
+        const respSelect = getEl(`${prefix}_responsible`);
+        
+        if (typeSelect && typeSelect.tagName === 'SELECT') {
+            const existing = new Set(state.allDealers.map(d => d.price_type).filter(Boolean));
+            let html = '<option value="">-- Выберите --</option>';
+            existing.forEach(t => html += `<option value="${t}">${t}</option>`);
+            // Добавим стандартные, если их нет
+            if(!existing.has('ОПТ')) html += `<option value="ОПТ">ОПТ</option>`;
+            if(!existing.has('Розница')) html += `<option value="Розница">Розница</option>`;
+            typeSelect.innerHTML = html;
+        }
+
+        if (respSelect && respSelect.tagName === 'SELECT') {
+            const existing = new Set(state.allDealers.map(d => d.responsible).filter(Boolean));
+            let html = '<option value="">-- Выберите --</option>';
+            // Стандартные системные роли
+            html += `<option value="regional_astana">Региональный Астана</option>`;
+            html += `<option value="regional_regions">Региональный Регионы</option>`;
+            html += `<option value="office">Офис</option>`;
+            
+            existing.forEach(r => {
+                // Не дублируем системные
+                if (!['regional_astana', 'regional_regions', 'office'].includes(r)) {
+                    html += `<option value="${r}">${r}</option>`;
+                }
+            });
+            respSelect.innerHTML = html;
+        }
+    }
+
+    // ==========================================
+    // 6. MAIN LOGIC
     // ==========================================
 
     async function initApp() {
@@ -185,9 +221,8 @@ document.addEventListener('DOMContentLoaded', () => {
         grid.innerHTML = list.map(d => {
             const st = state.statusList.find(s=>s.value===(d.status||'standard')) || {label:d.status, color:'#777'};
             const avatar = d.photo_url ? `<img src="${d.photo_url}">` : `<i class="bi bi-shop"></i>`;
-            const editBtn = state.currentUserRole !== 'guest' ? `<button class="btn-circle" onclick="event.stopPropagation(); window.openEditModal('${d.id}')"><i class="bi bi-pencil"></i></button>` : ''; // FIXED: stopPropagation
+            const editBtn = state.currentUserRole !== 'guest' ? `<button class="btn-circle" onclick="event.stopPropagation(); window.openEditModal('${d.id}')"><i class="bi bi-pencil"></i></button>` : ''; 
             
-            // --- ICONS LOGIC ---
             let icons = '';
             if (d.contacts && d.contacts.length > 0) {
                 const phone = d.contacts.find(c => c.contactInfo)?.contactInfo || '';
@@ -205,7 +240,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!url.startsWith('http')) { if (url.startsWith('@')) url = 'https://instagram.com/' + url.substring(1); else url = 'https://instagram.com/' + url; }
                 icons += `<a href="${url}" target="_blank" class="btn-circle btn-circle-insta" onclick="event.stopPropagation()"><i class="bi bi-instagram"></i></a>`;
             }
-            // -------------------
 
             return `
             <div class="dealer-item" onclick="window.open('dealer.html?id=${d.id}','_blank')">
@@ -224,8 +258,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderDashboard() {
         const db = getEl('dashboard-stats'); if(!db) return;
-        
-        // --- FULL DASHBOARD LOGIC ---
         const total = state.allDealers.length;
         if(total === 0) { db.innerHTML=''; return; }
 
@@ -267,21 +299,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             </div>
         `;
-        // -----------------------------
     }
 
     // ==========================================
-    // 6. EVENT HANDLERS
+    // 7. EVENT HANDLERS
     // ==========================================
     
-    // Global Edit (Exposed)
+    // Global Edit
     window.openEditModal = async (id) => {
         try {
             const r = await fetch(`${API.dealers}/${id}`); const d = await r.json();
-            getEl('edit_db_id').value = d.id; getEl('edit_dealer_id').value = d.dealer_id; getEl('edit_name').value = d.name; getEl('edit_city').value = d.city;
-            getEl('edit_address').value = d.address; getEl('edit_latitude').value = d.latitude||''; getEl('edit_longitude').value = d.longitude||'';
+            
+            // 1. Заполняем списки (ВАЖНО! Сначала заполнить, потом выбрать значение)
+            populateModalMenus('edit');
+
+            // 2. Ставим значения
+            getEl('edit_db_id').value = d.id; 
+            getEl('edit_dealer_id').value = d.dealer_id; 
+            getEl('edit_name').value = d.name; 
+            getEl('edit_city').value = d.city;
+            getEl('edit_address').value = d.address; 
+            getEl('edit_latitude').value = d.latitude||''; 
+            getEl('edit_longitude').value = d.longitude||'';
             if(getEl('edit_status')) getEl('edit_status').value = d.status || 'standard';
-            // Render lists
+            
+            // Попытка установить значения в селекты (если они совпадают с опциями)
+            if(getEl('edit_price_type')) getEl('edit_price_type').value = d.price_type || '';
+            if(getEl('edit_responsible')) getEl('edit_responsible').value = d.responsible || '';
+
+            // Lists
             renderList('edit-contact-list', d.contacts, generators.contact);
             renderList('edit-address-list', d.additional_addresses, generators.address);
             renderList('edit-pos-list', d.pos_materials, generators.pos);
@@ -295,7 +341,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if(cl) cl.innerHTML = state.fullProductCatalog.map(p => `<div class="form-check"><input type="checkbox" class="form-check-input" value="${p.id}" ${(d.products||[]).find(x=>x.id===p.id)?'checked':''}><label>${p.sku} ${p.name}</label></div>`).join('');
             
             const modalEl = getEl('edit-modal');
-            const m = new bootstrap.Modal(modalEl, {backdrop:'static'}); // Fixed: Create new instance properly
+            const m = new bootstrap.Modal(modalEl, {backdrop:'static'}); 
             modalEl.addEventListener('shown.bs.modal', () => refreshEditMap());
             m.show();
 
@@ -307,6 +353,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if(btnAdd) btnAdd.onclick = () => {
         state.currentStep = 1;
         getEl('add-dealer-form').reset();
+        populateModalMenus('add'); // Заполняем списки и тут
+        
         ['add-contact-list','add-address-list','add-pos-list','add-visits-list','add-competitor-list'].forEach(id => getEl(id).innerHTML='');
         getEl('add_latitude').value=''; getEl('add_longitude').value=''; state.addPhotosData=[]; renderPhotoPreviews(getEl('add-photo-preview-container'), []);
         renderProductChecklist(getEl('add-product-checklist'));
@@ -333,13 +381,11 @@ document.addEventListener('DOMContentLoaded', () => {
             state.currentStep++;
             getEl(`step-${state.currentStep}`).classList.add('active');
             
-            // Update circles
             for(let i=1; i<=state.totalSteps; i++) {
                 const c = getEl(`step-ind-${i}`);
                 if(i < state.currentStep) { c.classList.add('completed'); c.innerHTML='✔'; }
                 else { c.classList.remove('completed'); c.innerHTML=i; if(i===state.currentStep) c.classList.add('active'); else c.classList.remove('active'); }
             }
-            // Buttons
             getEl('btn-prev-step').style.display = 'inline-block';
             if(state.currentStep === state.totalSteps) {
                 next.style.display = 'none';
@@ -355,7 +401,6 @@ document.addEventListener('DOMContentLoaded', () => {
             state.currentStep--;
             getEl(`step-${state.currentStep}`).classList.add('active');
             
-            // Circles & Buttons logic (simplified repeat)
              for(let i=1; i<=state.totalSteps; i++) {
                 const c = getEl(`step-ind-${i}`);
                 if(i===state.currentStep) c.classList.add('active'); else c.classList.remove('active');
@@ -385,7 +430,7 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         const btn = getEl('btn-finish-step'); btn.disabled = true;
         const data = {
-            dealer_id: getVal('dealer_id'), name: getVal('name'), city: getVal('city'), address: getVal('address'), status: getVal('status'), responsible: getVal('responsible'), latitude: getVal('add_latitude'), longitude: getVal('add_longitude'),
+            dealer_id: getVal('dealer_id'), name: getVal('name'), city: getVal('city'), address: getVal('address'), status: getVal('status'), responsible: getVal('responsible'), latitude: getVal('add_latitude'), longitude: getVal('add_longitude'), price_type: getVal('price_type'), organization: getVal('organization'),
             contacts: collectList('add-contact-list', '.contact-entry', [{key:'name',sel:'.contact-name'},{key:'contactInfo',sel:'.contact-info'}]),
             pos_materials: collectList('add-pos-list', '.pos-entry', [{key:'name',sel:'.pos-name'},{key:'quantity',sel:'.pos-quantity'}]),
             competitors: collectList('add-competitor-list', '.competitor-entry', [{key:'brand',sel:'.competitor-brand'},{key:'collection',sel:'.competitor-collection'},{key:'price_opt',sel:'.competitor-price-opt'},{key:'price_retail',sel:'.competitor-price-retail'}])
@@ -407,7 +452,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const btn = formEdit.querySelector('button'); btn.disabled = true;
         const id = getVal('edit_db_id');
         const data = {
-            dealer_id: getVal('edit_dealer_id'), name: getVal('edit_name'), city: getVal('edit_city'), address: getVal('edit_address'), status: getVal('edit_status'), responsible: getVal('edit_responsible'), latitude: getVal('edit_latitude'), longitude: getVal('edit_longitude'),
+            dealer_id: getVal('edit_dealer_id'), name: getVal('edit_name'), city: getVal('edit_city'), address: getVal('edit_address'), status: getVal('edit_status'), responsible: getVal('edit_responsible'), latitude: getVal('edit_latitude'), longitude: getVal('edit_longitude'), price_type: getVal('edit_price_type'), organization: getVal('edit_organization'),
             contacts: collectList('edit-contact-list', '.contact-entry', [{key:'name',sel:'.contact-name'},{key:'contactInfo',sel:'.contact-info'}]),
             pos_materials: collectList('edit-pos-list', '.pos-entry', [{key:'name',sel:'.pos-name'},{key:'quantity',sel:'.pos-quantity'}]),
             competitors: collectList('edit-competitor-list', '.competitor-entry', [{key:'brand',sel:'.competitor-brand'},{key:'collection',sel:'.competitor-collection'},{key:'price_opt',sel:'.competitor-price-opt'},{key:'price_retail',sel:'.competitor-price-retail'}])
