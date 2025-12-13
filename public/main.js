@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("CRM Loaded: main.js v2.0 (Status ID Editable)");
+    console.log("CRM Loaded: main.js v2.1 (Status Table Fixed)");
 
     // 1. HELPERS
     const getEl = (id) => document.getElementById(id);
@@ -9,7 +9,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.showToast = (message, type = 'success') => {
         let container = getEl('toast-container-custom');
-        if (!container) { container = document.createElement('div'); container.id = 'toast-container-custom'; container.className = 'toast-container-custom'; document.body.appendChild(container); }
+        if (!container) { 
+            container = document.createElement('div'); container.id = 'toast-container-custom'; container.className = 'toast-container-custom'; document.body.appendChild(container); 
+        }
         const toast = document.createElement('div'); toast.className = `toast-modern toast-${type}`;
         const icon = type === 'success' ? 'check-circle-fill' : 'exclamation-triangle-fill';
         toast.innerHTML = `<i class="bi bi-${icon} fs-5"></i><span class="fw-bold text-dark">${message}</span>`;
@@ -154,11 +156,64 @@ document.addEventListener('DOMContentLoaded', () => {
     if(formEdit) formEdit.onsubmit = async (e) => { e.preventDefault(); const btn = document.querySelector('button[form="edit-dealer-form"]'); let oldHtml = 'Сохранить'; if(btn) { oldHtml = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Сохранение...'; } try { const id = getVal('edit_db_id'); const data = { dealer_id: getVal('edit_dealer_id'), name: getVal('edit_name'), city: getVal('edit_city'), address: getVal('edit_address'), status: getVal('edit_status'), responsible: getVal('edit_responsible'), latitude: getVal('edit_latitude'), longitude: getVal('edit_longitude'), price_type: getVal('edit_price_type'), organization: getVal('edit_organization'), delivery: getVal('edit_delivery'), website: getVal('edit_website'), instagram: getVal('edit_instagram'), bonuses: getVal('edit_bonuses'), contacts: collectList('edit-contact-list', '.contact-entry', [{key:'name',sel:'.contact-name'},{key:'contactInfo',sel:'.contact-info'}]), pos_materials: collectList('edit-pos-list', '.pos-entry', [{key:'name',sel:'.pos-name'},{key:'quantity',sel:'.pos-quantity'}]), competitors: collectList('edit-competitor-list', '.competitor-entry', [{key:'brand',sel:'.competitor-brand'},{key:'collection',sel:'.competitor-collection'},{key:'price_opt',sel:'.competitor-price-opt'},{key:'price_retail',sel:'.competitor-price-retail'}]) }; await fetch(`${API.dealers}/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)}); const pIds = getSelectedProducts('edit-product-checklist'); await fetch(`${API.dealers}/${id}/products`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({productIds:pIds})}); window.showToast("Сохранено!"); setTimeout(()=>location.reload(), 500); } catch(e) { window.showToast("Ошибка", "error"); if(btn) { btn.disabled = false; btn.innerHTML = oldHtml; } } };
 
     const btnLogout = getEl('logout-btn'); if(btnLogout) btnLogout.onclick = (e) => { e.preventDefault(); const x = new XMLHttpRequest(); x.open("GET", "/?x="+Math.random(), true, "logout", "logout"); x.onreadystatechange=()=>window.location.reload(); x.send(); };
-    if(getEl('btn-manage-statuses')) getEl('btn-manage-statuses').onclick = () => { const m = new bootstrap.Modal(getEl('status-manager-modal')); const list = getEl('status-manager-list'); list.innerHTML = state.statusList.map(s => `<tr><td><div style="width:20px;height:20px;background:${s.color};border-radius:50%"></div></td><td>${s.label}<br><small class="text-muted">${s.value}</small></td><td class="text-end"><button class="btn btn-sm btn-light border me-1" onclick="editStatus('${s.id}')"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-danger" onclick="deleteStatus('${s.id}')"><i class="bi bi-trash"></i></button></td></tr>`).join(''); m.show(); };
-    const sForm = getEl('status-form'); if(sForm) sForm.onsubmit = async (e) => { e.preventDefault(); const valInput = getVal('st_value'); const finalVal = valInput ? valInput : 'st_'+Math.random().toString(36).substr(2,5); const body = { label: getVal('st_label'), value: finalVal, color: getVal('st_color'), isVisible: getEl('st_visible').checked, sortOrder: state.statusList.length+10 }; const id = getVal('st_id'); if(id) { await fetch(`${API.statuses}/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)}); } else { await fetch(API.statuses, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)}); } window.showToast("Сохранено"); setTimeout(()=>location.reload(),500); };
-    window.editStatus = (id) => { const s = state.statusList.find(x => x.id === id); if(!s) return; getEl('st_id').value = s.id; getEl('st_label').value = s.label; getEl('st_value').value = s.value; getEl('st_color').value = s.color; getEl('st_visible').checked = s.isVisible !== false; getEl('btn-save-status').textContent = 'Сохранить'; getEl('btn-cancel-edit-status').style.display = 'inline-block'; };
-    if(getEl('btn-cancel-edit-status')) getEl('btn-cancel-edit-status').onclick = () => { getEl('status-form').reset(); getEl('st_id').value=''; getEl('btn-save-status').textContent='Добавить'; getEl('btn-cancel-edit-status').style.display='none'; };
+    
+    // --- UPDATED STATUS LIST (5 COLUMNS) ---
+    if(getEl('btn-manage-statuses')) getEl('btn-manage-statuses').onclick = () => {
+        const m = new bootstrap.Modal(getEl('status-manager-modal'));
+        const list = getEl('status-manager-list');
+        list.innerHTML = state.statusList.map(s => `
+            <tr>
+                <td><div style="width:20px;height:20px;background:${s.color};border-radius:50%"></div></td>
+                <td>${s.label}</td>
+                <td>${s.value}</td>
+                <td class="text-center">${s.isVisible!==false ? '<i class="bi bi-eye-fill text-success"></i>' : '<i class="bi bi-eye-slash-fill text-muted"></i>'}</td>
+                <td class="text-end">
+                    <button class="btn btn-sm btn-light border me-1" onclick="editStatus('${s.id}')"><i class="bi bi-pencil"></i></button>
+                    <button class="btn btn-sm btn-light border text-danger" onclick="deleteStatus('${s.id}')"><i class="bi bi-trash"></i></button>
+                </td>
+            </tr>
+        `).join('');
+        m.show();
+    };
+    
+    const sForm = getEl('status-form'); 
+    if(sForm) sForm.onsubmit = async (e) => { 
+        e.preventDefault(); 
+        const val = getVal('st_value') || 'st_'+Math.random().toString(36).substr(2,5); // Use Custom ID if provided
+        const body = { 
+            label: getVal('st_label'), 
+            value: val,
+            color: getVal('st_color'), 
+            isVisible: getEl('st_visible').checked, 
+            sortOrder: state.statusList.length+10 
+        }; 
+        const id = getVal('st_id');
+        try { 
+            if(id) await fetch(`${API.statuses}/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+            else await fetch(API.statuses, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)}); 
+            window.showToast("Сохранено"); setTimeout(()=>location.reload(),500); 
+        } catch(e){ window.showToast("Ошибка","error"); } 
+    };
+    
+    // Edit Status Helper
+    window.editStatus = (id) => {
+        const s = state.statusList.find(x => x.id === id); if(!s) return;
+        getEl('st_id').value = s.id;
+        getEl('st_label').value = s.label;
+        getEl('st_value').value = s.value; // Populate Custom ID
+        getEl('st_color').value = s.color;
+        getEl('st_visible').checked = s.isVisible !== false;
+        
+        getEl('btn-save-status').textContent = 'Сохранить';
+        const cancel = getEl('btn-cancel-edit-status');
+        if(cancel) { 
+            cancel.style.display = 'inline-block';
+            cancel.onclick = () => { sForm.reset(); getEl('st_id').value=''; getEl('btn-save-status').textContent='Добавить'; cancel.style.display='none'; };
+        }
+    };
+    
     window.deleteStatus = async (id) => { if(confirm("Удалить?")) { await fetch(`${API.statuses}/${id}`, {method:'DELETE'}); location.reload(); } };
 
+    // Start
     initApp();
 });
