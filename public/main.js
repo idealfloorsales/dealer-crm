@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("CRM Loaded: main.js v1.4 (Selects Fixed)");
+    console.log("CRM Loaded: main.js v1.5 (Map Fix & Spinner)");
 
     // ==========================================
     // 1. HELPERS
@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const posMaterialsList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"];
 
     // ==========================================
-    // 3. UI GENERATORS
+    // 3. GENERATORS
     // ==========================================
     const generators = {
         contact: (c={}) => `<div class="contact-entry"><input type="text" class="form-control contact-name" placeholder="Имя" value="${c.name||''}"><input type="text" class="form-control contact-position" placeholder="Должность" value="${c.position||''}"><input type="text" class="form-control contact-info" placeholder="Телефон" value="${c.contactInfo||''}"><button type="button" class="btn-remove-entry" onclick="this.closest('.contact-entry').remove()"><i class="bi bi-x-lg"></i></button></div>`,
@@ -91,6 +91,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function initMapLogic(key, mapId, latId, lngId, searchId, btnSearchId, btnLocId) {
         const mapEl = getEl(mapId); if(!mapEl) return () => {};
+        
+        // Удаляем старую карту если есть
         if(maps[key]) { maps[key].remove(); maps[key] = null; markers[key] = null; } 
         
         const map = L.map(mapId).setView([51.1605, 71.4704], 12);
@@ -123,17 +125,24 @@ document.addEventListener('DOMContentLoaded', () => {
         const btnS = getEl(btnSearchId); if(btnS) btnS.onclick = doSearch;
         const btnL = getEl(btnLocId); if(btnL) btnL.onclick = () => { if(navigator.geolocation) navigator.geolocation.getCurrentPosition(p => setPoint(p.coords.latitude, p.coords.longitude)); };
         
-        return () => { setTimeout(() => { map.invalidateSize(); const lat = parseFloat(getVal(latId)), lng = parseFloat(getVal(lngId)); if(!isNaN(lat) && !isNaN(lng)) setPoint(lat, lng); }, 300); };
+        return () => { 
+            setTimeout(() => { 
+                map.invalidateSize(); 
+                const lat = parseFloat(getVal(latId)), lng = parseFloat(getVal(lngId));
+                if(!isNaN(lat) && !isNaN(lng)) { 
+                    setPoint(lat, lng); 
+                }
+            }, 300); // Тайм-аут для надежности
+        };
     }
 
     const refreshAddMap = initMapLogic('add', 'add-map', 'add_latitude', 'add_longitude', 'add-smart-search', 'btn-search-add', 'btn-loc-add');
     const refreshEditMap = initMapLogic('edit', 'edit-map', 'edit_latitude', 'edit_longitude', 'edit-smart-search', 'btn-search-edit', 'btn-loc-edit');
 
     // ==========================================
-    // 5. DATA POPULATION (FIX FOR EMPTY FIELDS)
+    // 5. DATA POPULATION
     // ==========================================
     function populateModalMenus(prefix) {
-        // Заполняем "Тип цен" и "Ответственный" на основе данных, которые уже есть в системе
         const typeSelect = getEl(`${prefix}_price_type`);
         const respSelect = getEl(`${prefix}_responsible`);
         
@@ -141,7 +150,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const existing = new Set(state.allDealers.map(d => d.price_type).filter(Boolean));
             let html = '<option value="">-- Выберите --</option>';
             existing.forEach(t => html += `<option value="${t}">${t}</option>`);
-            // Добавим стандартные, если их нет
             if(!existing.has('ОПТ')) html += `<option value="ОПТ">ОПТ</option>`;
             if(!existing.has('Розница')) html += `<option value="Розница">Розница</option>`;
             typeSelect.innerHTML = html;
@@ -150,16 +158,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (respSelect && respSelect.tagName === 'SELECT') {
             const existing = new Set(state.allDealers.map(d => d.responsible).filter(Boolean));
             let html = '<option value="">-- Выберите --</option>';
-            // Стандартные системные роли
             html += `<option value="regional_astana">Региональный Астана</option>`;
             html += `<option value="regional_regions">Региональный Регионы</option>`;
             html += `<option value="office">Офис</option>`;
-            
             existing.forEach(r => {
-                // Не дублируем системные
-                if (!['regional_astana', 'regional_regions', 'office'].includes(r)) {
-                    html += `<option value="${r}">${r}</option>`;
-                }
+                if (!['regional_astana', 'regional_regions', 'office'].includes(r)) html += `<option value="${r}">${r}</option>`;
             });
             respSelect.innerHTML = html;
         }
@@ -310,10 +313,8 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const r = await fetch(`${API.dealers}/${id}`); const d = await r.json();
             
-            // 1. Заполняем списки (ВАЖНО! Сначала заполнить, потом выбрать значение)
             populateModalMenus('edit');
 
-            // 2. Ставим значения
             getEl('edit_db_id').value = d.id; 
             getEl('edit_dealer_id').value = d.dealer_id; 
             getEl('edit_name').value = d.name; 
@@ -322,12 +323,9 @@ document.addEventListener('DOMContentLoaded', () => {
             getEl('edit_latitude').value = d.latitude||''; 
             getEl('edit_longitude').value = d.longitude||'';
             if(getEl('edit_status')) getEl('edit_status').value = d.status || 'standard';
-            
-            // Попытка установить значения в селекты (если они совпадают с опциями)
             if(getEl('edit_price_type')) getEl('edit_price_type').value = d.price_type || '';
             if(getEl('edit_responsible')) getEl('edit_responsible').value = d.responsible || '';
 
-            // Lists
             renderList('edit-contact-list', d.contacts, generators.contact);
             renderList('edit-address-list', d.additional_addresses, generators.address);
             renderList('edit-pos-list', d.pos_materials, generators.pos);
@@ -342,7 +340,15 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const modalEl = getEl('edit-modal');
             const m = new bootstrap.Modal(modalEl, {backdrop:'static'}); 
-            modalEl.addEventListener('shown.bs.modal', () => refreshEditMap());
+            
+            // Map Listener: Call refresher AND resize logic explicitly
+            modalEl.addEventListener('shown.bs.modal', () => { 
+                refreshEditMap(); 
+            });
+            // Also listen for tab switches inside modal
+            const tabMap = modalEl.querySelector('button[data-bs-target="#tab-map"]');
+            if(tabMap) tabMap.addEventListener('shown.bs.tab', () => refreshEditMap());
+
             m.show();
 
         } catch(e) { window.showToast("Ошибка загрузки", "error"); console.error(e); }
@@ -353,7 +359,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(btnAdd) btnAdd.onclick = () => {
         state.currentStep = 1;
         getEl('add-dealer-form').reset();
-        populateModalMenus('add'); // Заполняем списки и тут
+        populateModalMenus('add'); 
         
         ['add-contact-list','add-address-list','add-pos-list','add-visits-list','add-competitor-list'].forEach(id => getEl(id).innerHTML='');
         getEl('add_latitude').value=''; getEl('add_longitude').value=''; state.addPhotosData=[]; renderPhotoPreviews(getEl('add-photo-preview-container'), []);
@@ -449,7 +455,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const formEdit = getEl('edit-dealer-form');
     if(formEdit) formEdit.onsubmit = async (e) => {
         e.preventDefault();
-        const btn = formEdit.querySelector('button'); btn.disabled = true;
+        
+        // --- SPINNER LOGIC ---
+        const btn = formEdit.querySelector('button[type="submit"]'); 
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Сохранение...';
+        // ---------------------
+
         const id = getVal('edit_db_id');
         const data = {
             dealer_id: getVal('edit_dealer_id'), name: getVal('edit_name'), city: getVal('edit_city'), address: getVal('edit_address'), status: getVal('edit_status'), responsible: getVal('edit_responsible'), latitude: getVal('edit_latitude'), longitude: getVal('edit_longitude'), price_type: getVal('edit_price_type'), organization: getVal('edit_organization'),
@@ -462,7 +475,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const pIds = getSelectedProducts('edit-product-checklist');
             await fetch(`${API.dealers}/${id}/products`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({productIds:pIds})});
             window.showToast("Сохранено!"); setTimeout(()=>location.reload(), 500); 
-        } catch(e) { window.showToast("Ошибка", "error"); btn.disabled = false; }
+        } catch(e) { 
+            window.showToast("Ошибка", "error"); 
+            btn.disabled = false; 
+            btn.innerHTML = originalText;
+        }
     };
 
     // Logout
