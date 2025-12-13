@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("CRM Loaded: main.js v1.7 (Full Fields Mapping)");
+    console.log("CRM Loaded: main.js v1.8 (Sales in Grid)");
 
     // ==========================================
     // 1. HELPERS
@@ -29,12 +29,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================
     // 2. STATE & CONFIG
     // ==========================================
-    const API = { dealers: '/api/dealers', products: '/api/products', competitors: '/api/competitors-ref', statuses: '/api/statuses' };
+    const API = { dealers: '/api/dealers', products: '/api/products', competitors: '/api/competitors-ref', statuses: '/api/statuses', sales: '/api/sales' };
+    
     let state = {
         allDealers: [],
         statusList: [],
         competitorsRef: [],
         fullProductCatalog: [],
+        currentMonthSales: [], // НОВОЕ: Храним продажи за текущий месяц
         currentUserRole: 'guest',
         currentSort: { column: 'name', direction: 'asc' },
         currentStep: 1,
@@ -91,7 +93,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function initMapLogic(key, mapId, latId, lngId, searchId, btnSearchId, btnLocId) {
         const mapEl = getEl(mapId); if(!mapEl) return () => {};
-        
         if(maps[key]) { maps[key].remove(); maps[key] = null; markers[key] = null; } 
         
         const map = L.map(mapId).setView([51.1605, 71.4704], 12);
@@ -137,16 +138,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const refreshEditMap = initMapLogic('edit', 'edit-map', 'edit_latitude', 'edit_longitude', 'edit-smart-search', 'btn-search-edit', 'btn-loc-edit');
 
     // ==========================================
-    // 5. DATA POPULATION (FIX FOR EMPTY FIELDS)
+    // 5. DATA POPULATION
     // ==========================================
     function populateModalMenus(prefix, savedPriceType = null, savedResponsible = null) {
         const typeSelect = getEl(`${prefix}_price_type`);
         const respSelect = getEl(`${prefix}_responsible`);
         
-        // 1. PRICE TYPES
         if (typeSelect && typeSelect.tagName === 'SELECT') {
             const existing = new Set(state.allDealers.map(d => d.price_type).filter(Boolean));
-            // Добавляем текущее сохраненное значение, даже если его нет у других
             if(savedPriceType) existing.add(savedPriceType);
             if(!existing.has('ОПТ')) existing.add('ОПТ');
             if(!existing.has('Розница')) existing.add('Розница');
@@ -156,13 +155,10 @@ document.addEventListener('DOMContentLoaded', () => {
             typeSelect.innerHTML = html;
         }
 
-        // 2. RESPONSIBLE
         if (respSelect && respSelect.tagName === 'SELECT') {
             const existing = new Set(state.allDealers.map(d => d.responsible).filter(Boolean));
-            // Добавляем текущего
             if(savedResponsible) existing.add(savedResponsible);
             
-            // Системные
             const sys = ['regional_astana', 'regional_regions', 'office'];
             let html = '<option value="">-- Выберите --</option>';
             html += `<option value="regional_astana" ${savedResponsible==='regional_astana'?'selected':''}>Региональный Астана</option>`;
@@ -182,7 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function initApp() {
         try { const r = await fetch('/api/auth/me'); if(r.ok) { const d = await r.json(); state.currentUserRole = d.role; const b = getEl('user-role-badge'); if(b) b.textContent = d.role; if(d.role==='guest') { const btn = getEl('open-add-modal-btn'); if(btn) btn.style.display='none'; } } } catch(e){}
-        await Promise.all([fetchStatuses(), fetchProducts(), fetchCompetitors(), fetchDealers()]);
+        await Promise.all([fetchStatuses(), fetchProducts(), fetchCompetitors(), fetchDealers(), fetchCurrentMonthSales()]);
         updateUI();
         const pid = localStorage.getItem('pendingEditDealerId'); if(pid) { localStorage.removeItem('pendingEditDealerId'); window.openEditModal(pid); }
     }
@@ -190,6 +186,16 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchStatuses() { const r = await fetch(API.statuses); if(r.ok) state.statusList = await r.json(); }
     async function fetchProducts() { const r = await fetch(API.products); if(r.ok) state.fullProductCatalog = await r.json(); }
     async function fetchCompetitors() { const r = await fetch(API.competitors); if(r.ok) state.competitorsRef = await r.json(); }
+    
+    // НОВОЕ: Загрузка продаж
+    async function fetchCurrentMonthSales() {
+        const month = new Date().toISOString().slice(0, 7); // "2023-10"
+        try {
+            const r = await fetch(`${API.sales}?month=${month}`);
+            if(r.ok) state.currentMonthSales = await r.json();
+        } catch(e) { console.error("Sales fetch error", e); }
+    }
+
     async function fetchDealers() { try { const r = await fetch(API.dealers); if(r.ok) state.allDealers = await r.json(); else getEl('dealer-grid').innerHTML = '<div class="alert alert-danger">Ошибка сервера</div>'; } catch(e) { getEl('dealer-grid').innerHTML = '<div class="alert alert-danger">Нет связи</div>'; } }
 
     function updateUI() {
@@ -229,11 +235,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if(!list.length) { grid.innerHTML = '<div class="text-center text-muted py-5">Пусто</div>'; return; }
         
+        // Lookup for sales
+        const salesMap = {};
+        state.currentMonthSales.forEach(s => {
+            if(s.dealerId) {
+                if(!salesMap[s.dealerId]) salesMap[s.dealerId] = 0;
+                salesMap[s.dealerId] += (s.fact || 0);
+            }
+        });
+
         grid.innerHTML = list.map(d => {
             const st = state.statusList.find(s=>s.value===(d.status||'standard')) || {label:d.status, color:'#777'};
             const avatar = d.photo_url ? `<img src="${d.photo_url}">` : `<i class="bi bi-shop"></i>`;
             const editBtn = state.currentUserRole !== 'guest' ? `<button class="btn-circle" onclick="event.stopPropagation(); window.openEditModal('${d.id}')"><i class="bi bi-pencil"></i></button>` : ''; 
             
+            // --- SALES BADGE ---
+            const salesVolume = salesMap[d.id] || 0;
+            let salesBadge = '';
+            if (salesVolume > 0) {
+                let colorClass = 'bg-danger'; // < 100
+                if (salesVolume >= 250) colorClass = 'bg-success';
+                else if (salesVolume >= 100) colorClass = 'bg-warning text-dark';
+                
+                salesBadge = `<span class="badge ${colorClass} rounded-pill ms-2" title="Продажи за текущий месяц">${salesVolume.toFixed(2)} м²</span>`;
+            }
+            // -------------------
+
             let icons = '';
             if (d.contacts && d.contacts.length > 0) {
                 const phone = d.contacts.find(c => c.contactInfo)?.contactInfo || '';
@@ -260,7 +287,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span class="dealer-name">${safeText(d.name)}</span>
                         <span style="background:${st.color};color:#fff;padding:2px 8px;border-radius:10px;font-size:0.7em">${st.label}</span>
                     </div>
-                    <div class="dealer-meta"><span>#${safeText(d.dealer_id)}</span><span>${safeText(d.city)}</span></div>
+                    <div class="dealer-meta">
+                        <span>#${safeText(d.dealer_id)}</span>
+                        <span>${safeText(d.city)}</span>
+                        ${d.price_type ? `<span><i class="bi bi-tag-fill text-muted" style="font-size:0.8em"></i> ${safeText(d.price_type)}</span>` : ''}
+                        ${salesBadge}
+                    </div>
                 </div>
                 <div class="dealer-actions">${icons} ${editBtn}</div>
             </div>`;
@@ -321,7 +353,6 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const r = await fetch(`${API.dealers}/${id}`); const d = await r.json();
             
-            // ВАЖНО: Заполняем списки С УЧЕТОМ сохраненных данных
             populateModalMenus('edit', d.price_type, d.responsible);
 
             getEl('edit_db_id').value = d.id; 
@@ -333,14 +364,12 @@ document.addEventListener('DOMContentLoaded', () => {
             getEl('edit_longitude').value = d.longitude||'';
             if(getEl('edit_status')) getEl('edit_status').value = d.status || 'standard';
             
-            // ВАЖНО: Заполняем "забытые" поля
             getEl('edit_organization').value = d.organization || '';
             getEl('edit_delivery').value = d.delivery || '';
             getEl('edit_website').value = d.website || '';
             getEl('edit_instagram').value = d.instagram || '';
             getEl('edit_bonuses').value = d.bonuses || '';
 
-            // Устанавливаем значения селектов
             const pType = getEl('edit_price_type'); if(pType) pType.value = d.price_type || '';
             const pResp = getEl('edit_responsible'); if(pResp) pResp.value = d.responsible || '';
 
