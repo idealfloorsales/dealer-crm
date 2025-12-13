@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("CRM Loaded: main.js v1.5 (Map Fix & Spinner)");
+    console.log("CRM Loaded: main.js v1.6 (Edit Save Fixed)");
 
     // ==========================================
     // 1. HELPERS
@@ -92,7 +92,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function initMapLogic(key, mapId, latId, lngId, searchId, btnSearchId, btnLocId) {
         const mapEl = getEl(mapId); if(!mapEl) return () => {};
         
-        // Удаляем старую карту если есть
         if(maps[key]) { maps[key].remove(); maps[key] = null; markers[key] = null; } 
         
         const map = L.map(mapId).setView([51.1605, 71.4704], 12);
@@ -129,10 +128,8 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => { 
                 map.invalidateSize(); 
                 const lat = parseFloat(getVal(latId)), lng = parseFloat(getVal(lngId));
-                if(!isNaN(lat) && !isNaN(lng)) { 
-                    setPoint(lat, lng); 
-                }
-            }, 300); // Тайм-аут для надежности
+                if(!isNaN(lat) && !isNaN(lng)) { setPoint(lat, lng); }
+            }, 300); 
         };
     }
 
@@ -323,8 +320,10 @@ document.addEventListener('DOMContentLoaded', () => {
             getEl('edit_latitude').value = d.latitude||''; 
             getEl('edit_longitude').value = d.longitude||'';
             if(getEl('edit_status')) getEl('edit_status').value = d.status || 'standard';
-            if(getEl('edit_price_type')) getEl('edit_price_type').value = d.price_type || '';
-            if(getEl('edit_responsible')) getEl('edit_responsible').value = d.responsible || '';
+            
+            // Safe set for Selects
+            const pType = getEl('edit_price_type'); if(pType && d.price_type) pType.value = d.price_type;
+            const pResp = getEl('edit_responsible'); if(pResp && d.responsible) pResp.value = d.responsible;
 
             renderList('edit-contact-list', d.contacts, generators.contact);
             renderList('edit-address-list', d.additional_addresses, generators.address);
@@ -341,11 +340,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const modalEl = getEl('edit-modal');
             const m = new bootstrap.Modal(modalEl, {backdrop:'static'}); 
             
-            // Map Listener: Call refresher AND resize logic explicitly
-            modalEl.addEventListener('shown.bs.modal', () => { 
-                refreshEditMap(); 
-            });
-            // Also listen for tab switches inside modal
+            modalEl.addEventListener('shown.bs.modal', () => refreshEditMap());
             const tabMap = modalEl.querySelector('button[data-bs-target="#tab-map"]');
             if(tabMap) tabMap.addEventListener('shown.bs.tab', () => refreshEditMap());
 
@@ -430,18 +425,22 @@ document.addEventListener('DOMContentLoaded', () => {
     bindAddBtn('add-visits-btn-add-modal', 'add-visits-list', 'visit'); bindAddBtn('add-visits-btn-edit-modal', 'edit-visits-list', 'visit');
     bindAddBtn('add-competitor-btn-add-modal', 'add-competitor-list', 'competitor'); bindAddBtn('add-competitor-btn-edit-modal', 'edit-competitor-list', 'competitor');
 
-    // Save
+    // Save Add
     const formAdd = getEl('add-dealer-form');
     if(formAdd) formAdd.onsubmit = async (e) => {
         e.preventDefault();
-        const btn = getEl('btn-finish-step'); btn.disabled = true;
-        const data = {
-            dealer_id: getVal('dealer_id'), name: getVal('name'), city: getVal('city'), address: getVal('address'), status: getVal('status'), responsible: getVal('responsible'), latitude: getVal('add_latitude'), longitude: getVal('add_longitude'), price_type: getVal('price_type'), organization: getVal('organization'),
-            contacts: collectList('add-contact-list', '.contact-entry', [{key:'name',sel:'.contact-name'},{key:'contactInfo',sel:'.contact-info'}]),
-            pos_materials: collectList('add-pos-list', '.pos-entry', [{key:'name',sel:'.pos-name'},{key:'quantity',sel:'.pos-quantity'}]),
-            competitors: collectList('add-competitor-list', '.competitor-entry', [{key:'brand',sel:'.competitor-brand'},{key:'collection',sel:'.competitor-collection'},{key:'price_opt',sel:'.competitor-price-opt'},{key:'price_retail',sel:'.competitor-price-retail'}])
-        };
+        const btn = getEl('btn-finish-step'); 
+        const oldHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
         try {
+            const data = {
+                dealer_id: getVal('dealer_id'), name: getVal('name'), city: getVal('city'), address: getVal('address'), status: getVal('status'), responsible: getVal('responsible'), latitude: getVal('add_latitude'), longitude: getVal('add_longitude'), price_type: getVal('price_type'), organization: getVal('organization'),
+                contacts: collectList('add-contact-list', '.contact-entry', [{key:'name',sel:'.contact-name'},{key:'contactInfo',sel:'.contact-info'}]),
+                pos_materials: collectList('add-pos-list', '.pos-entry', [{key:'name',sel:'.pos-name'},{key:'quantity',sel:'.pos-quantity'}]),
+                competitors: collectList('add-competitor-list', '.competitor-entry', [{key:'brand',sel:'.competitor-brand'},{key:'collection',sel:'.competitor-collection'},{key:'price_opt',sel:'.competitor-price-opt'},{key:'price_retail',sel:'.competitor-price-retail'}])
+            };
             const r = await fetch(API.dealers, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
             if(r.ok) { 
                 const newD = await r.json();
@@ -449,36 +448,41 @@ document.addEventListener('DOMContentLoaded', () => {
                 if(pIds.length) await fetch(`${API.dealers}/${newD.id}/products`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({productIds:pIds})});
                 window.showToast("Добавлено!"); setTimeout(()=>location.reload(), 500); 
             }
-        } catch(e) { window.showToast("Ошибка", "error"); btn.disabled = false; }
+        } catch(e) { window.showToast("Ошибка", "error"); btn.disabled = false; btn.innerHTML = oldHtml; }
     };
 
+    // Save Edit (FIXED BUTTON FINDER)
     const formEdit = getEl('edit-dealer-form');
     if(formEdit) formEdit.onsubmit = async (e) => {
         e.preventDefault();
         
-        // --- SPINNER LOGIC ---
-        const btn = formEdit.querySelector('button[type="submit"]'); 
-        const originalText = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Сохранение...';
-        // ---------------------
+        // 1. Ищем кнопку где угодно, связанную с этой формой
+        const btn = document.querySelector('button[form="edit-dealer-form"]');
+        let oldHtml = 'Сохранить';
+        if(btn) {
+            oldHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        }
 
-        const id = getVal('edit_db_id');
-        const data = {
-            dealer_id: getVal('edit_dealer_id'), name: getVal('edit_name'), city: getVal('edit_city'), address: getVal('edit_address'), status: getVal('edit_status'), responsible: getVal('edit_responsible'), latitude: getVal('edit_latitude'), longitude: getVal('edit_longitude'), price_type: getVal('edit_price_type'), organization: getVal('edit_organization'),
-            contacts: collectList('edit-contact-list', '.contact-entry', [{key:'name',sel:'.contact-name'},{key:'contactInfo',sel:'.contact-info'}]),
-            pos_materials: collectList('edit-pos-list', '.pos-entry', [{key:'name',sel:'.pos-name'},{key:'quantity',sel:'.pos-quantity'}]),
-            competitors: collectList('edit-competitor-list', '.competitor-entry', [{key:'brand',sel:'.competitor-brand'},{key:'collection',sel:'.competitor-collection'},{key:'price_opt',sel:'.competitor-price-opt'},{key:'price_retail',sel:'.competitor-price-retail'}])
-        };
         try {
+            const id = getVal('edit_db_id');
+            const data = {
+                dealer_id: getVal('edit_dealer_id'), name: getVal('edit_name'), city: getVal('edit_city'), address: getVal('edit_address'), status: getVal('edit_status'), responsible: getVal('edit_responsible'), latitude: getVal('edit_latitude'), longitude: getVal('edit_longitude'), price_type: getVal('edit_price_type'), organization: getVal('edit_organization'),
+                contacts: collectList('edit-contact-list', '.contact-entry', [{key:'name',sel:'.contact-name'},{key:'contactInfo',sel:'.contact-info'}]),
+                pos_materials: collectList('edit-pos-list', '.pos-entry', [{key:'name',sel:'.pos-name'},{key:'quantity',sel:'.pos-quantity'}]),
+                competitors: collectList('edit-competitor-list', '.competitor-entry', [{key:'brand',sel:'.competitor-brand'},{key:'collection',sel:'.competitor-collection'},{key:'price_opt',sel:'.competitor-price-opt'},{key:'price_retail',sel:'.competitor-price-retail'}])
+            };
+            
             await fetch(`${API.dealers}/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
             const pIds = getSelectedProducts('edit-product-checklist');
             await fetch(`${API.dealers}/${id}/products`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({productIds:pIds})});
-            window.showToast("Сохранено!"); setTimeout(()=>location.reload(), 500); 
+            
+            window.showToast("Сохранено!"); 
+            setTimeout(()=>location.reload(), 500); 
         } catch(e) { 
             window.showToast("Ошибка", "error"); 
-            btn.disabled = false; 
-            btn.innerHTML = originalText;
+            if(btn) { btn.disabled = false; btn.innerHTML = oldHtml; }
         }
     };
 
