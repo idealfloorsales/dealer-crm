@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("CRM Loaded: main.js v1.6 (Edit Save Fixed)");
+    console.log("CRM Loaded: main.js v1.7 (Full Fields Mapping)");
 
     // ==========================================
     // 1. HELPERS
@@ -137,29 +137,40 @@ document.addEventListener('DOMContentLoaded', () => {
     const refreshEditMap = initMapLogic('edit', 'edit-map', 'edit_latitude', 'edit_longitude', 'edit-smart-search', 'btn-search-edit', 'btn-loc-edit');
 
     // ==========================================
-    // 5. DATA POPULATION
+    // 5. DATA POPULATION (FIX FOR EMPTY FIELDS)
     // ==========================================
-    function populateModalMenus(prefix) {
+    function populateModalMenus(prefix, savedPriceType = null, savedResponsible = null) {
         const typeSelect = getEl(`${prefix}_price_type`);
         const respSelect = getEl(`${prefix}_responsible`);
         
+        // 1. PRICE TYPES
         if (typeSelect && typeSelect.tagName === 'SELECT') {
             const existing = new Set(state.allDealers.map(d => d.price_type).filter(Boolean));
+            // Добавляем текущее сохраненное значение, даже если его нет у других
+            if(savedPriceType) existing.add(savedPriceType);
+            if(!existing.has('ОПТ')) existing.add('ОПТ');
+            if(!existing.has('Розница')) existing.add('Розница');
+
             let html = '<option value="">-- Выберите --</option>';
-            existing.forEach(t => html += `<option value="${t}">${t}</option>`);
-            if(!existing.has('ОПТ')) html += `<option value="ОПТ">ОПТ</option>`;
-            if(!existing.has('Розница')) html += `<option value="Розница">Розница</option>`;
+            existing.forEach(t => html += `<option value="${t}" ${t===savedPriceType?'selected':''}>${t}</option>`);
             typeSelect.innerHTML = html;
         }
 
+        // 2. RESPONSIBLE
         if (respSelect && respSelect.tagName === 'SELECT') {
             const existing = new Set(state.allDealers.map(d => d.responsible).filter(Boolean));
+            // Добавляем текущего
+            if(savedResponsible) existing.add(savedResponsible);
+            
+            // Системные
+            const sys = ['regional_astana', 'regional_regions', 'office'];
             let html = '<option value="">-- Выберите --</option>';
-            html += `<option value="regional_astana">Региональный Астана</option>`;
-            html += `<option value="regional_regions">Региональный Регионы</option>`;
-            html += `<option value="office">Офис</option>`;
+            html += `<option value="regional_astana" ${savedResponsible==='regional_astana'?'selected':''}>Региональный Астана</option>`;
+            html += `<option value="regional_regions" ${savedResponsible==='regional_regions'?'selected':''}>Региональный Регионы</option>`;
+            html += `<option value="office" ${savedResponsible==='office'?'selected':''}>Офис</option>`;
+            
             existing.forEach(r => {
-                if (!['regional_astana', 'regional_regions', 'office'].includes(r)) html += `<option value="${r}">${r}</option>`;
+                if (!sys.includes(r)) html += `<option value="${r}" ${r===savedResponsible?'selected':''}>${r}</option>`;
             });
             respSelect.innerHTML = html;
         }
@@ -310,7 +321,8 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const r = await fetch(`${API.dealers}/${id}`); const d = await r.json();
             
-            populateModalMenus('edit');
+            // ВАЖНО: Заполняем списки С УЧЕТОМ сохраненных данных
+            populateModalMenus('edit', d.price_type, d.responsible);
 
             getEl('edit_db_id').value = d.id; 
             getEl('edit_dealer_id').value = d.dealer_id; 
@@ -321,9 +333,16 @@ document.addEventListener('DOMContentLoaded', () => {
             getEl('edit_longitude').value = d.longitude||'';
             if(getEl('edit_status')) getEl('edit_status').value = d.status || 'standard';
             
-            // Safe set for Selects
-            const pType = getEl('edit_price_type'); if(pType && d.price_type) pType.value = d.price_type;
-            const pResp = getEl('edit_responsible'); if(pResp && d.responsible) pResp.value = d.responsible;
+            // ВАЖНО: Заполняем "забытые" поля
+            getEl('edit_organization').value = d.organization || '';
+            getEl('edit_delivery').value = d.delivery || '';
+            getEl('edit_website').value = d.website || '';
+            getEl('edit_instagram').value = d.instagram || '';
+            getEl('edit_bonuses').value = d.bonuses || '';
+
+            // Устанавливаем значения селектов
+            const pType = getEl('edit_price_type'); if(pType) pType.value = d.price_type || '';
+            const pResp = getEl('edit_responsible'); if(pResp) pResp.value = d.responsible || '';
 
             renderList('edit-contact-list', d.contacts, generators.contact);
             renderList('edit-address-list', d.additional_addresses, generators.address);
@@ -437,6 +456,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const data = {
                 dealer_id: getVal('dealer_id'), name: getVal('name'), city: getVal('city'), address: getVal('address'), status: getVal('status'), responsible: getVal('responsible'), latitude: getVal('add_latitude'), longitude: getVal('add_longitude'), price_type: getVal('price_type'), organization: getVal('organization'),
+                delivery: getVal('delivery'), website: getVal('website'), instagram: getVal('instagram'), bonuses: getVal('bonuses'), // ADDED THESE FIELDS
                 contacts: collectList('add-contact-list', '.contact-entry', [{key:'name',sel:'.contact-name'},{key:'contactInfo',sel:'.contact-info'}]),
                 pos_materials: collectList('add-pos-list', '.pos-entry', [{key:'name',sel:'.pos-name'},{key:'quantity',sel:'.pos-quantity'}]),
                 competitors: collectList('add-competitor-list', '.competitor-entry', [{key:'brand',sel:'.competitor-brand'},{key:'collection',sel:'.competitor-collection'},{key:'price_opt',sel:'.competitor-price-opt'},{key:'price_retail',sel:'.competitor-price-retail'}])
@@ -451,24 +471,24 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(e) { window.showToast("Ошибка", "error"); btn.disabled = false; btn.innerHTML = oldHtml; }
     };
 
-    // Save Edit (FIXED BUTTON FINDER)
+    // Save Edit
     const formEdit = getEl('edit-dealer-form');
     if(formEdit) formEdit.onsubmit = async (e) => {
         e.preventDefault();
         
-        // 1. Ищем кнопку где угодно, связанную с этой формой
         const btn = document.querySelector('button[form="edit-dealer-form"]');
         let oldHtml = 'Сохранить';
         if(btn) {
             oldHtml = btn.innerHTML;
             btn.disabled = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Сохранение...';
         }
 
         try {
             const id = getVal('edit_db_id');
             const data = {
                 dealer_id: getVal('edit_dealer_id'), name: getVal('edit_name'), city: getVal('edit_city'), address: getVal('edit_address'), status: getVal('edit_status'), responsible: getVal('edit_responsible'), latitude: getVal('edit_latitude'), longitude: getVal('edit_longitude'), price_type: getVal('edit_price_type'), organization: getVal('edit_organization'),
+                delivery: getVal('edit_delivery'), website: getVal('edit_website'), instagram: getVal('edit_instagram'), bonuses: getVal('edit_bonuses'), // ADDED THESE FIELDS
                 contacts: collectList('edit-contact-list', '.contact-entry', [{key:'name',sel:'.contact-name'},{key:'contactInfo',sel:'.contact-info'}]),
                 pos_materials: collectList('edit-pos-list', '.pos-entry', [{key:'name',sel:'.pos-name'},{key:'quantity',sel:'.pos-quantity'}]),
                 competitors: collectList('edit-competitor-list', '.competitor-entry', [{key:'brand',sel:'.competitor-brand'},{key:'collection',sel:'.competitor-collection'},{key:'price_opt',sel:'.competitor-price-opt'},{key:'price_retail',sel:'.competitor-price-retail'}])
