@@ -143,4 +143,26 @@ app.post('/api/knowledge', checkWrite, async (req, res) => { const a = new Knowl
 app.put('/api/knowledge/:id', checkWrite, async (req, res) => { const a = await Knowledge.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(a)); });
 app.delete('/api/knowledge/:id', checkWrite, async (req, res) => { await Knowledge.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
 
+// --- НОВЫЙ ROUTE ДЛЯ ДАШБОРДА (Легкий) ---
+app.get('/api/tasks', async (req, res) => {
+    try {
+        // Загружаем только Имя, Статус и Визиты (без фото и лишнего мусора)
+        const data = await Dealer.find(getDealerFilter(req))
+            .select('name visits status responsible city')
+            .lean();
+        
+        // Преобразуем для клиента
+        res.json(data.map(d => ({
+            id: d._id,
+            name: d.name,
+            status: d.status,
+            visits: d.visits || [],
+            responsible: d.responsible
+        })));
+    } catch (e) {
+        res.status(500).json([]);
+    }
+});
+
 app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
+
