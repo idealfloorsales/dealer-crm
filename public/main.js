@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("CRM Loaded: main.js v1.8 (Sales in Grid)");
+    console.log("CRM Loaded: main.js v1.9 (Zero Sales Red & City Icon)");
 
     // ==========================================
     // 1. HELPERS
@@ -30,13 +30,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // 2. STATE & CONFIG
     // ==========================================
     const API = { dealers: '/api/dealers', products: '/api/products', competitors: '/api/competitors-ref', statuses: '/api/statuses', sales: '/api/sales' };
-    
     let state = {
         allDealers: [],
         statusList: [],
         competitorsRef: [],
         fullProductCatalog: [],
-        currentMonthSales: [], // НОВОЕ: Храним продажи за текущий месяц
+        currentMonthSales: [], 
         currentUserRole: 'guest',
         currentSort: { column: 'name', direction: 'asc' },
         currentStep: 1,
@@ -125,13 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const btnS = getEl(btnSearchId); if(btnS) btnS.onclick = doSearch;
         const btnL = getEl(btnLocId); if(btnL) btnL.onclick = () => { if(navigator.geolocation) navigator.geolocation.getCurrentPosition(p => setPoint(p.coords.latitude, p.coords.longitude)); };
         
-        return () => { 
-            setTimeout(() => { 
-                map.invalidateSize(); 
-                const lat = parseFloat(getVal(latId)), lng = parseFloat(getVal(lngId));
-                if(!isNaN(lat) && !isNaN(lng)) { setPoint(lat, lng); }
-            }, 300); 
-        };
+        return () => { setTimeout(() => { map.invalidateSize(); const lat = parseFloat(getVal(latId)), lng = parseFloat(getVal(lngId)); if(!isNaN(lat) && !isNaN(lng)) { setPoint(lat, lng); } }, 300); };
     }
 
     const refreshAddMap = initMapLogic('add', 'add-map', 'add_latitude', 'add_longitude', 'add-smart-search', 'btn-search-add', 'btn-loc-add');
@@ -164,10 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
             html += `<option value="regional_astana" ${savedResponsible==='regional_astana'?'selected':''}>Региональный Астана</option>`;
             html += `<option value="regional_regions" ${savedResponsible==='regional_regions'?'selected':''}>Региональный Регионы</option>`;
             html += `<option value="office" ${savedResponsible==='office'?'selected':''}>Офис</option>`;
-            
-            existing.forEach(r => {
-                if (!sys.includes(r)) html += `<option value="${r}" ${r===savedResponsible?'selected':''}>${r}</option>`;
-            });
+            existing.forEach(r => { if (!sys.includes(r)) html += `<option value="${r}" ${r===savedResponsible?'selected':''}>${r}</option>`; });
             respSelect.innerHTML = html;
         }
     }
@@ -186,16 +176,10 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchStatuses() { const r = await fetch(API.statuses); if(r.ok) state.statusList = await r.json(); }
     async function fetchProducts() { const r = await fetch(API.products); if(r.ok) state.fullProductCatalog = await r.json(); }
     async function fetchCompetitors() { const r = await fetch(API.competitors); if(r.ok) state.competitorsRef = await r.json(); }
-    
-    // НОВОЕ: Загрузка продаж
     async function fetchCurrentMonthSales() {
-        const month = new Date().toISOString().slice(0, 7); // "2023-10"
-        try {
-            const r = await fetch(`${API.sales}?month=${month}`);
-            if(r.ok) state.currentMonthSales = await r.json();
-        } catch(e) { console.error("Sales fetch error", e); }
+        const month = new Date().toISOString().slice(0, 7); 
+        try { const r = await fetch(`${API.sales}?month=${month}`); if(r.ok) state.currentMonthSales = await r.json(); } catch(e) {}
     }
-
     async function fetchDealers() { try { const r = await fetch(API.dealers); if(r.ok) state.allDealers = await r.json(); else getEl('dealer-grid').innerHTML = '<div class="alert alert-danger">Ошибка сервера</div>'; } catch(e) { getEl('dealer-grid').innerHTML = '<div class="alert alert-danger">Нет связи</div>'; } }
 
     function updateUI() {
@@ -235,30 +219,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if(!list.length) { grid.innerHTML = '<div class="text-center text-muted py-5">Пусто</div>'; return; }
         
-        // Lookup for sales
         const salesMap = {};
-        state.currentMonthSales.forEach(s => {
-            if(s.dealerId) {
-                if(!salesMap[s.dealerId]) salesMap[s.dealerId] = 0;
-                salesMap[s.dealerId] += (s.fact || 0);
-            }
-        });
+        state.currentMonthSales.forEach(s => { if(s.dealerId) { if(!salesMap[s.dealerId]) salesMap[s.dealerId]=0; salesMap[s.dealerId] += (s.fact||0); } });
 
         grid.innerHTML = list.map(d => {
             const st = state.statusList.find(s=>s.value===(d.status||'standard')) || {label:d.status, color:'#777'};
             const avatar = d.photo_url ? `<img src="${d.photo_url}">` : `<i class="bi bi-shop"></i>`;
             const editBtn = state.currentUserRole !== 'guest' ? `<button class="btn-circle" onclick="event.stopPropagation(); window.openEditModal('${d.id}')"><i class="bi bi-pencil"></i></button>` : ''; 
             
-            // --- SALES BADGE ---
+            // --- SALES LOGIC ---
             const salesVolume = salesMap[d.id] || 0;
-            let salesBadge = '';
-            if (salesVolume > 0) {
-                let colorClass = 'bg-danger'; // < 100
-                if (salesVolume >= 250) colorClass = 'bg-success';
-                else if (salesVolume >= 100) colorClass = 'bg-warning text-dark';
-                
-                salesBadge = `<span class="badge ${colorClass} rounded-pill ms-2" title="Продажи за текущий месяц">${salesVolume.toFixed(2)} м²</span>`;
-            }
+            let colorClass = 'bg-danger'; 
+            if (salesVolume >= 250) colorClass = 'bg-success';
+            else if (salesVolume >= 100) colorClass = 'bg-warning text-dark';
+            
+            const salesBadge = `<span class="badge ${colorClass} rounded-pill ms-2" style="font-weight:normal" title="Продажи за текущий месяц">${salesVolume.toFixed(2)} м²</span>`;
             // -------------------
 
             let icons = '';
@@ -289,7 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                     <div class="dealer-meta">
                         <span>#${safeText(d.dealer_id)}</span>
-                        <span>${safeText(d.city)}</span>
+                        <span><i class="bi bi-geo-alt text-muted"></i> ${safeText(d.city)}</span>
                         ${d.price_type ? `<span><i class="bi bi-tag-fill text-muted" style="font-size:0.8em"></i> ${safeText(d.price_type)}</span>` : ''}
                         ${salesBadge}
                     </div>
@@ -352,7 +327,6 @@ document.addEventListener('DOMContentLoaded', () => {
     window.openEditModal = async (id) => {
         try {
             const r = await fetch(`${API.dealers}/${id}`); const d = await r.json();
-            
             populateModalMenus('edit', d.price_type, d.responsible);
 
             getEl('edit_db_id').value = d.id; 
@@ -387,7 +361,6 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const modalEl = getEl('edit-modal');
             const m = new bootstrap.Modal(modalEl, {backdrop:'static'}); 
-            
             modalEl.addEventListener('shown.bs.modal', () => refreshEditMap());
             const tabMap = modalEl.querySelector('button[data-bs-target="#tab-map"]');
             if(tabMap) tabMap.addEventListener('shown.bs.tab', () => refreshEditMap());
@@ -485,7 +458,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const data = {
                 dealer_id: getVal('dealer_id'), name: getVal('name'), city: getVal('city'), address: getVal('address'), status: getVal('status'), responsible: getVal('responsible'), latitude: getVal('add_latitude'), longitude: getVal('add_longitude'), price_type: getVal('price_type'), organization: getVal('organization'),
-                delivery: getVal('delivery'), website: getVal('website'), instagram: getVal('instagram'), bonuses: getVal('bonuses'), // ADDED THESE FIELDS
+                delivery: getVal('delivery'), website: getVal('website'), instagram: getVal('instagram'), bonuses: getVal('bonuses'), 
                 contacts: collectList('add-contact-list', '.contact-entry', [{key:'name',sel:'.contact-name'},{key:'contactInfo',sel:'.contact-info'}]),
                 pos_materials: collectList('add-pos-list', '.pos-entry', [{key:'name',sel:'.pos-name'},{key:'quantity',sel:'.pos-quantity'}]),
                 competitors: collectList('add-competitor-list', '.competitor-entry', [{key:'brand',sel:'.competitor-brand'},{key:'collection',sel:'.competitor-collection'},{key:'price_opt',sel:'.competitor-price-opt'},{key:'price_retail',sel:'.competitor-price-retail'}])
@@ -517,7 +490,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const id = getVal('edit_db_id');
             const data = {
                 dealer_id: getVal('edit_dealer_id'), name: getVal('edit_name'), city: getVal('edit_city'), address: getVal('edit_address'), status: getVal('edit_status'), responsible: getVal('edit_responsible'), latitude: getVal('edit_latitude'), longitude: getVal('edit_longitude'), price_type: getVal('edit_price_type'), organization: getVal('edit_organization'),
-                delivery: getVal('edit_delivery'), website: getVal('edit_website'), instagram: getVal('edit_instagram'), bonuses: getVal('edit_bonuses'), // ADDED THESE FIELDS
+                delivery: getVal('edit_delivery'), website: getVal('edit_website'), instagram: getVal('edit_instagram'), bonuses: getVal('edit_bonuses'), 
                 contacts: collectList('edit-contact-list', '.contact-entry', [{key:'name',sel:'.contact-name'},{key:'contactInfo',sel:'.contact-info'}]),
                 pos_materials: collectList('edit-pos-list', '.pos-entry', [{key:'name',sel:'.pos-name'},{key:'quantity',sel:'.pos-quantity'}]),
                 competitors: collectList('edit-competitor-list', '.competitor-entry', [{key:'brand',sel:'.competitor-brand'},{key:'collection',sel:'.competitor-collection'},{key:'price_opt',sel:'.competitor-price-opt'},{key:'price_retail',sel:'.competitor-price-retail'}])
