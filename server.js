@@ -164,5 +164,30 @@ app.get('/api/tasks', async (req, res) => {
     }
 });
 
+// ==========================================
+// НОВЫЙ ROUTE ДЛЯ ДАШБОРДА (ЛЕГКИЙ)
+// ==========================================
+app.get('/api/tasks', async (req, res) => {
+    try {
+        // Загружаем только Имя, Статус и Визиты (без тяжелых фото)
+        const data = await Dealer.find(getDealerFilter(req))
+            .select('name visits status responsible') 
+            .lean();
+        
+        // Преобразуем для клиента
+        res.json(data.map(d => ({
+            id: d._id,
+            name: d.name,
+            status: d.status,
+            visits: d.visits || [],
+            responsible: d.responsible
+        })));
+    } catch (e) {
+        console.error("Tasks API Error:", e);
+        res.status(500).json([]); 
+    }
+});
+
 app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
+
 
