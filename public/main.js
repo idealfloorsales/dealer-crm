@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("CRM Loaded: main.js v2.2 (Dashboard & Status Table Fix)");
+    console.log("CRM Loaded: main.js v2.3 (Dashboard & Status Fix)");
 
     // 1. HELPERS
     const getEl = (id) => document.getElementById(id);
@@ -29,12 +29,12 @@ document.addEventListener('DOMContentLoaded', () => {
         competitors: '/api/competitors-ref', 
         statuses: '/api/statuses', 
         sales: '/api/sales',
-        tasks: '/api/tasks' // НОВЫЙ API
+        tasks: '/api/tasks' // <--- НОВЫЙ API
     };
     
     let state = {
         allDealers: [],
-        allTasksData: [], // Данные для дашборда
+        allTasksData: [], // <--- ДАННЫЕ ДЛЯ ДАШБОРДА
         statusList: [],
         competitorsRef: [],
         fullProductCatalog: [],
@@ -110,24 +110,33 @@ document.addEventListener('DOMContentLoaded', () => {
     // 6. MAIN LOGIC
     async function initApp() {
         try { const r = await fetch('/api/auth/me'); if(r.ok) { const d = await r.json(); state.currentUserRole = d.role; const b = getEl('user-role-badge'); if(b) b.textContent = d.role; if(d.role==='guest') { const btn = getEl('open-add-modal-btn'); if(btn) btn.style.display='none'; } } } catch(e){}
-        await Promise.all([fetchStatuses(), fetchProducts(), fetchCompetitors(), fetchDealers(), fetchCurrentMonthSales(), fetchTasks()]);
+        
+        // ВАЖНО: Добавлена загрузка fetchTasks()
+        await Promise.all([
+            fetchStatuses(), 
+            fetchProducts(), 
+            fetchCompetitors(), 
+            fetchDealers(), 
+            fetchCurrentMonthSales(), 
+            fetchTasks() 
+        ]);
+        
         updateUI();
         const pid = localStorage.getItem('pendingEditDealerId'); if(pid) { localStorage.removeItem('pendingEditDealerId'); window.openEditModal(pid); }
     }
     
-    // FETCH FUNCTIONS
+    // FETCH
     async function fetchStatuses() { const r = await fetch(API.statuses); if(r.ok) state.statusList = await r.json(); }
     async function fetchProducts() { const r = await fetch(API.products); if(r.ok) state.fullProductCatalog = await r.json(); }
     async function fetchCompetitors() { const r = await fetch(API.competitors); if(r.ok) state.competitorsRef = await r.json(); }
     async function fetchCurrentMonthSales() { const month = new Date().toISOString().slice(0, 7); try { const r = await fetch(`${API.sales}?month=${month}`); if(r.ok) state.currentMonthSales = await r.json(); } catch(e) {} }
     async function fetchDealers() { try { const r = await fetch(API.dealers); if(r.ok) state.allDealers = await r.json(); else getEl('dealer-grid').innerHTML = '<div class="alert alert-danger">Ошибка сервера</div>'; } catch(e) { getEl('dealer-grid').innerHTML = '<div class="alert alert-danger">Нет связи</div>'; } }
-    
-    // НОВАЯ ФУНКЦИЯ ДЛЯ ЗАГРУЗКИ ЗАДАЧ
+    // NEW: Загрузка задач для дашборда
     async function fetchTasks() {
         try {
             const r = await fetch(API.tasks);
             if(r.ok) state.allTasksData = await r.json();
-        } catch(e) { console.warn("Tasks load failed"); }
+        } catch(e) { console.warn("Tasks load failed", e); }
     }
 
     function updateUI() { populateFilters(); renderDashboard(); renderDealers(); updateStatusSelects(); const dl1 = getEl('brands-datalist'); if(dl1) dl1.innerHTML = state.competitorsRef.map(r=>`<option value="${r.name}">`).join(''); const dl2 = getEl('pos-materials-datalist'); if(dl2) dl2.innerHTML = posMaterialsList.map(s=>`<option value="${s}">`).join(''); }
@@ -155,19 +164,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
     }
 
-    // --- ОБНОВЛЕННАЯ ЛОГИКА ДАШБОРДА (ИСПОЛЬЗУЕТ state.allTasksData) ---
+    // --- DASHBOARD (ИСПРАВЛЕННЫЙ) ---
     function renderDashboard() {
         const db = getEl('dashboard-stats'); if(!db) return;
         const total = state.allDealers.length; if(total === 0) { db.innerHTML=''; return; }
-        
-        // 1. Counters
         const activeDealers = state.allDealers.filter(d => d.status !== 'potential'); const totalReal = activeDealers.length; const noAvatar = activeDealers.filter(d => !d.photo_url).length;
-        
-        // 2. Structure
         let cActive=0, cStandard=0, cProblem=0, cPotential=0; state.allDealers.forEach(d => { if(d.status==='active') cActive++; else if(d.status==='standard') cStandard++; else if(d.status==='problem') cProblem++; else if(d.status==='potential') cPotential++; });
         const pActive = total>0?(cActive/total)*100:0, pStandard = total>0?(cStandard/total)*100:0, pProblem = total>0?(cProblem/total)*100:0, pPotential = total>0?(cPotential/total)*100:0;
 
-        // 3. TASKS Logic (From state.allTasksData)
+        // Tasks Logic (using state.allTasksData)
         const today = new Date(); today.setHours(0,0,0,0);
         const coolingLimit = new Date(today.getTime() - (15 * 24 * 60 * 60 * 1000));
         
@@ -175,23 +180,18 @@ document.addEventListener('DOMContentLoaded', () => {
         
         state.allTasksData.forEach(d => {
             if(d.status === 'archive') return;
-            
-            // a) Visits analysis
             let hasFuture = false;
             let lastVisit = null;
             if(d.visits && d.visits.length > 0) {
-                d.visits.forEach((v, idx) => {
+                d.visits.forEach((v) => {
                     if(!v.date) return;
                     const vDate = new Date(v.date); vDate.setHours(0,0,0,0);
                     if(v.isCompleted) {
                         if(!lastVisit || vDate > lastVisit) lastVisit = vDate;
                     } else {
-                        // Not completed
                         if(vDate < today) {
-                            // Overdue -> Problem
                             tasksProblem.push({dealerName:d.name, dealerId:d.id, type:'overdue', date:vDate, comment:v.comment});
                         } else {
-                            // Future
                             if(vDate.getTime() === today.getTime()) tasksUpcoming.push({dealerName:d.name, dealerId:d.id, isToday:true, date:vDate, comment:v.comment});
                             else tasksUpcoming.push({dealerName:d.name, dealerId:d.id, isToday:false, date:vDate, comment:v.comment});
                             hasFuture = true;
@@ -199,14 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
             }
-
-            // b) Status Problem
-            if(d.status === 'problem') {
-                // Avoid dupes if already in overdue
-                if(!tasksProblem.some(t => t.dealerId === d.id)) tasksProblem.push({dealerName:d.name, dealerId:d.id, type:'status', comment:'Проблемный статус'});
-            }
-
-            // c) Cooling
+            if(d.status === 'problem') { if(!tasksProblem.some(t => t.dealerId === d.id)) tasksProblem.push({dealerName:d.name, dealerId:d.id, type:'status', comment:'Проблемный статус'}); }
             if(!hasFuture && d.status !== 'problem' && d.status !== 'potential') {
                 if(!lastVisit) tasksCooling.push({dealerName:d.name, dealerId:d.id, days:999});
                 else if(lastVisit < coolingLimit) {
@@ -216,23 +209,18 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Sort lists
         tasksUpcoming.sort((a,b) => a.date - b.date);
         tasksProblem.sort((a,b) => (a.date||0) - (b.date||0));
         tasksCooling.sort((a,b) => b.days - a.days);
 
-        // Helper to render lists
         const renderTList = (arr, type) => {
             if(!arr.length) return `<div class="text-center py-4 text-muted"><small>Пусто</small></div>`;
-            return arr.slice(0, 50).map(t => { // Limit 50 to avoid freeze
+            return arr.slice(0, 50).map(t => {
                 let badge = '';
                 if(type==='upcoming') badge = t.isToday ? `<span class="badge bg-success">Сегодня</span>` : `<span class="badge bg-primary">${t.date.toLocaleDateString('ru')}</span>`;
                 if(type==='problem') badge = t.type==='overdue' ? `<span class="badge bg-danger">Просрок</span>` : `<span class="badge bg-danger">Статус</span>`;
                 if(type==='cooling') badge = `<span class="badge bg-warning text-dark">${t.days===999?'Никогда':t.days+' дн.'}</span>`;
-                return `<div class="d-flex justify-content-between align-items-center border-bottom py-2">
-                    <div class="text-truncate" style="max-width:60%"><a href="dealer.html?id=${t.dealerId}" target="_blank" class="text-decoration-none fw-bold text-dark">${safeText(t.dealerName)}</a></div>
-                    <div>${badge}</div>
-                </div>`;
+                return `<div class="d-flex justify-content-between align-items-center border-bottom py-2"><div class="text-truncate" style="max-width:60%"><a href="dealer.html?id=${t.dealerId}" target="_blank" class="text-decoration-none fw-bold text-dark">${safeText(t.dealerName)}</a></div><div>${badge}</div></div>`;
             }).join('');
         };
 
@@ -241,24 +229,9 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="col-6"><div class="stat-card-modern"><div class="stat-icon-box ${noAvatar>0?'bg-danger-subtle text-danger':'bg-success-subtle text-success'}"><i class="bi bi-camera-fill"></i></div><div class="stat-info"><h3 class="${noAvatar>0?'text-danger':''}">${noAvatar}</h3><p>Без фото</p></div></div></div>
             <div class="col-12 mt-2"><div class="stat-card-modern d-block p-3"><h6 class="text-muted fw-bold small mb-3 text-uppercase">Структура базы</h6><div class="progress mb-3" style="height: 12px; border-radius: 6px;"><div class="progress-bar bg-success" style="width: ${pActive}%"></div><div class="progress-bar bg-warning" style="width: ${pStandard}%"></div><div class="progress-bar bg-danger" style="width: ${pProblem}%"></div><div class="progress-bar bg-primary" style="width: ${pPotential}%"></div></div><div class="d-flex justify-content-between text-center small"><div><span class="badge rounded-pill text-bg-success mb-1">${cActive}</span><br><span class="text-muted" style="font-size:0.75rem">VIP</span></div><div><span class="badge rounded-pill text-bg-warning mb-1">${cStandard}</span><br><span class="text-muted" style="font-size:0.75rem">Std</span></div><div><span class="badge rounded-pill text-bg-danger mb-1">${cProblem}</span><br><span class="text-muted" style="font-size:0.75rem">Prob</span></div><div><span class="badge rounded-pill text-bg-primary mb-1">${cPotential}</span><br><span class="text-muted" style="font-size:0.75rem">Pot</span></div></div></div></div>
             
-            <div class="col-md-4 mt-2">
-                <div class="stat-card-modern d-block p-3 h-100">
-                    <h6 class="text-danger fw-bold"><i class="bi bi-exclamation-circle-fill"></i> Проблемы (${tasksProblem.length})</h6>
-                    <div style="max-height:200px; overflow-y:auto;">${renderTList(tasksProblem, 'problem')}</div>
-                </div>
-            </div>
-            <div class="col-md-4 mt-2">
-                <div class="stat-card-modern d-block p-3 h-100">
-                    <h6 class="text-primary fw-bold"><i class="bi bi-calendar-check-fill"></i> План (${tasksUpcoming.length})</h6>
-                    <div style="max-height:200px; overflow-y:auto;">${renderTList(tasksUpcoming, 'upcoming')}</div>
-                </div>
-            </div>
-            <div class="col-md-4 mt-2">
-                <div class="stat-card-modern d-block p-3 h-100">
-                    <h6 class="text-warning fw-bold"><i class="bi bi-hourglass-split"></i> Давно не были (${tasksCooling.length})</h6>
-                    <div style="max-height:200px; overflow-y:auto;">${renderTList(tasksCooling, 'cooling')}</div>
-                </div>
-            </div>
+            <div class="col-md-4 mt-2"><div class="stat-card-modern d-block p-3 h-100"><h6 class="text-danger fw-bold"><i class="bi bi-exclamation-circle-fill"></i> Проблемы (${tasksProblem.length})</h6><div style="max-height:200px; overflow-y:auto;">${renderTList(tasksProblem, 'problem')}</div></div></div>
+            <div class="col-md-4 mt-2"><div class="stat-card-modern d-block p-3 h-100"><h6 class="text-primary fw-bold"><i class="bi bi-calendar-check-fill"></i> План (${tasksUpcoming.length})</h6><div style="max-height:200px; overflow-y:auto;">${renderTList(tasksUpcoming, 'upcoming')}</div></div></div>
+            <div class="col-md-4 mt-2"><div class="stat-card-modern d-block p-3 h-100"><h6 class="text-warning fw-bold"><i class="bi bi-hourglass-split"></i> Давно не были (${tasksCooling.length})</h6><div style="max-height:200px; overflow-y:auto;">${renderTList(tasksCooling, 'cooling')}</div></div></div>
         `;
     }
 
@@ -282,7 +255,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const btnLogout = getEl('logout-btn'); if(btnLogout) btnLogout.onclick = (e) => { e.preventDefault(); const x = new XMLHttpRequest(); x.open("GET", "/?x="+Math.random(), true, "logout", "logout"); x.onreadystatechange=()=>window.location.reload(); x.send(); };
     
-    // --- UPDATED STATUS LIST (5 COLUMNS FIX) ---
+    // --- STATUS LIST FIXED (5 COLS) ---
     if(getEl('btn-manage-statuses')) getEl('btn-manage-statuses').onclick = () => {
         const m = new bootstrap.Modal(getEl('status-manager-modal'));
         const list = getEl('status-manager-list');
@@ -304,7 +277,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sForm = getEl('status-form'); 
     if(sForm) sForm.onsubmit = async (e) => { 
         e.preventDefault(); 
-        const val = getVal('st_value') || 'st_'+Math.random().toString(36).substr(2,5); // Use Custom ID if provided
+        const val = getVal('st_value') || 'st_'+Math.random().toString(36).substr(2,5); 
         const body = { 
             label: getVal('st_label'), 
             value: val,
@@ -324,7 +297,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const s = state.statusList.find(x => x.id === id); if(!s) return;
         getEl('st_id').value = s.id;
         getEl('st_label').value = s.label;
-        getEl('st_value').value = s.value; // Populate Custom ID
+        getEl('st_value').value = s.value; 
         getEl('st_color').value = s.color;
         getEl('st_visible').checked = s.isVisible !== false;
         
