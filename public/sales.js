@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     const API_DEALERS_URL = '/api/dealers';
     const API_SALES_URL = '/api/sales';
-    const API_AUTH_ME = '/api/auth/me';
+    const API_AUTH_ME = '/api/auth/me'; 
 
     const container = document.getElementById('sales-container');
     const totalStatsContainer = document.getElementById('total-stats-container');
