@@ -7,12 +7,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const API_PRODUCTS_URL = '/api/products'; 
     const API_COMPETITORS_REF_URL = '/api/competitors-ref';
     const API_STATUSES_URL = '/api/statuses';
-    const API_TASKS_URL = '/api/tasks'; // Для дашборда
+    const API_TASKS_URL = '/api/tasks';
+    const API_SALES_URL = '/api/sales'; // Вернули URL продаж
 
     let fullProductCatalog = [];
     let competitorsRef = []; 
     let allDealers = [];
     let statusList = []; 
+    let currentMonthSales = []; // Вернули массив продаж
     
     let currentSort = { column: 'name', direction: 'asc' };
     let isSaving = false; 
@@ -49,7 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const filterCity = document.getElementById('filter-city'); const filterPriceType = document.getElementById('filter-price-type'); const filterStatus = document.getElementById('filter-status'); const filterResponsible = document.getElementById('filter-responsible'); const searchBar = document.getElementById('search-bar'); 
     
-    // EXPORT BUTTONS (ИСПРАВЛЕНО: Теперь они работают)
+    // EXPORT BUTTONS
     const btnExportDealers = document.getElementById('export-dealers-btn');
     const btnExportCompetitors = document.getElementById('export-competitors-prices-btn');
 
@@ -115,7 +117,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // 4. LISTENERS
     // ==========================================
 
-    // Фильтры
     if(filterCity) filterCity.onchange = renderDealerList; 
     if(filterPriceType) filterPriceType.onchange = renderDealerList; 
     if(filterStatus) filterStatus.onchange = renderDealerList; 
@@ -155,7 +156,6 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    // Кнопки "+" в списках
     const setupListBtn = (id, list, genFunc) => { const btn = document.getElementById(id); if(btn) btn.onclick = () => list.insertAdjacentHTML('beforeend', genFunc()); };
     setupListBtn('add-contact-btn-add-modal', addContactList, createContactEntryHTML); setupListBtn('add-address-btn-add-modal', addAddressList, createAddressEntryHTML); setupListBtn('add-pos-btn-add-modal', addPosList, createPosEntryHTML); setupListBtn('add-visits-btn-add-modal', addVisitsList, createVisitEntryHTML); setupListBtn('add-competitor-btn-add-modal', addCompetitorList, createCompetitorEntryHTML);
     setupListBtn('add-contact-btn-edit-modal', editContactList, createContactEntryHTML); setupListBtn('add-address-btn-edit-modal', editAddressList, createAddressEntryHTML); setupListBtn('add-pos-btn-edit-modal', editPosList, createPosEntryHTML); setupListBtn('add-visits-btn-edit-modal', editVisitsList, createVisitEntryHTML); setupListBtn('add-competitor-btn-edit-modal', editCompetitorList, createCompetitorEntryHTML);
@@ -163,7 +163,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if(btnAddOrgAdd) btnAddOrgAdd.onclick = () => addOrgList.insertAdjacentHTML('beforeend', createOrgInputHTML());
     if(btnEditOrgAdd) btnEditOrgAdd.onclick = () => editOrgList.insertAdjacentHTML('beforeend', createOrgInputHTML());
 
-    // Фото
     if(addAvatarInput) addAvatarInput.addEventListener('change', async (e) => { const file = e.target.files[0]; if (file) { newAvatarBase64 = await compressImage(file, 800, 0.8); addAvatarPreview.src = newAvatarBase64; addAvatarPreview.style.display='block'; } });
     if(editAvatarInput) editAvatarInput.addEventListener('change', async (e) => { const file = e.target.files[0]; if (file) { newAvatarBase64 = await compressImage(file, 800, 0.8); editAvatarPreview.src = newAvatarBase64; editAvatarPreview.style.display='block'; } });
     if(addPhotoInput) addPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) addPhotosData.push({ photo_url: await compressImage(file, 1000, 0.7) }); renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData); addPhotoInput.value = ''; });
@@ -171,7 +170,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if(editPhotoInput) editPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) editPhotosData.push({ photo_url: await compressImage(file, 1000, 0.7) }); renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData); editPhotoInput.value = ''; });
     if(editPhotoPreviewContainer) editPhotoPreviewContainer.addEventListener('click', (e) => { const btn = e.target.closest('.btn-remove-photo'); if(btn) { editPhotosData.splice(btn.dataset.index, 1); renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData); } });
 
-    // Кнопки действий
     const logoutBtn = document.getElementById('logout-btn'); if (logoutBtn) { logoutBtn.onclick = () => { const url = window.location.protocol + "//" + "logout:logout@" + window.location.host + window.location.pathname; window.location.href = url; }; }
     
     if(document.body) { document.body.addEventListener('click', (e) => { const taskBtn = e.target.closest('.btn-complete-task'); if (taskBtn) { taskBtn.disabled = true; taskBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; completeTask(taskBtn, taskBtn.dataset.id, taskBtn.dataset.index); } }); }
@@ -287,9 +285,12 @@ document.addEventListener('DOMContentLoaded', () => {
         updatePosDatalist(); 
         try { const compRes = await fetch(API_COMPETITORS_REF_URL); if (compRes.ok) { competitorsRef = await compRes.json(); updateBrandsDatalist(); } } catch(e){}
         try { 
-            const response = await fetch(API_DEALERS_URL); 
-            if (!response.ok) throw new Error(response.statusText); 
-            allDealers = await response.json(); 
+            // ЗАГРУЖАЕМ И ДИЛЕРОВ, И ЗАДАЧИ, И ПРОДАЖИ (для цветных бейджиков)
+            await Promise.all([
+                fetchDealers(),
+                fetchTasks(),
+                fetchCurrentMonthSales() // <-- ВОТ ОНО
+            ]);
             populateFilters(allDealers); 
             renderDashboard(); 
             renderDealerList(); 
@@ -297,6 +298,18 @@ document.addEventListener('DOMContentLoaded', () => {
             if(dealerGrid) dealerGrid.innerHTML = `<div class="col-12"><div class="alert alert-danger text-center">Ошибка загрузки: ${error.message}</div></div>`; 
         }
         const pendingId = localStorage.getItem('pendingEditDealerId'); if (pendingId) { localStorage.removeItem('pendingEditDealerId'); openEditModal(pendingId); }
+    }
+
+    async function fetchDealers() { const response = await fetch(API_DEALERS_URL); if (!response.ok) throw new Error(response.statusText); allDealers = await response.json(); }
+    async function fetchTasks() { try { const response = await fetch(API_TASKS_URL); if(response.ok) allTasksData = await response.json(); } catch(e) { console.error("Tasks Error", e); } }
+    
+    // --- НОВАЯ ФУНКЦИЯ ДЛЯ БЕЙДЖЕЙ ПРОДАЖ ---
+    async function fetchCurrentMonthSales() {
+        const month = new Date().toISOString().slice(0, 7); 
+        try { 
+            const r = await fetch(`${API_SALES_URL}?month=${month}`); 
+            if(r.ok) currentMonthSales = await r.json(); 
+        } catch(e) { console.error(e); }
     }
 
     // --- STATUS LOGIC ---
@@ -406,9 +419,39 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const today = new Date(); today.setHours(0,0,0,0); const coolingLimit = new Date(today.getTime() - (15 * 24 * 60 * 60 * 1000));
         const tasksUpcoming = [], tasksProblem = [], tasksCooling = [];
-        allDealers.forEach(d => { if (d.status === 'archive') return; const isPotential = d.status === 'potential'; let lastVisitDate = null; let hasFutureTasks = false; if (d.visits && Array.isArray(d.visits)) { d.visits.forEach((v, index) => { const vDate = new Date(v.date); if (!v.date) return; vDate.setHours(0,0,0,0); if (v.isCompleted && (!lastVisitDate || vDate > lastVisitDate)) lastVisitDate = vDate; if (!v.isCompleted) { const taskData = { dealerName: d.name, dealerId: d.id, date: vDate, comment: v.comment || "Без комментария", visitIndex: index }; if (vDate < today) tasksProblem.push({...taskData, type: 'overdue'}); else { tasksUpcoming.push({...taskData, isToday: vDate.getTime() === today.getTime()}); hasFutureTasks = true; } } }); } if (d.status === 'problem') { if (!tasksProblem.some(t => t.dealerId === d.id && t.type === 'overdue')) tasksProblem.push({ dealerName: d.name, dealerId: d.id, type: 'status', comment: 'Статус: Проблемный' }); } if (!hasFutureTasks && d.status !== 'problem' && !isPotential) { if (!lastVisitDate) tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: 999 }); else if (lastVisitDate < coolingLimit) { const days = Math.floor((today - lastVisitDate) / (1000 * 60 * 60 * 24)); tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: days }); } } });
-        tasksUpcoming.sort((a, b) => a.date - b.date); tasksProblem.sort((a, b) => (a.date || 0) - (b.date || 0)); tasksCooling.sort((a, b) => b.days - a.days);
-        renderTaskList(document.getElementById('tasks-list-upcoming'), tasksUpcoming, 'upcoming'); renderTaskList(document.getElementById('tasks-list-problem'), tasksProblem, 'problem'); renderTaskList(document.getElementById('tasks-list-cooling'), tasksCooling, 'cooling');
+        
+        // ВНИМАНИЕ: Здесь список задач берется из allTasksData (который теперь загружается)
+        allTasksData.forEach(d => { 
+            if (d.status === 'archive') return; 
+            const isPotential = d.status === 'potential'; 
+            let lastVisitDate = null; 
+            let hasFutureTasks = false; 
+            
+            if (d.visits && Array.isArray(d.visits)) { 
+                d.visits.forEach((v, index) => { 
+                    const vDate = new Date(v.date); if (!v.date) return; vDate.setHours(0,0,0,0); 
+                    if (v.isCompleted && (!lastVisitDate || vDate > lastVisitDate)) lastVisitDate = vDate; 
+                    if (!v.isCompleted) { 
+                        const taskData = { dealerName: d.name, dealerId: d.id, date: vDate, comment: v.comment || "Без комментария", visitIndex: index }; 
+                        if (vDate < today) tasksProblem.push({...taskData, type: 'overdue'}); 
+                        else { tasksUpcoming.push({...taskData, isToday: vDate.getTime() === today.getTime()}); hasFutureTasks = true; } 
+                    } 
+                }); 
+            } 
+            if (d.status === 'problem') { if (!tasksProblem.some(t => t.dealerId === d.id && t.type === 'overdue')) tasksProblem.push({ dealerName: d.name, dealerId: d.id, type: 'status', comment: 'Статус: Проблемный' }); } 
+            if (!hasFutureTasks && d.status !== 'problem' && !isPotential) { 
+                if (!lastVisitDate) tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: 999 }); 
+                else if (lastVisitDate < coolingLimit) { const days = Math.floor((today - lastVisitDate) / (1000 * 60 * 60 * 24)); tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: days }); } 
+            } 
+        });
+        
+        tasksUpcoming.sort((a, b) => a.date - b.date); 
+        tasksProblem.sort((a, b) => (a.date || 0) - (b.date || 0)); 
+        tasksCooling.sort((a, b) => b.days - a.days);
+        
+        renderTaskList(document.getElementById('tasks-list-upcoming'), tasksUpcoming, 'upcoming'); 
+        renderTaskList(document.getElementById('tasks-list-problem'), tasksProblem, 'problem'); 
+        renderTaskList(document.getElementById('tasks-list-cooling'), tasksCooling, 'cooling');
     }
 
     function renderTaskList(container, tasks, type) { if (!container) return; if (tasks.length === 0) { const msg = type === 'cooling' ? 'Все посещены недавно' : 'Задач нет'; container.innerHTML = `<div class="text-center py-4 text-muted"><i class="bi bi-check-circle display-6 d-block mb-2 text-success opacity-50"></i><small>${msg}</small></div>`; return; } container.innerHTML = tasks.map(t => { let badgeHtml = ''; let metaHtml = ''; if (type === 'upcoming') { const dateStr = t.date.toLocaleDateString('ru-RU', {day:'numeric', month:'short'}); badgeHtml = t.isToday ? `<span class="task-badge tb-today mt-1 d-inline-block">Сегодня</span>` : `<span class="task-badge tb-future mt-1 d-inline-block">${dateStr}</span>`; metaHtml = `<span class="text-muted small">${safeText(t.comment)}</span>`; } else if (type === 'problem') { if (t.type === 'overdue') { const dateStr = t.date.toLocaleDateString('ru-RU'); badgeHtml = `<span class="task-badge tb-overdue mt-1 d-inline-block">Просрок: ${dateStr}</span>`; metaHtml = `<span class="text-danger small fw-bold">${safeText(t.comment)}</span>`; } else { badgeHtml = `<span class="task-badge tb-overdue mt-1 d-inline-block">Проблема</span>`; metaHtml = `<span class="small text-muted">Внимание!</span>`; } } else if (type === 'cooling') { const daysStr = t.days === 999 ? 'Никогда' : `${t.days} дн.`; badgeHtml = `<span class="task-badge tb-cooling mt-1 d-inline-block">Без визитов: ${daysStr}</span>`; metaHtml = `<span class="text-muted small">Пора навестить</span>`; } const showCheckBtn = (type === 'upcoming' || (type === 'problem' && t.type === 'overdue')); const btnHtml = showCheckBtn ? `<button class="btn-task-check btn-complete-task" data-id="${t.dealerId}" data-index="${t.visitIndex}" title="Выполнить"><i class="bi bi-check-lg"></i></button>` : ''; return `<div class="task-item-modern align-items-start"><div class="task-content"><a href="dealer.html?id=${t.dealerId}" target="_blank" class="task-title text-truncate d-block" style="max-width: 200px;">${safeText(t.dealerName)}</a>${badgeHtml}<div class="mt-1">${metaHtml}</div></div><div class="mt-1">${btnHtml}</div></div>`; }).join(''); }
@@ -424,6 +467,14 @@ document.addEventListener('DOMContentLoaded', () => {
         filtered.sort((a, b) => { let valA = (a[currentSort.column] || '').toString(); let valB = (b[currentSort.column] || '').toString(); let res = currentSort.column === 'dealer_id' ? valA.localeCompare(valB, undefined, {numeric:true}) : valA.toLowerCase().localeCompare(valB.toLowerCase(), 'ru'); return currentSort.direction === 'asc' ? res : -res; });
         if (filtered.length === 0) { dealerGrid.innerHTML = ` <div class="empty-state"><i class="bi bi-search empty-state-icon"></i><h5 class="text-muted">Ничего не найдено</h5><p class="text-secondary small mb-3">Попробуйте изменить фильтры</p><button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('search-bar').value=''; document.getElementById('filter-city').value=''; document.getElementById('filter-status').value=''; renderDealerList()">Сбросить фильтры</button></div>`; return; }
         
+        // 1. ПОДГОТОВКА ДАННЫХ ПРОДАЖ (для бейджей)
+        const salesMap = {};
+        if(currentMonthSales && currentMonthSales.length > 0) {
+            currentMonthSales.forEach(s => {
+                if(s.dealerId) salesMap[s.dealerId] = (salesMap[s.dealerId] || 0) + (s.fact || 0);
+            });
+        }
+
         dealerGrid.innerHTML = filtered.map(d => {
             const statusObj = statusList.find(s => s.value === (d.status || 'standard')) || { label: d.status, color: '#6c757d' };
             const statusStyle = `background-color: ${statusObj.color}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 500;`;
@@ -432,99 +483,36 @@ document.addEventListener('DOMContentLoaded', () => {
             let instaBtn = ''; if (d.instagram) { let url = d.instagram.trim(); if (!url.startsWith('http')) { if (url.startsWith('@')) url = 'https://instagram.com/' + url.substring(1); else url = 'https://instagram.com/' + url; } instaBtn = `<a href="${url}" target="_blank" class="btn-circle btn-circle-insta" onclick="event.stopPropagation()" title="Instagram"><i class="bi bi-instagram"></i></a>`; }
             const avatarHtml = d.photo_url ? `<img src="${d.photo_url}" alt="${d.name}">` : `<i class="bi bi-shop"></i>`;
             const editBtn = (currentUserRole !== 'guest') ? `<button class="btn-circle" onclick="event.stopPropagation(); openEditModal('${d.id}')" title="Редактировать"><i class="bi bi-pencil"></i></button>` : '';
-            return `<div class="dealer-item" onclick="window.open('dealer.html?id=${d.id}', '_blank')"><div class="dealer-avatar-box">${avatarHtml}</div><div class="dealer-content"><div class="d-flex align-items-center gap-2 mb-1"><a href="dealer.html?id=${d.id}" class="dealer-name" target="_blank">${safeText(d.name)}</a><span style="${statusStyle}">${statusObj.label}</span></div><div class="dealer-meta"><span><i class="bi bi-hash"></i>${safeText(d.dealer_id)}</span><span><i class="bi bi-geo-alt"></i>${safeText(d.city)}</span>${d.price_type ? `<span><i class="bi bi-tag"></i>${safeText(d.price_type)}</span>` : ''}</div></div><div class="dealer-actions">${instaBtn} ${waBtn} ${phoneBtn} ${mapBtn} ${editBtn}</div></div>`;
+            
+            // 2. ЛОГИКА ЦВЕТА ПРОДАЖ
+            const salesFact = salesMap[d.id] || 0;
+            let salesColorClass = 'bg-danger'; 
+            if (salesFact >= 200) salesColorClass = 'bg-success'; 
+            else if (salesFact >= 100) salesColorClass = 'bg-warning text-dark'; 
+            
+            // 3. ФОРМИРОВАНИЕ БЕЙДЖИКА
+            const salesBadge = `<span class="badge ${salesColorClass} rounded-pill ms-2" title="Продажи за текущий месяц">${salesFact.toFixed(2)} м²</span>`;
+
+            return `<div class="dealer-item" onclick="window.open('dealer.html?id=${d.id}', '_blank')"><div class="dealer-avatar-box">${avatarHtml}</div><div class="dealer-content"><div class="d-flex align-items-center gap-2 mb-1"><a href="dealer.html?id=${d.id}" class="dealer-name" target="_blank">${safeText(d.name)}</a><span style="${statusStyle}">${statusObj.label}</span></div><div class="dealer-meta"><span><i class="bi bi-hash"></i>${safeText(d.dealer_id)}</span><span><i class="bi bi-geo-alt"></i>${safeText(d.city)}</span>${d.price_type ? `<span><i class="bi bi-tag"></i>${safeText(d.price_type)}</span>` : ''}${salesBadge}</div></div><div class="dealer-actions">${instaBtn} ${waBtn} ${phoneBtn} ${mapBtn} ${editBtn}</div></div>`;
         }).join('');
     }
 
     if(addModalEl) { addModalEl.addEventListener('shown.bs.modal', () => { if (refreshAddMap) refreshAddMap(); }); }
     if(editModalEl) { const tabMapBtn = document.querySelector('button[data-bs-target="#tab-map"]'); if(tabMapBtn) { tabMapBtn.addEventListener('shown.bs.tab', () => { if (refreshEditMap) refreshEditMap(); }); } }
-    
-    // ==========================================
-    // ADD DEALER SUBMIT (ОБНОВЛЕННАЯ ЛОГИКА)
-    // ==========================================
     if(openAddModalBtn) openAddModalBtn.onclick = () => { if(addForm) addForm.reset(); populateStatusSelects(); renderProductChecklist(addProductChecklist); renderList(addContactList, [], createContactEntryHTML); renderList(addAddressList, [], createAddressEntryHTML); renderList(addPosList, [], createPosEntryHTML); renderList(addVisitsList, [], createVisitEntryHTML); renderList(addCompetitorList, [], createCompetitorEntryHTML); if(document.getElementById('add_latitude')) { document.getElementById('add_latitude').value = ''; document.getElementById('add_longitude').value = ''; } addPhotosData = []; renderPhotoPreviews(addPhotoPreviewContainer, []); if(addAvatarPreview) { addAvatarPreview.src = ''; addAvatarPreview.style.display='none'; } newAvatarBase64 = null; 
-        
-        // Сброс списка организаций
-        document.getElementById('add-org-list').innerHTML = '';
-        addOrgList.insertAdjacentHTML('beforeend', createOrgInputHTML());
-        // Сброс договора
-        document.getElementById('add_contract_signed').checked = false;
-        document.getElementById('add_contract_date').value = '';
-        // Сброс сектора
+        document.getElementById('add-org-list').innerHTML = ''; addOrgList.insertAdjacentHTML('beforeend', createOrgInputHTML());
+        document.getElementById('add_contract_signed').checked = false; document.getElementById('add_contract_date').value = '';
         toggleSectorSelect('add', '');
-        
         addModal.show(); 
     };
-
-    if(addForm) addForm.addEventListener('submit', async (e) => { e.preventDefault(); if (isSaving) return; isSaving = true; const btn = document.getElementById('btn-finish-step'); const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; 
-        
-        const data = { 
-            dealer_id: getVal('dealer_id'), 
-            name: getVal('name'), 
-            // МНОЖЕСТВЕННЫЕ ОРГАНИЗАЦИИ
-            organizations: collectOrgs(document.getElementById('add-org-list')), 
-            price_type: getVal('price_type'), 
-            city: getVal('city'), 
-            address: getVal('address'), 
-            delivery: getVal('delivery'), 
-            website: getVal('website'), 
-            instagram: getVal('instagram'), 
-            latitude: getVal('add_latitude'), 
-            longitude: getVal('add_longitude'), 
-            bonuses: getVal('bonuses'), 
-            status: getVal('status'), 
-            responsible: document.getElementById('responsible').value, 
-            // НОВЫЕ ПОЛЯ
-            region_sector: document.getElementById('add_region_sector').value,
-            contract: { isSigned: document.getElementById('add_contract_signed').checked, date: getVal('add_contract_date') },
-            
-            contacts: collectData(addContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]), 
-            additional_addresses: collectData(addAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]), 
-            pos_materials: collectData(addPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]), 
-            visits: collectData(addVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'}]), 
-            photos: addPhotosData, 
-            avatarUrl: newAvatarBase64, 
-            competitors: collectData(addCompetitorList, '.competitor-entry', [{key:'brand',class:'.competitor-brand'},{key:'collection',class:'.competitor-collection'},{key:'price_opt',class:'.competitor-price-opt'},{key:'price_retail',class:'.competitor-price-retail'}]) 
-        }; 
-        try { const res = await fetch(API_DEALERS_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); if (!res.ok) throw new Error(await res.text()); const newD = await res.json(); const pIds = getSelectedProductIds('add-product-checklist'); if(pIds.length) await saveProducts(newD.id, pIds); addModal.hide(); window.showToast("Дилер добавлен!"); initApp(); } catch (e) { window.showToast("Ошибка сохранения", "error"); } finally { isSaving = false; btn.disabled = false; btn.innerHTML = oldText; } });
-    
-    // ==========================================
-    // EDIT DEALER SUBMIT (ОБНОВЛЕННАЯ ЛОГИКА)
-    // ==========================================
-    if(editForm) editForm.addEventListener('submit', async (e) => { e.preventDefault(); if (isSaving) return; isSaving = true; const btn = document.querySelector('button[form="edit-dealer-form"]'); const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; const id = document.getElementById('edit_db_id').value; let avatarToSend = getVal('edit-current-avatar-url'); if (newAvatarBase64) avatarToSend = newAvatarBase64; 
-        const data = { 
-            dealer_id: getVal('edit_dealer_id'), 
-            name: getVal('edit_name'), 
-            // МНОЖЕСТВЕННЫЕ ОРГАНИЗАЦИИ
-            organizations: collectOrgs(document.getElementById('edit-org-list')), 
-            price_type: getVal('edit_price_type'), 
-            city: getVal('edit_city'), 
-            address: getVal('edit_address'), 
-            delivery: getVal('edit_delivery'), 
-            website: getVal('edit_website'), 
-            instagram: getVal('edit_instagram'), 
-            latitude: getVal('edit_latitude'), 
-            longitude: getVal('edit_longitude'), 
-            bonuses: getVal('edit_bonuses'), 
-            status: getVal('edit_status'), 
-            responsible: document.getElementById('edit_responsible').value, 
-            // НОВЫЕ ПОЛЯ
-            region_sector: document.getElementById('edit_region_sector').value,
-            contract: { isSigned: document.getElementById('edit_contract_signed').checked, date: getVal('edit_contract_date') },
-            
-            avatarUrl: avatarToSend, 
-            contacts: collectData(editContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]), 
-            additional_addresses: collectData(editAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]), 
-            pos_materials: collectData(editPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]), 
-            visits: collectData(editVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'},{key:'isCompleted',class:'.visit-completed'}]), 
-            photos: editPhotosData, 
-            competitors: collectData(editCompetitorList, '.competitor-entry', [{key:'brand',class:'.competitor-brand'},{key:'collection',class:'.competitor-collection'},{key:'price_opt',class:'.competitor-price-opt'},{key:'price_retail',class:'.competitor-price-retail'}]) 
-        }; 
-        try { await fetch(`${API_DEALERS_URL}/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); await saveProducts(id, getSelectedProductIds('edit-product-checklist')); editModal.hide(); window.showToast("Изменения сохранены!"); initApp(); } catch (e) { window.showToast("Ошибка сохранения", "error"); } finally { isSaving = false; if(btn) { btn.disabled = false; btn.innerHTML = oldText; } } });
-    
-    if(qvForm) qvForm.addEventListener('submit', async (e) => { e.preventDefault(); if (isSaving) return; isSaving = true; const id = document.getElementById('qv_dealer_id').value; const comment = document.getElementById('qv_comment').value; const btn = qvForm.querySelector('button'); if(!id || !comment) { isSaving = false; return; } try { btn.disabled = true; const getRes = await fetch(`${API_DEALERS_URL}/${id}`); const dealer = await getRes.json(); const newVisit = { date: new Date().toISOString().slice(0,10), comment: comment, isCompleted: true }; const visits = [...(dealer.visits || []), newVisit]; await fetch(`${API_DEALERS_URL}/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ visits }) }); qvModal.hide(); alert("Визит добавлен!"); } catch(e) { alert("Ошибка"); } finally { isSaving = false; btn.disabled = false; } });
-
     let currentStep = 1; const totalSteps = 4; const prevBtn = document.getElementById('btn-prev-step'); const nextBtn = document.getElementById('btn-next-step'); const finishBtn = document.getElementById('btn-finish-step'); function showStep(step) { document.querySelectorAll('.wizard-step').forEach(s => s.classList.remove('active')); document.querySelectorAll('.step-circle').forEach(i => i.classList.remove('active')); const stepEl = document.getElementById(`step-${step}`); if(stepEl) stepEl.classList.add('active'); for (let i = 1; i <= totalSteps; i++) { const ind = document.getElementById(`step-ind-${i}`); if(!ind) continue; if (i < step) { ind.classList.add('completed'); ind.innerHTML = '✔'; } else { ind.classList.remove('completed'); ind.innerHTML = i; if (i === step) ind.classList.add('active'); else ind.classList.remove('active'); } } if (prevBtn) prevBtn.style.display = step === 1 ? 'none' : 'inline-block'; if (nextBtn && finishBtn) { if (step === totalSteps) { nextBtn.style.display = 'none'; finishBtn.style.display = 'inline-block'; } else { nextBtn.style.display = 'inline-block'; finishBtn.style.display = 'none'; } } } if(nextBtn) nextBtn.onclick = () => { if (currentStep === 1) { if (!document.getElementById('dealer_id').value || !document.getElementById('name').value) { window.showToast("Заполните ID и Название", "error"); return; } if (refreshAddMap) refreshAddMap(); } if (currentStep < totalSteps) { currentStep++; showStep(currentStep); } }; if(prevBtn) prevBtn.onclick = () => { if (currentStep > 1) { currentStep--; showStep(currentStep); } };
+    if(addForm) addForm.addEventListener('submit', async (e) => { e.preventDefault(); if (isSaving) return; isSaving = true; const btn = document.getElementById('btn-finish-step'); const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; 
+        const data = { dealer_id: getVal('dealer_id'), name: getVal('name'), organizations: collectOrgs(document.getElementById('add-org-list')), price_type: getVal('price_type'), city: getVal('city'), address: getVal('address'), delivery: getVal('delivery'), website: getVal('website'), instagram: getVal('instagram'), latitude: getVal('add_latitude'), longitude: getVal('add_longitude'), bonuses: getVal('bonuses'), status: getVal('status'), responsible: document.getElementById('responsible').value, region_sector: document.getElementById('add_region_sector').value, contract: { isSigned: document.getElementById('add_contract_signed').checked, date: getVal('add_contract_date') }, contacts: collectData(addContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]), additional_addresses: collectData(addAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]), pos_materials: collectData(addPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]), visits: collectData(addVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'}]), photos: addPhotosData, avatarUrl: newAvatarBase64, competitors: collectData(addCompetitorList, '.competitor-entry', [{key:'brand',class:'.competitor-brand'},{key:'collection',class:'.competitor-collection'},{key:'price_opt',class:'.competitor-price-opt'},{key:'price_retail',class:'.competitor-price-retail'}]) }; 
+        try { const res = await fetch(API_DEALERS_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); if (!res.ok) throw new Error(await res.text()); const newD = await res.json(); const pIds = getSelectedProductIds('add-product-checklist'); if(pIds.length) await saveProducts(newD.id, pIds); addModal.hide(); window.showToast("Дилер добавлен!"); initApp(); } catch (e) { window.showToast("Ошибка сохранения", "error"); } finally { isSaving = false; btn.disabled = false; btn.innerHTML = oldText; } });
+    if(editForm) editForm.addEventListener('submit', async (e) => { e.preventDefault(); if (isSaving) return; isSaving = true; const btn = document.querySelector('button[form="edit-dealer-form"]'); const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; const id = document.getElementById('edit_db_id').value; let avatarToSend = getVal('edit-current-avatar-url'); if (newAvatarBase64) avatarToSend = newAvatarBase64; 
+        const data = { dealer_id: getVal('edit_dealer_id'), name: getVal('edit_name'), organizations: collectOrgs(document.getElementById('edit-org-list')), price_type: getVal('edit_price_type'), city: getVal('edit_city'), address: getVal('edit_address'), delivery: getVal('edit_delivery'), website: getVal('edit_website'), instagram: getVal('edit_instagram'), latitude: getVal('edit_latitude'), longitude: getVal('edit_longitude'), bonuses: getVal('edit_bonuses'), status: getVal('edit_status'), responsible: document.getElementById('edit_responsible').value, region_sector: document.getElementById('edit_region_sector').value, contract: { isSigned: document.getElementById('edit_contract_signed').checked, date: getVal('edit_contract_date') }, avatarUrl: avatarToSend, contacts: collectData(editContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]), additional_addresses: collectData(editAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]), pos_materials: collectData(editPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]), visits: collectData(editVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'},{key:'isCompleted',class:'.visit-completed'}]), photos: editPhotosData, competitors: collectData(editCompetitorList, '.competitor-entry', [{key:'brand',class:'.competitor-brand'},{key:'collection',class:'.competitor-collection'},{key:'price_opt',class:'.competitor-price-opt'},{key:'price_retail',class:'.competitor-price-retail'}]) }; 
+        try { await fetch(`${API_DEALERS_URL}/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); await saveProducts(id, getSelectedProductIds('edit-product-checklist')); editModal.hide(); window.showToast("Изменения сохранены!"); initApp(); } catch (e) { window.showToast("Ошибка сохранения", "error"); } finally { isSaving = false; if(btn) { btn.disabled = false; btn.innerHTML = oldText; } } });
+    if(qvForm) qvForm.addEventListener('submit', async (e) => { e.preventDefault(); if (isSaving) return; isSaving = true; const id = document.getElementById('qv_dealer_id').value; const comment = document.getElementById('qv_comment').value; const btn = qvForm.querySelector('button'); if(!id || !comment) { isSaving = false; return; } try { btn.disabled = true; const getRes = await fetch(`${API_DEALERS_URL}/${id}`); const dealer = await getRes.json(); const newVisit = { date: new Date().toISOString().slice(0,10), comment: comment, isCompleted: true }; const visits = [...(dealer.visits || []), newVisit]; await fetch(`${API_DEALERS_URL}/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ visits }) }); qvModal.hide(); alert("Визит добавлен!"); } catch(e) { alert("Ошибка"); } finally { isSaving = false; btn.disabled = false; } });
 
     initApp();
 });
