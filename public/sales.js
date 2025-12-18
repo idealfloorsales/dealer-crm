@@ -13,10 +13,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Set Month
     const now = new Date();
-    const currentMonthStr = now.toISOString().slice(0, 7);
-    monthPicker.value = currentMonthStr;
+    monthPicker.value = now.toISOString().slice(0, 7);
 
-    // Groups (Визуальный порядок блоков)
+    // Группы отображения
     const inputGroups = [
         { key: 'regional_astana', title: 'Региональный Астана' },
         { key: 'north', title: 'Регион Север' },
@@ -38,23 +37,20 @@ document.addEventListener('DOMContentLoaded', () => {
             if (authRes.ok) {
                 const authData = await authRes.json();
                 currentUserRole = authData.role;
-                const badge = document.getElementById('user-role-badge');
-                if(badge) {
-                    const names = { 'admin': 'Админ', 'astana': 'Астана', 'regions': 'Регионы', 'guest': 'Гость' };
-                    badge.textContent = names[currentUserRole] || currentUserRole;
-                }
                 if (currentUserRole === 'guest') {
-                    saveBtn.disabled = true;
-                    saveBtn.innerHTML = '<i class="bi bi-lock"></i> Только чтение';
+                    if(saveBtn) {
+                        saveBtn.disabled = true;
+                        saveBtn.innerHTML = '<i class="bi bi-lock"></i> Только чтение';
+                    }
                 }
             }
         } catch (e) {}
-
         loadData();
     }
 
     async function loadData() {
         try {
+            container.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div></div>';
             const month = monthPicker.value;
             const [dealersRes, salesRes] = await Promise.all([
                 fetch(API_DEALERS),
@@ -63,15 +59,17 @@ document.addEventListener('DOMContentLoaded', () => {
             allDealers = await dealersRes.json();
             currentSales = await salesRes.json();
             renderAll();
-        } catch (e) { alert('Ошибка загрузки данных: ' + e.message); }
+        } catch (e) { 
+            container.innerHTML = `<div class="alert alert-danger">Ошибка: ${e.message}</div>`;
+        }
     }
 
-    // --- LOGIC ---
+    // --- LOGIC: ГРУППИРОВКА ---
     function getDealerGroup(d) {
-        // 1. Астана всегда отдельно
+        // 1. Астана
         if (d.responsible === 'regional_astana') return 'regional_astana';
         
-        // 2. Регионы делим по Секторам
+        // 2. Регионы (смотрим поле region_sector)
         if (d.responsible === 'regional_regions') {
             const sec = (d.region_sector || '').toLowerCase().trim();
             if (sec === 'север') return 'north';
@@ -79,20 +77,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (sec === 'запад') return 'west';
             if (sec === 'восток') return 'east';
             if (sec === 'центр') return 'center';
-            return 'other'; // Если сектор не указан
+            return 'other'; 
         }
-
-        // 3. Остальные
         return 'other';
-    }
-
-    function getMajorKey(dealerName) {
-        if (!dealerName) return null;
-        const lowerName = dealerName.toLowerCase();
-        // Логика отделения VIP-клиентов
-        if (lowerName.includes("мир ламината")) return "mir_laminata";
-        if (lowerName.includes("12 месяцев") && lowerName.includes("алаш")) return "twelve_months";
-        return null;
     }
 
     function fmt(num) {
@@ -103,10 +90,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function calculateKPI(plan, fact, daysInMonth, currentDay) {
         plan = parseFloat(plan) || 0;
         fact = parseFloat(fact) || 0;
-        
         let forecast = 0;
         if (currentDay > 0) forecast = (fact / currentDay) * daysInMonth;
-        
         const percent = plan > 0 ? (fact / plan) * 100 : 0;
         return { diff: fact - plan, forecast, percent };
     }
@@ -119,8 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const isCustom = row.dataset.custom === 'true';
             const group = row.closest('.region-card').dataset.group;
             
-            const rawVal = inp.value.replace(',', '.');
-            const val = parseFloat(rawVal) || 0;
+            const val = parseFloat(inp.value.replace(',', '.')) || 0;
 
             let record = currentSales.find(s => 
                 (isCustom && s.isCustom && s.dealerName === dealerName) || 
@@ -136,8 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         document.querySelectorAll('.plan-input').forEach(inp => {
             const planKey = inp.dataset.planKey;
-            const rawVal = inp.value.replace(',', '.');
-            const val = parseFloat(rawVal) || 0;
+            const val = parseFloat(inp.value.replace(',', '.')) || 0;
             let record = currentSales.find(s => s.dealerId === `PLAN_${planKey}`);
             if (record) { record.plan = val; } 
             else if (val !== 0) {
@@ -161,27 +144,30 @@ document.addEventListener('DOMContentLoaded', () => {
         container.innerHTML = '';
         summaryList.innerHTML = '';
 
-        // Инициализация сумм
+        // Суммы фактов
         const facts = {
             north: 0, south: 0, west: 0, east: 0, center: 0,
-            regional_astana: 0, mir_laminata: 0, twelve_months: 0, other: 0
+            regional_astana: 0, other: 0, 
+            vip: [] // Массив для VIP клиентов {name, fact}
         };
 
-        // 1. Рендер строк ввода (по группам)
+        // 1. Рендер блоков ввода
         inputGroups.forEach(grp => {
+            // Фильтруем дилеров для этого блока
             const groupDealers = allDealers.filter(d => {
                 const matchGroup = getDealerGroup(d) === grp.key;
                 const isReal = d.status !== 'potential' && d.status !== 'archive';
                 return matchGroup && isReal;
             });
+            
             const customSales = currentSales.filter(s => s.isCustom && s.group === grp.key);
 
             if (groupDealers.length === 0 && customSales.length === 0 && grp.key !== 'other') return;
 
             let rowsHtml = '';
             const items = [
-                ...groupDealers.map(d => ({ id: d.id, name: d.name, isCustom: false })),
-                ...customSales.map(s => ({ id: null, name: s.dealerName, isCustom: true }))
+                ...groupDealers.map(d => ({ id: d.id, name: d.name, isCustom: false, hasPersonalPlan: d.hasPersonalPlan })),
+                ...customSales.map(s => ({ id: null, name: s.dealerName, isCustom: true, hasPersonalPlan: false }))
             ];
             
             items.sort((a,b) => a.name.localeCompare(b.name));
@@ -190,27 +176,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 const sale = currentSales.find(s => (item.isCustom && s.isCustom && s.dealerName === item.name) || (!item.isCustom && !s.isCustom && s.dealerId === item.id)) || {};
                 const fact = parseFloat(sale.fact) || 0;
                 
-                // ВАЖНО: Разделение VIP клиентов
-                // Если имя совпадает с VIP, сумма идет в отдельную копилку
-                const majorKey = getMajorKey(item.name);
-                if (majorKey) {
-                    facts[majorKey] += fact;
-                } else if (grp.key === 'regional_astana') {
-                    facts.regional_astana += fact;
-                } else if (grp.key !== 'other') {
-                    facts[grp.key] += fact;
+                // --- ГЛАВНАЯ ЛОГИКА СУММИРОВАНИЯ ---
+                if (item.hasPersonalPlan) {
+                    // Если VIP - добавляем в список VIP (не в регион!)
+                    facts.vip.push({ id: item.id, name: item.name, fact: fact });
                 } else {
-                    facts.other += fact;
+                    // Если обычный - добавляем в регион
+                    if (facts[grp.key] !== undefined) facts[grp.key] += fact;
+                    else facts.other += fact;
                 }
 
                 const displayVal = (fact !== 0) ? fact : '';
-                const isMajor = !!majorKey;
+                const isMajor = item.hasPersonalPlan;
 
                 rowsHtml += `
                     <div class="sales-row" data-id="${item.id || ''}" data-name="${item.name}" data-custom="${item.isCustom}">
                         <div class="sales-dealer-name text-truncate">
                             ${item.isCustom ? '<i class="bi bi-asterisk text-warning me-1" style="font-size:0.7em" title="Разовый"></i>' : ''}
-                            ${isMajor ? '<i class="bi bi-star-fill text-warning me-1" title="Отдельный план"></i>' : ''}
+                            ${isMajor ? '<i class="bi bi-star-fill text-warning me-1" title="Отдельный план (VIP)"></i>' : ''}
                             <span class="${isMajor ? 'fw-bold text-primary' : ''}">${item.name}</span>
                         </div>
                         <div class="d-flex align-items-center gap-2">
@@ -238,16 +221,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 2. Рендер Сводки (Summary)
         const plans = {};
-        const keys = ["regional_regions", "north", "south", "west", "east", "center", "regional_astana", "mir_laminata", "twelve_months", "total_all"];
+        const keys = ["regional_regions", "north", "south", "west", "east", "center", "regional_astana", "total_all"];
+        
+        // Добавляем планы для VIP
+        facts.vip.forEach(v => keys.push(`vip_${v.id}`));
+
         keys.forEach(k => {
             const p = currentSales.find(s => s.dealerId === `PLAN_${k}`) || {};
             plans[k] = parseFloat(p.plan) || 0;
         });
 
-        // Считаем суммы для отчета
+        // Считаем суммы
         const totalRegionsFact = facts.north + facts.south + facts.west + facts.east + facts.center;
-        // VIP клиенты считаются отдельно и добавляются только в ОБЩИЙ итог
-        const totalFactAll = totalRegionsFact + facts.regional_astana + facts.mir_laminata + facts.twelve_months + facts.other;
+        
+        // Считаем VIP
+        let totalVipFact = 0;
+        facts.vip.forEach(v => totalVipFact += v.fact);
+
+        const totalFactAll = totalRegionsFact + facts.regional_astana + totalVipFact + facts.other;
         
         const renderSumItem = (title, planKey, factVal, isSubItem = false) => {
             const plan = plans[planKey] || 0;
@@ -283,9 +274,15 @@ document.addEventListener('DOMContentLoaded', () => {
         let summaryHtml = '';
         summaryHtml += `<div class="p-3 bg-primary-subtle border-bottom"><h6 class="fw-bold mb-3 text-primary text-uppercase small ls-1">Общий результат</h6>${renderSumItem("ВСЕГО ПО КОМПАНИИ", "total_all", totalFactAll)}</div>`;
         summaryHtml += renderSumItem("Астана (Региональный)", "regional_astana", facts.regional_astana);
-        // VIP клиенты - отдельные строки
-        summaryHtml += renderSumItem("Мир Ламината", "mir_laminata", facts.mir_laminata);
-        summaryHtml += renderSumItem("12 Месяцев Алаш", "twelve_months", facts.twelve_months);
+        
+        // VIP БЛОК
+        if (facts.vip.length > 0) {
+            summaryHtml += `<div class="summary-divider"><span class="small fw-bold text-muted">Спец. Клиенты</span></div>`;
+            facts.vip.forEach(v => {
+                summaryHtml += renderSumItem(v.name, `vip_${v.id}`, v.fact);
+            });
+        }
+
         summaryHtml += `<div class="mt-2 border-top"></div>`;
         summaryHtml += renderSumItem("Регионы (Общее)", "regional_regions", totalRegionsFact);
         summaryHtml += renderSumItem("Север", "north", facts.north, true);
@@ -327,29 +324,27 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- SAVE BTN ---
-    saveBtn.onclick = async () => {
-        captureState();
-        try {
-            saveBtn.disabled = true; 
-            saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-            const res = await fetch(API_SALES, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ month: monthPicker.value, data: currentSales }) });
-            if (res.ok) { 
-                if (window.showToast) {
-                    window.showToast('Сохранено успешно!');
-                } else {
-                    alert('Сохранено!'); 
-                }
-                saveBtn.className = 'btn btn-success shadow-sm px-4 rounded-pill';
-                saveBtn.innerHTML = '<i class="bi bi-check-lg"></i> Сохранено'; 
-                setTimeout(() => { saveBtn.innerHTML = '<i class="bi bi-save me-2"></i>Сохранить'; }, 2000);
-                loadData(); 
-            } else throw new Error('Ошибка');
-        } catch (e) { 
-            if (window.showToast) window.showToast(e.message, 'error'); else alert(e.message);
-            saveBtn.disabled = false; 
-        }
-        finally { saveBtn.disabled = false; }
-    };
+    if (saveBtn) {
+        saveBtn.onclick = async () => {
+            captureState();
+            try {
+                saveBtn.disabled = true; 
+                saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+                const res = await fetch(API_SALES, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ month: monthPicker.value, data: currentSales }) });
+                if (res.ok) { 
+                    if (window.showToast) { window.showToast('Сохранено успешно!'); } else { alert('Сохранено!'); }
+                    saveBtn.className = 'btn btn-success shadow-sm px-4 rounded-pill';
+                    saveBtn.innerHTML = '<i class="bi bi-check-lg"></i> Сохранено'; 
+                    setTimeout(() => { saveBtn.innerHTML = '<i class="bi bi-save me-2"></i>Сохранить'; }, 2000);
+                    loadData(); 
+                } else throw new Error('Ошибка');
+            } catch (e) { 
+                if (window.showToast) window.showToast(e.message, 'error'); else alert(e.message);
+                saveBtn.disabled = false; 
+            }
+            finally { saveBtn.disabled = false; }
+        };
+    }
     
     // --- LOGOUT ---
     if (logoutBtn) { 
@@ -368,6 +363,5 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     monthPicker.addEventListener('change', loadData);
-    
     init();
 });
