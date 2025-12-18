@@ -100,11 +100,37 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const infoEl = document.getElementById('dealer-info-main');
             if(infoEl) {
+                // 1. ОРГАНИЗАЦИИ
+                let orgsHtml = '<span class="text-muted">Не указано</span>';
+                if (dealer.organizations && dealer.organizations.length > 0) {
+                    orgsHtml = dealer.organizations.map(o => `<div>${safeText(o)}</div>`).join('');
+                } else if (dealer.organization) {
+                    orgsHtml = safeText(dealer.organization); // Обратная совместимость
+                }
+
+                // 2. ДОГОВОР
+                let contractHtml = '<span class="text-muted">Нет данных</span>';
+                if (dealer.contract) {
+                    const isSigned = dealer.contract.isSigned;
+                    const date = dealer.contract.date ? ` <small class="text-muted">(${dealer.contract.date})</small>` : '';
+                    contractHtml = isSigned 
+                        ? `<span class="text-success fw-bold"><i class="bi bi-file-earmark-check-fill me-1"></i>Подписан</span>${date}` 
+                        : `<span class="text-danger"><i class="bi bi-file-earmark-x me-1"></i>Не подписан</span>`;
+                }
+
+                // 3. СЕКТОР (Только если есть)
+                let sectorRow = '';
+                if (dealer.region_sector) {
+                    sectorRow = `<div class="info-row"><span class="info-label">Сектор</span><span class="info-val fw-bold text-dark">${safeText(dealer.region_sector)}</span></div>`;
+                }
+
                 infoEl.innerHTML = `
-                    <div class="info-row"><span class="info-label">Ответственный</span><span class="info-val text-primary">${formatResponsible(dealer.responsible)}</span></div>
-                    <div class="info-row"><span class="info-label">Организация</span><span class="info-val">${safeText(dealer.organization)}</span></div>
+                    <div class="info-row"><span class="info-label">Ответственный</span><span class="info-val text-primary fw-bold">${formatResponsible(dealer.responsible)}</span></div>
+                    ${sectorRow}
+                    <div class="info-row"><span class="info-label">Договор</span><span class="info-val">${contractHtml}</span></div>
+                    <div class="info-row"><span class="info-label">Организации</span><span class="info-val text-dark">${orgsHtml}</span></div>
                     <div class="info-row"><span class="info-label">Тип цен</span><span class="info-val">${safeText(dealer.price_type)}</span></div>
-                    <div class="info-row"><span class="info-label">Адрес (Юр.)</span><span class="info-val">${safeText(dealer.address)}</span></div>
+                    <div class="info-row"><span class="info-label">Адрес (Факт)</span><span class="info-val">${safeText(dealer.address)}</span></div>
                 `;
             }
 
@@ -131,18 +157,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- RENDER SALES (СТРОГАЯ ФИЛЬТРАЦИЯ) ---
+    // --- RENDER SALES ---
     async function fetchDealerSales() {
         if (!salesHistoryContainer) return;
         try {
-            // Запрашиваем все продажи (на всякий случай, если фильтр сервера барахлит)
-            // Но лучше добавить параметр, если сервер его поддерживает
             const res = await fetch(`${API_SALES_URL}?dealerId=${dealerId}`); 
             if (!res.ok) throw new Error();
             const rawSales = await res.json();
             
-            // Фильтрация на клиенте (САМОЕ ВАЖНОЕ ИЗМЕНЕНИЕ)
-            // Оставляем только записи, где dealerId совпадает с текущим ID дилера
+            // Фильтрация
             const mySales = rawSales.filter(s => s.dealerId === dealerId);
 
             if (!mySales || mySales.length === 0) { 
@@ -150,7 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return; 
             }
 
-            // Агрегация (суммирование дубликатов по месяцам)
+            // Агрегация
             const aggregatedData = {}; 
             let grandTotal = 0;
 
@@ -158,8 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if(!s.month) return;
                 const year = s.month.split('-')[0];
                 const fact = parseFloat(s.fact) || 0;
-
-                if (fact === 0) return; // Игнорируем нули
+                if (fact === 0) return;
 
                 if (!aggregatedData[year]) aggregatedData[year] = {};
                 if (!aggregatedData[year][s.month]) aggregatedData[year][s.month] = 0;
@@ -180,10 +202,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             years.forEach(year => {
                 html += `<tr class="table-secondary"><td colspan="2" class="fw-bold ps-3 text-dark">${year} год</td></tr>`;
-
                 const monthsData = aggregatedData[year];
                 const sortedMonths = Object.keys(monthsData).sort().reverse(); 
-
                 let yearTotal = 0;
 
                 sortedMonths.forEach(monthKey => {
@@ -193,17 +213,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     const monthDisplay = monthName.charAt(0).toUpperCase() + monthName.slice(1);
                     const displayValue = parseFloat(value.toFixed(2));
                     yearTotal += value;
-
                     html += `<tr><td class="ps-4">${monthDisplay}</td><td class="text-end font-monospace">${displayValue}</td></tr>`;
                 });
-
                 html += `<tr style="background-color: #fffbeb;"><td class="ps-3 fw-bold text-muted">Итого за ${year}:</td><td class="text-end fw-bold text-dark">${parseFloat(yearTotal.toFixed(2))}</td></tr>`;
             });
 
             html += '</tbody>';
             html += `<tfoot class="table-dark"><tr><td class="fw-bold ps-3 text-uppercase">Всего за все время</td><td class="text-end fw-bold fs-6">${parseFloat(grandTotal.toFixed(2))}</td></tr></tfoot>`;
             html += '</table></div>';
-            
             salesHistoryContainer.innerHTML = html;
 
         } catch (e) { 
@@ -212,7 +229,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // (Остальные функции рендера - без изменений)
     function renderDealerContacts(contacts) {
         if (!contactsListContainer) return;
         if (!contacts || contacts.length === 0) { contactsListContainer.innerHTML = '<p class="text-muted">Нет контактов.</p>'; return; }
