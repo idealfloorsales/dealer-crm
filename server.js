@@ -63,7 +63,7 @@ const compContactSchema = new mongoose.Schema({ name: String, position: String, 
 const compRefSchema = new mongoose.Schema({ name: String, country: String, supplier: String, warehouse: String, info: String, storage_days: String, stock_info: String, reserve_days: String, contacts: [compContactSchema], collections: [collectionItemSchema] });
 const CompRef = mongoose.model('CompRef', compRefSchema);
 
-// --- ОБНОВЛЕННАЯ СХЕМА ДИЛЕРА ---
+// --- СХЕМА ДИЛЕРА (С новыми полями) ---
 const dealerSchema = new mongoose.Schema({ 
     dealer_id: String, 
     name: String, 
@@ -74,10 +74,10 @@ const dealerSchema = new mongoose.Schema({
     bonuses: String, 
     photos: [photoSchema], 
     
-    // ИЗМЕНЕНИЯ ЗДЕСЬ:
-    organizations: [String], // Было organization: String, стало массив
-    contract: { isSigned: Boolean, date: String }, // Договор
-    region_sector: String, // Сектор (Север/Юг...)
+    // Новые поля
+    organizations: [String], 
+    contract: { isSigned: Boolean, date: String }, 
+    region_sector: String, 
     
     delivery: String, 
     website: String, 
@@ -111,7 +111,6 @@ async function connectToDB() {
 async function seedStatuses() {
     const count = await Status.countDocuments();
     if (count === 0) {
-        console.log("Seeding default statuses...");
         await Status.insertMany([
             { value: 'active', label: 'Активный', color: '#198754', isVisible: true, sortOrder: 1 },
             { value: 'standard', label: 'Стандарт', color: '#ffc107', isVisible: true, sortOrder: 2 },
@@ -127,7 +126,7 @@ function convertToClient(doc) {
     obj.id = obj._id; delete obj._id; delete obj.__v;
     if(obj.products) obj.products = obj.products.map(p => { if(p){p.id=p._id; delete p._id;} return p;});
     
-    // Совместимость: если есть старое поле organization, переносим его в массив
+    // Совместимость
     if (obj.organization && (!obj.organizations || obj.organizations.length === 0)) {
         obj.organizations = [obj.organization];
     }
@@ -152,7 +151,21 @@ app.post('/api/statuses', checkWrite, async (req, res) => { try { const s = new 
 app.put('/api/statuses/:id', checkWrite, async (req, res) => { try { await Status.findByIdAndUpdate(req.params.id, req.body); res.json({status:'ok'}); } catch(e){ res.status(500).json({error:e.message}); } });
 app.delete('/api/statuses/:id', checkWrite, async (req, res) => { await Status.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
 
-app.get('/api/dealers', async (req, res) => { try { const dealers = await Dealer.find(getDealerFilter(req)).lean(); res.json(dealers.map(d => ({ id: d._id, ...d, photo_url: d.avatarUrl }))); } catch (e) { res.status(500).json({ error: e.message }); } });
+// --- DEALERS API (ОПТИМИЗИРОВАННЫЙ) ---
+app.get('/api/dealers', async (req, res) => { 
+    try { 
+        // ВАЖНО: .select('-photos ...') отключает загрузку тяжелых фото в списке
+        const dealers = await Dealer.find(getDealerFilter(req))
+            .select('-photos -visits -products') 
+            .lean(); 
+        
+        // Отдаем список (аватарка остается, галерея вырезана)
+        res.json(dealers.map(d => ({ id: d._id, ...d, photo_url: d.avatarUrl }))); 
+    } catch (e) { 
+        res.status(500).json({ error: e.message }); 
+    } 
+});
+
 app.get('/api/dealers/:id', async (req, res) => { try { const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).populate('products'); res.json(convertToClient(d)); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.post('/api/dealers', checkWrite, async (req, res) => { try { const role = getUserRole(req); if (role === 'astana') req.body.responsible = 'regional_astana'; if (role === 'regions') req.body.responsible = 'regional_regions'; const d = new Dealer(req.body); await d.save(); res.status(201).json(convertToClient(d)); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.put('/api/dealers/:id', checkWrite, async (req, res) => { try { await Dealer.findOneAndUpdate({ _id: req.params.id, ...getDealerFilter(req) }, req.body); res.json({status:'ok'}); } catch (e) { res.status(500).json({ error: e.message }); } });
@@ -178,7 +191,7 @@ app.post('/api/knowledge', checkWrite, async (req, res) => { const a = new Knowl
 app.put('/api/knowledge/:id', checkWrite, async (req, res) => { const a = await Knowledge.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(a)); });
 app.delete('/api/knowledge/:id', checkWrite, async (req, res) => { await Knowledge.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
 
-// --- TASKS API (Чтобы работал Дашборд) ---
+// --- TASKS API (Чтобы Дашборд работал быстро) ---
 app.get('/api/tasks', async (req, res) => {
     try {
         const data = await Dealer.find(getDealerFilter(req))
