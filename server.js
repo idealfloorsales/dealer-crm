@@ -41,25 +41,29 @@ app.use(express.static('public'));
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
 // --- SCHEMAS ---
-const statusSchema = new mongoose.Schema({ value: String, label: String, color: String, isVisible: { type: Boolean, default: true }, sortOrder: { type: Number, default: 0 } });
+const statusSchema = new mongoose.Schema({ 
+    value: String, 
+    label: String, 
+    color: String, 
+    isVisible: { type: Boolean, default: true }, 
+    sortOrder: { type: Number, default: 0 } 
+});
 const Status = mongoose.model('Status', statusSchema);
 
 const productSchema = new mongoose.Schema({ sku: String, name: String });
 const Product = mongoose.model('Product', productSchema);
-
 const contactSchema = new mongoose.Schema({ name: String, position: String, contactInfo: String }, { _id: false }); 
 const photoSchema = new mongoose.Schema({ description: String, photo_url: String, date: { type: Date, default: Date.now } }, { _id: false });
 const additionalAddressSchema = new mongoose.Schema({ description: String, city: String, address: String }, { _id: false });
 const visitSchema = new mongoose.Schema({ date: String, comment: String, isCompleted: { type: Boolean, default: false } }, { _id: false });
 const posMaterialSchema = new mongoose.Schema({ name: String, quantity: Number }, { _id: false });
 const competitorSchema = new mongoose.Schema({ brand: String, collection: String, price_opt: String, price_retail: String }, { _id: false });
-
 const collectionItemSchema = new mongoose.Schema({ name: String, type: { type: String, default: 'standard' } }, { _id: false });
 const compContactSchema = new mongoose.Schema({ name: String, position: String, phone: String }, { _id: false });
 const compRefSchema = new mongoose.Schema({ name: String, country: String, supplier: String, warehouse: String, info: String, storage_days: String, stock_info: String, reserve_days: String, contacts: [compContactSchema], collections: [collectionItemSchema] });
 const CompRef = mongoose.model('CompRef', compRefSchema);
 
-// UPDATED DEALER SCHEMA
+// --- ОБНОВЛЕННАЯ СХЕМА ДИЛЕРА ---
 const dealerSchema = new mongoose.Schema({ 
     dealer_id: String, 
     name: String, 
@@ -70,10 +74,10 @@ const dealerSchema = new mongoose.Schema({
     bonuses: String, 
     photos: [photoSchema], 
     
-    // NEW FIELDS
-    organizations: [String], // Массив организаций
+    // ИЗМЕНЕНИЯ ЗДЕСЬ:
+    organizations: [String], // Было organization: String, стало массив
     contract: { isSigned: Boolean, date: String }, // Договор
-    region_sector: String, // Север, Юг и т.д.
+    region_sector: String, // Сектор (Север/Юг...)
     
     delivery: String, 
     website: String, 
@@ -93,10 +97,8 @@ const Dealer = mongoose.model('Dealer', dealerSchema);
 
 const salesSchema = new mongoose.Schema({ month: String, group: String, dealerId: String, dealerName: String, plan: Number, fact: Number, isCustom: { type: Boolean, default: false } });
 const Sales = mongoose.model('Sales', salesSchema);
-
 const Knowledge = mongoose.model('Knowledge', new mongoose.Schema({ title: String, content: String }, { timestamps: true }));
 
-// DB CONNECTION
 async function connectToDB() {
     if (!DB_CONNECTION_STRING) return console.error("No DB String");
     try { 
@@ -109,6 +111,7 @@ async function connectToDB() {
 async function seedStatuses() {
     const count = await Status.countDocuments();
     if (count === 0) {
+        console.log("Seeding default statuses...");
         await Status.insertMany([
             { value: 'active', label: 'Активный', color: '#198754', isVisible: true, sortOrder: 1 },
             { value: 'standard', label: 'Стандарт', color: '#ffc107', isVisible: true, sortOrder: 2 },
@@ -119,17 +122,15 @@ async function seedStatuses() {
     }
 }
 
-// HELPERS
 function convertToClient(doc) {
     if(!doc) return null; const obj = doc.toObject ? doc.toObject() : doc;
     obj.id = obj._id; delete obj._id; delete obj.__v;
     if(obj.products) obj.products = obj.products.map(p => { if(p){p.id=p._id; delete p._id;} return p;});
     
-    // BACKWARD COMPATIBILITY: Если есть старое поле organization (строка), превращаем в массив
+    // Совместимость: если есть старое поле organization, переносим его в массив
     if (obj.organization && (!obj.organizations || obj.organizations.length === 0)) {
         obj.organizations = [obj.organization];
     }
-    
     return obj;
 }
 function getUserRole(req) { return req.auth ? req.auth.user : 'guest'; }
@@ -143,29 +144,15 @@ function getDealerFilter(req) {
 }
 const checkWrite = (req, res, next) => { if (canWrite(req)) next(); else res.status(403).json({error:'Read Only'}); };
 
-// --- ROUTES ---
-
+// ROUTES
 app.get('/api/auth/me', (req, res) => { res.json({ role: getUserRole(req) }); });
 
-// STATUSES
 app.get('/api/statuses', async (req, res) => { const s = await Status.find().sort({sortOrder: 1}).lean(); res.json(s.map(convertToClient)); });
 app.post('/api/statuses', checkWrite, async (req, res) => { try { const s = new Status(req.body); await s.save(); res.json(convertToClient(s)); } catch(e){ res.status(500).json({error:e.message}); } });
 app.put('/api/statuses/:id', checkWrite, async (req, res) => { try { await Status.findByIdAndUpdate(req.params.id, req.body); res.json({status:'ok'}); } catch(e){ res.status(500).json({error:e.message}); } });
 app.delete('/api/statuses/:id', checkWrite, async (req, res) => { await Status.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
 
-// --- DEALERS API (OPTIMIZED) ---
-app.get('/api/dealers', async (req, res) => { 
-    try { 
-        const dealers = await Dealer.find(getDealerFilter(req))
-            .select('-photos -visits -products') 
-            .lean(); 
-        
-        res.json(dealers.map(d => ({ id: d._id, ...d, photo_url: d.avatarUrl }))); 
-    } catch (e) { 
-        res.status(500).json({ error: e.message }); 
-    } 
-});
-
+app.get('/api/dealers', async (req, res) => { try { const dealers = await Dealer.find(getDealerFilter(req)).lean(); res.json(dealers.map(d => ({ id: d._id, ...d, photo_url: d.avatarUrl }))); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.get('/api/dealers/:id', async (req, res) => { try { const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).populate('products'); res.json(convertToClient(d)); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.post('/api/dealers', checkWrite, async (req, res) => { try { const role = getUserRole(req); if (role === 'astana') req.body.responsible = 'regional_astana'; if (role === 'regions') req.body.responsible = 'regional_regions'; const d = new Dealer(req.body); await d.save(); res.status(201).json(convertToClient(d)); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.put('/api/dealers/:id', checkWrite, async (req, res) => { try { await Dealer.findOneAndUpdate({ _id: req.params.id, ...getDealerFilter(req) }, req.body); res.json({status:'ok'}); } catch (e) { res.status(500).json({ error: e.message }); } });
@@ -173,7 +160,6 @@ app.delete('/api/dealers/:id', checkWrite, async (req, res) => { try { await Dea
 app.get('/api/dealers/:id/products', async (req, res) => { const d = await Dealer.findById(req.params.id).populate('products'); res.json(d.products.map(convertToClient)); });
 app.put('/api/dealers/:id/products', async (req, res) => { await Dealer.findByIdAndUpdate(req.params.id, { products: req.body.productIds }); res.json({status:'ok'}); });
 
-// OTHER ROUTES
 app.get('/api/products', async (req, res) => { const s = new RegExp(req.query.search||'', 'i'); const p = await Product.find({$or:[{sku:s},{name:s}]}).sort({sku:1}).lean(); res.json(p.map(x=>{x.id=x._id;return x;})); });
 app.post('/api/products', checkWrite, async (req, res) => { const p = new Product(req.body); await p.save(); res.json(convertToClient(p)); });
 app.put('/api/products/:id', checkWrite, async (req, res) => { const p = await Product.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(p)); });
@@ -192,7 +178,7 @@ app.post('/api/knowledge', checkWrite, async (req, res) => { const a = new Knowl
 app.put('/api/knowledge/:id', checkWrite, async (req, res) => { const a = await Knowledge.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(a)); });
 app.delete('/api/knowledge/:id', checkWrite, async (req, res) => { await Knowledge.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
 
-// --- TASKS API ---
+// --- TASKS API (Чтобы работал Дашборд) ---
 app.get('/api/tasks', async (req, res) => {
     try {
         const data = await Dealer.find(getDealerFilter(req))
