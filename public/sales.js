@@ -1,279 +1,373 @@
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
     
-    const API_DEALERS_URL = '/api/dealers';
-    const API_SALES_URL = '/api/sales';
-    const API_AUTH_ME = '/api/auth/me'; 
-
-    const container = document.getElementById('sales-container');
-    const totalStatsContainer = document.getElementById('total-stats-container');
+    // Config
+    const API_DEALERS = '/api/dealers';
+    const API_SALES = '/api/sales';
+    
+    // UI Elements
     const monthPicker = document.getElementById('month-picker');
-    const prevBtn = document.getElementById('btn-prev-month');
-    const nextBtn = document.getElementById('btn-next-month');
+    const container = document.getElementById('sales-container');
+    const summaryList = document.getElementById('summary-list');
+    const saveBtn = document.getElementById('save-btn');
+    const logoutBtn = document.getElementById('logout-btn');
     
-    // Modal elements
-    const modalEl = document.getElementById('edit-sales-modal');
-    const modal = new bootstrap.Modal(modalEl);
-    const inpPlan = document.getElementById('edit_sales_plan');
-    const inpFact = document.getElementById('edit_sales_fact');
-    const btnSave = document.getElementById('btn-save-sales');
+    // Set Month
+    const now = new Date();
+    const currentMonthStr = now.toISOString().slice(0, 7);
+    monthPicker.value = currentMonthStr;
+
+    // Groups (Визуальный порядок блоков)
+    const inputGroups = [
+        { key: 'regional_astana', title: 'Региональный Астана' },
+        { key: 'north', title: 'Регион Север' },
+        { key: 'south', title: 'Регион Юг' },
+        { key: 'west', title: 'Регион Запад' },
+        { key: 'east', title: 'Регион Восток' },
+        { key: 'center', title: 'Регион Центр' },
+        { key: 'other', title: 'Остальные / Разовые' }
+    ];
 
     let allDealers = [];
     let currentSales = [];
     let currentUserRole = 'guest';
 
-    // Init Date
-    const now = new Date();
-    monthPicker.value = now.toISOString().slice(0, 7);
+    // --- INIT ---
+    async function init() {
+        try {
+            const authRes = await fetch('/api/auth/me');
+            if (authRes.ok) {
+                const authData = await authRes.json();
+                currentUserRole = authData.role;
+                const badge = document.getElementById('user-role-badge');
+                if(badge) {
+                    const names = { 'admin': 'Админ', 'astana': 'Астана', 'regions': 'Регионы', 'guest': 'Гость' };
+                    badge.textContent = names[currentUserRole] || currentUserRole;
+                }
+                if (currentUserRole === 'guest') {
+                    saveBtn.disabled = true;
+                    saveBtn.innerHTML = '<i class="bi bi-lock"></i> Только чтение';
+                }
+            }
+        } catch (e) {}
 
-    // --- INITIALIZATION ---
-    try {
-        const authRes = await fetch(API_AUTH_ME);
-        if (authRes.ok) { const d = await authRes.json(); currentUserRole = d.role; }
-        
-        await fetchDealers();
-        await loadData();
-    } catch (e) { console.error(e); }
-
-    // --- LISTENERS ---
-    monthPicker.addEventListener('change', loadData);
-    prevBtn.addEventListener('click', () => changeMonth(-1));
-    nextBtn.addEventListener('click', () => changeMonth(1));
-    btnSave.addEventListener('click', saveSales);
-
-    function changeMonth(delta) {
-        const d = new Date(monthPicker.value + '-01');
-        d.setMonth(d.getMonth() + delta);
-        monthPicker.value = d.toISOString().slice(0, 7);
         loadData();
     }
 
-    // --- DATA LOADING ---
-    async function fetchDealers() {
-        const res = await fetch(API_DEALERS_URL);
-        if(res.ok) allDealers = await res.json();
-    }
-
     async function loadData() {
-        container.innerHTML = '<div class="text-center py-5 text-muted">Загрузка данных...</div>';
-        const month = monthPicker.value;
         try {
-            const res = await fetch(`${API_SALES_URL}?month=${month}`);
-            if(!res.ok) throw new Error();
-            currentSales = await res.json();
-            renderReport();
-        } catch(e) {
-            container.innerHTML = '<div class="alert alert-danger">Ошибка загрузки продаж</div>';
-        }
+            const month = monthPicker.value;
+            const [dealersRes, salesRes] = await Promise.all([
+                fetch(API_DEALERS),
+                fetch(`${API_SALES}?month=${month}`)
+            ]);
+            allDealers = await dealersRes.json();
+            currentSales = await salesRes.json();
+            renderAll();
+        } catch (e) { alert('Ошибка загрузки данных: ' + e.message); }
     }
 
-    // --- RENDERING LOGIC ---
-    function renderReport() {
-        // 1. Подготовка структуры групп
-        const groups = {
-            'regional_astana': { id: 'astana', title: 'Астана', dealers: [], totalPlan: 0, totalFact: 0 },
-            'Север': { id: 'north', title: 'Север', dealers: [], totalPlan: 0, totalFact: 0 },
-            'Юг': { id: 'south', title: 'Юг', dealers: [], totalPlan: 0, totalFact: 0 },
-            'Запад': { id: 'west', title: 'Запад', dealers: [], totalPlan: 0, totalFact: 0 },
-            'Восток': { id: 'east', title: 'Восток', dealers: [], totalPlan: 0, totalFact: 0 },
-            'Центр': { id: 'center', title: 'Центр', dealers: [], totalPlan: 0, totalFact: 0 },
-            'other': { id: 'other', title: 'Прочее / Без сектора', dealers: [], totalPlan: 0, totalFact: 0 }
+    // --- LOGIC ---
+    function getDealerGroup(d) {
+        // 1. Астана всегда отдельно
+        if (d.responsible === 'regional_astana') return 'regional_astana';
+        
+        // 2. Регионы делим по Секторам
+        if (d.responsible === 'regional_regions') {
+            const sec = (d.region_sector || '').toLowerCase().trim();
+            if (sec === 'север') return 'north';
+            if (sec === 'юг') return 'south';
+            if (sec === 'запад') return 'west';
+            if (sec === 'восток') return 'east';
+            if (sec === 'центр') return 'center';
+            return 'other'; // Если сектор не указан
+        }
+
+        // 3. Остальные
+        return 'other';
+    }
+
+    function getMajorKey(dealerName) {
+        if (!dealerName) return null;
+        const lowerName = dealerName.toLowerCase();
+        // Логика отделения VIP-клиентов
+        if (lowerName.includes("мир ламината")) return "mir_laminata";
+        if (lowerName.includes("12 месяцев") && lowerName.includes("алаш")) return "twelve_months";
+        return null;
+    }
+
+    function fmt(num) {
+        if (typeof num !== 'number' || isNaN(num)) return 0;
+        return Math.round(num * 100) / 100;
+    }
+
+    function calculateKPI(plan, fact, daysInMonth, currentDay) {
+        plan = parseFloat(plan) || 0;
+        fact = parseFloat(fact) || 0;
+        
+        let forecast = 0;
+        if (currentDay > 0) forecast = (fact / currentDay) * daysInMonth;
+        
+        const percent = plan > 0 ? (fact / plan) * 100 : 0;
+        return { diff: fact - plan, forecast, percent };
+    }
+
+    function captureState() {
+        document.querySelectorAll('.sales-input.inp-fact').forEach(inp => {
+            const row = inp.closest('.sales-row');
+            const dealerId = row.dataset.id === "null" ? null : row.dataset.id;
+            const dealerName = row.dataset.name;
+            const isCustom = row.dataset.custom === 'true';
+            const group = row.closest('.region-card').dataset.group;
+            
+            const rawVal = inp.value.replace(',', '.');
+            const val = parseFloat(rawVal) || 0;
+
+            let record = currentSales.find(s => 
+                (isCustom && s.isCustom && s.dealerName === dealerName) || 
+                (!isCustom && !s.isCustom && s.dealerId === dealerId)
+            );
+
+            if (record) { 
+                record.fact = val; 
+            } else if (val !== 0) { 
+                currentSales.push({ month: monthPicker.value, group, dealerId, dealerName, isCustom, plan: 0, fact: val });
+            }
+        });
+        
+        document.querySelectorAll('.plan-input').forEach(inp => {
+            const planKey = inp.dataset.planKey;
+            const rawVal = inp.value.replace(',', '.');
+            const val = parseFloat(rawVal) || 0;
+            let record = currentSales.find(s => s.dealerId === `PLAN_${planKey}`);
+            if (record) { record.plan = val; } 
+            else if (val !== 0) {
+                currentSales.push({ month: monthPicker.value, group: 'PLAN', dealerId: `PLAN_${planKey}`, dealerName: `Plan ${planKey}`, isCustom: false, plan: val, fact: 0 });
+            }
+        });
+    }
+
+    // --- RENDER ---
+    function renderAll() {
+        const date = new Date(monthPicker.value);
+        const year = date.getFullYear();
+        const monthIndex = date.getMonth();
+        const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+        const today = new Date();
+        let currentDay = daysInMonth; 
+        if (today.getFullYear() === year && today.getMonth() === monthIndex) {
+            currentDay = today.getDate();
+        }
+
+        container.innerHTML = '';
+        summaryList.innerHTML = '';
+
+        // Инициализация сумм
+        const facts = {
+            north: 0, south: 0, west: 0, east: 0, center: 0,
+            regional_astana: 0, mir_laminata: 0, twelve_months: 0, other: 0
         };
 
-        let grandPlan = 0;
-        let grandFact = 0;
+        // 1. Рендер строк ввода (по группам)
+        inputGroups.forEach(grp => {
+            const groupDealers = allDealers.filter(d => {
+                const matchGroup = getDealerGroup(d) === grp.key;
+                const isReal = d.status !== 'potential' && d.status !== 'archive';
+                return matchGroup && isReal;
+            });
+            const customSales = currentSales.filter(s => s.isCustom && s.group === grp.key);
 
-        // 2. Распределение дилеров по группам
-        allDealers.forEach(d => {
-            if (d.status === 'archive' || d.status === 'potential') return; // Исключаем архив и потенциальных
+            if (groupDealers.length === 0 && customSales.length === 0 && grp.key !== 'other') return;
 
-            // Находим продажу для дилера
-            const sale = currentSales.find(s => s.dealerId === d.id) || { plan: 0, fact: 0 };
-            const dealerData = { ...d, plan: sale.plan || 0, fact: sale.fact || 0 };
-
-            // Определяем группу
-            let groupKey = 'other';
-            
-            if (d.responsible === 'regional_astana') {
-                groupKey = 'regional_astana';
-            } else if (d.responsible === 'regional_regions') {
-                // Если регионы - смотрим сектор
-                if (d.region_sector && groups[d.region_sector]) {
-                    groupKey = d.region_sector;
-                } else {
-                    groupKey = 'other'; // Региональный, но без сектора
-                }
-            }
-
-            // Добавляем в группу
-            groups[groupKey].dealers.push(dealerData);
-            groups[groupKey].totalPlan += dealerData.plan;
-            groups[groupKey].totalFact += dealerData.fact;
-
-            grandPlan += dealerData.plan;
-            grandFact += dealerData.fact;
-        });
-
-        // 3. Рендер верхней сводки (Total Stats)
-        const grandPercent = grandPlan > 0 ? Math.round((grandFact / grandPlan) * 100) : 0;
-        let progressColor = 'bg-danger';
-        if(grandPercent >= 100) progressColor = 'bg-success';
-        else if(grandPercent >= 80) progressColor = 'bg-warning';
-
-        totalStatsContainer.innerHTML = `
-            <div class="col-md-4">
-                <div class="card border-0 shadow-sm h-100">
-                    <div class="card-body text-center">
-                        <h6 class="text-muted text-uppercase small fw-bold">Общий План</h6>
-                        <h2 class="fw-bold mb-0">${grandPlan.toLocaleString()} <small class="text-muted fs-6">м²</small></h2>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card border-0 shadow-sm h-100">
-                    <div class="card-body text-center">
-                        <h6 class="text-muted text-uppercase small fw-bold">Общий Факт</h6>
-                        <h2 class="fw-bold text-primary mb-0">${grandFact.toLocaleString()} <small class="text-muted fs-6">м²</small></h2>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card border-0 shadow-sm h-100">
-                    <div class="card-body text-center">
-                        <h6 class="text-muted text-uppercase small fw-bold">Выполнение</h6>
-                        <div class="progress mt-2" style="height: 10px;">
-                            <div class="progress-bar ${progressColor}" role="progressbar" style="width: ${grandPercent}%"></div>
-                        </div>
-                        <h3 class="fw-bold mt-2 mb-0">${grandPercent}%</h3>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        // 4. Рендер Секторов
-        container.innerHTML = '';
-        
-        // Порядок вывода: Астана, затем сектора, затем прочее
-        const orderedKeys = ['regional_astana', 'Север', 'Юг', 'Запад', 'Восток', 'Центр', 'other'];
-
-        orderedKeys.forEach(key => {
-            const group = groups[key];
-            if (group.dealers.length === 0) return; // Пропускаем пустые группы
-
-            const gPercent = group.totalPlan > 0 ? Math.round((group.totalFact / group.totalPlan) * 100) : 0;
-            let gColor = 'text-danger'; 
-            if(gPercent >= 100) gColor = 'text-success'; else if(gPercent >= 80) gColor = 'text-warning';
-
-            // Карточка группы
-            const card = document.createElement('div');
-            card.className = 'card border-0 shadow-sm';
-            
-            // Заголовок группы
-            let headerHtml = `
-                <div class="card-header bg-white border-0 pt-3 pb-2 d-flex justify-content-between align-items-center">
-                    <h5 class="fw-bold mb-0">${group.title} <span class="badge bg-light text-dark border ms-2">${group.dealers.length}</span></h5>
-                    <div class="text-end">
-                        <span class="d-block small text-muted">Выполнение</span>
-                        <span class="fw-bold ${gColor}">${gPercent}%</span>
-                    </div>
-                </div>
-                <div class="px-3 pb-2">
-                    <div class="progress" style="height: 6px;">
-                        <div class="progress-bar ${gPercent >= 100 ? 'bg-success' : (gPercent >= 80 ? 'bg-warning' : 'bg-danger')}" style="width: ${gPercent}%"></div>
-                    </div>
-                    <div class="d-flex justify-content-between small text-muted mt-1">
-                        <span>План: <b>${group.totalPlan}</b></span>
-                        <span>Факт: <b>${group.totalFact}</b></span>
-                    </div>
-                </div>
-            `;
-
-            // Таблица дилеров
             let rowsHtml = '';
-            // Сортировка внутри группы: сначала те, у кого больше факт
-            group.dealers.sort((a, b) => b.fact - a.fact);
+            const items = [
+                ...groupDealers.map(d => ({ id: d.id, name: d.name, isCustom: false })),
+                ...customSales.map(s => ({ id: null, name: s.dealerName, isCustom: true }))
+            ];
+            
+            items.sort((a,b) => a.name.localeCompare(b.name));
 
-            group.dealers.forEach(d => {
-                const dPercent = d.plan > 0 ? Math.round((d.fact / d.plan) * 100) : 0;
-                let badgeClass = 'bg-danger-subtle text-danger';
-                if(dPercent >= 100) badgeClass = 'bg-success-subtle text-success';
-                else if(dPercent >= 80) badgeClass = 'bg-warning-subtle text-warning-emphasis';
+            items.forEach(item => {
+                const sale = currentSales.find(s => (item.isCustom && s.isCustom && s.dealerName === item.name) || (!item.isCustom && !s.isCustom && s.dealerId === item.id)) || {};
+                const fact = parseFloat(sale.fact) || 0;
+                
+                // ВАЖНО: Разделение VIP клиентов
+                // Если имя совпадает с VIP, сумма идет в отдельную копилку
+                const majorKey = getMajorKey(item.name);
+                if (majorKey) {
+                    facts[majorKey] += fact;
+                } else if (grp.key === 'regional_astana') {
+                    facts.regional_astana += fact;
+                } else if (grp.key !== 'other') {
+                    facts[grp.key] += fact;
+                } else {
+                    facts.other += fact;
+                }
+
+                const displayVal = (fact !== 0) ? fact : '';
+                const isMajor = !!majorKey;
 
                 rowsHtml += `
-                    <tr onclick="openEditModal('${d.id}', '${d.name}', ${d.plan}, ${d.fact})">
-                        <td class="ps-3">
-                            <div class="fw-bold text-truncate" style="max-width: 180px;">${d.name}</div>
-                            <div class="small text-muted">${d.city}</div>
-                        </td>
-                        <td class="text-end">
-                            <div class="small text-muted">План: ${d.plan}</div>
-                            <div class="fw-bold">${d.fact}</div>
-                        </td>
-                        <td class="text-end pe-3" style="width: 60px;">
-                            <span class="badge ${badgeClass}">${dPercent}%</span>
-                        </td>
-                    </tr>
+                    <div class="sales-row" data-id="${item.id || ''}" data-name="${item.name}" data-custom="${item.isCustom}">
+                        <div class="sales-dealer-name text-truncate">
+                            ${item.isCustom ? '<i class="bi bi-asterisk text-warning me-1" style="font-size:0.7em" title="Разовый"></i>' : ''}
+                            ${isMajor ? '<i class="bi bi-star-fill text-warning me-1" title="Отдельный план"></i>' : ''}
+                            <span class="${isMajor ? 'fw-bold text-primary' : ''}">${item.name}</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="sales-input-group">
+                                <input type="number" step="0.01" class="form-control form-control-sm sales-input inp-fact" value="${displayVal}" placeholder="0">
+                            </div>
+                            ${item.isCustom ? `<button class="btn btn-sm text-danger btn-del-row p-0" title="Удалить строку"><i class="bi bi-x-circle"></i></button>` : ''}
+                        </div>
+                    </div>
                 `;
             });
+            
+            if (!rowsHtml) rowsHtml = `<div class="text-center text-muted small py-3">Нет записей.</div>`;
 
-            card.innerHTML = `
-                ${headerHtml}
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
-                        <tbody>${rowsHtml}</tbody>
-                    </table>
+            container.innerHTML += `
+                <div class="region-card" data-group="${grp.key}">
+                    <div class="region-header">
+                        <span class="region-title">${grp.title}</span>
+                        <button class="btn btn-sm btn-light border-0 text-primary py-0 btn-add-custom" data-group="${grp.key}" style="font-size:0.8rem">+ Добавить</button>
+                    </div>
+                    <div class="region-body">${rowsHtml}</div>
                 </div>
             `;
-            container.appendChild(card);
+        });
+
+        // 2. Рендер Сводки (Summary)
+        const plans = {};
+        const keys = ["regional_regions", "north", "south", "west", "east", "center", "regional_astana", "mir_laminata", "twelve_months", "total_all"];
+        keys.forEach(k => {
+            const p = currentSales.find(s => s.dealerId === `PLAN_${k}`) || {};
+            plans[k] = parseFloat(p.plan) || 0;
+        });
+
+        // Считаем суммы для отчета
+        const totalRegionsFact = facts.north + facts.south + facts.west + facts.east + facts.center;
+        // VIP клиенты считаются отдельно и добавляются только в ОБЩИЙ итог
+        const totalFactAll = totalRegionsFact + facts.regional_astana + facts.mir_laminata + facts.twelve_months + facts.other;
+        
+        const renderSumItem = (title, planKey, factVal, isSubItem = false) => {
+            const plan = plans[planKey] || 0;
+            const { diff, forecast, percent } = calculateKPI(plan, factVal, daysInMonth, currentDay);
+            
+            let colorClass = 'p-mid'; let bgClass = 'bg-mid';
+            if (percent >= 90) { colorClass = 'p-high'; bgClass = 'bg-high'; }
+            if (percent < 70) { colorClass = 'p-low'; bgClass = 'bg-low'; }
+            const width = Math.min(percent, 100);
+
+            const planVal = plan !== 0 ? plan : '';
+
+            return `
+            <div class="summary-item ${isSubItem ? 'ps-4 bg-light bg-opacity-25' : ''}">
+                <div class="summary-header">
+                    <span class="summary-title">
+                        ${title}
+                        <input type="number" class="plan-input" data-plan-key="${planKey}" value="${planVal}" placeholder="План">
+                    </span>
+                    <span class="summary-percent ${colorClass}">${fmt(percent)}%</span>
+                </div>
+                <div class="summary-progress">
+                    <div class="summary-bar ${bgClass}" style="width: ${width}%"></div>
+                </div>
+                <div class="summary-meta">
+                    <span>Факт: <strong>${fmt(factVal)}</strong></span>
+                    <span class="${diff>=0 ? 'text-success':'text-danger'}">${diff>0?'+':''}${fmt(diff)}</span>
+                    <span>Прогноз: <strong>${fmt(forecast)}</strong></span>
+                </div>
+            </div>`;
+        };
+
+        let summaryHtml = '';
+        summaryHtml += `<div class="p-3 bg-primary-subtle border-bottom"><h6 class="fw-bold mb-3 text-primary text-uppercase small ls-1">Общий результат</h6>${renderSumItem("ВСЕГО ПО КОМПАНИИ", "total_all", totalFactAll)}</div>`;
+        summaryHtml += renderSumItem("Астана (Региональный)", "regional_astana", facts.regional_astana);
+        // VIP клиенты - отдельные строки
+        summaryHtml += renderSumItem("Мир Ламината", "mir_laminata", facts.mir_laminata);
+        summaryHtml += renderSumItem("12 Месяцев Алаш", "twelve_months", facts.twelve_months);
+        summaryHtml += `<div class="mt-2 border-top"></div>`;
+        summaryHtml += renderSumItem("Регионы (Общее)", "regional_regions", totalRegionsFact);
+        summaryHtml += renderSumItem("Север", "north", facts.north, true);
+        summaryHtml += renderSumItem("Восток", "east", facts.east, true);
+        summaryHtml += renderSumItem("Юг", "south", facts.south, true);
+        summaryHtml += renderSumItem("Запад", "west", facts.west, true);
+        summaryHtml += renderSumItem("Центр", "center", facts.center, true);
+        
+        if (facts.other !== 0) {
+            summaryHtml += `<div class="summary-item"><div class="summary-header"><span class="summary-title text-muted">Прочие / Разовые</span><span class="summary-percent text-muted">-</span></div><div class="summary-meta"><span>Факт: <strong>${fmt(facts.other)}</strong></span></div></div>`;
+        }
+
+        summaryList.innerHTML = summaryHtml;
+        setupEventListeners();
+    }
+
+    function setupEventListeners() {
+        document.querySelectorAll('.btn-add-custom').forEach(btn => {
+            btn.onclick = () => {
+                captureState();
+                const name = prompt("Название дилера/клиента:");
+                if (name) {
+                    currentSales.push({ month: monthPicker.value, group: btn.dataset.group, dealerName: name, isCustom: true, plan: 0, fact: 0 });
+                    renderAll();
+                }
+            };
+        });
+        document.querySelectorAll('.btn-del-row').forEach(btn => {
+            btn.onclick = (e) => {
+                if(confirm('Удалить строку?')) {
+                    captureState();
+                    const row = e.target.closest('.sales-row');
+                    const name = row.dataset.name;
+                    currentSales = currentSales.filter(s => !(s.isCustom && s.dealerName === name));
+                    renderAll();
+                }
+            };
         });
     }
 
-    // --- EDIT LOGIC ---
-    window.openEditModal = function(id, name, plan, fact) {
-        if (currentUserRole === 'guest') return;
-        document.getElementById('edit_sales_dealer_id').value = id;
-        document.getElementById('edit_sales_dealer_name').value = name;
-        inpPlan.value = plan || 0;
-        inpFact.value = fact || 0;
-        modal.show();
-    };
-
-    async function saveSales() {
-        const id = document.getElementById('edit_sales_dealer_id').value;
-        const name = document.getElementById('edit_sales_dealer_name').value;
-        const plan = parseFloat(inpPlan.value) || 0;
-        const fact = parseFloat(inpFact.value) || 0;
-        const month = monthPicker.value;
-
-        btnSave.disabled = true;
+    // --- SAVE BTN ---
+    saveBtn.onclick = async () => {
+        captureState();
         try {
-            // Отправляем массив, так как API принимает bulk write
-            const payload = {
-                month: month,
-                data: [{
-                    dealerId: id,
-                    dealerName: name,
-                    plan: plan,
-                    fact: fact
-                }]
-            };
-
-            const res = await fetch(API_SALES_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if(res.ok) {
-                modal.hide();
-                loadData(); // Перегрузить таблицу
-            } else {
-                alert('Ошибка сохранения');
-            }
-        } catch(e) {
-            console.error(e);
-            alert('Ошибка сети');
-        } finally {
-            btnSave.disabled = false;
+            saveBtn.disabled = true; 
+            saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+            const res = await fetch(API_SALES, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ month: monthPicker.value, data: currentSales }) });
+            if (res.ok) { 
+                if (window.showToast) {
+                    window.showToast('Сохранено успешно!');
+                } else {
+                    alert('Сохранено!'); 
+                }
+                saveBtn.className = 'btn btn-success shadow-sm px-4 rounded-pill';
+                saveBtn.innerHTML = '<i class="bi bi-check-lg"></i> Сохранено'; 
+                setTimeout(() => { saveBtn.innerHTML = '<i class="bi bi-save me-2"></i>Сохранить'; }, 2000);
+                loadData(); 
+            } else throw new Error('Ошибка');
+        } catch (e) { 
+            if (window.showToast) window.showToast(e.message, 'error'); else alert(e.message);
+            saveBtn.disabled = false; 
         }
+        finally { saveBtn.disabled = false; }
+    };
+    
+    // --- LOGOUT ---
+    if (logoutBtn) { 
+        logoutBtn.onclick = (e) => {
+            e.preventDefault();
+            localStorage.clear();
+            sessionStorage.clear();
+            logoutBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+            const xhr = new XMLHttpRequest();
+            xhr.open("GET", "/?chk=" + Math.random(), true, "logout", "logout");
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState == 4) window.location.reload();
+            };
+            xhr.send();
+        }; 
     }
+
+    monthPicker.addEventListener('change', loadData);
+    
+    init();
 });
