@@ -8,7 +8,6 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json({ limit: '50mb' })); 
 app.use(cors());
 
-// USERS
 const USERS = {
     'admin': process.env.ADMIN_PASSWORD || 'admin',
     'astana': process.env.ASTANA_PASSWORD || 'astana',
@@ -16,7 +15,6 @@ const USERS = {
     'guest': process.env.GUEST_PASSWORD || 'guest'
 };
 
-// AUTH
 const authMiddleware = (req, res, next) => {
     if (req.path === '/manifest.json' || req.path === '/sw.js' || req.path.endsWith('.png') || req.path.endsWith('.jpg') || req.path.endsWith('.jpeg') || req.path.endsWith('.ico') || req.path.endsWith('.gif')) {
         return next();
@@ -26,7 +24,6 @@ const authMiddleware = (req, res, next) => {
 };
 app.use(authMiddleware);
 
-// STATIC
 app.use(express.static('public', { index: false }));
 app.get('/', (req, res) => res.sendFile(__dirname + '/public/index.html'));
 app.get('/map.html', (req, res) => res.sendFile(__dirname + '/public/map.html'));
@@ -40,16 +37,9 @@ app.use(express.static('public'));
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// --- SCHEMAS ---
-const statusSchema = new mongoose.Schema({ 
-    value: String, 
-    label: String, 
-    color: String, 
-    isVisible: { type: Boolean, default: true }, 
-    sortOrder: { type: Number, default: 0 } 
-});
+// SCHEMAS
+const statusSchema = new mongoose.Schema({ value: String, label: String, color: String, isVisible: { type: Boolean, default: true }, sortOrder: { type: Number, default: 0 } });
 const Status = mongoose.model('Status', statusSchema);
-
 const productSchema = new mongoose.Schema({ sku: String, name: String });
 const Product = mongoose.model('Product', productSchema);
 const contactSchema = new mongoose.Schema({ name: String, position: String, contactInfo: String }, { _id: false }); 
@@ -63,7 +53,7 @@ const compContactSchema = new mongoose.Schema({ name: String, position: String, 
 const compRefSchema = new mongoose.Schema({ name: String, country: String, supplier: String, warehouse: String, info: String, storage_days: String, stock_info: String, reserve_days: String, contacts: [compContactSchema], collections: [collectionItemSchema] });
 const CompRef = mongoose.model('CompRef', compRefSchema);
 
-// --- СХЕМА ДИЛЕРА (С новыми полями) ---
+// DEALER SCHEMA (Обновленная)
 const dealerSchema = new mongoose.Schema({ 
     dealer_id: String, 
     name: String, 
@@ -74,11 +64,13 @@ const dealerSchema = new mongoose.Schema({
     bonuses: String, 
     photos: [photoSchema], 
     
-    // Новые поля
     organizations: [String], 
     contract: { isSigned: Boolean, date: String }, 
     region_sector: String, 
     
+    // ВАЖНОЕ ПОЛЕ ДЛЯ ВАШЕЙ ЗАДАЧИ
+    hasPersonalPlan: { type: Boolean, default: false }, // Если true - отдельная строка в плане
+
     delivery: String, 
     website: String, 
     instagram: String, 
@@ -101,11 +93,7 @@ const Knowledge = mongoose.model('Knowledge', new mongoose.Schema({ title: Strin
 
 async function connectToDB() {
     if (!DB_CONNECTION_STRING) return console.error("No DB String");
-    try { 
-        await mongoose.connect(DB_CONNECTION_STRING); 
-        console.log('MongoDB Connected');
-        await seedStatuses(); 
-    } catch (e) { console.error(e); }
+    try { await mongoose.connect(DB_CONNECTION_STRING); console.log('MongoDB Connected'); await seedStatuses(); } catch (e) { console.error(e); }
 }
 
 async function seedStatuses() {
@@ -125,11 +113,7 @@ function convertToClient(doc) {
     if(!doc) return null; const obj = doc.toObject ? doc.toObject() : doc;
     obj.id = obj._id; delete obj._id; delete obj.__v;
     if(obj.products) obj.products = obj.products.map(p => { if(p){p.id=p._id; delete p._id;} return p;});
-    
-    // Совместимость
-    if (obj.organization && (!obj.organizations || obj.organizations.length === 0)) {
-        obj.organizations = [obj.organization];
-    }
+    if (obj.organization && (!obj.organizations || obj.organizations.length === 0)) { obj.organizations = [obj.organization]; }
     return obj;
 }
 function getUserRole(req) { return req.auth ? req.auth.user : 'guest'; }
@@ -143,29 +127,19 @@ function getDealerFilter(req) {
 }
 const checkWrite = (req, res, next) => { if (canWrite(req)) next(); else res.status(403).json({error:'Read Only'}); };
 
-// ROUTES
 app.get('/api/auth/me', (req, res) => { res.json({ role: getUserRole(req) }); });
-
 app.get('/api/statuses', async (req, res) => { const s = await Status.find().sort({sortOrder: 1}).lean(); res.json(s.map(convertToClient)); });
 app.post('/api/statuses', checkWrite, async (req, res) => { try { const s = new Status(req.body); await s.save(); res.json(convertToClient(s)); } catch(e){ res.status(500).json({error:e.message}); } });
 app.put('/api/statuses/:id', checkWrite, async (req, res) => { try { await Status.findByIdAndUpdate(req.params.id, req.body); res.json({status:'ok'}); } catch(e){ res.status(500).json({error:e.message}); } });
 app.delete('/api/statuses/:id', checkWrite, async (req, res) => { await Status.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
 
-// --- DEALERS API (ОПТИМИЗИРОВАННЫЙ) ---
+// Dealers List
 app.get('/api/dealers', async (req, res) => { 
     try { 
-        // ВАЖНО: .select('-photos ...') отключает загрузку тяжелых фото в списке
-        const dealers = await Dealer.find(getDealerFilter(req))
-            .select('-photos -visits -products') 
-            .lean(); 
-        
-        // Отдаем список (аватарка остается, галерея вырезана)
+        const dealers = await Dealer.find(getDealerFilter(req)).select('-photos -visits -products').lean(); 
         res.json(dealers.map(d => ({ id: d._id, ...d, photo_url: d.avatarUrl }))); 
-    } catch (e) { 
-        res.status(500).json({ error: e.message }); 
-    } 
+    } catch (e) { res.status(500).json({ error: e.message }); } 
 });
-
 app.get('/api/dealers/:id', async (req, res) => { try { const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).populate('products'); res.json(convertToClient(d)); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.post('/api/dealers', checkWrite, async (req, res) => { try { const role = getUserRole(req); if (role === 'astana') req.body.responsible = 'regional_astana'; if (role === 'regions') req.body.responsible = 'regional_regions'; const d = new Dealer(req.body); await d.save(); res.status(201).json(convertToClient(d)); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.put('/api/dealers/:id', checkWrite, async (req, res) => { try { await Dealer.findOneAndUpdate({ _id: req.params.id, ...getDealerFilter(req) }, req.body); res.json({status:'ok'}); } catch (e) { res.status(500).json({ error: e.message }); } });
@@ -191,22 +165,8 @@ app.post('/api/knowledge', checkWrite, async (req, res) => { const a = new Knowl
 app.put('/api/knowledge/:id', checkWrite, async (req, res) => { const a = await Knowledge.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(a)); });
 app.delete('/api/knowledge/:id', checkWrite, async (req, res) => { await Knowledge.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
 
-// --- TASKS API (Чтобы Дашборд работал быстро) ---
 app.get('/api/tasks', async (req, res) => {
-    try {
-        const data = await Dealer.find(getDealerFilter(req))
-            .select('name visits status responsible') 
-            .lean();
-        res.json(data.map(d => ({
-            id: d._id,
-            name: d.name,
-            status: d.status,
-            visits: d.visits || [],
-            responsible: d.responsible
-        })));
-    } catch (e) {
-        res.status(500).json([]); 
-    }
+    try { const data = await Dealer.find(getDealerFilter(req)).select('name visits status responsible').lean(); res.json(data.map(d => ({ id: d._id, name: d.name, status: d.status, visits: d.visits || [], responsible: d.responsible }))); } catch (e) { res.status(500).json([]); }
 });
 
 app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
