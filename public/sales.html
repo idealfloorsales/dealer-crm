@@ -3,89 +3,67 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Продажи</title>
+    <title>Продажи (Сектора)</title>
     
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="style.css?v=230"> <link rel="icon" href="favicon.gif" type="image/gif">
-    <link rel="manifest" href="manifest.json">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#b9040a">
+    <link rel="stylesheet" href="style.css?v=227"> <link rel="icon" href="favicon.gif" type="image/gif">
 </head>
-<body>
-    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-4">
+<body class="bg-light">
+
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top mb-4">
         <div class="container-fluid">
-            <a class="navbar-brand" href="/"><img src="logo.png" alt="Logo" height="40"></a>
+            <a class="navbar-brand" href="/"><img src="logo.png" alt="Logo" height="30"></a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"><span class="navbar-toggler-icon"></span></button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item"><a class="nav-link" href="/">Дилеры</a></li>
                     <li class="nav-item"><a class="nav-link" href="/map.html">Карта</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/products.html">Матрица</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/report.html">Выставленность</a></li>
                     <li class="nav-item"><a class="nav-link active" href="/sales.html">Продажи</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/competitors.html">Конкуренты</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/knowledge.html">Статьи</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/report.html">Отчет</a></li>
                 </ul>
                 <div class="d-flex align-items-center gap-3">
                     <span id="user-role-badge" class="badge bg-light text-dark border">...</span>
-                    <button id="logout-btn" class="btn btn-sm btn-outline-danger"><i class="bi bi-box-arrow-right me-1"></i>Выход</button>
+                    <a href="/" class="btn btn-sm btn-outline-secondary">Назад</a>
                 </div>
             </div>
         </div>
     </nav>
-    
-    <div class="container"> 
+
+    <div class="container pb-5">
         
-        <div class="bg-white p-3 rounded-4 shadow-sm mb-4 border border-light sticky-filters d-flex justify-content-between align-items-center flex-wrap gap-3">
-            <h1 class="mb-0 border-0 pt-0 mt-0 fs-2">KPI Продажи</h1>
-            <div class="d-flex gap-2 align-items-center">
-                <input type="month" id="month-picker" class="form-control fw-bold" style="width: 160px; border-radius: 8px;">
-                <button id="save-btn" class="btn btn-success shadow-sm px-4 rounded-pill"><i class="bi bi-save me-2"></i>Сохранить</button>
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+            <h2 class="fw-bold mb-0">Выполнение плана</h2>
+            <div class="d-flex gap-2 bg-white p-2 rounded shadow-sm">
+                <button class="btn btn-light border" id="btn-prev-month"><i class="bi bi-chevron-left"></i></button>
+                <input type="month" id="month-picker" class="form-control border-0 fw-bold text-center" style="width: 160px;">
+                <button class="btn btn-light border" id="btn-next-month"><i class="bi bi-chevron-right"></i></button>
             </div>
         </div>
 
-        <div class="row g-4 mb-5">
-            <div class="col-lg-7">
-                <h5 class="text-muted fw-bold mb-3 small text-uppercase ls-1">Ввод данных по регионам</h5>
-                <div id="sales-container" class="d-flex flex-column gap-3">
-                    <p class="text-center mt-5 text-muted">Загрузка данных...</p>
-                </div>
-            </div>
+        <div class="row g-3 mb-4" id="total-stats-container">
+            <div class="col-12 text-center py-5"><div class="spinner-border text-primary"></div></div>
+        </div>
 
-            <div class="col-lg-5">
-                <h5 class="text-muted fw-bold mb-3 small text-uppercase ls-1">Сводная ведомость</h5>
-                
-                <div class="card border-0 shadow-sm rounded-4 overflow-hidden sticky-top" style="top: 90px; z-index: 10;">
-                    <div class="card-header bg-white border-0 pt-4 px-4 pb-0">
-                        <h5 class="fw-bold mb-0">Результаты месяца</h5>
-                        <small class="text-muted" id="summary-subtitle">План / Факт / Прогноз</small>
-                    </div>
-                    <div class="card-body px-0">
-                        <div id="summary-list" class="summary-list-container">
-                            </div>
-                    </div>
-                    <div class="card-footer bg-light border-0 p-3">
-                         <div class="alert alert-light border mb-0 small text-muted">
-                             <i class="bi bi-info-circle me-1"></i> Прогноз считается автоматически исходя из текущего дня месяца.
-                         </div>
-                    </div>
+        <div id="sales-container" class="d-flex flex-column gap-4"></div>
+
+    </div>
+
+    <div class="modal fade" id="edit-sales-modal" tabindex="-1">
+        <div class="modal-dialog modal-sm modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-0 pb-0"><h6 class="modal-title fw-bold">Изменить план/факт</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <input type="hidden" id="edit_sales_dealer_id">
+                    <input type="hidden" id="edit_sales_dealer_name">
+                    <div class="mb-2"><label class="small text-muted">План (м²)</label><input type="number" id="edit_sales_plan" class="form-control"></div>
+                    <div class="mb-3"><label class="small text-muted">Факт (м²)</label><input type="number" id="edit_sales_fact" class="form-control"></div>
+                    <div class="d-grid"><button type="button" id="btn-save-sales" class="btn btn-primary">Сохранить</button></div>
                 </div>
             </div>
         </div>
     </div>
-    
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="sales.js?v=230"></script> <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js').catch(err => console.error(err));
-        }
-    </script>
-</body>
+    <script src="sales.js?v=306"></script> </body>
 </html>
