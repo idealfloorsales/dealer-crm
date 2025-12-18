@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dealer-crm-cache-v301'; // ОБНОВИЛ ВЕРСИЮ
+const CACHE_NAME = 'dealer-crm-cache-v305'; // Version updated for Export feature
 const ASSETS = [
     '/',
     '/index.html',
