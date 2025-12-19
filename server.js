@@ -53,7 +53,7 @@ const compContactSchema = new mongoose.Schema({ name: String, position: String, 
 const compRefSchema = new mongoose.Schema({ name: String, country: String, supplier: String, warehouse: String, info: String, storage_days: String, stock_info: String, reserve_days: String, contacts: [compContactSchema], collections: [collectionItemSchema] });
 const CompRef = mongoose.model('CompRef', compRefSchema);
 
-// DEALER SCHEMA (Обновленная)
+// DEALER SCHEMA
 const dealerSchema = new mongoose.Schema({ 
     dealer_id: String, 
     name: String, 
@@ -68,8 +68,8 @@ const dealerSchema = new mongoose.Schema({
     contract: { isSigned: Boolean, date: String }, 
     region_sector: String, 
     
-    // ВАЖНОЕ ПОЛЕ ДЛЯ ВАШЕЙ ЗАДАЧИ
-    hasPersonalPlan: { type: Boolean, default: false }, // Если true - отдельная строка в плане
+    // ЭТО ПОЛЕ ВАЖНО ДЛЯ ГАЛОЧКИ VIP
+    hasPersonalPlan: { type: Boolean, default: false }, 
 
     delivery: String, 
     website: String, 
@@ -133,7 +133,7 @@ app.post('/api/statuses', checkWrite, async (req, res) => { try { const s = new 
 app.put('/api/statuses/:id', checkWrite, async (req, res) => { try { await Status.findByIdAndUpdate(req.params.id, req.body); res.json({status:'ok'}); } catch(e){ res.status(500).json({error:e.message}); } });
 app.delete('/api/statuses/:id', checkWrite, async (req, res) => { await Status.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
 
-// Dealers List
+// Optimized Dealers List
 app.get('/api/dealers', async (req, res) => { 
     try { 
         const dealers = await Dealer.find(getDealerFilter(req)).select('-photos -visits -products').lean(); 
