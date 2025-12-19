@@ -8,11 +8,16 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="style.css?v=230"> <link rel="icon" href="favicon.gif" type="image/gif">
     <style>
-        /* Стили для красивого скроллбара в сводке */
         .custom-scroll::-webkit-scrollbar { width: 6px; }
         .custom-scroll::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #ced4da; border-radius: 4px; }
         .custom-scroll::-webkit-scrollbar-thumb:hover { background: #adb5bd; }
+        
+        /* Стили для дашборда */
+        .dash-card { transition: transform 0.2s; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .dash-card:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .dash-value { font-size: 1.5rem; font-weight: 700; color: #212529; }
+        .dash-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #6c757d; font-weight: 600; }
     </style>
 </head>
 <body class="bg-light">
@@ -47,6 +52,8 @@
             </div>
         </div>
 
+        <div id="sales-top-dashboard" class="row g-3 mb-4"></div>
+
         <div class="row g-4 mb-5">
             <div class="col-lg-7">
                 <div id="sales-container" class="d-flex flex-column gap-3">
@@ -59,11 +66,9 @@
                     <div class="card-header bg-white border-0 pt-4 px-4 pb-2">
                         <h5 class="fw-bold mb-0">Сводная ведомость</h5>
                     </div>
-                    
                     <div class="card-body px-0 pt-0 custom-scroll" style="max-height: calc(100vh - 220px); overflow-y: auto;">
                         <div id="summary-list" class="summary-list-container"></div>
                     </div>
-
                     <div class="card-footer bg-white border-top p-3">
                          <div class="d-flex align-items-center gap-2 small text-muted">
                              <i class="bi bi-info-circle-fill text-primary"></i> 
@@ -76,7 +81,7 @@
     </div>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="sales.js?v=310"></script> 
+    <script src="sales.js?v=312"></script> 
     <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(err => console.error(err)); }</script>
 </body>
 </html>
