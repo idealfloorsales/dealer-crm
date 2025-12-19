@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     
+    // Config
     const API_DEALERS = '/api/dealers';
     const API_SALES = '/api/sales';
     
@@ -10,13 +11,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveBtn = document.getElementById('save-btn');
     const logoutBtn = document.getElementById('logout-btn');
     
+    // Set Month
     const now = new Date();
     monthPicker.value = now.toISOString().slice(0, 7);
 
     // ГРУППЫ: Порядок и заголовки
     const groupsConfig = [
         { key: 'regional_astana', title: '📍 Астана (Региональный)' },
-        { key: 'vip', title: '⭐ Спец. Клиенты (VIP)' }, // Новая группа для Мир Ламината и 12 Месяцев
+        { key: 'vip', title: 'Спец. Клиенты (VIP)' }, 
         { key: 'north', title: 'Регион Север' },
         { key: 'south', title: 'Регион Юг' },
         { key: 'west', title: 'Регион Запад' },
@@ -60,11 +62,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getDealerGroup(d) {
-        // 1. Сначала проверяем VIP по имени (Мир Ламината, 12 Месяцев)
-        const lowerName = (d.name || '').toLowerCase();
-        if (lowerName.includes("мир ламината") || (lowerName.includes("12 месяцев") && lowerName.includes("алаш"))) {
-            return 'vip';
-        }
+        // 1. Сначала проверяем VIP (галочка в базе)
+        if (d.hasPersonalPlan) return 'vip';
 
         // 2. Астана
         if (d.responsible === 'regional_astana') return 'regional_astana';
@@ -187,7 +186,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="sales-row" data-id="${item.id || ''}" data-name="${item.name}" data-custom="${item.isCustom}">
                         <div class="sales-dealer-name text-truncate">
                             ${item.isCustom ? '<i class="bi bi-asterisk text-warning me-1"></i>' : ''}
-                            ${grp.key === 'vip' ? '<i class="bi bi-star-fill text-warning me-1"></i>' : ''}
                             <span class="${grp.key === 'vip' ? 'fw-bold text-primary' : ''}">${item.name}</span>
                         </div>
                         <div class="d-flex align-items-center gap-2">
