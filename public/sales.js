@@ -9,14 +9,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const summaryList = document.getElementById('summary-list');
     const dashboardTop = document.getElementById('sales-top-dashboard'); 
     const saveBtn = document.getElementById('save-btn');
-    const logoutBtn = document.getElementById('logout-btn');
     const printBtn = document.getElementById('print-btn');
     const summaryCol = document.getElementById('summary-col');
     
+    // Mobile Tabs Elements
+    const tabInputBtn = document.getElementById('tab-input-btn');
+    const tabSummaryBtn = document.getElementById('tab-summary-btn');
+    const colInput = document.getElementById('sales-container-col');
+    const colSummary = document.getElementById('summary-col');
+
     const now = new Date();
     monthPicker.value = now.toISOString().slice(0, 7);
 
-    // ГРУППЫ (БЕЗ ЭМОДЗИ)
     const groupsConfig = [
         { key: 'regional_astana', title: 'Астана (Региональный)' },
         { key: 'vip', title: 'Спец. Клиенты (VIP)' }, 
@@ -30,20 +34,55 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let allDealers = [];
     let currentSales = [];
-    let currentUserRole = 'guest';
-
+    
     async function init() {
         try {
             const authRes = await fetch('/api/auth/me');
             if (authRes.ok) {
                 const authData = await authRes.json();
-                currentUserRole = authData.role;
-                if (currentUserRole === 'guest') {
-                    if(saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<i class="bi bi-lock"></i> Только чтение'; }
+                if (authData.role === 'guest' && saveBtn) { 
+                    saveBtn.disabled = true; 
+                    saveBtn.innerHTML = '<i class="bi bi-lock"></i> Только чтение'; 
                 }
             }
         } catch (e) {}
         loadData();
+        setupMobileTabs();
+    }
+
+    // --- ЛОГИКА МОБИЛЬНЫХ ВКЛАДОК ---
+    function setupMobileTabs() {
+        if(!tabInputBtn || !tabSummaryBtn) return;
+
+        tabInputBtn.onclick = () => {
+            // Активируем кнопку
+            tabInputBtn.classList.add('btn-white', 'shadow-sm', 'text-primary');
+            tabInputBtn.classList.remove('text-muted');
+            tabSummaryBtn.classList.remove('btn-white', 'shadow-sm', 'text-primary');
+            tabSummaryBtn.classList.add('text-muted');
+
+            // Показываем колонку ввода, скрываем сводку
+            colInput.classList.remove('mobile-hidden');
+            colSummary.classList.add('mobile-hidden');
+            
+            // Скролл вверх
+            window.scrollTo(0, 0);
+        };
+
+        tabSummaryBtn.onclick = () => {
+            // Активируем кнопку
+            tabSummaryBtn.classList.add('btn-white', 'shadow-sm', 'text-primary');
+            tabSummaryBtn.classList.remove('text-muted');
+            tabInputBtn.classList.remove('btn-white', 'shadow-sm', 'text-primary');
+            tabInputBtn.classList.add('text-muted');
+
+            // Показываем сводку, скрываем ввод
+            colSummary.classList.remove('mobile-hidden');
+            colInput.classList.add('mobile-hidden');
+            
+            // Скролл вверх
+            window.scrollTo(0, 0);
+        };
     }
 
     async function loadData() {
@@ -247,10 +286,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let summaryHtml = '';
         summaryHtml += `<div class="p-3 bg-primary-subtle border-bottom"><h6 class="fw-bold mb-3 text-primary text-uppercase small ls-1">Общий результат</h6>${renderSumItem("ВСЕГО ПО КОМПАНИИ", "total_all", totalFactAll)}</div>`;
-        summaryHtml += renderSumItem("Астана", "regional_astana", facts.regional_astana);
+        summaryHtml += renderSumItem("Астана (Региональный)", "regional_astana", facts.regional_astana);
         
         if (facts.vip.length > 0) {
-            summaryHtml += `<div class="mt-2 mb-1 px-3 pt-2 border-top"><span class="small fw-bold text-muted text-uppercase"></span></div>`;
+            summaryHtml += `<div class="mt-2 mb-1 px-3 pt-2 border-top"><span class="small fw-bold text-muted text-uppercase">VIP Клиенты</span></div>`;
             facts.vip.forEach(v => summaryHtml += renderSumItem(v.name, `vip_${v.id}`, v.fact));
         }
 
@@ -263,7 +302,7 @@ document.addEventListener('DOMContentLoaded', () => {
         summaryHtml += renderSumItem("Центр", "center", facts.center, true);
         
         if (facts.other !== 0) {
-            summaryHtml += `<div class="summary-item"><div class="summary-header"><span class="summary-title text-danger">Без категории</span><span class="summary-percent text-muted">-</span></div><div class="summary-meta"><span>Факт: <strong>${fmt(facts.other)}</strong></span></div></div>`;
+            summaryHtml += `<div class="summary-item"><div class="summary-header"><span class="summary-title text-danger">⚠️ Без категории</span><span class="summary-percent text-muted">-</span></div><div class="summary-meta"><span>Факт: <strong>${fmt(facts.other)}</strong></span></div></div>`;
         }
 
         summaryList.innerHTML = summaryHtml;
@@ -280,21 +319,20 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (percent >= 80) badgeColor = 'bg-warning text-dark';
 
             return `
-            <div class="col-md-3 col-sm-6">
-                <div class="card dash-card h-100 rounded-4">
-                    <div class="card-body p-3">
+            <div class="col-md-3 col-sm-6 col-6"> <div class="card dash-card h-100 rounded-4">
+                    <div class="card-body p-2 p-md-3">
                         <div class="d-flex justify-content-between align-items-start mb-2">
-                            <span class="dash-label">${title}</span>
-                            <div class="icon-circle bg-${color}-subtle text-${color} small"><i class="bi ${iconClass}"></i></div>
+                            <span class="dash-label text-truncate" style="max-width: 80%">${title}</span>
+                            <div class="icon-circle bg-${color}-subtle text-${color} small d-none d-md-flex"><i class="bi ${iconClass}"></i></div>
                         </div>
-                        <div class="d-flex align-items-baseline gap-2 mb-1">
-                            <span class="dash-value">${fmt(fact)}</span>
-                            <span class="badge ${badgeColor} rounded-pill">${fmt(percent)}%</span>
+                        <div class="d-flex align-items-baseline gap-2 mb-1 flex-wrap">
+                            <span class="dash-value fs-5 fs-md-4">${fmt(fact)}</span>
+                            <span class="badge ${badgeColor} rounded-pill" style="font-size: 0.65rem">${fmt(percent)}%</span>
                         </div>
                         <div class="progress" style="height: 4px;">
                             <div class="progress-bar ${badgeColor}" style="width: ${Math.min(percent, 100)}%"></div>
                         </div>
-                        <div class="small text-muted mt-2">План: ${fmt(plan)}</div>
+                        <div class="small text-muted mt-2 d-none d-md-block">План: ${fmt(plan)}</div>
                     </div>
                 </div>
             </div>`;
@@ -338,8 +376,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (printBtn) {
         printBtn.onclick = () => {
-            // Передаем текущую дату для печати
-            if(summaryCol) summaryCol.setAttribute('data-print-date', new Date().toLocaleString('ru-RU'));
+            if(summaryCol) summaryCol.setAttribute('data-print-date', new Date().toLocaleDateString());
             window.print();
         };
     }
@@ -361,15 +398,6 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (e) { alert(e.message); saveBtn.disabled = false; }
             finally { saveBtn.disabled = false; }
         };
-    }
-    
-    if (logoutBtn) { 
-        logoutBtn.onclick = (e) => {
-            e.preventDefault(); localStorage.clear(); sessionStorage.clear();
-            logoutBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-            const xhr = new XMLHttpRequest(); xhr.open("GET", "/?chk=" + Math.random(), true, "logout", "logout");
-            xhr.onreadystatechange = function () { if (xhr.readyState == 4) window.location.reload(); }; xhr.send();
-        }; 
     }
 
     monthPicker.addEventListener('change', loadData);
