@@ -3,25 +3,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const API_DEALERS = '/api/dealers';
     const API_SALES = '/api/sales';
     
+    // UI Elements
     const monthPicker = document.getElementById('month-picker');
     const container = document.getElementById('sales-container');
     const summaryList = document.getElementById('summary-list');
-    const dashboardTop = document.getElementById('sales-top-dashboard'); // Ссылка на новый блок
+    const dashboardTop = document.getElementById('sales-top-dashboard'); 
     const saveBtn = document.getElementById('save-btn');
+    const printBtn = document.getElementById('print-btn'); // Кнопка печати
     const logoutBtn = document.getElementById('logout-btn');
+    const pageHeader = document.getElementById('page-header'); // Для даты в отчете
     
     const now = new Date();
     monthPicker.value = now.toISOString().slice(0, 7);
 
     const groupsConfig = [
-        { key: 'regional_astana', title: 'Астана' },
-        { key: 'vip', title: '' }, 
+        { key: 'regional_astana', title: '📍 Астана (Региональный)' },
+        { key: 'vip', title: 'Спец. Клиенты (VIP)' }, 
         { key: 'north', title: 'Регион Север' },
         { key: 'south', title: 'Регион Юг' },
         { key: 'west', title: 'Регион Запад' },
         { key: 'east', title: 'Регион Восток' },
         { key: 'center', title: 'Регион Центр' },
-        { key: 'other', title: 'Прочие' }
+        { key: 'other', title: '⚠️ Без ответственного / Прочие' }
     ];
 
     let allDealers = [];
@@ -78,11 +81,13 @@ document.addEventListener('DOMContentLoaded', () => {
         return Math.round(num * 100) / 100;
     }
 
-    function calculateKPI(plan, fact) {
+    function calculateKPI(plan, fact, daysInMonth, currentDay) {
         plan = parseFloat(plan) || 0;
         fact = parseFloat(fact) || 0;
+        let forecast = 0;
+        if (currentDay > 0) forecast = (fact / currentDay) * daysInMonth;
         const percent = plan > 0 ? (fact / plan) * 100 : 0;
-        return { diff: fact - plan, percent };
+        return { diff: fact - plan, forecast, percent };
     }
 
     function captureState() {
@@ -92,7 +97,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const dealerName = row.dataset.name;
             const isCustom = row.dataset.custom === 'true';
             const group = row.closest('.region-card').dataset.group;
-            
             const val = parseFloat(inp.value.replace(',', '.')) || 0;
 
             let record = currentSales.find(s => 
@@ -118,6 +122,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderAll() {
+        const date = new Date(monthPicker.value);
+        const year = date.getFullYear();
+        const monthIndex = date.getMonth();
+        const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+        const today = new Date();
+        let currentDay = daysInMonth; 
+        if (today.getFullYear() === year && today.getMonth() === monthIndex) {
+            currentDay = today.getDate();
+        }
+
         container.innerHTML = '';
         summaryList.innerHTML = '';
         if(dashboardTop) dashboardTop.innerHTML = '';
@@ -128,7 +142,6 @@ document.addEventListener('DOMContentLoaded', () => {
             vip: [] 
         };
 
-        // 1. INPUTS
         groupsConfig.forEach(grp => {
             const groupDealers = allDealers.filter(d => {
                 const isReal = d.status !== 'potential' && d.status !== 'archive';
@@ -187,7 +200,6 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         });
 
-        // 2. PLANS
         const plans = {};
         const summaryKeys = ["regional_regions", "north", "south", "west", "east", "center", "regional_astana", "total_all"];
         facts.vip.forEach(v => summaryKeys.push(`vip_${v.id}`));
@@ -201,13 +213,11 @@ document.addEventListener('DOMContentLoaded', () => {
         let totalVipFact = 0; facts.vip.forEach(v => totalVipFact += v.fact);
         const totalFactAll = totalRegionsFact + facts.regional_astana + totalVipFact + facts.other;
         
-        // 3. RENDER TOP DASHBOARD (NEW)
         renderTopDashboard(facts, plans, totalRegionsFact);
 
-        // 4. RENDER SUMMARY LIST
         const renderSumItem = (title, planKey, factVal, isSubItem = false) => {
             const plan = plans[planKey] || 0;
-            const { percent } = calculateKPI(plan, factVal);
+            const { percent } = calculateKPI(plan, factVal, daysInMonth, currentDay);
             
             let colorClass = 'p-mid'; let bgClass = 'bg-mid';
             if (percent >= 90) { colorClass = 'p-high'; bgClass = 'bg-high'; }
@@ -235,7 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let summaryHtml = '';
         summaryHtml += `<div class="p-3 bg-primary-subtle border-bottom"><h6 class="fw-bold mb-3 text-primary text-uppercase small ls-1">Общий результат</h6>${renderSumItem("ВСЕГО ПО КОМПАНИИ", "total_all", totalFactAll)}</div>`;
-        summaryHtml += renderSumItem("Астана", "regional_astana", facts.regional_astana);
+        summaryHtml += renderSumItem("📍 Астана (Региональный)", "regional_astana", facts.regional_astana);
         
         if (facts.vip.length > 0) {
             summaryHtml += `<div class="mt-2 mb-1 px-3 pt-2 border-top"><span class="small fw-bold text-muted text-uppercase">VIP Клиенты</span></div>`;
@@ -251,7 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
         summaryHtml += renderSumItem("Центр", "center", facts.center, true);
         
         if (facts.other !== 0) {
-            summaryHtml += `<div class="summary-item"><div class="summary-header"><span class="summary-title text-danger">Без категории</span><span class="summary-percent text-muted">-</span></div><div class="summary-meta"><span>Факт: <strong>${fmt(facts.other)}</strong></span></div></div>`;
+            summaryHtml += `<div class="summary-item"><div class="summary-header"><span class="summary-title text-danger">⚠️ Без категории</span><span class="summary-percent text-muted">-</span></div><div class="summary-meta"><span>Факт: <strong>${fmt(facts.other)}</strong></span></div></div>`;
         }
 
         summaryList.innerHTML = summaryHtml;
@@ -261,7 +271,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderTopDashboard(facts, plans, totalRegionsFact) {
         if (!dashboardTop) return;
         
-        // Генерация HTML для карточки
         const createCard = (title, fact, plan, iconClass='bi-graph-up', color='primary') => {
             const { percent } = calculateKPI(plan, fact);
             let badgeColor = 'bg-danger';
@@ -290,15 +299,12 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         let html = '';
-        // 1. Астана
         html += createCard('Астана', facts.regional_astana, plans.regional_astana, 'bi-building', 'primary');
-        // 2. Регионы
         html += createCard('Регионы', totalRegionsFact, plans.regional_regions, 'bi-globe', 'info');
         
-        // 3. VIP Клиенты (Динамически)
         facts.vip.forEach(v => {
             const plan = plans[`vip_${v.id}`] || 0;
-            html += createCard(v.name, v.fact, plan, 'bi-star-fill', 'warning');
+            html += createCard(v.name, v.fact, plan, 'bi-star', 'warning');
         });
 
         dashboardTop.innerHTML = html;
@@ -326,6 +332,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             };
         });
+    }
+
+    if (printBtn) {
+        printBtn.onclick = () => {
+            if(pageHeader) pageHeader.setAttribute('data-date', new Date().toLocaleDateString());
+            window.print();
+        };
     }
 
     if (saveBtn) {
