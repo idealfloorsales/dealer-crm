@@ -17,14 +17,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ГРУППЫ: Порядок и заголовки
     const groupsConfig = [
-        { key: 'regional_astana', title: '📍 Астана (Региональный)' },
-        { key: 'vip', title: 'Спец. Клиенты (VIP)' }, 
+        { key: 'regional_astana', title: 'Астана (Региональный)' },
+        { key: 'vip', title: '' }, 
         { key: 'north', title: 'Регион Север' },
         { key: 'south', title: 'Регион Юг' },
         { key: 'west', title: 'Регион Запад' },
         { key: 'east', title: 'Регион Восток' },
         { key: 'center', title: 'Регион Центр' },
-        { key: 'other', title: '⚠️ Без ответственного / Прочие' }
+        { key: 'other', title: 'Прочие' }
     ];
 
     let allDealers = [];
