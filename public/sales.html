@@ -18,35 +18,54 @@
         .dash-value { font-size: 1.5rem; font-weight: 700; color: #212529; }
         .dash-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #6c757d; font-weight: 600; }
 
-        /* --- СТИЛИ ДЛЯ ПЕЧАТИ (КРАСИВЫЙ ОТЧЕТ) --- */
+        /* --- СТИЛИ ДЛЯ ПЕЧАТИ (ТОЛЬКО СВОДКА) --- */
         @media print {
-            body { background-color: white !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            @page { margin: 1cm; size: A4 portrait; }
             
-            /* Скрываем лишнее: навигацию, кнопки, левую колонку ввода */
-            .navbar, .sticky-filters button, .sticky-filters input, #sales-container-col, #logout-btn, .btn, .no-print { 
+            body { background-color: white !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; font-family: sans-serif; }
+            
+            /* СКРЫВАЕМ ВСЁ ЛИШНЕЕ */
+            .navbar, 
+            #page-header, 
+            #sales-top-dashboard, 
+            #sales-container-col, /* Левая колонка ввода */
+            .card-footer, 
+            #logout-btn,
+            .btn,
+            .sales-input-group { 
                 display: none !important; 
             }
 
-            /* Растягиваем контейнер */
-            .container { max-width: 100% !important; padding: 0 !important; margin: 0 !important; }
+            /* Сбрасываем сетку Bootstrap */
+            .container, .row { max-width: 100% !important; width: 100% !important; padding: 0 !important; margin: 0 !important; }
             
-            /* Настраиваем заголовок отчета */
-            .sticky-filters { border: none !important; shadow: none !important; padding: 0 !important; margin-bottom: 20px !important; }
-            .sticky-filters h1 { font-size: 24px !important; color: #000 !important; }
-            /* Добавляем дату в заголовок при печати */
-            .sticky-filters::after { content: "Отчет сформирован: " attr(data-date); display: block; font-size: 12px; color: #666; margin-top: 5px; }
-
-            /* Правая колонка (Сводка) теперь на всю ширину */
-            #summary-col { width: 100% !important; flex: 0 0 100% !important; max-width: 100% !important; }
+            /* РАЗВОРАЧИВАЕМ ПРАВУЮ КОЛОНКУ */
+            #summary-col { 
+                display: block !important;
+                width: 100% !important; 
+                flex: 0 0 100% !important; 
+                max-width: 100% !important; 
+            }
             
-            /* Убираем скролл внутри сводки, чтобы напечаталось всё */
-            .card-body.custom-scroll { max-height: none !important; overflow: visible !important; }
+            /* Убираем тени и границы карточки */
             .card { border: none !important; box-shadow: none !important; }
+            .card-header { background: none !important; border-bottom: 2px solid #000 !important; padding-left: 0 !important; }
             .sticky-top { position: static !important; }
             
-            /* Улучшаем вид дашборда сверху */
-            #sales-top-dashboard { margin-bottom: 30px !important; }
-            .dash-card { box-shadow: none !important; border: 1px solid #eee !important; page-break-inside: avoid; }
+            /* Раскрываем скролл (печатаем всё содержимое) */
+            .card-body.custom-scroll { max-height: none !important; overflow: visible !important; }
+
+            /* Добавляем дату печати */
+            #summary-col::after {
+                content: "Сформировано: " attr(data-print-date);
+                display: block;
+                margin-top: 30px;
+                font-size: 10pt;
+                color: #666;
+                text-align: right;
+                border-top: 1px solid #ddd;
+                padding-top: 10px;
+            }
         }
     </style>
 </head>
@@ -59,8 +78,11 @@
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item"><a class="nav-link" href="/">Дилеры</a></li>
                     <li class="nav-item"><a class="nav-link" href="/map.html">Карта</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/products.html">Матрица</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/report.html">Выставленность</a></li>
                     <li class="nav-item"><a class="nav-link active" href="/sales.html">Продажи</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/report.html">Отчет</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/competitors.html">Конкуренты</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/knowledge.html">Статьи</a></li>
                 </ul>
                 <div class="d-flex align-items-center gap-3">
                     <span id="user-role-badge" class="badge bg-light text-dark border">...</span>
@@ -75,7 +97,7 @@
             <h1 class="mb-0 border-0 pt-0 mt-0 fs-2 fw-bold text-dark">KPI Продажи</h1>
             <div class="d-flex gap-2 align-items-center">
                 <input type="month" id="month-picker" class="form-control fw-bold border-0 bg-light" style="width: 160px; border-radius: 8px;">
-                <button id="print-btn" class="btn btn-light border text-primary shadow-sm px-3 rounded-pill" title="Печать / Скачать PDF"><i class="bi bi-printer-fill me-2"></i>Отчет</button>
+                <button id="print-btn" class="btn btn-light border text-primary shadow-sm px-3 rounded-pill" title="Печать"><i class="bi bi-printer-fill me-2"></i>Отчет</button>
                 <button id="save-btn" class="btn btn-success shadow-sm px-4 rounded-pill"><i class="bi bi-save me-2"></i>Сохранить</button>
             </div>
         </div>
@@ -97,7 +119,7 @@
                     <div class="card-body px-0 pt-0 custom-scroll" style="max-height: calc(100vh - 220px); overflow-y: auto;">
                         <div id="summary-list" class="summary-list-container"></div>
                     </div>
-                    <div class="card-footer bg-white border-top p-3 no-print">
+                    <div class="card-footer bg-white border-top p-3">
                          <div class="d-flex align-items-center gap-2 small text-muted">
                              <i class="bi bi-info-circle-fill text-primary"></i> 
                              <span>Прогноз считается от текущего дня.</span>
@@ -109,7 +131,7 @@
     </div>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="sales.js?v=314"></script> 
+    <script src="sales.js?v=315"></script> 
     <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(err => console.error(err)); }</script>
 </body>
 </html>
