@@ -1,10 +1,9 @@
-const CACHE_NAME = 'dealer-crm-cache-v306'; // Updated for Sales Sectors
-// ... (остальной код тот же, что в файле sw.js из предыдущего сообщения)
+const CACHE_NAME = 'dealer-crm-cache-v309'; // UPDATED VERSION
 const ASSETS = [
     '/',
     '/index.html',
     '/map.html',
-    '/sales.html', 
+    '/sales.html',
     '/report.html',
     '/products.html',
     '/competitors.html',
@@ -53,7 +52,9 @@ self.addEventListener('fetch', (e) => {
             return fetch(e.request).then((response) => {
                 if (!response || response.status !== 200 || response.type !== 'basic') return response;
                 const responseToCache = response.clone();
-                caches.open(CACHE_NAME).then((cache) => cache.put(e.request, responseToCache));
+                caches.open(CACHE_NAME).then((cache) => {
+                    cache.put(e.request, responseToCache);
+                });
                 return response;
             }).catch(() => {});
         })
