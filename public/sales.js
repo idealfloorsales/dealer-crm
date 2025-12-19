@@ -247,10 +247,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let summaryHtml = '';
         summaryHtml += `<div class="p-3 bg-primary-subtle border-bottom"><h6 class="fw-bold mb-3 text-primary text-uppercase small ls-1">Общий результат</h6>${renderSumItem("ВСЕГО ПО КОМПАНИИ", "total_all", totalFactAll)}</div>`;
-        summaryHtml += renderSumItem("Астана (Региональный)", "regional_astana", facts.regional_astana);
+        summaryHtml += renderSumItem("Астана", "regional_astana", facts.regional_astana);
         
         if (facts.vip.length > 0) {
-            summaryHtml += `<div class="mt-2 mb-1 px-3 pt-2 border-top"><span class="small fw-bold text-muted text-uppercase">VIP Клиенты</span></div>`;
+            summaryHtml += `<div class="mt-2 mb-1 px-3 pt-2 border-top"><span class="small fw-bold text-muted text-uppercase"></span></div>`;
             facts.vip.forEach(v => summaryHtml += renderSumItem(v.name, `vip_${v.id}`, v.fact));
         }
 
