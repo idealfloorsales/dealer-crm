@@ -36,7 +36,7 @@
             text-align: center; color: #adb5bd; padding: 10px 0;
             text-decoration: none; flex: 1; transition: color 0.2s;
         }
-        .bottom-nav-item.active { color: #0d6efd; }
+        .bottom-nav-item.active { color: #B9040A; }
         .bottom-nav-item i { font-size: 1.4rem; display: block; margin-bottom: 2px; }
         .bottom-nav-item span { font-size: 0.65rem; font-weight: 600; }
 
@@ -49,7 +49,7 @@
                 position: fixed; bottom: 90px; right: 20px;
                 width: 56px; height: 56px;
                 border-radius: 50%;
-                background: #0d6efd; color: white;
+                background: #B9040A; color: white;
                 display: flex; align-items: center; justify-content: center;
                 box-shadow: 0 4px 15px rgba(13, 110, 253, 0.4);
                 z-index: 1040; font-size: 24px;
@@ -420,10 +420,11 @@
     </div>
 
     <div class="modal fade" id="quick-visit-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Быстрый визит</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="quick-visit-form"><input type="hidden" id="qv_dealer_id"><div class="mb-3"><textarea class="form-control" id="qv_comment" rows="3" required placeholder="Комментарий..."></textarea></div><div class="d-grid"><button type="submit" class="btn btn-success">Сохранить</button></div></form></div></div></div></div>
-    <div class="modal fade" id="status-manager-modal" tabindex="-1"><div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title fw-bold">Управление статусами</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="card bg-light border-0 mb-4"><div class="card-body"><form id="status-form" class="row g-2 align-items-end"><input type="hidden" id="st_id"> <div class="col-md-4"><label class="form-label small fw-bold text-muted">Название</label><input type="text" id="st_label" class="form-control" placeholder="Напр. VIP Клиент" required></div><div class="col-md-2 col-3"><label class="form-label small fw-bold text-muted">Цвет</label><input type="color" id="st_color" class="form-control form-control-color w-100" value="#0d6efd" title="Выберите цвет"></div><div class="col-md-3 col-9"><label class="form-label small fw-bold text-muted">Видимость</label><div class="form-check pt-1"><input class="form-check-input" type="checkbox" id="st_visible" checked><label class="form-check-label small" for="st_visible">Показывать в списке</label></div></div><div class="col-md-3 text-end"><button type="button" id="btn-cancel-edit-status" class="btn btn-sm btn-link text-muted me-2" style="display:none;">Отмена</button><button type="submit" class="btn btn-primary w-100" id="btn-save-status">Добавить</button></div></form></div></div><div class="table-responsive"><table class="table table-hover align-middle"><thead class="table-light small text-muted text-uppercase"><tr><th>Цвет</th><th>Название</th><th>Код (ID)</th><th class="text-center">В списке</th><th class="text-end">Действия</th></tr></thead><tbody id="status-manager-list"></tbody></table></div></div></div></div></div>
+    <div class="modal fade" id="status-manager-modal" tabindex="-1"><div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title fw-bold">Управление статусами</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="card bg-light border-0 mb-4"><div class="card-body"><form id="status-form" class="row g-2 align-items-end"><input type="hidden" id="st_id"> <div class="col-md-4"><label class="form-label small fw-bold text-muted">Название</label><input type="text" id="st_label" class="form-control" placeholder="Напр. VIP Клиент" required></div><div class="col-md-2 col-3"><label class="form-label small fw-bold text-muted">Цвет</label><input type="color" id="st_color" class="form-control form-control-color w-100" value="#B9040A" title="Выберите цвет"></div><div class="col-md-3 col-9"><label class="form-label small fw-bold text-muted">Видимость</label><div class="form-check pt-1"><input class="form-check-input" type="checkbox" id="st_visible" checked><label class="form-check-label small" for="st_visible">Показывать в списке</label></div></div><div class="col-md-3 text-end"><button type="button" id="btn-cancel-edit-status" class="btn btn-sm btn-link text-muted me-2" style="display:none;">Отмена</button><button type="submit" class="btn btn-primary w-100" id="btn-save-status">Добавить</button></div></form></div></div><div class="table-responsive"><table class="table table-hover align-middle"><thead class="table-light small text-muted text-uppercase"><tr><th>Цвет</th><th>Название</th><th>Код (ID)</th><th class="text-center">В списке</th><th class="text-end">Действия</th></tr></thead><tbody id="status-manager-list"></tbody></table></div></div></div></div></div>
     
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="script.js?v=249"></script> <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(err => console.error(err)); }</script>
 </body>
 </html>
+
