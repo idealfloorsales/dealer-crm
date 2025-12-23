@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('comp-form');
     const modalTitle = document.getElementById('comp-modal-title');
     const delBtn = document.getElementById('btn-delete-comp');
-    const saveBtn = document.getElementById('btn-save-comp'); // НОВАЯ КНОПКА
+    const saveBtn = document.getElementById('btn-save-comp');
 
     // Контейнеры
     const collectionsContainer = document.getElementById('collections-container');
@@ -34,19 +34,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const inpStock = document.getElementById('comp_stock');
     const inpReserve = document.getElementById('comp_reserve');
 
-    // Настройки
-    const collectionTypes = [
+    // Базовые типы
+    const defaultTypes = [
         { val: 'std', label: 'Стандарт', css: 'cb-std', dot: '#94a3b8' },
         { val: 'eng', label: 'Англ. Елка', css: 'cb-eng', dot: '#10b981' },
         { val: 'fr', label: 'Фр. Елка', css: 'cb-fr', dot: '#3b82f6' },
         { val: 'art', label: 'Художественный', css: 'cb-art', dot: '#f59e0b' },
-        { val: 'art_eng', label: 'Худ. Англ.', css: 'cb-art', dot: '#d97706' },
-        { val: 'art_fr', label: 'Худ. Фр.', css: 'cb-art', dot: '#7c3aed' },
         { val: 'mix', label: 'Худ. Микс', css: 'cb-art', dot: '#ef4444' }
     ];
 
     let competitors = [];
     let isSaving = false;
+    let dynamicTypes = []; // Сюда будем собирать найденные в базе типы
 
     // --- 1. ЗАГРУЗКА ---
     async function loadList() {
@@ -55,31 +54,86 @@ document.addEventListener('DOMContentLoaded', () => {
             if(res.ok) {
                 competitors = await res.json();
                 competitors.sort((a, b) => a.name.localeCompare(b.name));
+                refreshDynamicTypes(); // Обновляем список типов
+                updateFilterOptions(); // Обновляем фильтр в шапке
                 renderDashboard();
                 renderGrid();
             }
         } catch(e) { if(gridContainer) gridContainer.innerHTML = '<p class="text-danger p-5 text-center">Ошибка загрузки</p>'; }
     }
 
+    // Собираем все уникальные типы из базы
+    function refreshDynamicTypes() {
+        const found = new Set();
+        competitors.forEach(c => {
+            (c.collections || []).forEach(col => {
+                const t = (typeof col === 'string') ? 'std' : (col.type || 'std');
+                // Если типа нет в стандартных, добавляем в найденные
+                if (!defaultTypes.find(x => x.val === t)) {
+                    found.add(t);
+                }
+            });
+        });
+        
+        dynamicTypes = Array.from(found).map(t => ({
+            val: t,
+            label: t, // Названием будет сам код типа
+            css: 'cb-custom', 
+            dot: '#8b5cf6' // Фиолетовый для кастомных
+        }));
+    }
+
+    function getAllTypes() {
+        return [...defaultTypes, ...dynamicTypes];
+    }
+
+    function updateFilterOptions() {
+        if(!filterType) return;
+        const currentVal = filterType.value;
+        let html = `<option value="all">Все типы коллекций</option>`;
+        
+        // Стандартные (группируем для красоты или просто выводим)
+        defaultTypes.forEach(t => {
+            if(t.val !== 'std') html += `<option value="${t.val}">${t.label}</option>`;
+        });
+        
+        // Пользовательские
+        if(dynamicTypes.length > 0) {
+            html += `<optgroup label="Пользовательские">`;
+            dynamicTypes.forEach(t => html += `<option value="${t.val}">${t.label}</option>`);
+            html += `</optgroup>`;
+        }
+        
+        filterType.innerHTML = html;
+        filterType.value = currentVal;
+    }
+
     // --- 2. ДАШБОРД ---
     function renderDashboard() {
         if (!dashboardContainer) return;
         const totalBrands = competitors.length;
-        let totalCols = 0; let countEng = 0; let countFr = 0; let countArt = 0;
+        let totalCols = 0;
+        
+        // Группировка для дашборда упрощенная
+        let countEng = 0; let countFr = 0; let countArt = 0; let countCustom = 0;
+
         competitors.forEach(c => {
             (c.collections || []).forEach(col => {
                 totalCols++;
                 const t = (typeof col === 'string') ? 'std' : (col.type || 'std');
+                
                 if (t.includes('eng')) countEng++;
-                if (t.includes('fr') || t.includes('french')) countFr++;
-                if (t.includes('art') || t.includes('mix')) countArt++;
+                else if (t.includes('fr')) countFr++;
+                else if (t.includes('art') || t.includes('mix')) countArt++;
+                else if (t !== 'std') countCustom++; // Все остальные кастомные
             });
         });
+        
         dashboardContainer.innerHTML = `
             <div class="col-xl-3 col-md-6"><div class="stat-card-modern"><div class="stat-icon-box bg-primary-subtle text-primary"><i class="bi bi-shop"></i></div><div class="stat-info"><h3>${totalBrands}</h3><p>Брендов</p></div></div></div>
             <div class="col-xl-3 col-md-6"><div class="stat-card-modern"><div class="stat-icon-box bg-secondary-subtle text-secondary"><i class="bi bi-collection"></i></div><div class="stat-info"><h3>${totalCols}</h3><p>Коллекций</p></div></div></div>
             <div class="col-xl-3 col-md-6"><div class="stat-card-modern"><div class="stat-icon-box bg-success-subtle text-success"><i class="bi bi-chevron-double-up"></i></div><div class="stat-info"><h3>${countEng + countFr}</h3><p>Елочка</p></div></div></div>
-            <div class="col-xl-3 col-md-6"><div class="stat-card-modern"><div class="stat-icon-box bg-warning-subtle text-warning"><i class="bi bi-gem"></i></div><div class="stat-info"><h3>${countArt}</h3><p>Арт / Модуль</p></div></div></div>
+            <div class="col-xl-3 col-md-6"><div class="stat-card-modern"><div class="stat-icon-box bg-info-subtle text-info"><i class="bi bi-stars"></i></div><div class="stat-info"><h3>${countCustom + countArt}</h3><p>Арт / Другое</p></div></div></div>
         `;
     }
 
@@ -87,10 +141,17 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderGrid() {
         const search = searchInput ? searchInput.value.toLowerCase() : '';
         const filter = filterType ? filterType.value : 'all';
+        const allTypesList = getAllTypes();
+
         const filtered = competitors.filter(c => {
             const matchSearch = !search || c.name.toLowerCase().includes(search) || (c.supplier || '').toLowerCase().includes(search) || (c.country || '').toLowerCase().includes(search);
             let matchFilter = true;
-            if (filter !== 'all') { const typeKey = (filter === 'art') ? 'art' : filter; matchFilter = c.collections && c.collections.some(col => (col.type || 'std').includes(typeKey)); }
+            if (filter !== 'all') { 
+                matchFilter = c.collections && c.collections.some(col => {
+                    const t = col.type || 'std';
+                    return t === filter; 
+                }); 
+            }
             return matchSearch && matchFilter;
         });
 
@@ -100,17 +161,21 @@ document.addEventListener('DOMContentLoaded', () => {
             const typesSet = new Set();
             (c.collections || []).forEach(col => {
                 const t = (typeof col === 'string') ? 'std' : (col.type || 'std');
-                if (t !== 'std') { if(t.includes('eng')) typesSet.add('eng'); else if(t.includes('fr')) typesSet.add('fr'); else if(t.includes('art') || t.includes('mix')) typesSet.add('art'); }
+                if (t !== 'std') typesSet.add(t);
             });
-            let badgesHtml = ''; typesSet.forEach(t => { const info = collectionTypes.find(x => x.val === t); if(info) badgesHtml += `<span class="c-badge ${info.css}">${info.label}</span>`; });
+            
+            let badgesHtml = ''; 
+            typesSet.forEach(t => { 
+                const info = allTypesList.find(x => x.val === t) || { label: t, css: 'cb-custom' }; 
+                badgesHtml += `<span class="c-badge ${info.css}">${info.label}</span>`; 
+            });
             if(!badgesHtml) badgesHtml = `<span class="c-badge cb-std">Стандарт</span>`;
 
             const listHtml = (c.collections || []).map(col => {
                 const name = (typeof col === 'string') ? col : col.name;
                 const type = (typeof col === 'string') ? 'std' : (col.type || 'std');
-                let dotColor = '#94a3b8'; 
-                if(type.includes('eng')) dotColor = '#10b981'; else if(type.includes('fr')) dotColor = '#3b82f6'; else if(type.includes('art')) dotColor = '#f59e0b';
-                return `<div class="comp-list-item"><span><span class="comp-dot" style="background:${dotColor}"></span> ${name}</span></div>`;
+                const info = allTypesList.find(x => x.val === type) || { dot: '#8b5cf6' };
+                return `<div class="comp-list-item"><span><span class="comp-dot" style="background:${info.dot}"></span> ${name}</span></div>`;
             }).join('');
 
             return `<div class="col-xl-3 col-lg-4 col-md-6"><div class="comp-card-modern" id="card-${c.id}"><button class="btn-card-edit-abs" onclick="openEditModal('${c.id}')"><i class="bi bi-pencil-fill"></i></button><div class="comp-front"><span class="comp-flag">${c.country || 'Страна не указана'}</span><div class="comp-title">${c.name}</div><div class="comp-meta"><i class="bi bi-box-seam"></i> <span>${c.supplier || '-'}</span></div><div class="comp-meta"><i class="bi bi-geo-alt"></i> <span>${c.warehouse || '-'}</span></div><div class="comp-badges">${badgesHtml}</div><button class="btn-flip" onclick="toggleCard('${c.id}')">Коллекции (${(c.collections||[]).length}) <i class="bi bi-chevron-down ms-1"></i></button></div><div class="comp-back"><div class="d-flex justify-content-between align-items-center mb-2"><h6 class="fw-bold mb-0">Коллекции</h6><button class="btn-close-flip" onclick="toggleCard('${c.id}')"><i class="bi bi-x"></i></button></div><div class="comp-list-scroll">${listHtml || '<div class="text-center text-muted small mt-4">Пусто</div>'}</div></div></div></div>`;
@@ -133,13 +198,42 @@ document.addEventListener('DOMContentLoaded', () => {
         addBtn.onclick = () => { inpId.value = ''; form.reset(); modalTitle.textContent = 'Новый Бренд'; if(delBtn) delBtn.style.display = 'none'; collectionsContainer.innerHTML = ''; contactsContainer.innerHTML = ''; addCollectionRow(); addContactRow(); modal.show(); };
     }
 
-    // --- 5. ROWS ---
+    // --- 5. ROWS (С ЛОГИКОЙ ДОБАВЛЕНИЯ ТИПА) ---
     function addCollectionRow(name = '', type = 'std') {
         const div = document.createElement('div'); div.className = 'competitor-entry'; div.style.gridTemplateColumns = "2fr 1.5fr auto"; 
-        let options = collectionTypes.map(t => `<option value="${t.val}" ${t.val === type ? 'selected' : ''}>${t.label}</option>`).join('');
-        div.innerHTML = `<input type="text" class="form-control" placeholder="Название коллекции" value="${name}" required><select class="form-select">${options}</select><button type="button" class="btn-remove-entry" onclick="this.closest('.competitor-entry').remove()"><i class="bi bi-x-lg"></i></button>`;
+        
+        const allTypes = getAllTypes();
+        let options = allTypes.map(t => `<option value="${t.val}" ${t.val === type ? 'selected' : ''}>${t.label}</option>`).join('');
+        
+        // Добавляем опцию создания нового типа
+        options += `<option value="__NEW__" class="fw-bold text-primary">+ Свой тип...</option>`;
+
+        div.innerHTML = `<input type="text" class="form-control" placeholder="Название коллекции" value="${name}" required><select class="form-select collection-type-select">${options}</select><button type="button" class="btn-remove-entry" onclick="this.closest('.competitor-entry').remove()"><i class="bi bi-x-lg"></i></button>`;
+        
+        // Логика выбора "Новый тип"
+        const select = div.querySelector('select');
+        select.onchange = function() {
+            if (this.value === '__NEW__') {
+                const newName = prompt("Введите название нового типа (например, Кварцвинил):");
+                if (newName && newName.trim()) {
+                    const cleanName = newName.trim();
+                    // Создаем новую опцию
+                    const newOpt = document.createElement('option');
+                    newOpt.value = cleanName;
+                    newOpt.text = cleanName;
+                    newOpt.selected = true;
+                    // Вставляем перед "Добавить"
+                    this.insertBefore(newOpt, this.lastElementChild);
+                    this.value = cleanName; // Выбираем её
+                } else {
+                    this.value = 'std'; // Если отменили
+                }
+            }
+        };
+
         collectionsContainer.appendChild(div);
     }
+
     function addContactRow(name='', pos='', phone='') {
         const div = document.createElement('div'); div.className = 'competitor-entry'; div.style.gridTemplateColumns = "1fr 1fr 1fr auto"; 
         div.innerHTML = `<input type="text" class="form-control" placeholder="Имя" value="${name}"><input type="text" class="form-control" placeholder="Должность" value="${pos}"><input type="text" class="form-control" placeholder="Телефон" value="${phone}"><button type="button" class="btn-remove-entry" onclick="this.closest('.competitor-entry').remove()"><i class="bi bi-x-lg"></i></button>`;
@@ -148,12 +242,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if(addCollRowBtn) addCollRowBtn.onclick = () => addCollectionRow();
     if(addContactBtn) addContactBtn.onclick = () => addContactRow();
 
-    // --- 6. SAVE LOGIC (DIRECT CLICK FIX) ---
+    // --- 6. SAVE LOGIC ---
     if(saveBtn) {
         saveBtn.onclick = async () => {
             if(isSaving) return; 
             
-            // Ручная валидация
             if(!inpName.value.trim()) { alert("Введите название бренда!"); return; }
 
             isSaving = true;
