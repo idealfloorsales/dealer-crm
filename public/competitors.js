@@ -8,10 +8,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const addBtn = document.getElementById('add-comp-btn');
     const exportBtn = document.getElementById('export-comp-btn');
     const dashboardContainer = document.getElementById('comp-dashboard');
+    const btnManageTypes = document.getElementById('btn-manage-types');
 
-    // Модалка
+    // Модалки
     const modalEl = document.getElementById('comp-modal');
     const modal = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: false });
+    
+    const typesModalEl = document.getElementById('types-manager-modal');
+    const typesModal = new bootstrap.Modal(typesModalEl);
+    const typesListContainer = document.getElementById('types-manager-list');
+
     const form = document.getElementById('comp-form');
     const modalTitle = document.getElementById('comp-modal-title');
     const delBtn = document.getElementById('btn-delete-comp');
@@ -34,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const inpStock = document.getElementById('comp_stock');
     const inpReserve = document.getElementById('comp_reserve');
 
-    // Базовые типы
+    // Базовые типы (их нельзя удалять)
     const defaultTypes = [
         { val: 'std', label: 'Стандарт', css: 'cb-std', dot: '#94a3b8' },
         { val: 'eng', label: 'Англ. Елка', css: 'cb-eng', dot: '#10b981' },
@@ -45,7 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let competitors = [];
     let isSaving = false;
-    let dynamicTypes = []; // Сюда будем собирать найденные в базе типы
+    let dynamicTypes = [];
 
     // --- 1. ЗАГРУЗКА ---
     async function loadList() {
@@ -54,33 +60,27 @@ document.addEventListener('DOMContentLoaded', () => {
             if(res.ok) {
                 competitors = await res.json();
                 competitors.sort((a, b) => a.name.localeCompare(b.name));
-                refreshDynamicTypes(); // Обновляем список типов
-                updateFilterOptions(); // Обновляем фильтр в шапке
+                refreshDynamicTypes();
+                updateFilterOptions();
                 renderDashboard();
                 renderGrid();
             }
         } catch(e) { if(gridContainer) gridContainer.innerHTML = '<p class="text-danger p-5 text-center">Ошибка загрузки</p>'; }
     }
 
-    // Собираем все уникальные типы из базы
     function refreshDynamicTypes() {
         const found = new Set();
         competitors.forEach(c => {
             (c.collections || []).forEach(col => {
                 const t = (typeof col === 'string') ? 'std' : (col.type || 'std');
-                // Если типа нет в стандартных, добавляем в найденные
-                if (!defaultTypes.find(x => x.val === t)) {
-                    found.add(t);
-                }
+                if (!defaultTypes.find(x => x.val === t)) { found.add(t); }
             });
         });
         
         dynamicTypes = Array.from(found).map(t => ({
-            val: t,
-            label: t, // Названием будет сам код типа
-            css: 'cb-custom', 
-            dot: '#8b5cf6' // Фиолетовый для кастомных
+            val: t, label: t, css: 'cb-custom', dot: '#8b5cf6'
         }));
+        dynamicTypes.sort((a,b) => a.label.localeCompare(b.label));
     }
 
     function getAllTypes() {
@@ -91,51 +91,121 @@ document.addEventListener('DOMContentLoaded', () => {
         if(!filterType) return;
         const currentVal = filterType.value;
         let html = `<option value="all">Все типы коллекций</option>`;
-        
-        // Стандартные (группируем для красоты или просто выводим)
-        defaultTypes.forEach(t => {
-            if(t.val !== 'std') html += `<option value="${t.val}">${t.label}</option>`;
-        });
-        
-        // Пользовательские
+        defaultTypes.forEach(t => { if(t.val !== 'std') html += `<option value="${t.val}">${t.label}</option>`; });
         if(dynamicTypes.length > 0) {
             html += `<optgroup label="Пользовательские">`;
             dynamicTypes.forEach(t => html += `<option value="${t.val}">${t.label}</option>`);
             html += `</optgroup>`;
         }
-        
         filterType.innerHTML = html;
-        filterType.value = currentVal;
+        // Если выбранный тип был удален, сбрасываем на all
+        if (currentVal !== 'all' && !getAllTypes().find(t => t.val === currentVal)) {
+            filterType.value = 'all';
+        } else {
+            filterType.value = currentVal;
+        }
     }
 
-    // --- 2. ДАШБОРД ---
-    function renderDashboard() {
-        if (!dashboardContainer) return;
-        const totalBrands = competitors.length;
-        let totalCols = 0;
-        
-        // Группировка для дашборда упрощенная
-        let countEng = 0; let countFr = 0; let countArt = 0; let countCustom = 0;
+    // --- 2. УПРАВЛЕНИЕ ТИПАМИ (НОВОЕ) ---
+    if(btnManageTypes) {
+        btnManageTypes.onclick = () => {
+            renderTypesManager();
+            typesModal.show();
+        };
+    }
 
+    function renderTypesManager() {
+        if(!typesListContainer) return;
+        if(dynamicTypes.length === 0) {
+            typesListContainer.innerHTML = '<div class="text-center text-muted py-4">Нет пользовательских типов.<br>Создайте их при добавлении коллекции.</div>';
+            return;
+        }
+
+        typesListContainer.innerHTML = dynamicTypes.map(t => `
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+                <span class="badge ${t.css} fs-6">${t.label}</span>
+                <div>
+                    <button class="btn btn-sm btn-light border me-1" onclick="renameCustomType('${t.val}')" title="Переименовать"><i class="bi bi-pencil"></i></button>
+                    <button class="btn btn-sm btn-light text-danger border" onclick="deleteCustomType('${t.val}')" title="Удалить"><i class="bi bi-trash"></i></button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    // Глобальные функции для кнопок в HTML строке
+    window.renameCustomType = async (oldName) => {
+        const newName = prompt(`Введите новое название для "${oldName}":`, oldName);
+        if (!newName || newName.trim() === '' || newName === oldName) return;
+        
+        const cleanName = newName.trim();
+        // Проверка на дубликат с системными
+        if (defaultTypes.find(t => t.val === cleanName)) {
+            alert("Это имя занято системным типом."); return;
+        }
+
+        if(!confirm(`Это изменит тип во всех коллекциях (${competitors.filter(c => c.collections.some(col => col.type === oldName)).length} брендов). Продолжить?`)) return;
+
+        // Массовое обновление
+        const promises = [];
         competitors.forEach(c => {
-            (c.collections || []).forEach(col => {
-                totalCols++;
+            let changed = false;
+            const newCols = (c.collections || []).map(col => {
                 const t = (typeof col === 'string') ? 'std' : (col.type || 'std');
-                
-                if (t.includes('eng')) countEng++;
-                else if (t.includes('fr')) countFr++;
-                else if (t.includes('art') || t.includes('mix')) countArt++;
-                else if (t !== 'std') countCustom++; // Все остальные кастомные
+                if (t === oldName) {
+                    changed = true;
+                    return { name: (typeof col === 'string' ? col : col.name), type: cleanName };
+                }
+                return col;
             });
+
+            if (changed) {
+                // Отправляем на сервер
+                const data = { ...c, collections: newCols };
+                promises.push(fetch(`${API_URL}/${c.id}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) }));
+            }
         });
-        
-        dashboardContainer.innerHTML = `
-            <div class="col-xl-3 col-md-6"><div class="stat-card-modern"><div class="stat-icon-box bg-primary-subtle text-primary"><i class="bi bi-shop"></i></div><div class="stat-info"><h3>${totalBrands}</h3><p>Брендов</p></div></div></div>
-            <div class="col-xl-3 col-md-6"><div class="stat-card-modern"><div class="stat-icon-box bg-secondary-subtle text-secondary"><i class="bi bi-collection"></i></div><div class="stat-info"><h3>${totalCols}</h3><p>Коллекций</p></div></div></div>
-            <div class="col-xl-3 col-md-6"><div class="stat-card-modern"><div class="stat-icon-box bg-success-subtle text-success"><i class="bi bi-chevron-double-up"></i></div><div class="stat-info"><h3>${countEng + countFr}</h3><p>Елочка</p></div></div></div>
-            <div class="col-xl-3 col-md-6"><div class="stat-card-modern"><div class="stat-icon-box bg-info-subtle text-info"><i class="bi bi-stars"></i></div><div class="stat-info"><h3>${countCustom + countArt}</h3><p>Арт / Другое</p></div></div></div>
-        `;
-    }
+
+        if (promises.length > 0) {
+            typesModal.hide(); // Закрываем чтобы показать спиннер на фоне
+            // Блокируем интерфейс по-простому (через alert) или спиннер
+            await Promise.all(promises);
+            await loadList();
+            alert("Успешно переименовано!");
+        }
+    };
+
+    window.deleteCustomType = async (typeName) => {
+        if(!confirm(`Удалить тип "${typeName}"? \nВо всех коллекциях он будет заменен на "Стандарт".`)) return;
+
+        const promises = [];
+        competitors.forEach(c => {
+            let changed = false;
+            const newCols = (c.collections || []).map(col => {
+                const t = (typeof col === 'string') ? 'std' : (col.type || 'std');
+                if (t === typeName) {
+                    changed = true;
+                    return { name: (typeof col === 'string' ? col : col.name), type: 'std' };
+                }
+                return col;
+            });
+
+            if (changed) {
+                const data = { ...c, collections: newCols };
+                promises.push(fetch(`${API_URL}/${c.id}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) }));
+            }
+        });
+
+        if (promises.length > 0) {
+            typesModal.hide();
+            await Promise.all(promises);
+            await loadList();
+            alert("Тип удален!");
+        } else {
+            // Если тип был в списке, но не использовался (глюк), просто перегружаем
+            await loadList();
+        }
+    };
+
 
     // --- 3. РЕНДЕР СЕТКИ ---
     function renderGrid() {
