@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const inpStock = document.getElementById('comp_stock');
     const inpReserve = document.getElementById('comp_reserve');
 
-    // Базовые типы (их нельзя удалять)
+    // Базовые типы
     const defaultTypes = [
         { val: 'std', label: 'Стандарт', css: 'cb-std', dot: '#94a3b8' },
         { val: 'eng', label: 'Англ. Елка', css: 'cb-eng', dot: '#10b981' },
@@ -56,16 +56,29 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- 1. ЗАГРУЗКА ---
     async function loadList() {
         try {
+            console.log("Начинаю загрузку...");
             const res = await fetch(API_URL);
-            if(res.ok) {
-                competitors = await res.json();
-                competitors.sort((a, b) => a.name.localeCompare(b.name));
-                refreshDynamicTypes();
-                updateFilterOptions();
-                renderDashboard();
-                renderGrid();
-            }
-        } catch(e) { if(gridContainer) gridContainer.innerHTML = '<p class="text-danger p-5 text-center">Ошибка загрузки</p>'; }
+            
+            if(!res.ok) throw new Error(`Ошибка сервера: ${res.status}`);
+            
+            competitors = await res.json();
+            console.log("Данные получены:", competitors);
+
+            competitors.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            
+            refreshDynamicTypes();
+            updateFilterOptions();
+            renderDashboard();
+            renderGrid();
+        } catch(e) { 
+            console.error("CRITICAL ERROR:", e);
+            // ВОТ ЗДЕСЬ МЫ ВЫВЕДЕМ РЕАЛЬНУЮ ОШИБКУ НА ЭКРАН
+            if(gridContainer) gridContainer.innerHTML = `<div class="alert alert-danger text-center m-5">
+                <h4>Что-то пошло не так 😢</h4>
+                <p>Текст ошибки: <strong>${e.message}</strong></p>
+                <small>Покажите это разработчику</small>
+            </div>`; 
+        }
     }
 
     function refreshDynamicTypes() {
@@ -98,7 +111,6 @@ document.addEventListener('DOMContentLoaded', () => {
             html += `</optgroup>`;
         }
         filterType.innerHTML = html;
-        // Если выбранный тип был удален, сбрасываем на all
         if (currentVal !== 'all' && !getAllTypes().find(t => t.val === currentVal)) {
             filterType.value = 'all';
         } else {
@@ -106,7 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- 2. УПРАВЛЕНИЕ ТИПАМИ (НОВОЕ) ---
+    // --- 2. УПРАВЛЕНИЕ ТИПАМИ ---
     if(btnManageTypes) {
         btnManageTypes.onclick = () => {
             renderTypesManager();
@@ -132,20 +144,17 @@ document.addEventListener('DOMContentLoaded', () => {
         `).join('');
     }
 
-    // Глобальные функции для кнопок в HTML строке
     window.renameCustomType = async (oldName) => {
         const newName = prompt(`Введите новое название для "${oldName}":`, oldName);
         if (!newName || newName.trim() === '' || newName === oldName) return;
         
         const cleanName = newName.trim();
-        // Проверка на дубликат с системными
         if (defaultTypes.find(t => t.val === cleanName)) {
             alert("Это имя занято системным типом."); return;
         }
 
         if(!confirm(`Это изменит тип во всех коллекциях (${competitors.filter(c => c.collections.some(col => col.type === oldName)).length} брендов). Продолжить?`)) return;
 
-        // Массовое обновление
         const promises = [];
         competitors.forEach(c => {
             let changed = false;
@@ -159,15 +168,13 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (changed) {
-                // Отправляем на сервер
                 const data = { ...c, collections: newCols };
                 promises.push(fetch(`${API_URL}/${c.id}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) }));
             }
         });
 
         if (promises.length > 0) {
-            typesModal.hide(); // Закрываем чтобы показать спиннер на фоне
-            // Блокируем интерфейс по-простому (через alert) или спиннер
+            typesModal.hide(); 
             await Promise.all(promises);
             await loadList();
             alert("Успешно переименовано!");
@@ -201,7 +208,6 @@ document.addEventListener('DOMContentLoaded', () => {
             await loadList();
             alert("Тип удален!");
         } else {
-            // Если тип был в списке, но не использовался (глюк), просто перегружаем
             await loadList();
         }
     };
