@@ -56,27 +56,28 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- 1. ЗАГРУЗКА ---
     async function loadList() {
         try {
-            console.log("Начинаю загрузку...");
             const res = await fetch(API_URL);
             
-            if(!res.ok) throw new Error(`Ошибка сервера: ${res.status}`);
+            // Если сервер ответил ошибкой (404 или 500)
+            if(!res.ok) throw new Error(`Сервер ответил ошибкой: ${res.status}`);
             
             competitors = await res.json();
-            console.log("Данные получены:", competitors);
-
             competitors.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
             
             refreshDynamicTypes();
             updateFilterOptions();
-            renderDashboard();
+            
+            // ВОТ ОНА, ПОТЕРЯННАЯ ФУНКЦИЯ!
+            renderDashboard(); 
             renderGrid();
         } catch(e) { 
-            console.error("CRITICAL ERROR:", e);
-            // ВОТ ЗДЕСЬ МЫ ВЫВЕДЕМ РЕАЛЬНУЮ ОШИБКУ НА ЭКРАН
-            if(gridContainer) gridContainer.innerHTML = `<div class="alert alert-danger text-center m-5">
-                <h4>Что-то пошло не так 😢</h4>
-                <p>Текст ошибки: <strong>${e.message}</strong></p>
-                <small>Покажите это разработчику</small>
+            console.error("ERROR:", e);
+            // Показываем красивую ошибку пользователю
+            if(gridContainer) gridContainer.innerHTML = `<div class="alert alert-danger text-center m-5 shadow-sm">
+                <h4 class="alert-heading"><i class="bi bi-exclamation-triangle-fill"></i> Ошибка загрузки</h4>
+                <p>Не удалось получить данные с сервера. Текст ошибки: <strong>${e.message}</strong></p>
+                <hr>
+                <p class="mb-0 small">Попробуйте обновить страницу (Ctrl + F5)</p>
             </div>`; 
         }
     }
@@ -118,7 +119,35 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- 2. УПРАВЛЕНИЕ ТИПАМИ ---
+    // --- 2. ДАШБОРД (ВЕРНУЛ ЕГО НА МЕСТО) ---
+    function renderDashboard() {
+        if (!dashboardContainer) return;
+        const totalBrands = competitors.length;
+        let totalCols = 0;
+        
+        let countEng = 0; let countFr = 0; let countArt = 0; let countCustom = 0;
+
+        competitors.forEach(c => {
+            (c.collections || []).forEach(col => {
+                totalCols++;
+                const t = (typeof col === 'string') ? 'std' : (col.type || 'std');
+                
+                if (t.includes('eng')) countEng++;
+                else if (t.includes('fr')) countFr++;
+                else if (t.includes('art') || t.includes('mix')) countArt++;
+                else if (t !== 'std') countCustom++; 
+            });
+        });
+        
+        dashboardContainer.innerHTML = `
+            <div class="col-xl-3 col-md-6"><div class="stat-card-modern"><div class="stat-icon-box bg-primary-subtle text-primary"><i class="bi bi-shop"></i></div><div class="stat-info"><h3>${totalBrands}</h3><p>Брендов</p></div></div></div>
+            <div class="col-xl-3 col-md-6"><div class="stat-card-modern"><div class="stat-icon-box bg-secondary-subtle text-secondary"><i class="bi bi-collection"></i></div><div class="stat-info"><h3>${totalCols}</h3><p>Коллекций</p></div></div></div>
+            <div class="col-xl-3 col-md-6"><div class="stat-card-modern"><div class="stat-icon-box bg-success-subtle text-success"><i class="bi bi-chevron-double-up"></i></div><div class="stat-info"><h3>${countEng + countFr}</h3><p>Елочка</p></div></div></div>
+            <div class="col-xl-3 col-md-6"><div class="stat-card-modern"><div class="stat-icon-box bg-info-subtle text-info"><i class="bi bi-stars"></i></div><div class="stat-info"><h3>${countCustom + countArt}</h3><p>Арт / Другое</p></div></div></div>
+        `;
+    }
+
+    // --- 3. УПРАВЛЕНИЕ ТИПАМИ ---
     if(btnManageTypes) {
         btnManageTypes.onclick = () => {
             renderTypesManager();
@@ -213,7 +242,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
 
-    // --- 3. РЕНДЕР СЕТКИ ---
+    // --- 4. РЕНДЕР СЕТКИ ---
     function renderGrid() {
         const search = searchInput ? searchInput.value.toLowerCase() : '';
         const filter = filterType ? filterType.value : 'all';
@@ -260,7 +289,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.toggleCard = (id) => { const card = document.getElementById(`card-${id}`); if (card) { document.querySelectorAll('.comp-card-modern.is-flipped').forEach(c => { if(c !== card) c.classList.remove('is-flipped'); }); card.classList.toggle('is-flipped'); } };
 
-    // --- 4. OPEN MODAL ---
+    // --- 5. OPEN MODAL ---
     window.openEditModal = (id) => {
         const c = competitors.find(x => x.id === id); if (!c) return;
         inpId.value = c.id; modalTitle.textContent = `Редактировать: ${c.name}`; if(delBtn) delBtn.style.display = 'block';
@@ -274,35 +303,28 @@ document.addEventListener('DOMContentLoaded', () => {
         addBtn.onclick = () => { inpId.value = ''; form.reset(); modalTitle.textContent = 'Новый Бренд'; if(delBtn) delBtn.style.display = 'none'; collectionsContainer.innerHTML = ''; contactsContainer.innerHTML = ''; addCollectionRow(); addContactRow(); modal.show(); };
     }
 
-    // --- 5. ROWS (С ЛОГИКОЙ ДОБАВЛЕНИЯ ТИПА) ---
+    // --- 6. ROWS ---
     function addCollectionRow(name = '', type = 'std') {
         const div = document.createElement('div'); div.className = 'competitor-entry'; div.style.gridTemplateColumns = "2fr 1.5fr auto"; 
         
         const allTypes = getAllTypes();
         let options = allTypes.map(t => `<option value="${t.val}" ${t.val === type ? 'selected' : ''}>${t.label}</option>`).join('');
-        
-        // Добавляем опцию создания нового типа
         options += `<option value="__NEW__" class="fw-bold text-primary">+ Свой тип...</option>`;
 
         div.innerHTML = `<input type="text" class="form-control" placeholder="Название коллекции" value="${name}" required><select class="form-select collection-type-select">${options}</select><button type="button" class="btn-remove-entry" onclick="this.closest('.competitor-entry').remove()"><i class="bi bi-x-lg"></i></button>`;
         
-        // Логика выбора "Новый тип"
         const select = div.querySelector('select');
         select.onchange = function() {
             if (this.value === '__NEW__') {
                 const newName = prompt("Введите название нового типа (например, Кварцвинил):");
                 if (newName && newName.trim()) {
                     const cleanName = newName.trim();
-                    // Создаем новую опцию
                     const newOpt = document.createElement('option');
-                    newOpt.value = cleanName;
-                    newOpt.text = cleanName;
-                    newOpt.selected = true;
-                    // Вставляем перед "Добавить"
+                    newOpt.value = cleanName; newOpt.text = cleanName; newOpt.selected = true;
                     this.insertBefore(newOpt, this.lastElementChild);
-                    this.value = cleanName; // Выбираем её
+                    this.value = cleanName; 
                 } else {
-                    this.value = 'std'; // Если отменили
+                    this.value = 'std'; 
                 }
             }
         };
@@ -318,11 +340,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if(addCollRowBtn) addCollRowBtn.onclick = () => addCollectionRow();
     if(addContactBtn) addContactBtn.onclick = () => addContactRow();
 
-    // --- 6. SAVE LOGIC ---
+    // --- 7. SAVE LOGIC ---
     if(saveBtn) {
         saveBtn.onclick = async () => {
             if(isSaving) return; 
-            
             if(!inpName.value.trim()) { alert("Введите название бренда!"); return; }
 
             isSaving = true;
