@@ -58,7 +58,7 @@ const visitSchema = new mongoose.Schema({ date: String, comment: String, isCompl
 const posMaterialSchema = new mongoose.Schema({ name: String, quantity: Number }, { _id: false });
 const competitorSchema = new mongoose.Schema({ brand: String, collection: String, price_opt: String, price_retail: String }, { _id: false });
 
-// --- COMPETITORS REF SCHEMAS (ДЛЯ РАЗДЕЛА КОНКУРЕНТЫ) ---
+// --- COMPETITORS REF SCHEMAS (ЭТОГО НЕ ХВАТАЛО) ---
 const collectionItemSchema = new mongoose.Schema({ name: String, type: { type: String, default: 'standard' } }, { _id: false });
 const compContactSchema = new mongoose.Schema({ name: String, position: String, phone: String }, { _id: false });
 const compRefSchema = new mongoose.Schema({ 
@@ -188,7 +188,7 @@ app.get('/api/matrix', async (req, res) => { try { const prods = await Product.f
 app.get('/api/sales', async (req, res) => { const {month} = req.query; const s = await Sales.find(month ? {month} : {}).lean(); res.json(s); });
 app.post('/api/sales', checkWrite, async (req, res) => { const ops = req.body.data.map(i => ({ updateOne: { filter: { month: req.body.month, $or: [{dealerId: i.dealerId}, {dealerName: i.dealerName, isCustom:true}] }, update: {$set: i}, upsert: true } })); await Sales.bulkWrite(ops); res.json({status:'ok'}); });
 
-// --- COMPETITORS REF API (ВОТ ЧЕГО НЕ ХВАТАЛО) ---
+// --- COMPETITORS REF API (ВОТ ЭТО ДОЛЖНО БЫТЬ) ---
 app.get('/api/competitors-ref', async (req, res) => { const l = await CompRef.find().sort({name:1}); res.json(l.map(convertToClient)); });
 app.post('/api/competitors-ref', checkWrite, async (req, res) => { const c = new CompRef(req.body); await c.save(); res.json(convertToClient(c)); });
 app.put('/api/competitors-ref/:id', checkWrite, async (req, res) => { await CompRef.findByIdAndUpdate(req.params.id, req.body); res.json({status:'ok'}); });
