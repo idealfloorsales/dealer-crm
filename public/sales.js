@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const now = new Date();
     monthPicker.value = now.toISOString().slice(0, 7);
 
+    // Конфигурация групп (порядок отображения)
     const groupsConfig = [
         { key: 'regional_astana', title: 'Астана (Региональный)' },
         { key: 'vip', title: 'Спец. Клиенты (VIP)' }, 
@@ -50,37 +51,26 @@ document.addEventListener('DOMContentLoaded', () => {
         setupMobileTabs();
     }
 
-    // --- ЛОГИКА МОБИЛЬНЫХ ВКЛАДОК ---
     function setupMobileTabs() {
         if(!tabInputBtn || !tabSummaryBtn) return;
 
         tabInputBtn.onclick = () => {
-            // Активируем кнопку
             tabInputBtn.classList.add('btn-white', 'shadow-sm', 'text-primary');
             tabInputBtn.classList.remove('text-muted');
             tabSummaryBtn.classList.remove('btn-white', 'shadow-sm', 'text-primary');
             tabSummaryBtn.classList.add('text-muted');
-
-            // Показываем колонку ввода, скрываем сводку
             colInput.classList.remove('mobile-hidden');
             colSummary.classList.add('mobile-hidden');
-            
-            // Скролл вверх
             window.scrollTo(0, 0);
         };
 
         tabSummaryBtn.onclick = () => {
-            // Активируем кнопку
             tabSummaryBtn.classList.add('btn-white', 'shadow-sm', 'text-primary');
             tabSummaryBtn.classList.remove('text-muted');
             tabInputBtn.classList.remove('btn-white', 'shadow-sm', 'text-primary');
             tabInputBtn.classList.add('text-muted');
-
-            // Показываем сводку, скрываем ввод
             colSummary.classList.remove('mobile-hidden');
             colInput.classList.add('mobile-hidden');
-            
-            // Скролл вверх
             window.scrollTo(0, 0);
         };
     }
@@ -124,10 +114,16 @@ document.addEventListener('DOMContentLoaded', () => {
     function calculateKPI(plan, fact, daysInMonth, currentDay) {
         plan = parseFloat(plan) || 0;
         fact = parseFloat(fact) || 0;
+        
         let forecast = 0;
-        if (currentDay > 0) forecast = (fact / currentDay) * daysInMonth;
-        const percent = plan > 0 ? (fact / plan) * 100 : 0;
-        return { diff: fact - plan, forecast, percent };
+        if (currentDay > 0) {
+            forecast = (fact / currentDay) * daysInMonth;
+        }
+        
+        const percent = plan > 0 ? (fact / plan) * 100 : (fact > 0 ? 100 : 0);
+        const diff = fact - plan; // Если минус, то недобор. Если плюс, перебор.
+        
+        return { diff, forecast, percent };
     }
 
     function captureState() {
@@ -163,12 +159,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderAll() {
+        // Данные для прогноза
         const date = new Date(monthPicker.value);
         const year = date.getFullYear();
         const monthIndex = date.getMonth();
         const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+        
         const today = new Date();
         let currentDay = daysInMonth; 
+        
         if (today.getFullYear() === year && today.getMonth() === monthIndex) {
             currentDay = today.getDate();
         }
@@ -256,13 +255,28 @@ document.addEventListener('DOMContentLoaded', () => {
         
         renderTopDashboard(facts, plans, totalRegionsFact);
 
+        // --- ФУНКЦИЯ ОТРИСОВКИ СВОДКИ (С ФАКТОМ, РАЗНИЦЕЙ И ПРОГНОЗОМ) ---
         const renderSumItem = (title, planKey, factVal, isSubItem = false) => {
             const plan = plans[planKey] || 0;
-            const { percent } = calculateKPI(plan, factVal, daysInMonth, currentDay);
+            const { percent, forecast, diff } = calculateKPI(plan, factVal, daysInMonth, currentDay);
             
-            let colorClass = 'p-mid'; let bgClass = 'bg-mid';
-            if (percent >= 90) { colorClass = 'p-high'; bgClass = 'bg-high'; }
-            if (percent < 70) { colorClass = 'p-low'; bgClass = 'bg-low'; }
+            // Цвета прогресс-бара
+            let colorClass = 'text-warning'; let bgClass = 'bg-warning';
+            if (percent >= 90) { colorClass = 'text-success'; bgClass = 'bg-success'; }
+            if (percent < 70) { colorClass = 'text-danger'; bgClass = 'bg-danger'; }
+            
+            // Расчет текста "Осталось / Сверх"
+            let diffHtml = '';
+            if (plan > 0) {
+                if (diff < 0) {
+                    // Недобор (красный)
+                    diffHtml = `<span class="text-danger fw-bold" title="Не хватает до плана">Ещё: ${fmt(Math.abs(diff))}</span>`;
+                } else {
+                    // Перебор (зеленый)
+                    diffHtml = `<span class="text-success fw-bold" title="Сверх плана">+${fmt(diff)}</span>`;
+                }
+            }
+
             const width = Math.min(percent, 100);
             const planVal = plan !== 0 ? plan : '';
 
@@ -273,13 +287,17 @@ document.addEventListener('DOMContentLoaded', () => {
                         ${title}
                         <input type="number" class="plan-input" data-plan-key="${planKey}" value="${planVal}" placeholder="План">
                     </span>
-                    <span class="summary-percent ${colorClass}">${fmt(percent)}%</span>
+                    <span class="summary-percent ${colorClass} fw-bold">${fmt(percent)}%</span>
                 </div>
-                <div class="summary-progress">
-                    <div class="summary-bar ${bgClass}" style="width: ${width}%"></div>
+                <div class="progress mb-2" style="height: 6px;">
+                    <div class="progress-bar ${bgClass}" style="width: ${width}%"></div>
                 </div>
-                <div class="summary-meta">
-                    <span>Факт: <strong>${fmt(factVal)}</strong></span>
+                <div class="d-flex justify-content-between align-items-center small mt-1">
+                    <span class="text-dark">Факт: <strong>${fmt(factVal)}</strong></span>
+                    ${diffHtml}
+                </div>
+                <div class="text-end small text-muted mt-1" style="font-size: 0.7rem;">
+                    Прогноз: <strong>${fmt(forecast)}</strong>
                 </div>
             </div>`;
         };
@@ -313,13 +331,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!dashboardTop) return;
         
         const createCard = (title, fact, plan, iconClass='bi-graph-up', color='primary') => {
-            const { percent } = calculateKPI(plan, fact);
+            const { percent } = calculateKPI(plan, fact, 1, 1);
             let badgeColor = 'bg-danger';
             if (percent >= 100) badgeColor = 'bg-success';
             else if (percent >= 80) badgeColor = 'bg-warning text-dark';
 
             return `
-            <div class="col-md-3 col-sm-6 col-6"> <div class="card dash-card h-100 rounded-4">
+            <div class="col-md-3 col-sm-6 col-6"> 
+                <div class="card dash-card h-100 rounded-4">
                     <div class="card-body p-2 p-md-3">
                         <div class="d-flex justify-content-between align-items-start mb-2">
                             <span class="dash-label text-truncate" style="max-width: 80%">${title}</span>
