@@ -62,16 +62,18 @@ const competitorSchema = new mongoose.Schema({ brand: String, collection: String
 const collectionItemSchema = new mongoose.Schema({ name: String, type: { type: String, default: 'standard' } }, { _id: false });
 const compContactSchema = new mongoose.Schema({ name: String, position: String, phone: String }, { _id: false });
 const compRefSchema = new mongoose.Schema({ 
-    name: String, 
+name: String, 
     country: String, 
     supplier: String, 
     warehouse: String, 
+    website: String,   // <--- НОВОЕ ПОЛЕ
+    instagram: String, // <--- НОВОЕ ПОЛЕ
     info: String, 
     storage_days: String, 
     stock_info: String, 
     reserve_days: String, 
     contacts: [compContactSchema], 
-    collections: [collectionItemSchema] 
+    collections: [collectionItemSchema]
 });
 const CompRef = mongoose.model('CompRef', compRefSchema);
 
@@ -207,3 +209,4 @@ app.get('/api/tasks', async (req, res) => {
 });
 
 app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
+
