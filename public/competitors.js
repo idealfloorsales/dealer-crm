@@ -1,6 +1,17 @@
 document.addEventListener('DOMContentLoaded', () => {
     const API_URL = '/api/competitors-ref';
     
+    // --- АВТО-ИСПРАВЛЕНИЕ СТИЛЕЙ (Чтобы не лезть в HTML) ---
+    const styleFix = document.createElement('style');
+    styleFix.innerHTML = `
+        /* Скрываем карандаш, когда карточка перевернута (чтобы не мешал крестику) */
+        .comp-card-modern.is-flipped .btn-card-edit-abs { display: none !important; }
+        /* Цвета для своих типов коллекций */
+        .cb-custom { background-color: #e0cffc; color: #5b21b6; border: 1px solid #d8b4fe; }
+    `;
+    document.head.appendChild(styleFix);
+    // -------------------------------------------------------
+
     // Элементы
     const gridContainer = document.getElementById('competitors-grid');
     const searchInput = document.getElementById('search-input');
@@ -39,9 +50,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const inpStorage = document.getElementById('comp_storage');
     const inpStock = document.getElementById('comp_stock');
     const inpReserve = document.getElementById('comp_reserve');
-    // НОВЫЕ ИНПУТЫ
-    const inpWebsite = document.getElementById('comp_website');
-    const inpInstagram = document.getElementById('comp_instagram');
+    const inpWebsite = document.getElementById('comp_website');     // Новое поле
+    const inpInstagram = document.getElementById('comp_instagram'); // Новое поле
 
     // Базовые типы
     const defaultTypes = [
@@ -215,7 +225,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if(!instaUrl.startsWith('http')) instaUrl = 'https://instagram.com/' + instaUrl.replace('@','').trim();
                 socialHtml += `<a href="${instaUrl}" target="_blank" class="btn btn-sm btn-light text-danger border" title="Instagram" onclick="event.stopPropagation()"><i class="bi bi-instagram"></i></a>`;
             }
-            const socialBlock = socialHtml ? `<div class="mt-2 pt-2 border-top">${socialHtml}</div>` : '';
+            
+            // ДОБАВЛЕН КЛАСС mb-2 ДЛЯ ОТСТУПА
+            const socialBlock = socialHtml ? `<div class="mt-2 pt-2 border-top mb-2">${socialHtml}</div>` : '';
 
             const listHtml = (c.collections || []).map(col => {
                 const name = (typeof col === 'string') ? col : col.name;
@@ -236,7 +248,6 @@ document.addEventListener('DOMContentLoaded', () => {
         inpId.value = c.id; modalTitle.textContent = `Редактировать: ${c.name}`; if(delBtn) delBtn.style.display = 'block';
         inpName.value = c.name; inpCountry.value = c.country || ''; inpSupplier.value = c.supplier || ''; inpWarehouse.value = c.warehouse || ''; inpInfo.value = c.info || ''; inpStorage.value = c.storage_days || ''; inpStock.value = c.stock_info || ''; inpReserve.value = c.reserve_days || '';
         
-        // Populate New Fields
         if(inpWebsite) inpWebsite.value = c.website || '';
         if(inpInstagram) inpInstagram.value = c.instagram || '';
 
@@ -299,8 +310,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 country: inpCountry ? inpCountry.value : '', 
                 supplier: inpSupplier.value, 
                 warehouse: inpWarehouse.value, 
-                website: inpWebsite ? inpWebsite.value : '',     // SAVE WEBSITE
-                instagram: inpInstagram ? inpInstagram.value : '', // SAVE INSTAGRAM
+                website: inpWebsite ? inpWebsite.value : '',     
+                instagram: inpInstagram ? inpInstagram.value : '', 
                 info: inpInfo.value, 
                 storage_days: inpStorage.value, 
                 stock_info: inpStock.value, 
