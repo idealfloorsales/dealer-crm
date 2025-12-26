@@ -1,16 +1,44 @@
 document.addEventListener('DOMContentLoaded', () => {
     const API_URL = '/api/competitors-ref';
-    const API_DEALERS = '/api/dealers'; // Добавили адрес API дилеров
+    const API_DEALERS = '/api/dealers';
     
-    // Авто-стили
+    // --- ИСПРАВЛЕНИЯ СТИЛЕЙ ТУТ ---
     const styleFix = document.createElement('style');
     styleFix.innerHTML = `
+        /* 1. Увеличиваем высоту карточки, чтобы всё влезало */
+        .comp-card-modern {
+            min-height: 420px !important; /* Было меньше, теперь влезет всё */
+        }
+        
+        /* 2. Делаем переднюю часть карточки "резиновой", чтобы кнопка "Коллекции" всегда была внизу */
+        .comp-front {
+            display: flex;
+            flex-direction: column;
+            padding-bottom: 10px;
+        }
+        .comp-front .btn-flip {
+            margin-top: auto; /* Прижимает кнопку к низу */
+        }
+
+        /* 3. Исправляем цвет кнопки "Дилеры" при наведении */
+        .btn-dealers-hover:hover {
+            background-color: #6c757d !important; /* Серый фон */
+            color: #ffffff !important; /* Белый текст */
+            border-color: #6c757d !important;
+        }
+
+        /* Скрываем карандаш при перевороте */
         .comp-card-modern.is-flipped .btn-card-edit-abs { display: none !important; }
+        
+        /* Цвета типов */
         .cb-custom { background-color: #e0cffc; color: #5b21b6; border: 1px solid #d8b4fe; }
+        
+        /* Ссылки в модалке */
         .dealer-link-item { transition: background 0.2s; cursor: pointer; }
         .dealer-link-item:hover { background: #f8f9fa; }
     `;
     document.head.appendChild(styleFix);
+    // -------------------------------------------------------
 
     // Элементы
     const gridContainer = document.getElementById('competitors-grid');
@@ -29,7 +57,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const typesModal = new bootstrap.Modal(typesModalEl);
     const typesListContainer = document.getElementById('types-manager-list');
 
-    // НОВАЯ МОДАЛКА
     const dealersModalEl = document.getElementById('dealers-list-modal');
     const dealersModal = new bootstrap.Modal(dealersModalEl);
     const dealersListContainer = document.getElementById('dealers-list-container');
@@ -40,7 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const delBtn = document.getElementById('btn-delete-comp');
     const saveBtn = document.getElementById('btn-save-comp');
 
-    // Контейнеры формы
+    // Контейнеры
     const collectionsContainer = document.getElementById('collections-container');
     const addCollRowBtn = document.getElementById('add-coll-row-btn');
     const contactsContainer = document.getElementById('comp-contacts-list');
@@ -68,14 +95,13 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
 
     let competitors = [];
-    let allDealers = []; // Здесь будем хранить всех дилеров для статистики
+    let allDealers = [];
     let isSaving = false;
     let dynamicTypes = [];
 
     // --- 1. ЗАГРУЗКА ---
     async function loadList() {
         try {
-            // Загружаем И конкурентов, И дилеров параллельно
             const [compRes, dealersRes] = await Promise.all([
                 fetch(API_URL),
                 fetch(API_DEALERS)
@@ -85,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if(!dealersRes.ok) throw new Error(`Ошибка загрузки дилеров`);
             
             competitors = await compRes.json();
-            allDealers = await dealersRes.json(); // Сохраняем дилеров
+            allDealers = await dealersRes.json();
 
             competitors.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
             
@@ -102,7 +128,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- ОСТАЛЬНЫЕ ФУНКЦИИ БЕЗ ИЗМЕНЕНИЙ (Типы, Фильтры, Дашборд) ---
     function refreshDynamicTypes() {
         const found = new Set();
         competitors.forEach(c => { (c.collections || []).forEach(col => { const t = (typeof col === 'string') ? 'std' : (col.type || 'std'); if (!defaultTypes.find(x => x.val === t)) { found.add(t); } }); });
@@ -131,15 +156,11 @@ document.addEventListener('DOMContentLoaded', () => {
     window.renameCustomType = async (oldName) => { const newName = prompt(`Новое название для "${oldName}":`, oldName); if (!newName || newName === oldName) return; const clean = newName.trim(); if (defaultTypes.find(t => t.val === clean)) return alert("Занято."); if(!confirm("Переименовать везде?")) return; const p = []; competitors.forEach(c => { let ch = false; const nc = (c.collections||[]).map(col => { const t = (typeof col === 'string')?'std':(col.type||'std'); if(t===oldName){ch=true; return {name:(typeof col==='string'?col:col.name), type:clean};} return col; }); if(ch) p.push(fetch(`${API_URL}/${c.id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...c, collections:nc})})); }); if(p.length){typesModal.hide(); await Promise.all(p); await loadList(); alert("Готово");} };
     window.deleteCustomType = async (typeName) => { if(!confirm(`Удалить тип "${typeName}"?`)) return; const p = []; competitors.forEach(c => { let ch = false; const nc = (c.collections||[]).map(col => { const t = (typeof col === 'string')?'std':(col.type||'std'); if(t===typeName){ch=true; return {name:(typeof col==='string'?col:col.name), type:'std'};} return col; }); if(ch) p.push(fetch(`${API_URL}/${c.id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...c, collections:nc})})); }); if(p.length){typesModal.hide(); await Promise.all(p); await loadList(); alert("Удалено");} else await loadList(); };
 
-    // --- НОВАЯ ФУНКЦИЯ: ПОКАЗАТЬ ДИЛЕРОВ ---
     window.showDealersModal = (brandName) => {
-        // Фильтруем всех дилеров, у которых есть этот бренд в массиве competitors
         const dealersWithBrand = allDealers.filter(d => 
             d.competitors && d.competitors.some(c => c.brand === brandName)
         );
-
         dealersBrandNameSpan.textContent = brandName;
-        
         if (dealersWithBrand.length === 0) {
             dealersListContainer.innerHTML = '<div class="text-center py-4 text-muted">Этот бренд пока не выставлен ни у одного дилера.</div>';
         } else {
@@ -156,7 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
         dealersModal.show();
     };
 
-    // --- 4. РЕНДЕР СЕТКИ (ОБНОВЛЕН) ---
+    // --- 4. РЕНДЕР СЕТКИ ---
     function renderGrid() {
         const search = searchInput ? searchInput.value.toLowerCase() : '';
         const filter = filterType ? filterType.value : 'all';
@@ -189,10 +210,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             const socialBlock = socialHtml ? `<div class="mt-2 pt-2 border-top mb-2">${socialHtml}</div>` : '';
 
-            // СЧИТАЕМ ДИЛЕРОВ
             const dealersCount = allDealers.filter(d => d.competitors && d.competitors.some(comp => comp.brand === c.name)).length;
+            // Здесь добавлен класс btn-dealers-hover для изменения цвета при наведении
             const dealersBtn = dealersCount > 0 
-                ? `<button class="btn btn-sm w-100 btn-outline-secondary mt-2 border-0 bg-light" onclick="event.stopPropagation(); showDealersModal('${c.name}')"><i class="bi bi-shop me-1"></i> Дилеры: <strong>${dealersCount}</strong></button>`
+                ? `<button class="btn btn-sm w-100 btn-outline-secondary mt-2 border-0 bg-light btn-dealers-hover" onclick="event.stopPropagation(); showDealersModal('${c.name}')"><i class="bi bi-shop me-1"></i> Дилеры: <strong>${dealersCount}</strong></button>`
                 : `<div class="text-center mt-2 text-muted small py-1 bg-light rounded"><small>Нет у дилеров</small></div>`;
 
             const listHtml = (c.collections || []).map(col => {
@@ -208,7 +229,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.toggleCard = (id) => { const card = document.getElementById(`card-${id}`); if (card) { document.querySelectorAll('.comp-card-modern.is-flipped').forEach(c => { if(c !== card) c.classList.remove('is-flipped'); }); card.classList.toggle('is-flipped'); } };
 
-    // --- 5. OPEN MODAL ---
+    // --- 5. OPEN MODAL & 6. ROWS & 7. SAVE ---
     window.openEditModal = (id) => {
         const c = competitors.find(x => x.id === id); if (!c) return;
         inpId.value = c.id; modalTitle.textContent = `Редактировать: ${c.name}`; if(delBtn) delBtn.style.display = 'block';
@@ -218,10 +239,7 @@ document.addEventListener('DOMContentLoaded', () => {
         contactsContainer.innerHTML = ''; if (c.contacts && c.contacts.length > 0) { c.contacts.forEach(cnt => addContactRow(cnt.name, cnt.position, cnt.phone)); } else { addContactRow(); }
         modal.show();
     };
-
     if(addBtn) addBtn.onclick = () => { inpId.value = ''; form.reset(); modalTitle.textContent = 'Новый Бренд'; if(delBtn) delBtn.style.display = 'none'; collectionsContainer.innerHTML = ''; contactsContainer.innerHTML = ''; addCollectionRow(); addContactRow(); modal.show(); };
-
-    // --- 6. ROWS & SAVE (Без изменений) ---
     function addCollectionRow(name = '', type = 'std') {
         const div = document.createElement('div'); div.className = 'competitor-entry'; div.style.gridTemplateColumns = "2fr 1.5fr auto"; 
         const allTypes = getAllTypes(); let options = allTypes.map(t => `<option value="${t.val}" ${t.val === type ? 'selected' : ''}>${t.label}</option>`).join(''); options += `<option value="__NEW__" class="fw-bold text-primary">+ Свой тип...</option>`;
@@ -236,7 +254,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if(addCollRowBtn) addCollRowBtn.onclick = () => addCollectionRow();
     if(addContactBtn) addContactBtn.onclick = () => addContactRow();
-
     if(saveBtn) saveBtn.onclick = async () => {
         if(isSaving) return; if(!inpName.value.trim()) return alert("Введите название!");
         isSaving = true; const oldText = saveBtn.innerHTML; saveBtn.disabled = true; saveBtn.innerHTML = '...';
