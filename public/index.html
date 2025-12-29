@@ -36,22 +36,23 @@
             text-align: center; color: #adb5bd; padding: 10px 0;
             text-decoration: none; flex: 1; transition: color 0.2s;
         }
-        .bottom-nav-item.active { color: #B9040A; }
+        .bottom-nav-item.active { color: #B9040A; } /* Красный цвет активной кнопки */
         .bottom-nav-item i { font-size: 1.4rem; display: block; margin-bottom: 2px; }
         .bottom-nav-item span { font-size: 0.65rem; font-weight: 600; }
+
+        .desktop-nav { display: flex; }
 
         @media (max-width: 991px) {
             .desktop-nav { display: none !important; }
             .container { padding-left: 15px; padding-right: 15px; }
             
-            /* Плавающая кнопка добавления на мобильном (опционально) */
             #mobile-fab-add {
                 position: fixed; bottom: 90px; right: 20px;
                 width: 56px; height: 56px;
                 border-radius: 50%;
                 background: #B9040A; color: white;
                 display: flex; align-items: center; justify-content: center;
-                box-shadow: 0 4px 15px rgba(13, 110, 253, 0.4);
+                box-shadow: 0 4px 15px rgba(185, 4, 10, 0.4);
                 z-index: 1040; font-size: 24px;
                 border: none;
             }
@@ -189,6 +190,9 @@
         </a>
         <a href="/sales.html" class="bottom-nav-item">
             <i class="bi bi-graph-up-arrow"></i><span>Продажи</span>
+        </a>
+        <a href="/competitors.html" class="bottom-nav-item">
+            <i class="bi bi-globe"></i><span>Бренды</span>
         </a>
         <a href="/report.html" class="bottom-nav-item">
             <i class="bi bi-pie-chart"></i><span>Отчет</span>
@@ -427,4 +431,3 @@
     <script src="script.js?v=249"></script> <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(err => console.error(err)); }</script>
 </body>
 </html>
-
