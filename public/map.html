@@ -18,18 +18,42 @@
 
     <link rel="stylesheet" href="style.css?v=243"> <link rel="icon" href="favicon.gif" type="image/gif">
     <link rel="manifest" href="manifest.json">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#b9040a">
     
     <style>
-        body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; padding-bottom: 60px; } /* Место под меню */
         .map-wrapper { flex: 1; position: relative; width: 100%; height: 100%; display: flex; }
         #main-map { flex-grow: 1; height: 100%; z-index: 1; }
+
+        /* Нижнее меню */
+        .bottom-nav {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid #eee;
+            z-index: 2000;
+            height: 60px;
+            display: flex; justify-content: space-around;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        .bottom-nav-item {
+            text-align: center; color: #adb5bd; padding: 10px 0;
+            text-decoration: none; flex: 1; transition: color 0.2s;
+        }
+        .bottom-nav-item.active { color: #B9040A; }
+        .bottom-nav-item i { font-size: 1.4rem; display: block; margin-bottom: 2px; }
+        .bottom-nav-item span { font-size: 0.65rem; font-weight: 600; }
+        
+        .desktop-nav { display: flex; }
+        @media (max-width: 991px) {
+            .desktop-nav { display: none !important; }
+        }
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm" style="flex-shrink: 0; z-index: 2000;">
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm desktop-nav" style="flex-shrink: 0; z-index: 2000;">
         <div class="container-fluid">
             <a class="navbar-brand" href="/"><img src="logo.png" alt="Logo" height="30"></a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"><span class="navbar-toggler-icon"></span></button>
@@ -92,6 +116,24 @@
         </button>
         
         <div id="main-map"></div>
+    </div>
+
+    <div class="bottom-nav d-flex justify-content-around d-lg-none">
+        <a href="/" class="bottom-nav-item">
+            <i class="bi bi-shop"></i><span>Дилеры</span>
+        </a>
+        <a href="/map.html" class="bottom-nav-item active">
+            <i class="bi bi-geo-alt"></i><span>Карта</span>
+        </a>
+        <a href="/sales.html" class="bottom-nav-item">
+            <i class="bi bi-graph-up-arrow"></i><span>Продажи</span>
+        </a>
+        <a href="/competitors.html" class="bottom-nav-item">
+            <i class="bi bi-globe"></i><span>Бренды</span>
+        </a>
+        <a href="/report.html" class="bottom-nav-item">
+            <i class="bi bi-pie-chart"></i><span>Отчет</span>
+        </a>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
