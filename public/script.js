@@ -1,5 +1,33 @@
 document.addEventListener('DOMContentLoaded', () => {
     
+    // --- ВАЖНОЕ ДОБАВЛЕНИЕ: АВТО-ВСТАВКА ТОКЕНА ---
+    // Этот код перехватывает все запросы и добавляет в них ваш пропуск (Токен)
+    const originalFetch = window.fetch;
+    window.fetch = async function (url, options) {
+        options = options || {};
+        options.headers = options.headers || {};
+        
+        // 1. Берем токен из памяти
+        const token = localStorage.getItem('crm_token');
+        
+        // 2. Если токен есть, прикрепляем его к запросу
+        if (token) {
+            options.headers['Authorization'] = 'Bearer ' + token;
+        }
+
+        // 3. Отправляем запрос
+        const response = await originalFetch(url, options);
+
+        // 4. Если сервер сказал "401 Unauthorized" (Срок действия токена истек)
+        if (response.status === 401) {
+            // Выкидываем на страницу входа
+            window.location.href = '/login.html';
+        }
+
+        return response;
+    };
+    // ----------------------------------------------------
+
     const API_DEALERS_URL = '/api/dealers';
     const API_PRODUCTS_URL = '/api/products'; 
     const API_COMPETITORS_REF_URL = '/api/competitors-ref';
@@ -11,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let competitorsRef = []; 
     let allDealers = [];
     let statusList = []; 
-    let allTasksData = []; // Добавил переменную, которой не хватало в твоем коде
+    let allTasksData = [];
     let currentMonthSales = [];
     
     let currentSort = { column: 'name', direction: 'asc' };
@@ -90,7 +118,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if(editPhotoInput) editPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) editPhotosData.push({ photo_url: await compressImage(file, 1000, 0.7) }); renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData); editPhotoInput.value = ''; });
     if(editPhotoPreviewContainer) editPhotoPreviewContainer.addEventListener('click', (e) => { const btn = e.target.closest('.btn-remove-photo'); if(btn) { editPhotosData.splice(btn.dataset.index, 1); renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData); } });
 
-    const logoutBtn = document.getElementById('logout-btn'); if (logoutBtn) { logoutBtn.onclick = () => { const url = window.location.protocol + "//" + "logout:logout@" + window.location.host + window.location.pathname; window.location.href = url; }; }
+    const logoutBtn = document.getElementById('logout-btn'); 
+    if (logoutBtn) { 
+        logoutBtn.onclick = () => { 
+            // Очищаем токен при выходе
+            localStorage.removeItem('crm_token');
+            localStorage.removeItem('crm_user');
+            window.location.href = '/login.html'; 
+        }; 
+    }
     
     if(document.body) { document.body.addEventListener('click', (e) => { const taskBtn = e.target.closest('.btn-complete-task'); if (taskBtn) { taskBtn.disabled = true; taskBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; completeTask(taskBtn, taskBtn.dataset.id, taskBtn.dataset.index); } }); }
     document.querySelectorAll('.sort-btn').forEach(btn => { btn.onclick = (e) => { const sortKey = e.currentTarget.dataset.sort; if(currentSort.column === sortKey) currentSort.direction = (currentSort.direction === 'asc' ? 'desc' : 'asc'); else { currentSort.column = sortKey; currentSort.direction = 'asc'; } renderDealerList(); }; });
@@ -137,7 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             console.log("Starting app init...");
             // 1. Auth
-            try { const authRes = await fetch('/api/auth/me'); if (authRes.ok) { const authData = await authRes.json(); currentUserRole = authData.role; const badge = document.getElementById('user-role-badge'); if(badge) { const names = { 'admin': 'Админ', 'astana': 'Астана', 'regions': 'Регионы', 'guest': 'Гость' }; badge.textContent = names[currentUserRole] || currentUserRole; } if (currentUserRole === 'guest') { if (openAddModalBtn) openAddModalBtn.style.display = 'none'; } } } catch (e) {}
+            try { const authRes = await fetch('/api/auth/me'); if (authRes.ok) { const authData = await authRes.json(); currentUserRole = authData.user ? authData.user.role : 'guest'; const badge = document.getElementById('user-role-badge'); if(badge) { const names = { 'admin': 'Админ', 'astana': 'Астана', 'regions': 'Регионы', 'guest': 'Гость' }; badge.textContent = names[currentUserRole] || currentUserRole; } if (currentUserRole === 'guest') { if (openAddModalBtn) openAddModalBtn.style.display = 'none'; } } } catch (e) {}
 
             // 2. Load Dictionaries
             await Promise.all([
