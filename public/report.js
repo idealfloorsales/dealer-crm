@@ -1,292 +1,323 @@
 document.addEventListener('DOMContentLoaded', () => {
     
-    // API
-    const API_MATRIX = '/api/matrix';
-    const API_DEALERS = '/api/dealers';
-    const API_PRODUCTS = '/api/products';
-
-    // UI
+    const API_MATRIX_URL = '/api/matrix';
+    const API_PRODUCTS_URL = '/api/products';
+    
+    // Элементы
+    const matrixHeader = document.getElementById('matrix-header');
+    const matrixBody = document.getElementById('matrix-body');
+    const matrixFooter = document.getElementById('matrix-footer'); // НОВОЕ
+    const matrixContainer = document.getElementById('matrix-container');
+    const loadingMsg = document.getElementById('loading-msg');
+    const exportBtn = document.getElementById('export-csv-btn');
+    
+    // Фильтры
     const filterCity = document.getElementById('filter-city');
     const filterResponsible = document.getElementById('filter-responsible');
-    const btnExport = document.getElementById('export-csv-btn');
-    
-    // Multi-select Dealers
-    const dealerDropdownBtn = document.getElementById('dealer-dropdown-btn');
+
+    // Мульти-селекты
+    const dealerBtn = document.getElementById('dealer-dropdown-btn');
     const dealerMenu = document.getElementById('dealer-menu');
-    const dealerSearch = document.getElementById('dealer-search');
     const dealerListContainer = document.getElementById('dealer-list-container');
+    const dealerSearch = document.getElementById('dealer-search');
     const dealerSelectAll = document.getElementById('dealer-select-all');
     const dealerClear = document.getElementById('dealer-clear');
 
-    // Multi-select Products
-    const productDropdownBtn = document.getElementById('product-dropdown-btn');
+    const productBtn = document.getElementById('product-dropdown-btn');
     const productMenu = document.getElementById('product-menu');
-    const productSearch = document.getElementById('product-search');
     const productListContainer = document.getElementById('product-list-container');
+    const productSearch = document.getElementById('product-search');
     const productSelectAll = document.getElementById('product-select-all');
     const productClear = document.getElementById('product-clear');
-
-    // Table
-    const loadingMsg = document.getElementById('loading-msg');
-    const matrixContainer = document.getElementById('matrix-container');
-    const thead = document.getElementById('matrix-header');
-    const tbody = document.getElementById('matrix-body');
-
-    // Data State
-    let rawData = null; // { headers: [], matrix: [] }
-    let allDealers = [];
+    
+    let fullData = { headers: [], matrix: [] };
     let allProducts = [];
     
     let selectedDealerIds = new Set();
-    let selectedProductIds = new Set();
+    let selectedProductSkus = new Set();
 
-    // --- INIT ---
-    async function init() {
-        try {
-            // Load base lists for filters
-            const [dRes, pRes] = await Promise.all([
-                fetch(API_DEALERS + '?scope=all'),
-                fetch(API_PRODUCTS)
-            ]);
-            
-            if(dRes.ok) allDealers = await dRes.json();
-            if(pRes.ok) allProducts = await pRes.json();
+    const safeText = (text) => (text || '').toString().replace(/</g, "&lt;");
 
-            // Setup Filters
-            setupCityFilter();
-            renderMultiSelects();
-            
-            // Initial Load of Matrix
-            await loadMatrix();
+    // === ФИЛЬТРАЦИЯ ===
+    function getFilteredData() {
+        const city = filterCity.value;
+        const responsible = filterResponsible.value;
 
-        } catch (e) { console.error(e); }
+        // 1. Фильтруем Колонки (Дилеров)
+        const filteredHeaders = fullData.headers.filter(h => {
+            const matchFilters = (!city || h.city === city) && (!responsible || h.responsible === responsible);
+            const matchCheckboxes = (selectedDealerIds.size === 0) || selectedDealerIds.has(h.id);
+            return matchFilters && matchCheckboxes;
+        });
+
+        // 2. Фильтруем Строки (Товары)
+        const filteredMatrix = fullData.matrix.filter(p => {
+            const key = p.type === 'pos' ? p.name : p.sku;
+            return (selectedProductSkus.size === 0) || selectedProductSkus.has(key);
+        });
+
+        return { headers: filteredHeaders, matrix: filteredMatrix };
     }
 
-    async function loadMatrix() {
-        loadingMsg.style.display = 'block';
-        matrixContainer.style.display = 'none';
+    // --- 1. RENDER MATRIX (С ПОДСЧЕТАМИ) ---
+    function renderMatrix() {
+        const data = getFilteredData();
+        
+        // Маппинг индексов (так как мы фильтруем колонки, индексы смещаются)
+        const visibleOriginalIndices = data.headers.map(h => fullData.headers.indexOf(h));
+        const totalDealersCount = data.headers.length;
+
+        if (!matrixHeader || !matrixBody || !matrixFooter) return;
+
+        // --- ШАПКА ---
+        // ИЗМЕНЕНИЕ ЗДЕСЬ: Добавлена ссылка на дилера
+        matrixHeader.innerHTML = `
+            <tr>
+                <th>Артикул</th>
+                <th>Название</th>
+                ${data.headers.map(h => `
+                    <th class="text-center" title="${safeText(h.name)}">
+                        <div style="font-size:0.85rem; line-height:1.2; margin-bottom:2px; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                            <a href="dealer.html?id=${h.id}" target="_blank" class="text-dark text-decoration-none fw-bold" style="cursor: pointer;">
+                                ${safeText(h.name)}
+                            </a>
+                        </div>
+                        <span class="badge bg-light text-secondary border fw-normal" style="font-size:0.7rem">${safeText(h.city)}</span>
+                    </th>
+                `).join('')}
+                <th>Сводка</th> </tr>
+        `;
+        
+        // Массив для подсчета суммы по каждому дилеру (вертикально)
+        // Инициализируем нулями
+        const dealerTotals = new Array(totalDealersCount).fill(0);
+        let totalProductRows = 0; // Считаем только товары (не стенды)
+
+        // --- ТЕЛО ---
+        matrixBody.innerHTML = data.matrix.map(row => {
+            const isPos = row.type === 'pos';
+            const rowClass = isPos ? 'row-pos' : '';
+            const skuBadge = isPos ? '<span class="badge bg-warning text-dark">POS</span>' : `<span class="fw-bold text-dark">${safeText(row.sku)}</span>`;
+            
+            // Если это товар, увеличиваем счетчик "всего товаров" для футера
+            if (!isPos) totalProductRows++;
+
+            let rowPresenceCount = 0; // Счетчик по горизонтали
+
+            const cellsHtml = visibleOriginalIndices.map((index, i) => {
+                const cell = row.dealers[index];
+                
+                // Считаем сумму
+                if (cell.value > 0) {
+                    rowPresenceCount++; // Горизонтально
+                    if (!isPos) dealerTotals[i]++; // Вертикально (только если это товар, не стенд)
+                }
+
+                if (cell.is_pos) {
+                    return cell.value > 0 ? `<td class="text-center"><span class="pos-value">${cell.value}</span></td>` : '<td></td>';
+                } else {
+                    if (cell.value === 1) {
+                        return '<td class="text-center"><i class="bi bi-check-circle-fill matrix-check"></i></td>';
+                    } else {
+                        return '<td class="text-center"><span class="matrix-empty"></span></td>';
+                    }
+                }
+            }).join('');
+
+            // Ячейка сводки по строке (Справа)
+            const rowPercent = totalDealersCount > 0 ? Math.round((rowPresenceCount / totalDealersCount) * 100) : 0;
+            const rowSummary = `<td class="text-center text-muted small">
+                <div class="fw-bold text-dark">${rowPresenceCount} / ${totalDealersCount}</div>
+                <div>${rowPercent}%</div>
+            </td>`;
+
+            return `<tr class="${rowClass}"><td>${skuBadge}</td><td title="${safeText(row.name)}">${safeText(row.name)}</td>${cellsHtml}${rowSummary}</tr>`;
+        }).join('');
+
+        // --- ФУТЕР (ИТОГИ ПО ДИЛЕРАМ) ---
+        const footerCells = dealerTotals.map(count => {
+            const percent = totalProductRows > 0 ? Math.round((count / totalProductRows) * 100) : 0;
+            // Цвет процента
+            let colorClass = 'text-danger';
+            if(percent > 40) colorClass = 'text-warning';
+            if(percent > 70) colorClass = 'text-success';
+
+            return `<td>
+                <div class="fw-bold text-dark" style="font-size:0.9rem;">${count} / ${totalProductRows}</div>
+                <div class="${colorClass} small fw-bold">${percent}%</div>
+            </td>`;
+        }).join('');
+
+        matrixFooter.innerHTML = `
+            <tr>
+                <td colspan="2" class="text-end fw-bold text-uppercase text-secondary">Загрузка матрицы:</td>
+                ${footerCells}
+                <td>-</td>
+            </tr>
+        `;
+
+        updateDropdownLabels();
+    }
+
+    // --- 2. INIT ---
+    async function initPage() {
         try {
-            const res = await fetch(API_MATRIX);
-            if(!res.ok) throw new Error("Ошибка загрузки матрицы");
-            rawData = await res.json();
-            renderTable();
-        } catch(e) {
-            loadingMsg.textContent = "Ошибка: " + e.message;
-            loadingMsg.classList.add('text-danger');
-        } finally {
+            loadingMsg.style.display = 'block';
+            
+            const [matrixRes, prodRes] = await Promise.all([
+                fetch(API_MATRIX_URL),
+                fetch(API_PRODUCTS_URL)
+            ]);
+
+            if (!matrixRes.ok || !prodRes.ok) throw new Error('Ошибка сети');
+            fullData = await matrixRes.json(); 
+            allProducts = await prodRes.json();
+            
+            populateGlobalFilters();
+            updateDealerListOptions(); 
+            populateProductList();
+            
+            renderMatrix();    
+
             loadingMsg.style.display = 'none';
             matrixContainer.style.display = 'block';
+        } catch (error) {
+            loadingMsg.textContent = 'Ошибка загрузки: ' + error.message;
+            loadingMsg.className = 'alert alert-danger';
         }
     }
 
-    // --- RENDERING TABLE ---
-    function renderTable() {
-        if (!rawData) return;
-
-        // 1. Filter Dealers (Columns)
-        let dealers = rawData.headers; // headers = [{id, name, city, responsible}, ...]
-        
-        const cityVal = filterCity.value;
-        const respVal = filterResponsible.value;
-
-        dealers = dealers.filter(d => {
-            const matchCity = !cityVal || d.city === cityVal;
-            const matchResp = !respVal || d.responsible === respVal;
-            const matchId = selectedDealerIds.size === 0 || selectedDealerIds.has(d.id);
-            return matchCity && matchResp && matchId;
-        });
-
-        // 2. Filter Products (Rows)
-        let products = rawData.matrix; // matrix = [{sku, name, dealers: [{value...}, ...]}, ...]
-        
-        products = products.filter(p => {
-            // Find product ID in allProducts to match with selection
-            // Note: API Matrix usually returns SKU/Name. Let's assume we filter by SKU or just display all if no selection
-            // For simplicity, we check if selectedProductIds contains the product ID found in allProducts list
-            if (selectedProductIds.size === 0) return true;
-            const prodRef = allProducts.find(x => x.sku === p.sku);
-            return prodRef && selectedProductIds.has(prodRef.id);
-        });
-
-        // 3. Render Header
-        let headerHTML = `<tr><th class="sticky-col" style="min-width: 200px;">Товар / Декор</th>`;
-        dealers.forEach(d => {
-            // ВОТ ЗДЕСЬ ДОБАВЛЕНА ССЫЛКА НА ДИЛЕРА
-            headerHTML += `<th style="min-width: 100px; text-align: center;">
-                <a href="/dealer.html?id=${d.id}" target="_blank" class="text-decoration-none fw-bold text-dark dealer-link">
-                    ${d.name} <i class="bi bi-box-arrow-up-right small text-muted" style="font-size: 0.7em;"></i>
-                </a>
-                <div class="small text-muted fw-normal">${d.city || ''}</div>
-            </th>`;
-        });
-        headerHTML += `</tr>`;
-        thead.innerHTML = headerHTML;
-
-        // 4. Render Body
-        // Map original dealer indices to new filtered indices
-        const dealerIndices = dealers.map(d => rawData.headers.findIndex(h => h.id === d.id));
-
-        let bodyHTML = '';
-        products.forEach(p => {
-            let rowHTML = `<tr><td class="sticky-col fw-bold text-secondary">${p.name}<br><span class="small fw-normal text-muted">${p.sku}</span></td>`;
-            
-            dealerIndices.forEach(idx => {
-                const cellData = p.dealers[idx];
-                const val = cellData ? cellData.value : 0;
-                const isPos = cellData ? cellData.is_pos : false;
-                
-                let content = '';
-                let bgClass = '';
-
-                if (val > 0) {
-                    content = isPos ? `<span class="badge bg-info text-dark">${val}</span>` : `<i class="bi bi-check-lg text-success fs-5"></i>`;
-                    bgClass = isPos ? '' : 'bg-success-subtle';
-                } else {
-                    content = `<span class="text-muted opacity-25">&bull;</span>`;
-                }
-
-                rowHTML += `<td class="text-center ${bgClass}">${content}</td>`;
-            });
-            rowHTML += `</tr>`;
-            bodyHTML += rowHTML;
-        });
-        tbody.innerHTML = bodyHTML;
+    function populateGlobalFilters() {
+        const cities = [...new Set(fullData.headers.map(h => h.city).filter(Boolean))].sort();
+        filterCity.innerHTML = '<option value="">-- Все города --</option>';
+        cities.forEach(c => filterCity.add(new Option(c, c)));
     }
 
-    // --- FILTERS & UI LOGIC ---
-    function setupCityFilter() {
-        const cities = [...new Set(allDealers.map(d => d.city).filter(Boolean))].sort();
-        filterCity.innerHTML = '<option value="">-- Все --</option>' + cities.map(c => `<option value="${c}">${c}</option>`).join('');
-        
-        filterCity.addEventListener('change', renderTable);
-        filterResponsible.addEventListener('change', renderTable);
-    }
+    function updateDealerListOptions() {
+        const city = filterCity.value;
+        const responsible = filterResponsible.value;
+        const term = dealerSearch.value.toLowerCase();
 
-    function renderMultiSelects() {
-        // Render Dealer List
-        renderCheckboxList(dealerListContainer, allDealers, 'dealer', selectedDealerIds);
-        // Render Product List
-        renderCheckboxList(productListContainer, allProducts, 'product', selectedProductIds);
-    }
-
-    function renderCheckboxList(container, items, type, set) {
-        // Sort items
-        const sorted = [...items].sort((a,b) => (a.name || '').localeCompare(b.name || ''));
-        
-        container.innerHTML = sorted.map(item => `
-            <div class="form-check border-bottom py-2 mx-2">
-                <input class="form-check-input ${type}-checkbox" type="checkbox" value="${item.id}" id="${type}-${item.id}">
-                <label class="form-check-label w-100 stretched-link" for="${type}-${item.id}">
-                    ${item.name} <span class="text-muted small">${item.sku || item.city || ''}</span>
-                </label>
-            </div>
-        `).join('');
-
-        // Listeners
-        container.querySelectorAll(`.${type}-checkbox`).forEach(cb => {
-            cb.addEventListener('change', (e) => {
-                if(e.target.checked) set.add(e.target.value);
-                else set.delete(e.target.value);
-                
-                updateDropdownLabel(type, set.size, items.length);
-                renderTable();
-            });
-        });
-    }
-
-    function updateDropdownLabel(type, count, total) {
-        const btn = document.getElementById(`${type}-dropdown-btn`);
-        if(count === 0) btn.textContent = type === 'dealer' ? 'Все дилеры' : 'Все товары';
-        else btn.textContent = `Выбрано: ${count}`;
-        
-        // Highlight active filter
-        if(count > 0) btn.classList.add('text-primary', 'fw-bold');
-        else btn.classList.remove('text-primary', 'fw-bold');
-    }
-
-    // Dropdown Logic
-    function setupDropdown(type, searchInputId, clearBtnId, selectAllBtnId, containerId, items, set) {
-        const btn = document.getElementById(`${type}-dropdown-btn`);
-        const menu = document.getElementById(`${type}-menu`);
-        const search = document.getElementById(searchInputId);
-        
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            // Close others
-            document.querySelectorAll('.multi-select-menu').forEach(m => { if(m !== menu) m.style.display = 'none'; });
-            menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+        const availableDealers = fullData.headers.filter(d => {
+            const matchCity = !city || d.city === city;
+            const matchResp = !responsible || d.responsible === responsible;
+            const matchSearch = !term || d.name.toLowerCase().includes(term);
+            return matchCity && matchResp && matchSearch;
         });
 
-        // Search
-        search.addEventListener('input', (e) => {
+        dealerListContainer.innerHTML = availableDealers.map(d => {
+            const isChecked = selectedDealerIds.has(d.id) ? 'checked' : '';
+            return `
+            <div class="multi-select-item">
+                <div class="form-check">
+                    <input class="form-check-input dealer-checkbox" type="checkbox" value="${d.id}" id="d-${d.id}" ${isChecked}>
+                    <label class="form-check-label w-100" for="d-${d.id}" style="cursor:pointer">
+                        ${safeText(d.name)} <small class="text-muted ms-1">${safeText(d.city)}</small>
+                    </label>
+                </div>
+            </div>`;
+        }).join('');
+        
+        document.querySelectorAll('.dealer-checkbox').forEach(cb => cb.addEventListener('change', (e) => {
+            if (e.target.checked) selectedDealerIds.add(e.target.value); 
+            else selectedDealerIds.delete(e.target.value);
+            renderMatrix();
+        }));
+    }
+
+    function populateProductList() {
+        productListContainer.innerHTML = fullData.matrix.map(p => {
+            const id = p.type === 'pos' ? p.name : p.sku;
+            return `
+            <div class="multi-select-item">
+                <div class="form-check">
+                    <input class="form-check-input product-checkbox" type="checkbox" value="${id}" id="p-${id}">
+                    <label class="form-check-label w-100" for="p-${id}" style="cursor:pointer">
+                        <strong>${safeText(p.sku)}</strong> ${safeText(p.name)}
+                    </label>
+                </div>
+            </div>`;
+        }).join('');
+
+        productSearch.addEventListener('input', (e) => {
             const term = e.target.value.toLowerCase();
-            const checkboxes = document.getElementById(containerId).querySelectorAll('.form-check');
-            checkboxes.forEach(div => {
-                const text = div.innerText.toLowerCase();
-                div.style.display = text.includes(term) ? 'block' : 'none';
+            productListContainer.querySelectorAll('.multi-select-item').forEach(item => {
+                item.style.display = item.textContent.toLowerCase().includes(term) ? 'block' : 'none';
             });
         });
 
-        // Clear
-        document.getElementById(clearBtnId).addEventListener('click', () => {
-            set.clear();
-            document.getElementById(containerId).querySelectorAll('input').forEach(i => i.checked = false);
-            updateDropdownLabel(type, 0, items.length);
-            renderTable();
-        });
-
-        // Select All
-        document.getElementById(selectAllBtnId).addEventListener('click', () => {
-            // Select visible items only (if searching)
-            const checkboxes = document.getElementById(containerId).querySelectorAll('.form-check');
-            checkboxes.forEach(div => {
-                if(div.style.display !== 'none') {
-                    const inp = div.querySelector('input');
-                    inp.checked = true;
-                    set.add(inp.value);
-                }
-            });
-            updateDropdownLabel(type, set.size, items.length);
-            renderTable();
-        });
+        document.querySelectorAll('.product-checkbox').forEach(cb => cb.addEventListener('change', (e) => {
+            if (e.target.checked) selectedProductSkus.add(e.target.value); 
+            else selectedProductSkus.delete(e.target.value);
+            renderMatrix();
+        }));
     }
 
-    setupDropdown('dealer', 'dealer-search', 'dealer-clear', 'dealer-select-all', 'dealer-list-container', allDealers, selectedDealerIds);
-    setupDropdown('product', 'product-search', 'product-clear', 'product-select-all', 'product-list-container', allProducts, selectedProductIds);
+    function updateDropdownLabels() {
+        dealerBtn.textContent = selectedDealerIds.size > 0 ? `Дилеров: ${selectedDealerIds.size}` : 'Все дилеры';
+        productBtn.textContent = selectedProductSkus.size > 0 ? `Товаров: ${selectedProductSkus.size}` : 'Все товары';
+    }
 
-    // Close dropdowns on click outside
+    // --- UI HELPERS ---
+    function toggleMenu(menu) { menu.classList.toggle('show'); }
     document.addEventListener('click', (e) => {
-        if(!e.target.closest('.multi-select-dropdown')) {
-            document.querySelectorAll('.multi-select-menu').forEach(m => m.style.display = 'none');
-        }
+        if (!e.target.closest('#dealer-dropdown')) dealerMenu.classList.remove('show');
+        if (!e.target.closest('#product-dropdown')) productMenu.classList.remove('show');
     });
+    dealerBtn.onclick = () => toggleMenu(dealerMenu);
+    productBtn.onclick = () => toggleMenu(productMenu);
 
-    // Export CSV
-    if(btnExport) {
-        btnExport.onclick = () => {
-            if(!rawData) return;
-            // Generate basic CSV
-            let csv = '\uFEFFТовар;';
-            const headers = rawData.headers; // Assuming no filters for simple export, or use filtered state
-            headers.forEach(h => csv += `"${h.name} (${h.city})";`);
-            csv += '\n';
+    dealerSearch.addEventListener('input', () => updateDealerListOptions());
+
+    const bulkAction = (container, className, set, action) => {
+        container.querySelectorAll(`.${className}`).forEach(cb => {
+            if (cb.closest('.multi-select-item').style.display !== 'none') {
+                cb.checked = action;
+                if (action) set.add(cb.value); else set.delete(cb.value);
+            }
+        });
+        renderMatrix();
+    };
+
+    dealerSelectAll.onclick = () => { document.querySelectorAll('.dealer-checkbox').forEach(cb => { cb.checked = true; selectedDealerIds.add(cb.value); }); renderMatrix(); };
+    dealerClear.onclick = () => { document.querySelectorAll('.dealer-checkbox').forEach(cb => { cb.checked = false; selectedDealerIds.delete(cb.value); }); renderMatrix(); };
+
+    productSelectAll.onclick = () => bulkAction(productListContainer, 'product-checkbox', selectedProductSkus, true);
+    productClear.onclick = () => bulkAction(productListContainer, 'product-checkbox', selectedProductSkus, false);
+
+    if(filterCity) filterCity.onchange = () => { updateDealerListOptions(); renderMatrix(); };
+    if(filterResponsible) filterResponsible.onchange = () => { updateDealerListOptions(); renderMatrix(); };
+
+    // --- EXPORT ---
+    if(exportBtn) exportBtn.onclick = () => {
+        if (!fullData.matrix.length) return alert("Нет данных для экспорта");
+        const data = getFilteredData();
+        const visibleOriginalIndices = data.headers.map(h => fullData.headers.indexOf(h));
+        const clean = (text) => `"${String(text || '').replace(/"/g, '""')}"`;
+        
+        let csv = "\uFEFFАртикул;Название;";
+        // Заголовки дилеров
+        csv += data.headers.map(h => clean(`${h.name} (${h.city})`)).join(";") + ";Итого\r\n";
+
+        data.matrix.forEach(row => {
+            csv += `${clean(row.sku)};${clean(row.name)};`;
             
-            rawData.matrix.forEach(p => {
-                csv += `"${p.name}";`;
-                p.dealers.forEach(d => csv += `"${d.value > 0 ? (d.is_pos ? d.value : 1) : 0}";`);
-                csv += '\n';
+            let rowCount = 0;
+            const cells = visibleOriginalIndices.map(index => {
+                const cell = row.dealers[index];
+                if (cell.value > 0) rowCount++;
+                if (cell.is_pos) return cell.value > 0 ? cell.value : "";
+                return cell.value === 1 ? "1" : "";
             });
+            
+            csv += cells.join(";") + `;${rowCount}\r\n`;
+        });
 
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `Report_Matrix_${new Date().toISOString().slice(0,10)}.csv`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        };
-    }
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+        a.download = `Matrix_Report.csv`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    };
 
-    init();
+    initPage();
 });
