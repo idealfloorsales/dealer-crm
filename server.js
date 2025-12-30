@@ -2,11 +2,29 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const basicAuth = require('express-basic-auth'); 
+const fs = require('fs'); // <--- 1. Добавили модуль для чтения файлов
 
 const app = express();
 const PORT = process.env.PORT || 3000; 
 app.use(express.json({ limit: '50mb' })); 
 app.use(cors());
+
+// --- АВТО-ВЕРСИЯ (CACHE BUSTING) ---
+const APP_VERSION = Date.now(); // Генерирует уникальный номер при каждом старте
+
+// Функция для отдачи HTML с заменой версии
+const servePage = (res, fileName) => {
+    const filePath = __dirname + '/public/' + fileName;
+    fs.readFile(filePath, 'utf8', (err, data) => {
+        if (err) {
+            console.error('Ошибка чтения файла:', err);
+            return res.status(500).send('Ошибка сервера при загрузке страницы');
+        }
+        // Заменяем метку {{VER}} на реальный номер версии
+        const html = data.replace(/{{VER}}/g, APP_VERSION);
+        res.send(html);
+    });
+};
 
 // USERS
 const USERS = {
@@ -27,16 +45,19 @@ const authMiddleware = (req, res, next) => {
 app.use(authMiddleware);
 
 // STATIC FILES
-app.use(express.static('public', { index: false }));
-app.get('/', (req, res) => res.sendFile(__dirname + '/public/index.html'));
-app.get('/map.html', (req, res) => res.sendFile(__dirname + '/public/map.html'));
-app.get('/sales.html', (req, res) => res.sendFile(__dirname + '/public/sales.html'));
-app.get('/competitors.html', (req, res) => res.sendFile(__dirname + '/public/competitors.html'));
-app.get('/products.html', (req, res) => res.sendFile(__dirname + '/public/products.html'));
-app.get('/report.html', (req, res) => res.sendFile(__dirname + '/public/report.html'));
-app.get('/knowledge.html', (req, res) => res.sendFile(__dirname + '/public/knowledge.html'));
-app.get('/dealer.html', (req, res) => res.sendFile(__dirname + '/public/dealer.html'));
-app.use(express.static('public'));
+// app.use(express.static('public', { index: false })); // Убрали, так как теперь отдаем файлы вручную через servePage
+app.use(express.static('public')); // Оставляем для CSS, JS и картинок
+
+// --- HTML ROUTES (ОБНОВЛЕННЫЕ) ---
+app.get('/', (req, res) => servePage(res, 'index.html'));
+app.get('/map.html', (req, res) => servePage(res, 'map.html'));
+app.get('/sales.html', (req, res) => servePage(res, 'sales.html'));
+app.get('/competitors.html', (req, res) => servePage(res, 'competitors.html'));
+app.get('/products.html', (req, res) => servePage(res, 'products.html'));
+app.get('/report.html', (req, res) => servePage(res, 'report.html'));
+app.get('/knowledge.html', (req, res) => servePage(res, 'knowledge.html'));
+app.get('/dealer.html', (req, res) => servePage(res, 'dealer.html'));
+
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
@@ -165,10 +186,9 @@ app.delete('/api/statuses/:id', checkWrite, async (req, res) => { await Status.f
 // Dealers
 app.get('/api/dealers', async (req, res) => { 
     try { 
-        // --- ИЗМЕНЕНИЕ ЗДЕСЬ: Если просят ?scope=all, отдаем всех дилеров ---
         let filter = getDealerFilter(req);
         if (req.query.scope === 'all') {
-            filter = {}; // Сброс фильтра по ролям, показываем всё
+            filter = {}; 
         }
         
         const dealers = await Dealer.find(filter).select('-photos -visits -products').lean(); 
