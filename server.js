@@ -2,25 +2,26 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const basicAuth = require('express-basic-auth'); 
-const fs = require('fs'); // <--- 1. Добавили модуль для чтения файлов
+const fs = require('fs'); // Подключаем модуль для работы с файлами
 
 const app = express();
 const PORT = process.env.PORT || 3000; 
 app.use(express.json({ limit: '50mb' })); 
 app.use(cors());
 
-// --- АВТО-ВЕРСИЯ (CACHE BUSTING) ---
-const APP_VERSION = Date.now(); // Генерирует уникальный номер при каждом старте
+// --- АВТО-ВЕРСИЯ КЭША (CACHE BUSTING) ---
+// Генерируем уникальный номер при каждом запуске сервера
+const APP_VERSION = Date.now(); 
 
-// Функция для отдачи HTML с заменой версии
+// Функция для отдачи HTML-страниц с подменой версии
 const servePage = (res, fileName) => {
     const filePath = __dirname + '/public/' + fileName;
     fs.readFile(filePath, 'utf8', (err, data) => {
         if (err) {
-            console.error('Ошибка чтения файла:', err);
-            return res.status(500).send('Ошибка сервера при загрузке страницы');
+            console.error(`Ошибка чтения файла ${fileName}:`, err);
+            return res.status(500).send('Ошибка сервера');
         }
-        // Заменяем метку {{VER}} на реальный номер версии
+        // Заменяем метку {{VER}} на текущую версию
         const html = data.replace(/{{VER}}/g, APP_VERSION);
         res.send(html);
     });
@@ -36,6 +37,7 @@ const USERS = {
 
 // AUTH
 const authMiddleware = (req, res, next) => {
+    // Пропускаем статику и служебные файлы без пароля
     if (req.path === '/manifest.json' || req.path === '/sw.js' || req.path.endsWith('.png') || req.path.endsWith('.jpg') || req.path.endsWith('.jpeg') || req.path.endsWith('.ico') || req.path.endsWith('.gif')) {
         return next();
     }
@@ -44,11 +46,23 @@ const authMiddleware = (req, res, next) => {
 };
 app.use(authMiddleware);
 
-// STATIC FILES
-// app.use(express.static('public', { index: false })); // Убрали, так как теперь отдаем файлы вручную через servePage
-app.use(express.static('public')); // Оставляем для CSS, JS и картинок
+// --- MARSHRUTY (ROUTES) ---
 
-// --- HTML ROUTES (ОБНОВЛЕННЫЕ) ---
+// 1. Маршрут для Service Worker (важно для обновления кэша в фоне)
+app.get('/sw.js', (req, res) => {
+    const filePath = __dirname + '/public/sw.js';
+    fs.readFile(filePath, 'utf8', (err, data) => {
+        if (err) {
+            console.error('Ошибка чтения sw.js:', err);
+            return res.status(500).send('Error');
+        }
+        const js = data.replace(/{{VER}}/g, APP_VERSION);
+        res.set('Content-Type', 'application/javascript');
+        res.send(js);
+    });
+});
+
+// 2. Маршруты для HTML страниц (через servePage)
 app.get('/', (req, res) => servePage(res, 'index.html'));
 app.get('/map.html', (req, res) => servePage(res, 'map.html'));
 app.get('/sales.html', (req, res) => servePage(res, 'sales.html'));
@@ -58,6 +72,8 @@ app.get('/report.html', (req, res) => servePage(res, 'report.html'));
 app.get('/knowledge.html', (req, res) => servePage(res, 'knowledge.html'));
 app.get('/dealer.html', (req, res) => servePage(res, 'dealer.html'));
 
+// 3. Остальная статика (CSS, JS, картинки)
+app.use(express.static('public'));
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
@@ -173,7 +189,7 @@ function getDealerFilter(req) {
 }
 const checkWrite = (req, res, next) => { if (canWrite(req)) next(); else res.status(403).json({error:'Read Only'}); };
 
-// --- ROUTES ---
+// --- ROUTES API ---
 
 app.get('/api/auth/me', (req, res) => { res.json({ role: getUserRole(req) }); });
 
@@ -188,9 +204,8 @@ app.get('/api/dealers', async (req, res) => {
     try { 
         let filter = getDealerFilter(req);
         if (req.query.scope === 'all') {
-            filter = {}; 
+            filter = {}; // Показываем всех, если запрошен scope=all
         }
-        
         const dealers = await Dealer.find(filter).select('-photos -visits -products').lean(); 
         res.json(dealers.map(d => ({ id: d._id, ...d, photo_url: d.avatarUrl }))); 
     } catch (e) { res.status(500).json({ error: e.message }); } 
