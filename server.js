@@ -1,15 +1,14 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const basicAuth = require('express-basic-auth'); 
+// const basicAuth = require('express-basic-auth'); // <-- УБРАЛИ СТАРУЮ АВТОРИЗАЦИЮ
 const fs = require('fs'); 
-// --- НОВЫЕ БИБЛИОТЕКИ БЕЗОПАСНОСТИ ---
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 const app = express();
 const PORT = process.env.PORT || 3000; 
-const JWT_SECRET = process.env.JWT_SECRET || 'CHANGE_THIS_SECRET_KEY_123'; // Секретный ключ для подписи токенов
+const JWT_SECRET = process.env.JWT_SECRET || 'CHANGE_THIS_SECRET_KEY_123'; 
 
 app.use(express.json({ limit: '50mb' })); 
 app.use(cors());
@@ -37,133 +36,86 @@ const servePage = (res, fileName) => {
 };
 
 // ==========================================
-// НОВАЯ СИСТЕМА ПОЛЬЗОВАТЕЛЕЙ (RBAC)
+// МОДЕЛЬ ПОЛЬЗОВАТЕЛЯ
 // ==========================================
-
 const userSchema = new mongoose.Schema({
-    username: { type: String, required: true, unique: true }, // Логин
-    password: { type: String, required: true },               // Хеш пароля
-    fullName: String,                                         // Имя (Иван Иванов)
-    
-    // ГЛАВНЫЙ РУБИЛЬНИК
-    isBlocked: { type: Boolean, default: false },             // Если true - вход запрещен сразу
-
-    // ГЕОГРАФИЯ (Чьи данные видит?)
-    // 'all' = всё, 'astana' = Астана, 'region_north' = Север и т.д.
+    username: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+    fullName: String,
+    isBlocked: { type: Boolean, default: false },
     scope: { type: String, default: 'all' }, 
-
-    // ТОЧЕЧНЫЕ ПРАВА (ГАЛОЧКИ)
     permissions: {
-        // Просмотр разделов
         can_view_map: { type: Boolean, default: true },
         can_view_dealers: { type: Boolean, default: true },
         can_view_sales: { type: Boolean, default: true },
         can_view_competitors: { type: Boolean, default: true },
         can_view_report: { type: Boolean, default: true },
-        
-        // Редактирование
-        can_edit_dealer: { type: Boolean, default: false },   // Править карточку
-        can_delete_dealer: { type: Boolean, default: false }, // Удалять дилера (ОПАСНО!)
-        can_edit_sales: { type: Boolean, default: false },    // Ставить план/факт
-        
-        // Админка
-        can_manage_users: { type: Boolean, default: false },  // Создавать/удалять сотрудников
-        is_admin: { type: Boolean, default: false }           // Супер-админ (всё можно)
+        can_edit_dealer: { type: Boolean, default: false },
+        can_delete_dealer: { type: Boolean, default: false },
+        can_edit_sales: { type: Boolean, default: false },
+        can_manage_users: { type: Boolean, default: false },
+        is_admin: { type: Boolean, default: false }
     }
 }, { timestamps: true });
-
 const User = mongoose.model('User', userSchema);
 
-// --- СОЗДАНИЕ ПЕРВОГО АДМИНА (SEED) ---
+// --- СОЗДАНИЕ ПЕРВОГО АДМИНА ---
 async function seedUsers() {
     const count = await User.countDocuments();
     if (count === 0) {
         console.log('Создание первого администратора...');
-        // Пароль по умолчанию: admin123 (Обязательно смените!)
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash('admin123', salt);
-        
         await User.create({
             username: 'admin',
             password: hashedPassword,
             fullName: 'Главный Администратор',
             scope: 'all',
-            permissions: {
-                is_admin: true,
-                can_manage_users: true,
-                can_view_map: true, can_view_dealers: true, can_view_sales: true,
-                can_edit_dealer: true, can_delete_dealer: true, can_edit_sales: true
-            }
+            permissions: { is_admin: true, can_manage_users: true, can_view_map: true, can_view_dealers: true, can_view_sales: true, can_edit_dealer: true, can_delete_dealer: true, can_edit_sales: true }
         });
-        console.log('Администратор создан: логин "admin", пароль "admin123"');
     }
 }
 
-// --- API ВХОДА (LOGIN) ---
-app.post('/api/auth/login', async (req, res) => {
-    try {
-        const { username, password } = req.body;
-        
-        // 1. Ищем пользователя
-        const user = await User.findOne({ username });
-        if (!user) return res.status(400).json({ error: 'Неверный логин или пароль' });
-
-        // 2. Проверяем блокировку
-        if (user.isBlocked) return res.status(403).json({ error: 'Ваш аккаунт заблокирован' });
-
-        // 3. Сверяем пароль
-        const validPass = await bcrypt.compare(password, user.password);
-        if (!validPass) return res.status(400).json({ error: 'Неверный логин или пароль' });
-
-        // 4. Выдаем токен (действует 7 дней)
-        const token = jwt.sign(
-            { id: user._id, role: user.scope }, // Что зашито в токен
-            JWT_SECRET,
-            { expiresIn: '7d' }
-        );
-
-        // Отдаем токен и права клиенту
-        res.json({
-            token,
-            user: {
-                id: user._id,
-                username: user.username,
-                fullName: user.fullName,
-                scope: user.scope,
-                permissions: user.permissions
-            }
-        });
-
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
 // ==========================================
-// СТАРАЯ АВТОРИЗАЦИЯ (ВРЕМЕННО ОСТАВЛЯЕМ)
+// НОВАЯ ЗАЩИТА (JWT MIDDLEWARE)
 // ==========================================
-// Мы пока не удаляем Basic Auth, чтобы сайт не сломался прямо сейчас.
-// В следующих шагах мы заменим её на проверку Токена.
-const USERS_OLD = {
-    'admin': process.env.ADMIN_PASSWORD || 'admin',
-    'astana': process.env.ASTANA_PASSWORD || 'astana',
-    'regions': process.env.REGIONS_PASSWORD || 'regions',
-    'guest': process.env.GUEST_PASSWORD || 'guest'
-};
-
 const authMiddleware = (req, res, next) => {
-    // Пропускаем путь логина без пароля!
-    if (req.path === '/api/auth/login') return next();
-
-    if (req.path === '/manifest.json' || req.path === '/sw.js' || req.path.endsWith('.png') || req.path.endsWith('.jpg') || req.path.endsWith('.jpeg') || req.path.endsWith('.ico') || req.path.endsWith('.gif')) {
+    // 1. Разрешаем вход и статические файлы (html, css, js) без проверки
+    if (req.path === '/api/auth/login' || !req.path.startsWith('/api')) {
         return next();
     }
-    const user = basicAuth({ users: USERS_OLD, challenge: true, unauthorizedResponse: 'Доступ запрещен.' });
-    user(req, res, next);
+
+    // 2. Для API требуем Токен
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1]; // "Bearer TOKEN"
+
+    if (!token) return res.status(401).json({ error: 'Требуется авторизация' });
+
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) return res.status(403).json({ error: 'Токен недействителен' });
+        req.user = user; // Запоминаем, кто пришел
+        next();
+    });
 };
 app.use(authMiddleware);
 
-// --- STATIC ROUTES (через servePage) ---
+// --- API ВХОДА ---
+app.post('/api/auth/login', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        const user = await User.findOne({ username });
+        if (!user) return res.status(400).json({ error: 'Неверный логин' });
+        if (user.isBlocked) return res.status(403).json({ error: 'Аккаунт заблокирован' });
+
+        const validPass = await bcrypt.compare(password, user.password);
+        if (!validPass) return res.status(400).json({ error: 'Неверный пароль' });
+
+        const token = jwt.sign({ id: user._id, role: user.scope }, JWT_SECRET, { expiresIn: '7d' });
+        res.json({ token, user: { id: user._id, username: user.username, fullName: user.fullName, scope: user.scope, permissions: user.permissions } });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// --- СТАТИКА ---
 app.get('/sw.js', (req, res) => {
     const filePath = __dirname + '/public/sw.js';
     fs.readFile(filePath, 'utf8', (err, data) => {
@@ -173,8 +125,8 @@ app.get('/sw.js', (req, res) => {
         res.send(js);
     });
 });
-
 app.get('/', (req, res) => servePage(res, 'index.html'));
+app.get('/login.html', (req, res) => servePage(res, 'login.html')); // Добавили логин
 app.get('/map.html', (req, res) => servePage(res, 'map.html'));
 app.get('/sales.html', (req, res) => servePage(res, 'sales.html'));
 app.get('/competitors.html', (req, res) => servePage(res, 'competitors.html'));
@@ -182,12 +134,11 @@ app.get('/products.html', (req, res) => servePage(res, 'products.html'));
 app.get('/report.html', (req, res) => servePage(res, 'report.html'));
 app.get('/knowledge.html', (req, res) => servePage(res, 'knowledge.html'));
 app.get('/dealer.html', (req, res) => servePage(res, 'dealer.html'));
-
 app.use(express.static('public'));
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// --- СТАРЫЕ СХЕМЫ (БЕЗ ИЗМЕНЕНИЙ) ---
+// --- СХЕМЫ (БЕЗ ИЗМЕНЕНИЙ) ---
 const statusSchema = new mongoose.Schema({ value: String, label: String, color: String, isVisible: { type: Boolean, default: true }, sortOrder: { type: Number, default: 0 } });
 const Status = mongoose.model('Status', statusSchema);
 const productSchema = new mongoose.Schema({ sku: String, name: String });
@@ -210,27 +161,35 @@ const Knowledge = mongoose.model('Knowledge', new mongoose.Schema({ title: Strin
 
 async function connectToDB() {
     if (!DB_CONNECTION_STRING) return console.error("No DB String");
-    try { 
-        await mongoose.connect(DB_CONNECTION_STRING); 
-        console.log('MongoDB Connected'); 
-        await seedStatuses();
-        await seedUsers(); // <--- Создаем Админа при старте
-    } catch (e) { console.error(e); }
+    try { await mongoose.connect(DB_CONNECTION_STRING); console.log('MongoDB Connected'); await seedStatuses(); await seedUsers(); } catch (e) { console.error(e); }
 }
 
 async function seedStatuses() { const count = await Status.countDocuments(); if (count === 0) { await Status.insertMany([{ value: 'active', label: 'Активный', color: '#198754', isVisible: true, sortOrder: 1 }, { value: 'standard', label: 'Стандарт', color: '#ffc107', isVisible: true, sortOrder: 2 }, { value: 'problem', label: 'Проблемный', color: '#dc3545', isVisible: true, sortOrder: 3 }, { value: 'potential', label: 'Потенциальный', color: '#0d6efd', isVisible: true, sortOrder: 4 }, { value: 'archive', label: 'Архив', color: '#6c757d', isVisible: false, sortOrder: 5 }]); } }
+function convertToClient(doc) { if(!doc) return null; const obj = doc.toObject ? doc.toObject() : doc; obj.id = obj._id; delete obj._id; delete obj.__v; delete obj.password; if(obj.products) obj.products = obj.products.map(p => { if(p){p.id=p._id; delete p._id;} return p;}); if (obj.organization && (!obj.organizations || obj.organizations.length === 0)) { obj.organizations = [obj.organization]; } return obj; }
 
-// --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
-function convertToClient(doc) { if(!doc) return null; const obj = doc.toObject ? doc.toObject() : doc; obj.id = obj._id; delete obj._id; delete obj.__v; delete obj.password; if(obj.products) obj.products = obj.products.map(p => { if(p){p.id=p._id; delete p._id;} return p;}); return obj; }
-// Временно оставляем старые функции для совместимости, пока не перепишем API
-function getUserRole(req) { return req.auth ? req.auth.user : 'guest'; }
-function canWrite(req) { return req.auth ? req.auth.user !== 'guest' : false; }
-function getDealerFilter(req) { const role = getUserRole(req); if (role === 'admin' || role === 'guest') return {}; if (role === 'astana') return { $or: [{ responsible: 'regional_astana' }, { city: { $regex: /астана/i } }, { city: { $regex: /astana/i } }] }; if (role === 'regions') return { $or: [{ responsible: 'regional_regions' }, { city: { $not: { $regex: /астана/i } }, responsible: { $ne: 'regional_astana' } }] }; return { _id: null }; }
+// --- ПРОВЕРКА ПРАВ (НОВАЯ) ---
+// Вместо req.auth.user теперь смотрим req.user (из токена)
+function getUserRole(req) { return req.user ? req.user.role : 'guest'; }
+function canWrite(req) { 
+    // Если есть токен и роль не гость - можно писать (пока упрощенно, позже добавим проверку permissions)
+    return req.user && req.user.role !== 'guest'; 
+}
 const checkWrite = (req, res, next) => { if (canWrite(req)) next(); else res.status(403).json({error:'Read Only'}); };
 
-app.get('/api/auth/me', (req, res) => { res.json({ role: getUserRole(req) }); });
+function getDealerFilter(req) {
+    // В req.user теперь лежит инфо из токена
+    if (!req.user) return { _id: null }; // Если нет токена - ничего не показываем
+    const role = req.user.role; 
+    
+    if (role === 'admin' || role === 'guest' || role === 'all') return {}; 
+    if (role === 'astana') return { $or: [{ responsible: 'regional_astana' }, { city: { $regex: /астана/i } }, { city: { $regex: /astana/i } }] };
+    if (role === 'regions') return { $or: [{ responsible: 'regional_regions' }, { city: { $not: { $regex: /астана/i } }, responsible: { $ne: 'regional_astana' } }] };
+    return { _id: null }; 
+}
 
-// --- API (ОСТАЛИСЬ БЕЗ ИЗМЕНЕНИЙ) ---
+app.get('/api/auth/me', (req, res) => { res.json({ user: req.user }); });
+
+// --- API ROUTES (СХЕМЫ) ---
 app.get('/api/statuses', async (req, res) => { const s = await Status.find().sort({sortOrder: 1}).lean(); res.json(s.map(convertToClient)); });
 app.post('/api/statuses', checkWrite, async (req, res) => { try { const s = new Status(req.body); await s.save(); res.json(convertToClient(s)); } catch(e){ res.status(500).json({error:e.message}); } });
 app.put('/api/statuses/:id', checkWrite, async (req, res) => { try { await Status.findByIdAndUpdate(req.params.id, req.body); res.json({status:'ok'}); } catch(e){ res.status(500).json({error:e.message}); } });
