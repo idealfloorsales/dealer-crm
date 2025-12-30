@@ -1559,3 +1559,32 @@ nav a.nav-link.active { background: var(--primary-color) !important; color: whit
     from { opacity: 1; transform: translateY(0); }
     to { opacity: 0; transform: translateY(-20px); }
 }
+/* Добавьте это в style.css или <style> в report.html */
+
+/* Родительский блок должен быть "точкой отсчета" */
+.multi-select-dropdown {
+    position: relative; /* Самое важное! */
+    width: 100%;
+}
+
+/* Сам список */
+.multi-select-menu {
+    display: none;
+    position: absolute; /* Висит поверх всего */
+    top: 100%;          /* Сразу под кнопкой */
+    left: 0;            /* Прижат к левому краю кнопки */
+    width: 100%;        /* Ширина как у кнопки */
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1050;      /* Чтобы был поверх таблицы */
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+/* Класс для показа */
+.multi-select-menu.show {
+    display: block;
+}
