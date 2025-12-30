@@ -13,6 +13,18 @@ app.use(cors());
 // Создаем уникальный номер версии при каждом перезапуске сервера
 const APP_VERSION = Date.now(); 
 
+// --- ОТКЛЮЧЕНИЕ КЭША ДЛЯ ДАННЫХ (НОВОЕ) ---
+const nocache = (req, res, next) => {
+    res.header('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+    res.header('Expires', '-1');
+    res.header('Pragma', 'no-cache');
+    next();
+};
+
+// Применяем "не кэшировать" ко всем API запросам
+app.use('/api', nocache);
+// ---------------------------------------------
+
 // Функция: читает файл, меняет {{VER}} на цифры и отправляет браузеру
 const servePage = (res, fileName) => {
     const filePath = __dirname + '/public/' + fileName;
