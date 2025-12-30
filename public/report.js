@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Элементы
     const matrixHeader = document.getElementById('matrix-header');
     const matrixBody = document.getElementById('matrix-body');
-    const matrixFooter = document.getElementById('matrix-footer'); // НОВОЕ
+    const matrixFooter = document.getElementById('matrix-footer');
     const matrixContainer = document.getElementById('matrix-container');
     const loadingMsg = document.getElementById('loading-msg');
     const exportBtn = document.getElementById('export-csv-btn');
@@ -45,9 +45,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 1. Фильтруем Колонки (Дилеров)
         const filteredHeaders = fullData.headers.filter(h => {
-            const matchFilters = (!city || h.city === city) && (!responsible || h.responsible === responsible);
+            const matchCity = !city || h.city === city;
+            const matchResp = !responsible || h.responsible === responsible;
             const matchCheckboxes = (selectedDealerIds.size === 0) || selectedDealerIds.has(h.id);
-            return matchFilters && matchCheckboxes;
+            return matchCity && matchResp && matchCheckboxes;
         });
 
         // 2. Фильтруем Строки (Товары)
@@ -59,7 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return { headers: filteredHeaders, matrix: filteredMatrix };
     }
 
-    // --- 1. RENDER MATRIX (С ПОДСЧЕТАМИ) ---
+    // --- 1. RENDER MATRIX (С ПОДСЧЕТАМИ И ССЫЛКАМИ) ---
     function renderMatrix() {
         const data = getFilteredData();
         
@@ -69,8 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!matrixHeader || !matrixBody || !matrixFooter) return;
 
-        // --- ШАПКА ---
-        // ИЗМЕНЕНИЕ ЗДЕСЬ: Добавлена ссылка на дилера
+        // --- ШАПКА ТАБЛИЦЫ ---
         matrixHeader.innerHTML = `
             <tr>
                 <th>Артикул</th>
@@ -78,28 +78,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 ${data.headers.map(h => `
                     <th class="text-center" title="${safeText(h.name)}">
                         <div style="font-size:0.85rem; line-height:1.2; margin-bottom:2px; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                            <a href="dealer.html?id=${h.id}" target="_blank" class="text-dark text-decoration-none fw-bold" style="cursor: pointer;">
-                                ${safeText(h.name)}
+                            <a href="/dealer.html?id=${h.id}" target="_blank" class="text-dark text-decoration-none fw-bold dealer-link">
+                                ${safeText(h.name)} <i class="bi bi-box-arrow-up-right small text-muted" style="font-size: 0.7em;"></i>
                             </a>
                         </div>
                         <span class="badge bg-light text-secondary border fw-normal" style="font-size:0.7rem">${safeText(h.city)}</span>
                     </th>
                 `).join('')}
-                <th>Сводка</th> </tr>
+                <th>Сводка</th> 
+            </tr>
         `;
         
-        // Массив для подсчета суммы по каждому дилеру (вертикально)
-        // Инициализируем нулями
+        // Инициализируем массив для подсчета итогов по колонкам (дилерам)
         const dealerTotals = new Array(totalDealersCount).fill(0);
         let totalProductRows = 0; // Считаем только товары (не стенды)
 
-        // --- ТЕЛО ---
+        // --- ТЕЛО ТАБЛИЦЫ ---
         matrixBody.innerHTML = data.matrix.map(row => {
             const isPos = row.type === 'pos';
             const rowClass = isPos ? 'row-pos' : '';
             const skuBadge = isPos ? '<span class="badge bg-warning text-dark">POS</span>' : `<span class="fw-bold text-dark">${safeText(row.sku)}</span>`;
             
-            // Если это товар, увеличиваем счетчик "всего товаров" для футера
             if (!isPos) totalProductRows++;
 
             let rowPresenceCount = 0; // Счетчик по горизонтали
@@ -109,17 +108,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Считаем сумму
                 if (cell.value > 0) {
-                    rowPresenceCount++; // Горизонтально
-                    if (!isPos) dealerTotals[i]++; // Вертикально (только если это товар, не стенд)
+                    rowPresenceCount++; 
+                    if (!isPos) dealerTotals[i]++; // +1 к итогу дилера
                 }
 
                 if (cell.is_pos) {
                     return cell.value > 0 ? `<td class="text-center"><span class="pos-value">${cell.value}</span></td>` : '<td></td>';
                 } else {
                     if (cell.value === 1) {
-                        return '<td class="text-center"><i class="bi bi-check-circle-fill matrix-check"></i></td>';
+                        return '<td class="text-center"><i class="bi bi-check-circle-fill matrix-check text-success"></i></td>';
                     } else {
-                        return '<td class="text-center"><span class="matrix-empty"></span></td>';
+                        return '<td class="text-center"><span class="matrix-empty text-muted opacity-25">&bull;</span></td>';
                     }
                 }
             }).join('');
@@ -137,7 +136,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // --- ФУТЕР (ИТОГИ ПО ДИЛЕРАМ) ---
         const footerCells = dealerTotals.map(count => {
             const percent = totalProductRows > 0 ? Math.round((count / totalProductRows) * 100) : 0;
-            // Цвет процента
             let colorClass = 'text-danger';
             if(percent > 40) colorClass = 'text-warning';
             if(percent > 70) colorClass = 'text-success';
@@ -150,7 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         matrixFooter.innerHTML = `
             <tr>
-                <td colspan="2" class="text-end fw-bold text-uppercase text-secondary">Загрузка матрицы:</td>
+                <td colspan="2" class="text-end fw-bold text-uppercase text-secondary">Итого по дилерам:</td>
                 ${footerCells}
                 <td>-</td>
             </tr>
@@ -159,7 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateDropdownLabels();
     }
 
-    // --- 2. INIT ---
+    // --- 2. ЗАГРУЗКА И НАСТРОЙКА ---
     async function initPage() {
         try {
             loadingMsg.style.display = 'block';
@@ -187,10 +185,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // --- ИСПРАВЛЕННАЯ ФУНКЦИЯ ФИЛЬТРОВ ---
     function populateGlobalFilters() {
+        // 1. Города
         const cities = [...new Set(fullData.headers.map(h => h.city).filter(Boolean))].sort();
-        filterCity.innerHTML = '<option value="">-- Все города --</option>';
+        filterCity.innerHTML = '<option value="">-- Все --</option>';
         cities.forEach(c => filterCity.add(new Option(c, c)));
+
+        // 2. Ответственные (ДИНАМИЧЕСКИ)
+        const responsibles = [...new Set(fullData.headers.map(h => h.responsible).filter(Boolean))].sort();
+        filterResponsible.innerHTML = '<option value="">-- Все --</option>';
+        
+        // Красивые названия (словарь)
+        const respNames = {
+            'regional_astana': 'Региональный Астана',
+            'regional_regions': 'Региональный Регионы'
+        };
+
+        responsibles.forEach(r => {
+            const label = respNames[r] || r; 
+            filterResponsible.add(new Option(label, r));
+        });
     }
 
     function updateDealerListOptions() {
@@ -260,10 +275,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- UI HELPERS ---
     function toggleMenu(menu) { menu.classList.toggle('show'); }
+    
+    // Закрытие меню при клике вне
     document.addEventListener('click', (e) => {
         if (!e.target.closest('#dealer-dropdown')) dealerMenu.classList.remove('show');
         if (!e.target.closest('#product-dropdown')) productMenu.classList.remove('show');
     });
+    
     dealerBtn.onclick = () => toggleMenu(dealerMenu);
     productBtn.onclick = () => toggleMenu(productMenu);
 
@@ -288,7 +306,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(filterCity) filterCity.onchange = () => { updateDealerListOptions(); renderMatrix(); };
     if(filterResponsible) filterResponsible.onchange = () => { updateDealerListOptions(); renderMatrix(); };
 
-    // --- EXPORT ---
+    // --- EXPORT CSV ---
     if(exportBtn) exportBtn.onclick = () => {
         if (!fullData.matrix.length) return alert("Нет данных для экспорта");
         const data = getFilteredData();
