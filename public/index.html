@@ -57,7 +57,12 @@
                 border: none;
             }
         }
-    </style>
+    </style> <script>
+    // Если нет ключа - сразу на выход
+    if (!localStorage.getItem('crm_token')) {
+        window.location.href = '/login.html';
+    }
+</script>
 </head>
 <body class="bg-light">
     
@@ -431,5 +436,6 @@
     <script src="script.js?v={{VER}}"></script> <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(err => console.error(err)); }</script>
 </body>
 </html>
+
 
 
