@@ -1,7 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-// const basicAuth = require('express-basic-auth'); // <-- УБРАЛИ СТАРУЮ АВТОРИЗАЦИЮ
+// const basicAuth = require('express-basic-auth'); 
 const fs = require('fs'); 
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -80,12 +80,17 @@ async function seedUsers() {
 // НОВАЯ ЗАЩИТА (JWT MIDDLEWARE)
 // ==========================================
 const authMiddleware = (req, res, next) => {
-    // 1. Разрешаем вход и статические файлы (html, css, js) без проверки
+    // 1. Разрешаем предварительные запросы браузера (CORS OPTIONS)
+    if (req.method === 'OPTIONS') {
+        return next(); 
+    }
+
+    // 2. Разрешаем вход и статические файлы (html, css, js) без проверки
     if (req.path === '/api/auth/login' || !req.path.startsWith('/api')) {
         return next();
     }
 
-    // 2. Для API требуем Токен
+    // 3. Для API требуем Токен
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; // "Bearer TOKEN"
 
@@ -126,7 +131,7 @@ app.get('/sw.js', (req, res) => {
     });
 });
 app.get('/', (req, res) => servePage(res, 'index.html'));
-app.get('/login.html', (req, res) => servePage(res, 'login.html')); // Добавили логин
+app.get('/login.html', (req, res) => servePage(res, 'login.html'));
 app.get('/map.html', (req, res) => servePage(res, 'map.html'));
 app.get('/sales.html', (req, res) => servePage(res, 'sales.html'));
 app.get('/competitors.html', (req, res) => servePage(res, 'competitors.html'));
@@ -168,17 +173,12 @@ async function seedStatuses() { const count = await Status.countDocuments(); if 
 function convertToClient(doc) { if(!doc) return null; const obj = doc.toObject ? doc.toObject() : doc; obj.id = obj._id; delete obj._id; delete obj.__v; delete obj.password; if(obj.products) obj.products = obj.products.map(p => { if(p){p.id=p._id; delete p._id;} return p;}); if (obj.organization && (!obj.organizations || obj.organizations.length === 0)) { obj.organizations = [obj.organization]; } return obj; }
 
 // --- ПРОВЕРКА ПРАВ (НОВАЯ) ---
-// Вместо req.auth.user теперь смотрим req.user (из токена)
 function getUserRole(req) { return req.user ? req.user.role : 'guest'; }
-function canWrite(req) { 
-    // Если есть токен и роль не гость - можно писать (пока упрощенно, позже добавим проверку permissions)
-    return req.user && req.user.role !== 'guest'; 
-}
+function canWrite(req) { return req.user && req.user.role !== 'guest'; }
 const checkWrite = (req, res, next) => { if (canWrite(req)) next(); else res.status(403).json({error:'Read Only'}); };
 
 function getDealerFilter(req) {
-    // В req.user теперь лежит инфо из токена
-    if (!req.user) return { _id: null }; // Если нет токена - ничего не показываем
+    if (!req.user) return { _id: null }; 
     const role = req.user.role; 
     
     if (role === 'admin' || role === 'guest' || role === 'all') return {}; 
