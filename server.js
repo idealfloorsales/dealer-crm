@@ -2,24 +2,24 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const basicAuth = require('express-basic-auth'); 
-const fs = require('fs'); // Подключаем модуль для работы с файлами
+const fs = require('fs'); // <--- 1. Добавили модуль для чтения файлов
 
 const app = express();
 const PORT = process.env.PORT || 3000; 
 app.use(express.json({ limit: '50mb' })); 
 app.use(cors());
 
-// --- АВТО-ВЕРСИЯ КЭША (CACHE BUSTING) ---
-// Генерируем уникальный номер при каждом запуске сервера
+// --- АВТО-ВЕРСИЯ КЭША ---
+// Создаем уникальный номер версии при каждом перезапуске сервера
 const APP_VERSION = Date.now(); 
 
-// Функция для отдачи HTML-страниц с подменой версии
+// Функция: читает файл, меняет {{VER}} на цифры и отправляет браузеру
 const servePage = (res, fileName) => {
     const filePath = __dirname + '/public/' + fileName;
     fs.readFile(filePath, 'utf8', (err, data) => {
         if (err) {
             console.error(`Ошибка чтения файла ${fileName}:`, err);
-            return res.status(500).send('Ошибка сервера');
+            return res.status(500).send('Server Error');
         }
         // Заменяем метку {{VER}} на текущую версию
         const html = data.replace(/{{VER}}/g, APP_VERSION);
@@ -37,7 +37,6 @@ const USERS = {
 
 // AUTH
 const authMiddleware = (req, res, next) => {
-    // Пропускаем статику и служебные файлы без пароля
     if (req.path === '/manifest.json' || req.path === '/sw.js' || req.path.endsWith('.png') || req.path.endsWith('.jpg') || req.path.endsWith('.jpeg') || req.path.endsWith('.ico') || req.path.endsWith('.gif')) {
         return next();
     }
@@ -46,9 +45,9 @@ const authMiddleware = (req, res, next) => {
 };
 app.use(authMiddleware);
 
-// --- MARSHRUTY (ROUTES) ---
+// --- 2. НОВЫЕ МАРШРУТЫ (С ЗАМЕНОЙ ВЕРСИИ) ---
 
-// 1. Маршрут для Service Worker (важно для обновления кэша в фоне)
+// Специальный маршрут для Service Worker
 app.get('/sw.js', (req, res) => {
     const filePath = __dirname + '/public/sw.js';
     fs.readFile(filePath, 'utf8', (err, data) => {
@@ -56,13 +55,14 @@ app.get('/sw.js', (req, res) => {
             console.error('Ошибка чтения sw.js:', err);
             return res.status(500).send('Error');
         }
+        // Меняем версию внутри JS файла
         const js = data.replace(/{{VER}}/g, APP_VERSION);
         res.set('Content-Type', 'application/javascript');
         res.send(js);
     });
 });
 
-// 2. Маршруты для HTML страниц (через servePage)
+// Маршруты для HTML страниц (через функцию servePage)
 app.get('/', (req, res) => servePage(res, 'index.html'));
 app.get('/map.html', (req, res) => servePage(res, 'map.html'));
 app.get('/sales.html', (req, res) => servePage(res, 'sales.html'));
@@ -72,12 +72,12 @@ app.get('/report.html', (req, res) => servePage(res, 'report.html'));
 app.get('/knowledge.html', (req, res) => servePage(res, 'knowledge.html'));
 app.get('/dealer.html', (req, res) => servePage(res, 'dealer.html'));
 
-// 3. Остальная статика (CSS, JS, картинки)
+// Остальная статика (картинки, стили и т.д.)
 app.use(express.static('public'));
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// --- SCHEMAS ---
+// --- SCHEMAS (ВАШИ СХЕМЫ БЕЗ ИЗМЕНЕНИЙ) ---
 
 // Statuses
 const statusSchema = new mongoose.Schema({ value: String, label: String, color: String, isVisible: { type: Boolean, default: true }, sortOrder: { type: Number, default: 0 } });
@@ -128,7 +128,7 @@ const dealerSchema = new mongoose.Schema({
     organizations: [String], 
     contract: { isSigned: Boolean, date: String }, 
     region_sector: String, 
-    hasPersonalPlan: { type: Boolean, default: false }, // VIP галочка
+    hasPersonalPlan: { type: Boolean, default: false },
 
     delivery: String, 
     website: String, 
@@ -189,7 +189,7 @@ function getDealerFilter(req) {
 }
 const checkWrite = (req, res, next) => { if (canWrite(req)) next(); else res.status(403).json({error:'Read Only'}); };
 
-// --- ROUTES API ---
+// --- ROUTES API (ВАШИ API БЕЗ ИЗМЕНЕНИЙ) ---
 
 app.get('/api/auth/me', (req, res) => { res.json({ role: getUserRole(req) }); });
 
@@ -203,9 +203,7 @@ app.delete('/api/statuses/:id', checkWrite, async (req, res) => { await Status.f
 app.get('/api/dealers', async (req, res) => { 
     try { 
         let filter = getDealerFilter(req);
-        if (req.query.scope === 'all') {
-            filter = {}; // Показываем всех, если запрошен scope=all
-        }
+        if (req.query.scope === 'all') { filter = {}; } // Показываем всех
         const dealers = await Dealer.find(filter).select('-photos -visits -products').lean(); 
         res.json(dealers.map(d => ({ id: d._id, ...d, photo_url: d.avatarUrl }))); 
     } catch (e) { res.status(500).json({ error: e.message }); } 
