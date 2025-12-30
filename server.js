@@ -58,22 +58,22 @@ const visitSchema = new mongoose.Schema({ date: String, comment: String, isCompl
 const posMaterialSchema = new mongoose.Schema({ name: String, quantity: Number }, { _id: false });
 const competitorSchema = new mongoose.Schema({ brand: String, collection: String, price_opt: String, price_retail: String }, { _id: false });
 
-// --- COMPETITORS REF SCHEMAS (ЭТОГО НЕ ХВАТАЛО) ---
+// --- COMPETITORS REF SCHEMAS ---
 const collectionItemSchema = new mongoose.Schema({ name: String, type: { type: String, default: 'standard' } }, { _id: false });
 const compContactSchema = new mongoose.Schema({ name: String, position: String, phone: String }, { _id: false });
 const compRefSchema = new mongoose.Schema({ 
-name: String, 
+    name: String, 
     country: String, 
     supplier: String, 
     warehouse: String, 
-    website: String,   // <--- НОВОЕ ПОЛЕ
-    instagram: String, // <--- НОВОЕ ПОЛЕ
+    website: String, 
+    instagram: String,
     info: String, 
     storage_days: String, 
     stock_info: String, 
     reserve_days: String, 
     contacts: [compContactSchema], 
-    collections: [collectionItemSchema]
+    collections: [collectionItemSchema] 
 });
 const CompRef = mongoose.model('CompRef', compRefSchema);
 
@@ -165,7 +165,13 @@ app.delete('/api/statuses/:id', checkWrite, async (req, res) => { await Status.f
 // Dealers
 app.get('/api/dealers', async (req, res) => { 
     try { 
-        const dealers = await Dealer.find(getDealerFilter(req)).select('-photos -visits -products').lean(); 
+        // --- ИЗМЕНЕНИЕ ЗДЕСЬ: Если просят ?scope=all, отдаем всех дилеров ---
+        let filter = getDealerFilter(req);
+        if (req.query.scope === 'all') {
+            filter = {}; // Сброс фильтра по ролям, показываем всё
+        }
+        
+        const dealers = await Dealer.find(filter).select('-photos -visits -products').lean(); 
         res.json(dealers.map(d => ({ id: d._id, ...d, photo_url: d.avatarUrl }))); 
     } catch (e) { res.status(500).json({ error: e.message }); } 
 });
@@ -190,7 +196,7 @@ app.get('/api/matrix', async (req, res) => { try { const prods = await Product.f
 app.get('/api/sales', async (req, res) => { const {month} = req.query; const s = await Sales.find(month ? {month} : {}).lean(); res.json(s); });
 app.post('/api/sales', checkWrite, async (req, res) => { const ops = req.body.data.map(i => ({ updateOne: { filter: { month: req.body.month, $or: [{dealerId: i.dealerId}, {dealerName: i.dealerName, isCustom:true}] }, update: {$set: i}, upsert: true } })); await Sales.bulkWrite(ops); res.json({status:'ok'}); });
 
-// --- COMPETITORS REF API (ВОТ ЭТО ДОЛЖНО БЫТЬ) ---
+// --- COMPETITORS REF API ---
 app.get('/api/competitors-ref', async (req, res) => { const l = await CompRef.find().sort({name:1}); res.json(l.map(convertToClient)); });
 app.post('/api/competitors-ref', checkWrite, async (req, res) => { const c = new CompRef(req.body); await c.save(); res.json(convertToClient(c)); });
 app.put('/api/competitors-ref/:id', checkWrite, async (req, res) => { await CompRef.findByIdAndUpdate(req.params.id, req.body); res.json({status:'ok'}); });
@@ -209,4 +215,3 @@ app.get('/api/tasks', async (req, res) => {
 });
 
 app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
-
