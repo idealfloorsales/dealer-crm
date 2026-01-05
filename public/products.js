@@ -1,9 +1,22 @@
+// --- АВТОРИЗАЦИЯ (ВСТАВИТЬ В НАЧАЛО ФАЙЛА) ---
+const originalFetch = window.fetch;
+window.fetch = async function (url, options) {
+    options = options || {};
+    options.headers = options.headers || {};
+    const token = localStorage.getItem('crm_token');
+    if (token) options.headers['Authorization'] = 'Bearer ' + token;
+    const response = await originalFetch(url, options);
+    if (response.status === 401) window.location.href = '/login.html';
+    return response;
+};
+// -------------------------------------------
+
 document.addEventListener('DOMContentLoaded', () => {
     
     const API_URL = '/api/products';
     
     // Элементы
-    const listContainer = document.getElementById('products-list-container'); // Новый контейнер
+    const listContainer = document.getElementById('products-list-container'); 
     const searchInput = document.getElementById('product-search');
     const totalLabel = document.getElementById('total-count');
     
