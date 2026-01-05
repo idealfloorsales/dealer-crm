@@ -138,8 +138,27 @@ app.post('/api/auth/login', async (req, res) => {
         const validPass = await bcrypt.compare(password, user.password);
         if (!validPass) return res.status(400).json({ error: 'Неверный пароль' });
 
-        const token = jwt.sign({ id: user._id, role: user.scope }, JWT_SECRET, { expiresIn: '7d' });
-        res.json({ token, user: { id: user._id, username: user.username, fullName: user.fullName, scope: user.scope, permissions: user.permissions } });
+        // ВАЖНОЕ ИЗМЕНЕНИЕ: Добавляем permissions внутрь токена!
+        const token = jwt.sign(
+            { 
+                id: user._id, 
+                role: user.scope,
+                permissions: user.permissions // <--- ВОТ ЭТОЙ СТРОЧКИ НЕ ХВАТАЛО
+            }, 
+            JWT_SECRET, 
+            { expiresIn: '7d' }
+        );
+
+        res.json({ 
+            token, 
+            user: { 
+                id: user._id, 
+                username: user.username, 
+                fullName: user.fullName, 
+                scope: user.scope, 
+                permissions: user.permissions 
+            } 
+        });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -329,5 +348,6 @@ app.delete('/api/knowledge/:id', checkWrite, async (req, res) => { await Knowled
 app.get('/api/tasks', async (req, res) => { try { const data = await Dealer.find(getDealerFilter(req)).select('name visits status responsible').lean(); res.json(data.map(d => ({ id: d._id, name: d.name, status: d.status, visits: d.visits || [], responsible: d.responsible }))); } catch (e) { res.status(500).json([]); } });
 
 app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
+
 
 
