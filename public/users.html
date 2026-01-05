@@ -84,6 +84,11 @@
                                 <div class="card h-100 bg-light border-0">
                                     <div class="card-body">
                                         <h6 class="card-title small fw-bold mb-3">Что видит?</h6>
+                                        
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input perm-check" type="checkbox" id="p_can_view_dealers">
+                                            <label class="form-check-label" for="p_can_view_dealers">Список дилеров</label>
+                                        </div>
                                         <div class="form-check form-switch mb-2">
                                             <input class="form-check-input perm-check" type="checkbox" id="p_can_view_map">
                                             <label class="form-check-label" for="p_can_view_map">Карта дилеров</label>
@@ -222,8 +227,12 @@
             document.getElementById('modalTitle').innerText = 'Новый сотрудник';
             // Сброс галочек
             document.querySelectorAll('.perm-check').forEach(cb => cb.checked = false);
-            // Дефолтные права
-            ['p_can_view_map', 'p_can_view_dealers', 'p_can_view_sales'].forEach(id => document.getElementById(id).checked = true);
+            
+            // ИСПРАВЛЕННОЕ МЕСТО: Проверяем, существует ли элемент, перед тем как ставить галочку
+            ['p_can_view_map', 'p_can_view_dealers', 'p_can_view_sales'].forEach(id => {
+                const el = document.getElementById(id);
+                if(el) el.checked = true; 
+            });
             modal.show();
         }
 
