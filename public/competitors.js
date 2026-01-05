@@ -1,3 +1,16 @@
+// --- АВТОРИЗАЦИЯ (ВСТАВИТЬ В НАЧАЛО ФАЙЛА) ---
+const originalFetch = window.fetch;
+window.fetch = async function (url, options) {
+    options = options || {};
+    options.headers = options.headers || {};
+    const token = localStorage.getItem('crm_token');
+    if (token) options.headers['Authorization'] = 'Bearer ' + token;
+    const response = await originalFetch(url, options);
+    if (response.status === 401) window.location.href = '/login.html';
+    return response;
+};
+// -------------------------------------------
+
 document.addEventListener('DOMContentLoaded', () => {
     const API_URL = '/api/competitors-ref';
     const API_DEALERS = '/api/dealers';
@@ -7,7 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
     styleFix.innerHTML = `
         /* 1. Увеличиваем высоту карточки, чтобы всё влезало */
         .comp-card-modern {
-            min-height: 420px !important; /* Было меньше, теперь влезет всё */
+            min-height: 420px !important; 
         }
         
         /* 2. Делаем переднюю часть карточки "резиновой", чтобы кнопка "Коллекции" всегда была внизу */
@@ -17,13 +30,13 @@ document.addEventListener('DOMContentLoaded', () => {
             padding-bottom: 10px;
         }
         .comp-front .btn-flip {
-            margin-top: auto; /* Прижимает кнопку к низу */
+            margin-top: auto; 
         }
 
         /* 3. Исправляем цвет кнопки "Дилеры" при наведении */
         .btn-dealers-hover:hover {
-            background-color: #6c757d !important; /* Серый фон */
-            color: #ffffff !important; /* Белый текст */
+            background-color: #6c757d !important; 
+            color: #ffffff !important; 
             border-color: #6c757d !important;
         }
 
@@ -83,7 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const inpStorage = document.getElementById('comp_storage');
     const inpStock = document.getElementById('comp_stock');
     const inpReserve = document.getElementById('comp_reserve');
-    const inpWebsite = document.getElementById('comp_website');     
+    const inpWebsite = document.getElementById('comp_website');      
     const inpInstagram = document.getElementById('comp_instagram'); 
 
     const defaultTypes = [
@@ -211,7 +224,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const socialBlock = socialHtml ? `<div class="mt-2 pt-2 border-top mb-2">${socialHtml}</div>` : '';
 
             const dealersCount = allDealers.filter(d => d.competitors && d.competitors.some(comp => comp.brand === c.name)).length;
-            // Здесь добавлен класс btn-dealers-hover для изменения цвета при наведении
             const dealersBtn = dealersCount > 0 
                 ? `<button class="btn btn-sm w-100 btn-outline-secondary mt-2 border-0 bg-light btn-dealers-hover" onclick="event.stopPropagation(); showDealersModal('${c.name}')"><i class="bi bi-shop me-1"></i> Дилеры: <strong>${dealersCount}</strong></button>`
                 : `<div class="text-center mt-2 text-muted small py-1 bg-light rounded"><small>Нет у дилеров</small></div>`;
