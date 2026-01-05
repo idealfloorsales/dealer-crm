@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Управление сотрудниками</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-light">
+
+    <div class="container py-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h3><i class="bi bi-people-fill text-primary me-2"></i>Сотрудники</h3>
+            <div>
+                <a href="/" class="btn btn-outline-secondary me-2">На главную</a>
+                <button class="btn btn-primary" onclick="openUserModal()">
+                    <i class="bi bi-person-plus-fill me-2"></i>Добавить
+                </button>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-4">Имя / Логин</th>
+                                <th>Регион</th>
+                                <th>Роль</th>
+                                <th>Статус</th>
+                                <th class="text-end pe-4">Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-table-body">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="userModal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitle">Сотрудник</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="userForm">
+                        <input type="hidden" id="u_id">
+                        
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label small text-muted">Имя Фамилия</label>
+                                <input type="text" id="u_fullName" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small text-muted">Логин (для входа)</label>
+                                <input type="text" id="u_username" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small text-muted">Пароль</label>
+                                <input type="text" id="u_password" class="form-control" placeholder="Заполнить для смены">
+                                <div class="form-text small">Оставьте пустым, если не меняете</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small text-muted">Зона ответственности</label>
+                                <select id="u_scope" class="form-select">
+                                    <option value="all">Вся компания</option>
+                                    <option value="astana">Только Астана</option>
+                                    <option value="regions">Все Регионы</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <h6 class="border-bottom pb-2 mb-3 text-primary">Права доступа</h6>
+                        
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="card h-100 bg-light border-0">
+                                    <div class="card-body">
+                                        <h6 class="card-title small fw-bold mb-3">Что видит?</h6>
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input perm-check" type="checkbox" id="p_can_view_map">
+                                            <label class="form-check-label" for="p_can_view_map">Карта дилеров</label>
+                                        </div>
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input perm-check" type="checkbox" id="p_can_view_sales">
+                                            <label class="form-check-label" for="p_can_view_sales">Продажи (План/Факт)</label>
+                                        </div>
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input perm-check" type="checkbox" id="p_can_view_competitors">
+                                            <label class="form-check-label" for="p_can_view_competitors">Конкуренты</label>
+                                        </div>
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input perm-check" type="checkbox" id="p_can_view_report">
+                                            <label class="form-check-label" for="p_can_view_report">Аналитика (Отчет)</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="card h-100 bg-light border-0">
+                                    <div class="card-body">
+                                        <h6 class="card-title small fw-bold mb-3">Что может делать?</h6>
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input perm-check" type="checkbox" id="p_can_edit_dealer">
+                                            <label class="form-check-label" for="p_can_edit_dealer">Редактировать дилера</label>
+                                        </div>
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input perm-check" type="checkbox" id="p_can_edit_sales">
+                                            <label class="form-check-label" for="p_can_edit_sales">Вносить продажи</label>
+                                        </div>
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input perm-check" type="checkbox" id="p_can_delete_dealer">
+                                            <label class="form-check-label text-danger" for="p_can_delete_dealer">Удалять дилера (Опасно!)</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-12">
+                                <div class="card bg-warning-subtle border-0">
+                                    <div class="card-body d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="fw-bold mb-0">Администратор</h6>
+                                            <small class="text-muted">Полный доступ к управлению сотрудниками</small>
+                                        </div>
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input perm-check" type="checkbox" id="p_is_admin" style="transform: scale(1.3);">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-12 mt-3 text-end">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="u_isBlocked">
+                                    <label class="form-check-label text-danger fw-bold" for="u_isBlocked">Заблокировать доступ</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="modal-footer px-0 pb-0 mt-3 border-0">
+                            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button>
+                            <button type="submit" class="btn btn-primary px-4">Сохранить</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 1. АВТОРИЗАЦИЯ ЗАПРОСОВ (Копия из script.js)
+        const originalFetch = window.fetch;
+        window.fetch = async function (url, options) {
+            options = options || {}; options.headers = options.headers || {};
+            const token = localStorage.getItem('crm_token');
+            if (token) options.headers['Authorization'] = 'Bearer ' + token;
+            const response = await originalFetch(url, options);
+            if (response.status === 401) window.location.href = '/login.html';
+            return response;
+        };
+
+        const modal = new bootstrap.Modal(document.getElementById('userModal'));
+        const tbody = document.getElementById('users-table-body');
+        let allUsers = [];
+
+        async function loadUsers() {
+            try {
+                const res = await fetch('/api/admin/users');
+                if (!res.ok) throw new Error('Ошибка доступа');
+                allUsers = await res.json();
+                render();
+            } catch (e) {
+                alert('Ошибка: ' + e.message);
+            }
+        }
+
+        function render() {
+            tbody.innerHTML = allUsers.map(u => {
+                const roleBadge = u.permissions.is_admin 
+                    ? '<span class="badge bg-warning text-dark">Админ</span>' 
+                    : '<span class="badge bg-secondary">Сотрудник</span>';
+                
+                const statusBadge = u.isBlocked 
+                    ? '<span class="badge bg-danger">Блок</span>' 
+                    : '<span class="badge bg-success">Активен</span>';
+
+                return `
+                <tr class="${u.isBlocked ? 'table-secondary text-muted' : ''}">
+                    <td class="ps-4">
+                        <div class="fw-bold">${u.fullName || 'Без имени'}</div>
+                        <div class="small text-muted">@${u.username}</div>
+                    </td>
+                    <td>${u.scope}</td>
+                    <td>${roleBadge}</td>
+                    <td>${statusBadge}</td>
+                    <td class="text-end pe-4">
+                        <button class="btn btn-sm btn-light border" onclick="editUser('${u._id}')">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        ${!u.permissions.is_admin ? `
+                        <button class="btn btn-sm btn-light border text-danger" onclick="deleteUser('${u._id}')">
+                            <i class="bi bi-trash"></i>
+                        </button>` : ''}
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        window.openUserModal = () => {
+            document.getElementById('userForm').reset();
+            document.getElementById('u_id').value = '';
+            document.getElementById('modalTitle').innerText = 'Новый сотрудник';
+            // Сброс галочек
+            document.querySelectorAll('.perm-check').forEach(cb => cb.checked = false);
+            // Дефолтные права
+            ['p_can_view_map', 'p_can_view_dealers', 'p_can_view_sales'].forEach(id => document.getElementById(id).checked = true);
+            modal.show();
+        }
+
+        window.editUser = (id) => {
+            const u = allUsers.find(x => x._id === id);
+            if(!u) return;
+            
+            document.getElementById('u_id').value = u._id;
+            document.getElementById('u_fullName').value = u.fullName || '';
+            document.getElementById('u_username').value = u.username;
+            document.getElementById('u_password').value = ''; // Пароль не показываем
+            document.getElementById('u_scope').value = u.scope;
+            document.getElementById('u_isBlocked').checked = u.isBlocked;
+
+            // Заполняем галочки
+            for (const [key, val] of Object.entries(u.permissions)) {
+                const el = document.getElementById(`p_${key}`);
+                if(el) el.checked = val;
+            }
+
+            document.getElementById('modalTitle').innerText = 'Редактирование';
+            modal.show();
+        }
+
+        window.deleteUser = async (id) => {
+            if(!confirm('Удалить сотрудника?')) return;
+            await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
+            loadUsers();
+        }
+
+        document.getElementById('userForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('u_id').value;
+            
+            // Собираем права
+            const permissions = {};
+            document.querySelectorAll('.perm-check').forEach(cb => {
+                permissions[cb.id.replace('p_', '')] = cb.checked;
+            });
+
+            const data = {
+                fullName: document.getElementById('u_fullName').value,
+                username: document.getElementById('u_username').value,
+                password: document.getElementById('u_password').value,
+                scope: document.getElementById('u_scope').value,
+                isBlocked: document.getElementById('u_isBlocked').checked,
+                permissions
+            };
+
+            const url = id ? `/api/admin/users/${id}` : '/api/admin/users';
+            const method = id ? 'PUT' : 'POST';
+
+            try {
+                const res = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                if(!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error);
+                }
+                
+                modal.hide();
+                loadUsers();
+            } catch (e) {
+                alert(e.message);
+            }
+        });
+
+        loadUsers();
+    </script>
+</body>
+</html>
