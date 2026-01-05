@@ -59,20 +59,43 @@ const userSchema = new mongoose.Schema({
 }, { timestamps: true });
 const User = mongoose.model('User', userSchema);
 
-// --- СОЗДАНИЕ ПЕРВОГО АДМИНА ---
+// --- ОБНОВЛЕННАЯ ФУНКЦИЯ СОЗДАНИЯ АДМИНА ---
 async function seedUsers() {
-    const count = await User.countDocuments();
-    if (count === 0) {
+    // Ищем пользователя admin
+    const admin = await User.findOne({ username: 'admin' });
+    
+    // Полный набор прав Супер-Админа
+    const adminPermissions = {
+        is_admin: true,
+        can_manage_users: true,
+        can_view_map: true, can_view_dealers: true, can_view_sales: true, 
+        can_view_competitors: true, can_view_report: true,
+        can_edit_dealer: true, can_delete_dealer: true, can_edit_sales: true
+    };
+
+    if (!admin) {
+        // Если админа нет вообще - создаем
         console.log('Создание первого администратора...');
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash('admin123', salt);
+        
         await User.create({
             username: 'admin',
             password: hashedPassword,
             fullName: 'Главный Администратор',
             scope: 'all',
-            permissions: { is_admin: true, can_manage_users: true, can_view_map: true, can_view_dealers: true, can_view_sales: true, can_edit_dealer: true, can_delete_dealer: true, can_edit_sales: true }
+            permissions: adminPermissions
         });
+        console.log('Администратор создан.');
+    } else {
+        // Если админ уже есть - ОБНОВЛЯЕМ ЕМУ ПРАВА (Это починит ошибку)
+        admin.permissions = adminPermissions;
+        admin.scope = 'all';
+        // Если вдруг у него не было поля isBlocked
+        if (admin.isBlocked === undefined) admin.isBlocked = false;
+        
+        await admin.save();
+        console.log('Права администратора принудительно обновлены.');
     }
 }
 
@@ -306,4 +329,5 @@ app.delete('/api/knowledge/:id', checkWrite, async (req, res) => { await Knowled
 app.get('/api/tasks', async (req, res) => { try { const data = await Dealer.find(getDealerFilter(req)).select('name visits status responsible').lean(); res.json(data.map(d => ({ id: d._id, name: d.name, status: d.status, visits: d.visits || [], responsible: d.responsible }))); } catch (e) { res.status(500).json([]); } });
 
 app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
+
 
