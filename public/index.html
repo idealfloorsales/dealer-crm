@@ -12,17 +12,15 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-    <link rel="stylesheet" href="style.css?v={{VER}}"> <link rel="icon" href="favicon.gif" type="image/gif">
+    <link rel="stylesheet" href="style.css?v={{VER}}"> 
+    <link rel="icon" href="favicon.gif" type="image/gif">
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#ffffff">
     
     <style>
-        /* Мобильные улучшения */
-        body { padding-bottom: 80px; } /* Место под нижнее меню */
-
-        /* Нижнее меню */
+        body { padding-bottom: 80px; }
         .bottom-nav {
             position: fixed; bottom: 0; left: 0; right: 0;
             background: rgba(255, 255, 255, 0.98);
@@ -36,7 +34,7 @@
             text-align: center; color: #adb5bd; padding: 10px 0;
             text-decoration: none; flex: 1; transition: color 0.2s;
         }
-        .bottom-nav-item.active { color: #B9040A; } /* Красный цвет активной кнопки */
+        .bottom-nav-item.active { color: #B9040A; }
         .bottom-nav-item i { font-size: 1.4rem; display: block; margin-bottom: 2px; }
         .bottom-nav-item span { font-size: 0.65rem; font-weight: 600; }
 
@@ -57,12 +55,27 @@
                 border: none;
             }
         }
-    </style> <script>
-    // Если нет ключа - сразу на выход
-    if (!localStorage.getItem('crm_token')) {
-        window.location.href = '/login.html';
-    }
-</script>
+        /* Скрывать элементы админа по умолчанию */
+        .admin-only { display: none !important; }
+    </style>
+    <script>
+        if (!localStorage.getItem('crm_token')) {
+            window.location.href = '/login.html';
+        }
+        
+        // Функция проверки прав (запускается сразу)
+        document.addEventListener("DOMContentLoaded", () => {
+            try {
+                const token = localStorage.getItem('crm_token');
+                if(token) {
+                    const payload = JSON.parse(atob(token.split('.')[1]));
+                    if (payload.permissions && payload.permissions.is_admin) {
+                        document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('admin-only'));
+                    }
+                }
+            } catch(e) { console.error('Token Error', e); }
+        });
+    </script>
 </head>
 <body class="bg-light">
     
@@ -79,6 +92,7 @@
                     <li class="nav-item"><a class="nav-link" href="/sales.html">Продажи</a></li>
                     <li class="nav-item"><a class="nav-link" href="/competitors.html">Конкуренты</a></li>
                     <li class="nav-item"><a class="nav-link" href="/knowledge.html">Статьи</a></li>
+                    <li class="nav-item admin-only"><a class="nav-link text-primary fw-bold" href="/users.html"><i class="bi bi-people-fill me-1"></i>Сотрудники</a></li>
                 </ul>
                 <div class="d-flex align-items-center gap-3">
                     <span id="user-role-badge" class="badge bg-light text-dark border">...</span>
@@ -92,6 +106,8 @@
         <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3 mt-3 mt-lg-0">
             <h1 class="mb-0 border-0 pt-0 mt-0 fw-bold fs-2 text-dark">Дилеры</h1>
             <div class="d-flex gap-2">
+                <a href="/users.html" class="btn btn-light shadow-sm text-primary d-lg-none admin-only"><i class="bi bi-people-fill"></i></a>
+                
                 <button id="export-competitors-prices-btn" class="btn btn-light shadow-sm text-info d-none d-md-block" title="Цены"><i class="bi bi-tags-fill"></i> Цены</button>
                 <button id="export-dealers-btn" class="btn btn-light shadow-sm text-success d-none d-md-block"><i class="bi bi-file-earmark-excel"></i> База</button>
                 <button id="open-add-modal-btn" class="btn btn-primary shadow-sm px-4 d-none d-lg-block"><i class="bi bi-plus-lg me-2"></i>Добавить</button>
@@ -200,7 +216,7 @@
             <i class="bi bi-globe"></i><span>Бренды</span>
         </a>
         <a href="/report.html" class="bottom-nav-item">
-            <i class="bi bi-pie-chart"></i><span>Выставленность</span>
+            <i class="bi bi-pie-chart"></i><span>Матрица</span>
         </a>
     </div>
 
@@ -436,6 +452,3 @@
     <script src="script.js?v={{VER}}"></script> <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(err => console.error(err)); }</script>
 </body>
 </html>
-
-
-
