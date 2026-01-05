@@ -2,7 +2,7 @@
 const originalFetch = window.fetch;
 window.fetch = async function (url, options) {
     options = options || {};
-    options.headers = options.headers || {};
+    options.headers = options.headers || {}; 
     const token = localStorage.getItem('crm_token');
     if (token) options.headers['Authorization'] = 'Bearer ' + token;
     const response = await originalFetch(url, options);
@@ -352,3 +352,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
     initPage();
 });
+
