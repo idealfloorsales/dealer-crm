@@ -120,6 +120,91 @@ app.post('/api/auth/login', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ==========================================
+// API УПРАВЛЕНИЯ ПОЛЬЗОВАТЕЛЯМИ (ТОЛЬКО ДЛЯ АДМИНОВ)
+// ==========================================
+
+// Middleware: Проверка, что это Админ
+const requireAdmin = (req, res, next) => {
+    if (!req.user || !req.user.permissions || !req.user.permissions.is_admin) {
+        return res.status(403).json({ error: 'Доступ только для администраторов' });
+    }
+    next();
+};
+
+// 1. Получить всех пользователей
+app.get('/api/admin/users', requireAdmin, async (req, res) => {
+    try {
+        // Отдаем всё, кроме хешей паролей
+        const users = await User.find().select('-password').sort({ createdAt: -1 });
+        res.json(users);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 2. Создать пользователя
+app.post('/api/admin/users', requireAdmin, async (req, res) => {
+    try {
+        const { username, password, fullName, scope, permissions } = req.body;
+        
+        // Проверка уникальности
+        const exists = await User.findOne({ username });
+        if (exists) return res.status(400).json({ error: 'Логин уже занят' });
+
+        // Хешируем пароль
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        const newUser = new User({
+            username,
+            password: hashedPassword,
+            fullName,
+            scope,
+            permissions
+        });
+
+        await newUser.save();
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 3. Обновить пользователя (права, имя, блокировка)
+app.put('/api/admin/users/:id', requireAdmin, async (req, res) => {
+    try {
+        const { fullName, scope, permissions, isBlocked, password } = req.body;
+        
+        const updateData = { fullName, scope, permissions, isBlocked };
+
+        // Если прислали новый пароль - хешируем и обновляем
+        if (password && password.trim() !== "") {
+            const salt = await bcrypt.genSalt(10);
+            updateData.password = await bcrypt.hash(password, salt);
+        }
+
+        await User.findByIdAndUpdate(req.params.id, updateData);
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 4. Удалить пользователя
+app.delete('/api/admin/users/:id', requireAdmin, async (req, res) => {
+    try {
+        // Нельзя удалить самого себя
+        if (req.params.id === req.user.id) {
+            return res.status(400).json({ error: 'Нельзя удалить самого себя' });
+        }
+        await User.findByIdAndDelete(req.params.id);
+        res.json({ status: 'deleted' });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // --- СТАТИКА ---
 app.get('/sw.js', (req, res) => {
     const filePath = __dirname + '/public/sw.js';
@@ -221,3 +306,4 @@ app.delete('/api/knowledge/:id', checkWrite, async (req, res) => { await Knowled
 app.get('/api/tasks', async (req, res) => { try { const data = await Dealer.find(getDealerFilter(req)).select('name visits status responsible').lean(); res.json(data.map(d => ({ id: d._id, name: d.name, status: d.status, visits: d.visits || [], responsible: d.responsible }))); } catch (e) { res.status(500).json([]); } });
 
 app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
+
