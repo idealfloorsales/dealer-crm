@@ -13,7 +13,8 @@ window.fetch = async function (url, options) {
 
 document.addEventListener('DOMContentLoaded', () => {
     
-    const API_URL = '/api/dealers';
+    const API_DEALERS_URL = '/api/dealers';
+    const API_STATUSES_URL = '/api/statuses'; // Новый API
     const DEFAULT_LAT = 51.1605; 
     const DEFAULT_LNG = 71.4704;
 
@@ -48,6 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
     let allDealers = [];
+    let statusList = []; // Список статусов из базы
     let userLat = null; 
     let userLng = null;
     
@@ -65,32 +67,89 @@ document.addEventListener('DOMContentLoaded', () => {
         return R * c;
     }
 
-    const statusColors = { 'active': '#198754', 'standard': '#ffc107', 'problem': '#dc3545', 'potential': '#0d6efd', 'archive': '#6c757d' };
+    // Получить цвет и иконку статуса (Динамически)
     function createPinIcon(status) {
-        const color = statusColors[status] || '#ffc107';
+        // По умолчанию серый
+        let color = '#6c757d'; 
+        
+        // Ищем статус в загруженном списке
+        const statusObj = statusList.find(s => s.value === status);
+        
+        if (statusObj && statusObj.color) {
+            color = statusObj.color;
+        } else {
+            // Фолбэк для старых жестко заданных статусов (на всякий случай)
+            const fallbackColors = { 'active': '#198754', 'standard': '#ffc107', 'problem': '#dc3545', 'potential': '#0d6efd', 'archive': '#6c757d' };
+            color = fallbackColors[status] || '#6c757d';
+        }
+
         const svgHtml = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${color}" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="pin-svg"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg>`;
         return L.divIcon({ className: 'custom-pin', html: svgHtml, iconSize: [36, 36], iconAnchor: [18, 36], popupAnchor: [0, -32] });
     }
 
     // --- LOAD DATA ---
-    async function loadDealers() {
+    async function init() {
         try {
-            const res = await fetch(API_URL);
-            if(!res.ok) throw new Error('Error');
-            allDealers = await res.json();
+            // 1. Грузим статусы
+            await loadStatuses();
             
-            const cities = [...new Set(allDealers.map(d => d.city).filter(Boolean))].sort();
-            if(filterCity) {
-                filterCity.innerHTML = '<option value="">Все города</option>';
-                cities.forEach(c => filterCity.add(new Option(c, c)));
-            }
-
-            updateMapAndList();
+            // 2. Грузим дилеров
+            await loadDealers();
+            
         } catch (e) { 
             console.error(e); 
             if(dealerListContainer) dealerListContainer.innerHTML = '<p class="text-center text-danger mt-4">Ошибка загрузки</p>';
-            if(visibleCountBadge) visibleCountBadge.textContent = "Ошибка";
         }
+    }
+
+    async function loadStatuses() {
+        try {
+            const res = await fetch(API_STATUSES_URL);
+            if(res.ok) {
+                statusList = await res.json();
+                populateStatusFilter();
+            }
+        } catch(e) { console.warn('Statuses load error', e); }
+    }
+
+    function populateStatusFilter() {
+        if(!filterStatus) return;
+        
+        let html = '<option value="">Все статусы</option>';
+        
+        // Если база пустая, добавим дефолтные
+        if (statusList.length === 0) {
+            html += `
+                <option value="active">🟢 Активный</option>
+                <option value="standard">🟡 Стандарт</option>
+                <option value="problem">🔴 Проблемный</option>
+                <option value="potential">🔵 Потенциальный</option>
+                <option value="archive">⚫ Архив</option>
+            `;
+        } else {
+            // Иначе генерируем из базы
+            statusList.forEach(s => {
+                // Если статус скрыт (isVisible=false), его не должно быть в фильтре? 
+                // Обычно на карте хотят видеть всё, но можно добавить проверку:
+                // if (s.isVisible !== false) ...
+                html += `<option value="${s.value}">${s.label}</option>`;
+            });
+        }
+        filterStatus.innerHTML = html;
+    }
+
+    async function loadDealers() {
+        const res = await fetch(API_DEALERS_URL);
+        if(!res.ok) throw new Error('Error');
+        allDealers = await res.json();
+        
+        const cities = [...new Set(allDealers.map(d => d.city).filter(Boolean))].sort();
+        if(filterCity) {
+            filterCity.innerHTML = '<option value="">Все города</option>';
+            cities.forEach(c => filterCity.add(new Option(c, c)));
+        }
+
+        updateMapAndList();
     }
 
     function updateMapAndList() {
@@ -100,9 +159,17 @@ document.addEventListener('DOMContentLoaded', () => {
         // Фильтрация
         let filtered = allDealers.filter(d => {
             if (!d.latitude || !d.longitude) return false;
+            
+            // Если статус не выбран - показываем всё, кроме "archive" (если такой есть в базе)
+            // Но если статусы динамические, лучше показывать всё по дефолту
             let statusMatch = true;
-            if (status) statusMatch = (d.status === status);
-            else statusMatch = (d.status !== 'archive'); 
+            if (status) {
+                statusMatch = (d.status === status);
+            } else {
+                // Показываем всё, если фильтр пуст
+                statusMatch = true; 
+            }
+            
             return (!city || d.city === city) && statusMatch;
         });
 
@@ -111,7 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
             filtered.forEach(d => { d._distance = getDistanceKm(userLat, userLng, d.latitude, d.longitude); });
             filtered.sort((a, b) => a._distance - b._distance);
         } else {
-            filtered.sort((a, b) => a.name.localeCompare(b.name));
+            filtered.sort((a, b) => (a.name||'').localeCompare(b.name||''));
         }
 
         renderMapMarkers(filtered);
@@ -147,15 +214,15 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             map.addLayer(markersCluster);
         } else {
-            // РЕЖИМ ТЕПЛОВОЙ КАРТЫ (ИСПРАВЛЕНО: ДЕЛАЕМ ЯРЧЕ И КРУПНЕЕ)
+            // РЕЖИМ ТЕПЛОВОЙ КАРТЫ
             const heatPoints = filtered.map(d => [d.latitude, d.longitude, 1]);
             
             if(L.heatLayer) {
                 heatLayer = L.heatLayer(heatPoints, { 
-                    radius: 50,        // Увеличили радиус (было 25)
-                    blur: 35,          // Больше размытия для плавности
-                    minOpacity: 0.6,   // Важно: Минимальная яркость (0.6 делает точки видимыми сразу)
-                    maxZoom: 12        // Зум, на котором интенсивность максимальна
+                    radius: 50,        
+                    blur: 35,          
+                    minOpacity: 0.6,   
+                    maxZoom: 12        
                 }).addTo(map);
             }
         }
@@ -168,11 +235,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!dealerListContainer) return;
         if (filtered.length === 0) { dealerListContainer.innerHTML = '<p class="text-center text-muted mt-5">Ничего не найдено</p>'; return; }
 
-        const statusNames = { 'active': 'Активный', 'standard': 'Стандарт', 'problem': 'Проблемный', 'potential': 'Потенциальный', 'archive': 'Архив' };
-
         dealerListContainer.innerHTML = filtered.map(d => {
             const dist = (d._distance !== undefined) ? `<span class="dist-badge"><i class="bi bi-cursor-fill me-1"></i>${d._distance.toFixed(1)} км</span>` : '';
-            const stName = statusNames[d.status] || d.status;
+            
+            // Название статуса берем из базы
+            const statusObj = statusList.find(s => s.value === d.status) || { label: d.status, color: '#6c757d' };
+            const statusColor = statusObj.color || '#6c757d';
 
             return `
             <div class="map-list-item" onclick="flyToDealer(${d.latitude}, ${d.longitude}, '${d.id}')">
@@ -182,7 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="map-item-addr">${d.address || d.city || ''}</div>
                 <div class="map-item-meta">
-                    <span class="text-uppercase" style="font-size:0.7rem; font-weight:700; color:${statusColors[d.status||'standard']}">${stName}</span>
+                    <span class="text-uppercase" style="font-size:0.7rem; font-weight:700; color:${statusColor}">${statusObj.label}</span>
                 </div>
             </div>`;
         }).join('');
@@ -266,5 +334,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if(btnShowListMobile && sidebar) btnShowListMobile.onclick = () => { sidebar.classList.add('open'); };
     if(btnToggleSidebar && sidebar) btnToggleSidebar.onclick = () => { sidebar.classList.remove('open'); };
 
-    loadDealers();
+    // START
+    init();
 });
