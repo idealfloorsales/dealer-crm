@@ -1591,32 +1591,31 @@ nav a.nav-link.active { background: var(--primary-color) !important; color: whit
     display: block;
 }
 
-/* --- НУМЕРАЦИЯ (ВЕРТИКАЛЬНАЯ) --- */
+/* --- НУМЕРАЦИЯ ДИЛЕРОВ --- */
 #dealer-grid {
-    padding-left: 20px; /* Место слева под цифры */
+    padding-left: 40px; /* Отступ слева для цифр */
 }
 
 .dealer-index-number {
     position: absolute;
-    left: -25px; /* Выносим за границу карточки */
+    left: -40px; /* Выносим влево */
     top: 50%;
-    /* Поворачиваем на -90 градусов и центрируем */
+    /* Поворачиваем на 90 градусов против часовой и центрируем */
     transform: translateY(-50%) rotate(-90deg); 
     
-    font-size: 1.1rem; /* Размер шрифта */
-    font-weight: 800;  /* Жирность */
-    color: #cbd5e1;    /* Светло-серый цвет (всегда виден) */
-    width: 50px;       /* Ширина контейнера цифры */
+    font-size: 1.1rem; 
+    font-weight: 800;  
+    color: #cbd5e1;    /* Светло-серый (видно всегда) */
+    width: 40px;
     text-align: center;
     font-family: 'Inter', sans-serif;
-    pointer-events: none;
-    user-select: none;
+    pointer-events: none; /* Пропускает клики */
+    user-select: none;    /* Не выделяется */
     letter-spacing: 1px;
 }
 
-/* На мобильных чуть плотнее */
+/* Адаптив для телефонов */
 @media (max-width: 768px) {
-    #dealer-grid { padding-left: 25px; }
-    .dealer-index-number { left: -20px; font-size: 0.9rem; }
+    #dealer-grid { padding-left: 30px; }
+    .dealer-index-number { left: -40px; font-size: 0.9rem; }
 }
-
