@@ -50,7 +50,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const filterCity = document.getElementById('filter-city'); const filterPriceType = document.getElementById('filter-price-type'); const filterStatus = document.getElementById('filter-status'); const filterResponsible = document.getElementById('filter-responsible'); const searchBar = document.getElementById('search-bar'); 
     const btnExportDealers = document.getElementById('export-dealers-btn'); const btnExportCompetitors = document.getElementById('export-competitors-prices-btn');
     const addOrgList = document.getElementById('add-org-list'); const editOrgList = document.getElementById('edit-org-list'); const btnAddOrgAdd = document.getElementById('btn-add-org-add'); const btnEditOrgAdd = document.getElementById('btn-edit-org-add');
-    const logoutBtn = document.getElementById('logout-btn');
 
     // MAPS
     let mapInstances = { add: null, edit: null };
@@ -173,7 +172,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 4. Render
             populateFilters(allDealers);
-            renderDashboard(); // <-- ВОТ НОВАЯ ФУНКЦИЯ ДАШБОРДА
+            renderDashboard();
             renderDealerList();
             
             // 5. Restore pending edit
@@ -251,107 +250,21 @@ document.addEventListener('DOMContentLoaded', () => {
     async function saveProducts(dealerId, ids) { await fetch(`${API_DEALERS_URL}/${dealerId}/products`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({productIds: ids})}); }
     async function completeTask(btn, dealerId, visitIndex) { try { btn.disabled = true; const res = await fetch(`${API_DEALERS_URL}/${dealerId}`); if(!res.ok) throw new Error(); const dealer = await res.json(); if (dealer.visits && dealer.visits[visitIndex]) { dealer.visits[visitIndex].isCompleted = true; } await fetch(`${API_DEALERS_URL}/${dealerId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visits: dealer.visits }) }); initApp(); window.showToast("Задача выполнена!"); } catch (e) { window.showToast("Ошибка", "error"); btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg"></i>'; } }
 
-    // --- НОВАЯ ФУНКЦИЯ ДАШБОРДА (Здоровье / Прирост / Охват) ---
     function renderDashboard() {
         if (!dashboardStats) return; 
         if (!allDealers || allDealers.length === 0) { dashboardStats.innerHTML = ''; return; }
-
-        // 1. АКТИВНЫЕ vs СПЯЩИЕ
-        const activeDealerIds = new Set();
-        if (currentMonthSales && currentMonthSales.length > 0) {
-            currentMonthSales.forEach(s => {
-                if (s.fact > 0) activeDealerIds.add(s.dealerId);
-            });
-        }
+        const activeDealers = allDealers.filter(d => d.status !== 'potential'); const totalDealers = activeDealers.length; const noAvatarCount = activeDealers.filter(d => !d.photo_url).length; 
+        let countActive = 0, countStandard = 0, countPotential = 0, countProblem = 0; 
+        allDealers.forEach(d => { if (d.status === 'active') countActive++; else if (d.status === 'standard') countStandard++; else if (d.status === 'problem') countProblem++; else if (d.status === 'potential') countPotential++; });
+        const totalAll = allDealers.length; const pctActive = totalAll > 0 ? (countActive / totalAll) * 100 : 0; const pctStandard = totalAll > 0 ? (countStandard / totalAll) * 100 : 0; const pctProblem = totalAll > 0 ? (countProblem / totalAll) * 100 : 0; const pctPotential = totalAll > 0 ? (countPotential / totalAll) * 100 : 0;
         
-        let countActive = 0;
-        let countSleeping = 0;
-        let countNew = 0;
-        const cityCounts = {};
-        
-        // Текущая дата для проверки "Новых" (созданы в этом месяце)
-        const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-        allDealers.forEach(d => {
-            // Исключаем архив из статистики
-            if (d.status === 'archive') return;
-
-            // Активные / Спящие (по продажам)
-            // Мы связываем по ID. У вас в базе ID - это d.id, в продажах s.dealerId
-            if (activeDealerIds.has(d.id)) {
-                countActive++;
-            } else {
-                countSleeping++;
-            }
-
-            // Новые (по дате создания)
-            if (d.createdAt) {
-                const created = new Date(d.createdAt);
-                if (created >= startOfMonth) countNew++;
-            }
-
-            // Города
-            if (d.city) {
-                cityCounts[d.city] = (cityCounts[d.city] || 0) + 1;
-            }
-        });
-
-        // Сортировка городов (Топ 3)
-        const sortedCities = Object.entries(cityCounts).sort((a, b) => b[1] - a[1]);
-        const totalForCities = allDealers.filter(d => d.status !== 'archive').length;
-        const topCities = sortedCities.slice(0, 3);
-        
-        // Генерация HTML для городов
-        let citiesHtml = '';
-        topCities.forEach(([city, count]) => {
-            const pct = Math.round((count / totalForCities) * 100);
-            citiesHtml += `
-            <div class="city-stat-row">
-                <span class="city-name text-truncate">${city}</span>
-                <div class="city-bar-bg"><div class="city-bar-fill" style="width: ${pct}%"></div></div>
-                <span class="city-val">${pct}%</span>
-            </div>`;
-        });
-
-        // ОТРИСОВКА
         dashboardStats.innerHTML = `
-            <div class="col-6">
-                <div class="stat-card-modern h-100 flex-column align-items-start justify-content-center p-3">
-                    <div class="d-flex align-items-center gap-2 mb-2 w-100">
-                        <div class="icon-circle bg-success-subtle text-success" style="width:32px;height:32px;font-size:1rem;"><i class="bi bi-heart-pulse-fill"></i></div>
-                        <span class="fw-bold text-dark small">Здоровье</span>
-                    </div>
-                    <div class="stat-dual-value">
-                        <span class="stat-val-active">${countActive}</span>
-                        <span class="text-muted fw-light">/</span>
-                        <span class="stat-val-sleep">${countSleeping}</span>
-                    </div>
-                    <div class="stat-sublabel mt-1">Актив / Спят</div>
-                </div>
-            </div>
-
-            <div class="col-6">
-                <div class="stat-card-modern h-100 flex-column align-items-start justify-content-center p-3">
-                    <div class="d-flex align-items-center gap-2 mb-2 w-100">
-                        <div class="icon-circle bg-primary-subtle text-primary" style="width:32px;height:32px;font-size:1rem;"><i class="bi bi-graph-up-arrow"></i></div>
-                        <span class="fw-bold text-dark small">Прирост</span>
-                    </div>
-                    <h3 class="text-primary mb-0">+${countNew}</h3>
-                    <div class="stat-sublabel mt-1">Новых за месяц</div>
-                </div>
-            </div>
-
-            <div class="col-12 mt-2">
-                <div class="stat-card-modern d-block p-3">
-                    <h6 class="text-muted fw-bold small mb-3 text-uppercase" style="letter-spacing:1px;">Охват территорий</h6>
-                    ${citiesHtml}
-                    ${sortedCities.length === 0 ? '<div class="text-muted small text-center">Нет данных</div>' : ''}
-                </div>
-            </div>
+            <div class="col-6"><div class="stat-card-modern"><div class="stat-icon-box bg-primary-subtle text-primary"><i class="bi bi-shop"></i></div><div class="stat-info"><h3>${totalDealers}</h3><p>Дилеров</p></div></div></div>
+            <div class="col-6"><div class="stat-card-modern"><div class="stat-icon-box ${noAvatarCount > 0 ? 'bg-danger-subtle text-danger' : 'bg-success-subtle text-success'}"><i class="bi bi-camera-fill"></i></div><div class="stat-info"><h3 class="${noAvatarCount > 0 ? 'text-danger' : ''}">${noAvatarCount}</h3><p>Без фото</p></div></div></div>
+            <div class="col-12 mt-2"><div class="stat-card-modern d-block p-3"><h6 class="text-muted fw-bold small mb-3 text-uppercase" style="letter-spacing:1px;">Структура базы</h6><div class="progress mb-3" style="height: 12px; border-radius: 6px;"><div class="progress-bar bg-success" role="progressbar" style="width: ${pctActive}%"></div><div class="progress-bar bg-warning" role="progressbar" style="width: ${pctStandard}%"></div><div class="progress-bar bg-danger" role="progressbar" style="width: ${pctProblem}%"></div><div class="progress-bar bg-primary" role="progressbar" style="width: ${pctPotential}%"></div></div><div class="d-flex justify-content-between text-center small"><div><span class="badge rounded-pill text-bg-success mb-1">${countActive}</span><br><span class="text-muted" style="font-size:0.75rem">VIP</span></div><div><span class="badge rounded-pill text-bg-warning mb-1">${countStandard}</span><br><span class="text-muted" style="font-size:0.75rem">Станд.</span></div><div><span class="badge rounded-pill text-bg-danger mb-1">${countProblem}</span><br><span class="text-muted" style="font-size:0.75rem">Пробл.</span></div><div><span class="badge rounded-pill text-bg-primary mb-1">${countPotential}</span><br><span class="text-muted" style="font-size:0.75rem">Потенц.</span></div></div></div></div>
         `;
         
-        // --- ОСТАЛЬНАЯ ЛОГИКА ЗАДАЧ (ОСТАВЛЯЕМ БЕЗ ИЗМЕНЕНИЙ) ---
+        const today = new Date(); today.setHours(0,0,0,0); const coolingLimit = new Date(today.getTime() - (15 * 24 * 60 * 60 * 1000));
         const tasksUpcoming = [], tasksProblem = [], tasksCooling = [];
         allTasksData.forEach(d => { if (d.status === 'archive') return; const isPotential = d.status === 'potential'; let lastVisitDate = null; let hasFutureTasks = false; if (d.visits && Array.isArray(d.visits)) { d.visits.forEach((v, index) => { const vDate = new Date(v.date); if (!v.date) return; vDate.setHours(0,0,0,0); if (v.isCompleted && (!lastVisitDate || vDate > lastVisitDate)) lastVisitDate = vDate; if (!v.isCompleted) { const taskData = { dealerName: d.name, dealerId: d.id, date: vDate, comment: v.comment || "Без комментария", visitIndex: index }; if (vDate < today) tasksProblem.push({...taskData, type: 'overdue'}); else { tasksUpcoming.push({...taskData, isToday: vDate.getTime() === today.getTime()}); hasFutureTasks = true; } } }); } if (d.status === 'problem') { if (!tasksProblem.some(t => t.dealerId === d.id && t.type === 'overdue')) tasksProblem.push({ dealerName: d.name, dealerId: d.id, type: 'status', comment: 'Статус: Проблемный' }); } if (!hasFutureTasks && d.status !== 'problem' && !isPotential) { if (!lastVisitDate) tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: 999 }); else if (lastVisitDate < coolingLimit) { const days = Math.floor((today - lastVisitDate) / (1000 * 60 * 60 * 24)); tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: days }); } } });
         tasksUpcoming.sort((a, b) => a.date - b.date); tasksProblem.sort((a, b) => (a.date || 0) - (b.date || 0)); tasksCooling.sort((a, b) => b.days - a.days);
@@ -378,6 +291,7 @@ document.addEventListener('DOMContentLoaded', () => {
             currentMonthSales.forEach(s => { if(s.dealerId) salesMap[s.dealerId] = (salesMap[s.dealerId] || 0) + (s.fact || 0); });
         }
 
+        // ВАЖНО: Добавил index в аргументы map
         dealerGrid.innerHTML = filtered.map((d, index) => {
             const statusObj = statusList.find(s => s.value === (d.status || 'standard')) || { label: d.status, color: '#6c757d' };
             const statusStyle = `background-color: ${statusObj.color}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 500;`;
@@ -409,7 +323,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let salesColorClass = 'bg-danger'; if (salesFact >= 200) salesColorClass = 'bg-success'; else if (salesFact >= 100) salesColorClass = 'bg-warning text-dark'; 
             const salesBadge = `<span class="badge ${salesColorClass} rounded-pill ms-2" title="Продажи за текущий месяц">${salesFact.toFixed(2)} м²</span>`;
 
-            // ВСТАВЛЕНА НУМЕРАЦИЯ (index + 1)
+            // ВСТАВЛЕНО: <div class="dealer-index-number">
             return `<div class="dealer-item" onclick="window.open('dealer.html?id=${d.id}', '_blank')">
                 <div class="dealer-index-number">${index + 1}</div>
                 <div class="dealer-avatar-box">${avatarHtml}</div>
