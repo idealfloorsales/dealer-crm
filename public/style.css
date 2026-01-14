@@ -1591,32 +1591,31 @@ nav a.nav-link.active { background: var(--primary-color) !important; color: whit
     display: block;
 }
 
-/* --- НУМЕРАЦИЯ СПИСКА (Слева от карточки) --- */
-
-/* 1. Двигаем весь список вправо, чтобы было место для цифр */
+/* --- НУМЕРАЦИЯ (ВЕРТИКАЛЬНАЯ) --- */
 #dealer-grid {
-    padding-left: 40px; /* Место под цифры */
+    padding-left: 30px; /* Место слева под цифры */
 }
 
-/* 2. Сама цифра */
 .dealer-index-number {
     position: absolute;
-    left: -40px; /* Выносим влево за пределы карточки */
+    left: -35px; /* Выносим за границу карточки */
     top: 50%;
-    transform: translateY(-50%); /* Центрируем по вертикали */
+    /* Поворачиваем на -90 градусов и центрируем */
+    transform: translateY(-50%) rotate(-90deg); 
     
-    font-size: 1.5rem;
-    font-weight: 800;
-    color: #94a3b8; /* Серый цвет */
-    opacity: 0.4;   /* Полупрозрачность */
-    width: 30px;
+    font-size: 1.1rem; /* Размер шрифта */
+    font-weight: 800;  /* Жирность */
+    color: #cbd5e1;    /* Светло-серый цвет (всегда виден) */
+    width: 50px;       /* Ширина контейнера цифры */
     text-align: center;
-    pointer-events: none; /* Чтобы не мешала кликать */
     font-family: 'Inter', sans-serif;
+    pointer-events: none;
+    user-select: none;
+    letter-spacing: 1px;
 }
 
-/* На мобильном можно сделать цифры поменьше или убрать отступ */
+/* На мобильных чуть плотнее */
 @media (max-width: 768px) {
-    #dealer-grid { padding-left: 30px; }
-    .dealer-index-number { left: -30px; font-size: 1.2rem; }
+    #dealer-grid { padding-left: 25px; }
+    .dealer-index-number { left: -30px; font-size: 0.9rem; }
 }
