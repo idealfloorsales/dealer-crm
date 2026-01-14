@@ -1593,12 +1593,12 @@ nav a.nav-link.active { background: var(--primary-color) !important; color: whit
 
 /* --- НУМЕРАЦИЯ (ВЕРТИКАЛЬНАЯ) --- */
 #dealer-grid {
-    padding-left: 30px; /* Место слева под цифры */
+    padding-left: 20px; /* Место слева под цифры */
 }
 
 .dealer-index-number {
     position: absolute;
-    left: -35px; /* Выносим за границу карточки */
+    left: -25px; /* Выносим за границу карточки */
     top: 50%;
     /* Поворачиваем на -90 градусов и центрируем */
     transform: translateY(-50%) rotate(-90deg); 
@@ -1617,5 +1617,6 @@ nav a.nav-link.active { background: var(--primary-color) !important; color: whit
 /* На мобильных чуть плотнее */
 @media (max-width: 768px) {
     #dealer-grid { padding-left: 25px; }
-    .dealer-index-number { left: -30px; font-size: 0.9rem; }
+    .dealer-index-number { left: -20px; font-size: 0.9rem; }
 }
+
