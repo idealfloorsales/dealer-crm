@@ -1619,3 +1619,49 @@ nav a.nav-link.active { background: var(--primary-color) !important; color: whit
     #dealer-grid { padding-left: 30px; }
     .dealer-index-number { left: -40px; font-size: 0.9rem; }
 }
+
+/* --- НОВЫЙ ДАШБОРД (V2) --- */
+
+/* Контейнер цифр "42 / 25" */
+.stat-dual-value {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--text-dark);
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+}
+.stat-val-active { color: #166534; } /* Зеленый */
+.stat-val-sleep { color: #94a3b8; font-size: 1.1rem; } /* Серый */
+
+.stat-sublabel {
+    font-size: 0.75rem;
+    color: var(--text-gray);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Прогресс бар для городов */
+.city-stat-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    font-size: 0.85rem;
+}
+.city-name { font-weight: 600; color: var(--text-dark); min-width: 80px; }
+.city-val { font-weight: 700; color: var(--primary-color); margin-left: 10px; }
+.city-bar-bg {
+    flex-grow: 1;
+    height: 6px;
+    background-color: #f1f5f9;
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 0 10px;
+}
+.city-bar-fill {
+    height: 100%;
+    background-color: var(--primary-color);
+    border-radius: 3px;
+}
