@@ -102,7 +102,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const logoutBtn = document.getElementById('logout-btn'); 
     if (logoutBtn) { 
         logoutBtn.onclick = () => { 
-            // Очищаем токен при выходе
             localStorage.removeItem('crm_token');
             localStorage.removeItem('crm_user');
             window.location.href = '/login.html'; 
@@ -173,7 +172,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 4. Render
             populateFilters(allDealers);
-            renderDashboard(); // <-- ВОТ ОНА (ВОССТАНОВЛЕНА)
+            renderDashboard();
             renderDealerList();
             
             // 5. Restore pending edit
@@ -323,7 +322,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let salesColorClass = 'bg-danger'; if (salesFact >= 200) salesColorClass = 'bg-success'; else if (salesFact >= 100) salesColorClass = 'bg-warning text-dark'; 
             const salesBadge = `<span class="badge ${salesColorClass} rounded-pill ms-2" title="Продажи за текущий месяц">${salesFact.toFixed(2)} м²</span>`;
 
-            // ВСТАВЛЕНА НУМЕРАЦИЯ (index + 1)
+            // ВСТАВЛЯЕМ НУМЕРАЦИЮ СЮДА
             return `<div class="dealer-item" onclick="window.open('dealer.html?id=${d.id}', '_blank')">
                 <div class="dealer-index-number">${index + 1}</div>
                 <div class="dealer-avatar-box">${avatarHtml}</div>
