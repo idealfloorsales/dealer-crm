@@ -291,6 +291,7 @@ document.addEventListener('DOMContentLoaded', () => {
             currentMonthSales.forEach(s => { if(s.dealerId) salesMap[s.dealerId] = (salesMap[s.dealerId] || 0) + (s.fact || 0); });
         }
 
+        // ВАЖНО: Добавил index в аргументы map
         dealerGrid.innerHTML = filtered.map((d, index) => {
             const statusObj = statusList.find(s => s.value === (d.status || 'standard')) || { label: d.status, color: '#6c757d' };
             const statusStyle = `background-color: ${statusObj.color}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 500;`;
@@ -322,7 +323,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let salesColorClass = 'bg-danger'; if (salesFact >= 200) salesColorClass = 'bg-success'; else if (salesFact >= 100) salesColorClass = 'bg-warning text-dark'; 
             const salesBadge = `<span class="badge ${salesColorClass} rounded-pill ms-2" title="Продажи за текущий месяц">${salesFact.toFixed(2)} м²</span>`;
 
-            // ВСТАВЛЯЕМ НУМЕРАЦИЮ СЮДА
+            // ВСТАВЛЕНО: <div class="dealer-index-number">
             return `<div class="dealer-item" onclick="window.open('dealer.html?id=${d.id}', '_blank')">
                 <div class="dealer-index-number">${index + 1}</div>
                 <div class="dealer-avatar-box">${avatarHtml}</div>
