@@ -85,9 +85,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if(filterResponsible) filterResponsible.onchange = renderDealerList; 
     if(searchBar) searchBar.oninput = renderDealerList;
     
-    if(btnExportDealers) { btnExportDealers.onclick = () => { if(!allDealers || allDealers.length === 0) return window.showToast("Нет данных", "error"); let csv = "\uFEFFID;Название;Город;Адрес;Статус;Ответственный;Организации;Телефон\n"; allDealers.forEach(d => { const phone = (d.contacts && d.contacts[0]) ? d.contacts[0].contactInfo : ''; const orgs = (d.organizations || [d.organization]).filter(Boolean).join(', '); csv += `${cleanCsv(d.dealer_id)};${cleanCsv(d.name)};${cleanCsv(d.city)};${cleanCsv(d.address)};${cleanCsv(d.status)};${cleanCsv(d.responsible)};${cleanCsv(orgs)};${cleanCsv(phone)}\n`; }); downloadCsv(csv, `base_dealers_${new Date().toISOString().slice(0,10)}.csv`); }; }
-    if(btnExportCompetitors) { btnExportCompetitors.onclick = () => { if(!allDealers || allDealers.length === 0) return window.showToast("Нет данных", "error"); let csv = "\uFEFFДилер;Город;Бренд;Коллекция;ОПТ;Розница\n"; let count = 0; allDealers.forEach(d => { if(d.competitors && d.competitors.length > 0) { d.competitors.forEach(c => { csv += `${cleanCsv(d.name)};${cleanCsv(d.city)};${cleanCsv(c.brand)};${cleanCsv(c.collection)};${cleanCsv(c.price_opt)};${cleanCsv(c.price_retail)}\n`; count++; }); } }); if(count === 0) return window.showToast("Нет данных о конкурентах", "warning"); downloadCsv(csv, `competitors_prices_${new Date().toISOString().slice(0,10)}.csv`); }; }
-
     const setupListBtn = (id, list, genFunc) => { const btn = document.getElementById(id); if(btn) btn.onclick = () => list.insertAdjacentHTML('beforeend', genFunc()); };
     setupListBtn('add-contact-btn-add-modal', addContactList, createContactEntryHTML); setupListBtn('add-address-btn-add-modal', addAddressList, createAddressEntryHTML); setupListBtn('add-pos-btn-add-modal', addPosList, createPosEntryHTML); setupListBtn('add-visits-btn-add-modal', addVisitsList, createVisitEntryHTML); setupListBtn('add-competitor-btn-add-modal', addCompetitorList, createCompetitorEntryHTML);
     setupListBtn('add-contact-btn-edit-modal', editContactList, createContactEntryHTML); setupListBtn('add-address-btn-edit-modal', editAddressList, createAddressEntryHTML); setupListBtn('add-pos-btn-edit-modal', editPosList, createPosEntryHTML); setupListBtn('add-visits-btn-edit-modal', editVisitsList, createVisitEntryHTML); setupListBtn('add-competitor-btn-edit-modal', editCompetitorList, createCompetitorEntryHTML);
@@ -177,7 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 4. Render
             populateFilters(allDealers);
-            renderDashboard(); // <-- НОВАЯ ВЕРСИЯ (Заполненность городов)
+            renderDashboard();
             renderDealerList();
             
             // 5. Restore pending edit
@@ -185,6 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             console.error("CRITICAL ERROR:", error);
+            // --- СИСТЕМА ОТЛОВА ОШИБОК (КРАСНЫЙ ЭКРАН) ---
             if(dealerGrid) {
                 dealerGrid.innerHTML = `
                 <div class="alert alert-danger text-center m-5 shadow-sm p-4 rounded-4 border-0">
@@ -204,6 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if(dashboardStats) dashboardStats.innerHTML = '<p class="text-danger small text-center">Ошибка статистики</p>';
         }
     }
+    // -----------------------------------------------------
 
     async function openEditModal(id) {
         try {
@@ -255,11 +254,12 @@ document.addEventListener('DOMContentLoaded', () => {
     async function saveProducts(dealerId, ids) { await fetch(`${API_DEALERS_URL}/${dealerId}/products`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({productIds: ids})}); }
     async function completeTask(btn, dealerId, visitIndex) { try { btn.disabled = true; const res = await fetch(`${API_DEALERS_URL}/${dealerId}`); if(!res.ok) throw new Error(); const dealer = await res.json(); if (dealer.visits && dealer.visits[visitIndex]) { dealer.visits[visitIndex].isCompleted = true; } await fetch(`${API_DEALERS_URL}/${dealerId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visits: dealer.visits }) }); initApp(); window.showToast("Задача выполнена!"); } catch (e) { window.showToast("Ошибка", "error"); btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg"></i>'; } }
 
-    // --- MODIFIED DASHBOARD (С ПОЛНЫМ СПИСКОМ ГОРОДОВ) ---
+    // --- НОВАЯ ФУНКЦИЯ ДАШБОРДА ---
     function renderDashboard() {
         if (!dashboardStats) return; 
         if (!allDealers || allDealers.length === 0) { dashboardStats.innerHTML = ''; return; }
 
+        // 1. ПОДГОТОВКА ДАННЫХ
         const activeIds = new Set();
         if (currentMonthSales && currentMonthSales.length > 0) {
             currentMonthSales.forEach(s => { if (s.fact > 0) activeIds.add(s.dealerId); });
@@ -275,23 +275,22 @@ document.addEventListener('DOMContentLoaded', () => {
         allDealers.forEach(d => {
             if (d.status === 'archive') return;
 
-            // Здоровье
+            // Health
             if (activeIds.has(d.id)) activeCount++;
             else sleepingCount++;
 
-            // Прирост
+            // Growth (Assuming d.createdAt exists)
             if (d.createdAt && new Date(d.createdAt) >= startOfMonth) newCount++;
 
-            // Города
+            // Cities
             const city = d.city || 'Не указан';
             cityCounts[city] = (cityCounts[city] || 0) + 1;
         });
 
+        // 2. ВСЕ ГОРОДА (ПОЛНЫЙ СПИСОК)
         const total = activeCount + sleepingCount;
-        
-        // Сортируем все города
         const sortedCities = Object.entries(cityCounts)
-            .sort((a, b) => b[1] - a[1]);
+            .sort((a, b) => b[1] - a[1]); // Сортировка по убыванию
         
         let citiesHtml = '';
         sortedCities.forEach(([name, count]) => {
@@ -304,6 +303,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>`;
         });
 
+        // 3. РЕНДЕР
         dashboardStats.innerHTML = `
             <div class="col-6">
                 <div class="stat-card-modern h-100 flex-column align-items-start justify-content-center p-3">
@@ -335,13 +335,15 @@ document.addEventListener('DOMContentLoaded', () => {
                          <h6 class="text-muted fw-bold small mb-0 text-uppercase" style="letter-spacing:1px;">География базы</h6>
                          <span class="badge bg-light text-dark border">Все города</span>
                     </div>
-                    <div style="max-height: 200px; overflow-y: auto; padding-right: 5px;">
+                    <div style="max-height: 250px; overflow-y: auto; padding-right: 5px;">
                         ${citiesHtml || '<div class="text-center text-muted small">Нет данных</div>'}
                     </div>
                 </div>
             </div>
         `;
         
+        // --- ЗАДАЧИ ---
+        const today = new Date(); today.setHours(0,0,0,0); const coolingLimit = new Date(today.getTime() - (15 * 24 * 60 * 60 * 1000));
         const tasksUpcoming = [], tasksProblem = [], tasksCooling = [];
         allTasksData.forEach(d => { if (d.status === 'archive') return; const isPotential = d.status === 'potential'; let lastVisitDate = null; let hasFutureTasks = false; if (d.visits && Array.isArray(d.visits)) { d.visits.forEach((v, index) => { const vDate = new Date(v.date); if (!v.date) return; vDate.setHours(0,0,0,0); if (v.isCompleted && (!lastVisitDate || vDate > lastVisitDate)) lastVisitDate = vDate; if (!v.isCompleted) { const taskData = { dealerName: d.name, dealerId: d.id, date: vDate, comment: v.comment || "Без комментария", visitIndex: index }; if (vDate < today) tasksProblem.push({...taskData, type: 'overdue'}); else { tasksUpcoming.push({...taskData, isToday: vDate.getTime() === today.getTime()}); hasFutureTasks = true; } } }); } if (d.status === 'problem') { if (!tasksProblem.some(t => t.dealerId === d.id && t.type === 'overdue')) tasksProblem.push({ dealerName: d.name, dealerId: d.id, type: 'status', comment: 'Статус: Проблемный' }); } if (!hasFutureTasks && d.status !== 'problem' && !isPotential) { if (!lastVisitDate) tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: 999 }); else if (lastVisitDate < coolingLimit) { const days = Math.floor((today - lastVisitDate) / (1000 * 60 * 60 * 24)); tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: days }); } } });
         tasksUpcoming.sort((a, b) => a.date - b.date); tasksProblem.sort((a, b) => (a.date || 0) - (b.date || 0)); tasksCooling.sort((a, b) => b.days - a.days);
@@ -399,6 +401,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let salesColorClass = 'bg-danger'; if (salesFact >= 200) salesColorClass = 'bg-success'; else if (salesFact >= 100) salesColorClass = 'bg-warning text-dark'; 
             const salesBadge = `<span class="badge ${salesColorClass} rounded-pill ms-2" title="Продажи за текущий месяц">${salesFact.toFixed(2)} м²</span>`;
 
+            // ВСТАВЛЕНА НУМЕРАЦИЯ (index + 1)
             return `<div class="dealer-item" onclick="window.open('dealer.html?id=${d.id}', '_blank')">
                 <div class="dealer-index-number">${index + 1}</div>
                 <div class="dealer-avatar-box">${avatarHtml}</div>
