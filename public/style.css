@@ -1665,3 +1665,47 @@ nav a.nav-link.active { background: var(--primary-color) !important; color: whit
     background-color: var(--primary-color);
     border-radius: 3px;
 }
+/* --- НОВЫЙ ДАШБОРД (V3) --- */
+
+.stat-dual-value {
+    font-size: 1.6rem;
+    font-weight: 800;
+    line-height: 1;
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+}
+.stat-val-active { color: #166534; } 
+.stat-val-sleep { color: #94a3b8; font-size: 1.1rem; font-weight: 600; }
+
+.stat-sublabel {
+    font-size: 0.7rem;
+    color: #64748b;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 4px;
+}
+
+/* Прогресс-бар для городов (Актив / Потенциал) */
+.city-stat-row {
+    margin-bottom: 10px;
+}
+.city-bar-header {
+    display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 600; margin-bottom: 2px;
+}
+.city-stacked-bar {
+    display: flex;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    background: #f1f5f9;
+}
+.bar-active { background-color: #166534; }
+.bar-potential { background-color: #0d6efd; }
+
+/* Кнопка настроек */
+.btn-dash-settings {
+    background: transparent; border: none; color: #94a3b8;
+}
+.btn-dash-settings:hover { color: #475569; transform: rotate(30deg); transition: 0.3s; }
