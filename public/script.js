@@ -172,7 +172,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 4. Render
             populateFilters(allDealers);
-            renderDashboard();
+            renderDashboard(); // <-- НОВАЯ ВЕРСИЯ ДАШБОРДА
             renderDealerList();
             
             // 5. Restore pending edit
@@ -250,18 +250,91 @@ document.addEventListener('DOMContentLoaded', () => {
     async function saveProducts(dealerId, ids) { await fetch(`${API_DEALERS_URL}/${dealerId}/products`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({productIds: ids})}); }
     async function completeTask(btn, dealerId, visitIndex) { try { btn.disabled = true; const res = await fetch(`${API_DEALERS_URL}/${dealerId}`); if(!res.ok) throw new Error(); const dealer = await res.json(); if (dealer.visits && dealer.visits[visitIndex]) { dealer.visits[visitIndex].isCompleted = true; } await fetch(`${API_DEALERS_URL}/${dealerId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visits: dealer.visits }) }); initApp(); window.showToast("Задача выполнена!"); } catch (e) { window.showToast("Ошибка", "error"); btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg"></i>'; } }
 
+    // --- MODIFIED DASHBOARD ---
     function renderDashboard() {
         if (!dashboardStats) return; 
         if (!allDealers || allDealers.length === 0) { dashboardStats.innerHTML = ''; return; }
-        const activeDealers = allDealers.filter(d => d.status !== 'potential'); const totalDealers = activeDealers.length; const noAvatarCount = activeDealers.filter(d => !d.photo_url).length; 
-        let countActive = 0, countStandard = 0, countPotential = 0, countProblem = 0; 
-        allDealers.forEach(d => { if (d.status === 'active') countActive++; else if (d.status === 'standard') countStandard++; else if (d.status === 'problem') countProblem++; else if (d.status === 'potential') countPotential++; });
-        const totalAll = allDealers.length; const pctActive = totalAll > 0 ? (countActive / totalAll) * 100 : 0; const pctStandard = totalAll > 0 ? (countStandard / totalAll) * 100 : 0; const pctProblem = totalAll > 0 ? (countProblem / totalAll) * 100 : 0; const pctPotential = totalAll > 0 ? (countPotential / totalAll) * 100 : 0;
+
+        // 1. DATA PREP
+        const activeIds = new Set();
+        if (currentMonthSales && currentMonthSales.length > 0) {
+            currentMonthSales.forEach(s => { if (s.fact > 0) activeIds.add(s.dealerId); });
+        }
+
+        let activeCount = 0;
+        let sleepingCount = 0;
+        let newCount = 0;
+        const cityCounts = {};
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+        allDealers.forEach(d => {
+            if (d.status === 'archive') return;
+
+            // Health
+            if (activeIds.has(d.id)) activeCount++;
+            else sleepingCount++;
+
+            // Growth (Assuming d.createdAt exists, fallback to false if missing)
+            if (d.createdAt && new Date(d.createdAt) >= startOfMonth) newCount++;
+
+            // Cities
+            const city = d.city || 'Не указан';
+            cityCounts[city] = (cityCounts[city] || 0) + 1;
+        });
+
+        // 2. CITIES LOGIC
+        const total = activeCount + sleepingCount;
+        const sortedCities = Object.entries(cityCounts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 3);
         
+        let citiesHtml = '';
+        sortedCities.forEach(([name, count]) => {
+            const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+            citiesHtml += `
+                <div class="city-stat-row">
+                    <span style="width: 70px;" class="text-truncate fw-bold text-dark">${name}</span>
+                    <div class="city-bar-bg"><div class="city-bar-fill" style="width: ${pct}%"></div></div>
+                    <span class="city-val">${pct}%</span>
+                </div>`;
+        });
+
+        // 3. RENDER
         dashboardStats.innerHTML = `
-            <div class="col-6"><div class="stat-card-modern"><div class="stat-icon-box bg-primary-subtle text-primary"><i class="bi bi-shop"></i></div><div class="stat-info"><h3>${totalDealers}</h3><p>Дилеров</p></div></div></div>
-            <div class="col-6"><div class="stat-card-modern"><div class="stat-icon-box ${noAvatarCount > 0 ? 'bg-danger-subtle text-danger' : 'bg-success-subtle text-success'}"><i class="bi bi-camera-fill"></i></div><div class="stat-info"><h3 class="${noAvatarCount > 0 ? 'text-danger' : ''}">${noAvatarCount}</h3><p>Без фото</p></div></div></div>
-            <div class="col-12 mt-2"><div class="stat-card-modern d-block p-3"><h6 class="text-muted fw-bold small mb-3 text-uppercase" style="letter-spacing:1px;">Структура базы</h6><div class="progress mb-3" style="height: 12px; border-radius: 6px;"><div class="progress-bar bg-success" role="progressbar" style="width: ${pctActive}%"></div><div class="progress-bar bg-warning" role="progressbar" style="width: ${pctStandard}%"></div><div class="progress-bar bg-danger" role="progressbar" style="width: ${pctProblem}%"></div><div class="progress-bar bg-primary" role="progressbar" style="width: ${pctPotential}%"></div></div><div class="d-flex justify-content-between text-center small"><div><span class="badge rounded-pill text-bg-success mb-1">${countActive}</span><br><span class="text-muted" style="font-size:0.75rem">VIP</span></div><div><span class="badge rounded-pill text-bg-warning mb-1">${countStandard}</span><br><span class="text-muted" style="font-size:0.75rem">Станд.</span></div><div><span class="badge rounded-pill text-bg-danger mb-1">${countProblem}</span><br><span class="text-muted" style="font-size:0.75rem">Пробл.</span></div><div><span class="badge rounded-pill text-bg-primary mb-1">${countPotential}</span><br><span class="text-muted" style="font-size:0.75rem">Потенц.</span></div></div></div></div>
+            <div class="col-6">
+                <div class="stat-card-modern h-100 flex-column align-items-start justify-content-center p-3">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <div class="icon-circle bg-success-subtle text-success" style="width:28px;height:28px;font-size:0.9rem;"><i class="bi bi-heart-pulse-fill"></i></div>
+                        <span class="small fw-bold text-muted">Здоровье</span>
+                    </div>
+                    <div class="stat-dual-value">
+                        <span class="stat-val-active">${activeCount}</span>
+                        <span class="text-muted fw-light" style="font-size:1rem;">/</span>
+                        <span class="stat-val-sleep">${sleepingCount}</span>
+                    </div>
+                    <div class="stat-sublabel mt-1">Актив / Спят</div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="stat-card-modern h-100 flex-column align-items-start justify-content-center p-3">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <div class="icon-circle bg-primary-subtle text-primary" style="width:28px;height:28px;font-size:0.9rem;"><i class="bi bi-graph-up-arrow"></i></div>
+                        <span class="small fw-bold text-muted">Прирост</span>
+                    </div>
+                    <h3 class="mb-0 text-primary fw-bolder">+${newCount}</h3>
+                    <div class="stat-sublabel mt-1">Новых в этом мес.</div>
+                </div>
+            </div>
+            <div class="col-12 mt-2">
+                <div class="stat-card-modern d-block p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                         <h6 class="text-muted fw-bold small mb-0 text-uppercase" style="letter-spacing:1px;">Охват</h6>
+                         <span class="badge bg-light text-dark border">Топ-3</span>
+                    </div>
+                    ${citiesHtml || '<div class="text-center text-muted small">Нет данных</div>'}
+                </div>
+            </div>
         `;
         
         const today = new Date(); today.setHours(0,0,0,0); const coolingLimit = new Date(today.getTime() - (15 * 24 * 60 * 60 * 1000));
@@ -291,7 +364,6 @@ document.addEventListener('DOMContentLoaded', () => {
             currentMonthSales.forEach(s => { if(s.dealerId) salesMap[s.dealerId] = (salesMap[s.dealerId] || 0) + (s.fact || 0); });
         }
 
-        // ВАЖНО: Добавил index в аргументы map
         dealerGrid.innerHTML = filtered.map((d, index) => {
             const statusObj = statusList.find(s => s.value === (d.status || 'standard')) || { label: d.status, color: '#6c757d' };
             const statusStyle = `background-color: ${statusObj.color}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 500;`;
@@ -323,7 +395,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let salesColorClass = 'bg-danger'; if (salesFact >= 200) salesColorClass = 'bg-success'; else if (salesFact >= 100) salesColorClass = 'bg-warning text-dark'; 
             const salesBadge = `<span class="badge ${salesColorClass} rounded-pill ms-2" title="Продажи за текущий месяц">${salesFact.toFixed(2)} м²</span>`;
 
-            // ВСТАВЛЕНО: <div class="dealer-index-number">
+            // ВСТАВЛЕНА НУМЕРАЦИЯ (index + 1)
             return `<div class="dealer-item" onclick="window.open('dealer.html?id=${d.id}', '_blank')">
                 <div class="dealer-index-number">${index + 1}</div>
                 <div class="dealer-avatar-box">${avatarHtml}</div>
