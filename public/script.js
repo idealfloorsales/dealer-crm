@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return response;
     };
 
-    // --- 2. КОНСТАНТЫ И ПЕРЕМЕННЫЕ ---
+    // --- 2. КОНСТАНТЫ ---
     const API_DEALERS_URL = '/api/dealers';
     const API_PRODUCTS_URL = '/api/products'; 
     const API_COMPETITORS_REF_URL = '/api/competitors-ref';
@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let newAvatarBase64 = null; 
     let currentUserRole = 'guest';
 
-    // Настройки дашборда
+    // Настройки дашборда (по умолчанию)
     const defaultDashConfig = {
         showHealth: true,
         showGrowth: true,
@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     let dashConfig = JSON.parse(localStorage.getItem('dash_config')) || defaultDashConfig;
 
-    // Список для исключения из матрицы товаров (POS)
+    // Список POS-материалов (для исключения из матрицы)
     const posMaterialsList = [
         "С600 - 600мм задняя стенка", 
         "С800 - 800мм задняя стенка", 
@@ -55,13 +55,13 @@ document.addEventListener('DOMContentLoaded', () => {
         "Табличка - Табличка орг.стекло"
     ];
 
-    // --- 3. ЭЛЕМЕНТЫ DOM ---
+    // --- 3. ЭЛЕМЕНТЫ ---
     const addModalEl = document.getElementById('add-modal'); const addModal = new bootstrap.Modal(addModalEl, { backdrop: 'static', keyboard: false }); const addForm = document.getElementById('add-dealer-form');
     const editModalEl = document.getElementById('edit-modal'); const editModal = new bootstrap.Modal(editModalEl, { backdrop: 'static', keyboard: false }); const editForm = document.getElementById('edit-dealer-form');
     const qvModalEl = document.getElementById('quick-visit-modal'); const qvModal = new bootstrap.Modal(qvModalEl, { backdrop: 'static', keyboard: false }); const qvForm = document.getElementById('quick-visit-form');
     const statusModalEl = document.getElementById('status-manager-modal'); const statusModal = statusModalEl ? new bootstrap.Modal(statusModalEl) : null; const btnManageStatuses = document.getElementById('btn-manage-statuses'); const statusForm = document.getElementById('status-form'); const statusListContainer = document.getElementById('status-manager-list');
     
-    // Настройки
+    // Элементы настроек дашборда
     const btnDashSettings = document.getElementById('btn-dash-settings');
     const settingsModalElement = document.getElementById('dashboard-settings-modal');
     const settingsModal = settingsModalElement ? new bootstrap.Modal(settingsModalElement) : null;
@@ -72,22 +72,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const dealerGrid = document.getElementById('dealer-grid'); 
     const dashboardStats = document.getElementById('dashboard-stats');
     
-    // Списки внутри модалок
     const addProductChecklist = document.getElementById('add-product-checklist'); const addContactList = document.getElementById('add-contact-list'); const addAddressList = document.getElementById('add-address-list'); const addPosList = document.getElementById('add-pos-list'); const addVisitsList = document.getElementById('add-visits-list'); const addCompetitorList = document.getElementById('add-competitor-list'); const addPhotoInput = document.getElementById('add-photo-input'); const addPhotoPreviewContainer = document.getElementById('add-photo-preview-container'); const addAvatarInput = document.getElementById('add-avatar-input'); const addAvatarPreview = document.getElementById('add-avatar-preview');
     const editProductChecklist = document.getElementById('edit-product-checklist'); const editContactList = document.getElementById('edit-contact-list'); const editAddressList = document.getElementById('edit-address-list'); const editPosList = document.getElementById('edit-pos-list'); const editVisitsList = document.getElementById('edit-visits-list'); const editCompetitorList = document.getElementById('edit-competitor-list'); const editPhotoInput = document.getElementById('edit-photo-input'); const editPhotoPreviewContainer = document.getElementById('edit-photo-preview-container'); const editAvatarInput = document.getElementById('edit-avatar-input'); const editAvatarPreview = document.getElementById('edit-avatar-preview'); const editCurrentAvatarUrl = document.getElementById('edit-current-avatar-url');
     
-    // Фильтры и кнопки
     const filterCity = document.getElementById('filter-city'); const filterPriceType = document.getElementById('filter-price-type'); const filterStatus = document.getElementById('filter-status'); const filterResponsible = document.getElementById('filter-responsible'); const searchBar = document.getElementById('search-bar'); 
     const btnExportDealers = document.getElementById('export-dealers-btn'); const btnExportCompetitors = document.getElementById('export-competitors-prices-btn');
     const addOrgList = document.getElementById('add-org-list'); const editOrgList = document.getElementById('edit-org-list'); const btnAddOrgAdd = document.getElementById('btn-add-org-add'); const btnEditOrgAdd = document.getElementById('btn-edit-org-add');
     const logoutBtn = document.getElementById('logout-btn');
 
-    // Карты
     let mapInstances = { add: null, edit: null };
     let markerInstances = { add: null, edit: null };
     let refreshAddMap = null; let refreshEditMap = null;
 
-    // --- 4. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
+    // --- 4. HELPERS ---
     const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
     const safeText = (text) => (text || '').toString().replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const safeAttr = (text) => (text || '').toString().replace(/"/g, '&quot;');
@@ -105,14 +102,19 @@ document.addEventListener('DOMContentLoaded', () => {
     window.showToast = function(message, type = 'success') { let container = document.getElementById('toast-container-custom'); if (!container) { container = document.createElement('div'); container.id = 'toast-container-custom'; container.className = 'toast-container-custom'; document.body.appendChild(container); } const toast = document.createElement('div'); toast.className = `toast-modern toast-${type}`; const icon = type === 'success' ? 'check-circle-fill' : (type === 'error' ? 'exclamation-triangle-fill' : 'info-circle-fill'); toast.innerHTML = `<i class="bi bi-${icon} fs-5"></i><span class="fw-bold text-dark">${message}</span>`; container.appendChild(toast); setTimeout(() => { toast.style.animation = 'toastFadeOut 0.5s forwards'; setTimeout(() => toast.remove(), 500); }, 3000); };
     window.toggleSectorSelect = function(prefix, responsibleValue) { const sectorSelect = document.getElementById(`${prefix}_region_sector`); if (responsibleValue === 'regional_regions') { sectorSelect.style.display = 'block'; } else { sectorSelect.style.display = 'none'; sectorSelect.value = ''; } };
     
-    // ФУНКЦИЯ КАТАЛОГА С ФИЛЬТРАЦИЕЙ
+    // --- СПЕЦИАЛЬНЫЙ РЕНДЕР КАТАЛОГА (Без POS) ---
     function renderProductChecklist(container, selectedIds=[]) { 
         if(!container) return; 
         const set = new Set(selectedIds); 
         const filteredCatalog = fullProductCatalog.filter(p => !posMaterialsList.includes(p.name));
-        container.innerHTML = filteredCatalog.map(p => `<div class="checklist-item form-check"><input type="checkbox" class="form-check-input" id="prod-${container.id}-${p.id}" value="${p.id}" ${set.has(p.id)?'checked':''}><label class="form-check-label" for="prod-${container.id}-${p.id}"><strong>${p.sku}</strong> - ${p.name}</label></div>`).join(''); 
+        container.innerHTML = filteredCatalog.map(p => 
+            `<div class="checklist-item form-check">
+                <input type="checkbox" class="form-check-input" id="prod-${container.id}-${p.id}" value="${p.id}" ${set.has(p.id)?'checked':''}>
+                <label class="form-check-label" for="prod-${container.id}-${p.id}"><strong>${p.sku}</strong> - ${p.name}</label>
+             </div>`
+        ).join(''); 
     }
-
+    
     function getSelectedProductIds(containerId) { const el=document.getElementById(containerId); if(!el) return []; return Array.from(el.querySelectorAll('input:checked')).map(cb=>cb.value); }
     function collectData(container, selector, fields) { if (!container) return []; const data = []; container.querySelectorAll(selector).forEach(entry => { const item = {}; let hasData = false; fields.forEach(f => { const inp = entry.querySelector(f.class); if(inp){item[f.key]=inp.value; if(item[f.key]) hasData=true;} }); if(hasData) data.push(item); }); return data; }
     function renderList(container, data, htmlGen) { if(container) container.innerHTML = (data && data.length > 0) ? data.map(htmlGen).join('') : htmlGen(); }
@@ -208,7 +210,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderDashboard(); 
             renderDealerList();
             
-            // 5. Setup Listeners (AFTER functions are defined)
+            // 5. SETUP EVENT LISTENERS (NOW SAFE)
             setupEventListeners();
             
             const pendingId = localStorage.getItem('pendingEditDealerId'); if (pendingId) { localStorage.removeItem('pendingEditDealerId'); openEditModal(pendingId); }
@@ -229,7 +231,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // --- SAFE LISTENER SETUP ---
+    // --- SAFE LISTENERS ---
     function setupEventListeners() {
         if(filterCity) filterCity.onchange = renderDealerList; 
         if(filterPriceType) filterPriceType.onchange = renderDealerList; 
@@ -282,7 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderDashboard(); 
     };
 
-    // --- RENDER DASHBOARD (V3: Active/Potential Cities) ---
+    // --- RENDER DASHBOARD (V3) ---
     function renderDashboard() {
         if (!dashboardStats) return; 
         if (!allDealers || allDealers.length === 0) { dashboardStats.innerHTML = ''; return; }
@@ -312,7 +314,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (d.createdAt && new Date(d.createdAt) >= startOfMonth) newCount++;
 
             if (d.products && d.products.length > 0) {
-                // Фильтруем POS, чтобы считать только реальный товар
+                // Filter out POS items
                 const realProducts = d.products.filter(p => !posMaterialsList.includes(p.name));
                 totalSKU += realProducts.length;
                 if(realProducts.length > 0) totalDealersWithProducts++;
@@ -415,12 +417,16 @@ document.addEventListener('DOMContentLoaded', () => {
         dashboardStats.innerHTML = html;
 
         // --- TASKS ---
+        // ИСПРАВЛЕНО: Восстановлена функция renderTaskList и логика tasks
         const today = new Date(); today.setHours(0,0,0,0); const coolingLimit = new Date(today.getTime() - (15 * 24 * 60 * 60 * 1000));
         const tasksUpcoming = [], tasksProblem = [], tasksCooling = [];
         allTasksData.forEach(d => { if (d.status === 'archive') return; const isPotential = d.status === 'potential'; let lastVisitDate = null; let hasFutureTasks = false; if (d.visits && Array.isArray(d.visits)) { d.visits.forEach((v, index) => { const vDate = new Date(v.date); if (!v.date) return; vDate.setHours(0,0,0,0); if (v.isCompleted && (!lastVisitDate || vDate > lastVisitDate)) lastVisitDate = vDate; if (!v.isCompleted) { const taskData = { dealerName: d.name, dealerId: d.id, date: vDate, comment: v.comment || "Без комментария", visitIndex: index }; if (vDate < today) tasksProblem.push({...taskData, type: 'overdue'}); else { tasksUpcoming.push({...taskData, isToday: vDate.getTime() === today.getTime()}); hasFutureTasks = true; } } }); } if (d.status === 'problem') { if (!tasksProblem.some(t => t.dealerId === d.id && t.type === 'overdue')) tasksProblem.push({ dealerName: d.name, dealerId: d.id, type: 'status', comment: 'Статус: Проблемный' }); } if (!hasFutureTasks && d.status !== 'problem' && !isPotential) { if (!lastVisitDate) tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: 999 }); else if (lastVisitDate < coolingLimit) { const days = Math.floor((today - lastVisitDate) / (1000 * 60 * 60 * 24)); tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: days }); } } });
         tasksUpcoming.sort((a, b) => a.date - b.date); tasksProblem.sort((a, b) => (a.date || 0) - (b.date || 0)); tasksCooling.sort((a, b) => b.days - a.days);
         renderTaskList(document.getElementById('tasks-list-upcoming'), tasksUpcoming, 'upcoming'); renderTaskList(document.getElementById('tasks-list-problem'), tasksProblem, 'problem'); renderTaskList(document.getElementById('tasks-list-cooling'), tasksCooling, 'cooling');
     }
+    
+    // --- MISSING FUNCTION ADDED BACK ---
+    function renderTaskList(container, tasks, type) { if (!container) return; if (tasks.length === 0) { const msg = type === 'cooling' ? 'Все посещены недавно' : 'Задач нет'; container.innerHTML = `<div class="text-center py-4 text-muted"><i class="bi bi-check-circle display-6 d-block mb-2 text-success opacity-50"></i><small>${msg}</small></div>`; return; } container.innerHTML = tasks.map(t => { let badgeHtml = ''; let metaHtml = ''; if (type === 'upcoming') { const dateStr = t.date.toLocaleDateString('ru-RU', {day:'numeric', month:'short'}); badgeHtml = t.isToday ? `<span class="task-badge tb-today mt-1 d-inline-block">Сегодня</span>` : `<span class="task-badge tb-future mt-1 d-inline-block">${dateStr}</span>`; metaHtml = `<span class="text-muted small">${safeText(t.comment)}</span>`; } else if (type === 'problem') { if (t.type === 'overdue') { const dateStr = t.date.toLocaleDateString('ru-RU'); badgeHtml = `<span class="task-badge tb-overdue mt-1 d-inline-block">Просрок: ${dateStr}</span>`; metaHtml = `<span class="text-danger small fw-bold">${safeText(t.comment)}</span>`; } else { badgeHtml = `<span class="task-badge tb-overdue mt-1 d-inline-block">Проблема</span>`; metaHtml = `<span class="small text-muted">Внимание!</span>`; } } else if (type === 'cooling') { const daysStr = t.days === 999 ? 'Никогда' : `${t.days} дн.`; badgeHtml = `<span class="task-badge tb-cooling mt-1 d-inline-block">Без визитов: ${daysStr}</span>`; metaHtml = `<span class="text-muted small">Пора навестить</span>`; } const showCheckBtn = (type === 'upcoming' || (type === 'problem' && t.type === 'overdue')); const btnHtml = showCheckBtn ? `<button class="btn-task-check btn-complete-task" data-id="${t.dealerId}" data-index="${t.visitIndex}" title="Выполнить"><i class="bi bi-check-lg"></i></button>` : ''; return `<div class="task-item-modern align-items-start"><div class="task-content"><a href="dealer.html?id=${t.dealerId}" target="_blank" class="task-title text-truncate d-block" style="max-width: 200px;">${safeText(t.dealerName)}</a>${badgeHtml}<div class="mt-1">${metaHtml}</div></div><div class="mt-1">${btnHtml}</div></div>`; }).join(''); }
 
     // --- OTHER ---
     if(btnExportDealers) btnExportDealers.onclick = () => { if(!allDealers.length) return window.showToast("Нет данных", "error"); let csv = "\uFEFFID;Название;Город;Адрес;Статус;Ответственный;Организации;Телефон\n"; allDealers.forEach(d => { const phone = (d.contacts && d.contacts[0]) ? d.contacts[0].contactInfo : ''; const orgs = (d.organizations || [d.organization]).filter(Boolean).join(', '); csv += `${cleanCsv(d.dealer_id)};${cleanCsv(d.name)};${cleanCsv(d.city)};${cleanCsv(d.address)};${cleanCsv(d.status)};${cleanCsv(d.responsible)};${cleanCsv(orgs)};${cleanCsv(phone)}\n`; }); downloadCsv(csv, `base_dealers_${new Date().toISOString().slice(0,10)}.csv`); };
