@@ -247,8 +247,8 @@
                     <form id="add-dealer-form">
                         <div class="wizard-step active" id="step-1">
                             <div class="row g-4">
-                                <div class="col-md-3"><label class="form-label text-secondary small fw-bold">ID Дилера *</label><input type="text" id="dealer_id" class="form-control fw-bold" placeholder="Напр. 105" required></div>
-                                <div class="col-md-9"><label class="form-label text-secondary small fw-bold">Название Компании *</label><input type="text" id="name" class="form-control fw-bold" placeholder="ООО 'Пример'" required></div>
+                                <div class="col-md-3"><label class="form-label text-secondary small fw-bold">ID Дилера *</label><input type="text" id="dealer_id" class="form-control fw-bold" placeholder="IF000" required></div>
+                                <div class="col-md-9"><label class="form-label text-secondary small fw-bold">Название Компании *</label><input type="text" id="name" class="form-control fw-bold" placeholder="Название торговой точки" required></div>
                                 <div class="col-md-4"><label class="form-label text-secondary small fw-bold">Город</label><input type="text" id="city" class="form-control" placeholder="Астана"></div>
                                 <div class="col-md-8"><label class="form-label text-secondary small fw-bold">Адрес (текст)</label><input type="text" id="address" class="form-control" placeholder="Улица, дом..."></div>
                                 <div class="col-12"><div class="p-3 bg-light rounded-3 border"><div class="row align-items-center"><div class="col-auto"><img id="add-avatar-preview" class="avatar-preview bg-white shadow-sm" src="" alt="Avatar"></div><div class="col"><label class="form-label fw-bold mb-1">Логотип / Фото фасада</label><input type="file" id="add-avatar-input" class="form-control form-control-sm" accept="image/*"></div></div></div></div>
@@ -391,7 +391,7 @@
                                             <div class="form-check form-switch">
                                                 <input class="form-check-input" type="checkbox" id="edit_has_personal_plan">
                                                 <label class="form-check-label fw-bold" for="edit_has_personal_plan">
-                                                    Персональный план (VIP)
+                                                    Персональный план
                                                 </label>
                                                 <div class="form-text text-muted small">Если включено, дилер будет показан отдельной строкой в сводке продаж.</div>
                                             </div>
@@ -486,3 +486,4 @@
     <script src="script.js?v={{VER}}"></script> <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(err => console.error(err)); }</script>
 </body>
 </html>
+
