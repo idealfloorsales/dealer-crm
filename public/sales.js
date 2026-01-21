@@ -455,6 +455,7 @@ document.addEventListener('DOMContentLoaded', () => {
         saveBtn.onclick = async () => {
             captureState();
             try {
+                // БЛОКИРУЕМ КНОПКУ, ЧТОБЫ ИЗБЕЖАТЬ ДВОЙНОГО КЛИКА
                 saveBtn.disabled = true; 
                 saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
                 
@@ -465,22 +466,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
 
                 if (res.ok) { 
+                    // ЕСЛИ УСПЕШНО
                     if (window.showToast) { window.showToast('Сохранено!'); } else { alert('Сохранено!'); }
                     saveBtn.className = 'btn btn-success shadow-sm px-4 rounded-pill';
                     saveBtn.innerHTML = '<i class="bi bi-check-lg"></i> OK'; 
+                    
+                    // РАЗБЛОКИРУЕМ ЧЕРЕЗ 2 СЕКУНДЫ
                     setTimeout(() => { 
                         saveBtn.innerHTML = '<i class="bi bi-save me-2"></i>Сохранить'; 
                         saveBtn.className='btn btn-success shadow-sm px-4 rounded-pill'; 
+                        saveBtn.disabled = false; // Важно: разблокируем для повторного нажатия
                     }, 2000);
+
                     loadData(); 
                 } else throw new Error('Ошибка при сохранении');
             } catch (e) { 
+                // ЕСЛИ ОШИБКА - РАЗБЛОКИРУЕМ СРАЗУ
                 alert(e.message); 
                 saveBtn.disabled = false; 
                 saveBtn.innerHTML = '<i class="bi bi-save me-2"></i>Сохранить';
-            } finally { 
-                if (saveBtn.innerHTML.includes('spinner')) saveBtn.disabled = false; 
-            }
+            } 
+            // Убрал блок finally, так как он мог сбрасывать состояние слишком рано или конфликтовать с setTimeout
         };
     }
 
