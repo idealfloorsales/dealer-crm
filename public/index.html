@@ -55,14 +55,12 @@
                 border: none;
             }
         }
-        /* Скрывать элементы админа по умолчанию */
         .admin-only { display: none !important; }
     </style>
     <script>
         if (!localStorage.getItem('crm_token')) {
             window.location.href = '/login.html';
         }
-        
         document.addEventListener("DOMContentLoaded", () => {
             try {
                 const token = localStorage.getItem('crm_token');
@@ -112,7 +110,9 @@
                 <a href="/users.html" class="btn btn-light shadow-sm text-primary d-lg-none admin-only"><i class="bi bi-people-fill"></i></a>
                 
                 <button id="export-competitors-prices-btn" class="btn btn-light shadow-sm text-info d-none d-md-block" title="Цены"><i class="bi bi-tags-fill"></i> Цены</button>
+                
                 <button id="export-dealers-btn" class="btn btn-light shadow-sm text-success d-none d-md-block"><i class="bi bi-file-earmark-excel"></i> База</button>
+                
                 <button id="open-add-modal-btn" class="btn btn-primary shadow-sm px-4 d-none d-lg-block"><i class="bi bi-plus-lg me-2"></i>Добавить</button>
             </div>
         </div>
@@ -206,21 +206,32 @@
     </button>
 
     <div class="bottom-nav d-flex justify-content-around d-lg-none">
-        <a href="/" class="bottom-nav-item active">
-            <i class="bi bi-shop"></i><span>Дилеры</span>
-        </a>
-        <a href="/map.html" class="bottom-nav-item">
-            <i class="bi bi-geo-alt"></i><span>Карта</span>
-        </a>
-        <a href="/sales.html" class="bottom-nav-item">
-            <i class="bi bi-graph-up-arrow"></i><span>Продажи</span>
-        </a>
-        <a href="/competitors.html" class="bottom-nav-item">
-            <i class="bi bi-globe"></i><span>Бренды</span>
-        </a>
-        <a href="/report.html" class="bottom-nav-item">
-            <i class="bi bi-pie-chart"></i><span>Матрица</span>
-        </a>
+        <a href="/" class="bottom-nav-item active"><i class="bi bi-shop"></i><span>Дилеры</span></a>
+        <a href="/map.html" class="bottom-nav-item"><i class="bi bi-geo-alt"></i><span>Карта</span></a>
+        <a href="/sales.html" class="bottom-nav-item"><i class="bi bi-graph-up-arrow"></i><span>Продажи</span></a>
+        <a href="/competitors.html" class="bottom-nav-item"><i class="bi bi-globe"></i><span>Бренды</span></a>
+        <a href="/report.html" class="bottom-nav-item"><i class="bi bi-pie-chart"></i><span>Матрица</span></a>
+    </div>
+
+    <div class="modal fade" id="export-settings-modal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold">Настройка выгрузки</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small mb-3">Выберите колонки для Excel/CSV файла:</p>
+                    <div id="export-columns-list" class="d-flex flex-column gap-2" style="max-height: 400px; overflow-y: auto;">
+                        </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-success w-100 rounded-pill" onclick="generateAndDownloadCSV()">
+                        <i class="bi bi-download me-2"></i>Скачать
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="modal fade" id="add-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
@@ -448,35 +459,8 @@
     </div>
 
     <div class="modal fade" id="quick-visit-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Быстрый визит</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="quick-visit-form"><input type="hidden" id="qv_dealer_id"><div class="mb-3"><textarea class="form-control" id="qv_comment" rows="3" required placeholder="Комментарий..."></textarea></div><div class="d-grid"><button type="submit" class="btn btn-success">Сохранить</button></div></form></div></div></div></div>
-    <div class="modal fade" id="status-manager-modal" tabindex="-1"><div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title fw-bold">Управление статусами</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="card bg-light border-0 mb-4"><div class="card-body"><form id="status-form" class="row g-2 align-items-end">
-    <input type="hidden" id="st_id"> <div class="col-md-3">
-        <label class="form-label small fw-bold text-muted">Код (ID)</label>
-        <input type="text" id="st_value" class="form-control" placeholder="vip" required>
-        <div class="form-text" style="font-size: 0.7rem; margin-top: 2px;">На латинице</div>
-    </div>
-
-    <div class="col-md-4">
-        <label class="form-label small fw-bold text-muted">Название</label>
-        <input type="text" id="st_label" class="form-control" placeholder="VIP Клиент" required>
-    </div>
-
-    <div class="col-md-2 col-3">
-        <label class="form-label small fw-bold text-muted">Цвет</label>
-        <input type="color" id="st_color" class="form-control form-control-color w-100" value="#B9040A" title="Выберите цвет">
-    </div>
-
-    <div class="col-md-3 col-9">
-        <div class="form-check mb-2">
-            <input class="form-check-input" type="checkbox" id="st_visible" checked>
-            <label class="form-check-label small" for="st_visible">В списке</label>
-        </div>
-    </div>
-
-    <div class="col-12 mt-2 text-end">
-        <button type="button" id="btn-cancel-edit-status" class="btn btn-sm btn-link text-muted me-2" style="display:none;">Отмена</button>
-        <button type="submit" class="btn btn-primary px-4" id="btn-save-status">Сохранить</button>
-    </div>
-</form></div></div><div class="table-responsive"><table class="table table-hover align-middle"><thead class="table-light small text-muted text-uppercase"><tr><th>Цвет</th><th>Название</th><th>Код (ID)</th><th class="text-center">В списке</th><th class="text-end">Действия</th></tr></thead><tbody id="status-manager-list"></tbody></table></div></div></div></div></div>
+    
+    <div class="modal fade" id="status-manager-modal" tabindex="-1"><div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title fw-bold">Управление статусами</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="card bg-light border-0 mb-4"><div class="card-body"><form id="status-form" class="row g-2 align-items-end"><input type="hidden" id="st_id"><div class="col-md-3"><label class="form-label small fw-bold text-muted">Код (ID)</label><input type="text" id="st_value" class="form-control" placeholder="vip" required><div class="form-text" style="font-size: 0.7rem; margin-top: 2px;">На латинице</div></div><div class="col-md-4"><label class="form-label small fw-bold text-muted">Название</label><input type="text" id="st_label" class="form-control" placeholder="VIP Клиент" required></div><div class="col-md-2 col-3"><label class="form-label small fw-bold text-muted">Цвет</label><input type="color" id="st_color" class="form-control form-control-color w-100" value="#B9040A" title="Выберите цвет"></div><div class="col-md-3 col-9"><div class="form-check mb-2"><input class="form-check-input" type="checkbox" id="st_visible" checked><label class="form-check-label small" for="st_visible">В списке</label></div></div><div class="col-12 mt-2 text-end"><button type="button" id="btn-cancel-edit-status" class="btn btn-sm btn-link text-muted me-2" style="display:none;">Отмена</button><button type="submit" class="btn btn-primary px-4" id="btn-save-status">Сохранить</button></div></form></div></div><div class="table-responsive"><table class="table table-hover align-middle"><thead class="table-light small text-muted text-uppercase"><tr><th>Цвет</th><th>Название</th><th>Код (ID)</th><th class="text-center">В списке</th><th class="text-end">Действия</th></tr></thead><tbody id="status-manager-list"></tbody></table></div></div></div></div></div>
     
     <div class="modal fade" id="dashboard-settings-modal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered modal-sm">
@@ -486,8 +470,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="d-flex flex-column gap-2" id="dash-settings-list">
-                        </div>
+                    <div class="d-flex flex-column gap-2" id="dash-settings-list"></div>
                 </div>
                 <div class="modal-footer border-0 pt-0">
                     <button type="button" class="btn btn-primary w-100" onclick="saveDashboardConfig()">Сохранить</button>
@@ -503,4 +486,3 @@
     <script src="script.js?v={{VER}}"></script> <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(err => console.error(err)); }</script>
 </body>
 </html>
-
