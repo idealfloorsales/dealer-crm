@@ -1709,3 +1709,174 @@ nav a.nav-link.active { background: var(--primary-color) !important; color: whit
     background: transparent; border: none; color: #94a3b8;
 }
 .btn-dash-settings:hover { color: #475569; transform: rotate(30deg); transition: 0.3s; }
+/* style.css */
+/* Modern CRM Design - Brand Edition (#b9040a) */
+
+:root {
+    --primary-color: #b9040a;   
+    --primary-hover: #900308;
+    --text-dark: #1e293b;
+    --text-gray: #64748b;
+    --bg-light: #f3f4f6;
+    --card-bg: #ffffff;
+    
+    --success-bg: #dcfce7; --success-text: #166534;
+    --danger-bg: #fee2e2;  --danger-text: #991b1b;
+    --warning-bg: #fef3c7; --warning-text: #92400e;
+    --info-bg: #e0f2fe;    --info-text: #075985;
+    --gray-bg: #f1f5f9;    --gray-text: #475569;
+}
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background-color: var(--bg-light);
+    color: var(--text-dark);
+    line-height: 1.5;
+}
+
+h1, h2, h3, h4, h5, h6 { font-weight: 700; color: var(--text-dark); margin-bottom: 0.5rem; }
+h1 { font-size: 1.75rem; border: none; }
+
+nav.navbar { background: #fff !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05); padding: 0.75rem 1rem; border-bottom: 1px solid #e2e8f0; }
+nav .navbar-brand { font-weight: 700; color: var(--primary-color) !important; }
+nav a.nav-link { color: var(--text-gray) !important; font-weight: 500; font-size: 0.95rem; border-radius: 8px; padding: 8px 16px !important; transition: 0.2s; }
+nav a.nav-link:hover { background: #fff1f2; color: var(--primary-color) !important; }
+nav a.nav-link.active { background: var(--primary-color) !important; color: white !important; font-weight: 600; box-shadow: 0 4px 6px -1px rgba(185, 4, 10, 0.3); }
+
+.btn { font-weight: 500; padding: 0.5rem 1rem; border-radius: 8px; transition: all 0.2s; border: 1px solid transparent; }
+.btn-primary { background-color: var(--primary-color); border-color: var(--primary-color); box-shadow: 0 4px 10px rgba(185, 4, 10, 0.25); }
+.btn-primary:hover, .btn-primary:active, .btn-primary:focus { background-color: var(--primary-hover) !important; border-color: var(--primary-hover) !important; transform: translateY(-1px); }
+.btn-light { background: #fff; border: 1px solid #e2e8f0; color: var(--text-dark); }
+.btn-light:hover { background: #f8fafc; border-color: #cbd5e1; color: var(--primary-color); }
+.btn-success { background-color: #10b981; border-color: #10b981; color: white; }
+
+.form-control, .form-select { border-radius: 8px; border: 1px solid #e2e8f0; padding: 0.6rem 1rem; font-size: 0.95rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
+.form-control:focus, .form-select:focus { border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(185, 4, 10, 0.15); outline: none; }
+.form-check-input:checked { background-color: var(--primary-color); border-color: var(--primary-color); }
+
+.wizard-progress-container { position: relative; padding: 0 10px; }
+.wizard-progress-bar { position: absolute; top: 20px; left: 20px; right: 20px; height: 4px; background: #e9ecef; z-index: 0; border-radius: 4px; }
+.wizard-steps-wrapper { position: relative; display: flex; justify-content: space-between; z-index: 1; }
+.step-circle { width: 44px; height: 44px; border-radius: 50%; background: #fff; border: 3px solid #e9ecef; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #94a3b8; transition: all 0.3s; font-size: 1.1rem; }
+.step-circle.active { border-color: var(--primary-color); background: var(--primary-color); color: white; box-shadow: 0 0 0 4px rgba(185, 4, 10, 0.15); }
+.step-circle.completed { border-color: var(--primary-color); background: var(--primary-color); color: white; opacity: 0.8; }
+.wizard-step { display: none; animation: fadeIn 0.3s; }
+.wizard-step.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.dealer-item { background: var(--card-bg); border: 1px solid #fff; border-radius: 16px; padding: 18px 24px; display: flex; align-items: center; margin-bottom: 0; transition: all 0.2s ease-in-out; box-shadow: 0 2px 5px rgba(0,0,0,0.02); overflow: visible !important; position: relative; }
+.dealer-item:hover { transform: translateY(-3px); box-shadow: 0 10px 30px -5px rgba(0,0,0,0.08); border-color: #e2e8f0; z-index: 10; }
+.dealer-avatar-box { width: 56px; height: 56px; border-radius: 50%; flex-shrink: 0; background: #f1f5f9; margin-right: 20px; overflow: hidden; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 1.5rem; border: 2px solid #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+.dealer-avatar-box img { width: 100%; height: 100%; object-fit: cover; }
+.dealer-content { flex-grow: 1; margin-right: 20px; min-width: 0; }
+.dealer-name { font-size: 1.1rem; font-weight: 700; color: var(--text-dark); text-decoration: none; display: block; margin-bottom: 4px; }
+.dealer-name:hover { color: var(--primary-color); }
+.dealer-meta { display: flex; flex-wrap: wrap; gap: 15px; font-size: 0.85rem; color: var(--text-gray); align-items: center; }
+.dealer-meta span { display: flex; align-items: center; gap: 6px; }
+.dealer-meta i { color: #94a3b8; }
+.status-pill { padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; display: inline-block; }
+.dealer-actions { display: flex; gap: 10px; align-items: center; }
+.btn-circle { width: 40px; height: 40px; border-radius: 50%; background: #fff; border: 1px solid #e2e8f0; color: var(--text-gray); display: flex; align-items: center; justify-content: center; transition: all 0.2s; font-size: 1.1rem; text-decoration: none; }
+.btn-circle:hover { background: #fff1f2; color: var(--primary-color); border-color: #fda4af; transform: scale(1.05); }
+.btn-circle-wa { color: #166534; background: #f0fdf4; border-color: #bbf7d0; }
+.btn-circle-wa:hover { background: #166534; color: #fff; border-color: #166534; }
+.btn-circle-call { color: #0369a1; background: #f0f9ff; border-color: #bae6fd; }
+.btn-circle-call:hover { background: #0369a1; color: #fff; border-color: #0369a1; }
+.btn-circle-insta { color: #c13584; background: #fdf2f8; border-color: #fce7f3; }
+.btn-circle-insta:hover { background: #c13584; color: #fff; border-color: #c13584; }
+
+@media (max-width: 768px) {
+    .dealer-item { flex-direction: column; align-items: flex-start; padding: 16px; }
+    .dealer-avatar-box { width: 48px; height: 48px; margin-bottom: 12px; }
+    .dealer-content { width: 100%; margin-right: 0; margin-bottom: 15px; }
+    .dealer-actions { width: 100%; justify-content: space-between; border-top: 1px solid #f1f5f9; padding-top: 12px; }
+    .btn-circle { flex: 1; border-radius: 8px; width: auto; height: 36px; font-size: 1rem; }
+    #dealer-grid { padding-left: 30px !important; }
+    .dealer-index-number { left: -30px !important; font-size: 0.9rem !important; }
+}
+
+.icon-circle { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
+.bg-danger-subtle { background-color: #fef2f2; }
+.bg-primary-subtle { background-color: #f0f9ff; }
+.bg-warning-subtle { background-color: #fffbeb; }
+.bg-success-subtle { background-color: #f0fdf4; }
+
+/* --- НОВЫЙ ДАШБОРД (V3) --- */
+.stat-card-modern {
+    background: #fff; border-radius: 16px; padding: 15px;
+    display: flex; align-items: center; justify-content: flex-start; gap: 10px;
+    border: 1px solid #f1f5f9; box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+    transition: transform 0.2s; height: auto;
+}
+.stat-card-modern:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05); }
+
+/* Цифры */
+.stat-dual-value { font-size: 1.5rem; font-weight: 800; line-height: 1; display: flex; align-items: baseline; gap: 4px; }
+.stat-val-active { color: #166534; } 
+.stat-val-sleep { color: #94a3b8; font-size: 1.1rem; font-weight: 600; }
+.stat-sublabel { font-size: 0.7rem; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+
+/* Кнопка настроек */
+.btn-dash-settings { background: transparent; border: none; color: #cbd5e1; transition: 0.2s; padding: 0 5px; }
+.btn-dash-settings:hover { color: #64748b; transform: rotate(30deg); }
+
+/* Города */
+.city-stat-row { margin-bottom: 10px; }
+.city-bar-header { display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 600; margin-bottom: 2px; }
+.city-stacked-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: #f1f5f9; }
+.bar-active { background-color: #166534; }
+.bar-potential { background-color: #0d6efd; }
+
+.task-list-modern { max-height: 300px; overflow-y: auto; padding: 0 10px; }
+.task-item-modern { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; margin-bottom: 8px; background: #f8fafc; border-radius: 10px; border: 1px solid transparent; transition: all 0.2s; }
+.task-item-modern:hover { background: #fff; border-color: #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+.task-content { flex-grow: 1; min-width: 0; margin-right: 10px; }
+.task-title { font-weight: 600; font-size: 0.95rem; color: var(--text-dark); text-decoration: none; display: block; margin-bottom: 2px; line-height: 1.2; }
+.task-title:hover { color: var(--primary-color); }
+.task-meta { font-size: 0.8rem; color: var(--text-gray); display: flex; align-items: center; gap: 8px; }
+.task-badge { padding: 2px 6px; border-radius: 6px; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; }
+.tb-today { background: #fee2e2; color: #991b1b; }
+.tb-future { background: #e0f2fe; color: #075985; }
+.tb-overdue { background: #450a0a; color: #fff; }
+.tb-cooling { background: #fef3c7; color: #92400e; }
+.btn-task-check { width: 32px; height: 32px; border-radius: 50%; border: 1px solid #cbd5e1; background: #fff; color: #cbd5e1; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+.btn-task-check:hover { border-color: #166534; color: #166534; background: #f0fdf4; }
+
+/* Нумерация */
+#dealer-grid { padding-left: 40px; }
+.dealer-index-number { position: absolute; left: -40px; top: 50%; transform: translateY(-50%) rotate(-90deg); font-size: 1.1rem; font-weight: 800; color: #cbd5e1; width: 40px; text-align: center; font-family: 'Inter', sans-serif; pointer-events: none; user-select: none; letter-spacing: 1px; }
+
+/* Всякие модалки */
+.list-container { background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 12px; padding: 12px; max-height: 350px; overflow-y: auto; }
+.contact-entry, .address-entry, .pos-entry, .visit-entry { background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; margin-bottom: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.03); display: flex; gap: 8px; align-items: center; }
+.competitor-entry { background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; margin-bottom: 8px; display: grid; grid-template-columns: 2fr 2fr 1fr 1fr 32px; gap: 8px; align-items: center; }
+.list-container input.form-control, .list-container select.form-select { font-size: 0.9rem; padding: 0.4rem 0.6rem; height: 36px; margin: 0; }
+.btn-remove-entry { width: 32px; height: 36px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 6px; border: 1px solid #fee2e2; background-color: #fff; color: #ef4444; transition: all 0.2s; }
+.btn-remove-entry:hover { background-color: #dc3545; border-color: #dc3545; color: white; }
+.sticky-filters { position: sticky; top: 10px; z-index: 100; backdrop-filter: blur(10px); background-color: rgba(255, 255, 255, 0.95) !important; transition: all 0.3s ease; }
+.empty-state { text-align: center; padding: 60px 20px; color: var(--text-gray); }
+.empty-state-icon { font-size: 4rem; color: #cbd5e1; margin-bottom: 15px; }
+
+/* Toast */
+.toast-container-custom { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+.toast-modern { background: #fff; padding: 14px 20px; border-radius: 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.15); border-left: 6px solid #ccc; display: flex; align-items: center; gap: 12px; min-width: 280px; max-width: 350px; animation: toastSlideIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); pointer-events: auto; font-size: 0.95rem; }
+.toast-success { border-left-color: #198754; } .toast-success i { color: #198754; }
+.toast-error { border-left-color: #dc3545; } .toast-error i { color: #dc3545; }
+@keyframes toastSlideIn { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes toastFadeOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-20px); } }
+
+/* Стили для строки выбора колонок в экспорте */
+.export-option-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.export-option-row:hover {
+    background: #f1f5f9;
+}
