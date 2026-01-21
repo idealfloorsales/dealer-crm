@@ -76,7 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let markerInstances = { add: null, edit: null };
     let refreshAddMap = null; let refreshEditMap = null;
 
-    // --- 4. EXPORT CONFIGURATION (Кастомная выгрузка) ---
+    // --- 4. EXPORT CONFIGURATION (ИСПРАВЛЕНО) ---
     const exportColumnsConfig = [
         { id: 'id', label: 'ID дилера', isChecked: true, getValue: d => d.dealer_id },
         { id: 'name_org', label: 'Название и Организация', isChecked: true, getValue: d => {
@@ -103,11 +103,24 @@ document.addEventListener('DOMContentLoaded', () => {
         { id: 'contract_date', label: 'Дата договора', isChecked: true, getValue: d => (d.contract && d.contract.date) ? d.contract.date : '' },
         { id: 'website_insta', label: 'Сайт / Инстаграм', isChecked: false, getValue: d => [d.website, d.instagram].filter(Boolean).join(' / ') },
         { id: 'bonuses', label: 'Бонусы / Заметки', isChecked: false, getValue: d => d.bonuses },
-        { id: 'total_sales', label: 'Общие продажи', isChecked: true, getValue: d => d.total_sales || '0' },
+        
+        // ИСПРАВЛЕНО: Поиск продаж в currentMonthSales по ID дилера
+        { id: 'total_sales', label: 'Продажи (Тек. месяц)', isChecked: true, getValue: d => {
+            const sale = currentMonthSales.find(s => String(s.dealerId) === String(d.id));
+            return sale ? sale.fact : '0';
+        }},
+        
+        // ИСПРАВЛЕНО: Безопасный поиск даты и форматирование
         { id: 'last_visit', label: 'Последний визит', isChecked: true, getValue: d => {
-            if(!d.visits || !d.visits.length) return '';
+            if(!d.visits || !Array.isArray(d.visits) || d.visits.length === 0) return '-';
+            // Сортировка: новые сверху
             const sorted = [...d.visits].sort((a,b) => new Date(b.date) - new Date(a.date));
-            return sorted[0].date;
+            const lastDate = sorted[0].date;
+            if(!lastDate) return '-';
+            // Формат YYYY-MM-DD -> DD.MM.YYYY
+            try {
+                return lastDate.split('T')[0].split('-').reverse().join('.');
+            } catch(e) { return lastDate; }
         }}
     ];
 
@@ -134,12 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(!container) return; 
         const set = new Set(selectedIds); 
         const filteredCatalog = fullProductCatalog.filter(p => !posMaterialsList.includes(p.name));
-        container.innerHTML = filteredCatalog.map(p => 
-            `<div class="checklist-item form-check">
-                <input type="checkbox" class="form-check-input" id="prod-${container.id}-${p.id}" value="${p.id}" ${set.has(p.id)?'checked':''}>
-                <label class="form-check-label" for="prod-${container.id}-${p.id}"><strong>${p.sku}</strong> - ${p.name}</label>
-             </div>`
-        ).join(''); 
+        container.innerHTML = filteredCatalog.map(p => `<div class="checklist-item form-check"><input type="checkbox" class="form-check-input" id="prod-${container.id}-${p.id}" value="${p.id}" ${set.has(p.id)?'checked':''}><label class="form-check-label" for="prod-${container.id}-${p.id}"><strong>${p.sku}</strong> - ${p.name}</label></div>`).join(''); 
     }
 
     function getSelectedProductIds(containerId) { const el=document.getElementById(containerId); if(!el) return []; return Array.from(el.querySelectorAll('input:checked')).map(cb=>cb.value); }
