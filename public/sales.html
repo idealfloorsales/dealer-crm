@@ -20,6 +20,8 @@
             --bs-btn-border-color: #B9040A;
             --bs-btn-hover-bg: #990308;
             --bs-btn-hover-border-color: #8f0308;
+            --bs-btn-active-bg: #8f0308;
+            --bs-btn-active-border-color: #850307;
         }
         .btn-outline-primary {
             --bs-btn-color: #B9040A;
@@ -29,85 +31,152 @@
             --bs-btn-active-bg: #B9040A;
             --bs-btn-active-border-color: #B9040A;
         }
+        .text-primary { color: #B9040A !important; }
+        .bg-primary-subtle { background-color: #fbeaea !important; color: #B9040A !important; }
+        /* ------------------------------- */
 
-        body { background-color: #f8f9fa; padding-bottom: 80px; }
-        .sale-row input { font-size: 0.9rem; text-align: center; }
-        .badg-label {
-            position: absolute; top: -8px; left: 8px; 
-            background: #fff; padding: 0 4px; 
-            font-size: 0.6rem; color: #adb5bd; font-weight: 700;
-        }
-        .sticky-top-custom {
-            position: sticky; top: 0; z-index: 1020;
-            background: rgba(255,255,255,0.95);
-            backdrop-filter: blur(5px);
-            border-bottom: 1px solid #eee;
-        }
-        @media print { .no-print { display: none !important; } }
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #ced4da; border-radius: 4px; }
         
-        /* Mobile Tabs */
-        .mobile-tabs { display: none; }
-        @media (max-width: 768px) {
-            .mobile-tabs { display: flex; width: 100%; margin-bottom: 15px; }
-            .mobile-tabs .btn { flex: 1; border-radius: 0; }
-            .mobile-tabs .btn:first-child { border-top-left-radius: 8px; border-bottom-left-radius: 8px; }
-            .mobile-tabs .btn:last-child { border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
-        }
+        .dash-card { border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .dash-value { font-size: 1.5rem; font-weight: 700; color: #212529; }
+        .dash-label { font-size: 0.7rem; text-transform: uppercase; color: #6c757d; font-weight: 600; }
+
+        body { padding-bottom: 80px; } 
         
-        /* Nav */
-        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid #eee; z-index: 1050; padding-bottom: env(safe-area-inset-bottom); }
-        .bottom-nav-item { text-align: center; color: #adb5bd; padding: 10px 0; text-decoration: none; flex: 1; }
+        .bottom-nav {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid #eee;
+            z-index: 1050;
+            padding-bottom: env(safe-area-inset-bottom);
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.05);
+        }
+        .bottom-nav-item {
+            text-align: center; color: #adb5bd; padding: 10px 0;
+            text-decoration: none; flex: 1; transition: color 0.2s;
+        }
         .bottom-nav-item.active { color: #B9040A; }
-        .bottom-nav-item i { font-size: 1.4rem; display: block; }
-        .bottom-nav-item span { font-size: 0.7rem; }
+        .bottom-nav-item i { font-size: 1.4rem; display: block; margin-bottom: 2px; }
+        .bottom-nav-item span { font-size: 0.65rem; font-weight: 600; }
+
+        .mobile-view-toggler { display: none; } 
+
+        @media (max-width: 991px) {
+            .desktop-nav { display: none !important; } 
+            .mobile-view-toggler { display: flex; }   
+            .mobile-hidden { display: none !important; }
+            
+            .sticky-filters {
+                position: sticky; top: 0; z-index: 1020;
+                border-radius: 0 !important;
+                margin: -1rem -0.75rem 1rem -0.75rem !important;
+                box-shadow: 0 4px 10px rgba(0,0,0,0.05) !important;
+            }
+            .container { padding-left: 15px; padding-right: 15px; }
+        }
+
+        /* ПЕЧАТЬ */
+        @media print {
+            @page { margin: 1cm; size: A4 portrait; }
+            body { background-color: white !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; padding-bottom: 0 !important; font-family: sans-serif; }
+            
+            .bottom-nav, .mobile-view-toggler, .navbar, #page-header, #sales-top-dashboard, #sales-container-col, .card-footer, #logout-btn, .btn, .sales-input-group { 
+                display: none !important; 
+            }
+
+            .container, .row { max-width: 100% !important; width: 100% !important; padding: 0 !important; margin: 0 !important; }
+            
+            #summary-col { 
+                display: block !important;
+                width: 100% !important; 
+                flex: 0 0 100% !important; 
+                max-width: 100% !important; 
+            }
+            .mobile-hidden { display: block !important; }
+            
+            .card { border: none !important; box-shadow: none !important; }
+            .card-header { background: none !important; border-bottom: 2px solid #000 !important; padding-left: 0 !important; }
+            .sticky-top { position: static !important; }
+            .card-body.custom-scroll { max-height: none !important; overflow: visible !important; }
+
+            #summary-col::after {
+                content: "Сформировано: " attr(data-print-date);
+                display: block;
+                margin-top: 30px;
+                font-size: 10pt;
+                color: #666;
+                text-align: right;
+                border-top: 1px solid #ddd;
+                padding-top: 10px;
+            }
+        }
     </style>
 </head>
-<body>
+<body class="bg-light">
+    
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-4 desktop-nav">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/"><img src="logo.png" alt="Logo" height="40"></a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
 
-    <div class="sticky-top-custom py-2 shadow-sm mb-3">
-        <div class="container d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center gap-3">
-                <a href="/" class="btn btn-sm btn-light border rounded-circle d-none d-md-block"><i class="bi bi-arrow-left"></i></a>
-                <h5 class="mb-0 fw-bold text-dark">Продажи</h5>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item"><a class="nav-link" href="/">Дилеры</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/map.html">Карта</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/products.html">Матрица</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/report.html">Отчет</a></li>
+                    <li class="nav-item"><a class="nav-link active fw-bold" href="/sales.html">Продажи</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/competitors.html">Конкуренты</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/knowledge.html">Статьи</a></li>
+                </ul>
+                
+                <div class="d-flex align-items-center gap-3">
+                    <button id="logout-btn" class="btn btn-sm btn-outline-danger">Выход</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="container"> 
+        <div class="bg-white p-3 rounded-4 shadow-sm mb-4 border border-light sticky-filters" id="page-header">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h1 class="mb-0 border-0 pt-0 mt-0 fs-4 fw-bold text-dark">KPI Продажи</h1>
+                <button id="save-btn" class="btn btn-success shadow-sm px-3 rounded-pill btn-sm fw-bold"><i class="bi bi-check-lg me-1"></i>Сохранить</button>
             </div>
             
-            <div class="d-flex align-items-center gap-2">
-                <input type="month" id="month-picker" class="form-control form-control-sm border-0 bg-light fw-bold text-primary" style="width: 140px;">
-                <button id="save-btn" class="btn btn-success shadow-sm px-4 rounded-pill">
-                    <i class="bi bi-save me-2"></i>Сохранить
-                </button>
-            </div>
-        </div>
-        
-        <div class="container mt-2">
-             <div id="sales-top-dashboard" class="bg-light rounded-3 p-2 border d-flex justify-content-around">
-                 <span class="text-muted small">Загрузка сводки...</span>
-             </div>
-        </div>
-    </div>
-
-    <div class="container">
-        
-        <div class="mobile-tabs shadow-sm rounded-3">
-            <button class="btn btn-primary text-white active" id="tab-input-btn">Ввод данных</button>
-            <button class="btn btn-light text-dark border" id="tab-summary-btn">Рейтинг</button>
-        </div>
-
-        <div class="row">
-            <div class="col-md-8 col-12" id="sales-container-col">
-                <h6 class="text-muted small text-uppercase fw-bold mb-3 ms-1">Список дилеров</h6>
-                <div id="sales-container" class="pb-5">
-                    </div>
+            <div class="d-flex gap-2 align-items-center justify-content-between">
+                <input type="month" id="month-picker" class="form-control fw-bold border bg-light form-control-sm" style="width: 140px;">
+                <button id="print-btn" class="btn btn-light border text-secondary shadow-sm px-3 rounded-pill btn-sm d-none d-md-block"><i class="bi bi-printer-fill me-1"></i>Отчет</button>
             </div>
 
-            <div class="col-md-4 col-12 d-none d-md-block" id="summary-col">
-                <div class="card border-0 shadow-sm rounded-4 sticky-top" style="top: 180px;">
-                    <div class="card-header bg-white border-0 pt-3">
-                        <h6 class="fw-bold mb-0 text-primary"><i class="bi bi-trophy-fill me-2 text-warning"></i>Топ продаж</h6>
+            <div class="mobile-view-toggler mt-3 p-1 bg-light rounded-pill border">
+                <button class="btn btn-sm w-50 rounded-pill fw-bold btn-white shadow-sm text-primary" id="tab-input-btn">Ввод данных</button>
+                <button class="btn btn-sm w-50 rounded-pill fw-bold text-muted" id="tab-summary-btn">Сводка</button>
+            </div>
+        </div>
+
+        <div id="sales-top-dashboard" class="row g-2 mb-4"></div>
+
+        <div class="row g-4 mb-5">
+            <div class="col-lg-7" id="sales-container-col">
+                <div id="sales-container" class="d-flex flex-column gap-3">
+                    <p class="text-center mt-5 text-muted"><span class="spinner-border spinner-border-sm"></span> Загрузка...</p>
+                </div>
+            </div>
+
+            <div class="col-lg-5 mobile-hidden" id="summary-col">
+                <div class="card border-0 shadow-sm rounded-4 overflow-hidden sticky-top" style="top: 20px; z-index: 10;">
+                    <div class="card-header bg-white border-0 pt-4 px-4 pb-2">
+                        <h5 class="fw-bold mb-0">Сводная ведомость</h5>
                     </div>
-                    <div class="card-body p-0">
-                        <div id="summary-list" class="px-3 pb-3" style="max-height: 70vh; overflow-y: auto;">
-                            </div>
+                    <div class="card-body px-0 pt-0 custom-scroll" style="max-height: calc(100vh - 200px); overflow-y: auto;">
+                        <div id="summary-list" class="summary-list-container"></div>
                     </div>
                     <div class="card-footer bg-white border-top p-3 no-print">
                          <div class="d-flex align-items-center gap-2 small text-muted">
