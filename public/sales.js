@@ -1,4 +1,4 @@
-// --- АВТОРИЗАЦИЯ ---
+// --- АВТОРИЗАЦИЯ (ВСТАВИТЬ В НАЧАЛО ФАЙЛА) ---
 const originalFetch = window.fetch;
 window.fetch = async function (url, options) {
     options = options || {};
@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const dashboardTop = document.getElementById('sales-top-dashboard'); 
     const saveBtn = document.getElementById('save-btn');
     const printBtn = document.getElementById('print-btn');
+    const summaryCol = document.getElementById('summary-col');
     
     // Мобильные табы (Ввод / Сводка)
     const tabInputBtn = document.getElementById('tab-input-btn');
@@ -104,6 +105,9 @@ document.addEventListener('DOMContentLoaded', () => {
         container.innerHTML = dealers.map(d => {
             const s = salesMap[d.id] || { plan: '', fact: '' };
             
+            // Автоподстановка плана, если он пустой (логика: берем предыдущий или дефолт)
+            // Пока просто пустая строка или значение из базы
+            
             // Подсчет процента выполнения для визуализации
             const plan = parseFloat(s.plan) || 0;
             const fact = parseFloat(s.fact) || 0;
@@ -147,6 +151,14 @@ document.addEventListener('DOMContentLoaded', () => {
         let totalPlan = 0;
         let totalFact = 0;
 
+        // Собираем данные ПРЯМО ИЗ INPUTS, чтобы сводка была реактивной (или из map)
+        // Но лучше из salesMap, который обновим перед рендером
+        // Сейчас берем из salesMap, который обновился при загрузке.
+        // А чтобы сводка обновлялась при вводе, нужно вешать listeners.
+        
+        // Для простоты считаем из salesMap (то что пришло с сервера + локальные изменения если будем сохранять в массив)
+        
+        // Давайте пройдемся по текущим данным в salesMap
         Object.values(salesMap).forEach(v => {
             totalPlan += parseFloat(v.plan) || 0;
             totalFact += parseFloat(v.fact) || 0;
@@ -154,6 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const percent = totalPlan > 0 ? Math.round((totalFact / totalPlan) * 100) : 0;
         
+        // Обновляем дашборд сверху
         dashboardTop.innerHTML = `
             <div class="d-flex justify-content-around text-center w-100">
                 <div>
@@ -171,10 +184,12 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
 
+        // Обновляем список лидеров (Топ 5 по факту)
+        // Для этого нужно соединить dealers и salesMap
         const leaderBoard = dealers.map(d => {
             const s = salesMap[d.id] || { fact: 0 };
             return { name: d.name, fact: parseFloat(s.fact) || 0 };
-        }).sort((a, b) => b.fact - a.fact).slice(0, 10);
+        }).sort((a, b) => b.fact - a.fact).slice(0, 10); // Топ 10
 
         summaryList.innerHTML = leaderBoard.map((l, i) => `
             <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
@@ -187,34 +202,37 @@ document.addEventListener('DOMContentLoaded', () => {
         `).join('');
     }
 
-    // --- ЛОГИКА СОХРАНЕНИЯ (ИСПРАВЛЕНА БЛОКИРОВКА) ---
+    // Сбор данных перед сохранением
+    function collectDataFromInputs() {
+        const currentSales = [];
+        const rows = container.querySelectorAll('.sale-row');
+        rows.forEach(row => {
+            const id = row.dataset.id;
+            const planInp = row.querySelector('.inp-plan');
+            const factInp = row.querySelector('.inp-fact');
+            
+            const planVal = parseFloat(planInp.value);
+            const factVal = parseFloat(factInp.value);
+
+            // Сохраняем, если есть хоть что-то
+            if (!isNaN(planVal) || !isNaN(factVal)) {
+                currentSales.push({
+                    dealerId: id,
+                    plan: isNaN(planVal) ? 0 : planVal,
+                    fact: isNaN(factVal) ? 0 : factVal
+                });
+            }
+        });
+        return currentSales;
+    }
+
     if (saveBtn) {
         saveBtn.onclick = async () => {
-            const currentSales = [];
-            const rows = container.querySelectorAll('.sale-row');
-            
-            rows.forEach(row => {
-                const id = row.dataset.id;
-                const planInp = row.querySelector('.inp-plan');
-                const factInp = row.querySelector('.inp-fact');
-                
-                const planVal = parseFloat(planInp.value);
-                const factVal = parseFloat(factInp.value);
-
-                // Сохраняем, если есть хоть что-то
-                if (!isNaN(planVal) || !isNaN(factVal)) {
-                    currentSales.push({
-                        dealerId: id,
-                        plan: isNaN(planVal) ? 0 : planVal,
-                        fact: isNaN(factVal) ? 0 : factVal
-                    });
-                }
-            });
-
+            const currentSales = collectDataFromInputs();
             if (currentSales.length === 0 && !confirm("Данные пустые. Сохранить пустой месяц?")) return;
 
             try {
-                // 1. Блокируем кнопку
+                // БЛОКИРУЕМ КНОПКУ
                 saveBtn.disabled = true;
                 saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
                 
@@ -225,19 +243,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
 
                 if (res.ok) { 
-                    // 2. Успех
                     if (window.showToast) { window.showToast('Сохранено!'); } else { alert('Сохранено!'); }
                     
                     saveBtn.className = 'btn btn-success shadow-sm px-4 rounded-pill';
                     saveBtn.innerHTML = '<i class="bi bi-check-lg"></i> OK'; 
                     
+                    // Перезагрузка данных для обновления сумм
                     await loadData(); 
-
-                    // 3. РАЗБЛОКИРОВКА ЧЕРЕЗ 2 СЕКУНДЫ
+                    
+                    // !!! ИСПРАВЛЕНИЕ: РАЗБЛОКИРОВКА КНОПКИ ЧЕРЕЗ 2 СЕКУНДЫ !!!
                     setTimeout(() => { 
                         saveBtn.innerHTML = '<i class="bi bi-save me-2"></i>Сохранить'; 
                         saveBtn.className = 'btn btn-success shadow-sm px-4 rounded-pill'; 
-                        saveBtn.disabled = false; // Важно: снимаем disabled
+                        saveBtn.disabled = false; // Возвращаем активность
                     }, 2000);
 
                 } else {
@@ -246,11 +264,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
             } catch (e) { 
                 alert(e.message); 
+                // При ошибке разблокируем сразу
                 saveBtn.disabled = false; 
                 saveBtn.innerHTML = '<i class="bi bi-save me-2"></i>Сохранить';
             } 
         };
     }
+    
+    // Пересчет сводки "на лету" при вводе (опционально)
+    container.addEventListener('input', (e) => {
+        if (e.target.classList.contains('inp-plan') || e.target.classList.contains('inp-fact')) {
+            // Можно реализовать локальный пересчет, но проще пока оставить кнопку Сохранить
+        }
+    });
 
     monthPicker.addEventListener('change', loadData);
     init();
