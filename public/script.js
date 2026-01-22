@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const defaultDashConfig = { showHealth: true, showGrowth: true, showCityPen: true, showMatrix: false, showVisits: false };
     let dashConfig = JSON.parse(localStorage.getItem('dash_config')) || defaultDashConfig;
 
-    // Список POS-материалов (для исключения из матрицы)
+    // Список POS-материалов
     const posMaterialsList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"];
 
     // --- 3. ЭЛЕМЕНТЫ DOM ---
@@ -109,13 +109,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }},
         { id: 'last_visit', label: 'Последний визит', isChecked: true, getValue: d => {
             let visits = d.visits;
-            // Ищем в задачах, если в дилере пусто
             if (!visits || !Array.isArray(visits) || visits.length === 0) {
                 const taskData = allTasksData.find(t => String(t.id) === String(d.id));
                 if (taskData && taskData.visits && Array.isArray(taskData.visits)) visits = taskData.visits;
             }
             if(!visits || !Array.isArray(visits) || visits.length === 0) return '-';
-            
             const sorted = [...visits].sort((a,b) => new Date(b.date) - new Date(a.date));
             const lastDate = sorted[0].date;
             if(!lastDate) return '-';
@@ -141,7 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.showToast = function(message, type = 'success') { let container = document.getElementById('toast-container-custom'); if (!container) { container = document.createElement('div'); container.id = 'toast-container-custom'; container.className = 'toast-container-custom'; document.body.appendChild(container); } const toast = document.createElement('div'); toast.className = `toast-modern toast-${type}`; const icon = type === 'success' ? 'check-circle-fill' : (type === 'error' ? 'exclamation-triangle-fill' : 'info-circle-fill'); toast.innerHTML = `<i class="bi bi-${icon} fs-5"></i><span class="fw-bold text-dark">${message}</span>`; container.appendChild(toast); setTimeout(() => { toast.style.animation = 'toastFadeOut 0.5s forwards'; setTimeout(() => toast.remove(), 500); }, 3000); };
     window.toggleSectorSelect = function(prefix, responsibleValue) { const sectorSelect = document.getElementById(`${prefix}_region_sector`); if (responsibleValue === 'regional_regions') { sectorSelect.style.display = 'block'; } else { sectorSelect.style.display = 'none'; sectorSelect.value = ''; } };
     
-    // ФУНКЦИЯ КАТАЛОГА С ФИЛЬТРАЦИЕЙ POS
+    // ФУНКЦИЯ КАТАЛОГА С ФИЛЬТРАЦИЕЙ
     function renderProductChecklist(container, selectedIds=[]) { 
         if(!container) return; 
         const set = new Set(selectedIds); 
@@ -422,11 +420,12 @@ document.addEventListener('DOMContentLoaded', () => {
             sortedCities.forEach(([name, stats]) => {
                 const activePct = Math.round((stats.active / stats.total) * 100);
                 const potPct = 100 - activePct; 
+                // !!! ИСПРАВЛЕНИЕ: Добавлен d-flex и justify-content-between !!!
                 citiesHtml += `
                 <div class="city-stat-row">
-                    <div class="city-bar-header">
+                    <div class="city-bar-header d-flex justify-content-between align-items-center">
                         <span>${name}</span>
-                        <span class="text-muted" style="font-size:0.75rem"> ${stats.active} / ${stats.potential}</span>
+                        <span class="text-muted" style="font-size:0.75rem">${stats.active} / ${stats.potential}</span>
                     </div>
                     <div class="city-stacked-bar">
                         <div class="bar-active" style="width: ${activePct}%" title="Активные (${stats.active})"></div>
@@ -435,7 +434,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>`;
             });
 
-            // !!! ИСПРАВЛЕНИЕ ЗДЕСЬ: Добавлен HR, убран mb-3 !!!
+            // !!! ИСПРАВЛЕНИЕ: Видимая линия и отступы !!!
             html += `
             <div class="col-12 mt-2">
                 <div class="stat-card-modern d-block p-3">
@@ -446,7 +445,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <span class="text-primary fw-bold" style="font-size:0.7rem">● Потенциал</span>
                          </div>
                     </div>
-                    <hr class="my-2" style="opacity: 0.1">
+                    <hr class="my-2" style="border-top: 1px solid #ccc; opacity: 1;">
                     <div style="max-height: 250px; overflow-y: auto; padding-right: 5px;">
                         ${citiesHtml || '<div class="text-center text-muted small">Нет данных</div>'}
                     </div>
