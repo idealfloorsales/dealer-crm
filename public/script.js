@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const defaultDashConfig = { showHealth: true, showGrowth: true, showCityPen: true, showMatrix: false, showVisits: false };
     let dashConfig = JSON.parse(localStorage.getItem('dash_config')) || defaultDashConfig;
 
-    // Список POS-материалов
+    // Список POS-материалов (для исключения из матрицы)
     const posMaterialsList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"];
 
     // --- 3. ЭЛЕМЕНТЫ DOM ---
@@ -330,6 +330,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let html = '';
         
+        // 1. Calculations
         const activeIds = new Set();
         if(currentMonthSales) currentMonthSales.forEach(s => { if(s.fact > 0) activeIds.add(s.dealerId); });
         
@@ -425,7 +426,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="city-stat-row">
                     <div class="city-bar-header">
                         <span>${name}</span>
-                        <span class="text-muted" style="font-size:0.75rem">${stats.active} / ${stats.potential}</span>
+                        <span class="text-muted" style="font-size:0.75rem"> ${stats.active} / ${stats.potential}</span>
                     </div>
                     <div class="city-stacked-bar">
                         <div class="bar-active" style="width: ${activePct}%" title="Активные (${stats.active})"></div>
@@ -434,16 +435,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>`;
             });
 
+            // !!! ИСПРАВЛЕНИЕ ЗДЕСЬ: Добавлен HR, убран mb-3 !!!
             html += `
             <div class="col-12 mt-2">
                 <div class="stat-card-modern d-block p-3">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-0">
                          <h6 class="text-muted fw-bold small mb-0 text-uppercase" style="letter-spacing:1px;">Потенциал городов</h6>
                          <div class="d-flex gap-2 small">
                             <span class="text-success fw-bold" style="font-size:0.7rem">● Актив</span>
                             <span class="text-primary fw-bold" style="font-size:0.7rem">● Потенциал</span>
                          </div>
                     </div>
+                    <hr class="my-2" style="opacity: 0.1">
                     <div style="max-height: 250px; overflow-y: auto; padding-right: 5px;">
                         ${citiesHtml || '<div class="text-center text-muted small">Нет данных</div>'}
                     </div>
@@ -543,8 +546,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const firstTabEl = document.querySelector('#editTabs button[data-bs-target="#tab-main"]'); if(firstTabEl) { const tab = new bootstrap.Tab(firstTabEl); tab.show(); } editModal.show();
         } catch(e){ window.showToast("Ошибка загрузки данных", "error"); console.error(e); }
     }
-    
-    // !!! КРИТИЧЕСКИ ВАЖНО: ДЕЛАЕМ ФУНКЦИЮ ГЛОБАЛЬНОЙ !!!
+    // EXPOSE TO WINDOW
     window.openEditModal = openEditModal;
 
     window.showQuickVisit = (id) => { document.getElementById('qv_dealer_id').value = id; document.getElementById('qv_comment').value = ''; qvModal.show(); };
