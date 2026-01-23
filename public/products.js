@@ -1,4 +1,4 @@
-// --- АВТОРИЗАЦИЯ ---
+// --- АВТОРИЗАЦИЯ (ВСТАВИТЬ В НАЧАЛО ФАЙЛА) ---
 const originalFetch = window.fetch;
 window.fetch = async function (url, options) {
     options = options || {};
@@ -9,7 +9,7 @@ window.fetch = async function (url, options) {
     if (response.status === 401) window.location.href = '/login.html';
     return response;
 };
-// -------------------
+// -------------------------------------------
 
 document.addEventListener('DOMContentLoaded', () => {
     
@@ -20,9 +20,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchInput = document.getElementById('product-search');
     const totalLabel = document.getElementById('total-count');
     
-    // Импорт Excel
-    const btnImport = document.getElementById('btn-import-excel');
-    const fileInput = document.getElementById('excel-upload-input');
+    // Импорт
+    const btnImport = document.getElementById('btn-import-stock');
+    const fileInput = document.getElementById('excel-file-input');
     
     // Модалка товара
     const modalEl = document.getElementById('product-modal');
@@ -34,27 +34,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const addBtn = document.getElementById('add-product-btn');
     const resetBtn = document.getElementById('reset-catalog-btn'); 
     
-    // Поля формы
+    // Поля ввода
     const inpId = document.getElementById('prod_id');
     const inpSku = document.getElementById('prod_sku');
     const inpName = document.getElementById('prod_name');
-    const inpIsLiquid = document.getElementById('prod_is_liquid');
-    const inpExcelAlias = document.getElementById('excel_alias');
+    const inpLiquid = document.getElementById('prod_is_liquid');
+    const inpAlias = document.getElementById('prod_alias');
     
     // Характеристики
-    const inpClass = document.getElementById('char_class');
-    const inpThickness = document.getElementById('char_thickness');
-    const inpBevel = document.getElementById('char_bevel');
-    const inpSize = document.getElementById('char_size');
-    const inpWeight = document.getElementById('package_weight');
-    const inpPkgArea = document.getElementById('package_area');
-    const inpPkgQty = document.getElementById('package_qty');
+    const charClass = document.getElementById('char_class');
+    const charThick = document.getElementById('char_thick');
+    const charBevel = document.getElementById('char_bevel');
+    const charSize = document.getElementById('char_size');
+    const pkgArea = document.getElementById('pkg_area');
+    const pkgQty = document.getElementById('pkg_qty');
+    const pkgWeight = document.getElementById('pkg_weight');
 
-    // Модалка маппинга
+    // Маппинг (Привязка)
     const mapModalEl = document.getElementById('mapping-modal');
     const mapModal = new bootstrap.Modal(mapModalEl);
-    const mapContainer = document.getElementById('mapping-container');
-    const btnSaveMap = document.getElementById('btn-save-mapping');
+    const mapList = document.getElementById('mapping-list');
+    const btnSaveMapping = document.getElementById('btn-save-mapping');
 
     let allProducts = [];
     let unmappedItems = []; // Очередь на привязку
@@ -65,82 +65,78 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!res.ok) throw new Error('Ошибка загрузки');
             allProducts = await res.json();
             
-            // Сортировка: сначала ликвидные, потом по имени
+            // Сортировка: Сначала ликвидные, потом по имени
             allProducts.sort((a, b) => {
                 if (a.is_liquid !== false && b.is_liquid === false) return -1;
                 if (a.is_liquid === false && b.is_liquid !== false) return 1;
-                return (a.name || '').localeCompare(b.name || '');
+                return a.name.localeCompare(b.name);
             });
 
             renderList(allProducts);
         } catch (e) {
             console.error(e);
-            listContainer.innerHTML = '<div class="text-danger text-center p-3">Не удалось загрузить товары</div>';
+            listContainer.innerHTML = '<div class="text-center text-danger p-4">Ошибка загрузки данных</div>';
         }
     }
 
     function renderList(products) {
         totalLabel.textContent = products.length;
         if (products.length === 0) {
-            listContainer.innerHTML = '<div class="text-center text-muted p-4">Каталог пуст</div>';
+            listContainer.innerHTML = '<div class="text-center text-muted p-4">Список пуст</div>';
             return;
         }
 
         listContainer.innerHTML = products.map(p => {
-            // Классы для цвета (зеленый/красный)
-            const isLiquid = p.is_liquid !== false; // по умолчанию true
-            const rowClass = isLiquid ? 'product-liquid' : 'product-illiquid';
-            const icon = isLiquid ? '<i class="bi bi-check-circle-fill text-success"></i>' : '<i class="bi bi-x-circle-fill text-danger"></i>';
+            const isLiquid = p.is_liquid !== false; // По умолчанию true
+            const cssClass = isLiquid ? 'prod-card-liquid' : 'prod-card-illiquid';
+            const statusIcon = isLiquid ? '<i class="bi bi-check-circle-fill text-success"></i>' : '<i class="bi bi-x-circle-fill text-danger"></i>';
             
-            // Сборка строки характеристик
-            const chars = [];
-            if(p.characteristics) {
+            // Характеристики
+            let charsHtml = '';
+            if (p.characteristics) {
                 const c = p.characteristics;
-                if(c.class) chars.push(`${c.class} кл`);
-                if(c.thickness) chars.push(`${c.thickness} мм`);
-                if(c.bevel) chars.push(`${c.bevel}`);
-                if(c.package_area) chars.push(`Уп: ${c.package_area} м²`);
+                if(c.class) charsHtml += `<span class="char-badge">${c.class} кл</span>`;
+                if(c.thickness) charsHtml += `<span class="char-badge">${c.thickness} мм</span>`;
+                if(c.bevel) charsHtml += `<span class="char-badge">${c.bevel}</span>`;
+                if(c.package_area) charsHtml += `<span class="char-badge">Уп: ${c.package_area} м²</span>`;
             }
-            const charHtml = chars.map(t => `<span class="char-tag">${t}</span>`).join('');
 
             // Остаток
-            let stockHtml = '';
+            let stockBadge = '';
             if (p.stock_qty !== undefined && p.stock_qty !== null) {
                 const qty = parseFloat(p.stock_qty);
-                const color = qty > 20 ? 'bg-success' : (qty > 0 ? 'bg-warning text-dark' : 'bg-secondary');
-                stockHtml = `<span class="badge ${color} rounded-pill stock-badge">${qty.toFixed(2)} м²</span>`;
+                const color = qty > 50 ? 'text-success' : (qty > 0 ? 'text-warning' : 'text-muted');
+                stockBadge = `<div class="${color} stock-val text-end" title="Остаток на складе">${qty.toFixed(2)} м²</div>`;
             }
 
             return `
-            <div class="card shadow-sm border-0 ${rowClass}" onclick="openModal('${p.id}')" style="cursor:pointer; transition: transform 0.1s;">
+            <div class="card shadow-sm border-0 mb-0 ${cssClass}" onclick="openModal('${p.id}')" style="cursor:pointer;">
                 <div class="card-body p-2 d-flex justify-content-between align-items-center">
-                    <div class="flex-grow-1" style="min-width: 0;">
+                    <div class="d-flex flex-column" style="overflow: hidden;">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="fw-bold text-truncate">${safe(p.name)}</span>
+                            ${!isLiquid ? '<span class="badge bg-danger text-white" style="font-size:0.6rem">СТОП</span>' : ''}
+                        </div>
                         <div class="d-flex align-items-center gap-2 mb-1">
-                            <span class="fw-bold text-truncate" style="font-size: 1rem;">${safe(p.name)}</span>
-                            ${!isLiquid ? '<span class="badge bg-danger-subtle text-danger" style="font-size:0.6rem">НЕЛИКВИД</span>' : ''}
+                            <small class="text-muted font-monospace">${safe(p.sku)}</small>
                         </div>
-                        
-                        <div class="text-muted small mb-1" style="font-size: 0.8rem; font-family: monospace;">
-                            ${safe(p.sku)}
-                        </div>
-
-                        <div>${charHtml}</div>
+                        <div class="text-truncate">${charsHtml}</div>
                     </div>
-                    
-                    <div class="ms-2 d-flex flex-column align-items-end gap-1">
-                       ${stockHtml}
-                       <i class="bi bi-chevron-right text-muted small"></i>
+                    <div class="d-flex flex-column align-items-end ps-2">
+                        ${stockBadge}
+                        <i class="bi bi-chevron-right text-muted small mt-1"></i>
                     </div>
                 </div>
             </div>`;
         }).join('');
     }
 
-    // --- МОДАЛКА И ФОРМА ---
+    // --- МОДАЛКА ---
     window.openModal = (id) => {
         form.reset();
         btnDelete.style.display = 'none';
-        
+        document.getElementById('alias-block').classList.remove('show');
+
         if (id) {
             const p = allProducts.find(x => String(x.id) === String(id));
             if (!p) return;
@@ -148,275 +144,254 @@ document.addEventListener('DOMContentLoaded', () => {
             inpId.value = p.id;
             inpSku.value = p.sku || '';
             inpName.value = p.name || '';
-            inpIsLiquid.checked = p.is_liquid !== false;
-            inpExcelAlias.value = p.excel_alias || '';
-            
+            inpLiquid.checked = p.is_liquid !== false;
+            inpAlias.value = p.excel_alias || '';
+            if(p.excel_alias) document.getElementById('alias-block').classList.add('show');
+
             // Характеристики
             if (p.characteristics) {
                 const c = p.characteristics;
-                inpClass.value = c.class || '';
-                inpThickness.value = c.thickness || '';
-                inpBevel.value = c.bevel || '';
-                inpSize.value = c.size || '';
-                inpWeight.value = c.weight || '';
-                inpPkgArea.value = c.package_area || '';
-                inpPkgQty.value = c.package_qty || '';
+                charClass.value = c.class || '';
+                charThick.value = c.thickness || '';
+                charBevel.value = c.bevel || '';
+                charSize.value = c.size || '';
+                pkgArea.value = c.package_area || '';
+                pkgQty.value = c.package_qty || '';
+                pkgWeight.value = c.weight || '';
             }
 
-            modalTitle.textContent = 'Редактировать товар';
+            modalTitle.textContent = 'Редактировать';
             btnDelete.style.display = 'block';
             btnDelete.onclick = () => deleteProduct(p.id);
         } else {
             inpId.value = '';
             modalTitle.textContent = 'Новый товар';
-            inpIsLiquid.checked = true;
+            inpLiquid.checked = true;
         }
         modal.show();
     };
 
     // --- СОХРАНЕНИЕ ---
-    form.onsubmit = async (e) => {
-        e.preventDefault();
-        
-        const characteristics = {
-            class: inpClass.value.trim(),
-            thickness: inpThickness.value.trim(),
-            bevel: inpBevel.value.trim(),
-            size: inpSize.value.trim(),
-            weight: inpWeight.value.trim(),
-            package_area: inpPkgArea.value.trim(),
-            package_qty: inpPkgQty.value.trim()
-        };
-
-        const data = { 
-            sku: inpSku.value.trim(), 
-            name: inpName.value.trim(),
-            is_liquid: inpIsLiquid.checked,
-            excel_alias: inpExcelAlias.value.trim(),
-            characteristics: characteristics
-        };
-
-        const id = inpId.value;
-        let url = API_URL;
-        let method = 'POST';
-        if (id) { url = `${API_URL}/${id}`; method = 'PUT'; }
-
-        try {
-            const btn = form.querySelector('button[type="submit"]');
-            btn.disabled = true; 
+    if(form) {
+        form.onsubmit = async (e) => {
+            e.preventDefault();
             
-            const res = await fetch(url, { method: method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
-            if (res.ok) { await loadProducts(); modal.hide(); } else { alert('Ошибка сохранения'); }
+            const chars = {
+                class: charClass.value.trim(),
+                thickness: charThick.value.trim(),
+                bevel: charBevel.value.trim(),
+                size: charSize.value.trim(),
+                package_area: pkgArea.value.trim(),
+                package_qty: pkgQty.value.trim(),
+                weight: pkgWeight.value.trim()
+            };
+
+            const data = { 
+                sku: inpSku.value.trim(), 
+                name: inpName.value.trim(),
+                is_liquid: inpLiquid.checked,
+                excel_alias: inpAlias.value.trim(),
+                characteristics: chars
+            };
             
-            btn.disabled = false;
-        } catch (e) { alert(e.message); }
-    };
+            const id = inpId.value;
+            let url = API_URL;
+            let method = 'POST';
+            if (id) { url = `${API_URL}/${id}`; method = 'PUT'; }
+
+            try {
+                const btn = form.querySelector('button[type="submit"]');
+                const oldText = btn.innerHTML;
+                btn.disabled = true; btn.innerHTML = '...';
+                
+                const res = await fetch(url, { method: method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+                if (res.ok) { await loadProducts(); modal.hide(); } else { alert('Ошибка сохранения'); }
+                
+                btn.disabled = false; btn.innerHTML = oldText;
+            } catch (e) { alert(e.message); }
+        };
+    }
 
     window.deleteProduct = async (id) => {
         if(confirm('Удалить этот товар?')) {
-            try { await fetch(`${API_URL}/${id}`, { method: 'DELETE' }); loadProducts(); modal.hide(); } catch(e) { alert('Ошибка'); }
+            try { await fetch(`${API_URL}/${id}`, { method: 'DELETE' }); loadProducts(); modal.hide(); } catch(e) { alert('Ошибка удаления'); }
         }
     };
 
-    // --- ИМПОРТ EXCEL (ОСТАТКИ) ---
+    // --- ЛОГИКА IMPORT EXCEL ---
     btnImport.onclick = () => fileInput.click();
-    
+
     fileInput.onchange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
+        
         const reader = new FileReader();
         reader.onload = (evt) => {
             try {
                 const data = new Uint8Array(evt.target.result);
                 const workbook = XLSX.read(data, {type: 'array'});
-                const sheetName = workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[sheetName];
-                const json = XLSX.utils.sheet_to_json(worksheet, {header: 1}); // Массив массивов
-                processExcelData(json);
+                const sheetName = workbook.SheetNames[0]; // Берем первый лист
+                const sheet = workbook.Sheets[sheetName];
+                const jsonData = XLSX.utils.sheet_to_json(sheet, {header: 1}); // Массив массивов
+                processExcel(jsonData);
             } catch (err) {
-                alert("Ошибка чтения файла: " + err.message);
+                alert("Ошибка чтения: " + err.message);
             }
-            fileInput.value = ''; // сброс
+            fileInput.value = '';
         };
         reader.readAsArrayBuffer(file);
     };
 
-    async function processExcelData(rows) {
-        // 1. Ищем заголовки
-        let headerRowIdx = -1;
-        let colNameIdx = -1;
-        let colStockIdx = -1;
+    async function processExcel(rows) {
+        // 1. Находим строку заголовков (ищем "Номенклатура" и "Остаток")
+        let headerIdx = -1;
+        let colName = -1;
+        let colStock = -1;
 
-        for (let i = 0; i < Math.min(rows.length, 10); i++) {
+        for (let i = 0; i < Math.min(rows.length, 15); i++) {
             const row = rows[i];
             for (let j = 0; j < row.length; j++) {
-                const cell = String(row[j]).toLowerCase();
-                if (cell.includes('номенклатура') || cell.includes('наименование')) colNameIdx = j;
-                if (cell.includes('остаток') || cell.includes('свободный')) colStockIdx = j;
+                const val = String(row[j]).toLowerCase();
+                if (val.includes('номенклатура') || val.includes('наименование')) colName = j;
+                // Ищем именно "Остаток" (свободный), а не "В наличии"
+                if (val === 'остаток' || val.includes('свободный')) colStock = j;
             }
-            if (colNameIdx !== -1 && colStockIdx !== -1) {
-                headerRowIdx = i;
+            if (colName !== -1 && colStock !== -1) {
+                headerIdx = i;
                 break;
             }
         }
 
-        if (headerRowIdx === -1) return alert("Не найдены колонки 'Номенклатура' и 'Остаток'");
+        if (headerIdx === -1) return alert('Не найдены заголовки "Номенклатура" и "Остаток"');
 
         unmappedItems = [];
-        let updatesCount = 0;
+        let updatedCount = 0;
 
-        // 2. Проходим по данным
-        for (let i = headerRowIdx + 1; i < rows.length; i++) {
+        // 2. Бежим по строкам
+        for (let i = headerIdx + 1; i < rows.length; i++) {
             const row = rows[i];
-            const nameRaw = String(row[colNameIdx] || '').trim();
-            const stockRaw = parseFloat(row[colStockIdx]);
+            const nameRaw = String(row[colName] || '').trim();
+            const stockVal = parseFloat(row[colStock]);
 
-            if (!nameRaw || isNaN(stockRaw)) continue;
+            if (!nameRaw || isNaN(stockVal)) continue;
 
             // Поиск товара в CRM
-            // Приоритет: 1. excel_alias (точное), 2. name (точное), 3. SKU входит в название Excel (опасно, но эффективно)
+            // 1. По Alias (если уже привязывали)
             let product = allProducts.find(p => p.excel_alias === nameRaw);
-            
+            // 2. По точному имени
+            if (!product) product = allProducts.find(p => p.name.toLowerCase() === nameRaw.toLowerCase());
+            // 3. По SKU внутри названия (если SKU длиннее 3 символов)
             if (!product) {
-                product = allProducts.find(p => p.name.toLowerCase() === nameRaw.toLowerCase());
-            }
-            
-            if (!product && nameRaw.length > 5) {
-                // Попытка найти по артикулу внутри длинного названия
-                product = allProducts.find(p => p.sku && p.sku.length > 2 && nameRaw.includes(p.sku));
+                product = allProducts.find(p => p.sku && p.sku.length > 3 && nameRaw.includes(p.sku));
             }
 
             if (product) {
-                // Нашли -> обновляем остаток
-                if (product.stock_qty !== stockRaw) {
-                    await updateStock(product.id, stockRaw);
-                    updatesCount++;
+                // Обновляем остаток
+                if (product.stock_qty !== stockVal) {
+                    product.stock_qty = stockVal;
+                    // Шлем запрос (оптимизация: можно пачкой, но пока по одному для надежности)
+                    await fetch(`${API_URL}/${product.id}`, {
+                        method: 'PUT',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(product)
+                    });
+                    updatedCount++;
                 }
             } else {
-                // Не нашли -> в очередь на маппинг
-                unmappedItems.push({ name: nameRaw, qty: stockRaw });
+                // Не нашли -> в список на ручную привязку
+                unmappedItems.push({ name: nameRaw, qty: stockVal });
             }
         }
 
-        await loadProducts(); // Обновить интерфейс
+        await loadProducts(); // Обновить UI
 
         if (unmappedItems.length > 0) {
             showMappingModal();
         } else {
-            alert(`Готово! Обновлено товаров: ${updatesCount}`);
+            alert(`Готово! Обновлено: ${updatedCount}, неизвестных нет.`);
         }
     }
 
-    async function updateStock(id, qty) {
-        // Отправляем на сервер только остаток (оптимизация)
-        // Если API не умеет PATCH, шлем весь объект (тут упрощено, предполагаем что API умный или мы шлем только stock_qty)
-        // Для надежности читаем текущий объект, меняем qty и шлем PUT
-        const p = allProducts.find(x => x.id === id);
-        if(p) {
-            p.stock_qty = qty;
-            await fetch(`${API_URL}/${id}`, { 
-                method: 'PUT', 
-                headers: {'Content-Type': 'application/json'}, 
-                body: JSON.stringify(p) 
-            });
-        }
-    }
-
-    // --- ПРИВЯЗКА (MAPPING) ---
     function showMappingModal() {
-        mapContainer.innerHTML = '';
-        // Берем только уникальные названия, чтобы не дублировать
+        mapList.innerHTML = '';
+        // Убираем дубли в названиях
         const uniqueNames = [...new Set(unmappedItems.map(i => i.name))];
-        
-        // Ограничим 10 штук за раз, чтобы не зависало
-        const chunk = uniqueNames.slice(0, 10); 
-        
+        // Показываем первые 10, чтобы не грузить
+        const chunk = uniqueNames.slice(0, 10);
+
         if (chunk.length === 0) return;
 
-        // Генерация списка опций для Select
-        const optionsHtml = `<option value="">-- Не выбрано (Пропустить) --</option>` + 
+        // Генерация <option> для всех товаров
+        const opts = `<option value="">-- Пропустить --</option>` + 
             allProducts.map(p => `<option value="${p.id}">${p.sku} - ${p.name}</option>`).join('');
 
-        chunk.forEach((excelName, idx) => {
-            // Найдем примерное кол-во для справки
-            const sampleItem = unmappedItems.find(i => i.name === excelName);
-            
-            const div = document.createElement('div');
-            div.className = 'p-2 border rounded bg-light';
-            div.innerHTML = `
-                <div class="mb-1 fw-bold text-truncate" title="${excelName}">${excelName}</div>
-                <div class="d-flex gap-2 align-items-center">
-                    <span class="badge bg-secondary">${sampleItem.qty}</span>
+        chunk.forEach(excelName => {
+            const item = unmappedItems.find(i => i.name === excelName);
+            const row = document.createElement('div');
+            row.className = 'p-2 bg-light border rounded';
+            row.innerHTML = `
+                <div class="fw-bold text-truncate mb-1" title="${excelName}">${excelName}</div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-secondary">${item.qty}</span>
                     <select class="form-select form-select-sm map-select" data-excel-name="${excelName}">
-                        ${optionsHtml}
+                        ${opts}
                     </select>
                 </div>
             `;
-            mapContainer.appendChild(div);
+            mapList.appendChild(row);
         });
 
-        // Если осталось больше, пишем "и еще X..."
         if (uniqueNames.length > 10) {
-            mapContainer.innerHTML += `<div class="text-center text-muted small mt-2">...и еще ${uniqueNames.length - 10} позиций (загрузите их следующим этапом)</div>`;
+            mapList.innerHTML += `<div class="text-center text-muted small">...и еще ${uniqueNames.length - 10} шт. (загрузите файл снова после сохранения)</div>`;
         }
 
         mapModal.show();
     }
 
-    btnSaveMap.onclick = async () => {
+    btnSaveMapping.onclick = async () => {
         const selects = document.querySelectorAll('.map-select');
-        let savedCount = 0;
-        
-        btnSaveMap.disabled = true;
-        btnSaveMap.innerHTML = 'Сохранение...';
+        btnSaveMapping.disabled = true;
+        btnSaveMapping.innerHTML = 'Сохранение...';
 
         for (const sel of selects) {
             const prodId = sel.value;
             const excelName = sel.dataset.excelName;
             
             if (prodId) {
-                const p = allProducts.find(x => String(x.id) === String(prodId));
-                if (p) {
-                    // 1. Сохраняем Alias
-                    p.excel_alias = excelName;
-                    
-                    // 2. Ищем правильный остаток для этого имени
+                const product = allProducts.find(p => String(p.id) === String(prodId));
+                if (product) {
+                    product.excel_alias = excelName; // ЗАПОМИНАЕМ СВЯЗЬ
                     const item = unmappedItems.find(i => i.name === excelName);
-                    if (item) p.stock_qty = item.qty;
+                    if(item) product.stock_qty = item.qty; // И сразу остаток
 
-                    await fetch(`${API_URL}/${p.id}`, { 
-                        method: 'PUT', 
-                        headers: {'Content-Type': 'application/json'}, 
-                        body: JSON.stringify(p) 
+                    await fetch(`${API_URL}/${product.id}`, {
+                        method: 'PUT',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(product)
                     });
-                    savedCount++;
                 }
             }
         }
 
-        btnSaveMap.disabled = false;
-        btnSaveMap.innerHTML = 'Сохранить связи';
+        btnSaveMapping.disabled = false;
+        btnSaveMapping.innerHTML = 'Сохранить связи';
         mapModal.hide();
         await loadProducts();
-        alert(`Привязано товаров: ${savedCount}. Попробуйте загрузить файл еще раз, чтобы обновить остальные.`);
+        alert('Связи сохранены. Если остались еще товары, загрузите файл повторно.');
     };
 
-    // --- Search ---
+    // --- ПОИСК ---
     searchInput.addEventListener('input', (e) => {
         const term = e.target.value.toLowerCase();
         const filtered = allProducts.filter(p => 
-            (p.name && p.name.toLowerCase().includes(term)) || 
+            p.name.toLowerCase().includes(term) || 
             (p.sku && p.sku.toLowerCase().includes(term))
         );
         renderList(filtered);
     });
 
     addBtn.onclick = () => openModal();
-    if(resetBtn) resetBtn.onclick = async () => {
-        if(!confirm('Очистить ВЕСЬ каталог?')) return;
-        // Тут логика очистки, если API позволяет, или заглушка
-        alert('Функция отключена для безопасности');
-    };
+    if(resetBtn) resetBtn.onclick = () => { if(confirm('Сбросить весь каталог?')) alert('Отключено в целях безопасности'); };
 
     function safe(str) { return (str || '').replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
 
