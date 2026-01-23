@@ -273,7 +273,23 @@ const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 // --- СХЕМЫ (БЕЗ ИЗМЕНЕНИЙ) ---
 const statusSchema = new mongoose.Schema({ value: String, label: String, color: String, isVisible: { type: Boolean, default: true }, sortOrder: { type: Number, default: 0 } });
 const Status = mongoose.model('Status', statusSchema);
-const productSchema = new mongoose.Schema({ sku: String, name: String });
+// --- ОБНОВЛЕННАЯ СХЕМА ТОВАРА ---
+const productSchema = new mongoose.Schema({
+    sku: String,
+    name: String,
+    is_liquid: { type: Boolean, default: true }, // Ликвидность
+    excel_alias: String,                         // Название для Excel
+    stock_qty: Number,                           // Остаток
+    characteristics: {                           // Характеристики
+        class: String,
+        thickness: String,
+        bevel: String,
+        size: String,
+        package_area: String,
+        package_qty: String,
+        weight: String
+    }
+});
 const Product = mongoose.model('Product', productSchema);
 const contactSchema = new mongoose.Schema({ name: String, position: String, contactInfo: String }, { _id: false }); 
 const photoSchema = new mongoose.Schema({ description: String, photo_url: String, date: { type: Date, default: Date.now } }, { _id: false });
@@ -348,6 +364,7 @@ app.delete('/api/knowledge/:id', checkWrite, async (req, res) => { await Knowled
 app.get('/api/tasks', async (req, res) => { try { const data = await Dealer.find(getDealerFilter(req)).select('name visits status responsible').lean(); res.json(data.map(d => ({ id: d._id, name: d.name, status: d.status, visits: d.visits || [], responsible: d.responsible }))); } catch (e) { res.status(500).json([]); } });
 
 app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
+
 
 
 
