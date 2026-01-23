@@ -59,11 +59,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let allProducts = [];
     let unmappedItems = [];
     
-    // НАСТРОЙКИ СОРТИРОВКИ И ФИЛЬТРА
+    // Настройки
     let sortMode = 'sku'; // 'sku', 'stock_desc', 'stock_asc'
     let filterMode = 'all'; // 'all', 'liquid', 'illiquid'
 
-    // --- ВНЕДРЕНИЕ ПРОСТОГО МЕНЮ (Сортировка + Фильтр) ---
+    // --- ВНЕДРЕНИЕ ЧИСТЫХ КОНТРОЛОВ ---
     function injectSimpleControls() {
         const searchBlock = searchInput.closest('.sticky-filters');
         if(!searchBlock || document.getElementById('simple-controls')) return;
@@ -72,21 +72,21 @@ document.addEventListener('DOMContentLoaded', () => {
         controls.id = 'simple-controls';
         controls.className = 'mt-2 d-flex gap-2';
         
+        // Строгие селекты Bootstrap
         controls.innerHTML = `
-            <select id="sort-select" class="form-select form-select-sm border-secondary-subtle" style="width: 50%">
-                <option value="sku">🔤 По артикулу (А-Я)</option>
-                <option value="stock_desc">📉 По остатку (Много &rarr; Мало)</option>
-                <option value="stock_asc">📈 По остатку (Мало &rarr; Много)</option>
+            <select id="sort-select" class="form-select form-select-sm text-secondary bg-light border-0" style="font-weight: 500;">
+                <option value="sku">Сортировка: Артикул (А-Я)</option>
+                <option value="stock_desc">По остатку (Убывание)</option>
+                <option value="stock_asc">По остатку (Возрастание)</option>
             </select>
-            <select id="filter-select" class="form-select form-select-sm border-secondary-subtle" style="width: 50%">
-                <option value="all">👁️ Все товары</option>
-                <option value="liquid">✅ Только Ликвид</option>
-                <option value="illiquid">❌ Только Неликвид</option>
+            <select id="filter-select" class="form-select form-select-sm text-secondary bg-light border-0" style="font-weight: 500;">
+                <option value="all">Все товары</option>
+                <option value="liquid">Только Ликвид</option>
+                <option value="illiquid">Только Неликвид</option>
             </select>
         `;
         searchBlock.appendChild(controls);
 
-        // Слушатели событий
         document.getElementById('sort-select').onchange = (e) => {
             sortMode = e.target.value;
             applyLogic();
@@ -99,7 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function loadProducts() {
         try {
-            listContainer.innerHTML = '<p class="text-center text-muted p-5">Загрузка...</p>';
+            listContainer.innerHTML = '<div class="text-center text-muted py-5">Загрузка...</div>';
             const res = await fetch(API_URL);
             if (!res.ok) throw new Error('Ошибка');
             allProducts = await res.json();
@@ -108,29 +108,25 @@ document.addEventListener('DOMContentLoaded', () => {
             applyLogic();
         } catch (e) {
             console.error(e);
-            listContainer.innerHTML = '<p class="text-center text-danger mt-4">Ошибка загрузки</p>';
+            listContainer.innerHTML = '<div class="text-center text-danger py-4">Ошибка загрузки данных</div>';
         }
     }
 
-    // --- ГЛАВНАЯ ЛОГИКА (Фильтр + Сортировка) ---
+    // --- ЛОГИКА ФИЛЬТРАЦИИ ---
     function applyLogic() {
         const term = searchInput.value.toLowerCase();
         
-        // 1. Фильтрация
         let filtered = allProducts.filter(p => {
-            // Поиск
             const matchSearch = (p.name && p.name.toLowerCase().includes(term)) || 
                                 (p.sku && p.sku.toLowerCase().includes(term));
             if(!matchSearch) return false;
 
-            // Фильтр ликвидности
             if (filterMode === 'liquid' && p.is_liquid === false) return false;
             if (filterMode === 'illiquid' && p.is_liquid !== false) return false;
 
             return true;
         });
 
-        // 2. Сортировка
         filtered.sort((a, b) => {
             if (sortMode === 'sku') {
                 return (a.sku || '').localeCompare(b.sku || '');
@@ -144,18 +140,19 @@ document.addEventListener('DOMContentLoaded', () => {
         renderList(filtered);
     }
 
-    // --- ОТРИСОВКА СПИСКА (КРАСИВАЯ, как просили) ---
+    // --- ОТРИСОВКА СПИСКА (СТРОГАЯ) ---
     function renderList(products) {
         totalLabel.textContent = `Найдено: ${products.length}`;
         if (products.length === 0) {
-            listContainer.innerHTML = '<p class="text-center text-muted mt-4">Список пуст</p>';
+            listContainer.innerHTML = '<div class="text-center text-muted py-4">Список пуст</div>';
             return;
         }
 
         listContainer.innerHTML = products.map(p => {
             const isLiquid = p.is_liquid !== false; 
-            const rowClass = isLiquid ? 'row-liquid' : 'row-illiquid';
-            const opacity = isLiquid ? '' : 'opacity-75';
+            // Используем стандартные классы или легкие оттенки
+            const bgClass = isLiquid ? 'bg-white' : 'bg-light';
+            const textOpacity = isLiquid ? '' : 'text-muted';
 
             // Характеристики
             let details = [];
@@ -179,26 +176,27 @@ document.addEventListener('DOMContentLoaded', () => {
             let stockHtml = '';
             if (p.stock_qty !== undefined && p.stock_qty !== null) {
                 const qty = parseFloat(p.stock_qty);
-                const color = qty > 20 ? 'text-success' : (qty > 0 ? 'text-warning' : 'text-secondary');
-                stockHtml = `<div class="ms-3 ${color} fw-bold text-nowrap fs-6">${qty.toFixed(2)} м²</div>`;
+                // Цвета Bootstrap: success (зеленый), warning (желтый), secondary (серый)
+                const colorClass = qty > 20 ? 'text-success' : (qty > 0 ? 'text-warning' : 'text-secondary');
+                stockHtml = `<span class="${colorClass} fw-bold" style="font-size: 0.9rem;">${qty.toFixed(2)} м²</span>`;
             }
 
             return `
-            <div class="bg-white p-2 rounded-3 shadow-sm border border-light mb-2 d-flex align-items-center justify-content-between ${rowClass} ${opacity}" onclick="openModal('${p.id}')" style="cursor:pointer; min-height: 55px;">
+            <div class="${bgClass} p-3 rounded-4 shadow-sm border border-light mb-2 d-flex align-items-center justify-content-between" onclick="openModal('${p.id}')" style="cursor:pointer; min-height: 60px;">
                 
                 <div style="overflow: hidden; flex-grow: 1;">
                     <div class="d-flex align-items-center gap-2 mb-1">
-                        <span class="badge bg-secondary text-white fw-normal font-monospace" style="font-size: 0.85rem;">${p.sku || '???'}</span>
-                        <h6 class="mb-0 fw-bold text-dark text-truncate" style="font-size: 0.95rem;">${p.name || 'Без названия'}</h6>
-                        ${!isLiquid ? '<span class="badge bg-danger p-1" style="font-size:0.6rem">СТОП</span>' : ''}
+                        <span class="badge bg-light text-secondary border border-secondary-subtle fw-normal font-monospace">${p.sku || '---'}</span>
+                        <span class="fw-bold text-dark text-truncate ${textOpacity}">${p.name || 'Без названия'}</span>
+                        ${!isLiquid ? '<span class="badge bg-danger bg-opacity-10 text-danger border border-danger-subtle" style="font-size:0.65rem">НЕЛИКВИД</span>' : ''}
                     </div>
 
-                    <div class="text-muted small text-truncate" style="font-size: 0.85rem; padding-left: 2px;">
-                        ${detailsStr || '<span class="opacity-50">Нет характеристик</span>'}
+                    <div class="text-muted small text-truncate" style="font-size: 0.85rem;">
+                        ${detailsStr || 'Нет характеристик'}
                     </div>
                 </div>
 
-                <div class="d-flex align-items-center">
+                <div class="d-flex align-items-center ps-3">
                     ${stockHtml}
                     <i class="bi bi-chevron-right text-muted ms-3 small"></i>
                 </div>
@@ -231,7 +229,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if(pkgWeight) pkgWeight.value = c.weight || '';
                 }
 
-                modalTitle.textContent = 'Редактировать товар';
+                modalTitle.textContent = 'Редактирование';
                 if(btnDelete) {
                     btnDelete.style.display = 'block';
                     btnDelete.onclick = () => deleteProduct(p.id);
@@ -246,7 +244,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     window.deleteProduct = async (id) => {
-        if(confirm('Удалить этот товар?')) {
+        if(confirm('Удалить товар из базы?')) {
             try { await fetch(`${API_URL}/${id}`, { method: 'DELETE' }); loadProducts(); modal.hide(); } catch(e) { alert('Ошибка удаления'); }
         }
     };
@@ -282,7 +280,7 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const btn = form.querySelector('button[type="submit"]');
                 const oldText = btn.innerHTML;
-                btn.disabled = true; btn.innerHTML = '...';
+                btn.disabled = true; btn.innerHTML = 'Сохранение...';
                 
                 const res = await fetch(url, { method: method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
                 if (res.ok) { await loadProducts(); modal.hide(); } else { alert('Ошибка сохранения.'); }
