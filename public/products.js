@@ -85,7 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- ОТРИСОВКА СПИСКА ---
+// --- ОТРИСОВКА СПИСКА ---
     function renderList(products) {
         totalLabel.textContent = `Всего товаров: ${products.length}`;
         if (products.length === 0) {
@@ -94,40 +94,60 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         listContainer.innerHTML = products.map(p => {
-            // Ликвидность (по умолчанию true, если поля нет)
+            // Ликвидность
             const isLiquid = p.is_liquid !== false; 
             const rowClass = isLiquid ? 'row-liquid' : 'row-illiquid';
-            
-            // Сборка характеристик в HTML
-            let charsHtml = '';
+            const opacity = isLiquid ? '' : 'opacity-75'; // Чуть бледнее если неликвид
+
+            // Сборка строки характеристик (в одну строку через запятую или пробел)
+            let details = [];
             if(p.characteristics) {
                 const c = p.characteristics;
-                if(c.class) charsHtml += `<span class="char-tag">${c.class} кл</span>`;
-                if(c.thickness) charsHtml += `<span class="char-tag">${c.thickness} мм</span>`;
-                if(c.package_area) charsHtml += `<span class="char-tag">Уп: ${c.package_area} м²</span>`;
+                if(c.class) details.push(`${c.class} кл`);
+                if(c.thickness) details.push(`${c.thickness} мм`);
+                if(c.size) details.push(c.size); // Размер
+                if(c.bevel) details.push(c.bevel); // Фаска
+                
+                // Упаковка
+                let pack = [];
+                if(c.package_area) pack.push(`${c.package_area} м²`);
+                if(c.package_qty) pack.push(`${c.package_qty} шт`);
+                if(pack.length > 0) details.push(`(${pack.join('/')})`);
+                
+                if(c.weight) details.push(`${c.weight} кг`);
             }
+            const detailsStr = details.join(', ');
 
-            // Вывод остатка (если есть)
+            // Остаток
             let stockHtml = '';
             if (p.stock_qty !== undefined && p.stock_qty !== null) {
                 const qty = parseFloat(p.stock_qty);
                 const color = qty > 20 ? 'text-success' : (qty > 0 ? 'text-warning' : 'text-secondary');
-                stockHtml = `<div class="ms-2 ${color} stock-badge">${qty.toFixed(2)} м²</div>`;
+                // Отображаем остаток чуть крупнее справа
+                stockHtml = `<div class="ms-2 ${color} fw-bold text-nowrap" style="font-size:0.95rem;">${qty.toFixed(2)} м²</div>`;
             }
 
             return `
-            <div class="bg-white p-3 rounded-4 shadow-sm border border-light d-flex justify-content-between align-items-center mb-2 ${rowClass}" onclick="openModal('${p.id}')" style="cursor:pointer;">
-                <div style="overflow: hidden;">
-                    <div class="d-flex align-items-center gap-2">
-                        <h6 class="mb-0 fw-bold text-truncate">${p.name || ''}</h6>
-                        ${!isLiquid ? '<span class="badge bg-danger" style="font-size:0.6rem">СТОП</span>' : ''}
+            <div class="bg-white p-2 rounded-3 shadow-sm border border-light mb-2 d-flex align-items-center justify-content-between ${rowClass} ${opacity}" onclick="openModal('${p.id}')" style="cursor:pointer; min-height: 50px;">
+                
+                <div style="overflow: hidden; flex-grow: 1;">
+                    <div class="d-flex flex-wrap align-items-baseline gap-2">
+                        
+                        <span class="fw-bold text-dark" style="font-size: 0.95rem;">${p.name || 'Без названия'}</span>
+                        
+                        <span class="text-secondary fw-bold small text-nowrap">${p.sku || ''}</span>
+                        
+                        ${!isLiquid ? '<span class="badge bg-danger p-1" style="font-size:0.6rem">НЕЛИКВИД</span>' : ''}
+
+                        <span class="text-muted small" style="font-size: 0.85rem;">
+                            ${detailsStr}
+                        </span>
                     </div>
-                    <div class="text-muted small mb-1">${p.sku || ''}</div>
-                    <div class="d-flex flex-wrap">${charsHtml}</div>
                 </div>
-                <div class="d-flex align-items-center">
+
+                <div class="d-flex align-items-center ps-2">
                     ${stockHtml}
-                    <i class="bi bi-chevron-right text-muted ms-3"></i>
+                    <i class="bi bi-chevron-right text-muted ms-2 small"></i>
                 </div>
             </div>`;
         }).join('');
@@ -376,3 +396,4 @@ document.addEventListener('DOMContentLoaded', () => {
     // Первая загрузка
     loadProducts();
 });
+
