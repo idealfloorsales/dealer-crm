@@ -34,11 +34,6 @@ const servePage = (res, fileName) => {
     });
 };
 
-// --- MONGODB CONNECTION ---
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/dealer_db')
-    .then(() => console.log('MongoDB Connected'))
-    .catch(err => console.error(err));
-
 // --- MODELS ---
 
 // 1. User
@@ -78,7 +73,7 @@ const Dealer = mongoose.model('Dealer', {
     hasPersonalPlan: { type: Boolean, default: false }
 });
 
-// 3. Product (ОБНОВЛЕННАЯ СХЕМА!)
+// 3. Product (НОВАЯ СХЕМА С ХАРАКТЕРИСТИКАМИ)
 const Product = mongoose.model('Product', {
     sku: String,
     name: String,
@@ -336,5 +331,21 @@ app.get('/api/tasks', async (req, res) => {
     } catch(e) { res.status(500).send(e.message); } 
 });
 
-// --- SERVER START ---
-app.listen(PORT, () => console.log(`Server started on port ${PORT}`));
+// --- СТАРТ СЕРВЕРА (НАДЕЖНЫЙ) ---
+const start = async () => {
+    try {
+        const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/dealer_db';
+        
+        // Подключение к БД
+        await mongoose.connect(uri);
+        console.log('MongoDB Connected');
+
+        // Запуск сервера ТОЛЬКО после подключения к БД
+        app.listen(PORT, () => console.log(`Server started on port ${PORT}`));
+    } catch (error) {
+        console.error('ERROR: Database connection failed:', error.message);
+        process.exit(1);
+    }
+};
+
+start();
