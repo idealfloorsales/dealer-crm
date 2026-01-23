@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Товары и Склад</title>
+    <title>Матрица товаров</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,23 +17,23 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#b9040a">
-    
+
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 
     <style>
-        /* Стили для ликвидности */
-        .product-liquid { background-color: rgba(25, 135, 84, 0.1); border-left: 4px solid #198754; }
-        .product-illiquid { background-color: rgba(220, 53, 69, 0.1); border-left: 4px solid #dc3545; }
+        /* Стили статусов */
+        .prod-card-liquid { border-left: 4px solid #198754; background-color: #fff; }
+        .prod-card-illiquid { border-left: 4px solid #dc3545; background-color: rgba(220, 53, 69, 0.05); }
         
-        .char-tag { font-size: 0.75rem; background: #f8f9fa; border: 1px solid #dee2e6; padding: 1px 6px; border-radius: 4px; margin-right: 4px; color: #6c757d; display: inline-block; margin-bottom: 2px;}
-        .stock-badge { font-size: 0.9rem; font-weight: 600; min-width: 80px; text-align: right; }
+        .char-badge { font-size: 0.7rem; color: #6c757d; background: #f8f9fa; border: 1px solid #dee2e6; padding: 1px 5px; border-radius: 4px; margin-right: 3px; display: inline-block; margin-bottom: 2px;}
+        .stock-val { font-weight: 700; font-size: 0.95rem; }
     </style>
 </head>
 <body class="bg-light">
 
     <nav class="navbar navbar-expand-lg navbar-dark bg-danger shadow-sm sticky-top">
         <div class="container-fluid">
-            <a class="navbar-brand fw-bold" href="/"><i class="bi bi-box-seam me-2"></i>Склад</a>
+            <a class="navbar-brand fw-bold" href="/"><i class="bi bi-box-seam me-2"></i>Матрица</a>
             <div class="d-flex gap-2">
                 <button class="btn btn-sm btn-light text-danger rounded-circle" onclick="window.location.reload()"><i class="bi bi-arrow-clockwise"></i></button>
                 <button class="btn btn-sm btn-light text-danger rounded-circle" onclick="window.location.href='/'"><i class="bi bi-x-lg"></i></button>
@@ -49,17 +49,17 @@
                     <div class="col">
                         <div class="position-relative">
                             <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
-                            <input type="text" id="product-search" class="form-control form-control-lg border-0 bg-light ps-5 rounded-pill" placeholder="Поиск товара...">
+                            <input type="text" id="product-search" class="form-control form-control-lg border-0 bg-light ps-5 rounded-pill" placeholder="Поиск SKU или названия...">
                         </div>
                     </div>
                     <div class="col-auto">
-                        <input type="file" id="excel-upload-input" hidden accept=".xlsx, .xls, .csv">
-                        <button class="btn btn-success rounded-pill px-3" id="btn-import-excel" title="Загрузить остатки из Excel">
-                            <i class="bi bi-file-earmark-spreadsheet"></i> <span class="d-none d-md-inline">Остатки</span>
+                        <input type="file" id="excel-file-input" hidden accept=".xlsx, .xls">
+                        <button class="btn btn-success rounded-pill px-3" id="btn-import-stock" title="Загрузить остатки">
+                            <i class="bi bi-file-earmark-spreadsheet"></i> <span class="d-none d-sm-inline">Остатки</span>
                         </button>
                     </div>
                     <div class="col-auto">
-                        <button class="btn btn-danger rounded-circle" id="add-product-btn" title="Добавить товар">
+                        <button class="btn btn-danger rounded-circle" id="add-product-btn">
                             <i class="bi bi-plus-lg"></i>
                         </button>
                     </div>
@@ -68,8 +68,8 @@
         </div>
 
         <div class="d-flex justify-content-between align-items-center px-2 mb-2">
-            <span class="text-muted small">Всего товаров: <span id="total-count" class="fw-bold text-dark">0</span></span>
-            <button class="btn btn-sm btn-link text-muted text-decoration-none" id="reset-catalog-btn" style="font-size: 0.8rem;">Сбросить всё</button>
+            <span class="text-muted small">Позиций: <span id="total-count" class="fw-bold text-dark">0</span></span>
+            <button class="btn btn-sm btn-link text-muted text-decoration-none" id="reset-catalog-btn" style="font-size: 0.8rem;">Сброс</button>
         </div>
 
         <div id="products-list-container" class="d-flex flex-column gap-2">
@@ -77,7 +77,8 @@
     </div>
 
     <div class="modal fade" id="product-modal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered modal-lg"> <div class="modal-content rounded-4 border-0">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content rounded-4 border-0">
                 <div class="modal-header border-0 pb-0">
                     <h5 class="modal-title fw-bold" id="product-modal-title">Товар</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -87,77 +88,68 @@
                         <input type="hidden" id="prod_id">
                         
                         <div class="row g-2 mb-3">
-                            <div class="col-md-4">
-                                <label class="form-label small text-muted">Артикул (SKU)</label>
+                            <div class="col-4">
+                                <label class="small text-muted">Артикул (SKU)</label>
                                 <input type="text" class="form-control" id="prod_sku" required placeholder="AS-81">
                             </div>
-                            <div class="col-md-8">
-                                <label class="form-label small text-muted">Название</label>
+                            <div class="col-8">
+                                <label class="small text-muted">Название</label>
                                 <input type="text" class="form-control" id="prod_name" required placeholder="Дуб Карибский">
                             </div>
                         </div>
 
-                        <div class="form-check form-switch mb-3 p-3 bg-light rounded-3">
+                        <div class="form-check form-switch p-3 bg-light rounded mb-3">
                             <input class="form-check-input" type="checkbox" id="prod_is_liquid" checked>
                             <label class="form-check-label fw-bold" for="prod_is_liquid">Ликвидный товар</label>
-                            <div class="form-text small">Если выключено — товар будет помечен красным (вывод из ассортимента).</div>
+                            <div class="small text-muted" style="font-size: 0.75rem">Если выключено — подсвечивается красным (вывод)</div>
                         </div>
 
-                        <hr class="my-3 opacity-25">
-                        <h6 class="fw-bold mb-3"><i class="bi bi-sliders"></i> Характеристики</h6>
-
+                        <h6 class="small text-muted text-uppercase fw-bold mb-2">Характеристики</h6>
+                        
                         <div class="row g-2 mb-2">
-                            <div class="col-4">
-                                <label class="small text-muted">Класс</label>
-                                <input type="text" class="form-control form-control-sm" id="char_class" placeholder="33">
+                            <div class="col-3">
+                                <input type="text" class="form-control form-control-sm" id="char_class" placeholder="Класс (33)">
                             </div>
-                            <div class="col-4">
-                                <label class="small text-muted">Толщина (мм)</label>
-                                <input type="text" class="form-control form-control-sm" id="char_thickness" placeholder="8">
+                            <div class="col-3">
+                                <input type="text" class="form-control form-control-sm" id="char_thick" placeholder="Толщ (8мм)">
                             </div>
-                            <div class="col-4">
-                                <label class="small text-muted">Фаска</label>
-                                <input type="text" class="form-control form-control-sm" id="char_bevel" placeholder="4V">
+                            <div class="col-3">
+                                <input type="text" class="form-control form-control-sm" id="char_bevel" placeholder="Фаска (4V)">
+                            </div>
+                            <div class="col-3">
+                                <input type="text" class="form-control form-control-sm" id="char_size" placeholder="Размер">
                             </div>
                         </div>
 
                         <div class="row g-2 mb-3">
-                            <div class="col-6">
-                                <label class="small text-muted">Размер доски (мм)</label>
-                                <input type="text" class="form-control form-control-sm" id="char_size" placeholder="1200x400">
-                            </div>
-                            <div class="col-6">
-                                <label class="small text-muted">Вес упаковки (кг)</label>
-                                <input type="number" step="0.1" class="form-control form-control-sm" id="package_weight" placeholder="15.5">
-                            </div>
-                        </div>
-
-                        <div class="p-2 bg-light rounded mb-3 border">
-                            <label class="small fw-bold text-muted mb-1">Данные об упаковке</label>
-                            <div class="row g-2">
-                                <div class="col-6">
-                                    <div class="input-group input-group-sm">
-                                        <input type="number" step="0.001" class="form-control" id="package_area" placeholder="2.5">
-                                        <span class="input-group-text">м²</span>
-                                    </div>
+                            <div class="col-4">
+                                <div class="input-group input-group-sm">
+                                    <input type="number" step="0.001" class="form-control" id="pkg_area" placeholder="Упак м²">
+                                    <span class="input-group-text">м²</span>
                                 </div>
-                                <div class="col-6">
-                                    <div class="input-group input-group-sm">
-                                        <input type="number" class="form-control" id="package_qty" placeholder="20">
-                                        <span class="input-group-text">шт</span>
-                                    </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="input-group input-group-sm">
+                                    <input type="number" class="form-control" id="pkg_qty" placeholder="Шт/уп">
+                                    <span class="input-group-text">шт</span>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="input-group input-group-sm">
+                                    <input type="number" step="0.1" class="form-control" id="pkg_weight" placeholder="Вес">
+                                    <span class="input-group-text">кг</span>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label small text-muted">Привязка к Excel (Название из накладной)</label>
-                            <input type="text" class="form-control form-control-sm bg-light" id="excel_alias" placeholder="Автоматически заполнится при импорте...">
+                        <div class="mb-3 collapse" id="alias-block">
+                            <label class="small text-muted">Имя в Excel (для авто-связки)</label>
+                            <input type="text" class="form-control form-control-sm bg-light" id="prod_alias" readonly>
                         </div>
 
                         <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-primary rounded-pill btn-lg">Сохранить</button>
-                            <button type="button" class="btn btn-outline-danger btn-sm border-0" id="btn-delete-prod" style="display:none;">Удалить товар</button>
+                            <button type="submit" class="btn btn-primary rounded-pill">Сохранить</button>
+                            <button type="button" class="btn btn-outline-danger btn-sm border-0" id="btn-delete-prod">Удалить</button>
                         </div>
                     </form>
                 </div>
@@ -169,16 +161,15 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content rounded-4 border-0">
                 <div class="modal-header bg-warning-subtle border-0">
-                    <h5 class="modal-title text-warning-emphasis fw-bold"><i class="bi bi-link-45deg"></i> Привязка товаров</h5>
+                    <h5 class="modal-title text-dark fw-bold">Привязка товаров</h5>
                 </div>
                 <div class="modal-body">
-                    <p class="small text-muted mb-3">В файле найдены товары, которых нет в базе или название отличается. Пожалуйста, укажите соответствие.</p>
-                    
-                    <div id="mapping-container" class="d-flex flex-column gap-3">
+                    <p class="small text-muted mb-2">Эти товары из Excel не найдены в базе. Укажите соответствие один раз, и система запомнит.</p>
+                    <div id="mapping-list" class="d-flex flex-column gap-3 mt-3">
                         </div>
                 </div>
                 <div class="modal-footer border-0">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Отмена</button>
                     <button type="button" class="btn btn-primary" id="btn-save-mapping">Сохранить связи</button>
                 </div>
             </div>
