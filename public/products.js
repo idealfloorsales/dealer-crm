@@ -1,4 +1,4 @@
-// --- АВТОРИЗАЦИЯ (ВСТАВИТЬ В НАЧАЛО ФАЙЛА) ---
+// --- АВТОРИЗАЦИЯ ---
 const originalFetch = window.fetch;
 window.fetch = async function (url, options) {
     options = options || {};
@@ -9,7 +9,7 @@ window.fetch = async function (url, options) {
     if (response.status === 401) window.location.href = '/login.html';
     return response;
 };
-// -------------------------------------------
+// -------------------
 
 document.addEventListener('DOMContentLoaded', () => {
     
@@ -29,14 +29,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const addBtn = document.getElementById('add-product-btn');
     const resetBtn = document.getElementById('reset-catalog-btn'); 
     
-    // Поля формы (Старые + Новые)
+    // Поля формы (ИСПРАВЛЕНЫ ID)
     const inpId = document.getElementById('prod_id');
     const inpSku = document.getElementById('prod_sku');
     const inpName = document.getElementById('prod_name');
-    const btnDelete = document.getElementById('btn-delete-prod'); // Кнопка удаления
+    const btnDelete = document.getElementById('btn-delete-prod');
 
-    // Новые поля
-    const inpLiquid = document.getElementById('prod_liquid');
+    const inpLiquid = document.getElementById('prod_is_liquid'); // ИСПРАВЛЕНО
     const inpAlias = document.getElementById('prod_alias');
     const charClass = document.getElementById('char_class');
     const charThick = document.getElementById('char_thick');
@@ -46,9 +45,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const pkgQty = document.getElementById('pkg_qty');
     const pkgWeight = document.getElementById('pkg_weight');
 
-    // Excel элементы
-    const btnImport = document.getElementById('btn-import');
-    const fileInput = document.getElementById('excel-input');
+    // Excel
+    const btnImport = document.getElementById('btn-import-stock');
+    const fileInput = document.getElementById('excel-file-input');
     const mapModalEl = document.getElementById('mapping-modal');
     const mapModal = new bootstrap.Modal(mapModalEl);
     const mapList = document.getElementById('mapping-list');
@@ -64,7 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!res.ok) throw new Error('Ошибка');
             allProducts = await res.json();
             
-            // Сортировка: Ликвидные сверху
+            // Сортировка
             allProducts.sort((a, b) => {
                 if (a.is_liquid !== false && b.is_liquid === false) return -1;
                 if (a.is_liquid === false && b.is_liquid !== false) return 1;
@@ -77,23 +76,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderList(products) {
-        totalLabel.textContent = `Всего товаров: ${products.length}`;
+        totalLabel.textContent = products.length;
         if (products.length === 0) {
-            listContainer.innerHTML = '<p class="text-center text-muted mt-4">Список пуст</p>';
+            listContainer.innerHTML = '<div class="text-center text-muted p-4">Список пуст</div>';
             return;
         }
 
         listContainer.innerHTML = products.map(p => {
             const isLiquid = p.is_liquid !== false; 
-            const rowClass = isLiquid ? 'row-liquid' : 'row-illiquid';
+            const rowClass = isLiquid ? 'prod-liquid' : 'prod-illiquid';
             
-            // Сборка характеристик
+            // Характеристики
             let charsHtml = '';
             if(p.characteristics) {
                 const c = p.characteristics;
-                if(c.class) charsHtml += `<span class="char-tag">${c.class} кл</span>`;
-                if(c.thickness) charsHtml += `<span class="char-tag">${c.thickness} мм</span>`;
-                if(c.package_area) charsHtml += `<span class="char-tag">Уп: ${c.package_area} м²</span>`;
+                if(c.class) charsHtml += `<span class="char-badge">${c.class} кл</span>`;
+                if(c.thickness) charsHtml += `<span class="char-badge">${c.thickness} мм</span>`;
+                if(c.package_area) charsHtml += `<span class="char-badge">Уп: ${c.package_area} м²</span>`;
             }
 
             // Остаток
@@ -105,18 +104,20 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             return `
-            <div class="bg-white p-3 rounded-4 shadow-sm border border-light d-flex justify-content-between align-items-center ${rowClass}" onclick="openModal('${p.id}')" style="cursor:pointer;">
-                <div style="overflow: hidden;">
-                    <div class="d-flex align-items-center gap-2">
-                        <h6 class="mb-0 fw-bold text-truncate">${p.name || ''}</h6>
-                        ${!isLiquid ? '<span class="badge bg-danger" style="font-size:0.6rem">СТОП</span>' : ''}
+            <div class="card shadow-sm border-0 mb-2 ${rowClass}" onclick="openModal('${p.id}')" style="cursor:pointer;">
+                <div class="card-body p-2 d-flex justify-content-between align-items-center">
+                    <div style="overflow:hidden;">
+                        <div class="d-flex align-items-center gap-2">
+                            <h6 class="mb-0 fw-bold text-truncate">${p.name || ''}</h6>
+                            ${!isLiquid ? '<span class="badge bg-danger" style="font-size:0.6rem">СТОП</span>' : ''}
+                        </div>
+                        <div class="text-muted small font-monospace mb-1">${p.sku || ''}</div>
+                        <div class="d-flex flex-wrap">${charsHtml}</div>
                     </div>
-                    <div class="text-muted small mb-1">${p.sku || ''}</div>
-                    <div class="d-flex flex-wrap">${charsHtml}</div>
-                </div>
-                <div class="d-flex align-items-center">
-                    ${stockHtml}
-                    <i class="bi bi-chevron-right text-muted ms-3"></i>
+                    <div class="d-flex align-items-center">
+                        ${stockHtml}
+                        <i class="bi bi-chevron-right text-muted ms-2"></i>
+                    </div>
                 </div>
             </div>`;
         }).join('');
@@ -125,7 +126,6 @@ document.addEventListener('DOMContentLoaded', () => {
     window.openModal = (id) => {
         form.reset();
         if(btnDelete) btnDelete.style.display = 'none';
-        document.getElementById('alias-block').classList.remove('show');
         
         if (id) {
             const p = allProducts.find(x => String(x.id) === String(id));
@@ -134,10 +134,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 inpSku.value = p.sku;
                 inpName.value = p.name;
                 
-                // New Fields Population
+                // Исправленное заполнение
                 inpLiquid.checked = p.is_liquid !== false;
                 inpAlias.value = p.excel_alias || '';
-                if(p.excel_alias) document.getElementById('alias-block').classList.add('show');
 
                 if(p.characteristics) {
                     const c = p.characteristics;
@@ -187,7 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = { 
                 sku: inpSku.value.trim(), 
                 name: inpName.value.trim(),
-                is_liquid: inpLiquid.checked,
+                is_liquid: inpLiquid.checked, // Теперь работает
                 excel_alias: inpAlias.value.trim(),
                 characteristics: chars
             };
@@ -203,7 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 btn.disabled = true; btn.innerHTML = '...';
                 
                 const res = await fetch(url, { method: method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
-                if (res.ok) { await loadProducts(); modal.hide(); } else { alert('Ошибка.'); }
+                if (res.ok) { await loadProducts(); modal.hide(); } else { alert('Ошибка сохранения.'); }
                 
                 btn.disabled = false; btn.innerHTML = oldText;
             } catch (e) { alert('Ошибка сети'); }
