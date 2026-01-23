@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Матрица</title>
+    <title>Товары и Склад</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,78 +18,66 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#b9040a">
     
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+
     <style>
-        body { padding-bottom: 80px; }
-        .bottom-nav {
-            position: fixed; bottom: 0; left: 0; right: 0;
-            background: rgba(255, 255, 255, 0.98);
-            backdrop-filter: blur(10px);
-            border-top: 1px solid #eee;
-            z-index: 1050;
-            padding-bottom: env(safe-area-inset-bottom);
-            box-shadow: 0 -5px 20px rgba(0,0,0,0.05);
-        }
-        .bottom-nav-item {
-            text-align: center; color: #adb5bd; padding: 10px 0;
-            text-decoration: none; flex: 1; transition: color 0.2s;
-        }
-        .bottom-nav-item.active { color: #B9040A; }
-        .bottom-nav-item i { font-size: 1.4rem; display: block; margin-bottom: 2px; }
-        .bottom-nav-item span { font-size: 0.65rem; font-weight: 600; }
+        /* Стили для ликвидности */
+        .product-liquid { background-color: rgba(25, 135, 84, 0.1); border-left: 4px solid #198754; }
+        .product-illiquid { background-color: rgba(220, 53, 69, 0.1); border-left: 4px solid #dc3545; }
         
-        .desktop-nav { display: flex; }
-        @media (max-width: 991px) {
-            .desktop-nav { display: none !important; }
-        }
+        .char-tag { font-size: 0.75rem; background: #f8f9fa; border: 1px solid #dee2e6; padding: 1px 6px; border-radius: 4px; margin-right: 4px; color: #6c757d; display: inline-block; margin-bottom: 2px;}
+        .stock-badge { font-size: 0.9rem; font-weight: 600; min-width: 80px; text-align: right; }
     </style>
 </head>
-<body>
-    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-4 desktop-nav">
+<body class="bg-light">
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-danger shadow-sm sticky-top">
         <div class="container-fluid">
-            <a class="navbar-brand" href="/"><img src="logo.png" alt="Logo" height="40"></a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"><span class="navbar-toggler-icon"></span></button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav">
-                    <li class="nav-item"><a class="nav-link" href="/">Дилеры</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/map.html">Карта</a></li>
-                    <li class="nav-item"><a class="nav-link active" href="/products.html">Матрица</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/report.html">Выставленность</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/sales.html">Продажи</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/competitors.html">Конкуренты</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/knowledge.html">Статьи</a></li>
-                </ul>
+            <a class="navbar-brand fw-bold" href="/"><i class="bi bi-box-seam me-2"></i>Склад</a>
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-light text-danger rounded-circle" onclick="window.location.reload()"><i class="bi bi-arrow-clockwise"></i></button>
+                <button class="btn btn-sm btn-light text-danger rounded-circle" onclick="window.location.href='/'"><i class="bi bi-x-lg"></i></button>
             </div>
         </div>
     </nav>
-    
-    <div class="container">
-        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-            <h1 class="mb-0 border-0 pt-0 mt-0">Каталог товаров</h1>
-            <div class="d-flex gap-2">
-                <button id="reset-catalog-btn" class="btn btn-light shadow-sm text-secondary" title="Загрузить стандартный список">
-                    <i class="bi bi-arrow-clockwise me-2"></i>Сброс
-                </button>
-                <button id="add-product-btn" class="btn btn-primary shadow-sm px-4"><i class="bi bi-plus-lg me-2"></i>Добавить</button>
+
+    <div class="container-fluid py-3 mb-5">
+        
+        <div class="card border-0 shadow-sm rounded-4 mb-3">
+            <div class="card-body p-2">
+                <div class="row g-2 align-items-center">
+                    <div class="col">
+                        <div class="position-relative">
+                            <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+                            <input type="text" id="product-search" class="form-control form-control-lg border-0 bg-light ps-5 rounded-pill" placeholder="Поиск товара...">
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <input type="file" id="excel-upload-input" hidden accept=".xlsx, .xls, .csv">
+                        <button class="btn btn-success rounded-pill px-3" id="btn-import-excel" title="Загрузить остатки из Excel">
+                            <i class="bi bi-file-earmark-spreadsheet"></i> <span class="d-none d-md-inline">Остатки</span>
+                        </button>
+                    </div>
+                    <div class="col-auto">
+                        <button class="btn btn-danger rounded-circle" id="add-product-btn" title="Добавить товар">
+                            <i class="bi bi-plus-lg"></i>
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <div class="bg-white p-3 rounded-4 shadow-sm mb-4 border border-light sticky-filters">
-            <div class="input-group">
-                <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-search"></i></span>
-                <input type="text" id="product-search" class="form-control border-start-0 ps-0" placeholder="Поиск по артикулу или названию...">
-            </div>
+        <div class="d-flex justify-content-between align-items-center px-2 mb-2">
+            <span class="text-muted small">Всего товаров: <span id="total-count" class="fw-bold text-dark">0</span></span>
+            <button class="btn btn-sm btn-link text-muted text-decoration-none" id="reset-catalog-btn" style="font-size: 0.8rem;">Сбросить всё</button>
         </div>
 
         <div id="products-list-container" class="d-flex flex-column gap-2">
-            <p class="text-center text-muted p-5">Загрузка...</p>
-        </div>
-        
-        <p id="total-count" class="text-center text-muted mt-4 small">Всего товаров: 0</p>
+            </div>
     </div>
 
-    <div class="modal fade" id="product-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
+    <div class="modal fade" id="product-modal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-lg"> <div class="modal-content rounded-4 border-0">
                 <div class="modal-header border-0 pb-0">
                     <h5 class="modal-title fw-bold" id="product-modal-title">Товар</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -97,18 +85,101 @@
                 <div class="modal-body">
                     <form id="product-form">
                         <input type="hidden" id="prod_id">
+                        
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted">Артикул (SKU)</label>
+                                <input type="text" class="form-control" id="prod_sku" required placeholder="AS-81">
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label small text-muted">Название</label>
+                                <input type="text" class="form-control" id="prod_name" required placeholder="Дуб Карибский">
+                            </div>
+                        </div>
+
+                        <div class="form-check form-switch mb-3 p-3 bg-light rounded-3">
+                            <input class="form-check-input" type="checkbox" id="prod_is_liquid" checked>
+                            <label class="form-check-label fw-bold" for="prod_is_liquid">Ликвидный товар</label>
+                            <div class="form-text small">Если выключено — товар будет помечен красным (вывод из ассортимента).</div>
+                        </div>
+
+                        <hr class="my-3 opacity-25">
+                        <h6 class="fw-bold mb-3"><i class="bi bi-sliders"></i> Характеристики</h6>
+
+                        <div class="row g-2 mb-2">
+                            <div class="col-4">
+                                <label class="small text-muted">Класс</label>
+                                <input type="text" class="form-control form-control-sm" id="char_class" placeholder="33">
+                            </div>
+                            <div class="col-4">
+                                <label class="small text-muted">Толщина (мм)</label>
+                                <input type="text" class="form-control form-control-sm" id="char_thickness" placeholder="8">
+                            </div>
+                            <div class="col-4">
+                                <label class="small text-muted">Фаска</label>
+                                <input type="text" class="form-control form-control-sm" id="char_bevel" placeholder="4V">
+                            </div>
+                        </div>
+
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="small text-muted">Размер доски (мм)</label>
+                                <input type="text" class="form-control form-control-sm" id="char_size" placeholder="1200x400">
+                            </div>
+                            <div class="col-6">
+                                <label class="small text-muted">Вес упаковки (кг)</label>
+                                <input type="number" step="0.1" class="form-control form-control-sm" id="package_weight" placeholder="15.5">
+                            </div>
+                        </div>
+
+                        <div class="p-2 bg-light rounded mb-3 border">
+                            <label class="small fw-bold text-muted mb-1">Данные об упаковке</label>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <div class="input-group input-group-sm">
+                                        <input type="number" step="0.001" class="form-control" id="package_area" placeholder="2.5">
+                                        <span class="input-group-text">м²</span>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="input-group input-group-sm">
+                                        <input type="number" class="form-control" id="package_qty" placeholder="20">
+                                        <span class="input-group-text">шт</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="mb-3">
-                            <label class="form-label text-secondary small fw-bold">Артикул (SKU) *</label>
-                            <input type="text" class="form-control fw-bold" id="prod_sku" required placeholder="Например: 8EH34-701">
+                            <label class="form-label small text-muted">Привязка к Excel (Название из накладной)</label>
+                            <input type="text" class="form-control form-control-sm bg-light" id="excel_alias" placeholder="Автоматически заполнится при импорте...">
                         </div>
-                        <div class="mb-4">
-                            <label class="form-label text-secondary small fw-bold">Название / Декор *</label>
-                            <input type="text" class="form-control" id="prod_name" required placeholder="Например: Дуб Снежный">
-                        </div>
-                        <div class="d-grid">
-                            <button type="submit" class="btn btn-primary rounded-pill">Сохранить</button>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary rounded-pill btn-lg">Сохранить</button>
+                            <button type="button" class="btn btn-outline-danger btn-sm border-0" id="btn-delete-prod" style="display:none;">Удалить товар</button>
                         </div>
                     </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="mapping-modal" data-bs-backdrop="static" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content rounded-4 border-0">
+                <div class="modal-header bg-warning-subtle border-0">
+                    <h5 class="modal-title text-warning-emphasis fw-bold"><i class="bi bi-link-45deg"></i> Привязка товаров</h5>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-muted mb-3">В файле найдены товары, которых нет в базе или название отличается. Пожалуйста, укажите соответствие.</p>
+                    
+                    <div id="mapping-container" class="d-flex flex-column gap-3">
+                        </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" id="btn-save-mapping">Сохранить связи</button>
                 </div>
             </div>
         </div>
@@ -133,11 +204,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="products.js?v={{VER}}"></script> <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js').catch(err => console.error(err));
-        }
-    </script>
+    <script src="products.js"></script>
 </body>
 </html>
-
