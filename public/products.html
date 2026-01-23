@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Матрица товаров</title>
+    <title>Матрица</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,14 +17,12 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#b9040a">
-
+    
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 
     <style>
-        /* Стили статусов */
         .prod-card-liquid { border-left: 4px solid #198754; background-color: #fff; }
         .prod-card-illiquid { border-left: 4px solid #dc3545; background-color: rgba(220, 53, 69, 0.05); }
-        
         .char-badge { font-size: 0.7rem; color: #6c757d; background: #f8f9fa; border: 1px solid #dee2e6; padding: 1px 5px; border-radius: 4px; margin-right: 3px; display: inline-block; margin-bottom: 2px;}
         .stock-val { font-weight: 700; font-size: 0.95rem; }
     </style>
@@ -94,33 +92,23 @@
                             </div>
                             <div class="col-8">
                                 <label class="small text-muted">Название</label>
-                                <input type="text" class="form-control" id="prod_name" required placeholder="Дуб Карибский">
+                                <input type="text" class="form-control" id="prod_name" required placeholder="Например: Дуб Снежный">
                             </div>
                         </div>
 
                         <div class="form-check form-switch p-3 bg-light rounded mb-3">
                             <input class="form-check-input" type="checkbox" id="prod_is_liquid" checked>
                             <label class="form-check-label fw-bold" for="prod_is_liquid">Ликвидный товар</label>
-                            <div class="small text-muted" style="font-size: 0.75rem">Если выключено — подсвечивается красным (вывод)</div>
+                            <div class="small text-muted" style="font-size: 0.75rem">Если выключено — подсвечивается красным</div>
                         </div>
 
                         <h6 class="small text-muted text-uppercase fw-bold mb-2">Характеристики</h6>
-                        
                         <div class="row g-2 mb-2">
-                            <div class="col-3">
-                                <input type="text" class="form-control form-control-sm" id="char_class" placeholder="Класс (33)">
-                            </div>
-                            <div class="col-3">
-                                <input type="text" class="form-control form-control-sm" id="char_thick" placeholder="Толщ (8мм)">
-                            </div>
-                            <div class="col-3">
-                                <input type="text" class="form-control form-control-sm" id="char_bevel" placeholder="Фаска (4V)">
-                            </div>
-                            <div class="col-3">
-                                <input type="text" class="form-control form-control-sm" id="char_size" placeholder="Размер">
-                            </div>
+                            <div class="col-3"><input type="text" class="form-control form-control-sm" id="char_class" placeholder="Класс"></div>
+                            <div class="col-3"><input type="text" class="form-control form-control-sm" id="char_thick" placeholder="Толщ мм"></div>
+                            <div class="col-3"><input type="text" class="form-control form-control-sm" id="char_bevel" placeholder="Фаска"></div>
+                            <div class="col-3"><input type="text" class="form-control form-control-sm" id="char_size" placeholder="Размер"></div>
                         </div>
-
                         <div class="row g-2 mb-3">
                             <div class="col-4">
                                 <div class="input-group input-group-sm">
@@ -143,13 +131,13 @@
                         </div>
 
                         <div class="mb-3 collapse" id="alias-block">
-                            <label class="small text-muted">Имя в Excel (для авто-связки)</label>
+                            <label class="small text-muted">Имя в Excel (авто-связка)</label>
                             <input type="text" class="form-control form-control-sm bg-light" id="prod_alias" readonly>
                         </div>
 
                         <div class="d-grid gap-2">
                             <button type="submit" class="btn btn-primary rounded-pill">Сохранить</button>
-                            <button type="button" class="btn btn-outline-danger btn-sm border-0" id="btn-delete-prod">Удалить</button>
+                            <button type="button" class="btn btn-outline-danger btn-sm border-0" id="btn-delete-prod" style="display:none;">Удалить</button>
                         </div>
                     </form>
                 </div>
@@ -164,9 +152,8 @@
                     <h5 class="modal-title text-dark fw-bold">Привязка товаров</h5>
                 </div>
                 <div class="modal-body">
-                    <p class="small text-muted mb-2">Эти товары из Excel не найдены в базе. Укажите соответствие один раз, и система запомнит.</p>
-                    <div id="mapping-list" class="d-flex flex-column gap-3 mt-3">
-                        </div>
+                    <p class="small text-muted mb-2">Товары из Excel не найдены. Укажите соответствие:</p>
+                    <div id="mapping-list" class="d-flex flex-column gap-3 mt-3"></div>
                 </div>
                 <div class="modal-footer border-0">
                     <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Отмена</button>
