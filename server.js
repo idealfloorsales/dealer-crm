@@ -1,351 +1,172 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-// const basicAuth = require('express-basic-auth'); 
-const fs = require('fs'); 
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+const basicAuth = require('express-basic-auth'); 
 
 const app = express();
 const PORT = process.env.PORT || 3000; 
-const JWT_SECRET = process.env.JWT_SECRET || 'CHANGE_THIS_SECRET_KEY_123'; 
-
 app.use(express.json({ limit: '50mb' })); 
 app.use(cors());
 
-// --- АВТО-ВЕРСИЯ КЭША ---
-const APP_VERSION = Date.now(); 
-
-// --- ОТКЛЮЧЕНИЕ КЭША ДЛЯ API ---
-const nocache = (req, res, next) => {
-    res.header('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-    res.header('Expires', '-1');
-    res.header('Pragma', 'no-cache');
-    next();
-};
-app.use('/api', nocache);
-
-// Функция отдачи страниц
-const servePage = (res, fileName) => {
-    const filePath = __dirname + '/public/' + fileName;
-    fs.readFile(filePath, 'utf8', (err, data) => {
-        if (err) { console.error(err); return res.status(500).send('Server Error'); }
-        res.send(data.replace(/{{VER}}/g, APP_VERSION));
-    });
+const USERS = {
+    'admin': process.env.ADMIN_PASSWORD || 'admin',
+    'astana': process.env.ASTANA_PASSWORD || 'astana',
+    'regions': process.env.REGIONS_PASSWORD || 'regions',
+    'guest': process.env.GUEST_PASSWORD || 'guest'
 };
 
-// --- MODELS ---
-
-// 1. User
-const User = mongoose.model('User', {
-    username: { type: String, required: true, unique: true },
-    passwordHash: { type: String, required: true },
-    role: { type: String, enum: ['admin', 'regional_astana', 'regional_regions', 'office', 'guest'], default: 'guest' }
-});
-
-// 2. Dealer
-const Dealer = mongoose.model('Dealer', {
-    dealer_id: String,
-    name: String,
-    organizations: [String],
-    price_type: String,
-    city: String,
-    address: String,
-    contacts: [{ name: String, position: String, contactInfo: String }],
-    additional_addresses: [{ description: String, city: String, address: String }],
-    status: { type: String, default: 'standard' },
-    products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
-    pos_materials: [{ name: String, quantity: Number }],
-    visits: [{ date: String, comment: String, isCompleted: Boolean }],
-    competitors: [{ brand: String, collection: String, price_opt: String, price_retail: String }],
-    contract: { isSigned: Boolean, date: String }, 
-    delivery: String,
-    website: String,
-    instagram: String,
-    latitude: String, 
-    longitude: String,
-    bonuses: String,
-    responsible: String,
-    region_sector: String,
-    photos: [{ photo_url: String }],
-    avatarUrl: String,
-    createdAt: { type: Date, default: Date.now },
-    hasPersonalPlan: { type: Boolean, default: false }
-});
-
-// 3. Product (НОВАЯ СХЕМА С ХАРАКТЕРИСТИКАМИ)
-const Product = mongoose.model('Product', {
-    sku: String,
-    name: String,
-    is_liquid: { type: Boolean, default: true },
-    excel_alias: String,
-    stock_qty: Number,
-    characteristics: {
-        class: String,
-        thickness: String,
-        bevel: String,
-        size: String,
-        package_area: String,
-        package_qty: String,
-        weight: String
+const authMiddleware = (req, res, next) => {
+    if (req.path === '/manifest.json' || req.path === '/sw.js' || req.path.endsWith('.png') || req.path.endsWith('.jpg') || req.path.endsWith('.jpeg') || req.path.endsWith('.ico') || req.path.endsWith('.gif')) {
+        return next();
     }
-});
-
-// 4. Competitor Ref
-const CompetitorRef = mongoose.model('CompetitorRef', {
-    name: String,
-    collections: [mongoose.Schema.Types.Mixed] 
-});
-
-// 5. Status
-const Status = mongoose.model('Status', {
-    value: String,
-    label: String,
-    color: String,
-    isVisible: { type: Boolean, default: true },
-    sortOrder: { type: Number, default: 0 }
-});
-
-// 6. SalesPlan
-const SalesPlan = mongoose.model('SalesPlan', {
-    dealerId: String, 
-    month: String, 
-    plan: Number,
-    fact: Number
-});
-
-// 7. Knowledge Base
-const Knowledge = mongoose.model('Knowledge', {
-    title: String,
-    content: String, 
-    category: String,
-    createdAt: { type: Date, default: Date.now }
-});
-
-// --- MIDDLEWARE: AUTH CHECK ---
-const checkAuth = (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-    if (!token) return res.status(401).json({ message: 'No token' });
-
-    jwt.verify(token, JWT_SECRET, (err, user) => {
-        if (err) return res.status(403).json({ message: 'Invalid token' });
-        req.user = user;
-        next();
-    });
+    const user = basicAuth({ users: USERS, challenge: true, unauthorizedResponse: 'Доступ запрещен.' });
+    user(req, res, next);
 };
+app.use(authMiddleware);
 
-const checkWrite = (req, res, next) => {
-    if (req.user && (req.user.role === 'guest')) {
-        return res.status(403).json({ message: 'Read Only' });
-    }
-    next();
-};
-
-const getDealerFilter = (req) => {
-    const role = req.user.role;
-    if (role === 'regional_astana') return { responsible: 'regional_astana' };
-    if (role === 'regional_regions') return { responsible: 'regional_regions' };
-    if (role === 'office') return { responsible: 'office' };
-    return {}; 
-};
-
-// --- ROUTES: PAGES ---
+app.use(express.static('public', { index: false }));
+app.get('/', (req, res) => res.sendFile(__dirname + '/public/index.html'));
+app.get('/map.html', (req, res) => res.sendFile(__dirname + '/public/map.html'));
+app.get('/sales.html', (req, res) => res.sendFile(__dirname + '/public/sales.html'));
+app.get('/competitors.html', (req, res) => res.sendFile(__dirname + '/public/competitors.html'));
+app.get('/products.html', (req, res) => res.sendFile(__dirname + '/public/products.html'));
+app.get('/report.html', (req, res) => res.sendFile(__dirname + '/public/report.html'));
+app.get('/knowledge.html', (req, res) => res.sendFile(__dirname + '/public/knowledge.html'));
+app.get('/dealer.html', (req, res) => res.sendFile(__dirname + '/public/dealer.html'));
 app.use(express.static('public'));
-app.get('/', (req, res) => servePage(res, 'index.html'));
-app.get('/login.html', (req, res) => servePage(res, 'login.html'));
-app.get('/dealer.html', (req, res) => servePage(res, 'dealer.html'));
-app.get('/map.html', (req, res) => servePage(res, 'map.html'));
-app.get('/products.html', (req, res) => servePage(res, 'products.html'));
-app.get('/sales.html', (req, res) => servePage(res, 'sales.html'));
-app.get('/competitors.html', (req, res) => servePage(res, 'competitors.html'));
-app.get('/report.html', (req, res) => servePage(res, 'report.html'));
-app.get('/knowledge.html', (req, res) => servePage(res, 'knowledge.html'));
 
-// --- ROUTES: API AUTH ---
-app.post('/api/auth/login', async (req, res) => {
-    const { username, password } = req.body;
-    const user = await User.findOne({ username });
-    if (!user) return res.status(400).json({ message: 'User not found' });
+const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-    const isMatch = await bcrypt.compare(password, user.passwordHash);
-    if (!isMatch) return res.status(400).json({ message: 'Wrong password' });
+// SCHEMAS
+const statusSchema = new mongoose.Schema({ value: String, label: String, color: String, isVisible: { type: Boolean, default: true }, sortOrder: { type: Number, default: 0 } });
+const Status = mongoose.model('Status', statusSchema);
+const productSchema = new mongoose.Schema({ sku: String, name: String });
+const Product = mongoose.model('Product', productSchema);
+const contactSchema = new mongoose.Schema({ name: String, position: String, contactInfo: String }, { _id: false }); 
+const photoSchema = new mongoose.Schema({ description: String, photo_url: String, date: { type: Date, default: Date.now } }, { _id: false });
+const additionalAddressSchema = new mongoose.Schema({ description: String, city: String, address: String }, { _id: false });
+const visitSchema = new mongoose.Schema({ date: String, comment: String, isCompleted: { type: Boolean, default: false } }, { _id: false });
+const posMaterialSchema = new mongoose.Schema({ name: String, quantity: Number }, { _id: false });
+const competitorSchema = new mongoose.Schema({ brand: String, collection: String, price_opt: String, price_retail: String }, { _id: false });
+const collectionItemSchema = new mongoose.Schema({ name: String, type: { type: String, default: 'standard' } }, { _id: false });
+const compContactSchema = new mongoose.Schema({ name: String, position: String, phone: String }, { _id: false });
+const compRefSchema = new mongoose.Schema({ name: String, country: String, supplier: String, warehouse: String, info: String, storage_days: String, stock_info: String, reserve_days: String, contacts: [compContactSchema], collections: [collectionItemSchema] });
+const CompRef = mongoose.model('CompRef', compRefSchema);
 
-    const token = jwt.sign({ id: user._id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '30d' });
-    res.json({ token, user: { username: user.username, role: user.role } });
+// DEALER SCHEMA
+const dealerSchema = new mongoose.Schema({ 
+    dealer_id: String, 
+    name: String, 
+    price_type: String, 
+    city: String, 
+    address: String, 
+    contacts: [contactSchema], 
+    bonuses: String, 
+    photos: [photoSchema], 
+    
+    organizations: [String], 
+    contract: { isSigned: Boolean, date: String }, 
+    region_sector: String, 
+    
+    // ЭТО ПОЛЕ ВАЖНО ДЛЯ ГАЛОЧКИ VIP
+    hasPersonalPlan: { type: Boolean, default: false }, 
+
+    delivery: String, 
+    website: String, 
+    instagram: String, 
+    additional_addresses: [additionalAddressSchema], 
+    pos_materials: [posMaterialSchema], 
+    visits: [visitSchema], 
+    products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }], 
+    latitude: Number, 
+    longitude: Number, 
+    status: { type: String, default: 'standard' }, 
+    avatarUrl: String, 
+    competitors: [competitorSchema], 
+    responsible: String 
 });
+const Dealer = mongoose.model('Dealer', dealerSchema);
 
-app.get('/api/auth/me', checkAuth, async (req, res) => {
-    const user = await User.findById(req.user.id).select('-passwordHash');
-    res.json({ user });
-});
+const salesSchema = new mongoose.Schema({ month: String, group: String, dealerId: String, dealerName: String, plan: Number, fact: Number, isCustom: { type: Boolean, default: false } });
+const Sales = mongoose.model('Sales', salesSchema);
+const Knowledge = mongoose.model('Knowledge', new mongoose.Schema({ title: String, content: String }, { timestamps: true }));
 
-// --- ROUTES: API DATA ---
-app.use('/api/*', checkAuth); 
+async function connectToDB() {
+    if (!DB_CONNECTION_STRING) return console.error("No DB String");
+    try { await mongoose.connect(DB_CONNECTION_STRING); console.log('MongoDB Connected'); await seedStatuses(); } catch (e) { console.error(e); }
+}
 
-// Dealers
-app.get('/api/dealers', async (req, res) => {
-    const filter = getDealerFilter(req);
-    const dealers = await Dealer.find(filter).populate('products').sort({ name: 1 });
-    res.json(dealers);
-});
-
-app.get('/api/dealers/:id', async (req, res) => {
-    const d = await Dealer.findById(req.params.id).populate('products');
-    if (!d) return res.status(404).json({ message: 'Not found' });
-    res.json(d);
-});
-
-app.post('/api/dealers', checkWrite, async (req, res) => {
-    try {
-        const newDealer = new Dealer(req.body);
-        await newDealer.save();
-        res.json(newDealer);
-    } catch (e) { res.status(500).send(e.message); }
-});
-
-app.put('/api/dealers/:id', checkWrite, async (req, res) => {
-    try {
-        await Dealer.findByIdAndUpdate(req.params.id, req.body);
-        res.json({ status: 'updated' });
-    } catch (e) { res.status(500).send(e.message); }
-});
-
-app.put('/api/dealers/:id/products', checkWrite, async (req, res) => {
-    try {
-        const { productIds } = req.body;
-        const dealer = await Dealer.findById(req.params.id);
-        if(!dealer) return res.status(404).send('Not found');
-        dealer.products = productIds; 
-        await dealer.save();
-        res.json({ status: 'ok' });
-    } catch(e) { res.status(500).send(e.message); }
-});
-
-// Products
-app.get('/api/products', async (req, res) => {
-    const products = await Product.find().sort({ name: 1 });
-    res.json(products);
-});
-
-app.post('/api/products', checkWrite, async (req, res) => {
-    try {
-        // Проверка дублей SKU (только при создании)
-        if(req.body.sku) {
-            const exist = await Product.findOne({ sku: req.body.sku });
-            if(exist) return res.status(400).send('SKU exists');
-        }
-        const p = new Product(req.body);
-        await p.save();
-        res.json(p);
-    } catch (e) { res.status(500).send(e.message); }
-});
-
-app.put('/api/products/:id', checkWrite, async (req, res) => {
-    try {
-        await Product.findByIdAndUpdate(req.params.id, req.body);
-        res.json({ status: 'updated' });
-    } catch (e) { res.status(500).send(e.message); }
-});
-
-app.delete('/api/products/:id', checkWrite, async (req, res) => {
-    try {
-        await Product.findByIdAndDelete(req.params.id);
-        res.json({ status: 'deleted' });
-    } catch (e) { res.status(500).send(e.message); }
-});
-
-// Other refs
-app.get('/api/statuses', async (req, res) => {
-    let list = await Status.find().sort({ sortOrder: 1 });
-    if(list.length === 0) { // Default seed
+async function seedStatuses() {
+    const count = await Status.countDocuments();
+    if (count === 0) {
         await Status.insertMany([
-            { value: 'active', label: 'Активный', color: '#198754', sortOrder: 1 },
-            { value: 'potential', label: 'Потенциал', color: '#0d6efd', sortOrder: 2 },
-            { value: 'standard', label: 'Стандарт', color: '#6c757d', sortOrder: 3 },
-            { value: 'problem', label: 'Проблемный', color: '#dc3545', sortOrder: 4 },
-            { value: 'archive', label: 'Архив', color: '#000000', sortOrder: 99, isVisible: false }
+            { value: 'active', label: 'Активный', color: '#198754', isVisible: true, sortOrder: 1 },
+            { value: 'standard', label: 'Стандарт', color: '#ffc107', isVisible: true, sortOrder: 2 },
+            { value: 'problem', label: 'Проблемный', color: '#dc3545', isVisible: true, sortOrder: 3 },
+            { value: 'potential', label: 'Потенциальный', color: '#0d6efd', isVisible: true, sortOrder: 4 },
+            { value: 'archive', label: 'Архив', color: '#6c757d', isVisible: false, sortOrder: 5 }
         ]);
-        list = await Status.find();
     }
-    res.json(list);
+}
+
+function convertToClient(doc) {
+    if(!doc) return null; const obj = doc.toObject ? doc.toObject() : doc;
+    obj.id = obj._id; delete obj._id; delete obj.__v;
+    if(obj.products) obj.products = obj.products.map(p => { if(p){p.id=p._id; delete p._id;} return p;});
+    if (obj.organization && (!obj.organizations || obj.organizations.length === 0)) { obj.organizations = [obj.organization]; }
+    return obj;
+}
+function getUserRole(req) { return req.auth ? req.auth.user : 'guest'; }
+function canWrite(req) { return req.auth ? req.auth.user !== 'guest' : false; }
+function getDealerFilter(req) {
+    const role = getUserRole(req);
+    if (role === 'admin' || role === 'guest') return {}; 
+    if (role === 'astana') return { $or: [{ responsible: 'regional_astana' }, { city: { $regex: /астана/i } }, { city: { $regex: /astana/i } }] };
+    if (role === 'regions') return { $or: [{ responsible: 'regional_regions' }, { city: { $not: { $regex: /астана/i } }, responsible: { $ne: 'regional_astana' } }] };
+    return { _id: null }; 
+}
+const checkWrite = (req, res, next) => { if (canWrite(req)) next(); else res.status(403).json({error:'Read Only'}); };
+
+app.get('/api/auth/me', (req, res) => { res.json({ role: getUserRole(req) }); });
+app.get('/api/statuses', async (req, res) => { const s = await Status.find().sort({sortOrder: 1}).lean(); res.json(s.map(convertToClient)); });
+app.post('/api/statuses', checkWrite, async (req, res) => { try { const s = new Status(req.body); await s.save(); res.json(convertToClient(s)); } catch(e){ res.status(500).json({error:e.message}); } });
+app.put('/api/statuses/:id', checkWrite, async (req, res) => { try { await Status.findByIdAndUpdate(req.params.id, req.body); res.json({status:'ok'}); } catch(e){ res.status(500).json({error:e.message}); } });
+app.delete('/api/statuses/:id', checkWrite, async (req, res) => { await Status.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
+
+// Optimized Dealers List
+app.get('/api/dealers', async (req, res) => { 
+    try { 
+        const dealers = await Dealer.find(getDealerFilter(req)).select('-photos -visits -products').lean(); 
+        res.json(dealers.map(d => ({ id: d._id, ...d, photo_url: d.avatarUrl }))); 
+    } catch (e) { res.status(500).json({ error: e.message }); } 
 });
-app.post('/api/statuses', checkWrite, async (req, res) => { const s = new Status(req.body); await s.save(); res.json(s); });
-app.put('/api/statuses/:id', checkWrite, async (req, res) => { await Status.findByIdAndUpdate(req.params.id, req.body); res.json({status:'ok'}); });
-app.delete('/api/statuses/:id', checkWrite, async (req, res) => { await Status.findByIdAndDelete(req.params.id); res.json({status:'ok'}); });
+app.get('/api/dealers/:id', async (req, res) => { try { const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).populate('products'); res.json(convertToClient(d)); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.post('/api/dealers', checkWrite, async (req, res) => { try { const role = getUserRole(req); if (role === 'astana') req.body.responsible = 'regional_astana'; if (role === 'regions') req.body.responsible = 'regional_regions'; const d = new Dealer(req.body); await d.save(); res.status(201).json(convertToClient(d)); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.put('/api/dealers/:id', checkWrite, async (req, res) => { try { await Dealer.findOneAndUpdate({ _id: req.params.id, ...getDealerFilter(req) }, req.body); res.json({status:'ok'}); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.delete('/api/dealers/:id', checkWrite, async (req, res) => { try { await Dealer.findOneAndDelete({ _id: req.params.id, ...getDealerFilter(req) }); res.json({status:'deleted'}); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.get('/api/dealers/:id/products', async (req, res) => { const d = await Dealer.findById(req.params.id).populate('products'); res.json(d.products.map(convertToClient)); });
+app.put('/api/dealers/:id/products', async (req, res) => { await Dealer.findByIdAndUpdate(req.params.id, { products: req.body.productIds }); res.json({status:'ok'}); });
 
-// Sales
-app.get('/api/sales', async (req, res) => {
-    const { month } = req.query; 
-    const filter = getDealerFilter(req);
-    // Find dealers first
-    const dealers = await Dealer.find(filter).select('_id');
-    const dealerIds = dealers.map(d => d._id.toString());
-    
-    const query = { dealerId: { $in: dealerIds } };
-    if (month) query.month = month;
-    
-    const plans = await SalesPlan.find(query);
-    res.json(plans);
-});
-
-app.post('/api/sales', checkWrite, async (req, res) => {
-    const { dealerId, month, plan, fact } = req.body;
-    let entry = await SalesPlan.findOne({ dealerId, month });
-    if (entry) {
-        if(plan !== undefined) entry.plan = plan;
-        if(fact !== undefined) entry.fact = fact;
-        await entry.save();
-    } else {
-        entry = new SalesPlan({ dealerId, month, plan: plan||0, fact: fact||0 });
-        await entry.save();
-    }
-    res.json(entry);
-});
-
-// Competitors Ref
-app.get('/api/competitors-ref', async (req, res) => { const l = await CompetitorRef.find().sort({name:1}); res.json(l); });
-app.post('/api/competitors-ref', checkWrite, async (req, res) => { const c = new CompetitorRef(req.body); await c.save(); res.json(c); });
-app.put('/api/competitors-ref/:id', checkWrite, async (req, res) => { await CompetitorRef.findByIdAndUpdate(req.params.id, req.body); res.json({status:'ok'}); });
-app.delete('/api/competitors-ref/:id', checkWrite, async (req, res) => { await CompetitorRef.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
-
-// Knowledge
-const convertToClient = (doc) => { if(!doc) return null; return { id: doc._id, title: doc.title, content: doc.content, category: doc.category, date: doc.createdAt }; };
+app.get('/api/products', async (req, res) => { const s = new RegExp(req.query.search||'', 'i'); const p = await Product.find({$or:[{sku:s},{name:s}]}).sort({sku:1}).lean(); res.json(p.map(x=>{x.id=x._id;return x;})); });
+app.post('/api/products', checkWrite, async (req, res) => { const p = new Product(req.body); await p.save(); res.json(convertToClient(p)); });
+app.put('/api/products/:id', checkWrite, async (req, res) => { const p = await Product.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(p)); });
+app.delete('/api/products/:id', checkWrite, async (req, res) => { await Product.findByIdAndDelete(req.params.id); res.json({}); });
+app.post('/api/admin/import-catalog', async (req, res) => { if(getUserRole(req) !== 'admin') return res.status(403).json({error:'Admin only'}); res.json({status: 'ok'}); });
+app.get('/api/matrix', async (req, res) => { try { const prods = await Product.find().sort({sku:1}).lean(); const dealers = await Dealer.find(getDealerFilter(req)).lean(); const map = new Map(); dealers.forEach(d => map.set(d._id.toString(), new Set(d.products.map(String)))); const posList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"]; const matrix = prods.map(p => ({ sku: p.sku, name: p.name, type: 'product', dealers: dealers.map(d => ({ value: map.get(d._id.toString()).has(p._id.toString()) ? 1 : 0, is_pos: false })) })); posList.forEach(pn => { matrix.push({ sku: "POS", name: pn, type: 'pos', dealers: dealers.map(d => ({ value: (d.pos_materials||[]).find(m=>m.name===pn)?.quantity||0, is_pos: true })) }); }); res.json({ headers: dealers.map(d=>({id:d._id,name:d.name,city:d.city})), matrix }); } catch (e) { res.status(500).json({error:e.message}); } });
+app.get('/api/sales', async (req, res) => { const {month} = req.query; const s = await Sales.find(month ? {month} : {}).lean(); res.json(s); });
+app.post('/api/sales', checkWrite, async (req, res) => { const ops = req.body.data.map(i => ({ updateOne: { filter: { month: req.body.month, $or: [{dealerId: i.dealerId}, {dealerName: i.dealerName, isCustom:true}] }, update: {$set: i}, upsert: true } })); await Sales.bulkWrite(ops); res.json({status:'ok'}); });
+app.get('/api/competitors-ref', async (req, res) => { const l = await CompRef.find().sort({name:1}); res.json(l.map(convertToClient)); });
+app.post('/api/competitors-ref', checkWrite, async (req, res) => { const c = new CompRef(req.body); await c.save(); res.json(c); });
+app.put('/api/competitors-ref/:id', checkWrite, async (req, res) => { await CompRef.findByIdAndUpdate(req.params.id, req.body); res.json({status:'ok'}); });
+app.delete('/api/competitors-ref/:id', checkWrite, async (req, res) => { await CompRef.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
 app.get('/api/knowledge', async (req, res) => { const l = await Knowledge.find().sort({title:1}); res.json(l.map(convertToClient)); });
 app.get('/api/knowledge/:id', async (req, res) => { res.json(convertToClient(await Knowledge.findById(req.params.id))); });
 app.post('/api/knowledge', checkWrite, async (req, res) => { const a = new Knowledge(req.body); await a.save(); res.json(convertToClient(a)); });
 app.put('/api/knowledge/:id', checkWrite, async (req, res) => { const a = await Knowledge.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(a)); });
 app.delete('/api/knowledge/:id', checkWrite, async (req, res) => { await Knowledge.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
 
-// Tasks (Combined logic)
-app.get('/api/tasks', async (req, res) => { 
-    try { 
-        const data = await Dealer.find(getDealerFilter(req)).select('name visits status responsible').lean(); 
-        const tasks = data.map(d => ({ 
-            id: d._id, 
-            name: d.name, 
-            status: d.status, 
-            visits: d.visits 
-        })); 
-        res.json(tasks); 
-    } catch(e) { res.status(500).send(e.message); } 
+app.get('/api/tasks', async (req, res) => {
+    try { const data = await Dealer.find(getDealerFilter(req)).select('name visits status responsible').lean(); res.json(data.map(d => ({ id: d._id, name: d.name, status: d.status, visits: d.visits || [], responsible: d.responsible }))); } catch (e) { res.status(500).json([]); }
 });
 
-// --- СТАРТ СЕРВЕРА (НАДЕЖНЫЙ) ---
-const start = async () => {
-    try {
-        const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/dealer_db';
-        
-        // Подключение к БД
-        await mongoose.connect(uri);
-        console.log('MongoDB Connected');
-
-        // Запуск сервера ТОЛЬКО после подключения к БД
-        app.listen(PORT, () => console.log(`Server started on port ${PORT}`));
-    } catch (error) {
-        console.error('ERROR: Database connection failed:', error.message);
-        process.exit(1);
-    }
-};
-
-start();
+app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
