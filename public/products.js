@@ -94,21 +94,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         listContainer.innerHTML = products.map(p => {
-            // Ликвидность
             const isLiquid = p.is_liquid !== false; 
             const rowClass = isLiquid ? 'row-liquid' : 'row-illiquid';
-            const opacity = isLiquid ? '' : 'opacity-75'; // Чуть бледнее если неликвид
+            const opacity = isLiquid ? '' : 'opacity-75';
 
-            // Сборка строки характеристик (в одну строку через запятую или пробел)
+            // Сборка строки характеристик
             let details = [];
             if(p.characteristics) {
                 const c = p.characteristics;
                 if(c.class) details.push(`${c.class} кл`);
                 if(c.thickness) details.push(`${c.thickness} мм`);
-                if(c.size) details.push(c.size); // Размер
-                if(c.bevel) details.push(c.bevel); // Фаска
+                if(c.size) details.push(c.size);
+                if(c.bevel) details.push(c.bevel);
                 
-                // Упаковка
                 let pack = [];
                 if(c.package_area) pack.push(`${c.package_area} м²`);
                 if(c.package_qty) pack.push(`${c.package_qty} шт`);
@@ -123,31 +121,27 @@ document.addEventListener('DOMContentLoaded', () => {
             if (p.stock_qty !== undefined && p.stock_qty !== null) {
                 const qty = parseFloat(p.stock_qty);
                 const color = qty > 20 ? 'text-success' : (qty > 0 ? 'text-warning' : 'text-secondary');
-                // Отображаем остаток чуть крупнее справа
-                stockHtml = `<div class="ms-2 ${color} fw-bold text-nowrap" style="font-size:0.95rem;">${qty.toFixed(2)} м²</div>`;
+                stockHtml = `<div class="ms-3 ${color} fw-bold text-nowrap fs-6">${qty.toFixed(2)} м²</div>`;
             }
 
             return `
-            <div class="bg-white p-2 rounded-3 shadow-sm border border-light mb-2 d-flex align-items-center justify-content-between ${rowClass} ${opacity}" onclick="openModal('${p.id}')" style="cursor:pointer; min-height: 50px;">
+            <div class="bg-white p-2 rounded-3 shadow-sm border border-light mb-2 d-flex align-items-center justify-content-between ${rowClass} ${opacity}" onclick="openModal('${p.id}')" style="cursor:pointer; min-height: 55px;">
                 
                 <div style="overflow: hidden; flex-grow: 1;">
-                    <div class="d-flex flex-wrap align-items-baseline gap-2">
-                        
-                        <span class="fw-bold text-dark" style="font-size: 0.95rem;">${p.name || 'Без названия'}</span>
-                        
-                        <span class="text-secondary fw-bold small text-nowrap">${p.sku || ''}</span>
-                        
-                        ${!isLiquid ? '<span class="badge bg-danger p-1" style="font-size:0.6rem">НЕЛИКВИД</span>' : ''}
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <span class="badge bg-secondary text-white fw-normal font-monospace" style="font-size: 0.85rem;">${p.sku || '???'}</span>
+                        <h6 class="mb-0 fw-bold text-dark text-truncate" style="font-size: 0.95rem;">${p.name || 'Без названия'}</h6>
+                        ${!isLiquid ? '<span class="badge bg-danger p-1" style="font-size:0.6rem">СТОП</span>' : ''}
+                    </div>
 
-                        <span class="text-muted small" style="font-size: 0.85rem;">
-                            ${detailsStr}
-                        </span>
+                    <div class="text-muted small text-truncate" style="font-size: 0.85rem; padding-left: 2px;">
+                        ${detailsStr || '<span class="opacity-50">Нет характеристик</span>'}
                     </div>
                 </div>
 
-                <div class="d-flex align-items-center ps-2">
+                <div class="d-flex align-items-center">
                     ${stockHtml}
-                    <i class="bi bi-chevron-right text-muted ms-2 small"></i>
+                    <i class="bi bi-chevron-right text-muted ms-3 small"></i>
                 </div>
             </div>`;
         }).join('');
@@ -396,4 +390,5 @@ document.addEventListener('DOMContentLoaded', () => {
     // Первая загрузка
     loadProducts();
 });
+
 
