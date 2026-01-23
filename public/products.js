@@ -5,8 +5,12 @@ window.fetch = async function (url, options) {
     options.headers = options.headers || {};
     const token = localStorage.getItem('crm_token');
     if (token) options.headers['Authorization'] = 'Bearer ' + token;
+    
     const response = await originalFetch(url, options);
-    if (response.status === 401) window.location.href = '/login.html';
+    // Добавлена проверка на 403, чтобы не было ошибок в консоли
+    if (response.status === 401 || response.status === 403) {
+        window.location.href = '/login.html';
+    }
     return response;
 };
 // -------------------
@@ -20,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchInput = document.getElementById('product-search');
     const totalLabel = document.getElementById('total-count');
     
-    // Модалка
+    // Модалка товара
     const modalEl = document.getElementById('product-modal');
     const modal = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: false });
     const form = document.getElementById('product-form');
@@ -29,14 +33,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const addBtn = document.getElementById('add-product-btn');
     const resetBtn = document.getElementById('reset-catalog-btn'); 
     
-    // Поля формы (ИСПРАВЛЕНЫ ID)
+    // Поля формы - ВНИМАТЕЛЬНО С ID
     const inpId = document.getElementById('prod_id');
     const inpSku = document.getElementById('prod_sku');
     const inpName = document.getElementById('prod_name');
     const btnDelete = document.getElementById('btn-delete-prod');
 
-    const inpLiquid = document.getElementById('prod_is_liquid'); // ИСПРАВЛЕНО
+    // Новые поля
+    const inpLiquid = document.getElementById('prod_is_liquid'); // Точно совпадает с HTML
     const inpAlias = document.getElementById('prod_alias');
+    
     const charClass = document.getElementById('char_class');
     const charThick = document.getElementById('char_thick');
     const charBevel = document.getElementById('char_bevel');
@@ -46,8 +52,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const pkgWeight = document.getElementById('pkg_weight');
 
     // Excel
-    const btnImport = document.getElementById('btn-import-stock');
-    const fileInput = document.getElementById('excel-file-input');
+    const btnImport = document.getElementById('btn-import');
+    const fileInput = document.getElementById('excel-input');
     const mapModalEl = document.getElementById('mapping-modal');
     const mapModal = new bootstrap.Modal(mapModalEl);
     const mapList = document.getElementById('mapping-list');
@@ -63,7 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!res.ok) throw new Error('Ошибка');
             allProducts = await res.json();
             
-            // Сортировка
+            // Сортировка: Ликвидные сверху
             allProducts.sort((a, b) => {
                 if (a.is_liquid !== false && b.is_liquid === false) return -1;
                 if (a.is_liquid === false && b.is_liquid !== false) return 1;
@@ -76,23 +82,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderList(products) {
-        totalLabel.textContent = products.length;
+        totalLabel.textContent = `Всего товаров: ${products.length}`;
         if (products.length === 0) {
-            listContainer.innerHTML = '<div class="text-center text-muted p-4">Список пуст</div>';
+            listContainer.innerHTML = '<p class="text-center text-muted mt-4">Список пуст</p>';
             return;
         }
 
         listContainer.innerHTML = products.map(p => {
             const isLiquid = p.is_liquid !== false; 
-            const rowClass = isLiquid ? 'prod-liquid' : 'prod-illiquid';
+            const rowClass = isLiquid ? 'row-liquid' : 'row-illiquid';
             
-            // Характеристики
+            // Сборка характеристик
             let charsHtml = '';
             if(p.characteristics) {
                 const c = p.characteristics;
-                if(c.class) charsHtml += `<span class="char-badge">${c.class} кл</span>`;
-                if(c.thickness) charsHtml += `<span class="char-badge">${c.thickness} мм</span>`;
-                if(c.package_area) charsHtml += `<span class="char-badge">Уп: ${c.package_area} м²</span>`;
+                if(c.class) charsHtml += `<span class="char-tag">${c.class} кл</span>`;
+                if(c.thickness) charsHtml += `<span class="char-tag">${c.thickness} мм</span>`;
+                if(c.package_area) charsHtml += `<span class="char-tag">Уп: ${c.package_area} м²</span>`;
             }
 
             // Остаток
@@ -104,20 +110,18 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             return `
-            <div class="card shadow-sm border-0 mb-2 ${rowClass}" onclick="openModal('${p.id}')" style="cursor:pointer;">
-                <div class="card-body p-2 d-flex justify-content-between align-items-center">
-                    <div style="overflow:hidden;">
-                        <div class="d-flex align-items-center gap-2">
-                            <h6 class="mb-0 fw-bold text-truncate">${p.name || ''}</h6>
-                            ${!isLiquid ? '<span class="badge bg-danger" style="font-size:0.6rem">СТОП</span>' : ''}
-                        </div>
-                        <div class="text-muted small font-monospace mb-1">${p.sku || ''}</div>
-                        <div class="d-flex flex-wrap">${charsHtml}</div>
+            <div class="bg-white p-3 rounded-4 shadow-sm border border-light d-flex justify-content-between align-items-center ${rowClass}" onclick="openModal('${p.id}')" style="cursor:pointer;">
+                <div style="overflow: hidden;">
+                    <div class="d-flex align-items-center gap-2">
+                        <h6 class="mb-0 fw-bold text-truncate">${p.name || ''}</h6>
+                        ${!isLiquid ? '<span class="badge bg-danger" style="font-size:0.6rem">СТОП</span>' : ''}
                     </div>
-                    <div class="d-flex align-items-center">
-                        ${stockHtml}
-                        <i class="bi bi-chevron-right text-muted ms-2"></i>
-                    </div>
+                    <div class="text-muted small mb-1">${p.sku || ''}</div>
+                    <div class="d-flex flex-wrap">${charsHtml}</div>
+                </div>
+                <div class="d-flex align-items-center">
+                    ${stockHtml}
+                    <i class="bi bi-chevron-right text-muted ms-3"></i>
                 </div>
             </div>`;
         }).join('');
@@ -134,7 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 inpSku.value = p.sku;
                 inpName.value = p.name;
                 
-                // Исправленное заполнение
+                // Заполнение новых полей
                 inpLiquid.checked = p.is_liquid !== false;
                 inpAlias.value = p.excel_alias || '';
 
@@ -186,7 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = { 
                 sku: inpSku.value.trim(), 
                 name: inpName.value.trim(),
-                is_liquid: inpLiquid.checked, // Теперь работает
+                is_liquid: inpLiquid.checked, 
                 excel_alias: inpAlias.value.trim(),
                 characteristics: chars
             };
@@ -229,6 +233,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function processExcel(rows) {
         let hIdx = -1, cName = -1, cStock = -1;
+        // Поиск заголовков
         for(let i=0; i<Math.min(rows.length, 20); i++) {
             const r = rows[i];
             for(let j=0; j<r.length; j++) {
@@ -249,6 +254,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const stock = parseFloat(rows[i][cStock]);
             if(!name || isNaN(stock)) continue;
 
+            // Поиск совпадений
             let p = allProducts.find(x => x.excel_alias === name);
             if(!p) p = allProducts.find(x => x.name.toLowerCase() === name.toLowerCase());
             if(!p) p = allProducts.find(x => x.sku && x.sku.length > 3 && name.includes(x.sku));
