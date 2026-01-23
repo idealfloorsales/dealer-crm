@@ -12,7 +12,6 @@ window.fetch = async function (url, options) {
     }
     return response;
 };
-// -------------------
 
 document.addEventListener('DOMContentLoaded', () => {
     
@@ -40,6 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const inpLiquid = document.getElementById('prod_is_liquid');
     const inpAlias = document.getElementById('prod_alias');
     
+    // Характеристики
     const charClass = document.getElementById('char_class');
     const charThick = document.getElementById('char_thick');
     const charBevel = document.getElementById('char_bevel');
@@ -59,123 +59,96 @@ document.addEventListener('DOMContentLoaded', () => {
     let allProducts = [];
     let unmappedItems = [];
     
-    // Состояние фильтров
-    let filterState = {
-        liquidOnly: false,
-        inStockOnly: false,
-        class: '',
-        thickness: ''
-    };
+    // НАСТРОЙКИ СОРТИРОВКИ И ФИЛЬТРА
+    let sortMode = 'sku'; // 'sku', 'stock_desc', 'stock_asc'
+    let filterMode = 'all'; // 'all', 'liquid', 'illiquid'
 
-    // --- ВСТАВКА ФИЛЬТРОВ (ДИНАМИЧЕСКИ) ---
-    function injectFilters() {
-        const searchBlock = searchInput.closest('.sticky-filters'); // Ищем блок с поиском
-        if(!searchBlock) return;
+    // --- ВНЕДРЕНИЕ ПРОСТОГО МЕНЮ (Сортировка + Фильтр) ---
+    function injectSimpleControls() {
+        const searchBlock = searchInput.closest('.sticky-filters');
+        if(!searchBlock || document.getElementById('simple-controls')) return;
+
+        const controls = document.createElement('div');
+        controls.id = 'simple-controls';
+        controls.className = 'mt-2 d-flex gap-2';
         
-        // Создаем контейнер для фильтров, если его нет
-        let filterRow = document.getElementById('dynamic-filters');
-        if(!filterRow) {
-            filterRow = document.createElement('div');
-            filterRow.id = 'dynamic-filters';
-            filterRow.className = 'd-flex gap-2 overflow-auto pb-2 mt-2';
-            filterRow.style.whiteSpace = 'nowrap';
-            // Вставляем ПОСЛЕ инпута поиска
-            searchBlock.appendChild(filterRow);
-        }
-
-        // HTML кнопок фильтров
-        filterRow.innerHTML = `
-            <button class="btn btn-sm rounded-pill ${filterState.liquidOnly ? 'btn-success' : 'btn-outline-secondary'}" onclick="toggleFilter('liquidOnly')">
-                <i class="bi bi-check-circle me-1"></i>Только активные
-            </button>
-            <button class="btn btn-sm rounded-pill ${filterState.inStockOnly ? 'btn-warning text-dark' : 'btn-outline-secondary'}" onclick="toggleFilter('inStockOnly')">
-                <i class="bi bi-box-seam me-1"></i>В наличии
-            </button>
-            
-            <select class="form-select form-select-sm rounded-pill d-inline-block w-auto border-secondary" style="min-width: 100px;" onchange="setFilter('class', this.value)">
-                <option value="">Все классы</option>
-                <option value="32">32 класс</option>
-                <option value="33">33 класс</option>
-                <option value="34">34 класс</option>
+        controls.innerHTML = `
+            <select id="sort-select" class="form-select form-select-sm border-secondary-subtle" style="width: 50%">
+                <option value="sku">🔤 По артикулу (А-Я)</option>
+                <option value="stock_desc">📉 По остатку (Много &rarr; Мало)</option>
+                <option value="stock_asc">📈 По остатку (Мало &rarr; Много)</option>
             </select>
-
-             <select class="form-select form-select-sm rounded-pill d-inline-block w-auto border-secondary" style="min-width: 100px;" onchange="setFilter('thickness', this.value)">
-                <option value="">Любая толщина</option>
-                <option value="8">8 мм</option>
-                <option value="10">10 мм</option>
-                <option value="12">12 мм</option>
+            <select id="filter-select" class="form-select form-select-sm border-secondary-subtle" style="width: 50%">
+                <option value="all">👁️ Все товары</option>
+                <option value="liquid">✅ Только Ликвид</option>
+                <option value="illiquid">❌ Только Неликвид</option>
             </select>
         `;
+        searchBlock.appendChild(controls);
+
+        // Слушатели событий
+        document.getElementById('sort-select').onchange = (e) => {
+            sortMode = e.target.value;
+            applyLogic();
+        };
+        document.getElementById('filter-select').onchange = (e) => {
+            filterMode = e.target.value;
+            applyLogic();
+        };
     }
 
-    // Глобальные функции для онкликов
-    window.toggleFilter = (key) => {
-        filterState[key] = !filterState[key];
-        injectFilters(); // Перерисовать кнопки (чтобы цвет сменился)
-        applyFilters();  // Применить логику
-    };
-
-    window.setFilter = (key, val) => {
-        filterState[key] = val;
-        applyFilters();
-    };
-
-    // --- ЗАГРУЗКА ---
     async function loadProducts() {
         try {
             listContainer.innerHTML = '<p class="text-center text-muted p-5">Загрузка...</p>';
             const res = await fetch(API_URL);
-            if (!res.ok) throw new Error('Ошибка загрузки');
+            if (!res.ok) throw new Error('Ошибка');
             allProducts = await res.json();
             
-            // Первичная сортировка
-            allProducts.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-            
-            injectFilters(); // Рисуем фильтры
-            applyFilters();  // Рисуем список
+            injectSimpleControls();
+            applyLogic();
         } catch (e) {
             console.error(e);
-            listContainer.innerHTML = '<p class="text-center text-danger mt-4">Не удалось загрузить товары</p>';
+            listContainer.innerHTML = '<p class="text-center text-danger mt-4">Ошибка загрузки</p>';
         }
     }
 
-    // --- ЛОГИКА ФИЛЬТРАЦИИ ---
-    function applyFilters() {
+    // --- ГЛАВНАЯ ЛОГИКА (Фильтр + Сортировка) ---
+    function applyLogic() {
         const term = searchInput.value.toLowerCase();
         
-        const filtered = allProducts.filter(p => {
-            // 1. Поиск
+        // 1. Фильтрация
+        let filtered = allProducts.filter(p => {
+            // Поиск
             const matchSearch = (p.name && p.name.toLowerCase().includes(term)) || 
                                 (p.sku && p.sku.toLowerCase().includes(term));
             if(!matchSearch) return false;
 
-            // 2. Ликвидность
-            if(filterState.liquidOnly && p.is_liquid === false) return false;
-
-            // 3. Наличие (> 5 м2)
-            if(filterState.inStockOnly && (!p.stock_qty || p.stock_qty < 5)) return false;
-
-            // 4. Характеристики (Класс / Толщина)
-            if(p.characteristics) {
-                const c = p.characteristics;
-                if(filterState.class && (!c.class || !c.class.includes(filterState.class))) return false;
-                if(filterState.thickness && (!c.thickness || !c.thickness.includes(filterState.thickness))) return false;
-            } else {
-                // Если характеристик нет вообще, а фильтр включен - скрываем
-                if(filterState.class || filterState.thickness) return false;
-            }
+            // Фильтр ликвидности
+            if (filterMode === 'liquid' && p.is_liquid === false) return false;
+            if (filterMode === 'illiquid' && p.is_liquid !== false) return false;
 
             return true;
+        });
+
+        // 2. Сортировка
+        filtered.sort((a, b) => {
+            if (sortMode === 'sku') {
+                return (a.sku || '').localeCompare(b.sku || '');
+            } else if (sortMode === 'stock_desc') {
+                return (b.stock_qty || 0) - (a.stock_qty || 0);
+            } else if (sortMode === 'stock_asc') {
+                return (a.stock_qty || 0) - (b.stock_qty || 0);
+            }
         });
 
         renderList(filtered);
     }
 
-    // --- ОТРИСОВКА СПИСКА (КРАСИВАЯ) ---
+    // --- ОТРИСОВКА СПИСКА (КРАСИВАЯ, как просили) ---
     function renderList(products) {
-        totalLabel.textContent = `Найдено: ${products.length} шт`;
+        totalLabel.textContent = `Найдено: ${products.length}`;
         if (products.length === 0) {
-            listContainer.innerHTML = '<p class="text-center text-muted mt-4">Ничего не найдено</p>';
+            listContainer.innerHTML = '<p class="text-center text-muted mt-4">Список пуст</p>';
             return;
         }
 
@@ -233,7 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
     }
 
-    // --- МОДАЛКА (РЕДАКТИРОВАНИЕ) ---
+    // --- МОДАЛКА ---
     window.openModal = (id) => {
         form.reset();
         if(btnDelete) btnDelete.style.display = 'none';
@@ -274,11 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.deleteProduct = async (id) => {
         if(confirm('Удалить этот товар?')) {
-            try { 
-                await fetch(`${API_URL}/${id}`, { method: 'DELETE' }); 
-                loadProducts(); 
-                modal.hide(); 
-            } catch(e) { alert('Ошибка удаления'); }
+            try { await fetch(`${API_URL}/${id}`, { method: 'DELETE' }); loadProducts(); modal.hide(); } catch(e) { alert('Ошибка удаления'); }
         }
     };
 
@@ -327,7 +296,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    // --- ИМПОРТ EXCEL ---
+    // --- IMPORT EXCEL ---
     if(btnImport) btnImport.onclick = () => { if(fileInput) fileInput.click(); };
 
     if(fileInput) fileInput.onchange = (e) => {
@@ -385,7 +354,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         await loadProducts();
-        
         if(unmappedItems.length > 0) showMapping();
         else alert(`Обновлено: ${updated} шт.`);
     }
@@ -409,7 +377,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>`;
             mapList.appendChild(div);
         });
-        
         mapModal.show();
     }
 
@@ -434,15 +401,9 @@ document.addEventListener('DOMContentLoaded', () => {
         alert('Сохранено');
     };
 
-    // --- ПОИСК ---
-    searchInput.addEventListener('input', applyFilters); // Теперь при вводе сразу фильтруем с учетом кнопок
-
+    searchInput.addEventListener('input', applyLogic);
     addBtn.onclick = () => openModal();
-    
-    if(resetBtn) resetBtn.onclick = () => {
-        if(!confirm('Очистить весь каталог?')) return;
-        alert('Функция временно отключена');
-    };
+    if(resetBtn) resetBtn.onclick = () => { if(!confirm('Очистить весь каталог?')) return; alert('Функция временно отключена'); };
 
     loadProducts();
 });
