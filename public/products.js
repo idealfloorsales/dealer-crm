@@ -7,7 +7,6 @@ window.fetch = async function (url, options) {
     if (token) options.headers['Authorization'] = 'Bearer ' + token;
     
     const response = await originalFetch(url, options);
-    // Обработка потери авторизации
     if (response.status === 401 || response.status === 403) {
         window.location.href = '/login.html';
     }
@@ -19,32 +18,28 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const API_URL = '/api/products';
     
-    // Элементы списка
+    // Элементы
     const listContainer = document.getElementById('products-list-container'); 
     const searchInput = document.getElementById('product-search');
     const totalLabel = document.getElementById('total-count');
     
-    // Модальное окно Товара
+    // Модалка
     const modalEl = document.getElementById('product-modal');
     const modal = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: false });
     const form = document.getElementById('product-form');
     const modalTitle = document.getElementById('product-modal-title');
     
-    // Кнопки управления
     const addBtn = document.getElementById('add-product-btn');
     const resetBtn = document.getElementById('reset-catalog-btn'); 
     
-    // Поля формы (Основные)
+    // Поля формы
     const inpId = document.getElementById('prod_id');
     const inpSku = document.getElementById('prod_sku');
     const inpName = document.getElementById('prod_name');
     const btnDelete = document.getElementById('btn-delete-prod');
-
-    // Поля формы (Новые)
     const inpLiquid = document.getElementById('prod_is_liquid');
     const inpAlias = document.getElementById('prod_alias');
     
-    // Поля характеристик
     const charClass = document.getElementById('char_class');
     const charThick = document.getElementById('char_thick');
     const charBevel = document.getElementById('char_bevel');
@@ -53,9 +48,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const pkgQty = document.getElementById('pkg_qty');
     const pkgWeight = document.getElementById('pkg_weight');
 
-    // Элементы для Excel
-    const btnImport = document.getElementById('btn-import'); // В HTML id="btn-import" или "btn-import-stock" (проверьте совпадение)
-    const fileInput = document.getElementById('excel-input'); // В HTML id="excel-input"
+    // Excel
+    const btnImport = document.getElementById('btn-import');
+    const fileInput = document.getElementById('excel-input');
     const mapModalEl = document.getElementById('mapping-modal');
     const mapModal = new bootstrap.Modal(mapModalEl);
     const mapList = document.getElementById('mapping-list');
@@ -63,8 +58,69 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let allProducts = [];
     let unmappedItems = [];
+    
+    // Состояние фильтров
+    let filterState = {
+        liquidOnly: false,
+        inStockOnly: false,
+        class: '',
+        thickness: ''
+    };
 
-    // --- ЗАГРУЗКА СПИСКА ---
+    // --- ВСТАВКА ФИЛЬТРОВ (ДИНАМИЧЕСКИ) ---
+    function injectFilters() {
+        const searchBlock = searchInput.closest('.sticky-filters'); // Ищем блок с поиском
+        if(!searchBlock) return;
+        
+        // Создаем контейнер для фильтров, если его нет
+        let filterRow = document.getElementById('dynamic-filters');
+        if(!filterRow) {
+            filterRow = document.createElement('div');
+            filterRow.id = 'dynamic-filters';
+            filterRow.className = 'd-flex gap-2 overflow-auto pb-2 mt-2';
+            filterRow.style.whiteSpace = 'nowrap';
+            // Вставляем ПОСЛЕ инпута поиска
+            searchBlock.appendChild(filterRow);
+        }
+
+        // HTML кнопок фильтров
+        filterRow.innerHTML = `
+            <button class="btn btn-sm rounded-pill ${filterState.liquidOnly ? 'btn-success' : 'btn-outline-secondary'}" onclick="toggleFilter('liquidOnly')">
+                <i class="bi bi-check-circle me-1"></i>Только активные
+            </button>
+            <button class="btn btn-sm rounded-pill ${filterState.inStockOnly ? 'btn-warning text-dark' : 'btn-outline-secondary'}" onclick="toggleFilter('inStockOnly')">
+                <i class="bi bi-box-seam me-1"></i>В наличии
+            </button>
+            
+            <select class="form-select form-select-sm rounded-pill d-inline-block w-auto border-secondary" style="min-width: 100px;" onchange="setFilter('class', this.value)">
+                <option value="">Все классы</option>
+                <option value="32">32 класс</option>
+                <option value="33">33 класс</option>
+                <option value="34">34 класс</option>
+            </select>
+
+             <select class="form-select form-select-sm rounded-pill d-inline-block w-auto border-secondary" style="min-width: 100px;" onchange="setFilter('thickness', this.value)">
+                <option value="">Любая толщина</option>
+                <option value="8">8 мм</option>
+                <option value="10">10 мм</option>
+                <option value="12">12 мм</option>
+            </select>
+        `;
+    }
+
+    // Глобальные функции для онкликов
+    window.toggleFilter = (key) => {
+        filterState[key] = !filterState[key];
+        injectFilters(); // Перерисовать кнопки (чтобы цвет сменился)
+        applyFilters();  // Применить логику
+    };
+
+    window.setFilter = (key, val) => {
+        filterState[key] = val;
+        applyFilters();
+    };
+
+    // --- ЗАГРУЗКА ---
     async function loadProducts() {
         try {
             listContainer.innerHTML = '<p class="text-center text-muted p-5">Загрузка...</p>';
@@ -72,24 +128,54 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!res.ok) throw new Error('Ошибка загрузки');
             allProducts = await res.json();
             
-            // Сортировка: Сначала Ликвидные, потом Неликвидные, внутри по Алфавиту
-            allProducts.sort((a, b) => {
-                if (a.is_liquid !== false && b.is_liquid === false) return -1;
-                if (a.is_liquid === false && b.is_liquid !== false) return 1;
-                return (a.name || '').localeCompare(b.name || '');
-            });
-            renderList(allProducts);
+            // Первичная сортировка
+            allProducts.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            
+            injectFilters(); // Рисуем фильтры
+            applyFilters();  // Рисуем список
         } catch (e) {
             console.error(e);
             listContainer.innerHTML = '<p class="text-center text-danger mt-4">Не удалось загрузить товары</p>';
         }
     }
 
-// --- ОТРИСОВКА СПИСКА ---
+    // --- ЛОГИКА ФИЛЬТРАЦИИ ---
+    function applyFilters() {
+        const term = searchInput.value.toLowerCase();
+        
+        const filtered = allProducts.filter(p => {
+            // 1. Поиск
+            const matchSearch = (p.name && p.name.toLowerCase().includes(term)) || 
+                                (p.sku && p.sku.toLowerCase().includes(term));
+            if(!matchSearch) return false;
+
+            // 2. Ликвидность
+            if(filterState.liquidOnly && p.is_liquid === false) return false;
+
+            // 3. Наличие (> 5 м2)
+            if(filterState.inStockOnly && (!p.stock_qty || p.stock_qty < 5)) return false;
+
+            // 4. Характеристики (Класс / Толщина)
+            if(p.characteristics) {
+                const c = p.characteristics;
+                if(filterState.class && (!c.class || !c.class.includes(filterState.class))) return false;
+                if(filterState.thickness && (!c.thickness || !c.thickness.includes(filterState.thickness))) return false;
+            } else {
+                // Если характеристик нет вообще, а фильтр включен - скрываем
+                if(filterState.class || filterState.thickness) return false;
+            }
+
+            return true;
+        });
+
+        renderList(filtered);
+    }
+
+    // --- ОТРИСОВКА СПИСКА (КРАСИВАЯ) ---
     function renderList(products) {
-        totalLabel.textContent = `Всего товаров: ${products.length}`;
+        totalLabel.textContent = `Найдено: ${products.length} шт`;
         if (products.length === 0) {
-            listContainer.innerHTML = '<p class="text-center text-muted mt-4">Список пуст</p>';
+            listContainer.innerHTML = '<p class="text-center text-muted mt-4">Ничего не найдено</p>';
             return;
         }
 
@@ -98,7 +184,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const rowClass = isLiquid ? 'row-liquid' : 'row-illiquid';
             const opacity = isLiquid ? '' : 'opacity-75';
 
-            // Сборка строки характеристик
+            // Характеристики
             let details = [];
             if(p.characteristics) {
                 const c = p.characteristics;
@@ -147,10 +233,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
     }
 
-    // --- ОТКРЫТИЕ МОДАЛКИ (РЕДАКТИРОВАНИЕ) ---
+    // --- МОДАЛКА (РЕДАКТИРОВАНИЕ) ---
     window.openModal = (id) => {
         form.reset();
-        // Скрываем кнопку удаления, покажем если это редактирование
         if(btnDelete) btnDelete.style.display = 'none';
         
         if (id) {
@@ -159,8 +244,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 inpId.value = p.id;
                 inpSku.value = p.sku || '';
                 inpName.value = p.name || '';
-                
-                // Заполняем новые поля (с проверкой на существование элементов)
                 if(inpLiquid) inpLiquid.checked = p.is_liquid !== false;
                 if(inpAlias) inpAlias.value = p.excel_alias || '';
 
@@ -189,7 +272,6 @@ document.addEventListener('DOMContentLoaded', () => {
         modal.show();
     };
 
-    // --- УДАЛЕНИЕ ---
     window.deleteProduct = async (id) => {
         if(confirm('Удалить этот товар?')) {
             try { 
@@ -200,12 +282,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // --- СОХРАНЕНИЕ (ИСПРАВЛЕННАЯ ЛОГИКА) ---
+    // --- СОХРАНЕНИЕ ---
     if(form) {
         form.onsubmit = async (e) => {
             e.preventDefault();
             
-            // 1. Собираем характеристики
             const chars = {
                 class: charClass ? charClass.value.trim() : '',
                 thickness: charThick ? charThick.value.trim() : '',
@@ -216,16 +297,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 weight: pkgWeight ? pkgWeight.value.trim() : ''
             };
 
-            // 2. Собираем основной объект
             const data = { 
                 sku: inpSku.value.trim(), 
                 name: inpName.value.trim(),
-                is_liquid: inpLiquid ? inpLiquid.checked : true, // Если элемента нет, считаем true
+                is_liquid: inpLiquid ? inpLiquid.checked : true,
                 excel_alias: inpAlias ? inpAlias.value.trim() : '',
                 characteristics: chars
             };
-
-            console.log("Отправка:", data); // Для отладки
 
             const id = inpId.value;
             let url = API_URL;
@@ -235,20 +313,13 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const btn = form.querySelector('button[type="submit"]');
                 const oldText = btn.innerHTML;
-                btn.disabled = true; btn.innerHTML = 'Сохранение...';
+                btn.disabled = true; btn.innerHTML = '...';
                 
                 const res = await fetch(url, { method: method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
-                
-                if (res.ok) { 
-                    await loadProducts(); 
-                    modal.hide(); 
-                } else { 
-                    alert('Ошибка сохранения. Возможно, такой SKU уже есть.'); 
-                }
+                if (res.ok) { await loadProducts(); modal.hide(); } else { alert('Ошибка сохранения.'); }
                 
                 btn.disabled = false; btn.innerHTML = oldText;
             } catch (e) { 
-                console.error(e);
                 alert('Ошибка сети'); 
                 const btn = form.querySelector('button[type="submit"]');
                 if(btn) btn.disabled = false;
@@ -257,15 +328,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- ИМПОРТ EXCEL ---
-    // Обработчик кнопки (проверка на существование)
-    if(btnImport) btnImport.onclick = () => {
-        if(fileInput) fileInput.click();
-    };
+    if(btnImport) btnImport.onclick = () => { if(fileInput) fileInput.click(); };
 
     if(fileInput) fileInput.onchange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        
         const reader = new FileReader();
         reader.onload = (evt) => {
             try {
@@ -274,7 +341,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const ws = wb.Sheets[wb.SheetNames[0]];
                 const json = XLSX.utils.sheet_to_json(ws, {header: 1});
                 processExcel(json);
-            } catch (err) { alert("Ошибка чтения файла: " + err.message); }
+            } catch (err) { alert("Ошибка чтения: " + err.message); }
             fileInput.value = '';
         };
         reader.readAsArrayBuffer(file);
@@ -282,8 +349,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function processExcel(rows) {
         let hIdx = -1, cName = -1, cStock = -1;
-        
-        // Поиск заголовков (Номенклатура / Остаток)
         for(let i=0; i<Math.min(rows.length, 25); i++) {
             const r = rows[i];
             for(let j=0; j<r.length; j++) {
@@ -304,7 +369,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const stock = parseFloat(rows[i][cStock]);
             if(!name || isNaN(stock)) continue;
 
-            // Поиск товара (1. Alias, 2. Name, 3. SKU)
             let p = allProducts.find(x => x.excel_alias === name);
             if(!p) p = allProducts.find(x => x.name.toLowerCase() === name.toLowerCase());
             if(!p) p = allProducts.find(x => x.sku && x.sku.length > 3 && name.includes(x.sku));
@@ -323,12 +387,11 @@ document.addEventListener('DOMContentLoaded', () => {
         await loadProducts();
         
         if(unmappedItems.length > 0) showMapping();
-        else alert(`Готово! Обновлено: ${updated} товаров.`);
+        else alert(`Обновлено: ${updated} шт.`);
     }
 
     function showMapping() {
         mapList.innerHTML = '';
-        // Уникальные имена
         const names = [...new Set(unmappedItems.map(x => x.name))].slice(0, 10);
         if(names.length === 0) return;
 
@@ -358,7 +421,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const p = allProducts.find(x => String(x.id) === sel.value);
                 const n = sel.dataset.name;
                 if(p) {
-                    p.excel_alias = n; // Запоминаем связь
+                    p.excel_alias = n;
                     const it = unmappedItems.find(x => x.name === n);
                     if(it) p.stock_qty = it.qty;
                     await fetch(`${API_URL}/${p.id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(p) });
@@ -368,27 +431,18 @@ document.addEventListener('DOMContentLoaded', () => {
         btnSaveMapping.disabled = false;
         mapModal.hide();
         await loadProducts();
-        alert('Связи сохранены');
+        alert('Сохранено');
     };
 
     // --- ПОИСК ---
-    searchInput.addEventListener('input', (e) => {
-        const term = e.target.value.toLowerCase();
-        const filtered = allProducts.filter(p => p.name.toLowerCase().includes(term) || (p.sku && p.sku.toLowerCase().includes(term)));
-        renderList(filtered);
-    });
+    searchInput.addEventListener('input', applyFilters); // Теперь при вводе сразу фильтруем с учетом кнопок
 
-    // Открытие модалки добавления
     addBtn.onclick = () => openModal();
     
-    // Сброс каталога
     if(resetBtn) resetBtn.onclick = () => {
         if(!confirm('Очистить весь каталог?')) return;
         alert('Функция временно отключена');
     };
 
-    // Первая загрузка
     loadProducts();
 });
-
-
