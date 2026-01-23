@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchInput = document.getElementById('product-search');
     const totalLabel = document.getElementById('total-count');
     
-    // Модалка
+    // Модалки
     const modalEl = document.getElementById('product-modal');
     const modal = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: false });
     const form = document.getElementById('product-form');
@@ -39,7 +39,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const inpLiquid = document.getElementById('prod_is_liquid');
     const inpAlias = document.getElementById('prod_alias');
     
-    // Характеристики
     const charClass = document.getElementById('char_class');
     const charThick = document.getElementById('char_thick');
     const charBevel = document.getElementById('char_bevel');
@@ -56,14 +55,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const mapList = document.getElementById('mapping-list');
     const btnSaveMapping = document.getElementById('btn-save-mapping');
 
+    // Калькулятор
+    const calcModalEl = document.getElementById('global-calc-modal');
+    const calcModal = new bootstrap.Modal(calcModalEl);
+    const calcSearch = document.getElementById('calc-search-input');
+    const calcResults = document.getElementById('calc-search-results');
+    const calcInSqm = document.getElementById('calc-input-sqm');
+    const calcInMargin = document.getElementById('calc-input-margin');
+    
     let allProducts = [];
     let unmappedItems = [];
+    let sortMode = 'sku'; 
+    let filterMode = 'all'; 
     
-    // Настройки
-    let sortMode = 'sku'; // 'sku', 'stock_desc', 'stock_asc'
-    let filterMode = 'all'; // 'all', 'liquid', 'illiquid'
+    // Текущий товар в калькуляторе
+    let calcCurrentProduct = null;
 
-    // --- ВНЕДРЕНИЕ ЧИСТЫХ КОНТРОЛОВ ---
+    // --- ВНЕДРЕНИЕ КОНТРОЛОВ ---
     function injectSimpleControls() {
         const searchBlock = searchInput.closest('.sticky-filters');
         if(!searchBlock || document.getElementById('simple-controls')) return;
@@ -72,7 +80,6 @@ document.addEventListener('DOMContentLoaded', () => {
         controls.id = 'simple-controls';
         controls.className = 'mt-2 d-flex gap-2';
         
-        // Строгие селекты Bootstrap
         controls.innerHTML = `
             <select id="sort-select" class="form-select form-select-sm text-secondary bg-light border-0" style="font-weight: 500;">
                 <option value="sku">Сортировка: Артикул (А-Я)</option>
@@ -107,12 +114,10 @@ document.addEventListener('DOMContentLoaded', () => {
             injectSimpleControls();
             applyLogic();
         } catch (e) {
-            console.error(e);
             listContainer.innerHTML = '<div class="text-center text-danger py-4">Ошибка загрузки данных</div>';
         }
     }
 
-    // --- ЛОГИКА ФИЛЬТРАЦИИ ---
     function applyLogic() {
         const term = searchInput.value.toLowerCase();
         
@@ -140,7 +145,6 @@ document.addEventListener('DOMContentLoaded', () => {
         renderList(filtered);
     }
 
-    // --- ОТРИСОВКА СПИСКА (СТРОГАЯ) ---
     function renderList(products) {
         totalLabel.textContent = `Найдено: ${products.length}`;
         if (products.length === 0) {
@@ -150,11 +154,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         listContainer.innerHTML = products.map(p => {
             const isLiquid = p.is_liquid !== false; 
-            // Используем стандартные классы или легкие оттенки
             const bgClass = isLiquid ? 'bg-white' : 'bg-light';
             const textOpacity = isLiquid ? '' : 'text-muted';
 
-            // Характеристики
             let details = [];
             if(p.characteristics) {
                 const c = p.characteristics;
@@ -172,30 +174,25 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             const detailsStr = details.join(', ');
 
-            // Остаток
             let stockHtml = '';
             if (p.stock_qty !== undefined && p.stock_qty !== null) {
                 const qty = parseFloat(p.stock_qty);
-                // Цвета Bootstrap: success (зеленый), warning (желтый), secondary (серый)
                 const colorClass = qty > 20 ? 'text-success' : (qty > 0 ? 'text-warning' : 'text-secondary');
                 stockHtml = `<span class="${colorClass} fw-bold" style="font-size: 0.9rem;">${qty.toFixed(2)} м²</span>`;
             }
 
             return `
             <div class="${bgClass} p-3 rounded-4 shadow-sm border border-light mb-2 d-flex align-items-center justify-content-between" onclick="openModal('${p.id}')" style="cursor:pointer; min-height: 60px;">
-                
                 <div style="overflow: hidden; flex-grow: 1;">
                     <div class="d-flex align-items-center gap-2 mb-1">
                         <span class="badge bg-light text-secondary border border-secondary-subtle fw-normal font-monospace">${p.sku || '---'}</span>
                         <span class="fw-bold text-dark text-truncate ${textOpacity}">${p.name || 'Без названия'}</span>
                         ${!isLiquid ? '<span class="badge bg-danger bg-opacity-10 text-danger border border-danger-subtle" style="font-size:0.65rem">НЕЛИКВИД</span>' : ''}
                     </div>
-
                     <div class="text-muted small text-truncate" style="font-size: 0.85rem;">
                         ${detailsStr || 'Нет характеристик'}
                     </div>
                 </div>
-
                 <div class="d-flex align-items-center ps-3">
                     ${stockHtml}
                     <i class="bi bi-chevron-right text-muted ms-3 small"></i>
@@ -204,7 +201,114 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
     }
 
-    // --- МОДАЛКА ---
+    // --- ЛОГИКА КАЛЬКУЛЯТОРА ---
+    window.openGlobalCalc = () => {
+        calcSearch.value = '';
+        calcResults.classList.add('d-none');
+        document.getElementById('calc-selected-info').classList.add('d-none');
+        calcInSqm.value = '';
+        resetCalcDisplay();
+        calcCurrentProduct = null;
+        calcModal.show();
+        setTimeout(() => calcSearch.focus(), 500);
+    };
+
+    // Поиск в калькуляторе
+    calcSearch.addEventListener('input', (e) => {
+        const val = e.target.value.toLowerCase();
+        if(val.length < 2) {
+            calcResults.classList.add('d-none');
+            return;
+        }
+        
+        const matches = allProducts.filter(p => 
+            (p.name && p.name.toLowerCase().includes(val)) || 
+            (p.sku && p.sku.toLowerCase().includes(val))
+        ).slice(0, 10); // Максимум 10 подсказок
+
+        if(matches.length > 0) {
+            calcResults.innerHTML = matches.map(p => `
+                <div class="search-item" onclick="selectCalcProduct('${p.id}')">
+                    <div class="fw-bold small">${p.name}</div>
+                    <div class="text-muted small font-monospace">${p.sku}</div>
+                </div>
+            `).join('');
+            calcResults.classList.remove('d-none');
+        } else {
+            calcResults.innerHTML = '<div class="p-2 text-muted small text-center">Ничего не найдено</div>';
+            calcResults.classList.remove('d-none');
+        }
+    });
+
+    window.selectCalcProduct = (id) => {
+        const p = allProducts.find(x => String(x.id) === String(id));
+        if(!p) return;
+
+        calcCurrentProduct = p;
+        calcSearch.value = p.name;
+        calcResults.classList.add('d-none');
+
+        // Отображение данных
+        const area = p.characteristics?.package_area || 0;
+        const weight = p.characteristics?.weight || 0;
+
+        if(!area) {
+            alert('Внимание! У товара не заполнен метраж упаковки. Расчет невозможен.');
+            return;
+        }
+
+        document.getElementById('calc-sel-name').textContent = `${p.sku} - ${p.name}`;
+        document.getElementById('calc-sel-area').textContent = area;
+        document.getElementById('calc-sel-weight').textContent = weight;
+        document.getElementById('calc-selected-info').classList.remove('d-none');
+        
+        doCalculation();
+    };
+
+    function resetCalcDisplay() {
+        document.getElementById('res-packs').textContent = '0';
+        document.getElementById('res-total-sqm').textContent = '0';
+        document.getElementById('res-total-weight').textContent = '0';
+        document.getElementById('calc-formula-hint').textContent = '';
+    }
+
+    function doCalculation() {
+        if(!calcCurrentProduct) return;
+        
+        const reqSqm = parseFloat(calcInSqm.value);
+        if(!reqSqm || reqSqm <= 0) {
+            resetCalcDisplay();
+            return;
+        }
+
+        const margin = parseInt(calcInSqm.value ? calcInMargin.value : 0);
+        const packArea = parseFloat(calcCurrentProduct.characteristics.package_area);
+        const packWeight = parseFloat(calcCurrentProduct.characteristics.weight) || 0;
+
+        // 1. Добавляем запас
+        const withMargin = reqSqm * (1 + margin / 100);
+        
+        // 2. Считаем пачки (округляем вверх)
+        const packs = Math.ceil(withMargin / packArea);
+        
+        // 3. Итоговые цифры
+        const finalSqm = packs * packArea;
+        const finalWeight = packs * packWeight;
+
+        document.getElementById('res-packs').textContent = packs;
+        document.getElementById('res-total-sqm').textContent = finalSqm.toFixed(3);
+        document.getElementById('res-total-weight').textContent = finalWeight.toFixed(1);
+        
+        document.getElementById('calc-formula-hint').textContent = 
+            `Клиент: ${reqSqm} м² + ${margin}% = ${withMargin.toFixed(2)} м² (нужно)`;
+    }
+
+    // Слушатели ввода для пересчета
+    calcInSqm.addEventListener('input', doCalculation);
+    calcInMargin.addEventListener('change', doCalculation);
+
+
+    // --- ОБЫЧНЫЕ ФУНКЦИИ ---
     window.openModal = (id) => {
         form.reset();
         if(btnDelete) btnDelete.style.display = 'none';
@@ -244,16 +348,14 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     window.deleteProduct = async (id) => {
-        if(confirm('Удалить товар из базы?')) {
-            try { await fetch(`${API_URL}/${id}`, { method: 'DELETE' }); loadProducts(); modal.hide(); } catch(e) { alert('Ошибка удаления'); }
+        if(confirm('Удалить товар?')) {
+            try { await fetch(`${API_URL}/${id}`, { method: 'DELETE' }); loadProducts(); modal.hide(); } catch(e) { alert('Ошибка'); }
         }
     };
 
-    // --- СОХРАНЕНИЕ ---
     if(form) {
         form.onsubmit = async (e) => {
             e.preventDefault();
-            
             const chars = {
                 class: charClass ? charClass.value.trim() : '',
                 thickness: charThick ? charThick.value.trim() : '',
@@ -263,40 +365,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 package_qty: pkgQty ? pkgQty.value.trim() : '',
                 weight: pkgWeight ? pkgWeight.value.trim() : ''
             };
-
             const data = { 
-                sku: inpSku.value.trim(), 
-                name: inpName.value.trim(),
+                sku: inpSku.value.trim(), name: inpName.value.trim(),
                 is_liquid: inpLiquid ? inpLiquid.checked : true,
                 excel_alias: inpAlias ? inpAlias.value.trim() : '',
                 characteristics: chars
             };
-
             const id = inpId.value;
-            let url = API_URL;
-            let method = 'POST';
+            let url = API_URL; let method = 'POST';
             if (id) { url = `${API_URL}/${id}`; method = 'PUT'; }
 
             try {
                 const btn = form.querySelector('button[type="submit"]');
                 const oldText = btn.innerHTML;
                 btn.disabled = true; btn.innerHTML = 'Сохранение...';
-                
                 const res = await fetch(url, { method: method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
                 if (res.ok) { await loadProducts(); modal.hide(); } else { alert('Ошибка сохранения.'); }
-                
                 btn.disabled = false; btn.innerHTML = oldText;
-            } catch (e) { 
-                alert('Ошибка сети'); 
-                const btn = form.querySelector('button[type="submit"]');
-                if(btn) btn.disabled = false;
-            }
+            } catch (e) { alert('Ошибка сети'); }
         };
     }
 
-    // --- IMPORT EXCEL ---
     if(btnImport) btnImport.onclick = () => { if(fileInput) fileInput.click(); };
-
     if(fileInput) fileInput.onchange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -327,52 +417,38 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if(hIdx === -1) return alert('Не найдены колонки "Номенклатура" и "Остаток"');
-
-        unmappedItems = [];
-        let updated = 0;
-
+        unmappedItems = []; let updated = 0;
         for(let i=hIdx+1; i<rows.length; i++) {
             const name = String(rows[i][cName] || '').trim();
             const stock = parseFloat(rows[i][cStock]);
             if(!name || isNaN(stock)) continue;
-
             let p = allProducts.find(x => x.excel_alias === name);
             if(!p) p = allProducts.find(x => x.name.toLowerCase() === name.toLowerCase());
             if(!p) p = allProducts.find(x => x.sku && x.sku.length > 3 && name.includes(x.sku));
-
             if(p) {
                 if(p.stock_qty !== stock) {
                     p.stock_qty = stock;
                     await fetch(`${API_URL}/${p.id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(p) });
                     updated++;
                 }
-            } else {
-                unmappedItems.push({ name, qty: stock });
-            }
+            } else { unmappedItems.push({ name, qty: stock }); }
         }
-
         await loadProducts();
-        if(unmappedItems.length > 0) showMapping();
-        else alert(`Обновлено: ${updated} шт.`);
+        if(unmappedItems.length > 0) showMapping(); else alert(`Обновлено: ${updated} шт.`);
     }
 
     function showMapping() {
         mapList.innerHTML = '';
         const names = [...new Set(unmappedItems.map(x => x.name))].slice(0, 10);
         if(names.length === 0) return;
-
         const opts = `<option value="">-- Пропустить --</option>` + allProducts.map(p => `<option value="${p.id}">${p.sku} ${p.name}</option>`).join('');
-
         names.forEach(n => {
             const item = unmappedItems.find(x => x.name === n);
             const div = document.createElement('div');
             div.className = 'p-2 bg-light border rounded';
-            div.innerHTML = `
-                <div class="fw-bold text-truncate" title="${n}">${n}</div>
-                <div class="d-flex gap-2 align-items-center mt-1">
-                    <span class="badge bg-secondary">${item.qty}</span>
-                    <select class="form-select form-select-sm map-select" data-name="${n}">${opts}</select>
-                </div>`;
+            div.innerHTML = `<div class="fw-bold text-truncate" title="${n}">${n}</div>
+                <div class="d-flex gap-2 align-items-center mt-1"><span class="badge bg-secondary">${item.qty}</span>
+                <select class="form-select form-select-sm map-select" data-name="${n}">${opts}</select></div>`;
             mapList.appendChild(div);
         });
         mapModal.show();
