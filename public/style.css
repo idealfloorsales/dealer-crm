@@ -1880,3 +1880,27 @@ nav a.nav-link.active { background: var(--primary-color) !important; color: whit
 .export-option-row:hover {
     background: #f1f5f9;
 }
+
+
+
+
+
+
+/* ЭКСТРЕННОЕ ИСПРАВЛЕНИЕ: Убираем зависшую шторку */
+.modal-backdrop {
+    display: none !important; /* Скрываем затемнение */
+}
+
+/* Восстанавливаем затемнение ТОЛЬКО когда модалка реально открыта */
+.modal.show ~ .modal-backdrop, 
+.modal.show .modal-backdrop {
+    display: block !important;
+    opacity: 0.5 !important;
+    z-index: 1050 !important;
+}
+
+/* Если всё равно не нажимается — разблокируем body */
+body.modal-open {
+    overflow: auto !important;
+    padding-right: 0 !important;
+}
