@@ -145,12 +145,12 @@ document.addEventListener('DOMContentLoaded', () => {
         renderList(filtered);
     }
 
-    // --- ОТРИСОВКА (С ОБЩИМ ОСТАТКОМ) ---
+   // --- ОТРИСОВКА СПИСКА ---
     function renderList(products) {
         // 1. Считаем сумму остатков
         const totalStock = products.reduce((sum, p) => sum + (parseFloat(p.stock_qty) || 0), 0);
         
-        // 2. Красиво форматируем число (например: 1 200.50)
+        // 2. Форматируем число
         const formattedStock = totalStock.toLocaleString('ru-RU', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
@@ -169,15 +169,13 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         }
 
-        // 4. Рисуем сам список
+        // 4. Рисуем список
         listContainer.innerHTML = products.map(p => {
             const isLiquid = p.is_liquid !== false; 
             const bgClass = isLiquid ? 'bg-white' : 'bg-light';
             const textOpacity = isLiquid ? '' : 'text-muted';
 
             let details = [];
-            let packArea = 0; 
-
             if(p.characteristics) {
                 const c = p.characteristics;
                 if(c.class) details.push(`${c.class} кл`);
@@ -186,10 +184,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if(c.bevel) details.push(c.bevel);
                 
                 let pack = [];
-                if(c.package_area) {
-                    pack.push(`${c.package_area} м²`);
-                    packArea = parseFloat(c.package_area);
-                }
+                if(c.package_area) pack.push(`${c.package_area} м²`);
                 if(c.package_qty) pack.push(`${c.package_qty} шт`);
                 if(pack.length > 0) details.push(`(${pack.join('/')})`);
                 
@@ -203,11 +198,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const colorClass = qty > 20 ? 'text-success' : (qty > 0 ? 'text-warning' : 'text-secondary');
                 stockHtml = `<span class="${colorClass} fw-bold" style="font-size: 0.9rem;">${qty.toFixed(2)} м²</span>`;
             }
-
-            // Кнопка калькулятора (только если есть м2 упаковки)
-            const calcBtn = packArea > 0 
-                ? `<button class="btn btn-sm btn-light border ms-2 text-primary" onclick="openCalc(event, '${p.id}')" title="Калькулятор"><i class="bi bi-calculator"></i></button>`
-                : '';
 
             return `
             <div class="${bgClass} p-3 rounded-4 shadow-sm border border-light mb-2 d-flex align-items-center justify-content-between" onclick="openModal('${p.id}')" style="cursor:pointer; min-height: 60px;">
@@ -226,7 +216,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="d-flex flex-column align-items-end">
                        ${stockHtml}
                     </div>
-                    ${calcBtn}
+                    <button class="btn btn-sm btn-light border ms-3 text-secondary" title="Редактировать">
+                        <i class="bi bi-pencil"></i>
+                    </button>
                 </div>
             </div>`;
         }).join('');
@@ -512,4 +504,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
     loadProducts();
 });
+
 
