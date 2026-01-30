@@ -14,19 +14,34 @@ document.addEventListener('DOMContentLoaded', () => {
     const API_URL = '/api/competitors-ref';
     const API_DEALERS = '/api/dealers';
     
- // ... (начало файла без изменений)
+    // --- ВСЕ СТИЛИ (Карточки, Лого, Адреса, Лифт, Список) ---
+    const styleFix = document.createElement('style');
+    styleFix.innerHTML = `
+        /* Карточка (Стандартный вид) */
+        .comp-card-modern { min-height: 480px !important; transition: all 0.3s ease; }
+        .comp-front { display: flex; flex-direction: column; padding-bottom: 10px; }
+        .comp-front .btn-flip { margin-top: auto; }
+        .btn-dealers-hover:hover { background-color: #6c757d !important; color: #ffffff !important; border-color: #6c757d !important; }
+        .comp-card-modern.is-flipped .btn-card-edit-abs { display: none !important; }
+        .cb-custom { background-color: #e0cffc; color: #5b21b6; border: 1px solid #d8b4fe; }
+        .dealer-link-item:hover { background: #f8f9fa; }
+        
+        /* Логотип */
+        .comp-logo-box { height: 60px; display: flex; align-items: center; margin-bottom: 10px; }
+        .comp-logo-img { max-height: 100%; max-width: 100%; object-fit: contain; }
 
-    // В файле competitors.js найдите раздел "1. СТИЛИ (CSS)" внутри ЛИФТА
-    // И замените содержимое elevatorStyle.innerHTML на это:
+        /* Адреса в карточке */
+        .address-row { display: flex; gap: 6px; font-size: 0.85rem; color: #555; margin-bottom: 4px; align-items: baseline; }
+        .address-icon { color: #dc3545; font-size: 0.9rem; }
 
-    elevatorStyle.innerHTML = `
-        /* Капсула лифта */
+        /* --- ЛИФТ УПРАВЛЕНИЯ --- */
         .elevator-capsule {
             position: fixed; bottom: 100px; right: 15px; z-index: 1060;
             display: flex; flex-direction: column; gap: 5px;
             background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(4px);
             padding: 5px; border-radius: 50px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid rgba(0,0,0,0.05);
+            transition: opacity 0.3s;
         }
         @media (min-width: 992px) { .elevator-capsule { bottom: 30px; right: 25px; } }
 
@@ -37,71 +52,36 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         .elevator-btn:hover { background: #f8f9fa; color: #b9040a; transform: scale(1.1); }
 
-        /* --- СТРОГИЙ РЕЖИМ СТРОКИ (EXCEL STYLE) --- */
+        /* --- РЕЖИМ СПИСКА (СТРОГИЙ ВИД) --- */
         .comp-list-mode .col-xl-3, .comp-list-mode .col-lg-4, .comp-list-mode .col-md-6 { 
-            width: 100% !important; flex: 0 0 100%; padding: 0 8px; /* Убираем отступы колонок */
+            width: 100% !important; flex: 0 0 100%; padding: 0 8px;
         }
         
         .comp-list-mode .comp-card-modern {
-            min-height: 50px !important; /* Фиксированная высота */
-            height: 50px !important;
-            flex-direction: row; 
-            padding: 0 15px;
-            align-items: center;
-            gap: 15px;
-            margin-bottom: -1px; /* Склеиваем границы */
-            border-radius: 0; /* Убираем скругление */
-            border: 1px solid #eee;
-            box-shadow: none !important; /* Убираем тень */
+            min-height: 50px !important; height: 50px !important;
+            flex-direction: row; padding: 0 15px; align-items: center; gap: 15px;
+            margin-bottom: -1px; border-radius: 0; border: 1px solid #eee; box-shadow: none !important;
         }
-        /* Первый и последний элементы скругляем */
         .comp-list-mode .col-xl-3:first-child .comp-card-modern { border-top-left-radius: 8px; border-top-right-radius: 8px; }
         .comp-list-mode .col-xl-3:last-child .comp-card-modern { border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; }
 
-        .comp-list-mode .comp-front { 
-            flex-direction: row; width: 100%; padding: 0; align-items: center; flex-wrap: nowrap; 
-        }
+        .comp-list-mode .comp-front { flex-direction: row; width: 100%; padding: 0; align-items: center; flex-wrap: nowrap; }
 
-        /* 1. Логотип (Маленький) */
-        .comp-list-mode .comp-logo-box { 
-            height: 32px; width: 32px; margin: 0 15px 0 0; min-width: 32px;
-        }
-
-        /* 2. Название (Жирное) */
-        .comp-list-mode .comp-title { 
-            font-size: 0.95rem; font-weight: 700; margin: 0; white-space: nowrap; 
-            width: 25%; overflow: hidden; text-overflow: ellipsis; text-align: left; 
-        }
-
-        /* 3. Страна */
-        .comp-list-mode .comp-flag { 
-            display: block; position: static; background: none; color: #666; 
-            font-size: 0.9rem; font-weight: 400; padding: 0; width: 20%; 
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        }
-
-        /* 4. Поставщик */
-        .comp-list-mode .comp-meta {
-            display: flex !important; /* Показываем */
-            font-size: 0.85rem; color: #888; width: 25%;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-            margin-bottom: 0;
-        }
-        /* Скрываем иконку и склад, оставляем только текст поставщика */
+        /* Настройка колонок в списке */
+        .comp-list-mode .comp-logo-box { height: 32px; width: 32px; margin: 0 15px 0 0; min-width: 32px; }
+        .comp-list-mode .comp-title { font-size: 0.95rem; font-weight: 700; margin: 0; white-space: nowrap; width: 25%; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+        .comp-list-mode .comp-flag { display: block; position: static; background: none; color: #666; font-size: 0.9rem; font-weight: 400; padding: 0; width: 20%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        
+        /* Поставщик (первый meta) */
+        .comp-list-mode .comp-meta { display: flex !important; font-size: 0.85rem; color: #888; width: 25%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 0; }
         .comp-list-mode .comp-meta i { display: none; } 
-        /* Хак: показываем только первый comp-meta (Поставщик), второй (Склад) скрываем CSS-ом */
+        /* Скрываем склад (второй meta) и все остальное */
         .comp-list-mode .comp-meta:nth-of-type(n+3) { display: none !important; } 
 
-
-        /* СКРЫВАЕМ ВСЁ ЛИШНЕЕ */
-        .comp-list-mode .mt-2, /* Соцсети */
-        .comp-list-mode .comp-badges, /* Типы */
-        .comp-list-mode .btn-flip, /* Кнопка переворота */
-        .comp-list-mode .w-100.btn-outline-secondary, /* Кнопка дилеров */
-        .comp-list-mode .address-row /* Адреса */
-        { display: none !important; }
+        /* Скрываем лишнее */
+        .comp-list-mode .mt-2, .comp-list-mode .comp-badges, .comp-list-mode .btn-flip, .comp-list-mode .w-100.btn-outline-secondary, .comp-list-mode .address-row { display: none !important; }
         
-        /* Кнопка Редактирования (справа) */
+        /* Карандаш справа */
         .comp-list-mode .btn-card-edit-abs {
             position: static; margin-left: auto; opacity: 1; box-shadow: none; 
             border: none; background: transparent; color: #adb5bd; width: auto; height: auto;
@@ -148,7 +128,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const inpId = document.getElementById('comp_id');
     const inpName = document.getElementById('comp_name');
     const inpCountry = document.getElementById('comp_country');
-    // inpAddress удален, т.к. теперь список адресов
     const inpSupplier = document.getElementById('comp_supplier');
     const inpWarehouse = document.getElementById('comp_warehouse');
     const inpInfo = document.getElementById('comp_info');
@@ -157,6 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const inpReserve = document.getElementById('comp_reserve');
     const inpWebsite = document.getElementById('comp_website');      
     const inpInstagram = document.getElementById('comp_instagram'); 
+    const inpAddress = document.getElementById('comp_address'); // Если вдруг остался старый ID
     
     // Логотип
     const inpLogoFile = document.getElementById('comp_logo_input');
@@ -333,17 +313,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if(currentLogoBase64) { imgPreview.src = currentLogoBase64; imgPreview.classList.remove('d-none'); imgPlaceholder.classList.add('d-none'); } 
         else { imgPreview.classList.add('d-none'); imgPlaceholder.classList.remove('d-none'); inpLogoFile.value = ''; }
 
-        // Коллекции и Контакты
+        // Коллекции, Контакты, Адреса
         collectionsContainer.innerHTML = ''; if (c.collections && c.collections.length > 0) { c.collections.forEach(col => { if (typeof col === 'string') addCollectionRow(col, 'std'); else addCollectionRow(col.name, col.type); }); } else { addCollectionRow(); }
         contactsContainer.innerHTML = ''; if (c.contacts && c.contacts.length > 0) { c.contacts.forEach(cnt => addContactRow(cnt.name, cnt.position, cnt.phone)); } else { addContactRow(); }
-        
-        // АДРЕСА
-        addressesContainer.innerHTML = ''; 
-        if (c.addresses && c.addresses.length > 0) { 
-            c.addresses.forEach(a => addAddressRow(a.description, a.city, a.address)); 
-        } else { 
-            addAddressRow(); 
-        }
+        addressesContainer.innerHTML = ''; if (c.addresses && c.addresses.length > 0) { c.addresses.forEach(a => addAddressRow(a.description, a.city, a.address)); } else { addAddressRow(); }
 
         modal.show();
     };
