@@ -299,7 +299,23 @@ const posMaterialSchema = new mongoose.Schema({ name: String, quantity: Number }
 const competitorSchema = new mongoose.Schema({ brand: String, collection: String, price_opt: String, price_retail: String }, { _id: false });
 const collectionItemSchema = new mongoose.Schema({ name: String, type: { type: String, default: 'standard' } }, { _id: false });
 const compContactSchema = new mongoose.Schema({ name: String, position: String, phone: String }, { _id: false });
-const compRefSchema = new mongoose.Schema({ name: String, country: String, supplier: String, warehouse: String, website: String, instagram: String, info: String, storage_days: String, stock_info: String, reserve_days: String, contacts: [compContactSchema], collections: [collectionItemSchema] });
+// --- В server.js заменить compRefSchema на этот код ---
+const compRefSchema = new mongoose.Schema({ 
+    name: String, 
+    country: String, 
+    supplier: String, 
+    warehouse: String, 
+    address: String,       // <--- НОВОЕ ПОЛЕ
+    logoUrl: String,       // <--- НОВОЕ ПОЛЕ (Base64 картинка)
+    website: String, 
+    instagram: String, 
+    info: String, 
+    storage_days: String, 
+    stock_info: String, 
+    reserve_days: String, 
+    contacts: [compContactSchema], 
+    collections: [collectionItemSchema] 
+});
 const CompRef = mongoose.model('CompRef', compRefSchema);
 const dealerSchema = new mongoose.Schema({ dealer_id: String, name: String, price_type: String, city: String, address: String, contacts: [contactSchema], bonuses: String, photos: [photoSchema], organizations: [String], contract: { isSigned: Boolean, date: String }, region_sector: String, hasPersonalPlan: { type: Boolean, default: false }, delivery: String, website: String, instagram: String, additional_addresses: [additionalAddressSchema], pos_materials: [posMaterialSchema], visits: [visitSchema], products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }], latitude: Number, longitude: Number, status: { type: String, default: 'standard' }, avatarUrl: String, competitors: [competitorSchema], responsible: String });
 const Dealer = mongoose.model('Dealer', dealerSchema);
@@ -364,6 +380,7 @@ app.delete('/api/knowledge/:id', checkWrite, async (req, res) => { await Knowled
 app.get('/api/tasks', async (req, res) => { try { const data = await Dealer.find(getDealerFilter(req)).select('name visits status responsible').lean(); res.json(data.map(d => ({ id: d._id, name: d.name, status: d.status, visits: d.visits || [], responsible: d.responsible }))); } catch (e) { res.status(500).json([]); } });
 
 app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
+
 
 
 
