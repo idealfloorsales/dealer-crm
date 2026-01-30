@@ -14,24 +14,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const API_URL = '/api/competitors-ref';
     const API_DEALERS = '/api/dealers';
     
-    // СТИЛИ (Логотип и карточка)
+    // СТИЛИ
     const styleFix = document.createElement('style');
     styleFix.innerHTML = `
-        .comp-card-modern { min-height: 460px !important; } /* Чуть выше карточка */
+        .comp-card-modern { min-height: 480px !important; }
         .comp-front { display: flex; flex-direction: column; padding-bottom: 10px; }
         .comp-front .btn-flip { margin-top: auto; }
         .btn-dealers-hover:hover { background-color: #6c757d !important; color: #ffffff !important; border-color: #6c757d !important; }
         .comp-card-modern.is-flipped .btn-card-edit-abs { display: none !important; }
         .cb-custom { background-color: #e0cffc; color: #5b21b6; border: 1px solid #d8b4fe; }
         .dealer-link-item:hover { background: #f8f9fa; }
-        
-        /* Стили для лого в карточке */
-        .comp-logo-box {
-            height: 60px; display: flex; align-items: center; margin-bottom: 10px;
-        }
-        .comp-logo-img {
-            max-height: 100%; max-width: 100%; object-fit: contain;
-        }
+        .comp-logo-box { height: 60px; display: flex; align-items: center; margin-bottom: 10px; }
+        .comp-logo-img { max-height: 100%; max-width: 100%; object-fit: contain; }
+        /* Стиль для адреса в карточке */
+        .address-row { display: flex; gap: 6px; font-size: 0.85rem; color: #555; margin-bottom: 4px; align-items: baseline; }
+        .address-icon { color: #dc3545; font-size: 0.9rem; }
     `;
     document.head.appendChild(styleFix);
 
@@ -60,16 +57,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalTitle = document.getElementById('comp-modal-title');
     const delBtn = document.getElementById('btn-delete-comp');
     const saveBtn = document.getElementById('btn-save-comp');
+    
+    // Контейнеры списков
     const collectionsContainer = document.getElementById('collections-container');
     const addCollRowBtn = document.getElementById('add-coll-row-btn');
     const contactsContainer = document.getElementById('comp-contacts-list');
     const addContactBtn = document.getElementById('btn-add-contact');
+    
+    // НОВОЕ: Контейнер адресов
+    const addressesContainer = document.getElementById('comp-addresses-list');
+    const addAddressBtn = document.getElementById('btn-add-address');
 
     // Инпуты
     const inpId = document.getElementById('comp_id');
     const inpName = document.getElementById('comp_name');
     const inpCountry = document.getElementById('comp_country');
-    const inpAddress = document.getElementById('comp_address'); // НОВОЕ
     const inpSupplier = document.getElementById('comp_supplier');
     const inpWarehouse = document.getElementById('comp_warehouse');
     const inpInfo = document.getElementById('comp_info');
@@ -83,7 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const inpLogoFile = document.getElementById('comp_logo_input');
     const imgPreview = document.getElementById('comp_logo_preview');
     const imgPlaceholder = document.getElementById('comp_logo_placeholder');
-    let currentLogoBase64 = ""; // Храним тут картинку
+    let currentLogoBase64 = "";
 
     const defaultTypes = [
         { val: 'std', label: 'Стандарт', css: 'cb-std', dot: '#94a3b8' },
@@ -98,7 +100,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let isSaving = false;
     let dynamicTypes = [];
 
-    // --- ФУНКЦИЯ КОНВЕРТАЦИИ ФАЙЛА В BASE64 ---
     const toBase64 = file => new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.readAsDataURL(file);
@@ -106,25 +107,20 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.onerror = error => reject(error);
     });
 
-    // --- ОБРАБОТКА ВЫБОРА ФАЙЛА ---
     if(inpLogoFile) {
         inpLogoFile.onchange = async (e) => {
             const file = e.target.files[0];
             if(file) {
-                // Ограничение размера (например, 2Мб)
                 if(file.size > 2 * 1024 * 1024) return alert('Файл слишком большой! Максимум 2Мб.');
                 try {
                     const b64 = await toBase64(file);
                     currentLogoBase64 = b64;
-                    imgPreview.src = b64;
-                    imgPreview.classList.remove('d-none');
-                    imgPlaceholder.classList.add('d-none');
+                    imgPreview.src = b64; imgPreview.classList.remove('d-none'); imgPlaceholder.classList.add('d-none');
                 } catch(err) { alert('Ошибка чтения файла'); }
             }
         };
     }
 
-    // --- 1. ЗАГРУЗКА ---
     async function loadList() {
         try {
             const [compRes, dealersRes] = await Promise.all([ fetch(API_URL), fetch(API_DEALERS) ]);
@@ -171,7 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
         dealersModal.show();
     };
 
-    // --- 4. РЕНДЕР СЕТКИ (С ЛОГОТИПОМ) ---
+    // --- 4. РЕНДЕР СЕТКИ ---
     function renderGrid() {
         const search = searchInput ? searchInput.value.toLowerCase() : '';
         const filter = filterType ? filterType.value : 'all';
@@ -216,54 +212,73 @@ document.addEventListener('DOMContentLoaded', () => {
                 return `<div class="comp-list-item"><span><span class="comp-dot" style="background:${info.dot}"></span> ${name}</span></div>`;
             }).join('');
             
-            // --- ЛОГОТИП ИЛИ ЗАГОЛОВОК ---
-            let headerContent = '';
-            if (c.logoUrl) {
-                headerContent = `<div class="comp-logo-box"><img src="${c.logoUrl}" class="comp-logo-img" alt="${c.name}"></div><div class="comp-title" style="font-size: 1.1rem;">${c.name}</div>`;
-            } else {
-                headerContent = `<div class="comp-title">${c.name}</div>`;
-            }
+            // Логотип
+            let headerContent = c.logoUrl 
+                ? `<div class="comp-logo-box"><img src="${c.logoUrl}" class="comp-logo-img" alt="${c.name}"></div><div class="comp-title" style="font-size: 1.1rem;">${c.name}</div>`
+                : `<div class="comp-title">${c.name}</div>`;
             
-            // Адрес
+            // --- АДРЕСА (Рендерим все) ---
             let addressHtml = '';
-            if (c.address) {
-                addressHtml = `<div class="comp-meta text-truncate" title="${c.address}"><i class="bi bi-building"></i> <span>${c.address}</span></div>`;
+            if(c.addresses && c.addresses.length > 0) {
+                addressHtml = '<div class="mt-2 mb-2">';
+                c.addresses.forEach(a => {
+                    const desc = a.description ? `<span class="text-muted">(${a.description})</span>` : '';
+                    addressHtml += `
+                        <div class="address-row" title="${a.address}">
+                            <i class="bi bi-geo-alt-fill address-icon"></i>
+                            <div class="text-truncate">
+                                <span class="fw-bold text-dark">${a.city}:</span> 
+                                <span>${a.address}</span> ${desc}
+                            </div>
+                        </div>`;
+                });
+                addressHtml += '</div>';
             }
 
-            return `<div class="col-xl-3 col-lg-4 col-md-6"><div class="comp-card-modern" id="card-${c.id}"><button class="btn-card-edit-abs" onclick="openEditModal('${c.id}')"><i class="bi bi-pencil-fill"></i></button><div class="comp-front"><span class="comp-flag">${c.country || ''}</span>${headerContent}${addressHtml}<div class="comp-meta"><i class="bi bi-box-seam"></i> <span>${c.supplier || '-'}</span></div><div class="comp-meta"><i class="bi bi-geo-alt"></i> <span>${c.warehouse || '-'}</span></div>${socialBlock}<div class="comp-badges">${badgesHtml}</div>${dealersBtn}<button class="btn-flip" onclick="toggleCard('${c.id}')">Коллекции (${(c.collections||[]).length}) <i class="bi bi-chevron-down ms-1"></i></button></div><div class="comp-back"><div class="d-flex justify-content-between align-items-center mb-2"><h6 class="fw-bold mb-0">Коллекции</h6><button class="btn-close-flip" onclick="toggleCard('${c.id}')"><i class="bi bi-x"></i></button></div><div class="comp-list-scroll">${listHtml || '<div class="text-center text-muted small mt-4">Пусто</div>'}</div></div></div></div>`;
+            return `<div class="col-xl-3 col-lg-4 col-md-6"><div class="comp-card-modern" id="card-${c.id}"><button class="btn-card-edit-abs" onclick="openEditModal('${c.id}')"><i class="bi bi-pencil-fill"></i></button><div class="comp-front"><span class="comp-flag">${c.country || ''}</span>${headerContent}${addressHtml}<div class="comp-meta"><i class="bi bi-box-seam"></i> <span>${c.supplier || '-'}</span></div><div class="comp-meta"><i class="bi bi-building"></i> <span>${c.warehouse || '-'}</span></div>${socialBlock}<div class="comp-badges">${badgesHtml}</div>${dealersBtn}<button class="btn-flip" onclick="toggleCard('${c.id}')">Коллекции (${(c.collections||[]).length}) <i class="bi bi-chevron-down ms-1"></i></button></div><div class="comp-back"><div class="d-flex justify-content-between align-items-center mb-2"><h6 class="fw-bold mb-0">Коллекции</h6><button class="btn-close-flip" onclick="toggleCard('${c.id}')"><i class="bi bi-x"></i></button></div><div class="comp-list-scroll">${listHtml || '<div class="text-center text-muted small mt-4">Пусто</div>'}</div></div></div></div>`;
         }).join('');
     }
 
     window.toggleCard = (id) => { const card = document.getElementById(`card-${id}`); if (card) { document.querySelectorAll('.comp-card-modern.is-flipped').forEach(c => { if(c !== card) c.classList.remove('is-flipped'); }); card.classList.toggle('is-flipped'); } };
 
-    // --- 5. OPEN EDIT (С ЛОГОТИПОМ) ---
+    // --- 5. ОТКРЫТИЕ МОДАЛКИ (Заполняем адреса) ---
     window.openEditModal = (id) => {
         const c = competitors.find(x => x.id === id); if (!c) return;
         inpId.value = c.id; modalTitle.textContent = `Редактировать: ${c.name}`; if(delBtn) delBtn.style.display = 'block';
-        inpName.value = c.name; inpCountry.value = c.country || ''; inpAddress.value = c.address || ''; 
+        inpName.value = c.name; inpCountry.value = c.country || ''; 
         inpSupplier.value = c.supplier || ''; inpWarehouse.value = c.warehouse || ''; inpInfo.value = c.info || ''; inpStorage.value = c.storage_days || ''; inpStock.value = c.stock_info || ''; inpReserve.value = c.reserve_days || '';
         if(inpWebsite) inpWebsite.value = c.website || ''; if(inpInstagram) inpInstagram.value = c.instagram || '';
         
-        // Логотип
+        // Лого
         currentLogoBase64 = c.logoUrl || "";
-        if(currentLogoBase64) {
-            imgPreview.src = currentLogoBase64; imgPreview.classList.remove('d-none'); imgPlaceholder.classList.add('d-none');
-        } else {
-            imgPreview.classList.add('d-none'); imgPlaceholder.classList.remove('d-none'); inpLogoFile.value = '';
+        if(currentLogoBase64) { imgPreview.src = currentLogoBase64; imgPreview.classList.remove('d-none'); imgPlaceholder.classList.add('d-none'); } 
+        else { imgPreview.classList.add('d-none'); imgPlaceholder.classList.remove('d-none'); inpLogoFile.value = ''; }
+
+        // Коллекции
+        collectionsContainer.innerHTML = ''; if (c.collections && c.collections.length > 0) { c.collections.forEach(col => { if (typeof col === 'string') addCollectionRow(col, 'std'); else addCollectionRow(col.name, col.type); }); } else { addCollectionRow(); }
+        // Контакты
+        contactsContainer.innerHTML = ''; if (c.contacts && c.contacts.length > 0) { c.contacts.forEach(cnt => addContactRow(cnt.name, cnt.position, cnt.phone)); } else { addContactRow(); }
+        
+        // АДРЕСА (НОВОЕ)
+        addressesContainer.innerHTML = ''; 
+        if (c.addresses && c.addresses.length > 0) { 
+            c.addresses.forEach(a => addAddressRow(a.description, a.city, a.address)); 
+        } else { 
+            addAddressRow(); // Пустая строка по умолчанию
         }
 
-        collectionsContainer.innerHTML = ''; if (c.collections && c.collections.length > 0) { c.collections.forEach(col => { if (typeof col === 'string') addCollectionRow(col, 'std'); else addCollectionRow(col.name, col.type); }); } else { addCollectionRow(); }
-        contactsContainer.innerHTML = ''; if (c.contacts && c.contacts.length > 0) { c.contacts.forEach(cnt => addContactRow(cnt.name, cnt.position, cnt.phone)); } else { addContactRow(); }
         modal.show();
     };
 
     if(addBtn) addBtn.onclick = () => { 
         inpId.value = ''; form.reset(); modalTitle.textContent = 'Новый Бренд'; if(delBtn) delBtn.style.display = 'none'; 
-        // Сброс лого
         currentLogoBase64 = ""; imgPreview.classList.add('d-none'); imgPlaceholder.classList.remove('d-none'); inpLogoFile.value = '';
-        collectionsContainer.innerHTML = ''; contactsContainer.innerHTML = ''; addCollectionRow(); addContactRow(); modal.show(); 
+        collectionsContainer.innerHTML = ''; contactsContainer.innerHTML = ''; addressesContainer.innerHTML = ''; 
+        addCollectionRow(); addContactRow(); addAddressRow(); 
+        modal.show(); 
     };
 
+    // --- ФУНКЦИИ ДОБАВЛЕНИЯ СТРОК ---
     function addCollectionRow(name = '', type = 'std') {
         const div = document.createElement('div'); div.className = 'competitor-entry'; div.style.gridTemplateColumns = "2fr 1.5fr auto"; 
         const allTypes = getAllTypes(); let options = allTypes.map(t => `<option value="${t.val}" ${t.val === type ? 'selected' : ''}>${t.label}</option>`).join(''); options += `<option value="__NEW__" class="fw-bold text-primary">+ Свой тип...</option>`;
@@ -276,10 +291,26 @@ document.addEventListener('DOMContentLoaded', () => {
         div.innerHTML = `<input type="text" class="form-control" placeholder="Имя" value="${name}"><input type="text" class="form-control" placeholder="Должность" value="${pos}"><input type="text" class="form-control" placeholder="Телефон" value="${phone}"><button type="button" class="btn-remove-entry" onclick="this.closest('.competitor-entry').remove()"><i class="bi bi-x-lg"></i></button>`;
         contactsContainer.appendChild(div);
     }
+    // ФУНКЦИЯ ДЛЯ АДРЕСОВ (3 колонки: Описание, Город, Адрес)
+    function addAddressRow(desc='', city='', addr='') {
+        const div = document.createElement('div'); 
+        div.className = 'competitor-entry'; 
+        // Настраиваем сетку: 1fr (Описание) 1fr (Город) 2fr (Адрес) кнопка
+        div.style.gridTemplateColumns = "1fr 1fr 2fr auto"; 
+        div.innerHTML = `
+            <input type="text" class="form-control" placeholder="Описание (Склад/Офис)" value="${desc}">
+            <input type="text" class="form-control" placeholder="Город" value="${city}">
+            <input type="text" class="form-control" placeholder="Улица, дом" value="${addr}">
+            <button type="button" class="btn-remove-entry" onclick="this.closest('.competitor-entry').remove()"><i class="bi bi-x-lg"></i></button>
+        `;
+        addressesContainer.appendChild(div);
+    }
+    
     if(addCollRowBtn) addCollRowBtn.onclick = () => addCollectionRow();
     if(addContactBtn) addContactBtn.onclick = () => addContactRow();
+    if(addAddressBtn) addAddressBtn.onclick = () => addAddressRow();
 
-    // --- SAVE (С ЛОГОТИПОМ) ---
+    // --- SAVE ---
     if(saveBtn) saveBtn.onclick = async () => {
         if(isSaving) return; if(!inpName.value.trim()) return alert("Введите название!");
         isSaving = true; const oldText = saveBtn.innerHTML; saveBtn.disabled = true; saveBtn.innerHTML = '...';
@@ -287,30 +318,34 @@ document.addEventListener('DOMContentLoaded', () => {
         const collectionsData = []; collectionsContainer.querySelectorAll('.competitor-entry').forEach(row => { const inputs = row.querySelectorAll('input, select'); const name = inputs[0].value.trim(); const type = inputs[1].value; if (name) collectionsData.push({ name, type }); });
         const contactsData = []; contactsContainer.querySelectorAll('.competitor-entry').forEach(row => { const inputs = row.querySelectorAll('input'); const name = inputs[0].value.trim(); const pos = inputs[1].value.trim(); const phone = inputs[2].value.trim(); if (name || phone) contactsData.push({ name, position: pos, phone }); });
         
+        // СОБИРАЕМ АДРЕСА
+        const addressesData = []; 
+        addressesContainer.querySelectorAll('.competitor-entry').forEach(row => { 
+            const inputs = row.querySelectorAll('input'); 
+            const desc = inputs[0].value.trim(); 
+            const city = inputs[1].value.trim(); 
+            const addr = inputs[2].value.trim(); 
+            if (city || addr) addressesData.push({ description: desc, city, address: addr }); 
+        });
+
         const data = { 
-            name: inpName.value, 
-            country: inpCountry ? inpCountry.value : '', 
-            address: inpAddress ? inpAddress.value : '', // НОВОЕ
-            supplier: inpSupplier.value, 
-            warehouse: inpWarehouse.value, 
-            logoUrl: currentLogoBase64, // НОВОЕ
-            website: inpWebsite ? inpWebsite.value : '', 
-            instagram: inpInstagram ? inpInstagram.value : '', 
-            info: inpInfo.value, 
-            storage_days: inpStorage.value, 
-            stock_info: inpStock.value, 
-            reserve_days: inpReserve.value, 
-            collections: collectionsData, 
-            contacts: contactsData 
+            name: inpName.value, country: inpCountry ? inpCountry.value : '', 
+            supplier: inpSupplier.value, warehouse: inpWarehouse.value, 
+            logoUrl: currentLogoBase64, 
+            website: inpWebsite ? inpWebsite.value : '', instagram: inpInstagram ? inpInstagram.value : '', 
+            info: inpInfo.value, storage_days: inpStorage.value, stock_info: inpStock.value, reserve_days: inpReserve.value, 
+            collections: collectionsData, contacts: contactsData,
+            addresses: addressesData // <--- ОТПРАВЛЯЕМ МАССИВ АДРЕСОВ
         };
 
         const id = inpId.value; let url = API_URL; let method = 'POST'; if (id) { url = `${API_URL}/${id}`; method = 'PUT'; }
         try { const res = await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) }); if (res.ok) { await loadList(); modal.hide(); } else alert("Ошибка"); } catch (e) { alert("Ошибка сети"); } finally { isSaving = false; saveBtn.disabled = false; saveBtn.innerHTML = oldText; }
     };
+
     if(delBtn) delBtn.onclick = async () => { const id = inpId.value; if (!id) return; if (confirm('Удалить?')) { await fetch(`${API_URL}/${id}`, { method: 'DELETE' }); modal.hide(); loadList(); } };
     if(searchInput) searchInput.addEventListener('input', renderGrid);
     if(filterType) filterType.addEventListener('change', renderGrid);
-    if(exportBtn) exportBtn.onclick = () => { if (!competitors.length) return alert("Пусто"); const clean = (text) => `"${String(text || '').replace(/"/g, '""')}"`; let csv = "\uFEFFБренд;Страна;Коллекция;Тип;Поставщик;Склад;Контакты;Сайт;Instagram;Инфо\n"; competitors.forEach(c => { const contactsStr = (c.contacts || []).map(cnt => `${cnt.name} (${cnt.phone})`).join(', '); const bp = `${clean(c.name)};${clean(c.country)}`; const tp = `${clean(c.supplier)};${clean(c.warehouse)};${clean(contactsStr)};${clean(c.website)};${clean(c.instagram)};${clean(c.info)}`; if (c.collections && c.collections.length > 0) { c.collections.forEach(col => { const cn = (typeof col === 'string') ? col : col.name; const ct = (typeof col === 'string') ? 'std' : col.type; csv += `${bp};${clean(cn)};${clean(ct)};${tp}\n`; }); } else { csv += `${bp};;;${tp}\n`; } }); const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `Competitors_Ref.csv`; document.body.appendChild(a); a.click(); document.body.removeChild(a); };
+    if(exportBtn) exportBtn.onclick = () => { if (!competitors.length) return alert("Пусто"); const clean = (text) => `"${String(text || '').replace(/"/g, '""')}"`; let csv = "\uFEFFБренд;Страна;Коллекция;Тип;Поставщик;Склад;Контакты;Адреса;Сайт;Instagram;Инфо\n"; competitors.forEach(c => { const contactsStr = (c.contacts || []).map(cnt => `${cnt.name} (${cnt.phone})`).join(', '); const addrStr = (c.addresses || []).map(a => `${a.city}: ${a.address}`).join(' | '); const bp = `${clean(c.name)};${clean(c.country)}`; const tp = `${clean(c.supplier)};${clean(c.warehouse)};${clean(contactsStr)};${clean(addrStr)};${clean(c.website)};${clean(c.instagram)};${clean(c.info)}`; if (c.collections && c.collections.length > 0) { c.collections.forEach(col => { const cn = (typeof col === 'string') ? col : col.name; const ct = (typeof col === 'string') ? 'std' : col.type; csv += `${bp};${clean(cn)};${clean(ct)};${tp}\n`; }); } else { csv += `${bp};;;${tp}\n`; } }); const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `Competitors_Ref.csv`; document.body.appendChild(a); a.click(); document.body.removeChild(a); };
 
     loadList();
 });
