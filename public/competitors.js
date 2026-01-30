@@ -1,4 +1,4 @@
-// --- АВТОРИЗАЦИЯ (ВСТАВИТЬ В НАЧАЛО ФАЙЛА) ---
+// --- АВТОРИЗАЦИЯ ---
 const originalFetch = window.fetch;
 window.fetch = async function (url, options) {
     options = options || {};
@@ -9,49 +9,31 @@ window.fetch = async function (url, options) {
     if (response.status === 401) window.location.href = '/login.html';
     return response;
 };
-// -------------------------------------------
 
 document.addEventListener('DOMContentLoaded', () => {
     const API_URL = '/api/competitors-ref';
     const API_DEALERS = '/api/dealers';
     
-    // --- ИСПРАВЛЕНИЯ СТИЛЕЙ ТУТ ---
+    // СТИЛИ (Логотип и карточка)
     const styleFix = document.createElement('style');
     styleFix.innerHTML = `
-        /* 1. Увеличиваем высоту карточки, чтобы всё влезало */
-        .comp-card-modern {
-            min-height: 420px !important; 
-        }
-        
-        /* 2. Делаем переднюю часть карточки "резиновой", чтобы кнопка "Коллекции" всегда была внизу */
-        .comp-front {
-            display: flex;
-            flex-direction: column;
-            padding-bottom: 10px;
-        }
-        .comp-front .btn-flip {
-            margin-top: auto; 
-        }
-
-        /* 3. Исправляем цвет кнопки "Дилеры" при наведении */
-        .btn-dealers-hover:hover {
-            background-color: #6c757d !important; 
-            color: #ffffff !important; 
-            border-color: #6c757d !important;
-        }
-
-        /* Скрываем карандаш при перевороте */
+        .comp-card-modern { min-height: 460px !important; } /* Чуть выше карточка */
+        .comp-front { display: flex; flex-direction: column; padding-bottom: 10px; }
+        .comp-front .btn-flip { margin-top: auto; }
+        .btn-dealers-hover:hover { background-color: #6c757d !important; color: #ffffff !important; border-color: #6c757d !important; }
         .comp-card-modern.is-flipped .btn-card-edit-abs { display: none !important; }
-        
-        /* Цвета типов */
         .cb-custom { background-color: #e0cffc; color: #5b21b6; border: 1px solid #d8b4fe; }
-        
-        /* Ссылки в модалке */
-        .dealer-link-item { transition: background 0.2s; cursor: pointer; }
         .dealer-link-item:hover { background: #f8f9fa; }
+        
+        /* Стили для лого в карточке */
+        .comp-logo-box {
+            height: 60px; display: flex; align-items: center; margin-bottom: 10px;
+        }
+        .comp-logo-img {
+            max-height: 100%; max-width: 100%; object-fit: contain;
+        }
     `;
     document.head.appendChild(styleFix);
-    // -------------------------------------------------------
 
     // Элементы
     const gridContainer = document.getElementById('competitors-grid');
@@ -65,22 +47,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // Модалки
     const modalEl = document.getElementById('comp-modal');
     const modal = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: false });
-    
     const typesModalEl = document.getElementById('types-manager-modal');
     const typesModal = new bootstrap.Modal(typesModalEl);
     const typesListContainer = document.getElementById('types-manager-list');
-
     const dealersModalEl = document.getElementById('dealers-list-modal');
     const dealersModal = new bootstrap.Modal(dealersModalEl);
     const dealersListContainer = document.getElementById('dealers-list-container');
     const dealersBrandNameSpan = document.getElementById('dl-brand-name');
 
+    // Форма
     const form = document.getElementById('comp-form');
     const modalTitle = document.getElementById('comp-modal-title');
     const delBtn = document.getElementById('btn-delete-comp');
     const saveBtn = document.getElementById('btn-save-comp');
-
-    // Контейнеры
     const collectionsContainer = document.getElementById('collections-container');
     const addCollRowBtn = document.getElementById('add-coll-row-btn');
     const contactsContainer = document.getElementById('comp-contacts-list');
@@ -90,6 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const inpId = document.getElementById('comp_id');
     const inpName = document.getElementById('comp_name');
     const inpCountry = document.getElementById('comp_country');
+    const inpAddress = document.getElementById('comp_address'); // НОВОЕ
     const inpSupplier = document.getElementById('comp_supplier');
     const inpWarehouse = document.getElementById('comp_warehouse');
     const inpInfo = document.getElementById('comp_info');
@@ -98,6 +78,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const inpReserve = document.getElementById('comp_reserve');
     const inpWebsite = document.getElementById('comp_website');      
     const inpInstagram = document.getElementById('comp_instagram'); 
+    
+    // Логотип
+    const inpLogoFile = document.getElementById('comp_logo_input');
+    const imgPreview = document.getElementById('comp_logo_preview');
+    const imgPlaceholder = document.getElementById('comp_logo_placeholder');
+    let currentLogoBase64 = ""; // Храним тут картинку
 
     const defaultTypes = [
         { val: 'std', label: 'Стандарт', css: 'cb-std', dot: '#94a3b8' },
@@ -112,33 +98,42 @@ document.addEventListener('DOMContentLoaded', () => {
     let isSaving = false;
     let dynamicTypes = [];
 
+    // --- ФУНКЦИЯ КОНВЕРТАЦИИ ФАЙЛА В BASE64 ---
+    const toBase64 = file => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+    });
+
+    // --- ОБРАБОТКА ВЫБОРА ФАЙЛА ---
+    if(inpLogoFile) {
+        inpLogoFile.onchange = async (e) => {
+            const file = e.target.files[0];
+            if(file) {
+                // Ограничение размера (например, 2Мб)
+                if(file.size > 2 * 1024 * 1024) return alert('Файл слишком большой! Максимум 2Мб.');
+                try {
+                    const b64 = await toBase64(file);
+                    currentLogoBase64 = b64;
+                    imgPreview.src = b64;
+                    imgPreview.classList.remove('d-none');
+                    imgPlaceholder.classList.add('d-none');
+                } catch(err) { alert('Ошибка чтения файла'); }
+            }
+        };
+    }
+
     // --- 1. ЗАГРУЗКА ---
     async function loadList() {
         try {
-            const [compRes, dealersRes] = await Promise.all([
-                fetch(API_URL),
-                fetch(API_DEALERS)
-            ]);
-
-            if(!compRes.ok) throw new Error(`Ошибка загрузки конкурентов`);
-            if(!dealersRes.ok) throw new Error(`Ошибка загрузки дилеров`);
-            
+            const [compRes, dealersRes] = await Promise.all([ fetch(API_URL), fetch(API_DEALERS) ]);
+            if(!compRes.ok || !dealersRes.ok) throw new Error(`Ошибка загрузки`);
             competitors = await compRes.json();
             allDealers = await dealersRes.json();
-
             competitors.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-            
-            refreshDynamicTypes();
-            updateFilterOptions();
-            renderDashboard();
-            renderGrid();
-        } catch(e) { 
-            console.error("ERROR:", e);
-            if(gridContainer) gridContainer.innerHTML = `<div class="alert alert-danger text-center m-5 shadow-sm">
-                <h4 class="alert-heading"><i class="bi bi-exclamation-triangle-fill"></i> Ошибка загрузки</h4>
-                <p>Не удалось получить данные. ${e.message}</p>
-            </div>`; 
-        }
+            refreshDynamicTypes(); updateFilterOptions(); renderDashboard(); renderGrid();
+        } catch(e) { gridContainer.innerHTML = `<p class="text-danger text-center m-5">Ошибка: ${e.message}</p>`; }
     }
 
     function refreshDynamicTypes() {
@@ -170,27 +165,13 @@ document.addEventListener('DOMContentLoaded', () => {
     window.deleteCustomType = async (typeName) => { if(!confirm(`Удалить тип "${typeName}"?`)) return; const p = []; competitors.forEach(c => { let ch = false; const nc = (c.collections||[]).map(col => { const t = (typeof col === 'string')?'std':(col.type||'std'); if(t===typeName){ch=true; return {name:(typeof col==='string'?col:col.name), type:'std'};} return col; }); if(ch) p.push(fetch(`${API_URL}/${c.id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...c, collections:nc})})); }); if(p.length){typesModal.hide(); await Promise.all(p); await loadList(); alert("Удалено");} else await loadList(); };
 
     window.showDealersModal = (brandName) => {
-        const dealersWithBrand = allDealers.filter(d => 
-            d.competitors && d.competitors.some(c => c.brand === brandName)
-        );
+        const dealersWithBrand = allDealers.filter(d => d.competitors && d.competitors.some(c => c.brand === brandName));
         dealersBrandNameSpan.textContent = brandName;
-        if (dealersWithBrand.length === 0) {
-            dealersListContainer.innerHTML = '<div class="text-center py-4 text-muted">Этот бренд пока не выставлен ни у одного дилера.</div>';
-        } else {
-            dealersListContainer.innerHTML = dealersWithBrand.map(d => `
-                <a href="dealer.html?id=${d.id}" target="_blank" class="list-group-item list-group-item-action dealer-link-item d-flex justify-content-between align-items-center">
-                    <div>
-                        <div class="fw-bold text-primary">${d.name}</div>
-                        <small class="text-muted"><i class="bi bi-geo-alt me-1"></i>${d.city || 'Город не указан'}</small>
-                    </div>
-                    <i class="bi bi-chevron-right text-muted small"></i>
-                </a>
-            `).join('');
-        }
+        dealersListContainer.innerHTML = dealersWithBrand.length === 0 ? '<div class="text-center py-4 text-muted">Нет дилеров.</div>' : dealersWithBrand.map(d => `<a href="dealer.html?id=${d.id}" target="_blank" class="list-group-item list-group-item-action dealer-link-item d-flex justify-content-between align-items-center"><div><div class="fw-bold text-primary">${d.name}</div><small class="text-muted"><i class="bi bi-geo-alt me-1"></i>${d.city || 'Город не указан'}</small></div><i class="bi bi-chevron-right text-muted small"></i></a>`).join('');
         dealersModal.show();
     };
 
-    // --- 4. РЕНДЕР СЕТКИ ---
+    // --- 4. РЕНДЕР СЕТКИ (С ЛОГОТИПОМ) ---
     function renderGrid() {
         const search = searchInput ? searchInput.value.toLowerCase() : '';
         const filter = filterType ? filterType.value : 'all';
@@ -234,24 +215,55 @@ document.addEventListener('DOMContentLoaded', () => {
                 const info = allTypesList.find(x => x.val === type) || { dot: '#8b5cf6' };
                 return `<div class="comp-list-item"><span><span class="comp-dot" style="background:${info.dot}"></span> ${name}</span></div>`;
             }).join('');
+            
+            // --- ЛОГОТИП ИЛИ ЗАГОЛОВОК ---
+            let headerContent = '';
+            if (c.logoUrl) {
+                headerContent = `<div class="comp-logo-box"><img src="${c.logoUrl}" class="comp-logo-img" alt="${c.name}"></div><div class="comp-title" style="font-size: 1.1rem;">${c.name}</div>`;
+            } else {
+                headerContent = `<div class="comp-title">${c.name}</div>`;
+            }
+            
+            // Адрес
+            let addressHtml = '';
+            if (c.address) {
+                addressHtml = `<div class="comp-meta text-truncate" title="${c.address}"><i class="bi bi-building"></i> <span>${c.address}</span></div>`;
+            }
 
-            return `<div class="col-xl-3 col-lg-4 col-md-6"><div class="comp-card-modern" id="card-${c.id}"><button class="btn-card-edit-abs" onclick="openEditModal('${c.id}')"><i class="bi bi-pencil-fill"></i></button><div class="comp-front"><span class="comp-flag">${c.country || 'Страна не указана'}</span><div class="comp-title">${c.name}</div><div class="comp-meta"><i class="bi bi-box-seam"></i> <span>${c.supplier || '-'}</span></div><div class="comp-meta"><i class="bi bi-geo-alt"></i> <span>${c.warehouse || '-'}</span></div>${socialBlock}<div class="comp-badges">${badgesHtml}</div>${dealersBtn}<button class="btn-flip" onclick="toggleCard('${c.id}')">Коллекции (${(c.collections||[]).length}) <i class="bi bi-chevron-down ms-1"></i></button></div><div class="comp-back"><div class="d-flex justify-content-between align-items-center mb-2"><h6 class="fw-bold mb-0">Коллекции</h6><button class="btn-close-flip" onclick="toggleCard('${c.id}')"><i class="bi bi-x"></i></button></div><div class="comp-list-scroll">${listHtml || '<div class="text-center text-muted small mt-4">Пусто</div>'}</div></div></div></div>`;
+            return `<div class="col-xl-3 col-lg-4 col-md-6"><div class="comp-card-modern" id="card-${c.id}"><button class="btn-card-edit-abs" onclick="openEditModal('${c.id}')"><i class="bi bi-pencil-fill"></i></button><div class="comp-front"><span class="comp-flag">${c.country || ''}</span>${headerContent}${addressHtml}<div class="comp-meta"><i class="bi bi-box-seam"></i> <span>${c.supplier || '-'}</span></div><div class="comp-meta"><i class="bi bi-geo-alt"></i> <span>${c.warehouse || '-'}</span></div>${socialBlock}<div class="comp-badges">${badgesHtml}</div>${dealersBtn}<button class="btn-flip" onclick="toggleCard('${c.id}')">Коллекции (${(c.collections||[]).length}) <i class="bi bi-chevron-down ms-1"></i></button></div><div class="comp-back"><div class="d-flex justify-content-between align-items-center mb-2"><h6 class="fw-bold mb-0">Коллекции</h6><button class="btn-close-flip" onclick="toggleCard('${c.id}')"><i class="bi bi-x"></i></button></div><div class="comp-list-scroll">${listHtml || '<div class="text-center text-muted small mt-4">Пусто</div>'}</div></div></div></div>`;
         }).join('');
     }
 
     window.toggleCard = (id) => { const card = document.getElementById(`card-${id}`); if (card) { document.querySelectorAll('.comp-card-modern.is-flipped').forEach(c => { if(c !== card) c.classList.remove('is-flipped'); }); card.classList.toggle('is-flipped'); } };
 
-    // --- 5. OPEN MODAL & 6. ROWS & 7. SAVE ---
+    // --- 5. OPEN EDIT (С ЛОГОТИПОМ) ---
     window.openEditModal = (id) => {
         const c = competitors.find(x => x.id === id); if (!c) return;
         inpId.value = c.id; modalTitle.textContent = `Редактировать: ${c.name}`; if(delBtn) delBtn.style.display = 'block';
-        inpName.value = c.name; inpCountry.value = c.country || ''; inpSupplier.value = c.supplier || ''; inpWarehouse.value = c.warehouse || ''; inpInfo.value = c.info || ''; inpStorage.value = c.storage_days || ''; inpStock.value = c.stock_info || ''; inpReserve.value = c.reserve_days || '';
+        inpName.value = c.name; inpCountry.value = c.country || ''; inpAddress.value = c.address || ''; 
+        inpSupplier.value = c.supplier || ''; inpWarehouse.value = c.warehouse || ''; inpInfo.value = c.info || ''; inpStorage.value = c.storage_days || ''; inpStock.value = c.stock_info || ''; inpReserve.value = c.reserve_days || '';
         if(inpWebsite) inpWebsite.value = c.website || ''; if(inpInstagram) inpInstagram.value = c.instagram || '';
+        
+        // Логотип
+        currentLogoBase64 = c.logoUrl || "";
+        if(currentLogoBase64) {
+            imgPreview.src = currentLogoBase64; imgPreview.classList.remove('d-none'); imgPlaceholder.classList.add('d-none');
+        } else {
+            imgPreview.classList.add('d-none'); imgPlaceholder.classList.remove('d-none'); inpLogoFile.value = '';
+        }
+
         collectionsContainer.innerHTML = ''; if (c.collections && c.collections.length > 0) { c.collections.forEach(col => { if (typeof col === 'string') addCollectionRow(col, 'std'); else addCollectionRow(col.name, col.type); }); } else { addCollectionRow(); }
         contactsContainer.innerHTML = ''; if (c.contacts && c.contacts.length > 0) { c.contacts.forEach(cnt => addContactRow(cnt.name, cnt.position, cnt.phone)); } else { addContactRow(); }
         modal.show();
     };
-    if(addBtn) addBtn.onclick = () => { inpId.value = ''; form.reset(); modalTitle.textContent = 'Новый Бренд'; if(delBtn) delBtn.style.display = 'none'; collectionsContainer.innerHTML = ''; contactsContainer.innerHTML = ''; addCollectionRow(); addContactRow(); modal.show(); };
+
+    if(addBtn) addBtn.onclick = () => { 
+        inpId.value = ''; form.reset(); modalTitle.textContent = 'Новый Бренд'; if(delBtn) delBtn.style.display = 'none'; 
+        // Сброс лого
+        currentLogoBase64 = ""; imgPreview.classList.add('d-none'); imgPlaceholder.classList.remove('d-none'); inpLogoFile.value = '';
+        collectionsContainer.innerHTML = ''; contactsContainer.innerHTML = ''; addCollectionRow(); addContactRow(); modal.show(); 
+    };
+
     function addCollectionRow(name = '', type = 'std') {
         const div = document.createElement('div'); div.className = 'competitor-entry'; div.style.gridTemplateColumns = "2fr 1.5fr auto"; 
         const allTypes = getAllTypes(); let options = allTypes.map(t => `<option value="${t.val}" ${t.val === type ? 'selected' : ''}>${t.label}</option>`).join(''); options += `<option value="__NEW__" class="fw-bold text-primary">+ Свой тип...</option>`;
@@ -266,12 +278,32 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if(addCollRowBtn) addCollRowBtn.onclick = () => addCollectionRow();
     if(addContactBtn) addContactBtn.onclick = () => addContactRow();
+
+    // --- SAVE (С ЛОГОТИПОМ) ---
     if(saveBtn) saveBtn.onclick = async () => {
         if(isSaving) return; if(!inpName.value.trim()) return alert("Введите название!");
         isSaving = true; const oldText = saveBtn.innerHTML; saveBtn.disabled = true; saveBtn.innerHTML = '...';
+        
         const collectionsData = []; collectionsContainer.querySelectorAll('.competitor-entry').forEach(row => { const inputs = row.querySelectorAll('input, select'); const name = inputs[0].value.trim(); const type = inputs[1].value; if (name) collectionsData.push({ name, type }); });
         const contactsData = []; contactsContainer.querySelectorAll('.competitor-entry').forEach(row => { const inputs = row.querySelectorAll('input'); const name = inputs[0].value.trim(); const pos = inputs[1].value.trim(); const phone = inputs[2].value.trim(); if (name || phone) contactsData.push({ name, position: pos, phone }); });
-        const data = { name: inpName.value, country: inpCountry ? inpCountry.value : '', supplier: inpSupplier.value, warehouse: inpWarehouse.value, website: inpWebsite ? inpWebsite.value : '', instagram: inpInstagram ? inpInstagram.value : '', info: inpInfo.value, storage_days: inpStorage.value, stock_info: inpStock.value, reserve_days: inpReserve.value, collections: collectionsData, contacts: contactsData };
+        
+        const data = { 
+            name: inpName.value, 
+            country: inpCountry ? inpCountry.value : '', 
+            address: inpAddress ? inpAddress.value : '', // НОВОЕ
+            supplier: inpSupplier.value, 
+            warehouse: inpWarehouse.value, 
+            logoUrl: currentLogoBase64, // НОВОЕ
+            website: inpWebsite ? inpWebsite.value : '', 
+            instagram: inpInstagram ? inpInstagram.value : '', 
+            info: inpInfo.value, 
+            storage_days: inpStorage.value, 
+            stock_info: inpStock.value, 
+            reserve_days: inpReserve.value, 
+            collections: collectionsData, 
+            contacts: contactsData 
+        };
+
         const id = inpId.value; let url = API_URL; let method = 'POST'; if (id) { url = `${API_URL}/${id}`; method = 'PUT'; }
         try { const res = await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) }); if (res.ok) { await loadList(); modal.hide(); } else alert("Ошибка"); } catch (e) { alert("Ошибка сети"); } finally { isSaving = false; saveBtn.disabled = false; saveBtn.innerHTML = oldText; }
     };
