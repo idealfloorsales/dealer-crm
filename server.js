@@ -305,7 +305,7 @@ const compRefSchema = new mongoose.Schema({
     country: String, 
     supplier: String, 
     warehouse: String, 
-    address: String,       // <--- НОВОЕ ПОЛЕ
+    addresses: [additionalAddressSchema],       // <--- НОВОЕ ПОЛЕ
     logoUrl: String,       // <--- НОВОЕ ПОЛЕ (Base64 картинка)
     website: String, 
     instagram: String, 
@@ -380,6 +380,7 @@ app.delete('/api/knowledge/:id', checkWrite, async (req, res) => { await Knowled
 app.get('/api/tasks', async (req, res) => { try { const data = await Dealer.find(getDealerFilter(req)).select('name visits status responsible').lean(); res.json(data.map(d => ({ id: d._id, name: d.name, status: d.status, visits: d.visits || [], responsible: d.responsible }))); } catch (e) { res.status(500).json([]); } });
 
 app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
+
 
 
 
