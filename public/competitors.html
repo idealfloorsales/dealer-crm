@@ -132,9 +132,12 @@
     </div>
 </div>
 
-<div class="mb-3">
-    <label class="form-label text-secondary small fw-bold"><i class="bi bi-geo-alt me-1"></i>Адрес</label>
-    <input type="text" class="form-control" id="comp_address" placeholder="Улица, дом, офис...">
+<div class="mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <label class="form-label fw-bold mb-0 text-primary"><i class="bi bi-geo-alt me-1"></i>Адреса</label>
+        <button type="button" class="btn btn-sm btn-light border" id="btn-add-address">+ Добавить</button>
+    </div>
+    <div id="comp-addresses-list" class="list-container"></div>
 </div>
 
 <div class="row g-3 mb-4">
