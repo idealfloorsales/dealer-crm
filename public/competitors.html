@@ -107,60 +107,78 @@
                 <div class="modal-body">
                     <form id="comp-form">
                         <input type="hidden" id="comp_id">
-                        
-                        <div class="row g-3 mb-4">
-                            <div class="col-md-8">
-                                <label class="form-label text-secondary small fw-bold">Название Бренда *</label>
-                                <input type="text" class="form-control fw-bold" id="comp_name" required>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label text-secondary small fw-bold">Страна</label>
-                                <input type="text" class="form-control" id="comp_country" placeholder="Напр. Россия">
-                            </div>
-                        </div>
 
-                        <div class="row g-3 mb-4">
-                            <div class="col-md-6"><label class="form-label text-secondary small fw-bold">Поставщик</label><input type="text" class="form-control" id="comp_supplier"></div>
-                            <div class="col-md-6"><label class="form-label text-secondary small fw-bold">Склад (Город)</label><input type="text" class="form-control" id="comp_warehouse"></div>
-                        </div>
+<div class="text-center mb-4">
+    <div class="position-relative d-inline-block">
+        <img id="comp_logo_preview" src="" class="rounded-3 shadow-sm border bg-white d-none" style="width: 100px; height: 100px; object-fit: contain;">
+        <div id="comp_logo_placeholder" class="rounded-3 border border-2 border-dashed bg-light d-flex align-items-center justify-content-center text-muted" style="width: 100px; height: 100px;">
+            <div class="text-center small"><i class="bi bi-image fs-4"></i><br>Лого</div>
+        </div>
+        <button type="button" class="btn btn-sm btn-dark position-absolute top-100 start-50 translate-middle rounded-pill px-3 shadow-sm" style="margin-top: -15px;" onclick="document.getElementById('comp_logo_input').click()">
+            <i class="bi bi-camera me-1"></i>Фото
+        </button>
+    </div>
+    <input type="file" id="comp_logo_input" hidden accept="image/*">
+</div>
 
-                        <div class="row g-3 mb-4">
-                            <div class="col-md-6">
-                                <label class="form-label text-secondary small fw-bold"><i class="bi bi-globe me-1"></i>Веб-сайт</label>
-                                <input type="text" class="form-control" id="comp_website" placeholder="https://...">
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label text-secondary small fw-bold"><i class="bi bi-instagram me-1"></i>Instagram</label>
-                                <input type="text" class="form-control" id="comp_instagram" placeholder="@username">
-                            </div>
-                        </div>
+<div class="row g-3 mb-3">
+    <div class="col-md-8">
+        <label class="form-label text-secondary small fw-bold">Название Бренда *</label>
+        <input type="text" class="form-control fw-bold" id="comp_name" required>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label text-secondary small fw-bold">Страна</label>
+        <input type="text" class="form-control" id="comp_country" placeholder="Напр. Россия">
+    </div>
+</div>
 
-                        <div class="row g-3 mb-4 p-3 bg-light rounded-3 border mx-0">
-                            <div class="col-md-4"><label class="form-label small fw-bold">Срок хранения</label><input type="text" class="form-control form-control-sm" id="comp_storage"></div>
-                            <div class="col-md-4"><label class="form-label small fw-bold">Остатки</label><input type="text" class="form-control form-control-sm" id="comp_stock"></div>
-                            <div class="col-md-4"><label class="form-label small fw-bold">Резерв (дни)</label><input type="text" class="form-control form-control-sm" id="comp_reserve"></div>
-                        </div>
+<div class="mb-3">
+    <label class="form-label text-secondary small fw-bold"><i class="bi bi-geo-alt me-1"></i>Адрес</label>
+    <input type="text" class="form-control" id="comp_address" placeholder="Улица, дом, офис...">
+</div>
 
-                        <div class="mb-4">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <label class="form-label fw-bold mb-0 text-primary">Контакты</label>
-                                <button type="button" class="btn btn-sm btn-light border" id="btn-add-contact">+ Добавить</button>
-                            </div>
-                            <div id="comp-contacts-list" class="list-container"></div>
-                        </div>
+<div class="row g-3 mb-4">
+    <div class="col-md-6"><label class="form-label text-secondary small fw-bold">Поставщик</label><input type="text" class="form-control" id="comp_supplier"></div>
+    <div class="col-md-6"><label class="form-label text-secondary small fw-bold">Склад (Город)</label><input type="text" class="form-control" id="comp_warehouse"></div>
+</div>
 
-                        <div class="mb-4">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <label class="form-label fw-bold mb-0 text-primary">Коллекции</label>
-                                <button type="button" class="btn btn-sm btn-light border" id="add-coll-row-btn">+ Добавить</button>
-                            </div>
-                            <div id="collections-container" class="list-container"></div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label text-secondary small fw-bold">Доп. заметки</label>
-                            <textarea class="form-control" id="comp_info" rows="2"></textarea>
-                        </div>
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <label class="form-label text-secondary small fw-bold"><i class="bi bi-globe me-1"></i>Веб-сайт</label>
+        <input type="text" class="form-control" id="comp_website" placeholder="https://...">
+    </div>
+    <div class="col-md-6">
+        <label class="form-label text-secondary small fw-bold"><i class="bi bi-instagram me-1"></i>Instagram</label>
+        <input type="text" class="form-control" id="comp_instagram" placeholder="@username">
+    </div>
+</div>
+
+<div class="row g-3 mb-4 p-3 bg-light rounded-3 border mx-0">
+    <div class="col-md-4"><label class="form-label small fw-bold">Срок хранения</label><input type="text" class="form-control form-control-sm" id="comp_storage"></div>
+    <div class="col-md-4"><label class="form-label small fw-bold">Остатки</label><input type="text" class="form-control form-control-sm" id="comp_stock"></div>
+    <div class="col-md-4"><label class="form-label small fw-bold">Резерв (дни)</label><input type="text" class="form-control form-control-sm" id="comp_reserve"></div>
+</div>
+
+<div class="mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <label class="form-label fw-bold mb-0 text-primary">Контакты</label>
+        <button type="button" class="btn btn-sm btn-light border" id="btn-add-contact">+ Добавить</button>
+    </div>
+    <div id="comp-contacts-list" class="list-container"></div>
+</div>
+
+<div class="mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <label class="form-label fw-bold mb-0 text-primary">Коллекции</label>
+        <button type="button" class="btn btn-sm btn-light border" id="add-coll-row-btn">+ Добавить</button>
+    </div>
+    <div id="collections-container" class="list-container"></div>
+</div>
+
+<div class="mb-3">
+    <label class="form-label text-secondary small fw-bold">Доп. заметки</label>
+    <textarea class="form-control" id="comp_info" rows="2"></textarea>
+</div>
                     </form>
                 </div>
                 <div class="modal-footer justify-content-between border-0 pt-0">
