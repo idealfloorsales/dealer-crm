@@ -242,18 +242,23 @@
         </a>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="competitors.js?v={{VER}}"></script> 
-
-<div id="floating-controls" class="d-none">
-    <button class="btn btn-white shadow-sm rounded-circle border mb-2" onclick="toggleViewMode()" title="Сменить вид" style="width: 50px; height: 50px;">
-        <i class="bi bi-list-ul fs-4 text-secondary" id="view-mode-icon"></i>
+<div id="elevator-controls" class="elevator-capsule">
+    <button class="elevator-btn" onclick="scrollToTop()" title="В начало">
+        <i class="bi bi-arrow-up"></i>
     </button>
-    <br>
-    <button class="btn btn-primary shadow rounded-circle" onclick="scrollToTop()" title="Наверх" style="width: 50px; height: 50px;">
-        <i class="bi bi-arrow-up fs-4"></i>
+    
+    <button class="elevator-btn" onclick="toggleViewMode()" title="Сменить вид">
+        <i class="bi bi-list-ul" id="view-mode-icon" style="font-size: 1.2rem;"></i>
+    </button>
+    
+    <button class="elevator-btn" onclick="scrollToBottom()" title="В конец">
+        <i class="bi bi-arrow-down"></i>
     </button>
 </div>
     
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="competitors.js?v={{VER}}"></script> 
+
+
 </body>
 </html>
