@@ -105,6 +105,91 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.readAsDataURL(file);
         reader.onload = () => resolve(reader.result);
         reader.onerror = error => reject(error);
+
+// --- УЛУЧШЕНИЯ ИНТЕРФЕЙСА (Floating Controls) ---
+    
+    // 1. Добавляем CSS для плавающей кнопки и Компактного вида
+    const extraStyle = document.createElement('style');
+    extraStyle.innerHTML = `
+        #floating-controls {
+            position: fixed; bottom: 90px; right: 20px; z-index: 1040;
+            display: flex; flex-direction: column; align-items: center;
+            transition: opacity 0.3s;
+        }
+        @media (min-width: 992px) { #floating-controls { bottom: 30px; } }
+
+        /* КОМПАКТНЫЙ РЕЖИМ (СПИСОК) */
+        .comp-list-mode .col-xl-3, 
+        .comp-list-mode .col-lg-4, 
+        .comp-list-mode .col-md-6 {
+            width: 100% !important; /* Растягиваем на всю ширину */
+            flex: 0 0 100%;
+        }
+        .comp-list-mode .comp-card-modern {
+            min-height: auto !important; /* Убираем фикс. высоту */
+            flex-direction: row; /* Горизонтально */
+            padding: 10px 15px;
+            align-items: center;
+            gap: 15px;
+        }
+        /* В списке скрываем лишнее */
+        .comp-list-mode .comp-front { 
+            flex-direction: row; 
+            width: 100%; 
+            padding: 0; 
+            align-items: center;
+            flex-wrap: nowrap;
+        }
+        /* Перестройка элементов внутри строки */
+        .comp-list-mode .comp-flag { position: static; margin-right: 10px; font-size: 1.2rem; }
+        .comp-list-mode .comp-title { font-size: 1rem; margin: 0; white-space: nowrap; width: 200px; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+        .comp-list-mode .comp-meta { display: none; } /* Скрываем поставщика и склад */
+        .comp-list-mode .mt-2.pt-2 { display: none; } /* Скрываем соцсети */
+        .comp-list-mode .comp-logo-box { height: 30px; width: 30px; margin: 0 10px 0 0; }
+        .comp-list-mode .comp-badges { display: none; } /* Скрываем бейджи типов */
+        .comp-list-mode .btn-flip { display: none; } /* Скрываем кнопку переворота */
+        
+        /* Показываем кнопку "Развернуть" только в списке */
+        .btn-expand-list { display: none; }
+        .comp-list-mode .btn-expand-list { display: block; margin-left: auto; }
+        
+        .comp-list-mode .btn-card-edit-abs {
+            position: static; margin-left: 10px; opacity: 1; box-shadow: none; border: 1px solid #dee2e6;
+        }
+    `;
+    document.head.appendChild(extraStyle);
+
+    // 2. Логика появления кнопки
+    const floatCtrl = document.getElementById('floating-controls');
+    window.addEventListener('scroll', () => {
+        if (window.scrollY > 300) floatCtrl.classList.remove('d-none');
+        else floatCtrl.classList.add('d-none');
+    });
+
+    // 3. Функция "Наверх"
+    window.scrollToTop = () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    // 4. Функция переключения Вида
+    let isListView = false;
+    const viewIcon = document.getElementById('view-mode-icon');
+    
+    window.toggleViewMode = () => {
+        isListView = !isListView;
+        const container = document.getElementById('competitors-grid');
+        
+        if (isListView) {
+            container.classList.add('comp-list-mode');
+            viewIcon.classList.remove('bi-list-ul');
+            viewIcon.classList.add('bi-grid-fill');
+        } else {
+            container.classList.remove('comp-list-mode');
+            viewIcon.classList.remove('bi-grid-fill');
+            viewIcon.classList.add('bi-list-ul');
+        }
+    };
+        
     });
 
     if(inpLogoFile) {
