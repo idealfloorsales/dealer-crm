@@ -255,20 +255,20 @@
                                 
                                 <div class="col-md-6">
                                     <label class="form-label text-secondary small fw-bold">Ответственный</label>
-                                    <div class="d-flex gap-2">
+                                    <div class="d-flex flex-column gap-2">
                                         <select id="responsible" class="form-select" onchange="toggleSectorSelect('add', this.value)">
                                             <option value="">-- Не выбран --</option>
                                             <option value="regional_astana">Региональный Астана</option>
                                             <option value="regional_regions">Региональный Регионы</option>
                                         </select>
-                                        <select id="add_region_sector" class="form-select" style="display:none; max-width: 130px;">
-                                            <option value="">Сектор...</option>
-                                            <option value="Север">Север</option>
-                                            <option value="Юг">Юг</option>
-                                            <option value="Запад">Запад</option>
-                                            <option value="Восток">Восток</option>
-                                            <option value="Центр">Центр</option>
-                                        </select>
+                                        
+                                        <div id="add_sector_wrapper" class="input-group" style="display:none;">
+                                            <span class="input-group-text bg-light text-muted small">Сектор</span>
+                                            <select id="add_region_sector" class="form-select"></select>
+                                            <button type="button" class="btn btn-outline-secondary" onclick="openSectorManagerFromModal('add')">
+                                                <i class="bi bi-gear-fill"></i>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="col-md-6"><label class="form-label text-secondary small fw-bold">Статус</label><select id="status" class="form-select"><option value="potential">🔵 Потенциальный</option><option value="active">🟢 Активный</option><option value="standard" selected>🟡 Стандарт</option><option value="problem">🔴 Проблемный</option></select></div>
@@ -364,24 +364,26 @@
                                     <div class="col-md-6"><label class="form-label">Название</label><input type="text" id="edit_name" class="form-control" required></div>
                                     <div class="col-md-6"><label class="form-label">Аватар:</label><input type="file" id="edit-avatar-input" class="form-control"></div>
                                     <div class="col-md-6"><img id="edit-avatar-preview" class="avatar-preview" src=""></div>
+                                    
                                     <div class="col-md-6">
                                         <label class="form-label">Ответственный:</label>
-                                        <div class="d-flex gap-2">
+                                        <div class="d-flex flex-column gap-2">
                                             <select id="edit_responsible" class="form-select" onchange="toggleSectorSelect('edit', this.value)">
                                                 <option value="">-- Не выбран --</option>
                                                 <option value="regional_astana">Региональный Астана</option>
                                                 <option value="regional_regions">Региональный Регионы</option>
                                             </select>
-                                            <select id="edit_region_sector" class="form-select" style="display:none; max-width: 130px;">
-                                                <option value="">Сектор...</option>
-                                                <option value="Север">Север</option>
-                                                <option value="Юг">Юг</option>
-                                                <option value="Запад">Запад</option>
-                                                <option value="Восток">Восток</option>
-                                                <option value="Центр">Центр</option>
-                                            </select>
+                                            
+                                            <div id="edit_sector_wrapper" class="input-group" style="display:none;">
+                                                <span class="input-group-text bg-light text-muted small">Сектор</span>
+                                                <select id="edit_region_sector" class="form-select"></select>
+                                                <button type="button" class="btn btn-outline-secondary" onclick="openSectorManagerFromModal('edit')">
+                                                    <i class="bi bi-gear-fill"></i>
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
+
                                     <div class="col-md-6"><label class="form-label">Статус:</label><select id="edit_status" class="form-select"><option value="standard">🟡 Стандарт</option><option value="active">🟢 Активный</option><option value="problem">🔴 Проблемный</option><option value="potential">🔵 Потенциальный</option><option value="archive">⚫ Архив</option></select></div>
                                     <div class="col-md-6"><label class="form-label">Город</label><input type="text" id="edit_city" class="form-control"></div>
                                     <div class="col-md-6"><label class="form-label">Адрес</label><input type="text" id="edit_address" class="form-control"></div>
@@ -479,6 +481,24 @@
         </div>
     </div>
 
+    <div class="modal fade" id="sector-manager-modal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+                <div class="modal-header border-0 pb-0">
+                    <h6 class="modal-title fw-bold">Сектора: <span id="sec-man-type-label" class="text-primary"></span></h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="input-group mb-3">
+                        <input type="text" id="new-sector-name" class="form-control" placeholder="Название...">
+                        <button class="btn btn-primary" onclick="addNewSector()"><i class="bi bi-plus-lg"></i></button>
+                    </div>
+                    <div id="sector-manager-list" class="list-group list-group-flush"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="toast-container-custom" class="toast-container-custom"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -486,4 +506,3 @@
     <script src="script.js?v={{VER}}"></script> <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(err => console.error(err)); }</script>
 </body>
 </html>
-
