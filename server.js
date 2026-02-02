@@ -59,12 +59,9 @@ const userSchema = new mongoose.Schema({
 }, { timestamps: true });
 const User = mongoose.model('User', userSchema);
 
-// --- ОБНОВЛЕННАЯ ФУНКЦИЯ СОЗДАНИЯ АДМИНА ---
+// --- ФУНКЦИЯ СОЗДАНИЯ АДМИНА ---
 async function seedUsers() {
-    // Ищем пользователя admin
     const admin = await User.findOne({ username: 'admin' });
-    
-    // Полный набор прав Супер-Админа
     const adminPermissions = {
         is_admin: true,
         can_manage_users: true,
@@ -74,11 +71,9 @@ async function seedUsers() {
     };
 
     if (!admin) {
-        // Если админа нет вообще - создаем
         console.log('Создание первого администратора...');
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash('admin123', salt);
-        
         await User.create({
             username: 'admin',
             password: hashedPassword,
@@ -88,12 +83,9 @@ async function seedUsers() {
         });
         console.log('Администратор создан.');
     } else {
-        // Если админ уже есть - ОБНОВЛЯЕМ ЕМУ ПРАВА (Это починит ошибку)
         admin.permissions = adminPermissions;
         admin.scope = 'all';
-        // Если вдруг у него не было поля isBlocked
         if (admin.isBlocked === undefined) admin.isBlocked = false;
-        
         await admin.save();
         console.log('Права администратора принудительно обновлены.');
     }
@@ -103,25 +95,17 @@ async function seedUsers() {
 // НОВАЯ ЗАЩИТА (JWT MIDDLEWARE)
 // ==========================================
 const authMiddleware = (req, res, next) => {
-    // 1. Разрешаем предварительные запросы браузера (CORS OPTIONS)
-    if (req.method === 'OPTIONS') {
-        return next(); 
-    }
+    if (req.method === 'OPTIONS') return next(); 
+    if (req.path === '/api/auth/login' || !req.path.startsWith('/api')) return next();
 
-    // 2. Разрешаем вход и статические файлы (html, css, js) без проверки
-    if (req.path === '/api/auth/login' || !req.path.startsWith('/api')) {
-        return next();
-    }
-
-    // 3. Для API требуем Токен
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // "Bearer TOKEN"
+    const token = authHeader && authHeader.split(' ')[1]; 
 
     if (!token) return res.status(401).json({ error: 'Требуется авторизация' });
 
     jwt.verify(token, JWT_SECRET, (err, user) => {
         if (err) return res.status(403).json({ error: 'Токен недействителен' });
-        req.user = user; // Запоминаем, кто пришел
+        req.user = user; 
         next();
     });
 };
@@ -138,13 +122,8 @@ app.post('/api/auth/login', async (req, res) => {
         const validPass = await bcrypt.compare(password, user.password);
         if (!validPass) return res.status(400).json({ error: 'Неверный пароль' });
 
-        // ВАЖНОЕ ИЗМЕНЕНИЕ: Добавляем permissions внутрь токена!
         const token = jwt.sign(
-            { 
-                id: user._id, 
-                role: user.scope,
-                permissions: user.permissions // <--- ВОТ ЭТОЙ СТРОЧКИ НЕ ХВАТАЛО
-            }, 
+            { id: user._id, role: user.scope, permissions: user.permissions }, 
             JWT_SECRET, 
             { expiresIn: '7d' }
         );
@@ -152,21 +131,14 @@ app.post('/api/auth/login', async (req, res) => {
         res.json({ 
             token, 
             user: { 
-                id: user._id, 
-                username: user.username, 
-                fullName: user.fullName, 
-                scope: user.scope, 
-                permissions: user.permissions 
+                id: user._id, username: user.username, fullName: user.fullName, 
+                scope: user.scope, permissions: user.permissions 
             } 
         });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ==========================================
-// API УПРАВЛЕНИЯ ПОЛЬЗОВАТЕЛЯМИ (ТОЛЬКО ДЛЯ АДМИНОВ)
-// ==========================================
-
-// Middleware: Проверка, что это Админ
+// API УПРАВЛЕНИЯ ПОЛЬЗОВАТЕЛЯМИ
 const requireAdmin = (req, res, next) => {
     if (!req.user || !req.user.permissions || !req.user.permissions.is_admin) {
         return res.status(403).json({ error: 'Доступ только для администраторов' });
@@ -174,77 +146,45 @@ const requireAdmin = (req, res, next) => {
     next();
 };
 
-// 1. Получить всех пользователей
 app.get('/api/admin/users', requireAdmin, async (req, res) => {
     try {
-        // Отдаем всё, кроме хешей паролей
         const users = await User.find().select('-password').sort({ createdAt: -1 });
         res.json(users);
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 2. Создать пользователя
 app.post('/api/admin/users', requireAdmin, async (req, res) => {
     try {
         const { username, password, fullName, scope, permissions } = req.body;
-        
-        // Проверка уникальности
         const exists = await User.findOne({ username });
         if (exists) return res.status(400).json({ error: 'Логин уже занят' });
-
-        // Хешируем пароль
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
-
-        const newUser = new User({
-            username,
-            password: hashedPassword,
-            fullName,
-            scope,
-            permissions
-        });
-
+        const newUser = new User({ username, password: hashedPassword, fullName, scope, permissions });
         await newUser.save();
         res.json({ status: 'ok' });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 3. Обновить пользователя (права, имя, блокировка)
 app.put('/api/admin/users/:id', requireAdmin, async (req, res) => {
     try {
         const { fullName, scope, permissions, isBlocked, password } = req.body;
-        
         const updateData = { fullName, scope, permissions, isBlocked };
-
-        // Если прислали новый пароль - хешируем и обновляем
         if (password && password.trim() !== "") {
             const salt = await bcrypt.genSalt(10);
             updateData.password = await bcrypt.hash(password, salt);
         }
-
         await User.findByIdAndUpdate(req.params.id, updateData);
         res.json({ status: 'ok' });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 4. Удалить пользователя
 app.delete('/api/admin/users/:id', requireAdmin, async (req, res) => {
     try {
-        // Нельзя удалить самого себя
-        if (req.params.id === req.user.id) {
-            return res.status(400).json({ error: 'Нельзя удалить самого себя' });
-        }
+        if (req.params.id === req.user.id) return res.status(400).json({ error: 'Нельзя удалить самого себя' });
         await User.findByIdAndDelete(req.params.id);
         res.json({ status: 'deleted' });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // --- СТАТИКА ---
@@ -266,39 +206,20 @@ app.get('/products.html', (req, res) => servePage(res, 'products.html'));
 app.get('/report.html', (req, res) => servePage(res, 'report.html'));
 app.get('/knowledge.html', (req, res) => servePage(res, 'knowledge.html'));
 app.get('/dealer.html', (req, res) => servePage(res, 'dealer.html'));
+app.get('/users.html', (req, res) => servePage(res, 'users.html'));
 app.use(express.static('public'));
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
 
-// --- СХЕМЫ (БЕЗ ИЗМЕНЕНИЙ) ---
+// --- СХЕМЫ ---
 const statusSchema = new mongoose.Schema({ value: String, label: String, color: String, isVisible: { type: Boolean, default: true }, sortOrder: { type: Number, default: 0 } });
 const Status = mongoose.model('Status', statusSchema);
-// --- ОБНОВЛЕННАЯ СХЕМА ТОВАРА ---
+
 const productSchema = new mongoose.Schema({
-    sku: String,
-    name: String,
-    is_liquid: { type: Boolean, default: true }, // Ликвидность
-    excel_alias: String,                         // Название для Excel
-    stock_qty: Number,                           // Остаток
-    characteristics: {                           // Характеристики
-        class: String,
-        thickness: String,
-        bevel: String,
-        size: String,
-        package_area: String,
-        package_qty: String,
-        weight: String
-    }
+    sku: String, name: String, is_liquid: { type: Boolean, default: true }, excel_alias: String, stock_qty: Number,
+    characteristics: { class: String, thickness: String, bevel: String, size: String, package_area: String, package_qty: String, weight: String }
 });
 const Product = mongoose.model('Product', productSchema);
-const contactSchema = new mongoose.Schema({ name: String, position: String, contactInfo: String }, { _id: false }); 
-const photoSchema = new mongoose.Schema({ description: String, photo_url: String, date: { type: Date, default: Date.now } }, { _id: false });
-const additionalAddressSchema = new mongoose.Schema({ description: String, city: String, address: String }, { _id: false });
-const visitSchema = new mongoose.Schema({ date: String, comment: String, isCompleted: { type: Boolean, default: false } }, { _id: false });
-const posMaterialSchema = new mongoose.Schema({ name: String, quantity: Number }, { _id: false });
-const competitorSchema = new mongoose.Schema({ brand: String, collection: String, price_opt: String, price_retail: String }, { _id: false });
-const collectionItemSchema = new mongoose.Schema({ name: String, type: { type: String, default: 'standard' } }, { _id: false });
-const compContactSchema = new mongoose.Schema({ name: String, position: String, phone: String }, { _id: false });
 
 // --- НОВАЯ СХЕМА СЕКТОРОВ ---
 const sectorSchema = new mongoose.Schema({ 
@@ -307,7 +228,7 @@ const sectorSchema = new mongoose.Schema({
 });
 const Sector = mongoose.model('Sector', sectorSchema);
 
-// --- ФУНКЦИЯ ЗАПОЛНЕНИЯ НАЧАЛЬНЫМИ СЕКТОРАМИ ---
+// --- ЗАПОЛНЕНИЕ СЕКТОРОВ ---
 async function seedSectors() {
     const count = await Sector.countDocuments();
     if (count === 0) {
@@ -326,39 +247,46 @@ async function seedSectors() {
     }
 }
 
-// --- В server.js заменить compRefSchema на этот код ---
+const contactSchema = new mongoose.Schema({ name: String, position: String, contactInfo: String }, { _id: false }); 
+const photoSchema = new mongoose.Schema({ description: String, photo_url: String, date: { type: Date, default: Date.now } }, { _id: false });
+const additionalAddressSchema = new mongoose.Schema({ description: String, city: String, address: String }, { _id: false });
+const visitSchema = new mongoose.Schema({ date: String, comment: String, isCompleted: { type: Boolean, default: false } }, { _id: false });
+const posMaterialSchema = new mongoose.Schema({ name: String, quantity: Number }, { _id: false });
+const competitorSchema = new mongoose.Schema({ brand: String, collection: String, price_opt: String, price_retail: String }, { _id: false });
+const collectionItemSchema = new mongoose.Schema({ name: String, type: { type: String, default: 'standard' } }, { _id: false });
+const compContactSchema = new mongoose.Schema({ name: String, position: String, phone: String }, { _id: false });
+
 const compRefSchema = new mongoose.Schema({ 
-    name: String, 
-    country: String, 
-    supplier: String, 
-    warehouse: String, 
-    addresses: [additionalAddressSchema],       // <--- НОВОЕ ПОЛЕ
-    logoUrl: String,       // <--- НОВОЕ ПОЛЕ (Base64 картинка)
-    website: String, 
-    instagram: String, 
-    info: String, 
-    storage_days: String, 
-    stock_info: String, 
-    reserve_days: String, 
-    contacts: [compContactSchema], 
-    collections: [collectionItemSchema] 
+    name: String, country: String, supplier: String, warehouse: String, 
+    addresses: [additionalAddressSchema], logoUrl: String, 
+    website: String, instagram: String, info: String, 
+    storage_days: String, stock_info: String, reserve_days: String, 
+    contacts: [compContactSchema], collections: [collectionItemSchema] 
 });
 const CompRef = mongoose.model('CompRef', compRefSchema);
+
 const dealerSchema = new mongoose.Schema({ dealer_id: String, name: String, price_type: String, city: String, address: String, contacts: [contactSchema], bonuses: String, photos: [photoSchema], organizations: [String], contract: { isSigned: Boolean, date: String }, region_sector: String, hasPersonalPlan: { type: Boolean, default: false }, delivery: String, website: String, instagram: String, additional_addresses: [additionalAddressSchema], pos_materials: [posMaterialSchema], visits: [visitSchema], products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }], latitude: Number, longitude: Number, status: { type: String, default: 'standard' }, avatarUrl: String, competitors: [competitorSchema], responsible: String });
 const Dealer = mongoose.model('Dealer', dealerSchema);
+
 const salesSchema = new mongoose.Schema({ month: String, group: String, dealerId: String, dealerName: String, plan: Number, fact: Number, isCustom: { type: Boolean, default: false } });
 const Sales = mongoose.model('Sales', salesSchema);
+
 const Knowledge = mongoose.model('Knowledge', new mongoose.Schema({ title: String, content: String }, { timestamps: true }));
 
 async function connectToDB() {
     if (!DB_CONNECTION_STRING) return console.error("No DB String");
-    try { await mongoose.connect(DB_CONNECTION_STRING); console.log('MongoDB Connected'); await seedStatuses(); await seedUsers(); } catch (e) { console.error(e); }
+    try { 
+        await mongoose.connect(DB_CONNECTION_STRING); 
+        console.log('MongoDB Connected'); 
+        await seedStatuses(); 
+        await seedUsers(); 
+        await seedSectors(); // <--- ЗАПУСК ЗАПОЛНЕНИЯ
+    } catch (e) { console.error(e); }
 }
 
 async function seedStatuses() { const count = await Status.countDocuments(); if (count === 0) { await Status.insertMany([{ value: 'active', label: 'Активный', color: '#198754', isVisible: true, sortOrder: 1 }, { value: 'standard', label: 'Стандарт', color: '#ffc107', isVisible: true, sortOrder: 2 }, { value: 'problem', label: 'Проблемный', color: '#dc3545', isVisible: true, sortOrder: 3 }, { value: 'potential', label: 'Потенциальный', color: '#0d6efd', isVisible: true, sortOrder: 4 }, { value: 'archive', label: 'Архив', color: '#6c757d', isVisible: false, sortOrder: 5 }]); } }
 function convertToClient(doc) { if(!doc) return null; const obj = doc.toObject ? doc.toObject() : doc; obj.id = obj._id; delete obj._id; delete obj.__v; delete obj.password; if(obj.products) obj.products = obj.products.map(p => { if(p){p.id=p._id; delete p._id;} return p;}); if (obj.organization && (!obj.organizations || obj.organizations.length === 0)) { obj.organizations = [obj.organization]; } return obj; }
 
-// --- ПРОВЕРКА ПРАВ (НОВАЯ) ---
 function getUserRole(req) { return req.user ? req.user.role : 'guest'; }
 function canWrite(req) { return req.user && req.user.role !== 'guest'; }
 const checkWrite = (req, res, next) => { if (canWrite(req)) next(); else res.status(403).json({error:'Read Only'}); };
@@ -366,7 +294,6 @@ const checkWrite = (req, res, next) => { if (canWrite(req)) next(); else res.sta
 function getDealerFilter(req) {
     if (!req.user) return { _id: null }; 
     const role = req.user.role; 
-    
     if (role === 'admin' || role === 'guest' || role === 'all') return {}; 
     if (role === 'astana') return { $or: [{ responsible: 'regional_astana' }, { city: { $regex: /астана/i } }, { city: { $regex: /astana/i } }] };
     if (role === 'regions') return { $or: [{ responsible: 'regional_regions' }, { city: { $not: { $regex: /астана/i } }, responsible: { $ne: 'regional_astana' } }] };
@@ -375,11 +302,17 @@ function getDealerFilter(req) {
 
 app.get('/api/auth/me', (req, res) => { res.json({ user: req.user }); });
 
-// --- API ROUTES (СХЕМЫ) ---
+// --- API ROUTES ---
 app.get('/api/statuses', async (req, res) => { const s = await Status.find().sort({sortOrder: 1}).lean(); res.json(s.map(convertToClient)); });
 app.post('/api/statuses', checkWrite, async (req, res) => { try { const s = new Status(req.body); await s.save(); res.json(convertToClient(s)); } catch(e){ res.status(500).json({error:e.message}); } });
 app.put('/api/statuses/:id', checkWrite, async (req, res) => { try { await Status.findByIdAndUpdate(req.params.id, req.body); res.json({status:'ok'}); } catch(e){ res.status(500).json({error:e.message}); } });
 app.delete('/api/statuses/:id', checkWrite, async (req, res) => { await Status.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
+
+// --- API СЕКТОРОВ ---
+app.get('/api/sectors', async (req, res) => { const list = await Sector.find().sort({name:1}); res.json(list.map(convertToClient)); });
+app.post('/api/sectors', checkWrite, async (req, res) => { const s = new Sector(req.body); await s.save(); res.json(convertToClient(s)); });
+app.delete('/api/sectors/:id', checkWrite, async (req, res) => { await Sector.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
+
 app.get('/api/dealers', async (req, res) => { try { let filter = getDealerFilter(req); if (req.query.scope === 'all') { filter = {}; } const dealers = await Dealer.find(filter).select('-photos -visits -products').lean(); res.json(dealers.map(d => ({ id: d._id, ...d, photo_url: d.avatarUrl }))); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.get('/api/dealers/:id', async (req, res) => { try { const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).populate('products'); res.json(convertToClient(d)); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.post('/api/dealers', checkWrite, async (req, res) => { try { const role = getUserRole(req); if (role === 'astana') req.body.responsible = 'regional_astana'; if (role === 'regions') req.body.responsible = 'regional_regions'; const d = new Dealer(req.body); await d.save(); res.status(201).json(convertToClient(d)); } catch (e) { res.status(500).json({ error: e.message }); } });
@@ -407,10 +340,3 @@ app.delete('/api/knowledge/:id', checkWrite, async (req, res) => { await Knowled
 app.get('/api/tasks', async (req, res) => { try { const data = await Dealer.find(getDealerFilter(req)).select('name visits status responsible').lean(); res.json(data.map(d => ({ id: d._id, name: d.name, status: d.status, visits: d.visits || [], responsible: d.responsible }))); } catch (e) { res.status(500).json([]); } });
 
 app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
-
-
-
-
-
-
-
