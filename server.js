@@ -299,6 +299,33 @@ const posMaterialSchema = new mongoose.Schema({ name: String, quantity: Number }
 const competitorSchema = new mongoose.Schema({ brand: String, collection: String, price_opt: String, price_retail: String }, { _id: false });
 const collectionItemSchema = new mongoose.Schema({ name: String, type: { type: String, default: 'standard' } }, { _id: false });
 const compContactSchema = new mongoose.Schema({ name: String, position: String, phone: String }, { _id: false });
+
+// --- НОВАЯ СХЕМА СЕКТОРОВ ---
+const sectorSchema = new mongoose.Schema({ 
+    name: String, 
+    type: String // 'astana' или 'region'
+});
+const Sector = mongoose.model('Sector', sectorSchema);
+
+// --- ФУНКЦИЯ ЗАПОЛНЕНИЯ НАЧАЛЬНЫМИ СЕКТОРАМИ ---
+async function seedSectors() {
+    const count = await Sector.countDocuments();
+    if (count === 0) {
+        console.log('Seeding sectors...');
+        await Sector.insertMany([
+            { name: 'DIY', type: 'astana' },
+            { name: 'Салоны', type: 'astana' },
+            { name: 'Рынки', type: 'astana' },
+            { name: 'Объектные', type: 'astana' },
+            { name: 'Север', type: 'region' },
+            { name: 'Юг', type: 'region' },
+            { name: 'Запад', type: 'region' },
+            { name: 'Восток', type: 'region' },
+            { name: 'Центр', type: 'region' }
+        ]);
+    }
+}
+
 // --- В server.js заменить compRefSchema на этот код ---
 const compRefSchema = new mongoose.Schema({ 
     name: String, 
@@ -380,6 +407,7 @@ app.delete('/api/knowledge/:id', checkWrite, async (req, res) => { await Knowled
 app.get('/api/tasks', async (req, res) => { try { const data = await Dealer.find(getDealerFilter(req)).select('name visits status responsible').lean(); res.json(data.map(d => ({ id: d._id, name: d.name, status: d.status, visits: d.visits || [], responsible: d.responsible }))); } catch (e) { res.status(500).json([]); } });
 
 app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
+
 
 
 
