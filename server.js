@@ -221,10 +221,10 @@ const productSchema = new mongoose.Schema({
 });
 const Product = mongoose.model('Product', productSchema);
 
-// --- НОВАЯ СХЕМА СЕКТОРОВ ---
+// --- НОВАЯ СХЕМА СЕКТОРОВ (КАСТОМНЫЕ) ---
 const sectorSchema = new mongoose.Schema({ 
     name: String, 
-    type: String // 'astana' или 'region'
+    type: String // 'astana' (для DIY, Салонов) или 'region' (Север, Юг)
 });
 const Sector = mongoose.model('Sector', sectorSchema);
 
@@ -280,7 +280,7 @@ async function connectToDB() {
         console.log('MongoDB Connected'); 
         await seedStatuses(); 
         await seedUsers(); 
-        await seedSectors(); // <--- ЗАПУСК ЗАПОЛНЕНИЯ
+        await seedSectors(); // <--- АВТО-СОЗДАНИЕ СЕКТОРОВ
     } catch (e) { console.error(e); }
 }
 
