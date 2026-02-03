@@ -41,8 +41,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const sectorModal = sectorModalEl ? new bootstrap.Modal(sectorModalEl) : null;
     let currentSectorTypeMode = ''; // 'astana' или 'region'
 
-    // Настройки дашборда
-    const defaultDashConfig = { showHealth: true, showGrowth: true, showCityPen: true, showMatrix: false, showVisits: false };
+    // Настройки дашборда (Обновили дефолтные настройки)
+    const defaultDashConfig = { showKpi: true, showTop: true, showCoverage: true, showTasks: true };
     let dashConfig = JSON.parse(localStorage.getItem('dash_config')) || defaultDashConfig;
 
     // Список POS-материалов
@@ -83,6 +83,16 @@ document.addEventListener('DOMContentLoaded', () => {
     let markerInstances = { add: null, edit: null };
     let refreshAddMap = null; let refreshEditMap = null;
 
+    // --- CSS INJECTION FOR CHART (Добавляем стили диаграммы) ---
+    const dashStyle = document.createElement('style');
+    dashStyle.innerHTML = `
+        .circular-chart { display: block; margin: 0 auto; max-width: 100%; max-height: 140px; }
+        .circle-bg { fill: none; stroke: #eee; stroke-width: 3.8; }
+        .circle { fill: none; stroke-width: 2.8; stroke-linecap: round; animation: progress 1s ease-out forwards; transition: stroke-dasharray 0.5s; }
+        @keyframes progress { 0% { stroke-dasharray: 0 100; } }
+    `;
+    document.head.appendChild(dashStyle);
+
     // --- 4. EXPORT CONFIGURATION ---
     const exportColumnsConfig = [
         { id: 'id', label: 'ID дилера', isChecked: true, getValue: d => d.dealer_id },
@@ -101,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const map = { 'regional_astana': 'Региональный Астана', 'regional_regions': 'Региональный Регионы', 'office': 'Офис' };
             return map[d.responsible] || d.responsible;
         }},
-        { id: 'sector', label: 'Сектор', isChecked: true, getValue: d => d.region_sector || '' }, // <--- ДОБАВЛЕНО В ЭКСПОРТ
+        { id: 'sector', label: 'Сектор', isChecked: true, getValue: d => d.region_sector || '' },
         { id: 'price_type', label: 'Тип цен', isChecked: true, getValue: d => d.price_type },
         { id: 'contacts', label: 'Контакты (Телефон)', isChecked: true, getValue: d => {
             if (!d.contacts || !d.contacts.length) return '';
@@ -259,145 +269,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(e) { alert("Ошибка удаления"); }
     };
 
-    // ФУНКЦИЯ КАТАЛОГА С ФИЛЬТРАЦИЕЙ
-    function renderProductChecklist(container, selectedIds=[]) { 
-        if(!container) return; 
-        const set = new Set(selectedIds); 
-        const filteredCatalog = fullProductCatalog.filter(p => !posMaterialsList.includes(p.name));
-        container.innerHTML = filteredCatalog.map(p => 
-            `<div class="checklist-item form-check">
-                <input type="checkbox" class="form-check-input" id="prod-${container.id}-${p.id}" value="${p.id}" ${set.has(p.id)?'checked':''}>
-                <label class="form-check-label" for="prod-${container.id}-${p.id}"><strong>${p.sku}</strong> - ${p.name}</label>
-             </div>`
-        ).join(''); 
-    }
-
-    function getSelectedProductIds(containerId) { const el=document.getElementById(containerId); if(!el) return []; return Array.from(el.querySelectorAll('input:checked')).map(cb=>cb.value); }
-    function collectData(container, selector, fields) { if (!container) return []; const data = []; container.querySelectorAll(selector).forEach(entry => { const item = {}; let hasData = false; fields.forEach(f => { const inp = entry.querySelector(f.class); if(inp){item[f.key]=inp.value; if(item[f.key]) hasData=true;} }); if(hasData) data.push(item); }); return data; }
-    function renderList(container, data, htmlGen) { if(container) container.innerHTML = (data && data.length > 0) ? data.map(htmlGen).join('') : htmlGen(); }
-    function collectOrgs(container) { const orgs = []; container.querySelectorAll('.org-input').forEach(inp => { if(inp.value.trim()) orgs.push(inp.value.trim()); }); return orgs; }
-
-    // --- SETUP BUTTONS ---
-    const setupListBtn = (id, list, genFunc) => { const btn = document.getElementById(id); if(btn) btn.onclick = () => list.insertAdjacentHTML('beforeend', genFunc()); };
-    setupListBtn('add-contact-btn-add-modal', addContactList, createContactEntryHTML); setupListBtn('add-address-btn-add-modal', addAddressList, createAddressEntryHTML); setupListBtn('add-pos-btn-add-modal', addPosList, createPosEntryHTML); setupListBtn('add-visits-btn-add-modal', addVisitsList, createVisitEntryHTML); setupListBtn('add-competitor-btn-add-modal', addCompetitorList, createCompetitorEntryHTML);
-    setupListBtn('add-contact-btn-edit-modal', editContactList, createContactEntryHTML); setupListBtn('add-address-btn-edit-modal', editAddressList, createAddressEntryHTML); setupListBtn('add-pos-btn-edit-modal', editPosList, createPosEntryHTML); setupListBtn('add-visits-btn-edit-modal', editVisitsList, createVisitEntryHTML); setupListBtn('add-competitor-btn-edit-modal', editCompetitorList, createCompetitorEntryHTML);
-
-    if(btnAddOrgAdd) btnAddOrgAdd.onclick = () => addOrgList.insertAdjacentHTML('beforeend', createOrgInputHTML());
-    if(btnEditOrgAdd) btnEditOrgAdd.onclick = () => editOrgList.insertAdjacentHTML('beforeend', createOrgInputHTML());
-
-    if(addAvatarInput) addAvatarInput.addEventListener('change', async (e) => { const file = e.target.files[0]; if (file) { newAvatarBase64 = await compressImage(file, 800, 0.8); addAvatarPreview.src = newAvatarBase64; addAvatarPreview.style.display='block'; } });
-    if(editAvatarInput) editAvatarInput.addEventListener('change', async (e) => { const file = e.target.files[0]; if (file) { newAvatarBase64 = await compressImage(file, 800, 0.8); editAvatarPreview.src = newAvatarBase64; editAvatarPreview.style.display='block'; } });
-    if(addPhotoInput) addPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) addPhotosData.push({ photo_url: await compressImage(file, 1000, 0.7) }); renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData); addPhotoInput.value = ''; });
-    if(addPhotoPreviewContainer) addPhotoPreviewContainer.addEventListener('click', (e) => { const btn = e.target.closest('.btn-remove-photo'); if(btn) { addPhotosData.splice(btn.dataset.index, 1); renderPhotoPreviews(addPhotoPreviewContainer, addPhotosData); } });
-    if(editPhotoInput) editPhotoInput.addEventListener('change', async (e) => { for (let file of e.target.files) editPhotosData.push({ photo_url: await compressImage(file, 1000, 0.7) }); renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData); editPhotoInput.value = ''; });
-    if(editPhotoPreviewContainer) editPhotoPreviewContainer.addEventListener('click', (e) => { const btn = e.target.closest('.btn-remove-photo'); if(btn) { editPhotosData.splice(btn.dataset.index, 1); renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData); } });
-
-    if (logoutBtn) { 
-        logoutBtn.onclick = () => { 
-            localStorage.removeItem('crm_token');
-            localStorage.removeItem('crm_user');
-            window.location.href = '/login.html'; 
-        }; 
-    }
-    
-    if(document.body) { document.body.addEventListener('click', (e) => { const taskBtn = e.target.closest('.btn-complete-task'); if (taskBtn) { taskBtn.disabled = true; taskBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; completeTask(taskBtn, taskBtn.dataset.id, taskBtn.dataset.index); } }); }
-    document.querySelectorAll('.sort-btn').forEach(btn => { btn.onclick = (e) => { const sortKey = e.currentTarget.dataset.sort; if(currentSort.column === sortKey) currentSort.direction = (currentSort.direction === 'asc' ? 'desc' : 'asc'); else { currentSort.column = sortKey; currentSort.direction = 'asc'; } renderDealerList(); }; });
-
-    if(btnManageStatuses) { btnManageStatuses.onclick = () => { resetStatusForm(); statusModal.show(); }; }
-
-    function setupMapLogic(mapId, latId, lngId, searchId, btnSearchId, btnLocId, instanceKey) {
-        const mapEl = document.getElementById(mapId); if (!mapEl) return;
-        if (!mapInstances[instanceKey]) {
-            const map = L.map(mapId).setView([51.1605, 71.4704], 12);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: 'OSM' }).addTo(map);
-            mapInstances[instanceKey] = map;
-            map.on('click', (e) => { setMarker(e.latlng.lat, e.latlng.lng, instanceKey, latId, lngId); });
-        }
-        const map = mapInstances[instanceKey];
-        function setMarker(lat, lng, key, latInputId, lngInputId) {
-            if (markerInstances[key]) map.removeLayer(markerInstances[key]);
-            markerInstances[key] = L.marker([lat, lng], { draggable: true }).addTo(map);
-            document.getElementById(latInputId).value = lat.toFixed(6);
-            document.getElementById(lngInputId).value = lng.toFixed(6);
-            markerInstances[key].on('dragend', function(event) { const pos = event.target.getLatLng(); document.getElementById(latInputId).value = pos.lat.toFixed(6); document.getElementById(lngInputId).value = pos.lng.toFixed(6); });
-            map.setView([lat, lng], 16);
-        }
-        const handleSearch = async () => {
-            const input = document.getElementById(searchId); const query = input.value.trim(); if (!query) return;
-            const coordsRegex = /^(-?\d+(\.\d+)?)[,\s]+(-?\d+(\.\d+)?)$/; const match = query.match(coordsRegex);
-            if (match) { const lat = parseFloat(match[1]); const lng = parseFloat(match[3]); setMarker(lat, lng, instanceKey, latId, lngId); window.showToast("Координаты приняты!"); } 
-            else { try { const btn = document.getElementById(btnSearchId); const oldHtml = btn.innerHTML; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=kz&limit=1`); const data = await res.json(); if (data && data.length > 0) { const lat = parseFloat(data[0].lat); const lng = parseFloat(data[0].lon); setMarker(lat, lng, instanceKey, latId, lngId); } else { alert("Адрес не найден."); } btn.innerHTML = oldHtml; } catch (e) { console.error(e); } }
-        };
-        const searchBtn = document.getElementById(btnSearchId); const searchInp = document.getElementById(searchId);
-        if(searchBtn) searchBtn.onclick = handleSearch;
-        if(searchInp) searchInp.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); handleSearch(); } });
-        const locBtn = document.getElementById(btnLocId);
-        if(locBtn) { locBtn.onclick = () => { if (navigator.geolocation) { locBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; navigator.geolocation.getCurrentPosition(pos => { setMarker(pos.coords.latitude, pos.coords.longitude, instanceKey, latId, lngId); locBtn.innerHTML = '<i class="bi bi-geo-alt-fill"></i>'; }, () => { alert("Нет доступа к геопозиции"); locBtn.innerHTML = '<i class="bi bi-geo-alt-fill"></i>'; }); } }; }
-        return function invalidate() { setTimeout(() => { map.invalidateSize(); const curLat = parseFloat(document.getElementById(latId).value); const curLng = parseFloat(document.getElementById(lngId).value); if (!isNaN(curLat) && !isNaN(curLng)) { setMarker(curLat, curLng, instanceKey, latId, lngId); } }, 300); };
-    }
-    refreshAddMap = setupMapLogic('add-map', 'add_latitude', 'add_longitude', 'add-smart-search', 'btn-search-add', 'btn-loc-add', 'add');
-    refreshEditMap = setupMapLogic('edit-map', 'edit_latitude', 'edit_longitude', 'edit-smart-search', 'btn-search-edit', 'btn-loc-edit', 'edit');
-
-    // --- MAIN LOGIC ---
-    async function initApp() {
-        try {
-            console.log("Starting app init...");
-            // 1. Auth
-            try { const authRes = await fetch('/api/auth/me'); if (authRes.ok) { const authData = await authRes.json(); currentUserRole = authData.user ? authData.user.role : 'guest'; const badge = document.getElementById('user-role-badge'); if(badge) { const names = { 'admin': 'Админ', 'astana': 'Астана', 'regions': 'Регионы', 'guest': 'Гость' }; badge.textContent = names[currentUserRole] || currentUserRole; } if (currentUserRole === 'guest') { if (openAddModalBtn) openAddModalBtn.style.display = 'none'; } } } catch (e) {}
-
-            // 2. Load Dictionaries
-            await Promise.all([
-                fetchStatuses(),
-                fetchProductCatalog(),
-                fetchSectors(), // <--- ЗАГРУЖАЕМ СЕКТОРА
-                updatePosDatalist()
-            ]);
-
-            try { const compRes = await fetch(API_COMPETITORS_REF_URL); if (compRes.ok) { competitorsRef = await compRes.json(); updateBrandsDatalist(); } } catch(e){}
-
-            // 3. Load Main Data
-            console.log("Fetching main data...");
-            await Promise.all([
-                fetchDealers(),
-                fetchTasks(),
-                fetchCurrentMonthSales()
-            ]);
-
-            // 4. Render
-            populateFilters(allDealers);
-            renderDashboard(); 
-            renderDealerList();
-            
-            // 5. Setup Listeners
-            setupEventListeners();
-            
-            const pendingId = localStorage.getItem('pendingEditDealerId'); if (pendingId) { localStorage.removeItem('pendingEditDealerId'); openEditModal(pendingId); }
-
-        } catch (error) {
-            console.error("CRITICAL ERROR:", error);
-            if(dealerGrid) {
-                dealerGrid.innerHTML = `
-                <div class="alert alert-danger text-center m-5 shadow-sm p-4 rounded-4 border-0">
-                    <h1 class="display-6 text-danger mb-3"><i class="bi bi-wifi-off"></i></h1>
-                    <h4 class="fw-bold">Не удалось загрузить данные</h4>
-                    <p class="mb-3">Сервер не отвечает или произошла ошибка обработки.</p>
-                    <div class="p-2 bg-white rounded border d-inline-block text-start mb-3"><small class="text-danger font-monospace">${error.message}</small></div>
-                    <div><button class="btn btn-outline-danger px-4 rounded-pill" onclick="window.location.reload()"><i class="bi bi-arrow-clockwise me-2"></i>Попробовать снова</button></div>
-                </div>`;
-            }
-            if(dashboardStats) dashboardStats.innerHTML = '<p class="text-danger small text-center">Ошибка статистики</p>';
-        }
-    }
-    
-    // --- SAFE LISTENERS ---
-    function setupEventListeners() {
-        if(filterCity) filterCity.onchange = renderDealerList; 
-        if(filterPriceType) filterPriceType.onchange = renderDealerList; 
-        if(filterStatus) filterStatus.onchange = renderDealerList; 
-        if(filterResponsible) filterResponsible.onchange = renderDealerList; 
-        if(searchBar) searchBar.oninput = renderDealerList;
-    }
-
     // --- DASHBOARD SETTINGS LOGIC ---
     if(btnDashSettings) {
         btnDashSettings.onclick = () => {
@@ -405,24 +276,20 @@ document.addEventListener('DOMContentLoaded', () => {
             if(list) {
                 list.innerHTML = `
                     <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" id="set-showHealth" ${dashConfig.showHealth ? 'checked' : ''}>
-                        <label class="form-check-label" for="set-showHealth">Продажи тт (Актив/Спят)</label>
+                        <input class="form-check-input" type="checkbox" id="set-showKpi" ${dashConfig.showKpi ? 'checked' : ''}>
+                        <label class="form-check-label" for="set-showKpi">План продаж</label>
                     </div>
                     <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" id="set-showGrowth" ${dashConfig.showGrowth ? 'checked' : ''}>
-                        <label class="form-check-label" for="set-showGrowth">Прирост (Новые)</label>
+                        <input class="form-check-input" type="checkbox" id="set-showTop" ${dashConfig.showTop ? 'checked' : ''}>
+                        <label class="form-check-label" for="set-showTop">Топ-5</label>
                     </div>
                     <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" id="set-showCityPen" ${dashConfig.showCityPen ? 'checked' : ''}>
-                        <label class="form-check-label" for="set-showCityPen">Потенциал городов</label>
+                        <input class="form-check-input" type="checkbox" id="set-showCoverage" ${dashConfig.showCoverage ? 'checked' : ''}>
+                        <label class="form-check-label" for="set-showCoverage">Охват территории</label>
                     </div>
                     <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" id="set-showMatrix" ${dashConfig.showMatrix ? 'checked' : ''}>
-                        <label class="form-check-label" for="set-showMatrix">Матрица (Среднее SKU)</label>
-                    </div>
-                    <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" id="set-showVisits" ${dashConfig.showVisits ? 'checked' : ''}>
-                        <label class="form-check-label" for="set-showVisits">Активность (Визиты)</label>
+                        <input class="form-check-input" type="checkbox" id="set-showTasks" ${dashConfig.showTasks ? 'checked' : ''}>
+                        <label class="form-check-label" for="set-showTasks">Задачи</label>
                     </div>
                 `;
             }
@@ -431,150 +298,114 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     window.saveDashboardConfig = () => {
-        dashConfig.showHealth = document.getElementById('set-showHealth').checked;
-        dashConfig.showGrowth = document.getElementById('set-showGrowth').checked;
-        dashConfig.showCityPen = document.getElementById('set-showCityPen').checked;
-        dashConfig.showMatrix = document.getElementById('set-showMatrix').checked;
-        dashConfig.showVisits = document.getElementById('set-showVisits').checked;
+        dashConfig.showKpi = document.getElementById('set-showKpi').checked;
+        dashConfig.showTop = document.getElementById('set-showTop').checked;
+        dashConfig.showCoverage = document.getElementById('set-showCoverage').checked;
+        dashConfig.showTasks = document.getElementById('set-showTasks').checked;
         
         localStorage.setItem('dash_config', JSON.stringify(dashConfig));
         if(settingsModal) settingsModal.hide();
         renderDashboard(); 
     };
 
-    // --- RENDER DASHBOARD (V3) ---
+    // --- RENDER DASHBOARD (NEW V4 - KPI, TOP-5, COVERAGE) ---
     function renderDashboard() {
         if (!dashboardStats) return; 
         if (!allDealers || allDealers.length === 0) { dashboardStats.innerHTML = ''; return; }
 
-        let html = '';
+        // 1. KPI & TOP 5 DATA
+        let totalPlan = 0;
+        let totalFact = 0;
+        const dealerSalesMap = new Map();
+
+        if (currentMonthSales) {
+            currentMonthSales.forEach(s => {
+                const p = parseFloat(s.plan) || 0;
+                const f = parseFloat(s.fact) || 0;
+                totalPlan += p;
+                totalFact += f;
+                if (f > 0) {
+                    const key = s.dealerId || s.dealerName;
+                    dealerSalesMap.set(key, { name: s.dealerName, value: f, id: s.dealerId });
+                }
+            });
+        }
         
-        // 1. Calculations
-        const activeIds = new Set();
-        if(currentMonthSales) currentMonthSales.forEach(s => { if(s.fact > 0) activeIds.add(s.dealerId); });
+        const kpiPercent = totalPlan > 0 ? Math.round((totalFact / totalPlan) * 100) : 0;
         
-        let activeCount = 0;
-        let sleepingCount = 0;
-        let newCount = 0;
-        let totalSKU = 0;
-        let totalDealersWithProducts = 0;
+        // --- KPI UI Updates ---
+        const kpiFactEl = document.getElementById('kpi-fact-val');
+        const kpiPlanEl = document.getElementById('kpi-plan-val');
+        const kpiBadge = document.getElementById('kpi-percent-badge');
+        const kpiBar = document.getElementById('kpi-progress-bar');
 
-        const cityStats = {}; 
-        const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        if(kpiFactEl) kpiFactEl.textContent = `${totalFact.toLocaleString('ru-RU')} м²`;
+        if(kpiPlanEl) kpiPlanEl.textContent = `${totalPlan.toLocaleString('ru-RU')} м²`;
+        if(kpiBadge) {
+            kpiBadge.textContent = `${kpiPercent}%`;
+            kpiBadge.className = `badge border fs-6 ${kpiPercent >= 100 ? 'bg-success text-white' : (kpiPercent >= 50 ? 'bg-warning text-dark' : 'bg-light text-dark')}`;
+        }
+        if(kpiBar) {
+            kpiBar.style.width = `${Math.min(kpiPercent, 100)}%`;
+            kpiBar.className = `progress-bar ${kpiPercent >= 100 ? 'bg-success' : (kpiPercent >= 50 ? 'bg-warning' : 'bg-danger')}`;
+        }
 
-        allDealers.forEach(d => {
-            if (d.status === 'archive') return;
-
-            const isActive = activeIds.has(d.id);
-            if (isActive) activeCount++; else sleepingCount++;
-
-            if (d.createdAt && new Date(d.createdAt) >= startOfMonth) newCount++;
-
-            if (d.products && d.products.length > 0) {
-                const realProducts = d.products.filter(p => !posMaterialsList.includes(p.name));
-                totalSKU += realProducts.length;
-                if(realProducts.length > 0) totalDealersWithProducts++;
+        // --- TOP 5 UI Updates ---
+        const topListEl = document.getElementById('dash-top-dealers');
+        if (topListEl) {
+            const sortedSales = Array.from(dealerSalesMap.values()).sort((a,b) => b.value - a.value).slice(0, 5);
+            if (sortedSales.length === 0) {
+                topListEl.innerHTML = '<p class="text-center text-muted py-3 small">Нет продаж в этом месяце</p>';
+            } else {
+                topListEl.innerHTML = sortedSales.map((s, idx) => {
+                    const icon = idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : `${idx+1}.`));
+                    return `
+                    <div class="list-group-item px-0 py-2 border-0 d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center gap-2 text-truncate">
+                            <span class="fw-bold text-secondary" style="width:25px;">${icon}</span>
+                            <span class="text-dark fw-medium text-truncate" style="max-width: 150px;" title="${s.name}">${s.name}</span>
+                        </div>
+                        <span class="badge bg-light text-dark border">${s.value.toFixed(0)}</span>
+                    </div>`;
+                }).join('');
             }
+        }
 
-            const city = d.city || 'Не указан';
-            if (!cityStats[city]) cityStats[city] = { active: 0, potential: 0, total: 0 };
-            
-            if (isActive) cityStats[city].active++;
-            else cityStats[city].potential++;
-            
-            cityStats[city].total++;
+        // --- COVERAGE DATA ---
+        const activeDealers = allDealers.filter(d => d.status === 'active' || d.status === 'problem' || (d.status === 'standard' && dealerSalesMap.has(d.id)));
+        const totalActive = activeDealers.length;
+        
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        thirtyDaysAgo.setHours(0,0,0,0);
+
+        let visitedCount = 0;
+        activeDealers.forEach(d => {
+            let hasVisit = false;
+            // Check Dealer Visits
+            if (d.visits && Array.isArray(d.visits)) {
+                if (d.visits.some(v => v.isCompleted && new Date(v.date) >= thirtyDaysAgo)) hasVisit = true;
+            }
+            // Check Task Visits (fallback)
+            if (!hasVisit) {
+                const task = allTasksData.find(t => String(t.id) === String(d.id));
+                if (task && task.visits) {
+                    if (task.visits.some(v => v.isCompleted && new Date(v.date) >= thirtyDaysAgo)) hasVisit = true;
+                }
+            }
+            if (hasVisit) visitedCount++;
         });
 
-        const avgSKU = totalDealersWithProducts > 0 ? (totalSKU / totalDealersWithProducts).toFixed(1) : 0;
+        const covPercent = totalActive > 0 ? Math.round((visitedCount / totalActive) * 100) : 0;
+        const circle = document.getElementById('coverage-circle');
+        const textPct = document.getElementById('coverage-percent');
+        const textInfo = document.getElementById('coverage-text');
 
-        // 2. Widgets
-        if (dashConfig.showHealth) {
-            html += `
-            <div class="col-6">
-                <div class="stat-card-modern h-100 flex-column align-items-start justify-content-center p-3">
-                    <div class="d-flex align-items-center gap-2 mb-2">
-                        <div class="icon-circle bg-success-subtle text-success"><i class="bi bi-heart-pulse-fill"></i></div>
-                        <span class="small fw-bold text-muted">Продажи по дилерам</span>
-                    </div>
-                    <div class="stat-dual-value">
-                        <span class="stat-val-active">${activeCount}</span>
-                        <span class="text-muted fw-light" style="font-size:1rem;">/</span>
-                        <span class="stat-val-sleep">${sleepingCount}</span>
-                    </div>
-                    <div class="stat-sublabel">Актив / Спят</div>
-                </div>
-            </div>`;
-        }
+        if(circle) circle.setAttribute('stroke-dasharray', `${covPercent}, 100`);
+        if(textPct) textPct.textContent = `${covPercent}%`;
+        if(textInfo) textInfo.textContent = `Посещено: ${visitedCount} из ${totalActive}`;
 
-        if (dashConfig.showGrowth) {
-            html += `
-            <div class="col-6">
-                <div class="stat-card-modern h-100 flex-column align-items-start justify-content-center p-3">
-                    <div class="d-flex align-items-center gap-2 mb-2">
-                        <div class="icon-circle bg-primary-subtle text-primary"><i class="bi bi-graph-up-arrow"></i></div>
-                        <span class="small fw-bold text-muted">Прирост</span>
-                    </div>
-                    <h3 class="mb-0 text-primary fw-bolder">+${newCount}</h3>
-                    <div class="stat-sublabel">Новых в этом мес.</div>
-                </div>
-            </div>`;
-        }
-
-        if (dashConfig.showMatrix) {
-            html += `
-            <div class="col-6">
-                <div class="stat-card-modern h-100 flex-column align-items-start justify-content-center p-3">
-                    <div class="d-flex align-items-center gap-2 mb-2">
-                        <div class="icon-circle bg-warning-subtle text-warning"><i class="bi bi-grid-3x3-gap-fill"></i></div>
-                        <span class="small fw-bold text-muted">Матрица</span>
-                    </div>
-                    <h3 class="mb-0 text-dark fw-bolder">${avgSKU}</h3>
-                    <div class="stat-sublabel">Среднее SKU</div>
-                </div>
-            </div>`;
-        }
-
-        if (dashConfig.showCityPen) {
-            const sortedCities = Object.entries(cityStats).sort((a, b) => b[1].total - a[1].total);
-            let citiesHtml = '';
-            sortedCities.forEach(([name, stats]) => {
-                const activePct = Math.round((stats.active / stats.total) * 100);
-                const potPct = 100 - activePct; 
-                citiesHtml += `
-                <div class="city-stat-row">
-                    <div class="city-bar-header d-flex justify-content-between align-items-center">
-                        <span>${name}</span>
-                        <span class="text-muted" style="font-size:0.75rem">${stats.active} / ${stats.potential}</span>
-                    </div>
-                    <div class="city-stacked-bar">
-                        <div class="bar-active" style="width: ${activePct}%" title="Активные (${stats.active})"></div>
-                        <div class="bar-potential" style="width: ${potPct}%" title="Потенциал (${stats.potential})"></div>
-                    </div>
-                </div>`;
-            });
-
-            html += `
-            <div class="col-12 mt-2">
-                <div class="stat-card-modern d-block p-3">
-                    <div class="d-flex justify-content-between align-items-center mb-0">
-                         <h6 class="text-muted fw-bold small mb-0 text-uppercase" style="letter-spacing:1px;">Потенциал городов</h6>
-                         <div class="d-flex gap-2 small">
-                            <span class="text-success fw-bold" style="font-size:0.7rem">● Актив</span>
-                            <span class="text-primary fw-bold" style="font-size:0.7rem">● Потенциал</span>
-                         </div>
-                    </div>
-                    <hr class="my-2" style="border-top: 1px solid #ccc; opacity: 1;">
-                    <div style="max-height: 250px; overflow-y: auto; padding-right: 5px;">
-                        ${citiesHtml || '<div class="text-center text-muted small">Нет данных</div>'}
-                    </div>
-                </div>
-            </div>`;
-        }
-
-        dashboardStats.innerHTML = html;
-
-        // --- TASKS ---
+        // --- TASKS RENDER (Keep existing logic) ---
         const today = new Date(); today.setHours(0,0,0,0); const coolingLimit = new Date(today.getTime() - (15 * 24 * 60 * 60 * 1000));
         const tasksUpcoming = [], tasksProblem = [], tasksCooling = [];
         allTasksData.forEach(d => { if (d.status === 'archive') return; const isPotential = d.status === 'potential'; let lastVisitDate = null; let hasFutureTasks = false; if (d.visits && Array.isArray(d.visits)) { d.visits.forEach((v, index) => { const vDate = new Date(v.date); if (!v.date) return; vDate.setHours(0,0,0,0); if (v.isCompleted && (!lastVisitDate || vDate > lastVisitDate)) lastVisitDate = vDate; if (!v.isCompleted) { const taskData = { dealerName: d.name, dealerId: d.id, date: vDate, comment: v.comment || "Без комментария", visitIndex: index }; if (vDate < today) tasksProblem.push({...taskData, type: 'overdue'}); else { tasksUpcoming.push({...taskData, isToday: vDate.getTime() === today.getTime()}); hasFutureTasks = true; } } }); } if (d.status === 'problem') { if (!tasksProblem.some(t => t.dealerId === d.id && t.type === 'overdue')) tasksProblem.push({ dealerName: d.name, dealerId: d.id, type: 'status', comment: 'Статус: Проблемный' }); } if (!hasFutureTasks && d.status !== 'problem' && !isPotential) { if (!lastVisitDate) tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: 999 }); else if (lastVisitDate < coolingLimit) { const days = Math.floor((today - lastVisitDate) / (1000 * 60 * 60 * 24)); tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: days }); } } });
@@ -801,4 +632,3 @@ document.addEventListener('DOMContentLoaded', () => {
 
     initApp();
 });
-
