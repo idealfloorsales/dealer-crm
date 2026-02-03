@@ -56,6 +56,12 @@
             }
         }
         .admin-only { display: none !important; }
+        
+        /* Стили для круговой диаграммы */
+        .circular-chart { display: block; margin: 0 auto; max-width: 100%; max-height: 140px; }
+        .circle-bg { fill: none; stroke: #eee; stroke-width: 3.8; }
+        .circle { fill: none; stroke-width: 2.8; stroke-linecap: round; animation: progress 1s ease-out forwards; transition: stroke-dasharray 0.5s; }
+        @keyframes progress { 0% { stroke-dasharray: 0 100; } }
     </style>
     <script>
         if (!localStorage.getItem('crm_token')) {
@@ -151,9 +157,9 @@
                     <h6 class="fw-bold mb-3 w-100 text-start ps-2">Охват (Визиты 30 дн.)</h6>
                     
                     <div class="position-relative" style="width: 140px; height: 140px;">
-                        <svg viewBox="0 0 36 36" class="circular-chart" style="display: block; max-width: 100%; max-height: 100%;">
-                            <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#eee" stroke-width="3.8" />
-                            <path class="circle" id="coverage-circle" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#0d6efd" stroke-width="3.8" stroke-linecap="round" />
+                        <svg viewBox="0 0 36 36" class="circular-chart">
+                            <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                            <path class="circle" id="coverage-circle" stroke="#0d6efd" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
                         </svg>
                         <div class="position-absolute top-50 start-50 translate-middle">
                             <span class="fs-4 fw-bold text-dark" id="coverage-percent">0%</span>
