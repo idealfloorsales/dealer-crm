@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const API_STATUSES_URL = '/api/statuses';
     const API_TASKS_URL = '/api/tasks';
     const API_SALES_URL = '/api/sales';
-    const API_SECTORS_URL = '/api/sectors';
+    const API_SECTORS_URL = '/api/sectors'; // <--- НОВЫЙ API
 
     let fullProductCatalog = [];
     let competitorsRef = []; 
@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let statusList = []; 
     let allTasksData = [];
     let currentMonthSales = [];
-    let allSectors = [];
+    let allSectors = []; // <--- ХРАНИЛИЩЕ СЕКТОРОВ
     
     let currentSort = { column: 'name', direction: 'asc' };
     let isSaving = false; 
@@ -39,9 +39,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Для секторов
     const sectorModalEl = document.getElementById('sector-manager-modal');
     const sectorModal = sectorModalEl ? new bootstrap.Modal(sectorModalEl) : null;
-    let currentSectorTypeMode = '';
+    let currentSectorTypeMode = ''; // 'astana' или 'region'
 
-    // Настройки дашборда (упрощены для новой версии)
+    // Настройки дашборда
     const defaultDashConfig = { showKpi: true, showTop: true, showCoverage: true, showTasks: true };
     let dashConfig = JSON.parse(localStorage.getItem('dash_config')) || defaultDashConfig;
 
@@ -83,17 +83,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let markerInstances = { add: null, edit: null };
     let refreshAddMap = null; let refreshEditMap = null;
 
-    // --- CSS INJECTION FOR CHART ---
-    const dashStyle = document.createElement('style');
-    dashStyle.innerHTML = `
-        .circular-chart { display: block; margin: 0 auto; max-width: 100%; max-height: 250px; }
-        .circle-bg { fill: none; stroke: #eee; stroke-width: 3.8; }
-        .circle { fill: none; stroke-width: 2.8; stroke-linecap: round; animation: progress 1s ease-out forwards; }
-        @keyframes progress { 0% { stroke-dasharray: 0 100; } }
-        .percentage { fill: #666; font-family: sans-serif; font-weight: bold; font-size: 0.5em; text-anchor: middle; }
-    `;
-    document.head.appendChild(dashStyle);
-
     // --- 4. EXPORT CONFIGURATION ---
     const exportColumnsConfig = [
         { id: 'id', label: 'ID дилера', isChecked: true, getValue: d => d.dealer_id },
@@ -112,7 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const map = { 'regional_astana': 'Региональный Астана', 'regional_regions': 'Региональный Регионы', 'office': 'Офис' };
             return map[d.responsible] || d.responsible;
         }},
-        { id: 'sector', label: 'Сектор', isChecked: true, getValue: d => d.region_sector || '' },
+        { id: 'sector', label: 'Сектор', isChecked: true, getValue: d => d.region_sector || '' }, // <--- ДОБАВЛЕНО В ЭКСПОРТ
         { id: 'price_type', label: 'Тип цен', isChecked: true, getValue: d => d.price_type },
         { id: 'contacts', label: 'Контакты (Телефон)', isChecked: true, getValue: d => {
             if (!d.contacts || !d.contacts.length) return '';
@@ -157,26 +146,118 @@ document.addEventListener('DOMContentLoaded', () => {
     window.updateCollections = function(select) { const brandName = select.value; const row = select.closest('.competitor-entry'); const collSelect = row.querySelector('.competitor-collection'); let html = `<option value="">-- Коллекция --</option>`; const ref = competitorsRef.find(r => r.name === brandName); if (ref && ref.collections) { const sortedCols = [...ref.collections].sort((a, b) => { const typeA = (typeof a === 'object') ? a.type : 'std'; const typeB = (typeof b === 'object') ? b.type : 'std'; if (typeA === 'std' && typeB !== 'std') return 1; if (typeA !== 'std' && typeB === 'std') return -1; return 0; }); html += sortedCols.map(col => { const colName = (typeof col === 'string') ? col : col.name; const colType = (typeof col === 'object') ? col.type : 'std'; let label = ''; if(colType.includes('eng')) label = ' (Елка)'; else if(colType.includes('french')) label = ' (Фр. Елка)'; else if(colType.includes('art')) label = ' (Арт)'; return `<option value="${colName}">${colName}${label}</option>`; }).join(''); } collSelect.innerHTML = html; };
     window.showToast = function(message, type = 'success') { let container = document.getElementById('toast-container-custom'); if (!container) { container = document.createElement('div'); container.id = 'toast-container-custom'; container.className = 'toast-container-custom'; document.body.appendChild(container); } const toast = document.createElement('div'); toast.className = `toast-modern toast-${type}`; const icon = type === 'success' ? 'check-circle-fill' : (type === 'error' ? 'exclamation-triangle-fill' : 'info-circle-fill'); toast.innerHTML = `<i class="bi bi-${icon} fs-5"></i><span class="fw-bold text-dark">${message}</span>`; container.appendChild(toast); setTimeout(() => { toast.style.animation = 'toastFadeOut 0.5s forwards'; setTimeout(() => toast.remove(), 500); }, 3000); };
     
-    // --- SECTORS LOGIC ---
-    async function fetchSectors() { try { const res = await fetch(API_SECTORS_URL); if(res.ok) allSectors = await res.json(); } catch(e) { console.error("Sector fetch error", e); } }
-    window.toggleSectorSelect = function(prefix, responsibleValue) {
-        const wrapper = document.getElementById(`${prefix}_sector_wrapper`); const select = document.getElementById(`${prefix}_region_sector`);
-        if (!wrapper || !select) return;
-        let type = ''; if (responsibleValue === 'regional_astana') type = 'astana'; else if (responsibleValue === 'regional_regions') type = 'region';
-        if (type) { wrapper.style.display = 'flex'; const filtered = allSectors.filter(s => s.type === type); const currentVal = select.getAttribute('data-selected') || select.value; select.innerHTML = '<option value="">Выбрать...</option>' + filtered.map(s => `<option value="${s.name}">${s.name}</option>`).join(''); if (currentVal) select.value = currentVal; } else { wrapper.style.display = 'none'; select.value = ''; }
-    };
-    window.openSectorManagerFromModal = (prefix) => {
-        const responsibleSelect = document.getElementById(prefix === 'add' ? 'responsible' : 'edit_responsible'); const val = responsibleSelect.value;
-        if (val === 'regional_astana') currentSectorTypeMode = 'astana'; else if (val === 'regional_regions') currentSectorTypeMode = 'region'; else return alert("Сначала выберите ответственного!");
-        document.getElementById('sec-man-type-label').textContent = (currentSectorTypeMode === 'astana' ? 'Астана' : 'Регионы'); renderSectorManagerList(); sectorModal.show();
-    };
-    function renderSectorManagerList() {
-        const list = document.getElementById('sector-manager-list'); const filtered = allSectors.filter(s => s.type === currentSectorTypeMode);
-        if(filtered.length === 0) { list.innerHTML = '<div class="text-muted text-center small">Список пуст</div>'; return; }
-        list.innerHTML = filtered.map(s => `<div class="list-group-item d-flex justify-content-between align-items-center py-2 px-0"><span class="fw-bold">${s.name}</span><button class="btn btn-sm btn-outline-danger border-0" onclick="deleteSector('${s.id}')"><i class="bi bi-trash"></i></button></div>`).join('');
+    // --- НОВЫЕ ФУНКЦИИ СЕКТОРОВ (SECTORS LOGIC) ---
+    async function fetchSectors() {
+        try {
+            const res = await fetch(API_SECTORS_URL);
+            if(res.ok) allSectors = await res.json();
+        } catch(e) { console.error("Sector fetch error", e); }
     }
-    window.addNewSector = async () => { const input = document.getElementById('new-sector-name'); const name = input.value.trim(); if (!name) return; try { const res = await fetch(API_SECTORS_URL, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ name: name, type: currentSectorTypeMode }) }); if (res.ok) { input.value = ''; await fetchSectors(); renderSectorManagerList(); if (document.getElementById('add-modal').classList.contains('show')) { toggleSectorSelect('add', document.getElementById('responsible').value); } if (document.getElementById('edit-modal').classList.contains('show')) { toggleSectorSelect('edit', document.getElementById('edit_responsible').value); } } } catch(e) { alert("Ошибка сохранения"); } };
-    window.deleteSector = async (id) => { if(!confirm("Удалить сектор?")) return; try { await fetch(`${API_SECTORS_URL}/${id}`, { method: 'DELETE' }); await fetchSectors(); renderSectorManagerList(); if (document.getElementById('add-modal').classList.contains('show')) { toggleSectorSelect('add', document.getElementById('responsible').value); } if (document.getElementById('edit-modal').classList.contains('show')) { toggleSectorSelect('edit', document.getElementById('edit_responsible').value); } } catch(e) { alert("Ошибка удаления"); } };
+
+    // Универсальная функция переключения списка
+    window.toggleSectorSelect = function(prefix, responsibleValue) {
+        const wrapper = document.getElementById(`${prefix}_sector_wrapper`);
+        const select = document.getElementById(`${prefix}_region_sector`);
+        
+        if (!wrapper || !select) return;
+
+        let type = '';
+        if (responsibleValue === 'regional_astana') type = 'astana';
+        else if (responsibleValue === 'regional_regions') type = 'region';
+
+        if (type) {
+            wrapper.style.display = 'flex';
+            // Фильтруем список
+            const filtered = allSectors.filter(s => s.type === type);
+            // Сохраняем текущее значение, если оно есть
+            const currentVal = select.getAttribute('data-selected') || select.value;
+            
+            select.innerHTML = '<option value="">Выбрать...</option>' + 
+                filtered.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
+            
+            // Пытаемся восстановить выбор
+            if (currentVal) select.value = currentVal;
+        } else {
+            wrapper.style.display = 'none';
+            select.value = '';
+        }
+    };
+
+    // Открытие менеджера из модалки
+    window.openSectorManagerFromModal = (prefix) => {
+        const responsibleSelect = document.getElementById(prefix === 'add' ? 'responsible' : 'edit_responsible');
+        const val = responsibleSelect.value;
+        
+        if (val === 'regional_astana') currentSectorTypeMode = 'astana';
+        else if (val === 'regional_regions') currentSectorTypeMode = 'region';
+        else return alert("Сначала выберите ответственного!");
+
+        document.getElementById('sec-man-type-label').textContent = (currentSectorTypeMode === 'astana' ? 'Астана' : 'Регионы');
+        renderSectorManagerList();
+        sectorModal.show();
+    };
+
+    function renderSectorManagerList() {
+        const list = document.getElementById('sector-manager-list');
+        const filtered = allSectors.filter(s => s.type === currentSectorTypeMode);
+        
+        if(filtered.length === 0) {
+            list.innerHTML = '<div class="text-muted text-center small">Список пуст</div>';
+            return;
+        }
+
+        list.innerHTML = filtered.map(s => `
+            <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-0">
+                <span class="fw-bold">${s.name}</span>
+                <button class="btn btn-sm btn-outline-danger border-0" onclick="deleteSector('${s.id}')">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        `).join('');
+    }
+
+    window.addNewSector = async () => {
+        const input = document.getElementById('new-sector-name');
+        const name = input.value.trim();
+        if (!name) return;
+
+        try {
+            const res = await fetch(API_SECTORS_URL, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ name: name, type: currentSectorTypeMode })
+            });
+            if (res.ok) {
+                input.value = '';
+                await fetchSectors(); // Обновляем глобальный список
+                renderSectorManagerList(); // Обновляем список в модалке
+                
+                // Обновляем селекты в открытых модалках
+                if (document.getElementById('add-modal').classList.contains('show')) {
+                    toggleSectorSelect('add', document.getElementById('responsible').value);
+                }
+                if (document.getElementById('edit-modal').classList.contains('show')) {
+                    toggleSectorSelect('edit', document.getElementById('edit_responsible').value);
+                }
+            }
+        } catch(e) { alert("Ошибка сохранения"); }
+    };
+
+    window.deleteSector = async (id) => {
+        if(!confirm("Удалить сектор?")) return;
+        try {
+            await fetch(`${API_SECTORS_URL}/${id}`, { method: 'DELETE' });
+            await fetchSectors();
+            renderSectorManagerList();
+             // Обновляем селекты
+             if (document.getElementById('add-modal').classList.contains('show')) {
+                toggleSectorSelect('add', document.getElementById('responsible').value);
+            }
+            if (document.getElementById('edit-modal').classList.contains('show')) {
+                toggleSectorSelect('edit', document.getElementById('edit_responsible').value);
+            }
+        } catch(e) { alert("Ошибка удаления"); }
+    };
 
     // --- DASHBOARD SETTINGS ---
     if(btnDashSettings) { btnDashSettings.onclick = () => { if(settingsModal) settingsModal.show(); }; }
