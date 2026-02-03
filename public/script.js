@@ -406,7 +406,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 list.innerHTML = `
                     <div class="form-check form-switch mb-2">
                         <input class="form-check-input" type="checkbox" id="set-showHealth" ${dashConfig.showHealth ? 'checked' : ''}>
-                        <label class="form-check-label" for="set-showHealth">Здоровье базы (Актив/Спят)</label>
+                        <label class="form-check-label" for="set-showHealth">Продажи тт (Актив/Спят)</label>
                     </div>
                     <div class="form-check form-switch mb-2">
                         <input class="form-check-input" type="checkbox" id="set-showGrowth" ${dashConfig.showGrowth ? 'checked' : ''}>
@@ -495,7 +495,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="stat-card-modern h-100 flex-column align-items-start justify-content-center p-3">
                     <div class="d-flex align-items-center gap-2 mb-2">
                         <div class="icon-circle bg-success-subtle text-success"><i class="bi bi-heart-pulse-fill"></i></div>
-                        <span class="small fw-bold text-muted">Здоровье</span>
+                        <span class="small fw-bold text-muted">Продажи по дилерам</span>
                     </div>
                     <div class="stat-dual-value">
                         <span class="stat-val-active">${activeCount}</span>
@@ -801,3 +801,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
     initApp();
 });
+
