@@ -1,14 +1,21 @@
 document.addEventListener('DOMContentLoaded', () => {
     
-    // --- 1. АВТОРИЗАЦИЯ ---
+// --- 1. АВТОРИЗАЦИЯ ---
     const originalFetch = window.fetch;
     window.fetch = async function (url, options) {
         options = options || {};
         options.headers = options.headers || {};
         const token = localStorage.getItem('crm_token');
         if (token) options.headers['Authorization'] = 'Bearer ' + token;
+        
         const response = await originalFetch(url, options);
-        if (response.status === 401) window.location.href = '/login.html';
+        
+        // ИСПРАВЛЕНИЕ: Добавили проверку 403 (Forbidden)
+        if (response.status === 401 || response.status === 403) {
+            localStorage.removeItem('crm_token'); // Удаляем просроченный токен
+            window.location.href = '/login.html'; // Выкидываем на логин
+        }
+        
         return response;
     };
 
@@ -801,5 +808,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     initApp();
 });
+
 
 
