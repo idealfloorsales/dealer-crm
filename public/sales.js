@@ -1,4 +1,4 @@
-// --- АВТОРИЗАЦИЯ (Перехватчик ошибок) ---
+// --- АВТОРИЗАЦИЯ ---
 const originalFetch = window.fetch;
 window.fetch = async function (url, options) {
     options = options || {};
@@ -8,7 +8,6 @@ window.fetch = async function (url, options) {
     
     const response = await originalFetch(url, options);
     
-    // Если токен протух (401 или 403), выкидываем на логин
     if (response.status === 401 || response.status === 403) {
         localStorage.removeItem('crm_token');
         window.location.href = '/login.html';
@@ -16,7 +15,7 @@ window.fetch = async function (url, options) {
     
     return response;
 };
-// -------------------------------------------
+// --------------------
 
 document.addEventListener('DOMContentLoaded', () => {
     
@@ -24,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const API_SALES = '/api/sales';
     const API_SECTORS = '/api/sectors';
     
-    // Элементы интерфейса
+    // Элементы
     const monthPicker = document.getElementById('month-picker');
     const container = document.getElementById('sales-container');
     const summaryList = document.getElementById('summary-list');
@@ -32,19 +31,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveBtn = document.getElementById('save-btn');
     const printBtn = document.getElementById('print-btn');
     const summaryCol = document.getElementById('summary-col');
-    const lastUpdateInfo = document.getElementById('last-update-info'); // Элемент для даты
+    const lastUpdateInfo = document.getElementById('last-update-info');
     
-    // Мобильные табы
+    // Табы
     const tabInputBtn = document.getElementById('tab-input-btn');
     const tabSummaryBtn = document.getElementById('tab-summary-btn');
     const colInput = document.getElementById('sales-container-col');
     const colSummary = document.getElementById('summary-col');
 
-    // Установка текущего месяца
     const now = new Date();
     monthPicker.value = now.toISOString().slice(0, 7);
 
-    // БАЗОВАЯ КОНФИГУРАЦИЯ ГРУПП (VIP всегда первый)
+    // КОНФИГУРАЦИЯ ГРУПП
     let groupsConfig = [
         { key: 'vip', title: 'Спец. Клиенты (VIP)', isSystem: true }
     ];
@@ -53,13 +51,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSales = [];
     let allSectors = []; 
     
-    // Загружаем настройки видимости планов из браузера
-    // Пример: { "vip": true, "astana_diy": false }
+    // Загрузка настроек видимости планов
     let planVisibility = JSON.parse(localStorage.getItem('sales_plan_config')) || {};
 
     async function init() {
         try {
-            // Проверка прав (блокировка кнопки сохранения для гостей)
             const authRes = await fetch('/api/auth/me');
             if (authRes.ok) {
                 const authData = await authRes.json();
@@ -72,8 +68,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (e) { console.error(e); }
 
-        await loadSectors(); // Сначала строим структуру групп
-        loadData();          // Потом грузим данные
+        await loadSectors(); 
+        loadData();
         setupMobileTabs();
     }
 
@@ -83,17 +79,16 @@ document.addEventListener('DOMContentLoaded', () => {
             if (res.ok) {
                 allSectors = await res.json();
                 
-                // 1. СЕКТОРА АСТАНЫ
+                // АСТАНА
                 const astanaSectors = allSectors.filter(s => s.type === 'astana');
                 astanaSectors.forEach(s => {
                     const key = 'astana_' + s.name.replace(/\s+/g, '_').toLowerCase();
-                    // Добавляем, если еще нет в конфиге
                     if (!groupsConfig.find(g => g.key === key)) {
                         groupsConfig.push({ key: key, title: `Астана - ${s.name}`, sectorName: s.name, type: 'astana' });
                     }
                 });
 
-                // 2. СЕКТОРА РЕГИОНОВ
+                // РЕГИОНЫ
                 const regionSectors = allSectors.filter(s => s.type === 'region');
                 regionSectors.forEach(s => {
                     const key = 'sector_' + s.name.replace(/\s+/g, '_').toLowerCase();
@@ -102,11 +97,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
 
-                // Добавляем системные группы в конец
                 groupsConfig.push({ key: 'regional_regions', title: 'Регионы (Без сектора)', isSystem: true, type: 'region' });
                 groupsConfig.push({ key: 'other', title: 'Без ответственного / Прочие', isSystem: true });
             }
-        } catch (e) { console.error("Ошибка загрузки секторов", e); }
+        } catch (e) { console.error("Ошибка секторов", e); }
     }
 
     function setupMobileTabs() {
@@ -126,30 +120,26 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadData() {
         try {
             container.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div></div>';
-            const month = monthPicker.value;
-            
             const [dealersRes, salesRes] = await Promise.all([
                 fetch(API_DEALERS + '?scope=all'),
-                fetch(`${API_SALES}?month=${month}`)
+                fetch(`${API_SALES}?month=${monthPicker.value}`)
             ]);
 
-            if (!dealersRes.ok || !salesRes.ok) throw new Error("Ошибка доступа к данным");
+            if (!dealersRes.ok || !salesRes.ok) throw new Error("Ошибка доступа");
 
             allDealers = await dealersRes.json();
             currentSales = await salesRes.json();
-            
             renderAll();
-            updateLastModifiedText(); // Обновляем дату
+            updateLastModifiedText();
         } catch (e) { 
-            container.innerHTML = `<div class="alert alert-danger">Ошибка загрузки: ${e.message}</div>`;
+            container.innerHTML = `<div class="alert alert-danger">Ошибка: ${e.message}</div>`;
         }
     }
 
-    // --- ФУНКЦИЯ ДАТЫ ОБНОВЛЕНИЯ ---
     function updateLastModifiedText() {
         if (!lastUpdateInfo) return;
         if (!currentSales || currentSales.length === 0) {
-            lastUpdateInfo.textContent = 'Данных нет';
+            lastUpdateInfo.innerHTML = '<i class="bi bi-clock-history me-1"></i>Нет данных';
             return;
         }
         let maxDate = null;
@@ -161,46 +151,40 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         if (maxDate) {
             const str = maxDate.toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
-            lastUpdateInfo.textContent = `Обновлено: ${str}`;
+            lastUpdateInfo.innerHTML = `<i class="bi bi-clock-history me-1"></i>Обновлено: ${str}`;
         } else {
-            lastUpdateInfo.textContent = 'Обновлено: давно';
+            lastUpdateInfo.innerHTML = '<i class="bi bi-exclamation-circle me-1"></i>Нажмите "Сохранить"';
         }
     }
 
-    // --- ФУНКЦИЯ ПЕРЕКЛЮЧЕНИЯ ПЛАНА ---
+    // Переключение плана
     window.toggleGroupPlan = (groupKey) => {
-        // Если значения нет (undefined), считаем true. Переключаем на false.
-        const current = planVisibility[groupKey] !== false; 
+        const current = planVisibility[groupKey] !== false;
         planVisibility[groupKey] = !current;
         localStorage.setItem('sales_plan_config', JSON.stringify(planVisibility));
-        renderAll(); // Перерисовываем всё
+        renderAll(); 
     };
 
     function getDealerGroup(d) {
         if (d.hasPersonalPlan) return 'vip';
-        
         const sectorName = d.region_sector || '';
         const secLower = sectorName.toLowerCase().trim();
 
-        // Логика Астаны
         if (d.responsible === 'regional_astana') {
             const group = groupsConfig.find(g => g.type === 'astana' && g.sectorName === sectorName);
             if (group) return group.key;
-            // Нечеткий поиск
             const fuzzy = groupsConfig.find(g => g.type === 'astana' && g.title.toLowerCase().includes(secLower));
             if (fuzzy && secLower) return fuzzy.key;
-            return 'regional_astana'; // Прочие Астана
+            return 'regional_astana'; 
         }
         
-        // Логика Регионов
         if (d.responsible === 'regional_regions') {
             const group = groupsConfig.find(g => g.type === 'region' && g.sectorName === sectorName);
             if (group) return group.key;
             const fuzzy = groupsConfig.find(g => g.type === 'region' && g.title.toLowerCase().includes(secLower));
             if (fuzzy && secLower) return fuzzy.key;
-            return 'regional_regions'; // Прочие Регионы
+            return 'regional_regions';
         }
-        
         return 'other';
     }
 
@@ -220,7 +204,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function captureState() {
-        // Сохраняем факты
         document.querySelectorAll('.sales-input.inp-fact').forEach(inp => {
             const row = inp.closest('.sales-row');
             const dealerId = row.dataset.id === "null" ? null : row.dataset.id;
@@ -234,7 +217,6 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (val !== 0) { currentSales.push({ month: monthPicker.value, group, dealerId, dealerName, isCustom, plan: 0, fact: val }); }
         });
         
-        // Сохраняем планы
         document.querySelectorAll('.plan-input').forEach(inp => {
             const planKey = inp.dataset.planKey;
             const val = parseFloat(inp.value.replace(',', '.')) || 0;
@@ -303,12 +285,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>`;
             });
             
-            // --- КНОПКА ГЛАЗИК (ВКЛ/ВЫКЛ ПЛАН) ---
-            const isPlanVisible = planVisibility[grp.key] !== false; // По умолчанию true
-            // Если план включен - зеленый глазик (target), если выключен - серый круг
+            const isPlanVisible = planVisibility[grp.key] !== false; 
             const eyeIcon = isPlanVisible ? '<i class="bi bi-bullseye"></i>' : '<i class="bi bi-circle"></i>';
-            const eyeTitle = isPlanVisible ? 'Выключить план' : 'Включить план';
-            const eyeClass = isPlanVisible ? 'text-success' : 'text-muted opacity-50';
+            const eyeTitle = isPlanVisible ? 'Скрыть план' : 'Включить план';
+            const eyeClass = isPlanVisible ? 'text-success' : 'text-muted';
 
             container.innerHTML += `
                 <div class="region-card" data-group="${grp.key}">
@@ -336,7 +316,6 @@ document.addEventListener('DOMContentLoaded', () => {
             plans[k] = parseFloat(p.plan) || 0;
         });
 
-        // Считаем агрегаты
         let totalRegionsFact = 0;
         let totalAstanaFact = 0;
         let totalOtherFact = facts.other || 0;
@@ -351,20 +330,16 @@ document.addEventListener('DOMContentLoaded', () => {
         
         renderTopDashboard(facts, plans, totalRegionsFact, totalAstanaFact);
 
-        // Функция отрисовки строки сводки
-        // forcePlan = true -> показывать план принудительно (для Итогов)
         const renderSumItem = (title, planKey, factVal, isSubItem = false, forcePlan = false) => {
             const isVisible = forcePlan || (planVisibility[planKey] !== false);
 
             let innerContent = '';
             if (isVisible) {
-                // С ПЛАНОМ
                 const plan = plans[planKey] || 0;
                 const { percent, forecast, diff } = calculateKPI(plan, factVal, daysInMonth, currentDay);
                 let colorClass = 'text-warning'; let bgClass = 'bg-warning';
                 if (percent >= 90) { colorClass = 'text-success'; bgClass = 'bg-success'; }
                 if (percent < 70) { colorClass = 'text-danger'; bgClass = 'bg-danger'; }
-                
                 let diffHtml = '';
                 if (plan > 0) {
                     if (diff < 0) diffHtml = `<span class="text-danger fw-bold" title="Не хватает">Ещё: ${fmt(Math.abs(diff))}</span>`;
@@ -391,7 +366,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="text-end small text-muted mt-1" style="font-size: 0.7rem;">Прогноз: <strong>${fmt(forecast)}</strong></div>
                 `;
             } else {
-                // БЕЗ ПЛАНА (Упрощенно)
                 innerContent = `
                     <div class="summary-header mb-1">
                         <span class="summary-title text-dark">${title}</span>
@@ -409,18 +383,15 @@ document.addEventListener('DOMContentLoaded', () => {
         let summaryHtml = '';
         summaryHtml += `<div class="p-3 bg-primary-subtle border-bottom"><h6 class="fw-bold mb-3 text-primary text-uppercase small ls-1">Общий результат</h6>${renderSumItem("ВСЕГО ПО КОМПАНИИ", "total_all", totalFactAll, false, true)}</div>`;
         
-        // АСТАНА
         summaryHtml += `<div class="mt-2 mb-1 px-3 pt-2 border-top"><span class="small fw-bold text-muted text-uppercase">Астана</span></div>`;
         summaryHtml += renderSumItem("Астана (Итого)", "astana_all", totalAstanaFact, false, true);
         groupsConfig.forEach(g => { if (g.type === 'astana') summaryHtml += renderSumItem(g.title.replace('Астана - ', ''), g.key, facts[g.key], true); });
 
-        // VIP
         if (facts.vip.length > 0) {
             summaryHtml += `<div class="mt-2 mb-1 px-3 pt-2 border-top"><span class="small fw-bold text-muted text-uppercase">VIP Клиенты</span></div>`;
             facts.vip.forEach(v => summaryHtml += renderSumItem(v.name, `vip_${v.id}`, v.fact, false, true));
         }
 
-        // РЕГИОНЫ
         summaryHtml += `<div class="mt-2 mb-1 px-3 pt-2 border-top"><span class="small fw-bold text-muted text-uppercase">Регионы</span></div>`;
         summaryHtml += renderSumItem("Регионы (Итого)", "regions_all", totalRegionsFact, false, true);
         groupsConfig.forEach(g => { if (g.type === 'region') summaryHtml += renderSumItem(g.title.replace('Регион ', ''), g.key, facts[g.key], true); });
