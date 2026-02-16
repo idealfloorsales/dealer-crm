@@ -41,9 +41,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const now = new Date();
     monthPicker.value = now.toISOString().slice(0, 7);
 
-    // БАЗОВАЯ КОНФИГУРАЦИЯ (VIP всегда первый)
+    // БАЗОВАЯ КОНФИГУРАЦИЯ (VIP всегда первый, у него план всегда есть)
     let groupsConfig = [
-        { key: 'vip', title: 'Спец. Клиенты (VIP)', isSystem: true }
+        { key: 'vip', title: 'Спец. Клиенты (VIP)', isSystem: true, hasPlan: true }
     ];
 
     let allDealers = [];
@@ -75,32 +75,44 @@ document.addEventListener('DOMContentLoaded', () => {
             if (res.ok) {
                 allSectors = await res.json();
                 
-                // 1. СЕКТОРА АСТАНЫ (DIY, Салоны...)
+                // 1. СЕКТОРА АСТАНЫ
                 const astanaSectors = allSectors.filter(s => s.type === 'astana');
                 astanaSectors.forEach(s => {
                     const key = 'astana_' + s.name.replace(/\s+/g, '_').toLowerCase();
                     if (!groupsConfig.find(g => g.key === key)) {
-                        groupsConfig.push({ key: key, title: `Астана - ${s.name}`, sectorName: s.name, type: 'astana' });
+                        // Считываем настройку hasPlan (по умолчанию true, если не задана)
+                        const hp = (s.hasPlan !== undefined) ? s.hasPlan : true;
+                        groupsConfig.push({ 
+                            key: key, 
+                            title: `Астана - ${s.name}`, 
+                            sectorName: s.name, 
+                            type: 'astana',
+                            hasPlan: hp // <--- ВАЖНО: Передаем настройку
+                        });
                     }
                 });
 
-                // УБРАНО: Группа "Астана (Без сектора)" больше не добавляется в список отображения.
-                // groupsConfig.push({ key: 'regional_astana', title: 'Астана (Без сектора)', isSystem: true, type: 'astana' });
-
-                // 2. СЕКТОРА РЕГИОНОВ (Север, Юг...)
+                // 2. СЕКТОРА РЕГИОНОВ
                 const regionSectors = allSectors.filter(s => s.type === 'region');
                 regionSectors.forEach(s => {
                     const key = 'sector_' + s.name.replace(/\s+/g, '_').toLowerCase();
                     if (!groupsConfig.find(g => g.key === key)) {
-                        groupsConfig.push({ key: key, title: `Регион ${s.name}`, sectorName: s.name, type: 'region' });
+                        const hp = (s.hasPlan !== undefined) ? s.hasPlan : true;
+                        groupsConfig.push({ 
+                            key: key, 
+                            title: `Регион ${s.name}`, 
+                            sectorName: s.name, 
+                            type: 'region',
+                            hasPlan: hp // <--- ВАЖНО
+                        });
                     }
                 });
 
-                // Добавляем "Регионы (Прочее)" для тех, кто в регионах, но без сектора
-                groupsConfig.push({ key: 'regional_regions', title: 'Регионы (Без сектора)', isSystem: true, type: 'region' });
-
-                // Добавляем "Прочие"
-                groupsConfig.push({ key: 'other', title: 'Без ответственного / Прочие', isSystem: true });
+                // Остальные системные группы
+                // Регионы без сектора (обычно план нужен)
+                groupsConfig.push({ key: 'regional_regions', title: 'Регионы (Без сектора)', isSystem: true, type: 'region', hasPlan: true });
+                // Прочие (обычно план НЕ нужен)
+                groupsConfig.push({ key: 'other', title: 'Без ответственного / Прочие', isSystem: true, hasPlan: false });
             }
         } catch (e) { console.error("Ошибка загрузки секторов", e); }
     }
@@ -146,25 +158,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const sectorName = d.region_sector || '';
         const secLower = sectorName.toLowerCase().trim();
 
-        // ЛОГИКА ДЛЯ АСТАНЫ
         if (d.responsible === 'regional_astana') {
             const group = groupsConfig.find(g => g.type === 'astana' && g.sectorName === sectorName);
             if (group) return group.key;
-            
             const fuzzy = groupsConfig.find(g => g.type === 'astana' && g.title.toLowerCase().includes(secLower));
             if (fuzzy && secLower) return fuzzy.key;
-            
-            return 'regional_astana'; // Если вернет это, а в groupsConfig его нет - дилер не отобразится
+            return 'regional_astana';
         }
         
-        // ЛОГИКА ДЛЯ РЕГИОНОВ
         if (d.responsible === 'regional_regions') {
             const group = groupsConfig.find(g => g.type === 'region' && g.sectorName === sectorName);
             if (group) return group.key;
-            
             const fuzzy = groupsConfig.find(g => g.type === 'region' && g.title.toLowerCase().includes(secLower));
             if (fuzzy && secLower) return fuzzy.key;
-
             return 'regional_regions';
         }
         
@@ -223,13 +229,11 @@ document.addEventListener('DOMContentLoaded', () => {
         summaryList.innerHTML = '';
         if(dashboardTop) dashboardTop.innerHTML = '';
 
-        // Инициализация счетчиков
         const facts = {};
         groupsConfig.forEach(g => facts[g.key] = 0);
         facts.vip = []; 
 
         groupsConfig.forEach(grp => {
-            // Фильтруем дилеров для текущей группы
             const groupDealers = allDealers.filter(d => {
                 const isReal = d.status !== 'potential' && d.status !== 'archive';
                 const matchGroup = getDealerGroup(d) === grp.key;
@@ -311,74 +315,98 @@ document.addEventListener('DOMContentLoaded', () => {
         
         renderTopDashboard(facts, plans, totalRegionsFact, totalAstanaFact);
 
-        const renderSumItem = (title, planKey, factVal, isSubItem = false) => {
-            const plan = plans[planKey] || 0;
-            const { percent, forecast, diff } = calculateKPI(plan, factVal, daysInMonth, currentDay);
-            
-            let colorClass = 'text-warning'; let bgClass = 'bg-warning';
-            if (percent >= 90) { colorClass = 'text-success'; bgClass = 'bg-success'; }
-            if (percent < 70) { colorClass = 'text-danger'; bgClass = 'bg-danger'; }
-            
-            let diffHtml = '';
-            if (plan > 0) {
-                if (diff < 0) diffHtml = `<span class="text-danger fw-bold" title="Не хватает">Ещё: ${fmt(Math.abs(diff))}</span>`;
-                else diffHtml = `<span class="text-success fw-bold" title="Сверх плана">+${fmt(diff)}</span>`;
-            }
+        // Функция отрисовки строки сводки
+        // showPlan (bool) - показывать ли инпут плана и прогресс-бар
+        const renderSumItem = (title, planKey, factVal, isSubItem = false, showPlan = true) => {
+            let innerContent = '';
 
-            const width = Math.min(percent, 100);
-            const planVal = plan !== 0 ? plan : '';
+            if (showPlan) {
+                // ВАРИАНТ С ПЛАНОМ (Старый вид)
+                const plan = plans[planKey] || 0;
+                const { percent, forecast, diff } = calculateKPI(plan, factVal, daysInMonth, currentDay);
+                
+                let colorClass = 'text-warning'; let bgClass = 'bg-warning';
+                if (percent >= 90) { colorClass = 'text-success'; bgClass = 'bg-success'; }
+                if (percent < 70) { colorClass = 'text-danger'; bgClass = 'bg-danger'; }
+                
+                let diffHtml = '';
+                if (plan > 0) {
+                    if (diff < 0) diffHtml = `<span class="text-danger fw-bold" title="Не хватает">Ещё: ${fmt(Math.abs(diff))}</span>`;
+                    else diffHtml = `<span class="text-success fw-bold" title="Сверх плана">+${fmt(diff)}</span>`;
+                }
+
+                const width = Math.min(percent, 100);
+                const planVal = plan !== 0 ? plan : '';
+
+                innerContent = `
+                    <div class="summary-header">
+                        <span class="summary-title">
+                            ${title}
+                            <input type="number" class="plan-input" data-plan-key="${planKey}" value="${planVal}" placeholder="План">
+                        </span>
+                        <span class="summary-percent ${colorClass} fw-bold">${fmt(percent)}%</span>
+                    </div>
+                    <div class="progress mb-2" style="height: 6px;">
+                        <div class="progress-bar ${bgClass}" style="width: ${width}%"></div>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center small mt-1">
+                        <span class="text-dark">Факт: <strong>${fmt(factVal)}</strong></span>
+                        ${diffHtml}
+                    </div>
+                    <div class="text-end small text-muted mt-1" style="font-size: 0.7rem;">
+                        Прогноз: <strong>${fmt(forecast)}</strong>
+                    </div>
+                `;
+            } else {
+                // ВАРИАНТ БЕЗ ПЛАНА (Упрощенный)
+                innerContent = `
+                    <div class="summary-header">
+                        <span class="summary-title text-dark">${title}</span>
+                    </div>
+                    <div class="summary-meta mt-1">
+                        <span>Факт: <strong class="fs-6">${fmt(factVal)}</strong></span>
+                    </div>
+                `;
+            }
 
             return `
             <div class="summary-item ${isSubItem ? 'ps-4 bg-light bg-opacity-25' : ''}">
-                <div class="summary-header">
-                    <span class="summary-title">
-                        ${title}
-                        <input type="number" class="plan-input" data-plan-key="${planKey}" value="${planVal}" placeholder="План">
-                    </span>
-                    <span class="summary-percent ${colorClass} fw-bold">${fmt(percent)}%</span>
-                </div>
-                <div class="progress mb-2" style="height: 6px;">
-                    <div class="progress-bar ${bgClass}" style="width: ${width}%"></div>
-                </div>
-                <div class="d-flex justify-content-between align-items-center small mt-1">
-                    <span class="text-dark">Факт: <strong>${fmt(factVal)}</strong></span>
-                    ${diffHtml}
-                </div>
-                <div class="text-end small text-muted mt-1" style="font-size: 0.7rem;">
-                    Прогноз: <strong>${fmt(forecast)}</strong>
-                </div>
+                ${innerContent}
             </div>`;
         };
 
         let summaryHtml = '';
-        summaryHtml += `<div class="p-3 bg-primary-subtle border-bottom"><h6 class="fw-bold mb-3 text-primary text-uppercase small ls-1">Общий результат</h6>${renderSumItem("ВСЕГО ПО КОМПАНИИ", "total_all", totalFactAll)}</div>`;
+        // ИТОГО (Всегда с планом)
+        summaryHtml += `<div class="p-3 bg-primary-subtle border-bottom"><h6 class="fw-bold mb-3 text-primary text-uppercase small ls-1">Общий результат</h6>${renderSumItem("ВСЕГО ПО КОМПАНИИ", "total_all", totalFactAll, false, true)}</div>`;
         
-        // БЛОК АСТАНА (Сектора)
+        // БЛОК АСТАНА
         summaryHtml += `<div class="mt-2 mb-1 px-3 pt-2 border-top"><span class="small fw-bold text-muted text-uppercase">Астана</span></div>`;
-        summaryHtml += renderSumItem("Астана (Итого)", "astana_all", totalAstanaFact);
+        summaryHtml += renderSumItem("Астана (Итого)", "astana_all", totalAstanaFact, false, true);
+        
         groupsConfig.forEach(g => {
             if (g.type === 'astana') {
-                summaryHtml += renderSumItem(g.title.replace('Астана - ', ''), g.key, facts[g.key], true);
+                // Передаем параметр hasPlan в рендер
+                summaryHtml += renderSumItem(g.title.replace('Астана - ', ''), g.key, facts[g.key], true, g.hasPlan);
             }
         });
 
         // БЛОК VIP
         if (facts.vip.length > 0) {
             summaryHtml += `<div class="mt-2 mb-1 px-3 pt-2 border-top"><span class="small fw-bold text-muted text-uppercase">VIP Клиенты</span></div>`;
-            facts.vip.forEach(v => summaryHtml += renderSumItem(v.name, `vip_${v.id}`, v.fact));
+            facts.vip.forEach(v => summaryHtml += renderSumItem(v.name, `vip_${v.id}`, v.fact, false, true));
         }
 
         // БЛОК РЕГИОНЫ
         summaryHtml += `<div class="mt-2 mb-1 px-3 pt-2 border-top"><span class="small fw-bold text-muted text-uppercase">Регионы</span></div>`;
-        summaryHtml += renderSumItem("Регионы (Итого)", "regions_all", totalRegionsFact);
+        summaryHtml += renderSumItem("Регионы (Итого)", "regions_all", totalRegionsFact, false, true);
         groupsConfig.forEach(g => {
             if (g.type === 'region') {
-                summaryHtml += renderSumItem(g.title.replace('Регион ', ''), g.key, facts[g.key], true);
+                summaryHtml += renderSumItem(g.title.replace('Регион ', ''), g.key, facts[g.key], true, g.hasPlan);
             }
         });
         
         if (facts.other && facts.other !== 0) {
-            summaryHtml += `<div class="summary-item"><div class="summary-header"><span class="summary-title text-danger">⚠️ Без категории</span><span class="summary-percent text-muted">-</span></div><div class="summary-meta"><span>Факт: <strong>${fmt(facts.other)}</strong></span></div></div>`;
+            summaryHtml += `<div class="summary-item"><div class="summary-header"><span class="summary-title text-danger">⚠️ Без категории</span></div><div class="summary-meta"><span>Факт: <strong>${fmt(facts.other)}</strong></span></div></div>`;
         }
 
         summaryList.innerHTML = summaryHtml;
@@ -419,7 +447,6 @@ document.addEventListener('DOMContentLoaded', () => {
         html += createCard('Астана', totalAstanaFact, plans.astana_all, 'bi-building', 'primary');
         html += createCard('Регионы', totalRegionsFact, plans.regions_all, 'bi-globe', 'info');
         
-        // Выводим только 2 первых VIP
         facts.vip.slice(0, 2).forEach(v => {
             const plan = plans[`vip_${v.id}`] || 0;
             html += createCard(v.name, v.fact, plan, 'bi-star', 'warning');
