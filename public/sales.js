@@ -1,4 +1,4 @@
-// --- АВТОРИЗАЦИЯ ---
+// --- АВТОРИЗАЦИЯ (Перехватчик ошибок) ---
 const originalFetch = window.fetch;
 window.fetch = async function (url, options) {
     options = options || {};
@@ -8,6 +8,7 @@ window.fetch = async function (url, options) {
     
     const response = await originalFetch(url, options);
     
+    // Если токен протух (401 или 403), выкидываем на логин
     if (response.status === 401 || response.status === 403) {
         localStorage.removeItem('crm_token');
         window.location.href = '/login.html';
@@ -15,7 +16,7 @@ window.fetch = async function (url, options) {
     
     return response;
 };
-// --------------------
+// -------------------------------------------
 
 document.addEventListener('DOMContentLoaded', () => {
     
@@ -23,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const API_SALES = '/api/sales';
     const API_SECTORS = '/api/sectors';
     
-    // Элементы
+    // Элементы интерфейса
     const monthPicker = document.getElementById('month-picker');
     const container = document.getElementById('sales-container');
     const summaryList = document.getElementById('summary-list');
@@ -31,15 +32,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveBtn = document.getElementById('save-btn');
     const printBtn = document.getElementById('print-btn');
     const summaryCol = document.getElementById('summary-col');
+    const lastUpdateInfo = document.getElementById('last-update-info'); // Элемент для даты
+    
+    // Мобильные табы
     const tabInputBtn = document.getElementById('tab-input-btn');
     const tabSummaryBtn = document.getElementById('tab-summary-btn');
     const colInput = document.getElementById('sales-container-col');
     const colSummary = document.getElementById('summary-col');
 
+    // Установка текущего месяца
     const now = new Date();
     monthPicker.value = now.toISOString().slice(0, 7);
 
-    // КОНФИГУРАЦИЯ ГРУПП (Базовая)
+    // БАЗОВАЯ КОНФИГУРАЦИЯ ГРУПП (VIP всегда первый)
     let groupsConfig = [
         { key: 'vip', title: 'Спец. Клиенты (VIP)', isSystem: true }
     ];
@@ -48,12 +53,13 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSales = [];
     let allSectors = []; 
     
-    // --- ЗАГРУЗКА ВИДИМОСТИ ПЛАНОВ ИЗ ПАМЯТИ ---
-    // Формат: { "vip": true, "astana_diy": false, ... }
+    // Загружаем настройки видимости планов из браузера
+    // Пример: { "vip": true, "astana_diy": false }
     let planVisibility = JSON.parse(localStorage.getItem('sales_plan_config')) || {};
 
     async function init() {
         try {
+            // Проверка прав (блокировка кнопки сохранения для гостей)
             const authRes = await fetch('/api/auth/me');
             if (authRes.ok) {
                 const authData = await authRes.json();
@@ -66,8 +72,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (e) { console.error(e); }
 
-        await loadSectors(); 
-        loadData();
+        await loadSectors(); // Сначала строим структуру групп
+        loadData();          // Потом грузим данные
         setupMobileTabs();
     }
 
@@ -77,16 +83,17 @@ document.addEventListener('DOMContentLoaded', () => {
             if (res.ok) {
                 allSectors = await res.json();
                 
-                // 1. АСТАНА
+                // 1. СЕКТОРА АСТАНЫ
                 const astanaSectors = allSectors.filter(s => s.type === 'astana');
                 astanaSectors.forEach(s => {
                     const key = 'astana_' + s.name.replace(/\s+/g, '_').toLowerCase();
+                    // Добавляем, если еще нет в конфиге
                     if (!groupsConfig.find(g => g.key === key)) {
                         groupsConfig.push({ key: key, title: `Астана - ${s.name}`, sectorName: s.name, type: 'astana' });
                     }
                 });
 
-                // 2. РЕГИОНЫ
+                // 2. СЕКТОРА РЕГИОНОВ
                 const regionSectors = allSectors.filter(s => s.type === 'region');
                 regionSectors.forEach(s => {
                     const key = 'sector_' + s.name.replace(/\s+/g, '_').toLowerCase();
@@ -95,10 +102,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
 
+                // Добавляем системные группы в конец
                 groupsConfig.push({ key: 'regional_regions', title: 'Регионы (Без сектора)', isSystem: true, type: 'region' });
                 groupsConfig.push({ key: 'other', title: 'Без ответственного / Прочие', isSystem: true });
             }
-        } catch (e) { console.error("Ошибка секторов", e); }
+        } catch (e) { console.error("Ошибка загрузки секторов", e); }
     }
 
     function setupMobileTabs() {
@@ -118,50 +126,81 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadData() {
         try {
             container.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div></div>';
+            const month = monthPicker.value;
+            
             const [dealersRes, salesRes] = await Promise.all([
                 fetch(API_DEALERS + '?scope=all'),
-                fetch(`${API_SALES}?month=${monthPicker.value}`)
+                fetch(`${API_SALES}?month=${month}`)
             ]);
 
-            if (!dealersRes.ok || !salesRes.ok) throw new Error("Ошибка доступа");
+            if (!dealersRes.ok || !salesRes.ok) throw new Error("Ошибка доступа к данным");
 
             allDealers = await dealersRes.json();
             currentSales = await salesRes.json();
+            
             renderAll();
+            updateLastModifiedText(); // Обновляем дату
         } catch (e) { 
-            container.innerHTML = `<div class="alert alert-danger">Ошибка: ${e.message}</div>`;
+            container.innerHTML = `<div class="alert alert-danger">Ошибка загрузки: ${e.message}</div>`;
         }
     }
 
-    // --- ФУНКЦИЯ ПЕРЕКЛЮЧЕНИЯ ПЛАНА (СОХРАНЯЕТ В БРАУЗЕРЕ) ---
+    // --- ФУНКЦИЯ ДАТЫ ОБНОВЛЕНИЯ ---
+    function updateLastModifiedText() {
+        if (!lastUpdateInfo) return;
+        if (!currentSales || currentSales.length === 0) {
+            lastUpdateInfo.textContent = 'Данных нет';
+            return;
+        }
+        let maxDate = null;
+        currentSales.forEach(item => {
+            if (item.updatedAt) {
+                const d = new Date(item.updatedAt);
+                if (!maxDate || d > maxDate) maxDate = d;
+            }
+        });
+        if (maxDate) {
+            const str = maxDate.toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+            lastUpdateInfo.textContent = `Обновлено: ${str}`;
+        } else {
+            lastUpdateInfo.textContent = 'Обновлено: давно';
+        }
+    }
+
+    // --- ФУНКЦИЯ ПЕРЕКЛЮЧЕНИЯ ПЛАНА ---
     window.toggleGroupPlan = (groupKey) => {
-        // Если значения нет, считаем true. Переключаем на false.
-        const current = planVisibility[groupKey] !== false;
+        // Если значения нет (undefined), считаем true. Переключаем на false.
+        const current = planVisibility[groupKey] !== false; 
         planVisibility[groupKey] = !current;
         localStorage.setItem('sales_plan_config', JSON.stringify(planVisibility));
-        renderAll(); // Перерисовываем
+        renderAll(); // Перерисовываем всё
     };
 
     function getDealerGroup(d) {
         if (d.hasPersonalPlan) return 'vip';
+        
         const sectorName = d.region_sector || '';
         const secLower = sectorName.toLowerCase().trim();
 
+        // Логика Астаны
         if (d.responsible === 'regional_astana') {
             const group = groupsConfig.find(g => g.type === 'astana' && g.sectorName === sectorName);
             if (group) return group.key;
+            // Нечеткий поиск
             const fuzzy = groupsConfig.find(g => g.type === 'astana' && g.title.toLowerCase().includes(secLower));
             if (fuzzy && secLower) return fuzzy.key;
-            return 'regional_astana'; 
+            return 'regional_astana'; // Прочие Астана
         }
         
+        // Логика Регионов
         if (d.responsible === 'regional_regions') {
             const group = groupsConfig.find(g => g.type === 'region' && g.sectorName === sectorName);
             if (group) return group.key;
             const fuzzy = groupsConfig.find(g => g.type === 'region' && g.title.toLowerCase().includes(secLower));
             if (fuzzy && secLower) return fuzzy.key;
-            return 'regional_regions';
+            return 'regional_regions'; // Прочие Регионы
         }
+        
         return 'other';
     }
 
@@ -181,7 +220,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function captureState() {
-        // Сохраняем введенные факты
+        // Сохраняем факты
         document.querySelectorAll('.sales-input.inp-fact').forEach(inp => {
             const row = inp.closest('.sales-row');
             const dealerId = row.dataset.id === "null" ? null : row.dataset.id;
@@ -195,7 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (val !== 0) { currentSales.push({ month: monthPicker.value, group, dealerId, dealerName, isCustom, plan: 0, fact: val }); }
         });
         
-        // Сохраняем введенные планы
+        // Сохраняем планы
         document.querySelectorAll('.plan-input').forEach(inp => {
             const planKey = inp.dataset.planKey;
             const val = parseFloat(inp.value.replace(',', '.')) || 0;
@@ -264,11 +303,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>`;
             });
             
-            // --- КНОПКА ВКЛЮЧЕНИЯ/ВЫКЛЮЧЕНИЯ ПЛАНА ---
+            // --- КНОПКА ГЛАЗИК (ВКЛ/ВЫКЛ ПЛАН) ---
             const isPlanVisible = planVisibility[grp.key] !== false; // По умолчанию true
+            // Если план включен - зеленый глазик (target), если выключен - серый круг
             const eyeIcon = isPlanVisible ? '<i class="bi bi-bullseye"></i>' : '<i class="bi bi-circle"></i>';
-            const eyeTitle = isPlanVisible ? 'Скрыть план' : 'Включить план';
-            const eyeClass = isPlanVisible ? 'text-success' : 'text-muted';
+            const eyeTitle = isPlanVisible ? 'Выключить план' : 'Включить план';
+            const eyeClass = isPlanVisible ? 'text-success' : 'text-muted opacity-50';
 
             container.innerHTML += `
                 <div class="region-card" data-group="${grp.key}">
@@ -296,6 +336,7 @@ document.addEventListener('DOMContentLoaded', () => {
             plans[k] = parseFloat(p.plan) || 0;
         });
 
+        // Считаем агрегаты
         let totalRegionsFact = 0;
         let totalAstanaFact = 0;
         let totalOtherFact = facts.other || 0;
@@ -310,21 +351,24 @@ document.addEventListener('DOMContentLoaded', () => {
         
         renderTopDashboard(facts, plans, totalRegionsFact, totalAstanaFact);
 
+        // Функция отрисовки строки сводки
+        // forcePlan = true -> показывать план принудительно (для Итогов)
         const renderSumItem = (title, planKey, factVal, isSubItem = false, forcePlan = false) => {
-            // Проверяем видимость плана: либо принудительно (для Итого), либо по настройке пользователя
             const isVisible = forcePlan || (planVisibility[planKey] !== false);
 
             let innerContent = '';
             if (isVisible) {
+                // С ПЛАНОМ
                 const plan = plans[planKey] || 0;
                 const { percent, forecast, diff } = calculateKPI(plan, factVal, daysInMonth, currentDay);
                 let colorClass = 'text-warning'; let bgClass = 'bg-warning';
                 if (percent >= 90) { colorClass = 'text-success'; bgClass = 'bg-success'; }
                 if (percent < 70) { colorClass = 'text-danger'; bgClass = 'bg-danger'; }
+                
                 let diffHtml = '';
                 if (plan > 0) {
                     if (diff < 0) diffHtml = `<span class="text-danger fw-bold" title="Не хватает">Ещё: ${fmt(Math.abs(diff))}</span>`;
-                    else diffHtml = `<span class="text-success fw-bold" title="Сверх плана">+${fmt(diff)}</span>`;
+                    else diffHtml = `<span class="text-success fw-bold" title="Сверх"> +${fmt(diff)}</span>`;
                 }
                 const width = Math.min(percent, 100);
                 const planVal = plan !== 0 ? plan : '';
@@ -347,13 +391,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="text-end small text-muted mt-1" style="font-size: 0.7rem;">Прогноз: <strong>${fmt(forecast)}</strong></div>
                 `;
             } else {
-                // БЕЗ ПЛАНА
+                // БЕЗ ПЛАНА (Упрощенно)
                 innerContent = `
                     <div class="summary-header mb-1">
                         <span class="summary-title text-dark">${title}</span>
                     </div>
                     <div class="d-flex justify-content-between align-items-center small">
-                        <span class="text-muted">Без плана</span>
+                        <span class="text-muted fst-italic" style="font-size: 0.75rem;">Без плана</span>
                         <span class="text-dark fs-6">Факт: <strong>${fmt(factVal)}</strong></span>
                     </div>
                 `;
