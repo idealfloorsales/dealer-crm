@@ -5,8 +5,15 @@ window.fetch = async function (url, options) {
     options.headers = options.headers || {};
     const token = localStorage.getItem('crm_token');
     if (token) options.headers['Authorization'] = 'Bearer ' + token;
+    
     const response = await originalFetch(url, options);
-    if (response.status === 401) window.location.href = '/login.html';
+    
+    // ИСПРАВЛЕНИЕ: Добавлена проверка 403 (Forbidden)
+    if (response.status === 401 || response.status === 403) {
+        localStorage.removeItem('crm_token'); // Чистим плохой токен
+        window.location.href = '/login.html';
+    }
+    
     return response;
 };
 // -------------------------------------------
@@ -15,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const API_DEALERS = '/api/dealers';
     const API_SALES = '/api/sales';
+    const API_SECTORS = '/api/sectors'; // Новый API для секторов
     
     // Элементы интерфейса
     const monthPicker = document.getElementById('month-picker');
@@ -35,33 +43,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const now = new Date();
     monthPicker.value = now.toISOString().slice(0, 7);
 
-    // Конфигурация групп (Порядок отображения на странице)
-    const groupsConfig = [
-        { key: 'regional_astana', title: 'Астана (Региональный)' },
-        { key: 'vip', title: 'Спец. Клиенты (VIP)' }, 
-        { key: 'north', title: 'Регион Север' },
-        { key: 'south', title: 'Регион Юг' },
-        { key: 'west', title: 'Регион Запад' },
-        { key: 'east', title: 'Регион Восток' },
-        { key: 'center', title: 'Регион Центр' },
-        { key: 'other', title: 'Без ответственного / Прочие' }
+    // БАЗОВАЯ КОНФИГУРАЦИЯ ГРУПП (Будет дополнена динамически)
+    let groupsConfig = [
+        { key: 'vip', title: 'Спец. Клиенты (VIP)', isSystem: true }, 
+        { key: 'regional_astana', title: 'Астана (Региональный)', isSystem: true }
+        // Остальные группы (регионы) добавятся динамически из базы
     ];
 
     let allDealers = [];
     let currentSales = [];
+    let allSectors = []; // Список секторов из БД
     
     async function init() {
         try {
-            // Проверка прав (чтобы отключить кнопку Гостю)
+            // Проверка прав
             const authRes = await fetch('/api/auth/me');
             if (authRes.ok) {
                 const authData = await authRes.json();
-                // Используем новую структуру пользователя из токена
                 const user = authData.user || {};
-                
-                // Если нет прав на редактирование продаж - блокируем кнопку
                 const canEdit = user.permissions && user.permissions.can_edit_sales;
-                
                 if (!canEdit && saveBtn) { 
                     saveBtn.disabled = true; 
                     saveBtn.innerHTML = '<i class="bi bi-lock"></i> Только чтение'; 
@@ -69,8 +69,45 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (e) { console.error(e); }
 
+        // Сначала грузим сектора, чтобы построить структуру
+        await loadSectors(); 
         loadData();
         setupMobileTabs();
+    }
+
+    async function loadSectors() {
+        try {
+            const res = await fetch(API_SECTORS);
+            if (res.ok) {
+                allSectors = await res.json();
+                
+                // Строим группы на основе секторов
+                // 1. Астана (DIY, Салоны и т.д.)
+                const astanaSectors = allSectors.filter(s => s.type === 'astana');
+                astanaSectors.forEach(s => {
+                    // Добавляем как подгруппы или отдельные группы, если нужно
+                    // Пока оставим "Астана" как одну большую группу, или можно разбить
+                });
+
+                // 2. Регионы (Север, Юг, Запад...)
+                const regionSectors = allSectors.filter(s => s.type === 'region');
+                
+                // Добавляем регионы в конфиг, если их там еще нет
+                regionSectors.forEach(s => {
+                    // Генерируем ключ из названия (например "Север" -> "North" или транслит, или просто ID)
+                    // Для простоты используем название как ключ (убрав пробелы)
+                    const key = 'sector_' + s.name.replace(/\s+/g, '_').toLowerCase();
+                    
+                    // Проверяем, нет ли уже такой группы
+                    if (!groupsConfig.find(g => g.key === key)) {
+                        groupsConfig.push({ key: key, title: `Регион ${s.name}`, sectorName: s.name });
+                    }
+                });
+
+                // Добавляем "Прочие" в конец
+                groupsConfig.push({ key: 'other', title: 'Без сектора / Прочие', isSystem: true });
+            }
+        } catch (e) { console.error("Ошибка загрузки секторов", e); }
     }
 
     function setupMobileTabs() {
@@ -103,7 +140,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const month = monthPicker.value;
             
             const [dealersRes, salesRes] = await Promise.all([
-                // ВАЖНО: Добавляем ?scope=all
                 fetch(API_DEALERS + '?scope=all'),
                 fetch(`${API_SALES}?month=${month}`)
             ]);
@@ -122,14 +158,18 @@ document.addEventListener('DOMContentLoaded', () => {
     function getDealerGroup(d) {
         if (d.hasPersonalPlan) return 'vip';
         if (d.responsible === 'regional_astana') return 'regional_astana';
+        
         if (d.responsible === 'regional_regions') {
-            const sec = (d.region_sector || '').toLowerCase().trim();
-            if (sec === 'север') return 'north';
-            if (sec === 'юг') return 'south';
-            if (sec === 'запад') return 'west';
-            if (sec === 'восток') return 'east';
-            if (sec === 'центр') return 'center';
-            return 'other'; 
+            // Ищем сектор в конфиге
+            const sectorName = d.region_sector || '';
+            const group = groupsConfig.find(g => g.sectorName === sectorName);
+            if (group) return group.key;
+            
+            // Если сектор старый (например "север" текстом, а не из справочника) - фалбэк
+            const secLower = sectorName.toLowerCase().trim();
+            // Попробуем найти по частичному совпадению
+            const fuzzyGroup = groupsConfig.find(g => g.title.toLowerCase().includes(secLower));
+            if (fuzzyGroup) return fuzzyGroup.key;
         }
         return 'other';
     }
@@ -223,11 +263,10 @@ document.addEventListener('DOMContentLoaded', () => {
         summaryList.innerHTML = '';
         if(dashboardTop) dashboardTop.innerHTML = '';
 
-        const facts = {
-            north: 0, south: 0, west: 0, east: 0, center: 0,
-            regional_astana: 0, other: 0, 
-            vip: [] 
-        };
+        // Динамический объект для фактов (на основе конфига групп)
+        const facts = {};
+        groupsConfig.forEach(g => facts[g.key] = 0);
+        facts.vip = []; // VIP храним массивом для детализации
 
         groupsConfig.forEach(grp => {
             const groupDealers = allDealers.filter(d => {
@@ -254,10 +293,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 if (grp.key === 'vip') {
                     facts.vip.push({ id: item.id || item.name, name: item.name, fact: fact });
-                } else if (facts[grp.key] !== undefined) {
-                    facts[grp.key] += fact;
                 } else {
-                    facts.other += fact;
+                    facts[grp.key] += fact;
                 }
 
                 const displayVal = (fact !== 0) ? fact : '';
@@ -288,16 +325,26 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         });
 
+        // СБОРКА СВОДНОЙ ВЕДОМОСТИ
         const plans = {};
-        const summaryKeys = ["regional_regions", "north", "south", "west", "east", "center", "regional_astana", "total_all"];
-        facts.vip.forEach(v => summaryKeys.push(`vip_${v.id}`));
+        // Собираем ключи для планов (системные + динамические регионы + vip)
+        const allPlanKeys = ['regional_regions', 'regional_astana', 'total_all']; // Базовые
+        groupsConfig.forEach(g => { if(!g.isSystem || g.key==='other') allPlanKeys.push(g.key); }); // Добавляем регионы
+        facts.vip.forEach(v => allPlanKeys.push(`vip_${v.id}`)); // Добавляем VIP
 
-        summaryKeys.forEach(k => {
+        allPlanKeys.forEach(k => {
             const p = currentSales.find(s => s.dealerId === `PLAN_${k}`) || {};
             plans[k] = parseFloat(p.plan) || 0;
         });
 
-        const totalRegionsFact = facts.north + facts.south + facts.west + facts.east + facts.center;
+        // Считаем ИТОГО по регионам (все, кроме Астаны и VIP и Other)
+        let totalRegionsFact = 0;
+        groupsConfig.forEach(g => {
+            if (g.key !== 'vip' && g.key !== 'regional_astana' && g.key !== 'other') {
+                totalRegionsFact += facts[g.key];
+            }
+        });
+
         let totalVipFact = 0; facts.vip.forEach(v => totalVipFact += v.fact);
         const totalFactAll = totalRegionsFact + facts.regional_astana + totalVipFact + facts.other;
         
@@ -356,11 +403,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         summaryHtml += `<div class="mt-2 mb-1 px-3 pt-2 border-top"><span class="small fw-bold text-muted text-uppercase">Регионы</span></div>`;
         summaryHtml += renderSumItem("Регионы (Итого)", "regional_regions", totalRegionsFact);
-        summaryHtml += renderSumItem("Север", "north", facts.north, true);
-        summaryHtml += renderSumItem("Юг", "south", facts.south, true);
-        summaryHtml += renderSumItem("Запад", "west", facts.west, true);
-        summaryHtml += renderSumItem("Восток", "east", facts.east, true);
-        summaryHtml += renderSumItem("Центр", "center", facts.center, true);
+        
+        // Рендерим динамические регионы
+        groupsConfig.forEach(g => {
+            if (g.key !== 'vip' && g.key !== 'regional_astana' && g.key !== 'other') {
+                summaryHtml += renderSumItem(g.title, g.key, facts[g.key], true);
+            }
+        });
         
         if (facts.other !== 0) {
             summaryHtml += `<div class="summary-item"><div class="summary-header"><span class="summary-title text-danger">⚠️ Без категории</span><span class="summary-percent text-muted">-</span></div><div class="summary-meta"><span>Факт: <strong>${fmt(facts.other)}</strong></span></div></div>`;
@@ -486,7 +535,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 saveBtn.disabled = false; 
                 saveBtn.innerHTML = '<i class="bi bi-save me-2"></i>Сохранить';
             } 
-            // Убрал блок finally, так как он мог сбрасывать состояние слишком рано или конфликтовать с setTimeout
         };
     }
 
