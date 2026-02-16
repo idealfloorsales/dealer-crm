@@ -1,4 +1,4 @@
-// --- АВТОРИЗАЦИЯ (ВСТАВИТЬ В НАЧАЛО ФАЙЛА) ---
+// --- АВТОРИЗАЦИЯ ---
 const originalFetch = window.fetch;
 window.fetch = async function (url, options) {
     options = options || {};
@@ -8,7 +8,6 @@ window.fetch = async function (url, options) {
     
     const response = await originalFetch(url, options);
     
-    // ИСПРАВЛЕНИЕ: Проверка протухшего токена
     if (response.status === 401 || response.status === 403) {
         localStorage.removeItem('crm_token');
         window.location.href = '/login.html';
@@ -16,7 +15,7 @@ window.fetch = async function (url, options) {
     
     return response;
 };
-// -------------------------------------------
+// --------------------
 
 document.addEventListener('DOMContentLoaded', () => {
     
@@ -39,7 +38,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const colInput = document.getElementById('sales-container-col');
     const colSummary = document.getElementById('summary-col');
 
-    // Установка текущего месяца по умолчанию
     const now = new Date();
     monthPicker.value = now.toISOString().slice(0, 7);
 
@@ -80,15 +78,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 // 1. СЕКТОРА АСТАНЫ (DIY, Салоны...)
                 const astanaSectors = allSectors.filter(s => s.type === 'astana');
                 astanaSectors.forEach(s => {
-                    // Ключ: astana_diy, astana_market ...
                     const key = 'astana_' + s.name.replace(/\s+/g, '_').toLowerCase();
                     if (!groupsConfig.find(g => g.key === key)) {
                         groupsConfig.push({ key: key, title: `Астана - ${s.name}`, sectorName: s.name, type: 'astana' });
                     }
                 });
 
-                // Добавляем "Астана (Прочее)" для тех, у кого нет сектора
-                groupsConfig.push({ key: 'regional_astana', title: 'Астана (Без сектора)', isSystem: true, type: 'astana' });
+                // УБРАНО: Группа "Астана (Без сектора)" больше не добавляется в список отображения.
+                // groupsConfig.push({ key: 'regional_astana', title: 'Астана (Без сектора)', isSystem: true, type: 'astana' });
 
                 // 2. СЕКТОРА РЕГИОНОВ (Север, Юг...)
                 const regionSectors = allSectors.filter(s => s.type === 'region');
@@ -99,10 +96,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
 
-                // Добавляем "Регионы (Прочее)"
+                // Добавляем "Регионы (Прочее)" для тех, кто в регионах, но без сектора
                 groupsConfig.push({ key: 'regional_regions', title: 'Регионы (Без сектора)', isSystem: true, type: 'region' });
 
-                // Добавляем "Прочие" (без ответственного) в самый конец
+                // Добавляем "Прочие"
                 groupsConfig.push({ key: 'other', title: 'Без ответственного / Прочие', isSystem: true });
             }
         } catch (e) { console.error("Ошибка загрузки секторов", e); }
@@ -151,14 +148,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // ЛОГИКА ДЛЯ АСТАНЫ
         if (d.responsible === 'regional_astana') {
-            // 1. Ищем точное совпадение по сектору
             const group = groupsConfig.find(g => g.type === 'astana' && g.sectorName === sectorName);
             if (group) return group.key;
-            // 2. Фалбэк (если название поменялось чуть-чуть)
+            
             const fuzzy = groupsConfig.find(g => g.type === 'astana' && g.title.toLowerCase().includes(secLower));
             if (fuzzy && secLower) return fuzzy.key;
             
-            return 'regional_astana'; // Если сектора нет
+            return 'regional_astana'; // Если вернет это, а в groupsConfig его нет - дилер не отобразится
         }
         
         // ЛОГИКА ДЛЯ РЕГИОНОВ
@@ -292,7 +288,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // --- СБОРКА СВОДНОЙ ВЕДОМОСТИ ---
         const plans = {};
-        const allPlanKeys = ['total_all', 'astana_all', 'regions_all']; // Служебные ключи
+        const allPlanKeys = ['total_all', 'astana_all', 'regions_all']; 
         groupsConfig.forEach(g => allPlanKeys.push(g.key));
         facts.vip.forEach(v => allPlanKeys.push(`vip_${v.id}`));
 
@@ -301,7 +297,6 @@ document.addEventListener('DOMContentLoaded', () => {
             plans[k] = parseFloat(p.plan) || 0;
         });
 
-        // Считаем Агрегаты (ИТОГО АСТАНА и ИТОГО РЕГИОНЫ)
         let totalRegionsFact = 0;
         let totalAstanaFact = 0;
         let totalOtherFact = facts.other || 0;
@@ -358,10 +353,9 @@ document.addEventListener('DOMContentLoaded', () => {
         let summaryHtml = '';
         summaryHtml += `<div class="p-3 bg-primary-subtle border-bottom"><h6 class="fw-bold mb-3 text-primary text-uppercase small ls-1">Общий результат</h6>${renderSumItem("ВСЕГО ПО КОМПАНИИ", "total_all", totalFactAll)}</div>`;
         
-        // БЛОК АСТАНА
+        // БЛОК АСТАНА (Сектора)
         summaryHtml += `<div class="mt-2 mb-1 px-3 pt-2 border-top"><span class="small fw-bold text-muted text-uppercase">Астана</span></div>`;
         summaryHtml += renderSumItem("Астана (Итого)", "astana_all", totalAstanaFact);
-        // Выводим сектора Астаны
         groupsConfig.forEach(g => {
             if (g.type === 'astana') {
                 summaryHtml += renderSumItem(g.title.replace('Астана - ', ''), g.key, facts[g.key], true);
@@ -425,7 +419,7 @@ document.addEventListener('DOMContentLoaded', () => {
         html += createCard('Астана', totalAstanaFact, plans.astana_all, 'bi-building', 'primary');
         html += createCard('Регионы', totalRegionsFact, plans.regions_all, 'bi-globe', 'info');
         
-        // Выводим только 2 первых VIP для экономии места
+        // Выводим только 2 первых VIP
         facts.vip.slice(0, 2).forEach(v => {
             const plan = plans[`vip_${v.id}`] || 0;
             html += createCard(v.name, v.fact, plan, 'bi-star', 'warning');
