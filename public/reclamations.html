@@ -1,319 +1,502 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CRM - Рекламации</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="style.css?v={{VER}}"> 
-    <link rel="icon" href="favicon.gif" type="image/gif">
-    <style>
-        body { padding-bottom: 80px; }
-        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255, 255, 255, 0.98); backdrop-filter: blur(10px); border-top: 1px solid #eee; z-index: 1050; padding-bottom: env(safe-area-inset-bottom); box-shadow: 0 -5px 20px rgba(0,0,0,0.05); }
-        .bottom-nav-item { text-align: center; color: #adb5bd; padding: 10px 0; text-decoration: none; flex: 1; transition: color 0.2s; }
-        .bottom-nav-item.active { color: #B9040A; }
-        .bottom-nav-item i { font-size: 1.4rem; display: block; margin-bottom: 2px; }
-        .bottom-nav-item span { font-size: 0.65rem; font-weight: 600; }
-        .desktop-nav { display: flex; }
-        @media (max-width: 991px) {
-            .desktop-nav { display: none !important; }
-            .container { padding-left: 15px; padding-right: 15px; }
-            #mobile-fab-add { position: fixed; bottom: 90px; right: 20px; width: 56px; height: 56px; border-radius: 50%; background: #B9040A; color: white; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(185, 4, 10, 0.4); z-index: 1040; font-size: 24px; border: none; }
-        }
-        .admin-only { display: none !important; }
-        .photo-preview-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
-        .photo-preview-item { position: relative; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; border: 1px solid #ddd; }
-        .photo-preview-item img { width: 100%; height: 100%; object-fit: cover; }
-        .btn-remove-photo { position: absolute; top: 2px; right: 2px; background: rgba(255,0,0,0.8); color: white; border: none; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 12px; cursor: pointer; }
+// Авторизация
+const originalFetch = window.fetch;
+window.fetch = async function (url, options) {
+    options = options || {};
+    options.headers = options.headers || {};
+    const token = localStorage.getItem('crm_token');
+    if (token) options.headers['Authorization'] = 'Bearer ' + token;
+    const response = await originalFetch(url, options);
+    if (response.status === 401 || response.status === 403) {
+        localStorage.removeItem('crm_token');
+        window.location.href = '/login.html';
+    }
+    return response;
+};
 
-        /* ========================================= */
-        /* ИДЕАЛЬНЫЙ ДИЗАЙН ПЕЧАТИ (ФОРМА-АНКЕТА)    */
-        /* ========================================= */
-        #printable-area { display: none; }
-        @media print {
-            @page { size: A4 portrait; margin: 0; }
-            body.printing { background: white !important; margin: 0 !important; padding: 0 !important; font-family: 'Arial', sans-serif !important; }
-            body.printing > * { display: none !important; }
-            body.printing #printable-area { display: block !important; position: static !important; width: 100%; color: #000; padding: 15mm 20mm !important; box-sizing: border-box; }
-            #printable-area * { box-sizing: border-box; }
-            
-            .print-header { text-align: center; margin-bottom: 25px; }
-            .print-title { font-size: 24px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
-            .print-subtitle { font-size: 13px; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
-            
-            .print-section { margin-bottom: 20px; }
-            .print-section-title { font-size: 14px; font-weight: 800; text-transform: uppercase; color: #B9040A; border-bottom: 2px solid #B9040A; padding-bottom: 5px; margin-bottom: 15px; margin-top: 25px; }
-            
-            .print-row { display: flex; align-items: flex-end; margin-bottom: 14px; line-height: 1.2; }
-            .print-label { font-size: 14px; font-weight: 600; margin-right: 10px; color: #222; white-space: nowrap; }
-            .print-value { flex-grow: 1; border-bottom: 1px solid #777; min-height: 22px; padding-bottom: 2px; padding-left: 5px; font-size: 15px; font-weight: 700; color: #000; }
-            .print-value.empty { border-bottom: 1px dotted #999; }
-            
-            .print-block-label { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #222; }
-            .print-block-value { border: 1px solid #777; border-radius: 6px; padding: 12px; min-height: 100px; font-size: 14px; font-weight: 500; white-space: pre-wrap; background: #fafafa !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .print-block-value.empty { border: 1px dotted #999; background: transparent !important; }
-            
-            .print-signatures { display: flex; justify-content: space-between; margin-top: 40px; page-break-inside: avoid; }
-            .sig-box { width: 45%; }
-            .sig-line { border-bottom: 1px solid #000; height: 30px; margin-bottom: 5px; }
-            .sig-text { font-size: 12px; text-align: center; color: #555; }
+document.addEventListener('DOMContentLoaded', () => {
+    let allReclamations = [];
+    let allDealers = [];
+    let allProducts = [];
+    let uploadedPhotos = [];
+    let currentViewId = null;
+
+    const listEl = document.getElementById('reclamations-list');
+    const searchInput = document.getElementById('search-input');
+    const addModal = new bootstrap.Modal(document.getElementById('add-modal'));
+    const viewModal = new bootstrap.Modal(document.getElementById('view-modal'));
+    const form = document.getElementById('reclamation-form');
+
+    init();
+
+    async function init() {
+        document.getElementById('r_date').value = new Date().toISOString().slice(0, 10);
+        await Promise.all([
+            fetchDealers(),
+            fetchProducts(),
+            fetchReclamations()
+        ]);
+        renderList();
+        setupPhotoUpload();
+    }
+
+    async function fetchReclamations() {
+        try {
+            const res = await fetch('/api/reclamations');
+            if (res.ok) allReclamations = await res.json();
+        } catch (e) { console.error(e); }
+    }
+
+    async function fetchDealers() {
+        try {
+            const res = await fetch('/api/dealers?scope=all');
+            if (res.ok) {
+                allDealers = await res.json();
+                allDealers.sort((a,b) => a.name.localeCompare(b.name));
+                const select = document.getElementById('r_dealer');
+                select.innerHTML = '<option value="">-- Выберите дилера --</option>' + 
+                    allDealers.map(d => `<option value="${d.id}">${d.name} (${d.city})</option>`).join('');
+            }
+        } catch (e) {}
+    }
+
+    async function fetchProducts() {
+        try {
+            const res = await fetch('/api/products');
+            if (res.ok) {
+                allProducts = await res.json();
+                const dl = document.getElementById('products-datalist');
+                dl.innerHTML = allProducts.map(p => `<option value="${p.sku} ${p.name}">`).join('');
+            }
+        } catch(e) {}
+    }
+
+    function renderList() {
+        const query = searchInput.value.toLowerCase();
+        const filtered = allReclamations.filter(r => 
+            (r.dealerName || '').toLowerCase().includes(query) || 
+            (r.productName || '').toLowerCase().includes(query)
+        );
+
+        if (filtered.length === 0) {
+            listEl.innerHTML = '<div class="text-center text-muted p-5"><i class="bi bi-inbox display-4 d-block mb-3"></i>Нет рекламаций</div>';
+            return;
         }
-    </style>
-    <script>
-        if (!localStorage.getItem('crm_token')) window.location.href = '/login.html';
-        document.addEventListener("DOMContentLoaded", () => {
-            try {
-                const token = localStorage.getItem('crm_token');
-                if(token) {
-                    const payload = JSON.parse(atob(token.split('.')[1]));
-                    if (payload.permissions && payload.permissions.is_admin) {
-                        document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('admin-only'));
-                    }
+
+        listEl.innerHTML = filtered.map((r, index) => {
+            const dateStr = new Date(r.createdAt || r.date).toLocaleDateString('ru-RU');
+            const imgBadge = r.photos && r.photos.length > 0 ? `<i class="bi bi-image text-primary ms-2"></i> ${r.photos.length}` : '';
+            const seqNumStr = String(filtered.length - index).padStart(3, '0');
+            
+            return `
+            <div class="card border-0 shadow-sm rounded-4 cursor-pointer" onclick="viewReclamation('${r.id}')" style="cursor: pointer;">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h6 class="fw-bold text-dark mb-0 text-truncate" style="max-width: 70%;">
+                            <span class="text-muted fw-normal me-1">№${seqNumStr}</span> 
+                            ${r.dealerName || 'Неизвестный дилер'}
+                        </h6>
+                        <small class="text-muted">${dateStr}</small>
+                    </div>
+                    <div class="small text-secondary mb-2">
+                        <i class="bi bi-box-seam me-1"></i> <span class="fw-bold">${r.productName}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-end mt-2 pt-2 border-top">
+                        <div class="small text-primary fw-bold"><i class="bi bi-boxes"></i> Объем: ${r.purchasedVolume || '-'}</div>
+                        <div class="small text-muted">${imgBadge}</div>
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    searchInput.addEventListener('input', renderList);
+
+    window.addBatchInput = function() {
+        const container = document.getElementById('batch-list');
+        container.insertAdjacentHTML('beforeend', `<input type="text" class="form-control form-control-sm batch-input mt-1" placeholder="Номер партии">`);
+    };
+
+    window.openAddModal = () => {
+        form.reset();
+        document.getElementById('r_id').value = ''; 
+        document.getElementById('add-modal-title').textContent = 'Оформление рекламации';
+        document.getElementById('r_date').value = new Date().toISOString().slice(0, 10);
+        uploadedPhotos = [];
+        renderPhotoPreviews();
+        document.getElementById('batch-list').innerHTML = `<input type="text" class="form-control form-control-sm batch-input" placeholder="Номер партии">`;
+        addModal.show();
+    };
+
+    window.openEditModal = () => {
+        if(!currentViewId) return;
+        const r = allReclamations.find(x => x.id === currentViewId);
+        if(!r) return;
+
+        viewModal.hide(); 
+        document.getElementById('r_id').value = r.id; 
+        document.getElementById('add-modal-title').textContent = 'Редактирование рекламации';
+        
+        document.getElementById('r_dealer').value = r.dealerId || '';
+        document.getElementById('r_date').value = r.date || '';
+        document.getElementById('r_product').value = r.productName || '';
+        document.getElementById('r_invoice').value = r.invoiceNumber || '';
+        document.getElementById('r_purchase_date').value = r.purchaseDate || '';
+        
+        document.getElementById('r_client_name').value = r.clientName || '';
+        document.getElementById('r_client_phone').value = r.clientPhone || '';
+        document.getElementById('r_address').value = r.address || '';
+        document.getElementById('r_floor').value = r.floor || '';
+        document.getElementById('r_house_type').value = r.houseType || 'Многоэтажный';
+        document.getElementById('r_total_area').value = r.totalArea || '';
+        document.getElementById('r_purchased_volume').value = r.purchasedVolume || '';
+        
+        document.getElementById('r_base_type').value = r.baseType || 'Стяжка';
+        document.getElementById('r_underlayment').value = r.underlayment || '';
+        document.getElementById('r_warm_floor').value = r.warmFloor || 'Нет';
+        document.getElementById('r_installer').value = r.installer || 'Сам клиент';
+        
+        // Новые технические поля
+        document.getElementById('r_acclimatization').value = r.acclimatization || '';
+        document.getElementById('r_storage').value = r.storageMethod || 'Горизонтально';
+        document.getElementById('r_drying_time').value = r.dryingTime || '';
+        document.getElementById('r_floor_flatness').value = r.floorFlatness || '';
+
+        document.getElementById('r_description').value = r.description || '';
+        document.getElementById('r_client_demand').value = r.clientDemand || 'Замена товара';
+
+        const batchContainer = document.getElementById('batch-list');
+        batchContainer.innerHTML = '';
+        if(r.batchNumbers && r.batchNumbers.length > 0) {
+            r.batchNumbers.forEach(bn => {
+                batchContainer.insertAdjacentHTML('beforeend', `<input type="text" class="form-control form-control-sm batch-input mt-1" value="${bn}">`);
+            });
+        } else {
+            batchContainer.innerHTML = `<input type="text" class="form-control form-control-sm batch-input" placeholder="Номер партии">`;
+        }
+
+        uploadedPhotos = [...(r.photos || [])];
+        renderPhotoPreviews();
+        addModal.show();
+    };
+
+    const compressImage = (file, maxWidth = 1000, quality = 0.7) => new Promise((resolve, reject) => { 
+        const reader = new FileReader(); reader.readAsDataURL(file); 
+        reader.onload = event => { 
+            const img = new Image(); img.src = event.target.result; 
+            img.onload = () => { 
+                const elem = document.createElement('canvas'); 
+                let width = img.width; let height = img.height; 
+                if (width > maxWidth) { height *= maxWidth / width; width = maxWidth; } 
+                elem.width = width; elem.height = height; 
+                const ctx = elem.getContext('2d'); ctx.drawImage(img, 0, 0, width, height); 
+                resolve(elem.toDataURL('image/jpeg', quality)); 
+            }; 
+        }; 
+    });
+
+    function setupPhotoUpload() {
+        const input = document.getElementById('r_photos');
+        input.addEventListener('change', async (e) => {
+            for (let file of e.target.files) {
+                if(file.type.startsWith('image/')) {
+                    const base64 = await compressImage(file, 800, 0.7);
+                    uploadedPhotos.push({ photo_url: base64 });
                 }
-            } catch(e) {}
+            }
+            renderPhotoPreviews();
+            input.value = '';
         });
-    </script>
-</head>
-<body class="bg-light">
+    }
 
-    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-4 desktop-nav">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="/"><img src="logo.png" alt="Logo" height="40"></a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"><span class="navbar-toggler-icon"></span></button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item"><a class="nav-link" href="/">Дилеры</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/map.html">Карта</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/products.html">Матрица</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/report.html">Выставленность</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/sales.html">Продажи</a></li>
-                    <li class="nav-item"><a class="nav-link active fw-bold text-primary" href="/reclamations.html">Рекламации</a></li>
-                    <li class="nav-item admin-only"><a class="nav-link text-primary fw-bold" href="/users.html">Сотрудники</a></li>
-                </ul>
-                <button id="logout-btn" class="btn btn-sm btn-outline-danger">Выход</button>
+    function renderPhotoPreviews() {
+        const container = document.getElementById('r_photos_preview');
+        container.innerHTML = uploadedPhotos.map((p, index) => `
+            <div class="photo-preview-item">
+                <img src="${p.photo_url}">
+                <button type="button" class="btn-remove-photo" onclick="removePhoto(${index})"><i class="bi bi-x"></i></button>
             </div>
-        </div>
-    </nav>
+        `).join('');
+    }
+    window.removePhoto = (index) => { uploadedPhotos.splice(index, 1); renderPhotoPreviews(); };
 
-    <div class="container">
-        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-            <h1 class="h3 fw-bold mb-0">Реестр рекламаций</h1>
-            <div class="d-flex gap-2">
-                <button class="btn btn-light border text-secondary shadow-sm" onclick="printBlankForm()" title="Распечатать пустой акт для заполнения от руки">
-                    <i class="bi bi-printer me-2"></i>Печать бланка
-                </button>
-                <button class="btn btn-primary shadow-sm d-none d-lg-block" onclick="openAddModal()">
-                    <i class="bi bi-plus-lg me-2"></i>Новая рекламация
-                </button>
-            </div>
-        </div>
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('btn-save');
+        btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
 
-        <div class="bg-white p-3 rounded-4 shadow-sm mb-4 border border-light">
-            <div class="input-group">
-                <span class="input-group-text bg-light border-end-0"><i class="bi bi-search"></i></span>
-                <input type="text" id="search-input" class="form-control border-start-0 bg-light" placeholder="Поиск по дилеру или товару...">
-            </div>
-        </div>
+        const id = document.getElementById('r_id').value; 
+        const dealerSelect = document.getElementById('r_dealer');
+        const dealerName = dealerSelect.options[dealerSelect.selectedIndex].text.split(' (')[0];
+        const batchInputs = Array.from(document.querySelectorAll('.batch-input')).map(i => i.value.trim()).filter(Boolean);
 
-        <div id="reclamations-list" class="d-flex flex-column gap-3">
-            <p class="text-center text-muted mt-5"><span class="spinner-border spinner-border-sm"></span> Загрузка...</p>
-        </div>
-    </div>
+        const data = {
+            dealerId: dealerSelect.value,
+            dealerName: dealerName,
+            date: document.getElementById('r_date').value,
+            productName: document.getElementById('r_product').value,
+            invoiceNumber: document.getElementById('r_invoice').value,
+            purchaseDate: document.getElementById('r_purchase_date').value,
+            
+            clientName: document.getElementById('r_client_name').value,
+            clientPhone: document.getElementById('r_client_phone').value,
+            address: document.getElementById('r_address').value,
+            floor: document.getElementById('r_floor').value,
+            houseType: document.getElementById('r_house_type').value,
+            totalArea: document.getElementById('r_total_area').value,
+            purchasedVolume: document.getElementById('r_purchased_volume').value,
+            
+            baseType: document.getElementById('r_base_type').value,
+            underlayment: document.getElementById('r_underlayment').value,
+            warmFloor: document.getElementById('r_warm_floor').value,
+            installer: document.getElementById('r_installer').value,
+            batchNumbers: batchInputs,
+            
+            // Новые поля
+            acclimatization: document.getElementById('r_acclimatization').value,
+            storageMethod: document.getElementById('r_storage').value,
+            dryingTime: document.getElementById('r_drying_time').value,
+            floorFlatness: document.getElementById('r_floor_flatness').value,
 
-    <div class="modal fade" id="add-modal" tabindex="-1" data-bs-backdrop="static">
-        <div class="modal-dialog modal-xl modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header border-0 pb-0">
-                    <h5 class="modal-title fw-bold" id="add-modal-title">Оформление рекламации</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            description: document.getElementById('r_description').value,
+            clientDemand: document.getElementById('r_client_demand').value,
+            photos: uploadedPhotos
+        };
+
+        const method = id ? 'PUT' : 'POST';
+        const url = id ? `/api/reclamations/${id}` : '/api/reclamations';
+
+        try {
+            const res = await fetch(url, { method: method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+            if(res.ok) {
+                await fetchReclamations();
+                renderList();
+                addModal.hide();
+            } else { alert("Ошибка сохранения"); }
+        } catch(err) { alert(err.message); }
+        finally { btn.disabled = false; btn.innerHTML = '<i class="bi bi-send me-2"></i>Сохранить'; }
+    });
+
+    window.viewReclamation = (id) => {
+        const r = allReclamations.find(x => x.id === id);
+        if(!r) return;
+        currentViewId = id;
+
+        const idx = allReclamations.findIndex(x => x.id === id);
+        let seqNumStr = '';
+        if (idx !== -1) {
+            seqNumStr = `№${String(allReclamations.length - idx).padStart(3, '0')} - `;
+        }
+
+        document.getElementById('v_title').textContent = `Акт ${seqNumStr}${r.dealerName}`;
+        
+        let photosHtml = '';
+        if(r.photos && r.photos.length > 0) {
+            photosHtml = `<div class="mt-3 border-top pt-3"><h6 class="fw-bold">Фотографии:</h6><div class="d-flex flex-wrap gap-2">` + 
+                r.photos.map(p => `<a href="${p.photo_url}" target="_blank"><img src="${p.photo_url}" style="width: 100px; height: 100px; object-fit: cover; border-radius: 8px; border: 1px solid #ccc;"></a>`).join('') + 
+                `</div></div>`;
+        }
+
+        document.getElementById('view-body').innerHTML = `
+            <div class="card border-0 mb-3"><div class="card-body p-3">
+                <p class="mb-1 small text-muted">Товар / Артикул</p>
+                <h6 class="fw-bold text-dark">${r.productName}</h6>
+                <div class="d-flex gap-3 mt-2">
+                    <div><small class="text-muted d-block">Общая площадь:</small><span class="fw-bold">${r.totalArea || '-'}</span></div>
+                    <div><small class="text-primary d-block">Купленный объем:</small><span class="fw-bold text-primary">${r.purchasedVolume || '-'}</span></div>
                 </div>
-                <div class="modal-body">
-                    <form id="reclamation-form">
-                        <input type="hidden" id="r_id">
-                        
-                        <h6 class="fw-bold text-primary mt-2 border-bottom pb-2">1. Общая информация</h6>
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-6">
-                                <label class="form-label small fw-bold text-muted">Дилер *</label>
-                                <select id="r_dealer" class="form-select" required><option value="">Загрузка...</option></select>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label small fw-bold text-muted">Дата подачи</label>
-                                <input type="date" id="r_date" class="form-control" required>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label small fw-bold text-muted">Дата покупки клиентом</label>
-                                <input type="date" id="r_purchase_date" class="form-control">
-                            </div>
-                            <div class="col-md-8">
-                                <label class="form-label small fw-bold text-muted">Товар (Название / Артикул) *</label>
-                                <input type="text" id="r_product" class="form-control" list="products-datalist" placeholder="Начните вводить артикул..." required autocomplete="off">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label small fw-bold text-muted">Номер накладной</label>
-                                <input type="text" id="r_invoice" class="form-control" placeholder="№ 12345">
-                            </div>
-                        </div>
+            </div></div>
 
-                        <h6 class="fw-bold text-primary mt-4 border-bottom pb-2">2. Данные объекта и клиента</h6>
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-6">
-                                <label class="form-label small fw-bold text-muted">ФИО клиента</label>
-                                <input type="text" id="r_client_name" class="form-control" placeholder="Иванов И.И.">
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label small fw-bold text-muted">Телефон клиента</label>
-                                <input type="text" id="r_client_phone" class="form-control" placeholder="+7 777 ...">
-                            </div>
-                            <div class="col-md-8">
-                                <label class="form-label small fw-bold text-muted">Адрес объекта</label>
-                                <input type="text" id="r_address" class="form-control" placeholder="Улица, дом...">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label small fw-bold text-muted">Этаж</label>
-                                <input type="text" id="r_floor" class="form-control" placeholder="Например: 5">
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label small fw-bold text-muted">Тип помещения</label>
-                                <select id="r_house_type" class="form-select">
-                                    <option value="Многоэтажный">Многоэтажный дом</option>
-                                    <option value="Частный">Частный дом / Коттедж</option>
-                                    <option value="Коммерция">Коммерческое помещение</option>
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label small fw-bold text-muted">Общая пл. помещения</label>
-                                <input type="text" id="r_total_area" class="form-control" placeholder="Напр: 100 м²">
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label small fw-bold text-primary">Купленный объем (Товара)</label>
-                                <input type="text" id="r_purchased_volume" class="form-control border-primary" placeholder="Сколько всего м² или упаковок купили" required>
-                            </div>
-                        </div>
+            <div class="card border-0 mb-3"><div class="card-body p-3">
+                <h6 class="fw-bold border-bottom pb-2 mb-2">Технические данные</h6>
+                <div class="row g-2 small">
+                    <div class="col-6"><span class="text-muted">Тип дома:</span> <br><b>${r.houseType || '-'}</b></div>
+                    <div class="col-6"><span class="text-muted">Монтаж:</span> <br><b>${r.installer || '-'}</b></div>
+                    <div class="col-6"><span class="text-muted">Основание:</span> <br><b>${r.baseType || '-'}</b></div>
+                    <div class="col-6"><span class="text-muted">Теплый пол:</span> <br><b class="${r.warmFloor !== 'Нет' ? 'text-danger' : ''}">${r.warmFloor || '-'}</b></div>
+                    
+                    <div class="col-6"><span class="text-muted">Сушка пола:</span> <br><b>${r.dryingTime || '-'}</b></div>
+                    <div class="col-6"><span class="text-muted">Ровность (Перепад):</span> <br><b>${r.floorFlatness || '-'}</b></div>
+                    <div class="col-6"><span class="text-muted">Акклиматизация:</span> <br><b>${r.acclimatization || '-'}</b></div>
+                    <div class="col-6"><span class="text-muted">Способ хранения:</span> <br><b class="${r.storageMethod === 'Вертикально' ? 'text-danger' : ''}">${r.storageMethod || '-'}</b></div>
 
-                        <h6 class="fw-bold text-primary mt-4 border-bottom pb-2">3. Технические нюансы (Крайне важно)</h6>
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-3">
-                                <label class="form-label small fw-bold text-muted">Тип основания</label>
-                                <select id="r_base_type" class="form-select">
-                                    <option value="Стяжка">Бетонная стяжка</option>
-                                    <option value="Наливной пол">Наливной пол</option>
-                                    <option value="Фанера/OSB">Фанера / OSB</option>
-                                    <option value="Старый линолеум">Старый линолеум</option>
-                                    <option value="Прочее">Прочее</option>
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label small fw-bold text-muted" title="Например: 14 дней">Время сушки пола</label>
-                                <input type="text" id="r_drying_time" class="form-control" placeholder="Напр: 14 дней">
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label small fw-bold text-muted" title="Норма: 2мм на 1 метр">Ровность (Перепад)</label>
-                                <input type="text" id="r_floor_flatness" class="form-control" placeholder="Напр: 2 мм на 1м">
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label small fw-bold text-danger">Система "Теплый пол"</label>
-                                <select id="r_warm_floor" class="form-select border-danger">
-                                    <option value="Нет">Нет</option>
-                                    <option value="Водяной">Водяной</option>
-                                    <option value="Электрический кабель">Электрический (кабель)</option>
-                                    <option value="Инфракрасный пленка">Инфракрасная пленка</option>
-                                </select>
-                            </div>
-
-                            <div class="col-md-3">
-                                <label class="form-label small fw-bold text-muted">Акклиматизация</label>
-                                <input type="text" id="r_acclimatization" class="form-control" placeholder="Напр: 48 часов">
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label small fw-bold text-muted">Способ хранения</label>
-                                <select id="r_storage" class="form-select">
-                                    <option value="Горизонтально">Горизонтально (Правильно)</option>
-                                    <option value="Вертикально">Вертикально (Запрещено)</option>
-                                    <option value="Неизвестно">Неизвестно</option>
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label small fw-bold text-muted">Используемая подложка</label>
-                                <input type="text" id="r_underlayment" class="form-control" placeholder="Напр: Листовая 3мм">
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label small fw-bold text-muted">Кто монтировал?</label>
-                                <select id="r_installer" class="form-select">
-                                    <option value="Мастер дилера">Профессиональный мастер (от дилера)</option>
-                                    <option value="Сам клиент">Сам клиент</option>
-                                    <option value="Сторонняя бригада">Сторонняя бригада</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <h6 class="fw-bold text-primary mt-4 border-bottom pb-2">4. Суть претензии</h6>
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-6">
-                                <label class="form-label small fw-bold text-muted">Номера партий с коробок</label>
-                                <div id="batch-list" class="d-flex flex-column gap-1 mb-1">
-                                    <input type="text" class="form-control form-control-sm batch-input" placeholder="Номер партии">
-                                </div>
-                                <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none" onclick="addBatchInput()">+ Добавить партию</button>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label small fw-bold text-muted">Требование клиента</label>
-                                <select id="r_client_demand" class="form-select">
-                                    <option value="Замена товара">Замена товара</option>
-                                    <option value="Возврат денег">Возврат денег</option>
-                                    <option value="Денежная компенсация (скидка)">Денежная компенсация (скидка)</option>
-                                    <option value="Доукомплектовка">Доукомплектовка</option>
-                                </select>
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label small fw-bold text-muted">Подробное описание проблемы (Что именно не так, где дефект) *</label>
-                                <textarea id="r_description" class="form-control" rows="3" placeholder="Сломаны замки, вздутие, царапины..." required></textarea>
-                            </div>
-                            
-                            <div class="col-12 mt-3">
-                                <label class="form-label small fw-bold text-muted">Фотографии / Видео брака</label>
-                                <input type="file" id="r_photos" class="form-control form-control-sm" multiple accept="image/*, video/*">
-                                <div id="r_photos_preview" class="photo-preview-grid"></div>
-                            </div>
-                        </div>
-
-                    </form>
+                    <div class="col-12"><span class="text-muted">Подложка:</span> <b>${r.underlayment || '-'}</b></div>
+                    <div class="col-12"><span class="text-muted">Партии:</span> <b>${(r.batchNumbers||[]).join(', ') || '-'}</b></div>
                 </div>
-                <div class="modal-footer border-0 pt-0">
-                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Отмена</button>
-                    <button type="submit" form="reclamation-form" class="btn btn-primary rounded-pill px-4" id="btn-save"><i class="bi bi-send me-2"></i>Сохранить</button>
+            </div></div>
+
+            <div class="card border-0 mb-3"><div class="card-body p-3">
+                <h6 class="fw-bold border-bottom pb-2 mb-2">Суть проблемы</h6>
+                <p class="small mb-2">${r.description}</p>
+                <div class="p-2 bg-warning-subtle rounded text-dark small fw-bold">Требование: ${r.clientDemand}</div>
+            </div></div>
+
+            ${photosHtml}
+        `;
+        viewModal.show();
+    };
+
+    window.deleteCurrentReclamation = async () => {
+        if(!currentViewId) return;
+        if(!confirm("Удалить эту рекламацию навсегда?")) return;
+        try {
+            await fetch(`/api/reclamations/${currentViewId}`, { method: 'DELETE' });
+            viewModal.hide();
+            await fetchReclamations();
+            renderList();
+        } catch(e) { alert("Ошибка удаления"); }
+    };
+
+    // ==========================================
+    // ЛОГИКА ПЕЧАТИ (ОДНОСТРОЧНЫЙ ДИЗАЙН "АНКЕТА")
+    // ==========================================
+    function generatePrintHTML(data) {
+        const d = data || {};
+        
+        // Функция для вывода значения. Если пусто - рисуем пунктир.
+        const val = (v) => v ? `<div class="print-value">${v}</div>` : `<div class="print-value empty"></div>`;
+        const blockVal = (v) => v ? `<div class="print-block-value">${v}</div>` : `<div class="print-block-value empty"></div>`;
+        
+        let seqNumStr = '______';
+        if (d.id && allReclamations.length > 0) {
+            const idx = allReclamations.findIndex(x => x.id === d.id);
+            if (idx !== -1) {
+                seqNumStr = String(allReclamations.length - idx).padStart(3, '0');
+            }
+        }
+
+        const formattedDate = d.date ? new Date(d.date).toLocaleDateString('ru-RU') : '';
+        const purchaseDate = d.purchaseDate ? new Date(d.purchaseDate).toLocaleDateString('ru-RU') : '';
+
+        return `
+            <div class="print-header">
+                <div class="print-title">АКТ РЕКЛАМАЦИИ № ${seqNumStr}</div>
+                <div class="print-subtitle">Документ фиксации претензии по качеству товара</div>
+            </div>
+
+            <div class="print-row">
+                <div class="print-label">Дата составления:</div>
+                <div class="print-value" style="flex-grow: 0; width: 150px;">${formattedDate}</div>
+                <div class="print-label" style="margin-left: 20px;">Дилер (Магазин):</div>
+                ${val(d.dealerName)}
+            </div>
+            
+            <div class="print-section">
+                <div class="print-section-title">1. Общая информация о товаре</div>
+                <div class="print-row">
+                    <div class="print-label">Товар (Название / Артикул):</div>
+                    ${val(d.productName)}
+                </div>
+                <div class="print-row">
+                    <div class="print-label">Номер накладной отгрузки:</div>
+                    ${val(d.invoiceNumber)}
+                    <div class="print-label" style="margin-left: 20px;">Дата покупки:</div>
+                    <div class="print-value" style="flex-grow: 0; width: 150px;">${purchaseDate}</div>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <div class="modal fade" id="view-modal" tabindex="-1">
-        <div class="modal-dialog modal-lg modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title fw-bold" id="v_title">Рекламация</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <div class="print-section">
+                <div class="print-section-title">2. Данные объекта и клиента</div>
+                <div class="print-row">
+                    <div class="print-label">ФИО клиента:</div>
+                    ${val(d.clientName)}
+                    <div class="print-label" style="margin-left: 20px;">Телефон:</div>
+                    <div class="print-value" style="flex-grow: 0; width: 250px;">${d.clientPhone || ''}</div>
                 </div>
-                <div class="modal-body bg-light" id="view-body">
-                    </div>
-                <div class="modal-footer border-0 d-flex justify-content-between align-items-center bg-light">
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteCurrentReclamation()"><i class="bi bi-trash"></i> Удалить</button>
-                    <div>
-                        <button class="btn btn-outline-primary btn-sm px-3 rounded-pill me-2" onclick="openEditModal()"><i class="bi bi-pencil"></i> Редактировать</button>
-                        <button class="btn btn-primary btn-sm px-4 rounded-pill" onclick="printFilledForm()"><i class="bi bi-printer me-2"></i>Печать акта</button>
-                    </div>
+                <div class="print-row">
+                    <div class="print-label">Адрес объекта:</div>
+                    ${val(d.address)}
+                </div>
+                <div class="print-row">
+                    <div class="print-label">Тип помещения:</div>
+                    <div class="print-value" style="flex-grow: 0; width: 250px;">${d.houseType || ''}</div>
+                    <div class="print-label" style="margin-left: 20px;">Этаж:</div>
+                    <div class="print-value" style="flex-grow: 0; width: 100px;">${d.floor || ''}</div>
+                </div>
+                <div class="print-row">
+                    <div class="print-label">Общая площадь помещения:</div>
+                    <div class="print-value" style="flex-grow: 0; width: 150px;">${d.totalArea ? d.totalArea + ' м²' : ''}</div>
+                    <div class="print-label" style="margin-left: 20px;">Купленный объем товара:</div>
+                    <div class="print-value" style="flex-grow: 0; width: 150px;">${d.purchasedVolume || ''}</div>
+                </div>
+                <div class="print-row">
+                    <div class="print-label">Номера партий:</div>
+                    ${val(d.batchNumbers && d.batchNumbers.length ? d.batchNumbers.join(', ') : '')}
                 </div>
             </div>
-        </div>
-    </div>
 
-    <button id="mobile-fab-add" class="d-lg-none" onclick="openAddModal()"><i class="bi bi-plus-lg"></i></button>
-    <datalist id="products-datalist"></datalist>
+            <div class="print-section">
+                <div class="print-section-title">3. Технические условия монтажа</div>
+                
+                <div class="print-row">
+                    <div class="print-label">Тип основания:</div>
+                    ${val(d.baseType)}
+                    <div class="print-label" style="margin-left: 20px;">Время сушки пола:</div>
+                    <div class="print-value" style="flex-grow: 0; width: 200px;">${d.dryingTime || ''}</div>
+                </div>
+                
+                <div class="print-row">
+                    <div class="print-label">Ровность пола (перепад на 1м):</div>
+                    ${val(d.floorFlatness)}
+                    <div class="print-label" style="margin-left: 20px;">Акклиматизация:</div>
+                    <div class="print-value" style="flex-grow: 0; width: 200px;">${d.acclimatization || ''}</div>
+                </div>
+                
+                <div class="print-row">
+                    <div class="print-label">Способ хранения до укладки:</div>
+                    ${val(d.storageMethod)}
+                    <div class="print-label" style="margin-left: 20px;">Подложка:</div>
+                    <div class="print-value" style="flex-grow: 0; width: 200px;">${d.underlayment || ''}</div>
+                </div>
 
-    <div id="printable-area"></div>
+                <div class="print-row">
+                    <div class="print-label">Система "Теплый пол":</div>
+                    ${val(d.warmFloor)}
+                    <div class="print-label" style="margin-left: 20px;">Кто производил монтаж:</div>
+                    <div class="print-value" style="flex-grow: 0; width: 250px;">${d.installer || ''}</div>
+                </div>
+            </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="reclamations.js?v={{VER}}"></script>
-</body>
-</html>
+            <div class="print-section">
+                <div class="print-section-title">4. Суть претензии и требования</div>
+                <div class="print-block-label">Подробное описание проблемы:</div>
+                ${blockVal(d.description)}
+                
+                <div class="print-block-label" style="margin-top: 15px;">Требование клиента:</div>
+                <div class="print-row">
+                    ${val(d.clientDemand)}
+                </div>
+            </div>
+
+            <div class="print-signatures">
+                <div class="sig-box">
+                    <div class="sig-line"></div>
+                    <div class="sig-text">Подпись клиента (ФИО)</div>
+                </div>
+                <div class="sig-box">
+                    <div class="sig-line"></div>
+                    <div class="sig-text">Представитель дилера (ФИО)</div>
+                </div>
+            </div>
+        `;
+    }
+
+    window.printBlankForm = () => {
+        const area = document.getElementById('printable-area');
+        area.innerHTML = generatePrintHTML(null);
+        document.body.classList.add('printing');
+        window.print();
+        document.body.classList.remove('printing');
+    };
+
+    window.printFilledForm = () => {
+        if(!currentViewId) return;
+        const r = allReclamations.find(x => x.id === currentViewId);
+        if(!r) return;
+
+        const area = document.getElementById('printable-area');
+        area.innerHTML = generatePrintHTML(r);
+        document.body.classList.add('printing');
+        window.print();
+        document.body.classList.remove('printing');
+    };
+});
