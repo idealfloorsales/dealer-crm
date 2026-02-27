@@ -350,7 +350,7 @@ app.delete('/api/knowledge/:id', checkWrite, async (req, res) => { await Knowled
 app.get('/api/tasks', async (req, res) => { try { const data = await Dealer.find(getDealerFilter(req)).select('name visits status responsible').lean(); res.json(data.map(d => ({ id: d._id, name: d.name, status: d.status, visits: d.visits || [], responsible: d.responsible }))); } catch (e) { res.status(500).json([]); } });
 
 // ==========================================
-// РЕКЛАМАЦИИ (БРАК / ВОЗВРАТЫ)
+// РЕКВИЗИТЫ И РЕКЛАМАЦИИ
 // ==========================================
 const reclamationSchema = new mongoose.Schema({
     dealerId: String,
@@ -365,12 +365,19 @@ const reclamationSchema = new mongoose.Schema({
     floor: String,
     houseType: String,
     totalArea: String,
-    defectVolume: String,
+    purchasedVolume: String, // Было defectVolume
     batchNumbers: [String],
     baseType: String,
     underlayment: String,
     warmFloor: String,
     installer: String,
+    
+    // --- НОВЫЕ ТЕХНИЧЕСКИЕ ПОЛЯ ---
+    acclimatization: String, 
+    storageMethod: String,
+    dryingTime: String,
+    floorFlatness: String,
+
     description: String,
     clientDemand: String,
     photos: [{ photo_url: String }]
@@ -405,6 +412,7 @@ app.delete('/api/reclamations/:id', checkWrite, async (req, res) => {
 });
 
 app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
+
 
 
 
