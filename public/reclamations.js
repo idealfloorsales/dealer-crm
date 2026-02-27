@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let allDealers = [];
     let allProducts = [];
     let uploadedPhotos = [];
+    let currentViewId = null; // Для удаления и печати
 
     const listEl = document.getElementById('reclamations-list');
     const searchInput = document.getElementById('search-input');
@@ -71,7 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(e) {}
     }
 
-    // Рендер списка на главной
+    // Рендер списка
     function renderList() {
         const query = searchInput.value.toLowerCase();
         const filtered = allReclamations.filter(r => 
@@ -85,7 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         listEl.innerHTML = filtered.map(r => {
-            const dateStr = new Date(r.createdAt).toLocaleDateString('ru-RU');
+            const dateStr = new Date(r.createdAt || r.date).toLocaleDateString('ru-RU');
             const imgBadge = r.photos && r.photos.length > 0 ? `<i class="bi bi-image text-primary ms-2"></i> ${r.photos.length}` : '';
             return `
             <div class="card border-0 shadow-sm rounded-4 cursor-pointer" onclick="viewReclamation('${r.id}')" style="cursor: pointer;">
@@ -108,7 +109,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     searchInput.addEventListener('input', renderList);
 
-    // Добавление новой партии в форму
     window.addBatchInput = function() {
         const container = document.getElementById('batch-list');
         container.insertAdjacentHTML('beforeend', `<input type="text" class="form-control form-control-sm batch-input mt-1" placeholder="Номер партии">`);
@@ -123,7 +123,6 @@ document.addEventListener('DOMContentLoaded', () => {
         addModal.show();
     };
 
-    // Компрессия фото
     const compressImage = (file, maxWidth = 1000, quality = 0.7) => new Promise((resolve, reject) => { 
         const reader = new FileReader(); reader.readAsDataURL(file); 
         reader.onload = event => { 
@@ -143,7 +142,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const input = document.getElementById('r_photos');
         input.addEventListener('change', async (e) => {
             for (let file of e.target.files) {
-                // Если видео - пока пропускаем или можно сохранять оригинал, но лучше ограничить вес
                 if(file.type.startsWith('image/')) {
                     const base64 = await compressImage(file, 800, 0.7);
                     uploadedPhotos.push({ photo_url: base64 });
@@ -165,7 +163,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     window.removePhoto = (index) => { uploadedPhotos.splice(index, 1); renderPhotoPreviews(); };
 
-    // Отправка формы
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const btn = document.getElementById('btn-save');
@@ -173,7 +170,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const dealerSelect = document.getElementById('r_dealer');
         const dealerName = dealerSelect.options[dealerSelect.selectedIndex].text.split(' (')[0];
-
         const batchInputs = Array.from(document.querySelectorAll('.batch-input')).map(i => i.value.trim()).filter(Boolean);
 
         const data = {
@@ -201,11 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         try {
-            const res = await fetch('/api/reclamations', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            });
+            const res = await fetch('/api/reclamations', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
             if(res.ok) {
                 await fetchReclamations();
                 renderList();
@@ -219,6 +211,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.viewReclamation = (id) => {
         const r = allReclamations.find(x => x.id === id);
         if(!r) return;
+        currentViewId = id; // Сохраняем ID для печати и удаления
 
         document.getElementById('v_title').textContent = `Рекламация: ${r.dealerName}`;
         
@@ -231,7 +224,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         document.getElementById('view-body').innerHTML = `
             <div class="card border-0 mb-3"><div class="card-body p-3">
-                <p class="mb-1 small text-muted">Товар</p>
+                <p class="mb-1 small text-muted">Товар / Артикул</p>
                 <h6 class="fw-bold text-dark">${r.productName}</h6>
                 <div class="d-flex gap-3 mt-2">
                     <div><small class="text-muted d-block">Общая площадь:</small><span class="fw-bold">${r.totalArea || '-'}</span></div>
@@ -258,21 +251,91 @@ document.addEventListener('DOMContentLoaded', () => {
             </div></div>
 
             ${photosHtml}
-            
-            <div class="text-end mt-4">
-                <button class="btn btn-sm btn-outline-danger" onclick="deleteReclamation('${r.id}')"><i class="bi bi-trash"></i> Удалить</button>
-            </div>
         `;
         viewModal.show();
     };
 
-    window.deleteReclamation = async (id) => {
+    window.deleteCurrentReclamation = async () => {
+        if(!currentViewId) return;
         if(!confirm("Удалить эту рекламацию навсегда?")) return;
         try {
-            await fetch(`/api/reclamations/${id}`, { method: 'DELETE' });
+            await fetch(`/api/reclamations/${currentViewId}`, { method: 'DELETE' });
             viewModal.hide();
             await fetchReclamations();
             renderList();
         } catch(e) { alert("Ошибка удаления"); }
+    };
+
+    // ==========================================
+    // ЛОГИКА ПЕЧАТИ
+    // ==========================================
+    
+    // Генератор HTML для печатного листа
+    function generatePrintHTML(data) {
+        const d = data || {};
+        // Если значения нет, оставляем пустое место для ручного заполнения
+        const val = (v) => v ? `<b>${v}</b>` : '';
+        
+        return `
+            <div class="print-title">АКТ РЕКЛАМАЦИИ ${d.id ? '№ ' + d.id.slice(-6).toUpperCase() : ''}</div>
+            <div class="print-flex" style="margin-bottom: 20px;">
+                <div><strong>Дата:</strong> ${d.date ? new Date(d.date).toLocaleDateString('ru-RU') : '«___» ___________ 202_ г.'}</div>
+                <div><strong>Дилер (Магазин):</strong> ${val(d.dealerName)}</div>
+            </div>
+            
+            <table class="print-table">
+                <tr><td width="35%"><strong>Товар (Название / Артикул)</strong></td><td>${val(d.productName)}</td></tr>
+                <tr><td><strong>Номер накладной отгрузки</strong></td><td>${val(d.invoiceNumber)}</td></tr>
+                <tr><td><strong>Дата покупки клиентом</strong></td><td>${d.purchaseDate ? `<b>${new Date(d.purchaseDate).toLocaleDateString('ru-RU')}</b>` : ''}</td></tr>
+                <tr><td><strong>ФИО конечного клиента</strong></td><td>${val(d.clientName)}</td></tr>
+                <tr><td><strong>Телефон клиента</strong></td><td>${val(d.clientPhone)}</td></tr>
+                <tr><td><strong>Адрес объекта</strong></td><td>${val(d.address)}</td></tr>
+                <tr><td><strong>Тип дома и Этаж</strong></td><td>${d.houseType || ''} ${d.floor ? ', этаж ' + d.floor : ''}</td></tr>
+                <tr><td><strong>Общая квадратура (м²)</strong></td><td>${val(d.totalArea)}</td></tr>
+                <tr><td><strong>Объем брака (шт/м²)</strong></td><td>${val(d.defectVolume)}</td></tr>
+                <tr><td><strong>Номера партий</strong></td><td>${d.batchNumbers && d.batchNumbers.length ? `<b>${d.batchNumbers.join(', ')}</b>` : ''}</td></tr>
+            </table>
+
+            <div style="margin-top: 20px; margin-bottom: 5px; font-weight: bold; text-transform: uppercase;">Технические условия монтажа:</div>
+            <table class="print-table">
+                <tr><td width="35%"><strong>Тип основания</strong></td><td>${val(d.baseType)}</td></tr>
+                <tr><td><strong>Используемая подложка</strong></td><td>${val(d.underlayment)}</td></tr>
+                <tr><td><strong>Система "Теплый пол"</strong></td><td>${val(d.warmFloor)}</td></tr>
+                <tr><td><strong>Кто производил монтаж</strong></td><td>${val(d.installer)}</td></tr>
+            </table>
+
+            <div style="margin-top: 20px; margin-bottom: 5px; font-weight: bold; text-transform: uppercase;">Описание проблемы (Суть претензии):</div>
+            <div style="min-height: 100px; border: 1px solid #000; padding: 10px;">${val(d.description)}</div>
+
+            <div style="margin-top: 20px; margin-bottom: 5px; font-weight: bold; text-transform: uppercase;">Требование клиента:</div>
+            <div style="min-height: 40px; border: 1px solid #000; padding: 10px;">${val(d.clientDemand)}</div>
+
+            <div class="print-flex" style="margin-top: 60px;">
+                <div>Подпись клиента: ___________________</div>
+                <div>Представитель дилера: ___________________</div>
+            </div>
+        `;
+    }
+
+    // Печать пустого бланка
+    window.printBlankForm = () => {
+        const area = document.getElementById('printable-area');
+        area.innerHTML = generatePrintHTML(null); // Передаем null = пустые поля
+        document.body.classList.add('printing');
+        window.print();
+        document.body.classList.remove('printing');
+    };
+
+    // Печать заполненного акта
+    window.printFilledForm = () => {
+        if(!currentViewId) return;
+        const r = allReclamations.find(x => x.id === currentViewId);
+        if(!r) return;
+
+        const area = document.getElementById('printable-area');
+        area.innerHTML = generatePrintHTML(r);
+        document.body.classList.add('printing');
+        window.print();
+        document.body.classList.remove('printing');
     };
 });
