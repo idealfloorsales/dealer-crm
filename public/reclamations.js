@@ -85,7 +85,6 @@ document.addEventListener('DOMContentLoaded', () => {
         listEl.innerHTML = filtered.map((r, index) => {
             const dateStr = new Date(r.createdAt || r.date).toLocaleDateString('ru-RU');
             const imgBadge = r.photos && r.photos.length > 0 ? `<i class="bi bi-image text-primary ms-2"></i> ${r.photos.length}` : '';
-            // Вычисляем порядковый номер (отсортировано от новых к старым)
             const seqNumStr = String(filtered.length - index).padStart(3, '0');
             
             return `
@@ -102,7 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <i class="bi bi-box-seam me-1"></i> <span class="fw-bold">${r.productName}</span>
                     </div>
                     <div class="d-flex justify-content-between align-items-end mt-2 pt-2 border-top">
-                        <div class="small text-danger fw-bold"><i class="bi bi-exclamation-triangle"></i> Брак: ${r.defectVolume}</div>
+                        <div class="small text-primary fw-bold"><i class="bi bi-boxes"></i> Объем: ${r.purchasedVolume || '-'}</div>
                         <div class="small text-muted">${imgBadge}</div>
                     </div>
                 </div>
@@ -142,17 +141,26 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('r_product').value = r.productName || '';
         document.getElementById('r_invoice').value = r.invoiceNumber || '';
         document.getElementById('r_purchase_date').value = r.purchaseDate || '';
+        
         document.getElementById('r_client_name').value = r.clientName || '';
         document.getElementById('r_client_phone').value = r.clientPhone || '';
         document.getElementById('r_address').value = r.address || '';
         document.getElementById('r_floor').value = r.floor || '';
         document.getElementById('r_house_type').value = r.houseType || 'Многоэтажный';
         document.getElementById('r_total_area').value = r.totalArea || '';
-        document.getElementById('r_defect_volume').value = r.defectVolume || '';
+        document.getElementById('r_purchased_volume').value = r.purchasedVolume || '';
+        
         document.getElementById('r_base_type').value = r.baseType || 'Стяжка';
         document.getElementById('r_underlayment').value = r.underlayment || '';
         document.getElementById('r_warm_floor').value = r.warmFloor || 'Нет';
         document.getElementById('r_installer').value = r.installer || 'Сам клиент';
+        
+        // Новые технические поля
+        document.getElementById('r_acclimatization').value = r.acclimatization || '';
+        document.getElementById('r_storage').value = r.storageMethod || 'Горизонтально';
+        document.getElementById('r_drying_time').value = r.dryingTime || '';
+        document.getElementById('r_floor_flatness').value = r.floorFlatness || '';
+
         document.getElementById('r_description').value = r.description || '';
         document.getElementById('r_client_demand').value = r.clientDemand || 'Замена товара';
 
@@ -228,18 +236,27 @@ document.addEventListener('DOMContentLoaded', () => {
             productName: document.getElementById('r_product').value,
             invoiceNumber: document.getElementById('r_invoice').value,
             purchaseDate: document.getElementById('r_purchase_date').value,
+            
             clientName: document.getElementById('r_client_name').value,
             clientPhone: document.getElementById('r_client_phone').value,
             address: document.getElementById('r_address').value,
             floor: document.getElementById('r_floor').value,
             houseType: document.getElementById('r_house_type').value,
             totalArea: document.getElementById('r_total_area').value,
-            defectVolume: document.getElementById('r_defect_volume').value,
-            batchNumbers: batchInputs,
+            purchasedVolume: document.getElementById('r_purchased_volume').value,
+            
             baseType: document.getElementById('r_base_type').value,
             underlayment: document.getElementById('r_underlayment').value,
             warmFloor: document.getElementById('r_warm_floor').value,
             installer: document.getElementById('r_installer').value,
+            batchNumbers: batchInputs,
+            
+            // Новые поля
+            acclimatization: document.getElementById('r_acclimatization').value,
+            storageMethod: document.getElementById('r_storage').value,
+            dryingTime: document.getElementById('r_drying_time').value,
+            floorFlatness: document.getElementById('r_floor_flatness').value,
+
             description: document.getElementById('r_description').value,
             clientDemand: document.getElementById('r_client_demand').value,
             photos: uploadedPhotos
@@ -285,7 +302,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <h6 class="fw-bold text-dark">${r.productName}</h6>
                 <div class="d-flex gap-3 mt-2">
                     <div><small class="text-muted d-block">Общая площадь:</small><span class="fw-bold">${r.totalArea || '-'}</span></div>
-                    <div><small class="text-danger d-block">Объем брака:</small><span class="fw-bold text-danger">${r.defectVolume}</span></div>
+                    <div><small class="text-primary d-block">Купленный объем:</small><span class="fw-bold text-primary">${r.purchasedVolume || '-'}</span></div>
                 </div>
             </div></div>
 
@@ -296,6 +313,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="col-6"><span class="text-muted">Монтаж:</span> <br><b>${r.installer || '-'}</b></div>
                     <div class="col-6"><span class="text-muted">Основание:</span> <br><b>${r.baseType || '-'}</b></div>
                     <div class="col-6"><span class="text-muted">Теплый пол:</span> <br><b class="${r.warmFloor !== 'Нет' ? 'text-danger' : ''}">${r.warmFloor || '-'}</b></div>
+                    
+                    <div class="col-6"><span class="text-muted">Сушка пола:</span> <br><b>${r.dryingTime || '-'}</b></div>
+                    <div class="col-6"><span class="text-muted">Ровность (Перепад):</span> <br><b>${r.floorFlatness || '-'}</b></div>
+                    <div class="col-6"><span class="text-muted">Акклиматизация:</span> <br><b>${r.acclimatization || '-'}</b></div>
+                    <div class="col-6"><span class="text-muted">Способ хранения:</span> <br><b class="${r.storageMethod === 'Вертикально' ? 'text-danger' : ''}">${r.storageMethod || '-'}</b></div>
+
                     <div class="col-12"><span class="text-muted">Подложка:</span> <b>${r.underlayment || '-'}</b></div>
                     <div class="col-12"><span class="text-muted">Партии:</span> <b>${(r.batchNumbers||[]).join(', ') || '-'}</b></div>
                 </div>
@@ -329,9 +352,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function generatePrintHTML(data) {
         const d = data || {};
         
-        // Помощник для вывода подчеркнутого значения
+        // Функция для вывода значения. Если пусто - рисуем пунктир.
         const val = (v) => v ? `<div class="print-value">${v}</div>` : `<div class="print-value empty"></div>`;
-        // Помощник для вывода большого блока (Описание проблемы)
         const blockVal = (v) => v ? `<div class="print-block-value">${v}</div>` : `<div class="print-block-value empty"></div>`;
         
         let seqNumStr = '______';
@@ -378,7 +400,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="print-label">ФИО клиента:</div>
                     ${val(d.clientName)}
                     <div class="print-label" style="margin-left: 20px;">Телефон:</div>
-                    <div class="print-value" style="flex-grow: 0; width: 200px;">${d.clientPhone || ''}</div>
+                    <div class="print-value" style="flex-grow: 0; width: 250px;">${d.clientPhone || ''}</div>
                 </div>
                 <div class="print-row">
                     <div class="print-label">Адрес объекта:</div>
@@ -386,15 +408,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="print-row">
                     <div class="print-label">Тип помещения:</div>
-                    <div class="print-value" style="flex-grow: 0; width: 300px;">${d.houseType || ''}</div>
+                    <div class="print-value" style="flex-grow: 0; width: 250px;">${d.houseType || ''}</div>
                     <div class="print-label" style="margin-left: 20px;">Этаж:</div>
                     <div class="print-value" style="flex-grow: 0; width: 100px;">${d.floor || ''}</div>
                 </div>
                 <div class="print-row">
-                    <div class="print-label">Общая квадратура:</div>
+                    <div class="print-label">Общая площадь помещения:</div>
                     <div class="print-value" style="flex-grow: 0; width: 150px;">${d.totalArea ? d.totalArea + ' м²' : ''}</div>
-                    <div class="print-label" style="margin-left: 20px;">Объем заявленного брака:</div>
-                    ${val(d.defectVolume)}
+                    <div class="print-label" style="margin-left: 20px;">Купленный объем товара:</div>
+                    <div class="print-value" style="flex-grow: 0; width: 150px;">${d.purchasedVolume || ''}</div>
                 </div>
                 <div class="print-row">
                     <div class="print-label">Номера партий:</div>
@@ -404,17 +426,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
             <div class="print-section">
                 <div class="print-section-title">3. Технические условия монтажа</div>
+                
                 <div class="print-row">
                     <div class="print-label">Тип основания:</div>
                     ${val(d.baseType)}
-                    <div class="print-label" style="margin-left: 20px;">Подложка:</div>
-                    ${val(d.underlayment)}
+                    <div class="print-label" style="margin-left: 20px;">Время сушки пола:</div>
+                    <div class="print-value" style="flex-grow: 0; width: 200px;">${d.dryingTime || ''}</div>
                 </div>
+                
+                <div class="print-row">
+                    <div class="print-label">Ровность пола (перепад на 1м):</div>
+                    ${val(d.floorFlatness)}
+                    <div class="print-label" style="margin-left: 20px;">Акклиматизация:</div>
+                    <div class="print-value" style="flex-grow: 0; width: 200px;">${d.acclimatization || ''}</div>
+                </div>
+                
+                <div class="print-row">
+                    <div class="print-label">Способ хранения до укладки:</div>
+                    ${val(d.storageMethod)}
+                    <div class="print-label" style="margin-left: 20px;">Подложка:</div>
+                    <div class="print-value" style="flex-grow: 0; width: 200px;">${d.underlayment || ''}</div>
+                </div>
+
                 <div class="print-row">
                     <div class="print-label">Система "Теплый пол":</div>
                     ${val(d.warmFloor)}
-                    <div class="print-label" style="margin-left: 20px;">Монтаж производил:</div>
-                    ${val(d.installer)}
+                    <div class="print-label" style="margin-left: 20px;">Кто производил монтаж:</div>
+                    <div class="print-value" style="flex-grow: 0; width: 250px;">${d.installer || ''}</div>
                 </div>
             </div>
 
