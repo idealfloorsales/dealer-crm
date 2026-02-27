@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let allDealers = [];
     let allProducts = [];
     let uploadedPhotos = [];
-    let currentViewId = null; // Для удаления и печати
+    let currentViewId = null;
 
     const listEl = document.getElementById('reclamations-list');
     const searchInput = document.getElementById('search-input');
@@ -72,7 +72,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(e) {}
     }
 
-    // Рендер списка
     function renderList() {
         const query = searchInput.value.toLowerCase();
         const filtered = allReclamations.filter(r => 
@@ -114,12 +113,64 @@ document.addEventListener('DOMContentLoaded', () => {
         container.insertAdjacentHTML('beforeend', `<input type="text" class="form-control form-control-sm batch-input mt-1" placeholder="Номер партии">`);
     };
 
+    // Открытие модалки для НОВОЙ рекламации
     window.openAddModal = () => {
         form.reset();
+        document.getElementById('r_id').value = ''; // Очищаем ID
+        document.getElementById('add-modal-title').textContent = 'Оформление рекламации';
         document.getElementById('r_date').value = new Date().toISOString().slice(0, 10);
         uploadedPhotos = [];
         renderPhotoPreviews();
         document.getElementById('batch-list').innerHTML = `<input type="text" class="form-control form-control-sm batch-input" placeholder="Номер партии">`;
+        addModal.show();
+    };
+
+    // --- НОВОЕ: Открытие модалки для РЕДАКТИРОВАНИЯ ---
+    window.openEditModal = () => {
+        if(!currentViewId) return;
+        const r = allReclamations.find(x => x.id === currentViewId);
+        if(!r) return;
+
+        viewModal.hide(); // Закрываем карточку просмотра
+
+        document.getElementById('r_id').value = r.id; // Записываем ID
+        document.getElementById('add-modal-title').textContent = 'Редактирование рекламации';
+        
+        // Заполняем поля
+        document.getElementById('r_dealer').value = r.dealerId || '';
+        document.getElementById('r_date').value = r.date || '';
+        document.getElementById('r_product').value = r.productName || '';
+        document.getElementById('r_invoice').value = r.invoiceNumber || '';
+        document.getElementById('r_purchase_date').value = r.purchaseDate || '';
+        document.getElementById('r_client_name').value = r.clientName || '';
+        document.getElementById('r_client_phone').value = r.clientPhone || '';
+        document.getElementById('r_address').value = r.address || '';
+        document.getElementById('r_floor').value = r.floor || '';
+        document.getElementById('r_house_type').value = r.houseType || 'Многоэтажный';
+        document.getElementById('r_total_area').value = r.totalArea || '';
+        document.getElementById('r_defect_volume').value = r.defectVolume || '';
+        document.getElementById('r_base_type').value = r.baseType || 'Стяжка';
+        document.getElementById('r_underlayment').value = r.underlayment || '';
+        document.getElementById('r_warm_floor').value = r.warmFloor || 'Нет';
+        document.getElementById('r_installer').value = r.installer || 'Сам клиент';
+        document.getElementById('r_description').value = r.description || '';
+        document.getElementById('r_client_demand').value = r.clientDemand || 'Замена товара';
+
+        // Заполняем партии
+        const batchContainer = document.getElementById('batch-list');
+        batchContainer.innerHTML = '';
+        if(r.batchNumbers && r.batchNumbers.length > 0) {
+            r.batchNumbers.forEach(bn => {
+                batchContainer.insertAdjacentHTML('beforeend', `<input type="text" class="form-control form-control-sm batch-input mt-1" value="${bn}">`);
+            });
+        } else {
+            batchContainer.innerHTML = `<input type="text" class="form-control form-control-sm batch-input" placeholder="Номер партии">`;
+        }
+
+        // Заполняем фото
+        uploadedPhotos = [...(r.photos || [])];
+        renderPhotoPreviews();
+
         addModal.show();
     };
 
@@ -163,11 +214,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     window.removePhoto = (index) => { uploadedPhotos.splice(index, 1); renderPhotoPreviews(); };
 
+    // --- ОБНОВЛЕННАЯ ФОРМА СОХРАНЕНИЯ (POST или PUT) ---
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const btn = document.getElementById('btn-save');
         btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
 
+        const id = document.getElementById('r_id').value; // Проверяем ID
         const dealerSelect = document.getElementById('r_dealer');
         const dealerName = dealerSelect.options[dealerSelect.selectedIndex].text.split(' (')[0];
         const batchInputs = Array.from(document.querySelectorAll('.batch-input')).map(i => i.value.trim()).filter(Boolean);
@@ -196,22 +249,24 @@ document.addEventListener('DOMContentLoaded', () => {
             photos: uploadedPhotos
         };
 
+        const method = id ? 'PUT' : 'POST';
+        const url = id ? `/api/reclamations/${id}` : '/api/reclamations';
+
         try {
-            const res = await fetch('/api/reclamations', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+            const res = await fetch(url, { method: method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
             if(res.ok) {
                 await fetchReclamations();
                 renderList();
                 addModal.hide();
             } else { alert("Ошибка сохранения"); }
         } catch(err) { alert(err.message); }
-        finally { btn.disabled = false; btn.innerHTML = '<i class="bi bi-send me-2"></i>Отправить'; }
+        finally { btn.disabled = false; btn.innerHTML = '<i class="bi bi-send me-2"></i>Сохранить'; }
     });
 
-    // Просмотр карточки
     window.viewReclamation = (id) => {
         const r = allReclamations.find(x => x.id === id);
         if(!r) return;
-        currentViewId = id; // Сохраняем ID для печати и удаления
+        currentViewId = id;
 
         document.getElementById('v_title').textContent = `Рекламация: ${r.dealerName}`;
         
@@ -269,11 +324,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================
     // ЛОГИКА ПЕЧАТИ
     // ==========================================
-    
-    // Генератор HTML для печатного листа
     function generatePrintHTML(data) {
         const d = data || {};
-        // Если значения нет, оставляем пустое место для ручного заполнения
         const val = (v) => v ? `<b>${v}</b>` : '';
         
         return `
@@ -317,16 +369,14 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
-    // Печать пустого бланка
     window.printBlankForm = () => {
         const area = document.getElementById('printable-area');
-        area.innerHTML = generatePrintHTML(null); // Передаем null = пустые поля
+        area.innerHTML = generatePrintHTML(null);
         document.body.classList.add('printing');
         window.print();
         document.body.classList.remove('printing');
     };
 
-    // Печать заполненного акта
     window.printFilledForm = () => {
         if(!currentViewId) return;
         const r = allReclamations.find(x => x.id === currentViewId);
