@@ -86,8 +86,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const dateStr = new Date(r.createdAt || r.date).toLocaleDateString('ru-RU');
             const imgBadge = r.photos && r.photos.length > 0 ? `<i class="bi bi-image text-brand ms-2"></i> ${r.photos.length}` : '';
             const seqNumStr = String(filtered.length - index).padStart(3, '0');
-            
-            // Если решение заполнено, покажем зеленую галочку
             const resBadge = r.resolution ? `<span class="badge bg-success ms-2">Решено</span>` : '';
 
             return `
@@ -105,7 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <i class="bi bi-box-seam me-1"></i> <span class="fw-bold">${r.productName}</span>
                     </div>
                     <div class="d-flex justify-content-between align-items-end mt-2 pt-2 border-top">
-                        <div class="small text-brand fw-bold"><i class="bi bi-boxes"></i> Объем: ${r.purchasedVolume || '-'}</div>
+                        <div class="small text-brand fw-bold"><i class="bi bi-exclamation-triangle"></i> Брак: ${r.defectVolume}</div>
                         <div class="small text-muted">${imgBadge}</div>
                     </div>
                 </div>
@@ -150,25 +148,29 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('r_client_phone').value = r.clientPhone || '';
         document.getElementById('r_address').value = r.address || '';
         document.getElementById('r_floor').value = r.floor || '';
-        document.getElementById('r_house_type').value = r.houseType || 'Многоэтажный';
+        document.getElementById('r_house_type').value = r.houseType || '';
         document.getElementById('r_total_area').value = r.totalArea || '';
         document.getElementById('r_purchased_volume').value = r.purchasedVolume || '';
         
-        document.getElementById('r_base_type').value = r.baseType || 'Стяжка';
+        document.getElementById('r_base_type').value = r.baseType || '';
         document.getElementById('r_underlayment').value = r.underlayment || '';
-        document.getElementById('r_warm_floor').value = r.warmFloor || 'Нет';
-        document.getElementById('r_installer').value = r.installer || 'Сам клиент';
+        document.getElementById('r_warm_floor').value = r.warmFloor || '';
+        document.getElementById('r_installer').value = r.installer || '';
         
         document.getElementById('r_acclimatization').value = r.acclimatization || '';
-        document.getElementById('r_storage').value = r.storageMethod || 'Горизонтально';
+        document.getElementById('r_storage').value = r.storageMethod || '';
         document.getElementById('r_drying_time').value = r.dryingTime || '';
         document.getElementById('r_floor_flatness').value = r.floorFlatness || '';
 
+        // Новые поля
+        document.getElementById('r_defect_moment').value = r.defectMoment || '';
+        document.getElementById('r_defect_volume').value = r.defectVolume || '';
         document.getElementById('r_description').value = r.description || '';
-        document.getElementById('r_client_demand').value = r.clientDemand || 'Замена товара';
+        document.getElementById('r_client_demand').value = r.clientDemand || '';
         
-        // Поле Решения
         document.getElementById('r_resolution').value = r.resolution || '';
+        document.getElementById('r_compensation_amount').value = r.compensationAmount || '';
+        document.getElementById('r_internal_notes').value = r.internalNotes || '';
 
         const batchContainer = document.getElementById('batch-list');
         batchContainer.innerHTML = '';
@@ -262,9 +264,15 @@ document.addEventListener('DOMContentLoaded', () => {
             dryingTime: document.getElementById('r_drying_time').value,
             floorFlatness: document.getElementById('r_floor_flatness').value,
 
+            defectMoment: document.getElementById('r_defect_moment').value,
+            defectVolume: document.getElementById('r_defect_volume').value,
             description: document.getElementById('r_description').value,
             clientDemand: document.getElementById('r_client_demand').value,
-            resolution: document.getElementById('r_resolution').value, // <--- Сохраняем Решение
+            
+            resolution: document.getElementById('r_resolution').value,
+            compensationAmount: parseFloat(document.getElementById('r_compensation_amount').value) || 0,
+            internalNotes: document.getElementById('r_internal_notes').value,
+
             photos: uploadedPhotos
         };
 
@@ -307,8 +315,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 <p class="mb-1 small text-muted">Товар / Артикул</p>
                 <h6 class="fw-bold text-dark">${r.productName}</h6>
                 <div class="d-flex gap-3 mt-2">
-                    <div><small class="text-muted d-block">Общая площадь:</small><span class="fw-bold">${r.totalArea || '-'}</span></div>
-                    <div><small class="text-brand d-block">Купленный объем:</small><span class="fw-bold text-brand">${r.purchasedVolume || '-'}</span></div>
+                    <div><small class="text-muted d-block">Площадь:</small><span class="fw-bold">${r.totalArea || '-'}</span></div>
+                    <div><small class="text-primary d-block">Куплено:</small><span class="fw-bold">${r.purchasedVolume || '-'}</span></div>
+                    <div><small class="text-danger d-block">Объем брака:</small><span class="fw-bold text-danger">${r.defectVolume || '-'}</span></div>
                 </div>
             </div></div>
 
@@ -318,12 +327,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="col-6"><span class="text-muted">Тип дома:</span> <br><b>${r.houseType || '-'}</b></div>
                     <div class="col-6"><span class="text-muted">Монтаж:</span> <br><b>${r.installer || '-'}</b></div>
                     <div class="col-6"><span class="text-muted">Основание:</span> <br><b>${r.baseType || '-'}</b></div>
-                    <div class="col-6"><span class="text-muted">Теплый пол:</span> <br><b class="${r.warmFloor !== 'Нет' ? 'text-danger' : ''}">${r.warmFloor || '-'}</b></div>
+                    <div class="col-6"><span class="text-muted">Теплый пол:</span> <br><b class="${r.warmFloor && r.warmFloor !== 'Нет' ? 'text-danger' : ''}">${r.warmFloor || '-'}</b></div>
                     
                     <div class="col-6"><span class="text-muted">Сушка пола:</span> <br><b>${r.dryingTime || '-'}</b></div>
                     <div class="col-6"><span class="text-muted">Ровность (Перепад):</span> <br><b>${r.floorFlatness || '-'}</b></div>
                     <div class="col-6"><span class="text-muted">Акклиматизация:</span> <br><b>${r.acclimatization || '-'}</b></div>
-                    <div class="col-6"><span class="text-muted">Способ хранения:</span> <br><b class="${r.storageMethod === 'Вертикально' ? 'text-danger' : ''}">${r.storageMethod || '-'}</b></div>
+                    <div class="col-6"><span class="text-muted">Способ хранения:</span> <br><b class="${r.storageMethod === 'Вертикально (Запрещено)' ? 'text-danger' : ''}">${r.storageMethod || '-'}</b></div>
 
                     <div class="col-12"><span class="text-muted">Подложка:</span> <b>${r.underlayment || '-'}</b></div>
                     <div class="col-12"><span class="text-muted">Партии:</span> <b>${(r.batchNumbers||[]).join(', ') || '-'}</b></div>
@@ -332,13 +341,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
             <div class="card border-0 mb-3"><div class="card-body p-3">
                 <h6 class="fw-bold border-bottom pb-2 mb-2 text-brand">Суть проблемы</h6>
+                <p class="small text-muted mb-1">Выявлено: <b>${r.defectMoment || '-'}</b></p>
                 <p class="small mb-2">${r.description}</p>
-                <div class="p-2 bg-light rounded text-dark small fw-bold mb-2">Требование: ${r.clientDemand}</div>
+                <div class="p-2 bg-light rounded text-dark small fw-bold mb-2">Требование: ${r.clientDemand || '-'}</div>
             </div></div>
+
+            ${r.internalNotes ? `
+            <div class="card border-0 mb-3" style="background-color: #fff3cd; border-left: 4px solid #ffc107 !important;">
+                <div class="card-body p-3">
+                    <h6 class="fw-bold text-warning-emphasis mb-1"><i class="bi bi-lock-fill"></i> Служебные заметки</h6>
+                    <p class="small mb-0 text-dark">${r.internalNotes}</p>
+                </div>
+            </div>` : ''}
 
             <div class="card border-0 mb-3" style="background-color: #f8f9fa; border-left: 4px solid #198754 !important;">
                 <div class="card-body p-3">
-                    <h6 class="fw-bold text-success mb-2">Принятое решение</h6>
+                    <div class="d-flex justify-content-between align-items-start">
+                        <h6 class="fw-bold text-success mb-2">Принятое решение</h6>
+                        ${r.compensationAmount ? `<span class="badge bg-success">${r.compensationAmount} ₸</span>` : ''}
+                    </div>
                     <p class="small mb-0 text-dark fw-medium">${r.resolution ? r.resolution : '<span class="text-muted fw-normal fst-italic">Решение еще не заполнено...</span>'}</p>
                 </div>
             </div>
@@ -364,8 +385,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================
     function generatePrintHTML(data) {
         const d = data || {};
-        
-        // Функция для вывода значения. Если пусто - рисуем пунктир.
         const val = (v) => v ? `<div class="print-value">${v}</div>` : `<div class="print-value empty"></div>`;
         const blockVal = (v) => v ? `<div class="print-block-value">${v}</div>` : `<div class="print-block-value empty"></div>`;
         
@@ -471,7 +490,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
             <div class="print-section">
                 <div class="print-section-title">4. Суть претензии и требования</div>
-                <div class="print-block-label">Подробное описание проблемы:</div>
+                <div class="print-row">
+                    <div class="print-label">Момент выявления дефекта:</div>
+                    ${val(d.defectMoment)}
+                    <div class="print-label" style="margin-left: 20px;">Объем заявленного брака:</div>
+                    <div class="print-value" style="flex-grow: 0; width: 150px;">${d.defectVolume || ''}</div>
+                </div>
+                
+                <div class="print-block-label" style="margin-top: 15px;">Подробное описание проблемы:</div>
                 ${blockVal(d.description)}
                 
                 <div class="print-block-label" style="margin-top: 15px;">Требование клиента:</div>
