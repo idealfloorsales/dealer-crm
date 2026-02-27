@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Рекламации</title>
+    <title>CRM - Рекламации</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="style.css?v={{VER}}"> 
@@ -31,10 +31,18 @@
             #mobile-fab-add { position: fixed; bottom: 90px; right: 20px; width: 56px; height: 56px; border-radius: 50%; background: #B9040A; color: white; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(185, 4, 10, 0.4); z-index: 1040; font-size: 24px; border: none; }
         }
         .admin-only { display: none !important; }
+        
+        /* Стили для фото и видео превью */
         .photo-preview-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
-        .photo-preview-item { position: relative; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; border: 1px solid #ddd; }
-        .photo-preview-item img { width: 100%; height: 100%; object-fit: cover; }
+        .photo-preview-item { position: relative; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; border: 1px solid #ddd; background: #000; display: flex; align-items: center; justify-content: center; }
+        .photo-preview-item img, .photo-preview-item video { width: 100%; height: 100%; object-fit: cover; }
         .btn-remove-photo { position: absolute; top: 2px; right: 2px; background: rgba(255,0,0,0.8); color: white; border: none; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 12px; cursor: pointer; }
+        .play-icon-overlay { position: absolute; color: white; font-size: 24px; opacity: 0.8; pointer-events: none; }
+
+        /* Нумерация карточек */
+        .reclamation-card { position: relative; cursor: pointer; transition: transform 0.2s; }
+        .reclamation-card:hover { transform: translateY(-2px); }
+        .rec-index { position: absolute; top: -10px; left: -10px; width: 28px; height: 28px; background-color: #B9040A; color: white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: 700; font-size: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 2; }
 
         /* ПЕЧАТЬ */
         #printable-area { display: none; }
@@ -112,13 +120,25 @@
         </div>
 
         <div class="bg-white p-3 rounded-4 shadow-sm mb-4 border border-light">
-            <div class="input-group">
-                <span class="input-group-text bg-light border-end-0"><i class="bi bi-search"></i></span>
-                <input type="text" id="search-input" class="form-control border-start-0 bg-light" placeholder="Поиск по дилеру или товару...">
+            <div class="row g-2">
+                <div class="col-md-8">
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0"><i class="bi bi-search"></i></span>
+                        <input type="text" id="search-input" class="form-control border-start-0 bg-light" placeholder="Поиск по дилеру или товару...">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <select id="sort-select" class="form-select bg-light">
+                        <option value="newest">Сначала новые</option>
+                        <option value="oldest">Сначала старые</option>
+                        <option value="dealer_asc">По дилеру (А-Я)</option>
+                        <option value="dealer_desc">По дилеру (Я-А)</option>
+                    </select>
+                </div>
             </div>
         </div>
 
-        <div id="reclamations-list" class="d-flex flex-column gap-3">
+        <div id="reclamations-list" class="d-flex flex-column gap-3 mt-3">
             <p class="text-center text-muted mt-5"><span class="spinner-border spinner-border-sm"></span> Загрузка...</p>
         </div>
     </div>
@@ -253,8 +273,10 @@
                                 <label class="form-label small fw-bold text-muted">Подробное описание проблемы *</label>
                                 <textarea id="r_description" class="form-control" rows="3" placeholder="Сломаны замки, вздутие, царапины..." required></textarea>
                             </div>
+                            
                             <div class="col-12 mt-3">
                                 <label class="form-label small fw-bold text-muted">Фотографии / Видео брака</label>
+                                <div class="alert alert-warning py-1 small mb-2"><i class="bi bi-info-circle me-1"></i> Максимальный размер видео 8 МБ. Большие видео лучше отправлять ссылкой.</div>
                                 <input type="file" id="r_photos" class="form-control form-control-sm" multiple accept="image/*, video/*">
                                 <div id="r_photos_preview" class="photo-preview-grid"></div>
                             </div>
@@ -309,46 +331,28 @@
         </div>
     </div>
 
+    <div class="modal fade" id="fullscreen-modal" tabindex="-1">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content bg-dark">
+                <div class="modal-header border-0 pb-0">
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body d-flex align-items-center justify-content-center" id="fullscreen-viewer">
+                    </div>
+            </div>
+        </div>
+    </div>
+
     <button id="mobile-fab-add" class="d-lg-none" onclick="openAddModal()"><i class="bi bi-plus-lg"></i></button>
     
     <datalist id="products-datalist"></datalist>
-    <datalist id="house-type-list">
-        <option value="Многоэтажный дом">
-        <option value="Частный дом / Коттедж">
-        <option value="Коммерческое помещение">
-    </datalist>
-    <datalist id="base-type-list">
-        <option value="Бетонная стяжка">
-        <option value="Наливной пол">
-        <option value="Фанера / OSB">
-        <option value="Старый линолеум">
-    </datalist>
-    <datalist id="warm-floor-list">
-        <option value="Нет">
-        <option value="Водяной">
-        <option value="Электрический (кабель)">
-        <option value="Инфракрасная пленка">
-    </datalist>
-    <datalist id="storage-list">
-        <option value="Горизонтально (Правильно)">
-        <option value="Вертикально (Запрещено)">
-    </datalist>
-    <datalist id="installer-list">
-        <option value="Профессиональный мастер (от дилера)">
-        <option value="Сам клиент">
-        <option value="Сторонняя бригада">
-    </datalist>
-    <datalist id="defect-moment-list">
-        <option value="До укладки (в пачке)">
-        <option value="В процессе монтажа">
-        <option value="В процессе эксплуатации">
-    </datalist>
-    <datalist id="client-demand-list">
-        <option value="Замена товара">
-        <option value="Возврат денег">
-        <option value="Скидка / Компенсация">
-        <option value="Доукомплектовка">
-    </datalist>
+    <datalist id="house-type-list"><option value="Многоэтажный дом"><option value="Частный дом / Коттедж"><option value="Коммерческое помещение"></datalist>
+    <datalist id="base-type-list"><option value="Бетонная стяжка"><option value="Наливной пол"><option value="Фанера / OSB"><option value="Старый линолеум"></datalist>
+    <datalist id="warm-floor-list"><option value="Нет"><option value="Водяной"><option value="Электрический (кабель)"><option value="Инфракрасная пленка"></datalist>
+    <datalist id="storage-list"><option value="Горизонтально (Правильно)"><option value="Вертикально (Запрещено)"></datalist>
+    <datalist id="installer-list"><option value="Профессиональный мастер (от дилера)"><option value="Сам клиент"><option value="Сторонняя бригада"></datalist>
+    <datalist id="defect-moment-list"><option value="До укладки (в пачке)"><option value="В процессе монтажа"><option value="В процессе эксплуатации"></datalist>
+    <datalist id="client-demand-list"><option value="Замена товара"><option value="Возврат денег"><option value="Скидка / Компенсация"><option value="Доукомплектовка"></datalist>
 
     <div id="printable-area"></div>
 
