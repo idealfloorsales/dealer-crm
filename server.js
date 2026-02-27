@@ -377,7 +377,11 @@ const reclamationSchema = new mongoose.Schema({
     storageMethod: String,
     dryingTime: String,
     floorFlatness: String,
-
+// --- НОВЫЕ ПОЛЯ ---
+    defectMoment: String,       // Момент выявления
+    compensationAmount: Number, // Сумма компенсации
+    internalNotes: String,
+    
     description: String,
     clientDemand: String,
     resolution: String,
@@ -413,6 +417,7 @@ app.delete('/api/reclamations/:id', checkWrite, async (req, res) => {
 });
 
 app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
+
 
 
 
