@@ -380,6 +380,7 @@ const reclamationSchema = new mongoose.Schema({
 
     description: String,
     clientDemand: String,
+    resolution: String,
     photos: [{ photo_url: String }]
 }, { timestamps: true });
 const Reclamation = mongoose.model('Reclamation', reclamationSchema);
@@ -412,6 +413,7 @@ app.delete('/api/reclamations/:id', checkWrite, async (req, res) => {
 });
 
 app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
+
 
 
 
