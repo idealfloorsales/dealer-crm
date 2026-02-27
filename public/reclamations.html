@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Рекламации</title>
+    <title>CRM - Рекламации</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="style.css?v={{VER}}"> 
@@ -32,44 +32,48 @@
         /* ========================================= */
         #printable-area { display: none; }
         @media print {
-            /* УБИРАЕМ КОЛОНТИТУЛЫ (ССЫЛКИ И ДАТЫ БРАУЗЕРА) */
             @page { size: A4 portrait; margin: 0; }
-            
             body.printing { background: white !important; margin: 0 !important; padding: 0 !important; font-family: 'Arial', sans-serif !important; }
             body.printing > * { display: none !important; }
             body.printing #printable-area { display: block !important; position: static !important; width: 100%; color: #000; padding: 15mm 20mm !important; box-sizing: border-box; }
-            
             #printable-area * { box-sizing: border-box; }
             
-            /* Шапка */
             .print-header { text-align: center; margin-bottom: 25px; }
             .print-title { font-size: 24px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
             .print-subtitle { font-size: 13px; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
             
-            /* Заголовки блоков (Красная полоса снизу) */
             .print-section { margin-bottom: 20px; }
             .print-section-title { font-size: 14px; font-weight: 800; text-transform: uppercase; color: #B9040A; border-bottom: 2px solid #B9040A; padding-bottom: 5px; margin-bottom: 15px; margin-top: 25px; }
             
-            /* Строка анкеты (Текст слева, подчеркивание справа) */
             .print-row { display: flex; align-items: flex-end; margin-bottom: 14px; line-height: 1.2; }
             .print-label { font-size: 14px; font-weight: 600; margin-right: 10px; color: #222; white-space: nowrap; }
-            
-            /* Поле для заполнения (Подчеркнутое) */
             .print-value { flex-grow: 1; border-bottom: 1px solid #777; min-height: 22px; padding-bottom: 2px; padding-left: 5px; font-size: 15px; font-weight: 700; color: #000; }
-            .print-value.empty { border-bottom: 1px dotted #999; } /* Пустое поле будет пунктиром */
+            .print-value.empty { border-bottom: 1px dotted #999; }
             
-            /* Большие текстовые блоки (Описание проблемы) */
             .print-block-label { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #222; }
             .print-block-value { border: 1px solid #777; border-radius: 6px; padding: 12px; min-height: 100px; font-size: 14px; font-weight: 500; white-space: pre-wrap; background: #fafafa !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             .print-block-value.empty { border: 1px dotted #999; background: transparent !important; }
             
-            /* Подписи */
-            .print-signatures { display: flex; justify-content: space-between; margin-top: 50px; page-break-inside: avoid; }
+            .print-signatures { display: flex; justify-content: space-between; margin-top: 40px; page-break-inside: avoid; }
             .sig-box { width: 45%; }
             .sig-line { border-bottom: 1px solid #000; height: 30px; margin-bottom: 5px; }
             .sig-text { font-size: 12px; text-align: center; color: #555; }
         }
     </style>
+    <script>
+        if (!localStorage.getItem('crm_token')) window.location.href = '/login.html';
+        document.addEventListener("DOMContentLoaded", () => {
+            try {
+                const token = localStorage.getItem('crm_token');
+                if(token) {
+                    const payload = JSON.parse(atob(token.split('.')[1]));
+                    if (payload.permissions && payload.permissions.is_admin) {
+                        document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('admin-only'));
+                    }
+                }
+            } catch(e) {}
+        });
+    </script>
 </head>
 <body class="bg-light">
 
@@ -118,7 +122,7 @@
     </div>
 
     <div class="modal fade" id="add-modal" tabindex="-1" data-bs-backdrop="static">
-        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header border-0 pb-0">
                     <h5 class="modal-title fw-bold" id="add-modal-title">Оформление рекламации</h5>
@@ -134,25 +138,25 @@
                                 <label class="form-label small fw-bold text-muted">Дилер *</label>
                                 <select id="r_dealer" class="form-select" required><option value="">Загрузка...</option></select>
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-3">
                                 <label class="form-label small fw-bold text-muted">Дата подачи</label>
                                 <input type="date" id="r_date" class="form-control" required>
                             </div>
-                            <div class="col-12">
-                                <label class="form-label small fw-bold text-muted">Товар (Декор) *</label>
-                                <input type="text" id="r_product" class="form-control" list="products-datalist" placeholder="Начните вводить артикул или название..." required autocomplete="off">
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label small fw-bold text-muted">Номер накладной</label>
-                                <input type="text" id="r_invoice" class="form-control" placeholder="№ 12345">
-                            </div>
-                            <div class="col-md-6">
+                            <div class="col-md-3">
                                 <label class="form-label small fw-bold text-muted">Дата покупки клиентом</label>
                                 <input type="date" id="r_purchase_date" class="form-control">
                             </div>
+                            <div class="col-md-8">
+                                <label class="form-label small fw-bold text-muted">Товар (Название / Артикул) *</label>
+                                <input type="text" id="r_product" class="form-control" list="products-datalist" placeholder="Начните вводить артикул..." required autocomplete="off">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted">Номер накладной</label>
+                                <input type="text" id="r_invoice" class="form-control" placeholder="№ 12345">
+                            </div>
                         </div>
 
-                        <h6 class="fw-bold text-primary mt-4 border-bottom pb-2">2. Данные клиента и объекта</h6>
+                        <h6 class="fw-bold text-primary mt-4 border-bottom pb-2">2. Данные объекта и клиента</h6>
                         <div class="row g-3 mb-3">
                             <div class="col-md-6">
                                 <label class="form-label small fw-bold text-muted">ФИО клиента</label>
@@ -170,27 +174,27 @@
                                 <label class="form-label small fw-bold text-muted">Этаж</label>
                                 <input type="text" id="r_floor" class="form-control" placeholder="Например: 5">
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label small fw-bold text-muted">Тип дома</label>
+                            <div class="col-md-3">
+                                <label class="form-label small fw-bold text-muted">Тип помещения</label>
                                 <select id="r_house_type" class="form-select">
                                     <option value="Многоэтажный">Многоэтажный дом</option>
                                     <option value="Частный">Частный дом / Коттедж</option>
                                     <option value="Коммерция">Коммерческое помещение</option>
                                 </select>
                             </div>
+                            <div class="col-md-3">
+                                <label class="form-label small fw-bold text-muted">Общая пл. помещения</label>
+                                <input type="text" id="r_total_area" class="form-control" placeholder="Напр: 100 м²">
+                            </div>
                             <div class="col-md-6">
-                                <label class="form-label small fw-bold text-muted">Кто монтировал?</label>
-                                <select id="r_installer" class="form-select">
-                                    <option value="Мастер дилера">Профессиональный мастер (от дилера)</option>
-                                    <option value="Сам клиент">Сам клиент</option>
-                                    <option value="Сторонняя бригада">Сторонняя бригада</option>
-                                </select>
+                                <label class="form-label small fw-bold text-primary">Купленный объем (Товара)</label>
+                                <input type="text" id="r_purchased_volume" class="form-control border-primary" placeholder="Сколько всего м² или упаковок купили" required>
                             </div>
                         </div>
 
-                        <h6 class="fw-bold text-primary mt-4 border-bottom pb-2">3. Технические нюансы</h6>
+                        <h6 class="fw-bold text-primary mt-4 border-bottom pb-2">3. Технические нюансы (Крайне важно)</h6>
                         <div class="row g-3 mb-3">
-                            <div class="col-md-6">
+                            <div class="col-md-3">
                                 <label class="form-label small fw-bold text-muted">Тип основания</label>
                                 <select id="r_base_type" class="form-select">
                                     <option value="Стяжка">Бетонная стяжка</option>
@@ -200,43 +204,60 @@
                                     <option value="Прочее">Прочее</option>
                                 </select>
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label small fw-bold text-muted">Подложка (тип и толщина)</label>
-                                <input type="text" id="r_underlayment" class="form-control" placeholder="Напр: Листовая 3мм">
+                            <div class="col-md-3">
+                                <label class="form-label small fw-bold text-muted" title="Например: 14 дней">Время сушки пола</label>
+                                <input type="text" id="r_drying_time" class="form-control" placeholder="Напр: 14 дней">
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label small fw-bold text-muted text-danger">Система "Теплый пол"</label>
+                            <div class="col-md-3">
+                                <label class="form-label small fw-bold text-muted" title="Норма: 2мм на 1 метр">Ровность (Перепад)</label>
+                                <input type="text" id="r_floor_flatness" class="form-control" placeholder="Напр: 2 мм на 1м">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small fw-bold text-danger">Система "Теплый пол"</label>
                                 <select id="r_warm_floor" class="form-select border-danger">
                                     <option value="Нет">Нет</option>
                                     <option value="Водяной">Водяной</option>
                                     <option value="Электрический кабель">Электрический (кабель)</option>
-                                    <option value="Инфракрасный">Инфракрасная пленка</option>
+                                    <option value="Инфракрасный пленка">Инфракрасная пленка</option>
                                 </select>
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label small fw-bold text-muted">Номера партий</label>
-                                <div id="batch-list" class="d-flex flex-column gap-1 mb-1">
-                                    <input type="text" class="form-control form-control-sm batch-input" placeholder="Номер партии">
-                                </div>
-                                <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none" onclick="addBatchInput()">+ Добавить партию</button>
+
+                            <div class="col-md-3">
+                                <label class="form-label small fw-bold text-muted">Акклиматизация</label>
+                                <input type="text" id="r_acclimatization" class="form-control" placeholder="Напр: 48 часов">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small fw-bold text-muted">Способ хранения</label>
+                                <select id="r_storage" class="form-select">
+                                    <option value="Горизонтально">Горизонтально (Правильно)</option>
+                                    <option value="Вертикально">Вертикально (Запрещено)</option>
+                                    <option value="Неизвестно">Неизвестно</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small fw-bold text-muted">Используемая подложка</label>
+                                <input type="text" id="r_underlayment" class="form-control" placeholder="Напр: Листовая 3мм">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small fw-bold text-muted">Кто монтировал?</label>
+                                <select id="r_installer" class="form-select">
+                                    <option value="Мастер дилера">Профессиональный мастер (от дилера)</option>
+                                    <option value="Сам клиент">Сам клиент</option>
+                                    <option value="Сторонняя бригада">Сторонняя бригада</option>
+                                </select>
                             </div>
                         </div>
 
                         <h6 class="fw-bold text-primary mt-4 border-bottom pb-2">4. Суть претензии</h6>
                         <div class="row g-3 mb-3">
                             <div class="col-md-6">
-                                <label class="form-label small fw-bold text-muted">Общая квадратура</label>
-                                <input type="text" id="r_total_area" class="form-control" placeholder="100 м²">
+                                <label class="form-label small fw-bold text-muted">Номера партий с коробок</label>
+                                <div id="batch-list" class="d-flex flex-column gap-1 mb-1">
+                                    <input type="text" class="form-control form-control-sm batch-input" placeholder="Номер партии">
+                                </div>
+                                <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none" onclick="addBatchInput()">+ Добавить партию</button>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label small fw-bold text-muted text-danger">Объем брака</label>
-                                <input type="text" id="r_defect_volume" class="form-control border-danger" placeholder="Напр: 5 м² (или 2 пачки)" required>
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label small fw-bold text-muted">Подробное описание проблемы *</label>
-                                <textarea id="r_description" class="form-control" rows="3" placeholder="Сломаны замки, вздутие, царапины..." required></textarea>
-                            </div>
-                            <div class="col-12">
                                 <label class="form-label small fw-bold text-muted">Требование клиента</label>
                                 <select id="r_client_demand" class="form-select">
                                     <option value="Замена товара">Замена товара</option>
@@ -245,6 +266,11 @@
                                     <option value="Доукомплектовка">Доукомплектовка</option>
                                 </select>
                             </div>
+                            <div class="col-12">
+                                <label class="form-label small fw-bold text-muted">Подробное описание проблемы (Что именно не так, где дефект) *</label>
+                                <textarea id="r_description" class="form-control" rows="3" placeholder="Сломаны замки, вздутие, царапины..." required></textarea>
+                            </div>
+                            
                             <div class="col-12 mt-3">
                                 <label class="form-label small fw-bold text-muted">Фотографии / Видео брака</label>
                                 <input type="file" id="r_photos" class="form-control form-control-sm" multiple accept="image/*, video/*">
@@ -263,7 +289,7 @@
     </div>
 
     <div class="modal fade" id="view-modal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title fw-bold" id="v_title">Рекламация</h5>
