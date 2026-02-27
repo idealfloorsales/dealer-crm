@@ -391,7 +391,12 @@ app.post('/api/reclamations', checkWrite, async (req, res) => {
         res.json(convertToClient(r)); 
     } catch(e) { res.status(500).json({error: e.message}); }
 });
-
+app.put('/api/reclamations/:id', checkWrite, async (req, res) => {
+    try { 
+        const r = await Reclamation.findByIdAndUpdate(req.params.id, req.body, { new: true }); 
+        res.json(convertToClient(r)); 
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
 app.delete('/api/reclamations/:id', checkWrite, async (req, res) => {
     try { 
         await Reclamation.findByIdAndDelete(req.params.id); 
@@ -400,5 +405,6 @@ app.delete('/api/reclamations/:id', checkWrite, async (req, res) => {
 });
 
 app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
+
 
 
