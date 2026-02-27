@@ -70,6 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(e) {}
     }
 
+    // --- ОБНОВЛЕННЫЙ РЕНДЕР КАРТОЧЕК В СПИСКЕ ---
     function renderList() {
         const query = searchInput.value.toLowerCase();
         const filtered = allReclamations.filter(r => 
@@ -86,25 +87,41 @@ document.addEventListener('DOMContentLoaded', () => {
             const dateStr = new Date(r.createdAt || r.date).toLocaleDateString('ru-RU');
             const imgBadge = r.photos && r.photos.length > 0 ? `<i class="bi bi-image text-brand ms-2"></i> ${r.photos.length}` : '';
             const seqNumStr = String(filtered.length - index).padStart(3, '0');
-            const resBadge = r.resolution ? `<span class="badge bg-success ms-2">Решено</span>` : '';
+            
+            // Статус (решено или в работе)
+            const statusBadge = r.resolution 
+                ? `<span class="badge bg-success rounded-pill px-2 py-1"><i class="bi bi-check2-all"></i> Решено</span>` 
+                : `<span class="badge bg-warning text-dark rounded-pill px-2 py-1"><i class="bi bi-hourglass-split"></i> В работе</span>`;
+
+            // Краткое описание проблемы для карточки (обрезаем длинный текст)
+            const shortDesc = r.description ? (r.description.length > 60 ? r.description.substring(0, 60) + '...' : r.description) : 'Нет описания';
+            
+            // Тег требования клиента
+            const demandTag = r.clientDemand ? `<span class="badge bg-light text-dark border">${r.clientDemand}</span>` : '';
 
             return `
-            <div class="card border-0 shadow-sm rounded-4 cursor-pointer" onclick="viewReclamation('${r.id}')" style="cursor: pointer;">
+            <div class="card border-0 shadow-sm rounded-4 cursor-pointer mb-3" onclick="viewReclamation('${r.id}')" style="cursor: pointer; transition: transform 0.2s;">
                 <div class="card-body p-3">
                     <div class="d-flex justify-content-between align-items-start mb-2">
-                        <h6 class="fw-bold text-dark mb-0 text-truncate" style="max-width: 70%;">
+                        <h6 class="fw-bold text-dark mb-0 text-truncate" style="max-width: 65%;">
                             <span class="text-muted fw-normal me-1">№${seqNumStr}</span> 
                             ${r.dealerName || 'Неизвестный дилер'}
-                            ${resBadge}
                         </h6>
-                        <small class="text-muted">${dateStr}</small>
+                        <div>${statusBadge}</div>
                     </div>
-                    <div class="small text-secondary mb-2">
-                        <i class="bi bi-box-seam me-1"></i> <span class="fw-bold">${r.productName}</span>
+                    
+                    <div class="mb-2">
+                        <div class="small text-secondary mb-1"><i class="bi bi-box-seam me-1"></i> <span class="fw-bold text-dark">${r.productName}</span></div>
+                        <div class="small text-brand fw-bold"><i class="bi bi-cart-check me-1"></i> Куплено: ${r.purchasedVolume || '-'}</div>
                     </div>
+
+                    <div class="small text-muted mb-2 fst-italic border-start border-2 border-danger ps-2" style="font-size: 0.8rem; line-height: 1.3;">
+                        "${shortDesc}"
+                    </div>
+
                     <div class="d-flex justify-content-between align-items-end mt-2 pt-2 border-top">
-                        <div class="small text-brand fw-bold"><i class="bi bi-exclamation-triangle"></i> Брак: ${r.defectVolume}</div>
-                        <div class="small text-muted">${imgBadge}</div>
+                        <div>${demandTag}</div>
+                        <div class="small text-muted">${dateStr} ${imgBadge}</div>
                     </div>
                 </div>
             </div>`;
@@ -162,7 +179,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('r_drying_time').value = r.dryingTime || '';
         document.getElementById('r_floor_flatness').value = r.floorFlatness || '';
 
-        // Новые поля
         document.getElementById('r_defect_moment').value = r.defectMoment || '';
         document.getElementById('r_defect_volume').value = r.defectVolume || '';
         document.getElementById('r_description').value = r.description || '';
@@ -290,6 +306,7 @@ document.addEventListener('DOMContentLoaded', () => {
         finally { btn.disabled = false; btn.innerHTML = '<i class="bi bi-send me-2"></i>Сохранить'; }
     });
 
+    // --- ОБНОВЛЕННОЕ ОКНО ПРОСМОТРА ---
     window.viewReclamation = (id) => {
         const r = allReclamations.find(x => x.id === id);
         if(!r) return;
@@ -310,14 +327,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 `</div></div>`;
         }
 
+        const pDate = r.purchaseDate ? new Date(r.purchaseDate).toLocaleDateString('ru-RU') : '-';
+
         document.getElementById('view-body').innerHTML = `
+            
             <div class="card border-0 mb-3"><div class="card-body p-3">
                 <p class="mb-1 small text-muted">Товар / Артикул</p>
-                <h6 class="fw-bold text-dark">${r.productName}</h6>
-                <div class="d-flex gap-3 mt-2">
-                    <div><small class="text-muted d-block">Площадь:</small><span class="fw-bold">${r.totalArea || '-'}</span></div>
-                    <div><small class="text-primary d-block">Куплено:</small><span class="fw-bold">${r.purchasedVolume || '-'}</span></div>
-                    <div><small class="text-danger d-block">Объем брака:</small><span class="fw-bold text-danger">${r.defectVolume || '-'}</span></div>
+                <h5 class="fw-bold text-dark">${r.productName}</h5>
+                <div class="d-flex gap-4 mt-3">
+                    <div><small class="text-muted d-block">Куплено:</small><span class="fw-bold fs-6">${r.purchasedVolume || '-'}</span></div>
+                    <div><small class="text-danger d-block">Брак заявлен:</small><span class="fw-bold fs-6 text-danger">${r.defectVolume || '-'}</span></div>
+                    <div><small class="text-muted d-block">Площадь объекта:</small><span class="fw-bold fs-6">${r.totalArea || '-'}</span></div>
+                </div>
+            </div></div>
+
+            <div class="card border-0 mb-3"><div class="card-body p-3">
+                <h6 class="fw-bold border-bottom pb-2 mb-2 text-brand">Данные покупки и клиент</h6>
+                <div class="row g-2 small">
+                    <div class="col-6"><span class="text-muted">Накладная:</span> <br><b>${r.invoiceNumber || '-'}</b></div>
+                    <div class="col-6"><span class="text-muted">Дата покупки:</span> <br><b>${pDate}</b></div>
+                    <div class="col-12 mt-2"><span class="text-muted">Клиент:</span> <b>${r.clientName || '-'}</b> ${r.clientPhone ? `(${r.clientPhone})` : ''}</div>
+                    <div class="col-12"><span class="text-muted">Адрес:</span> <b>${r.address || '-'}</b> ${r.floor ? `, этаж ${r.floor}` : ''}</div>
                 </div>
             </div></div>
 
@@ -358,7 +388,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="card-body p-3">
                     <div class="d-flex justify-content-between align-items-start">
                         <h6 class="fw-bold text-success mb-2">Принятое решение</h6>
-                        ${r.compensationAmount ? `<span class="badge bg-success">${r.compensationAmount} ₸</span>` : ''}
+                        ${r.compensationAmount ? `<span class="badge bg-success fs-6">${r.compensationAmount} ₸</span>` : ''}
                     </div>
                     <p class="small mb-0 text-dark fw-medium">${r.resolution ? r.resolution : '<span class="text-muted fw-normal fst-italic">Решение еще не заполнено...</span>'}</p>
                 </div>
@@ -381,10 +411,11 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // ==========================================
-    // ЛОГИКА ПЕЧАТИ (ОДНОСТРОЧНЫЙ ДИЗАЙН "АНКЕТА")
+    // ЛОГИКА ПЕЧАТИ
     // ==========================================
     function generatePrintHTML(data) {
         const d = data || {};
+        
         const val = (v) => v ? `<div class="print-value">${v}</div>` : `<div class="print-value empty"></div>`;
         const blockVal = (v) => v ? `<div class="print-block-value">${v}</div>` : `<div class="print-block-value empty"></div>`;
         
