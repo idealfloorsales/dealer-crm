@@ -9,7 +9,6 @@
     <link rel="stylesheet" href="style.css?v={{VER}}"> 
     <link rel="icon" href="favicon.gif" type="image/gif">
     <style>
-        /* === ФИРМЕННЫЕ КРАСНЫЕ ЦВЕТА (ВМЕСТО СИНЕГО) === */
         :root { --bs-primary: #B9040A; --bs-primary-rgb: 185, 4, 10; }
         .text-brand { color: #B9040A !important; }
         .bg-brand { background-color: #B9040A !important; color: white !important; }
@@ -37,9 +36,7 @@
         .photo-preview-item img { width: 100%; height: 100%; object-fit: cover; }
         .btn-remove-photo { position: absolute; top: 2px; right: 2px; background: rgba(255,0,0,0.8); color: white; border: none; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 12px; cursor: pointer; }
 
-        /* ========================================= */
-        /* ИДЕАЛЬНЫЙ ДИЗАЙН ПЕЧАТИ (ФОРМА-АНКЕТА)    */
-        /* ========================================= */
+        /* ПЕЧАТЬ */
         #printable-area { display: none; }
         @media print {
             @page { size: A4 portrait; margin: 0; }
@@ -47,23 +44,18 @@
             body.printing > * { display: none !important; }
             body.printing #printable-area { display: block !important; position: static !important; width: 100%; color: #000; padding: 15mm 20mm !important; box-sizing: border-box; }
             #printable-area * { box-sizing: border-box; }
-            
             .print-header { text-align: center; margin-bottom: 25px; }
             .print-title { font-size: 24px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
             .print-subtitle { font-size: 13px; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
-            
             .print-section { margin-bottom: 20px; }
             .print-section-title { font-size: 14px; font-weight: 800; text-transform: uppercase; color: #B9040A; border-bottom: 2px solid #B9040A; padding-bottom: 5px; margin-bottom: 15px; margin-top: 25px; }
-            
             .print-row { display: flex; align-items: flex-end; margin-bottom: 14px; line-height: 1.2; }
             .print-label { font-size: 14px; font-weight: 600; margin-right: 10px; color: #222; white-space: nowrap; }
             .print-value { flex-grow: 1; border-bottom: 1px solid #777; min-height: 22px; padding-bottom: 2px; padding-left: 5px; font-size: 15px; font-weight: 700; color: #000; }
             .print-value.empty { border-bottom: 1px dotted #999; }
-            
             .print-block-label { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #222; }
             .print-block-value { border: 1px solid #777; border-radius: 6px; padding: 12px; min-height: 80px; font-size: 14px; font-weight: 500; white-space: pre-wrap; background: #fafafa !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             .print-block-value.empty { border: 1px dotted #999; background: transparent !important; }
-            
             .print-signatures { display: flex; justify-content: space-between; margin-top: 40px; page-break-inside: avoid; }
             .sig-box { width: 45%; }
             .sig-line { border-bottom: 1px solid #000; height: 30px; margin-bottom: 5px; }
@@ -186,11 +178,7 @@
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label small fw-bold text-muted">Тип помещения</label>
-                                <select id="r_house_type" class="form-select">
-                                    <option value="Многоэтажный">Многоэтажный дом</option>
-                                    <option value="Частный">Частный дом / Коттедж</option>
-                                    <option value="Коммерция">Коммерческое помещение</option>
-                                </select>
+                                <input type="text" id="r_house_type" class="form-control" list="house-type-list" placeholder="Многоэтажный" autocomplete="off">
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label small fw-bold text-muted">Общая пл. помещения</label>
@@ -206,30 +194,19 @@
                         <div class="row g-3 mb-3">
                             <div class="col-md-3">
                                 <label class="form-label small fw-bold text-muted">Тип основания</label>
-                                <select id="r_base_type" class="form-select">
-                                    <option value="Стяжка">Бетонная стяжка</option>
-                                    <option value="Наливной пол">Наливной пол</option>
-                                    <option value="Фанера/OSB">Фанера / OSB</option>
-                                    <option value="Старый линолеум">Старый линолеум</option>
-                                    <option value="Прочее">Прочее</option>
-                                </select>
+                                <input type="text" id="r_base_type" class="form-control" list="base-type-list" placeholder="Стяжка" autocomplete="off">
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label small fw-bold text-muted" title="Например: 14 дней">Время сушки пола</label>
+                                <label class="form-label small fw-bold text-muted">Время сушки пола</label>
                                 <input type="text" id="r_drying_time" class="form-control" placeholder="Напр: 14 дней">
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label small fw-bold text-muted" title="Норма: 2мм на 1 метр">Ровность (Перепад)</label>
+                                <label class="form-label small fw-bold text-muted">Ровность (Перепад)</label>
                                 <input type="text" id="r_floor_flatness" class="form-control" placeholder="Напр: 2 мм на 1м">
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label small fw-bold text-danger">Система "Теплый пол"</label>
-                                <select id="r_warm_floor" class="form-select border-danger">
-                                    <option value="Нет">Нет</option>
-                                    <option value="Водяной">Водяной</option>
-                                    <option value="Электрический кабель">Электрический (кабель)</option>
-                                    <option value="Инфракрасная пленка">Инфракрасная пленка</option>
-                                </select>
+                                <input type="text" id="r_warm_floor" class="form-control border-danger" list="warm-floor-list" placeholder="Нет" autocomplete="off">
                             </div>
 
                             <div class="col-md-3">
@@ -238,11 +215,7 @@
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label small fw-bold text-muted">Способ хранения</label>
-                                <select id="r_storage" class="form-select">
-                                    <option value="Горизонтально">Горизонтально (Правильно)</option>
-                                    <option value="Вертикально">Вертикально (Запрещено)</option>
-                                    <option value="Неизвестно">Неизвестно</option>
-                                </select>
+                                <input type="text" id="r_storage" class="form-control" list="storage-list" placeholder="Горизонтально" autocomplete="off">
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label small fw-bold text-muted">Используемая подложка</label>
@@ -250,34 +223,34 @@
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label small fw-bold text-muted">Кто монтировал?</label>
-                                <select id="r_installer" class="form-select">
-                                    <option value="Мастер дилера">Профессиональный мастер (от дилера)</option>
-                                    <option value="Сам клиент">Сам клиент</option>
-                                    <option value="Сторонняя бригада">Сторонняя бригада</option>
-                                </select>
+                                <input type="text" id="r_installer" class="form-control" list="installer-list" placeholder="Сам клиент" autocomplete="off">
                             </div>
                         </div>
 
                         <h6 class="fw-bold text-brand mt-4 border-bottom pb-2">4. Суть претензии</h6>
                         <div class="row g-3 mb-3">
-                            <div class="col-md-6">
-                                <label class="form-label small fw-bold text-muted">Номера партий с коробок</label>
+                            <div class="col-md-3">
+                                <label class="form-label small fw-bold text-muted">Момент выявления дефекта</label>
+                                <input type="text" id="r_defect_moment" class="form-control" list="defect-moment-list" placeholder="Когда выявили?" autocomplete="off">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small fw-bold text-danger">Объем брака</label>
+                                <input type="text" id="r_defect_volume" class="form-control border-danger" placeholder="Напр: 5 м²" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small fw-bold text-muted">Номера партий</label>
                                 <div id="batch-list" class="d-flex flex-column gap-1 mb-1">
                                     <input type="text" class="form-control form-control-sm batch-input" placeholder="Номер партии">
                                 </div>
-                                <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none text-brand" onclick="addBatchInput()">+ Добавить партию</button>
+                                <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none text-brand" onclick="addBatchInput()">+ Добавить</button>
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-3">
                                 <label class="form-label small fw-bold text-muted">Требование клиента</label>
-                                <select id="r_client_demand" class="form-select">
-                                    <option value="Замена товара">Замена товара</option>
-                                    <option value="Возврат денег">Возврат денег</option>
-                                    <option value="Денежная компенсация (скидка)">Денежная компенсация (скидка)</option>
-                                    <option value="Доукомплектовка">Доукомплектовка</option>
-                                </select>
+                                <input type="text" id="r_client_demand" class="form-control" list="client-demand-list" placeholder="Замена товара" autocomplete="off">
                             </div>
+
                             <div class="col-12">
-                                <label class="form-label small fw-bold text-muted">Подробное описание проблемы (Что именно не так, где дефект) *</label>
+                                <label class="form-label small fw-bold text-muted">Подробное описание проблемы *</label>
                                 <textarea id="r_description" class="form-control" rows="3" placeholder="Сломаны замки, вздутие, царапины..." required></textarea>
                             </div>
                             <div class="col-12 mt-3">
@@ -287,11 +260,22 @@
                             </div>
                         </div>
 
-                        <h6 class="fw-bold text-success mt-4 border-bottom pb-2">5. Решение (Официальный ответ)</h6>
+                        <h6 class="fw-bold text-success mt-4 border-bottom pb-2">5. Решение и Компенсация</h6>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-9">
+                                <label class="form-label small fw-bold text-muted">Официальное решение (Видно клиенту)</label>
+                                <textarea id="r_resolution" class="form-control border-success" rows="2" placeholder="Например: Одобрена замена 2-х пачек."></textarea>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small fw-bold text-success">Сумма компенсации (₸)</label>
+                                <input type="number" id="r_compensation_amount" class="form-control border-success" placeholder="0">
+                            </div>
+                        </div>
+
+                        <h6 class="fw-bold text-warning mt-4 border-bottom pb-2">6. Служебные заметки (Не для печати)</h6>
                         <div class="row g-3 mb-3">
                             <div class="col-12">
-                                <label class="form-label small fw-bold text-muted">Какое решение было принято заводом/руководством?</label>
-                                <textarea id="r_resolution" class="form-control border-success" rows="3" placeholder="Например: Одобрена замена 2-х пачек. Выдано со склада 20.10.2023."></textarea>
+                                <textarea id="r_internal_notes" class="form-control bg-warning bg-opacity-10 border-warning" rows="2" placeholder="Скрытые комментарии для менеджеров..."></textarea>
                             </div>
                         </div>
 
@@ -326,7 +310,45 @@
     </div>
 
     <button id="mobile-fab-add" class="d-lg-none" onclick="openAddModal()"><i class="bi bi-plus-lg"></i></button>
+    
     <datalist id="products-datalist"></datalist>
+    <datalist id="house-type-list">
+        <option value="Многоэтажный дом">
+        <option value="Частный дом / Коттедж">
+        <option value="Коммерческое помещение">
+    </datalist>
+    <datalist id="base-type-list">
+        <option value="Бетонная стяжка">
+        <option value="Наливной пол">
+        <option value="Фанера / OSB">
+        <option value="Старый линолеум">
+    </datalist>
+    <datalist id="warm-floor-list">
+        <option value="Нет">
+        <option value="Водяной">
+        <option value="Электрический (кабель)">
+        <option value="Инфракрасная пленка">
+    </datalist>
+    <datalist id="storage-list">
+        <option value="Горизонтально (Правильно)">
+        <option value="Вертикально (Запрещено)">
+    </datalist>
+    <datalist id="installer-list">
+        <option value="Профессиональный мастер (от дилера)">
+        <option value="Сам клиент">
+        <option value="Сторонняя бригада">
+    </datalist>
+    <datalist id="defect-moment-list">
+        <option value="До укладки (в пачке)">
+        <option value="В процессе монтажа">
+        <option value="В процессе эксплуатации">
+    </datalist>
+    <datalist id="client-demand-list">
+        <option value="Замена товара">
+        <option value="Возврат денег">
+        <option value="Скидка / Компенсация">
+        <option value="Доукомплектовка">
+    </datalist>
 
     <div id="printable-area"></div>
 
