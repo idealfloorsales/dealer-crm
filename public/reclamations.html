@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CRM - Рекламации</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="style.css?v={{VER}}"> 
+    <link rel="icon" href="favicon.gif" type="image/gif">
+    <style>
+        body { padding-bottom: 80px; }
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255, 255, 255, 0.98); backdrop-filter: blur(10px); border-top: 1px solid #eee; z-index: 1050; padding-bottom: env(safe-area-inset-bottom); box-shadow: 0 -5px 20px rgba(0,0,0,0.05); }
+        .bottom-nav-item { text-align: center; color: #adb5bd; padding: 10px 0; text-decoration: none; flex: 1; transition: color 0.2s; }
+        .bottom-nav-item.active { color: #B9040A; }
+        .bottom-nav-item i { font-size: 1.4rem; display: block; margin-bottom: 2px; }
+        .bottom-nav-item span { font-size: 0.65rem; font-weight: 600; }
+        .desktop-nav { display: flex; }
+        @media (max-width: 991px) {
+            .desktop-nav { display: none !important; }
+            .container { padding-left: 15px; padding-right: 15px; }
+            #mobile-fab-add { position: fixed; bottom: 90px; right: 20px; width: 56px; height: 56px; border-radius: 50%; background: #B9040A; color: white; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(185, 4, 10, 0.4); z-index: 1040; font-size: 24px; border: none; }
+        }
+        .admin-only { display: none !important; }
+        .photo-preview-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+        .photo-preview-item { position: relative; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; border: 1px solid #ddd; }
+        .photo-preview-item img { width: 100%; height: 100%; object-fit: cover; }
+        .btn-remove-photo { position: absolute; top: 2px; right: 2px; background: rgba(255,0,0,0.8); color: white; border: none; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 12px; cursor: pointer; }
+    </style>
+    <script>
+        if (!localStorage.getItem('crm_token')) window.location.href = '/login.html';
+        document.addEventListener("DOMContentLoaded", () => {
+            try {
+                const token = localStorage.getItem('crm_token');
+                if(token) {
+                    const payload = JSON.parse(atob(token.split('.')[1]));
+                    if (payload.permissions && payload.permissions.is_admin) {
+                        document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('admin-only'));
+                    }
+                }
+            } catch(e) {}
+        });
+    </script>
+</head>
+<body class="bg-light">
+
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-4 desktop-nav">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/"><img src="logo.png" alt="Logo" height="40"></a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"><span class="navbar-toggler-icon"></span></button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item"><a class="nav-link" href="/">Дилеры</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/map.html">Карта</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/products.html">Матрица</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/report.html">Выставленность</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/sales.html">Продажи</a></li>
+                    <li class="nav-item"><a class="nav-link active fw-bold text-primary" href="/reclamations.html">Рекламации</a></li>
+                    <li class="nav-item admin-only"><a class="nav-link text-primary fw-bold" href="/users.html">Сотрудники</a></li>
+                </ul>
+                <button id="logout-btn" class="btn btn-sm btn-outline-danger">Выход</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3 fw-bold mb-0">Реестр рекламаций</h1>
+            <button class="btn btn-primary shadow-sm d-none d-lg-block" onclick="openAddModal()">
+                <i class="bi bi-plus-lg me-2"></i>Новая рекламация
+            </button>
+        </div>
+
+        <div class="bg-white p-3 rounded-4 shadow-sm mb-4 border border-light">
+            <div class="input-group">
+                <span class="input-group-text bg-light border-end-0"><i class="bi bi-search"></i></span>
+                <input type="text" id="search-input" class="form-control border-start-0 bg-light" placeholder="Поиск по дилеру или товару...">
+            </div>
+        </div>
+
+        <div id="reclamations-list" class="d-flex flex-column gap-3">
+            <p class="text-center text-muted mt-5"><span class="spinner-border spinner-border-sm"></span> Загрузка...</p>
+        </div>
+    </div>
+
+    <div class="modal fade" id="add-modal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold">Оформление рекламации</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="reclamation-form">
+                        
+                        <h6 class="fw-bold text-primary mt-2 border-bottom pb-2">1. Общая информация</h6>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">Дилер *</label>
+                                <select id="r_dealer" class="form-select" required><option value="">Загрузка...</option></select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">Дата подачи</label>
+                                <input type="date" id="r_date" class="form-control" required>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small fw-bold text-muted">Товар (Декор) *</label>
+                                <input type="text" id="r_product" class="form-control" list="products-datalist" placeholder="Начните вводить артикул или название..." required autocomplete="off">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">Номер накладной</label>
+                                <input type="text" id="r_invoice" class="form-control" placeholder="№ 12345">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">Дата покупки клиентом</label>
+                                <input type="date" id="r_purchase_date" class="form-control">
+                            </div>
+                        </div>
+
+                        <h6 class="fw-bold text-primary mt-4 border-bottom pb-2">2. Данные клиента и объекта</h6>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">ФИО клиента</label>
+                                <input type="text" id="r_client_name" class="form-control" placeholder="Иванов И.И.">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">Телефон клиента</label>
+                                <input type="text" id="r_client_phone" class="form-control" placeholder="+7 777 ...">
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label small fw-bold text-muted">Адрес объекта</label>
+                                <input type="text" id="r_address" class="form-control" placeholder="Улица, дом...">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted">Этаж</label>
+                                <input type="text" id="r_floor" class="form-control" placeholder="Например: 5">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">Тип дома</label>
+                                <select id="r_house_type" class="form-select">
+                                    <option value="Многоэтажный">Многоэтажный дом</option>
+                                    <option value="Частный">Частный дом / Коттедж</option>
+                                    <option value="Коммерция">Коммерческое помещение</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">Кто монтировал?</label>
+                                <select id="r_installer" class="form-select">
+                                    <option value="Мастер дилера">Профессиональный мастер (от дилера)</option>
+                                    <option value="Сам клиент">Сам клиент</option>
+                                    <option value="Сторонняя бригада">Сторонняя бригада</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <h6 class="fw-bold text-primary mt-4 border-bottom pb-2">3. Технические нюансы</h6>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">Тип основания</label>
+                                <select id="r_base_type" class="form-select">
+                                    <option value="Стяжка">Бетонная стяжка</option>
+                                    <option value="Наливной пол">Наливной пол</option>
+                                    <option value="Фанера/OSB">Фанера / OSB</option>
+                                    <option value="Старый линолеум">Старый линолеум</option>
+                                    <option value="Прочее">Прочее</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">Подложка (тип и толщина)</label>
+                                <input type="text" id="r_underlayment" class="form-control" placeholder="Напр: Листовая 3мм">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted text-danger">Система "Теплый пол"</label>
+                                <select id="r_warm_floor" class="form-select border-danger">
+                                    <option value="Нет">❌ Нет</option>
+                                    <option value="Водяной">💧 Водяной</option>
+                                    <option value="Электрический кабель">⚡ Электрический (кабель)</option>
+                                    <option value="Инфракрасный">🔥 Инфракрасная пленка</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">Номера партий</label>
+                                <div id="batch-list" class="d-flex flex-column gap-1 mb-1">
+                                    <input type="text" class="form-control form-control-sm batch-input" placeholder="Номер партии">
+                                </div>
+                                <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none" onclick="addBatchInput()">+ Добавить партию</button>
+                            </div>
+                        </div>
+
+                        <h6 class="fw-bold text-primary mt-4 border-bottom pb-2">4. Суть претензии</h6>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">Общая квадратура</label>
+                                <input type="text" id="r_total_area" class="form-control" placeholder="100 м²">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted text-danger">Объем брака</label>
+                                <input type="text" id="r_defect_volume" class="form-control border-danger" placeholder="Напр: 5 м² (или 2 пачки)" required>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small fw-bold text-muted">Подробное описание проблемы *</label>
+                                <textarea id="r_description" class="form-control" rows="3" placeholder="Сломаны замки, вздутие, царапины..." required></textarea>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small fw-bold text-muted">Требование клиента</label>
+                                <select id="r_client_demand" class="form-select">
+                                    <option value="Замена товара">Замена товара</option>
+                                    <option value="Возврат денег">Возврат денег</option>
+                                    <option value="Денежная компенсация (скидка)">Денежная компенсация (скидка)</option>
+                                    <option value="Доукомплектовка">Доукомплектовка</option>
+                                </select>
+                            </div>
+                            <div class="col-12 mt-3">
+                                <label class="form-label small fw-bold text-muted">Фотографии / Видео брака</label>
+                                <input type="file" id="r_photos" class="form-control form-control-sm" multiple accept="image/*, video/*">
+                                <div id="r_photos_preview" class="photo-preview-grid"></div>
+                            </div>
+                        </div>
+
+                    </form>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" form="reclamation-form" class="btn btn-primary rounded-pill px-4" id="btn-save"><i class="bi bi-send me-2"></i>Отправить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="view-modal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="v_title">Рекламация</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body bg-light" id="view-body">
+                    </div>
+            </div>
+        </div>
+    </div>
+
+    <button id="mobile-fab-add" class="d-lg-none" onclick="openAddModal()"><i class="bi bi-plus-lg"></i></button>
+    <datalist id="products-datalist"></datalist>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="reclamations.js?v={{VER}}"></script>
+</body>
+</html>
