@@ -84,9 +84,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         listEl.innerHTML = filtered.map((r, index) => {
             const dateStr = new Date(r.createdAt || r.date).toLocaleDateString('ru-RU');
-            const imgBadge = r.photos && r.photos.length > 0 ? `<i class="bi bi-image text-primary ms-2"></i> ${r.photos.length}` : '';
+            const imgBadge = r.photos && r.photos.length > 0 ? `<i class="bi bi-image text-brand ms-2"></i> ${r.photos.length}` : '';
             const seqNumStr = String(filtered.length - index).padStart(3, '0');
             
+            // Если решение заполнено, покажем зеленую галочку
+            const resBadge = r.resolution ? `<span class="badge bg-success ms-2">Решено</span>` : '';
+
             return `
             <div class="card border-0 shadow-sm rounded-4 cursor-pointer" onclick="viewReclamation('${r.id}')" style="cursor: pointer;">
                 <div class="card-body p-3">
@@ -94,6 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <h6 class="fw-bold text-dark mb-0 text-truncate" style="max-width: 70%;">
                             <span class="text-muted fw-normal me-1">№${seqNumStr}</span> 
                             ${r.dealerName || 'Неизвестный дилер'}
+                            ${resBadge}
                         </h6>
                         <small class="text-muted">${dateStr}</small>
                     </div>
@@ -101,7 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <i class="bi bi-box-seam me-1"></i> <span class="fw-bold">${r.productName}</span>
                     </div>
                     <div class="d-flex justify-content-between align-items-end mt-2 pt-2 border-top">
-                        <div class="small text-primary fw-bold"><i class="bi bi-boxes"></i> Объем: ${r.purchasedVolume || '-'}</div>
+                        <div class="small text-brand fw-bold"><i class="bi bi-boxes"></i> Объем: ${r.purchasedVolume || '-'}</div>
                         <div class="small text-muted">${imgBadge}</div>
                     </div>
                 </div>
@@ -155,7 +159,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('r_warm_floor').value = r.warmFloor || 'Нет';
         document.getElementById('r_installer').value = r.installer || 'Сам клиент';
         
-        // Новые технические поля
         document.getElementById('r_acclimatization').value = r.acclimatization || '';
         document.getElementById('r_storage').value = r.storageMethod || 'Горизонтально';
         document.getElementById('r_drying_time').value = r.dryingTime || '';
@@ -163,6 +166,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         document.getElementById('r_description').value = r.description || '';
         document.getElementById('r_client_demand').value = r.clientDemand || 'Замена товара';
+        
+        // Поле Решения
+        document.getElementById('r_resolution').value = r.resolution || '';
 
         const batchContainer = document.getElementById('batch-list');
         batchContainer.innerHTML = '';
@@ -251,7 +257,6 @@ document.addEventListener('DOMContentLoaded', () => {
             installer: document.getElementById('r_installer').value,
             batchNumbers: batchInputs,
             
-            // Новые поля
             acclimatization: document.getElementById('r_acclimatization').value,
             storageMethod: document.getElementById('r_storage').value,
             dryingTime: document.getElementById('r_drying_time').value,
@@ -259,6 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             description: document.getElementById('r_description').value,
             clientDemand: document.getElementById('r_client_demand').value,
+            resolution: document.getElementById('r_resolution').value, // <--- Сохраняем Решение
             photos: uploadedPhotos
         };
 
@@ -302,12 +308,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 <h6 class="fw-bold text-dark">${r.productName}</h6>
                 <div class="d-flex gap-3 mt-2">
                     <div><small class="text-muted d-block">Общая площадь:</small><span class="fw-bold">${r.totalArea || '-'}</span></div>
-                    <div><small class="text-primary d-block">Купленный объем:</small><span class="fw-bold text-primary">${r.purchasedVolume || '-'}</span></div>
+                    <div><small class="text-brand d-block">Купленный объем:</small><span class="fw-bold text-brand">${r.purchasedVolume || '-'}</span></div>
                 </div>
             </div></div>
 
             <div class="card border-0 mb-3"><div class="card-body p-3">
-                <h6 class="fw-bold border-bottom pb-2 mb-2">Технические данные</h6>
+                <h6 class="fw-bold border-bottom pb-2 mb-2 text-brand">Технические данные</h6>
                 <div class="row g-2 small">
                     <div class="col-6"><span class="text-muted">Тип дома:</span> <br><b>${r.houseType || '-'}</b></div>
                     <div class="col-6"><span class="text-muted">Монтаж:</span> <br><b>${r.installer || '-'}</b></div>
@@ -325,10 +331,17 @@ document.addEventListener('DOMContentLoaded', () => {
             </div></div>
 
             <div class="card border-0 mb-3"><div class="card-body p-3">
-                <h6 class="fw-bold border-bottom pb-2 mb-2">Суть проблемы</h6>
+                <h6 class="fw-bold border-bottom pb-2 mb-2 text-brand">Суть проблемы</h6>
                 <p class="small mb-2">${r.description}</p>
-                <div class="p-2 bg-warning-subtle rounded text-dark small fw-bold">Требование: ${r.clientDemand}</div>
+                <div class="p-2 bg-light rounded text-dark small fw-bold mb-2">Требование: ${r.clientDemand}</div>
             </div></div>
+
+            <div class="card border-0 mb-3" style="background-color: #f8f9fa; border-left: 4px solid #198754 !important;">
+                <div class="card-body p-3">
+                    <h6 class="fw-bold text-success mb-2">Принятое решение</h6>
+                    <p class="small mb-0 text-dark fw-medium">${r.resolution ? r.resolution : '<span class="text-muted fw-normal fst-italic">Решение еще не заполнено...</span>'}</p>
+                </div>
+            </div>
 
             ${photosHtml}
         `;
@@ -465,6 +478,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="print-row">
                     ${val(d.clientDemand)}
                 </div>
+            </div>
+
+            <div class="print-section">
+                <div class="print-section-title">5. Решение по рекламации</div>
+                ${blockVal(d.resolution)}
             </div>
 
             <div class="print-signatures">
