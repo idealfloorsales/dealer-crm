@@ -30,13 +30,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function init() {
         document.getElementById('r_date').value = new Date().toISOString().slice(0, 10);
-        
         await Promise.all([
             fetchDealers(),
             fetchProducts(),
             fetchReclamations()
         ]);
-        
         renderList();
         setupPhotoUpload();
     }
@@ -113,10 +111,9 @@ document.addEventListener('DOMContentLoaded', () => {
         container.insertAdjacentHTML('beforeend', `<input type="text" class="form-control form-control-sm batch-input mt-1" placeholder="Номер партии">`);
     };
 
-    // Открытие модалки для НОВОЙ рекламации
     window.openAddModal = () => {
         form.reset();
-        document.getElementById('r_id').value = ''; // Очищаем ID
+        document.getElementById('r_id').value = ''; 
         document.getElementById('add-modal-title').textContent = 'Оформление рекламации';
         document.getElementById('r_date').value = new Date().toISOString().slice(0, 10);
         uploadedPhotos = [];
@@ -125,18 +122,15 @@ document.addEventListener('DOMContentLoaded', () => {
         addModal.show();
     };
 
-    // --- НОВОЕ: Открытие модалки для РЕДАКТИРОВАНИЯ ---
     window.openEditModal = () => {
         if(!currentViewId) return;
         const r = allReclamations.find(x => x.id === currentViewId);
         if(!r) return;
 
-        viewModal.hide(); // Закрываем карточку просмотра
-
-        document.getElementById('r_id').value = r.id; // Записываем ID
+        viewModal.hide(); 
+        document.getElementById('r_id').value = r.id; 
         document.getElementById('add-modal-title').textContent = 'Редактирование рекламации';
         
-        // Заполняем поля
         document.getElementById('r_dealer').value = r.dealerId || '';
         document.getElementById('r_date').value = r.date || '';
         document.getElementById('r_product').value = r.productName || '';
@@ -156,7 +150,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('r_description').value = r.description || '';
         document.getElementById('r_client_demand').value = r.clientDemand || 'Замена товара';
 
-        // Заполняем партии
         const batchContainer = document.getElementById('batch-list');
         batchContainer.innerHTML = '';
         if(r.batchNumbers && r.batchNumbers.length > 0) {
@@ -167,10 +160,8 @@ document.addEventListener('DOMContentLoaded', () => {
             batchContainer.innerHTML = `<input type="text" class="form-control form-control-sm batch-input" placeholder="Номер партии">`;
         }
 
-        // Заполняем фото
         uploadedPhotos = [...(r.photos || [])];
         renderPhotoPreviews();
-
         addModal.show();
     };
 
@@ -214,13 +205,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     window.removePhoto = (index) => { uploadedPhotos.splice(index, 1); renderPhotoPreviews(); };
 
-    // --- ОБНОВЛЕННАЯ ФОРМА СОХРАНЕНИЯ (POST или PUT) ---
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const btn = document.getElementById('btn-save');
         btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
 
-        const id = document.getElementById('r_id').value; // Проверяем ID
+        const id = document.getElementById('r_id').value; 
         const dealerSelect = document.getElementById('r_dealer');
         const dealerName = dealerSelect.options[dealerSelect.selectedIndex].text.split(' (')[0];
         const batchInputs = Array.from(document.querySelectorAll('.batch-input')).map(i => i.value.trim()).filter(Boolean);
@@ -322,49 +312,83 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // ==========================================
-    // ЛОГИКА ПЕЧАТИ
+    // ЛОГИКА ПЕЧАТИ (ОФИЦИАЛЬНЫЙ БЛАНК)
     // ==========================================
     function generatePrintHTML(data) {
         const d = data || {};
         const val = (v) => v ? `<b>${v}</b>` : '';
         
+        // ВЫЧИСЛЕНИЕ ПОРЯДКОВОГО НОМЕРА
+        let seqNumStr = '___';
+        if (d.id && allReclamations.length > 0) {
+            // Поскольку массив отсортирован по убыванию даты,
+            // индекс 0 - это последняя (самая новая) рекламация.
+            const idx = allReclamations.findIndex(x => x.id === d.id);
+            if (idx !== -1) {
+                const num = allReclamations.length - idx;
+                seqNumStr = String(num).padStart(3, '0'); // Формат 001, 002...
+            }
+        }
+
         return `
-            <div class="print-title">АКТ РЕКЛАМАЦИИ ${d.id ? '№ ' + d.id.slice(-6).toUpperCase() : ''}</div>
-            <div class="print-flex" style="margin-bottom: 20px;">
-                <div><strong>Дата:</strong> ${d.date ? new Date(d.date).toLocaleDateString('ru-RU') : '«___» ___________ 202_ г.'}</div>
-                <div><strong>Дилер (Магазин):</strong> ${val(d.dealerName)}</div>
+            <div class="print-title">Акт рекламации № ${seqNumStr}</div>
+            
+            <div class="print-flex" style="margin-bottom: 25px; font-size: 15px;">
+                <div><strong>Дата составления:</strong> ${d.date ? new Date(d.date).toLocaleDateString('ru-RU') : '«___» ___________ 202_ г.'}</div>
+                <div><strong>Дилер (Магазин):</strong> ${d.dealerName ? `<u><b>${d.dealerName}</b></u>` : '____________________________________'}</div>
             </div>
             
+            <div class="print-section-title">1. Общая информация</div>
             <table class="print-table">
-                <tr><td width="35%"><strong>Товар (Название / Артикул)</strong></td><td>${val(d.productName)}</td></tr>
-                <tr><td><strong>Номер накладной отгрузки</strong></td><td>${val(d.invoiceNumber)}</td></tr>
-                <tr><td><strong>Дата покупки клиентом</strong></td><td>${d.purchaseDate ? `<b>${new Date(d.purchaseDate).toLocaleDateString('ru-RU')}</b>` : ''}</td></tr>
-                <tr><td><strong>ФИО конечного клиента</strong></td><td>${val(d.clientName)}</td></tr>
-                <tr><td><strong>Телефон клиента</strong></td><td>${val(d.clientPhone)}</td></tr>
-                <tr><td><strong>Адрес объекта</strong></td><td>${val(d.address)}</td></tr>
-                <tr><td><strong>Тип дома и Этаж</strong></td><td>${d.houseType || ''} ${d.floor ? ', этаж ' + d.floor : ''}</td></tr>
-                <tr><td><strong>Общая квадратура (м²)</strong></td><td>${val(d.totalArea)}</td></tr>
-                <tr><td><strong>Объем брака (шт/м²)</strong></td><td>${val(d.defectVolume)}</td></tr>
-                <tr><td><strong>Номера партий</strong></td><td>${d.batchNumbers && d.batchNumbers.length ? `<b>${d.batchNumbers.join(', ')}</b>` : ''}</td></tr>
+                <tr><td width="40%">Товар (Название / Артикул)</td><td>${val(d.productName)}</td></tr>
+                <tr><td>Номер накладной отгрузки</td><td>${val(d.invoiceNumber)}</td></tr>
+                <tr><td>Дата покупки клиентом</td><td>${d.purchaseDate ? `<b>${new Date(d.purchaseDate).toLocaleDateString('ru-RU')}</b>` : ''}</td></tr>
             </table>
 
-            <div style="margin-top: 20px; margin-bottom: 5px; font-weight: bold; text-transform: uppercase;">Технические условия монтажа:</div>
+            <div class="print-section-title">2. Данные объекта и клиента</div>
             <table class="print-table">
-                <tr><td width="35%"><strong>Тип основания</strong></td><td>${val(d.baseType)}</td></tr>
-                <tr><td><strong>Используемая подложка</strong></td><td>${val(d.underlayment)}</td></tr>
-                <tr><td><strong>Система "Теплый пол"</strong></td><td>${val(d.warmFloor)}</td></tr>
-                <tr><td><strong>Кто производил монтаж</strong></td><td>${val(d.installer)}</td></tr>
+                <tr><td width="40%">ФИО конечного клиента</td><td>${val(d.clientName)}</td></tr>
+                <tr><td>Телефон клиента</td><td>${val(d.clientPhone)}</td></tr>
+                <tr><td>Адрес объекта</td><td>${val(d.address)}</td></tr>
+                <tr><td>Тип помещения и Этаж</td><td>${d.houseType || ''} ${d.floor ? ', этаж ' + d.floor : ''}</td></tr>
+                <tr><td>Общая квадратура (м²)</td><td>${val(d.totalArea)}</td></tr>
+                <tr><td>Объем брака (шт / м²)</td><td>${val(d.defectVolume)}</td></tr>
+                <tr><td>Номера партий</td><td>${d.batchNumbers && d.batchNumbers.length ? `<b>${d.batchNumbers.join(', ')}</b>` : ''}</td></tr>
             </table>
 
-            <div style="margin-top: 20px; margin-bottom: 5px; font-weight: bold; text-transform: uppercase;">Описание проблемы (Суть претензии):</div>
-            <div style="min-height: 100px; border: 1px solid #000; padding: 10px;">${val(d.description)}</div>
+            <div class="print-section-title">3. Технические условия монтажа</div>
+            <table class="print-table">
+                <tr><td width="40%">Тип основания</td><td>${val(d.baseType)}</td></tr>
+                <tr><td>Используемая подложка</td><td>${val(d.underlayment)}</td></tr>
+                <tr><td>Система "Теплый пол"</td><td>${val(d.warmFloor)}</td></tr>
+                <tr><td>Кто производил монтаж</td><td>${val(d.installer)}</td></tr>
+            </table>
 
-            <div style="margin-top: 20px; margin-bottom: 5px; font-weight: bold; text-transform: uppercase;">Требование клиента:</div>
-            <div style="min-height: 40px; border: 1px solid #000; padding: 10px;">${val(d.clientDemand)}</div>
+            <div class="print-section-title">4. Суть претензии и требования</div>
+            <table class="print-table">
+                <tr>
+                    <td style="padding: 15px; vertical-align: top; height: 120px;">
+                        <div style="margin-bottom: 10px; color: #555; font-size: 12px; font-weight: bold;">Описание проблемы:</div>
+                        ${val(d.description)}
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 15px; vertical-align: top; height: 60px;">
+                        <div style="margin-bottom: 5px; color: #555; font-size: 12px; font-weight: bold;">Требование клиента:</div>
+                        ${val(d.clientDemand)}
+                    </td>
+                </tr>
+            </table>
 
-            <div class="print-flex" style="margin-top: 60px;">
-                <div>Подпись клиента: ___________________</div>
-                <div>Представитель дилера: ___________________</div>
+            <div class="print-flex" style="margin-top: 50px;">
+                <div class="signature-block">
+                    <div class="signature-line"></div>
+                    <div class="signature-label">Подпись клиента (ФИО)</div>
+                </div>
+                <div class="signature-block">
+                    <div class="signature-line"></div>
+                    <div class="signature-label">Представитель дилера (ФИО)</div>
+                </div>
             </div>
         `;
     }
