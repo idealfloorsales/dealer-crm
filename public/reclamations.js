@@ -82,14 +82,20 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        listEl.innerHTML = filtered.map(r => {
+        listEl.innerHTML = filtered.map((r, index) => {
             const dateStr = new Date(r.createdAt || r.date).toLocaleDateString('ru-RU');
             const imgBadge = r.photos && r.photos.length > 0 ? `<i class="bi bi-image text-primary ms-2"></i> ${r.photos.length}` : '';
+            // Номер акта (обратный отсчет, так как сортировка от новых к старым)
+            const seqNumStr = String(filtered.length - index).padStart(3, '0');
+            
             return `
             <div class="card border-0 shadow-sm rounded-4 cursor-pointer" onclick="viewReclamation('${r.id}')" style="cursor: pointer;">
                 <div class="card-body p-3">
                     <div class="d-flex justify-content-between align-items-start mb-2">
-                        <h6 class="fw-bold text-dark mb-0 text-truncate" style="max-width: 70%;">${r.dealerName || 'Неизвестный дилер'}</h6>
+                        <h6 class="fw-bold text-dark mb-0 text-truncate" style="max-width: 70%;">
+                            <span class="text-muted fw-normal me-1">№${seqNumStr}</span> 
+                            ${r.dealerName || 'Неизвестный дилер'}
+                        </h6>
                         <small class="text-muted">${dateStr}</small>
                     </div>
                     <div class="small text-secondary mb-2">
@@ -258,7 +264,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if(!r) return;
         currentViewId = id;
 
-        document.getElementById('v_title').textContent = `Рекламация: ${r.dealerName}`;
+        // Ищем индекс для номера
+        const idx = allReclamations.findIndex(x => x.id === id);
+        let seqNumStr = '';
+        if (idx !== -1) {
+            seqNumStr = `№${String(allReclamations.length - idx).padStart(3, '0')} - `;
+        }
+
+        document.getElementById('v_title').textContent = `Акт ${seqNumStr}${r.dealerName}`;
         
         let photosHtml = '';
         if(r.photos && r.photos.length > 0) {
@@ -312,75 +325,66 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // ==========================================
-    // ЛОГИКА ПЕЧАТИ (ОФИЦИАЛЬНЫЙ БЛАНК)
+    // ЛОГИКА ПЕЧАТИ (КРАСИВЫЙ СОВРЕМЕННЫЙ БЛАНК)
     // ==========================================
     function generatePrintHTML(data) {
         const d = data || {};
         const val = (v) => v ? `<b>${v}</b>` : '';
         
-        // ВЫЧИСЛЕНИЕ ПОРЯДКОВОГО НОМЕРА
-        let seqNumStr = '___';
+        let seqNumStr = '______';
         if (d.id && allReclamations.length > 0) {
-            // Поскольку массив отсортирован по убыванию даты,
-            // индекс 0 - это последняя (самая новая) рекламация.
             const idx = allReclamations.findIndex(x => x.id === d.id);
             if (idx !== -1) {
-                const num = allReclamations.length - idx;
-                seqNumStr = String(num).padStart(3, '0'); // Формат 001, 002...
+                seqNumStr = String(allReclamations.length - idx).padStart(3, '0');
             }
         }
 
+        const formattedDate = d.date ? new Date(d.date).toLocaleDateString('ru-RU') : '«___» ___________ 202_ г.';
+
         return `
-            <div class="print-title">Акт рекламации № ${seqNumStr}</div>
-            
-            <div class="print-flex" style="margin-bottom: 25px; font-size: 15px;">
-                <div><strong>Дата составления:</strong> ${d.date ? new Date(d.date).toLocaleDateString('ru-RU') : '«___» ___________ 202_ г.'}</div>
-                <div><strong>Дилер (Магазин):</strong> ${d.dealerName ? `<u><b>${d.dealerName}</b></u>` : '____________________________________'}</div>
+            <div class="print-header">
+                <div class="print-title">Акт рекламации № ${seqNumStr}</div>
+                <div class="print-meta">
+                    <div>Дата составления: <strong>${formattedDate}</strong></div>
+                    <div style="margin-top: 5px;">Дилер: <strong>${d.dealerName ? d.dealerName : '___________________________'}</strong></div>
+                </div>
             </div>
             
-            <div class="print-section-title">1. Общая информация</div>
+            <div class="print-section-title"><i class="bi bi-info-square-fill me-1"></i> 1. Общая информация</div>
             <table class="print-table">
-                <tr><td width="40%">Товар (Название / Артикул)</td><td>${val(d.productName)}</td></tr>
+                <tr><td>Товар (Название / Артикул)</td><td>${val(d.productName)}</td></tr>
                 <tr><td>Номер накладной отгрузки</td><td>${val(d.invoiceNumber)}</td></tr>
                 <tr><td>Дата покупки клиентом</td><td>${d.purchaseDate ? `<b>${new Date(d.purchaseDate).toLocaleDateString('ru-RU')}</b>` : ''}</td></tr>
             </table>
 
-            <div class="print-section-title">2. Данные объекта и клиента</div>
+            <div class="print-section-title"><i class="bi bi-person-lines-fill me-1"></i> 2. Данные объекта и клиента</div>
             <table class="print-table">
-                <tr><td width="40%">ФИО конечного клиента</td><td>${val(d.clientName)}</td></tr>
+                <tr><td>ФИО конечного клиента</td><td>${val(d.clientName)}</td></tr>
                 <tr><td>Телефон клиента</td><td>${val(d.clientPhone)}</td></tr>
                 <tr><td>Адрес объекта</td><td>${val(d.address)}</td></tr>
-                <tr><td>Тип помещения и Этаж</td><td>${d.houseType || ''} ${d.floor ? ', этаж ' + d.floor : ''}</td></tr>
+                <tr><td>Тип помещения и Этаж</td><td>${val(d.houseType)} ${d.floor ? ', этаж ' + d.floor : ''}</td></tr>
                 <tr><td>Общая квадратура (м²)</td><td>${val(d.totalArea)}</td></tr>
                 <tr><td>Объем брака (шт / м²)</td><td>${val(d.defectVolume)}</td></tr>
                 <tr><td>Номера партий</td><td>${d.batchNumbers && d.batchNumbers.length ? `<b>${d.batchNumbers.join(', ')}</b>` : ''}</td></tr>
             </table>
 
-            <div class="print-section-title">3. Технические условия монтажа</div>
+            <div class="print-section-title"><i class="bi bi-tools me-1"></i> 3. Технические условия монтажа</div>
             <table class="print-table">
-                <tr><td width="40%">Тип основания</td><td>${val(d.baseType)}</td></tr>
+                <tr><td>Тип основания</td><td>${val(d.baseType)}</td></tr>
                 <tr><td>Используемая подложка</td><td>${val(d.underlayment)}</td></tr>
                 <tr><td>Система "Теплый пол"</td><td>${val(d.warmFloor)}</td></tr>
                 <tr><td>Кто производил монтаж</td><td>${val(d.installer)}</td></tr>
             </table>
 
-            <div class="print-section-title">4. Суть претензии и требования</div>
-            <table class="print-table">
-                <tr>
-                    <td style="padding: 15px; vertical-align: top; height: 120px;">
-                        <div style="margin-bottom: 10px; color: #555; font-size: 12px; font-weight: bold;">Описание проблемы:</div>
-                        ${val(d.description)}
-                    </td>
-                </tr>
-                <tr>
-                    <td style="padding: 15px; vertical-align: top; height: 60px;">
-                        <div style="margin-bottom: 5px; color: #555; font-size: 12px; font-weight: bold;">Требование клиента:</div>
-                        ${val(d.clientDemand)}
-                    </td>
-                </tr>
-            </table>
+            <div class="print-section-title"><i class="bi bi-exclamation-triangle-fill me-1"></i> 4. Суть претензии и требования</div>
+            
+            <div style="font-weight: 600; color: #495057; font-size: 12px; margin-bottom: 5px;">Описание проблемы:</div>
+            <div class="print-box ${!d.description ? 'empty' : ''}">${val(d.description)}</div>
 
-            <div class="print-flex" style="margin-top: 50px;">
+            <div style="font-weight: 600; color: #495057; font-size: 12px; margin-bottom: 5px;">Требование клиента:</div>
+            <div class="print-box ${!d.clientDemand ? 'empty' : ''}" style="min-height: 40px;">${val(d.clientDemand)}</div>
+
+            <div class="print-signatures">
                 <div class="signature-block">
                     <div class="signature-line"></div>
                     <div class="signature-label">Подпись клиента (ФИО)</div>
