@@ -349,5 +349,56 @@ app.put('/api/knowledge/:id', checkWrite, async (req, res) => { const a = await 
 app.delete('/api/knowledge/:id', checkWrite, async (req, res) => { await Knowledge.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
 app.get('/api/tasks', async (req, res) => { try { const data = await Dealer.find(getDealerFilter(req)).select('name visits status responsible').lean(); res.json(data.map(d => ({ id: d._id, name: d.name, status: d.status, visits: d.visits || [], responsible: d.responsible }))); } catch (e) { res.status(500).json([]); } });
 
+// ==========================================
+// РЕКЛАМАЦИИ (БРАК / ВОЗВРАТЫ)
+// ==========================================
+const reclamationSchema = new mongoose.Schema({
+    dealerId: String,
+    dealerName: String,
+    date: String,
+    productName: String,
+    invoiceNumber: String,
+    purchaseDate: String,
+    clientName: String,
+    clientPhone: String,
+    address: String,
+    floor: String,
+    houseType: String,
+    totalArea: String,
+    defectVolume: String,
+    batchNumbers: [String],
+    baseType: String,
+    underlayment: String,
+    warmFloor: String,
+    installer: String,
+    description: String,
+    clientDemand: String,
+    photos: [{ photo_url: String }]
+}, { timestamps: true });
+const Reclamation = mongoose.model('Reclamation', reclamationSchema);
+
+app.get('/api/reclamations', async (req, res) => {
+    try { 
+        const list = await Reclamation.find().sort({createdAt: -1}); 
+        res.json(list.map(convertToClient)); 
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+
+app.post('/api/reclamations', checkWrite, async (req, res) => {
+    try { 
+        const r = new Reclamation(req.body); 
+        await r.save(); 
+        res.json(convertToClient(r)); 
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+
+app.delete('/api/reclamations/:id', checkWrite, async (req, res) => {
+    try { 
+        await Reclamation.findByIdAndDelete(req.params.id); 
+        res.json({status: 'deleted'}); 
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+
 app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
+
 
