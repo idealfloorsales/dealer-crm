@@ -19,8 +19,6 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#ffffff">
     
-    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
-
     <style>
         body { padding-bottom: 80px; }
         .bottom-nav {
@@ -58,22 +56,6 @@
             }
         }
         .admin-only { display: none !important; }
-
-        /* Стили Soft UI (Мягкие карточки для Дашборда) */
-        .soft-card {
-            background: #ffffff;
-            border-radius: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.8);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.03);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-        .soft-card:hover { transform: translateY(-3px); box-shadow: 0 15px 35px rgba(0, 0, 0, 0.06); }
-        .kpi-value { font-size: 2rem; font-weight: 800; color: #2d3748; line-height: 1.2; }
-        .kpi-label { font-size: 0.85rem; font-weight: 600; color: #718096; text-transform: uppercase; letter-spacing: 0.5px; }
-        .kpi-icon { width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; }
-        .kpi-trend { font-size: 0.85rem; font-weight: 600; padding: 4px 8px; border-radius: 8px; }
-        .trend-up { background: #e6fffa; color: #38b2ac; }
-        .trend-down { background: #fff5f5; color: #e53e3e; }
     </style>
     <script>
         if (!localStorage.getItem('crm_token')) {
@@ -135,96 +117,46 @@
             </div>
         </div>
 
-        <div id="dashboard-container" class="mb-5">
-            <div class="row g-3 mb-4">
-                <div class="col-6 col-md-3">
-                    <div class="soft-card p-3 h-100">
-                        <div class="d-flex justify-content-between align-items-start mb-2">
-                            <div class="kpi-icon" style="background: #fff5f5; color: #e53e3e;"><i class="bi bi-box-seam-fill"></i></div>
+        <div class="row g-3 mb-4" id="dashboard-container">
+            <div class="col-md-6">
+                <div id="dashboard-stats" class="row g-3 h-100"></div>
+            </div>
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm rounded-4 h-100 overflow-hidden" style="background: #fff5f5;">
+                    <div class="card-header bg-transparent border-0 pt-3 px-3 pb-0">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <div class="icon-circle bg-danger text-white shadow-sm"><i class="bi bi-exclamation-triangle-fill"></i></div>
+                            <h6 class="fw-bold mb-0 text-danger">Проблемы</h6>
                         </div>
-                        <div class="kpi-value" id="kpi-sales">0 <span class="fs-6 text-muted">м²</span></div>
-                        <div class="kpi-label mt-1">Отгружено (мес)</div>
                     </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="soft-card p-3 h-100">
-                        <div class="d-flex justify-content-between align-items-start mb-2">
-                            <div class="kpi-icon" style="background: #eebffd; color: #805ad5;"><i class="bi bi-shop"></i></div>
-                        </div>
-                        <div class="kpi-value" id="kpi-active">0</div>
-                        <div class="kpi-label mt-1">Активных точек</div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="soft-card p-3 h-100">
-                        <div class="d-flex justify-content-between align-items-start mb-2">
-                            <div class="kpi-icon" style="background: #e6fffa; color: #319795;"><i class="bi bi-grid-1x2-fill"></i></div>
-                        </div>
-                        <div class="kpi-value" id="kpi-matrix">0 <span class="fs-6 text-muted">шт</span></div>
-                        <div class="kpi-label mt-1">Ср. выставленность</div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="soft-card p-3 h-100" id="card-reclamations" style="cursor: pointer;" onclick="window.location.href='/reclamations.html'">
-                        <div class="d-flex justify-content-between align-items-start mb-2">
-                            <div class="kpi-icon" style="background: #fffaf0; color: #dd6b20;"><i class="bi bi-exclamation-octagon-fill"></i></div>
-                        </div>
-                        <div class="kpi-value text-danger" id="kpi-reclamations">0</div>
-                        <div class="kpi-label mt-1">Открыто рекламаций</div>
+                    <div class="card-body px-2 pt-0">
+                        <div id="tasks-list-problem" class="task-list-modern"><p class="text-center text-muted py-3 small">Загрузка...</p></div>
                     </div>
                 </div>
             </div>
-
-            <div class="row g-3 mb-4">
-                <div class="col-md-5">
-                    <div class="soft-card p-4 h-100 d-flex flex-column align-items-center justify-content-center">
-                        <h6 class="kpi-label text-center mb-0">Выполнение плана (м²)</h6>
-                        <div id="chart-speedometer" style="min-height: 250px;"></div>
-                        <div class="d-flex justify-content-between w-100 mt-2 text-muted fw-bold small">
-                            <span>0</span><span>Цель: 10 000 м²</span>
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+                    <div class="card-header bg-white border-0 pt-3 px-3 pb-0">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <div class="icon-circle bg-primary-subtle text-primary"><i class="bi bi-calendar-check-fill"></i></div>
+                            <h6 class="fw-bold mb-0">План на сегодня</h6>
                         </div>
                     </div>
-                </div>
-                <div class="col-md-7">
-                    <div class="soft-card p-4 h-100">
-                        <h6 class="kpi-label mb-3">Здоровье матрицы по регионам</h6>
-                        <div id="chart-rings" class="d-flex justify-content-around flex-wrap align-items-center h-100" style="min-height: 200px;"></div>
+                    <div class="card-body px-2 pt-0">
+                        <div id="tasks-list-upcoming" class="task-list-modern"><p class="text-center text-muted py-3 small">Загрузка...</p></div>
                     </div>
                 </div>
             </div>
-
-            <div class="row g-3">
-                <div class="col-md-4">
-                    <div class="soft-card h-100 d-flex flex-column">
-                        <div class="p-3 border-bottom d-flex align-items-center gap-2">
-                            <div class="icon-circle bg-danger text-white shadow-sm" style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:50%;"><i class="bi bi-exclamation-triangle-fill"></i></div>
-                            <h6 class="fw-bold mb-0 text-danger">Проблемные</h6>
-                        </div>
-                        <div class="p-2 flex-grow-1">
-                            <div id="tasks-list-problem" class="task-list-modern"><p class="text-center text-muted py-3 small">Загрузка...</p></div>
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+                    <div class="card-header bg-white border-0 pt-3 px-3 pb-0">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <div class="icon-circle bg-warning-subtle text-warning"><i class="bi bi-hourglass-split"></i></div>
+                            <h6 class="fw-bold mb-0">Давно не были</h6>
                         </div>
                     </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="soft-card h-100 d-flex flex-column">
-                        <div class="p-3 border-bottom d-flex align-items-center gap-2">
-                            <div class="icon-circle bg-primary text-white shadow-sm" style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:50%;"><i class="bi bi-calendar-check-fill"></i></div>
-                            <h6 class="fw-bold mb-0 text-primary">План визитов</h6>
-                        </div>
-                        <div class="p-2 flex-grow-1">
-                            <div id="tasks-list-upcoming" class="task-list-modern"><p class="text-center text-muted py-3 small">Загрузка...</p></div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="soft-card h-100 d-flex flex-column">
-                        <div class="p-3 border-bottom d-flex align-items-center gap-2">
-                            <div class="icon-circle bg-warning text-dark shadow-sm" style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:50%;"><i class="bi bi-hourglass-split"></i></div>
-                            <h6 class="fw-bold mb-0 text-warning">Давно не были</h6>
-                        </div>
-                        <div class="p-2 flex-grow-1">
-                            <div id="tasks-list-cooling" class="task-list-modern"><p class="text-center text-muted py-3 small">Загрузка...</p></div>
-                        </div>
+                    <div class="card-body px-2 pt-0">
+                        <div id="tasks-list-cooling" class="task-list-modern"><p class="text-center text-muted py-3 small">Загрузка...</p></div>
                     </div>
                 </div>
             </div>
@@ -575,3 +507,5 @@
     <script src="script.js?v={{VER}}"></script> <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(err => console.error(err)); }</script>
 </body>
 </html>
+
+
