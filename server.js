@@ -269,9 +269,8 @@ const dealerSchema = new mongoose.Schema({ dealer_id: String, name: String, pric
 const Dealer = mongoose.model('Dealer', dealerSchema);
 
 const salesSchema = new mongoose.Schema({ month: String, group: String, dealerId: String, dealerName: String, plan: Number, fact: Number, isCustom: { type: Boolean, default: false } 
-}, { timestamps: true }); // <--- Включает createdAt и updatedAt
+}, { timestamps: true }); 
 const Sales = mongoose.model('Sales', salesSchema);
-
 
 const Knowledge = mongoose.model('Knowledge', new mongoose.Schema({ title: String, content: String }, { timestamps: true }));
 
@@ -282,7 +281,7 @@ async function connectToDB() {
         console.log('MongoDB Connected'); 
         await seedStatuses(); 
         await seedUsers(); 
-        await seedSectors(); // <--- АВТО-СОЗДАНИЕ СЕКТОРОВ
+        await seedSectors(); 
     } catch (e) { console.error(e); }
 }
 
@@ -328,16 +327,59 @@ app.put('/api/products/:id', checkWrite, async (req, res) => { const p = await P
 app.delete('/api/products/:id', checkWrite, async (req, res) => { await Product.findByIdAndDelete(req.params.id); res.json({}); });
 app.post('/api/admin/import-catalog', async (req, res) => { if(getUserRole(req) !== 'admin') return res.status(403).json({error:'Admin only'}); res.json({status: 'ok'}); });
 app.get('/api/matrix', async (req, res) => { try { const prods = await Product.find().sort({sku:1}).lean(); const dealers = await Dealer.find(getDealerFilter(req)).lean(); const map = new Map(); dealers.forEach(d => map.set(d._id.toString(), new Set(d.products.map(String)))); const posList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"]; const matrix = prods.map(p => ({ sku: p.sku, name: p.name, type: 'product', dealers: dealers.map(d => ({ value: map.get(d._id.toString()).has(p._id.toString()) ? 1 : 0, is_pos: false })) })); posList.forEach(pn => { matrix.push({ sku: "POS", name: pn, type: 'pos', dealers: dealers.map(d => ({ value: (d.pos_materials||[]).find(m=>m.name===pn)?.quantity||0, is_pos: true })) }); }); res.json({ headers: dealers.map(d=>({id:d._id, name:d.name, city:d.city, responsible:d.responsible})), matrix }); } catch (e) { res.status(500).json({error:e.message}); } });
+
 app.get('/api/sales', async (req, res) => { const {month} = req.query; const s = await Sales.find(month ? {month} : {}).lean(); res.json(s); });
-app.post('/api/sales', checkWrite, async (req, res) => {const now = new Date();const ops = req.body.data.map(i => ({updateOne: { filter: { month: req.body.month, $or: [{dealerId: i.dealerId}, {dealerName: i.dealerName, isCustom:true}] }, 
-            // Принудительно обновляем updatedAt
-            update: { $set: { ...i, updatedAt: now } }, 
-            upsert: true 
-        } 
-    })); 
+
+// ===== ИСПРАВЛЕННЫЙ БЛОК: СОХРАНЕНИЕ И УДАЛЕНИЕ РАЗОВЫХ ПРОДАЖ =====
+app.post('/api/sales', checkWrite, async (req, res) => {
+    const now = new Date();
+    
+    // 1. Формируем операции обновления/добавления строк
+    const ops = req.body.data.map(i => {
+        // Жестко разделяем фильтры, чтобы дилеры и разовые продажи никогда не путались
+        const filter = { month: req.body.month };
+        if (i.isCustom) {
+            filter.isCustom = true;
+            filter.dealerName = i.dealerName;
+            if (i.group) filter.group = i.group; // Учитываем регион/группу
+        } else {
+            filter.dealerId = i.dealerId;
+        }
+
+        return {
+            updateOne: { 
+                filter: filter, 
+                update: { $set: { ...i, updatedAt: now } }, 
+                upsert: true 
+            } 
+        };
+    }); 
+    
+    // Применяем сохранения
     await Sales.bulkWrite(ops); 
+
+    // 2. Логика удаления (очистка)
+    // Собираем все сектора, с которыми сейчас работает менеджер (чтобы случайно не удалить чужие)
+    const incomingGroups = [...new Set(req.body.data.map(i => i.group).filter(Boolean))];
+    
+    // Собираем названия всех разовых продаж, которые менеджер ОСТАВИЛ на экране
+    const incomingCustomNames = req.body.data.filter(i => i.isCustom).map(i => i.dealerName);
+
+    if (incomingGroups.length > 0) {
+        // Удаляем из базы те разовые продажи, которых НЕТ в присланных данных, 
+        // но ТОЛЬКО в рамках тех секторов (групп), которые были присланы.
+        await Sales.deleteMany({
+            month: req.body.month,
+            isCustom: true,
+            group: { $in: incomingGroups },
+            dealerName: { $nin: incomingCustomNames } // Если имени нет в списке с экрана - удаляем из БД
+        });
+    }
+
     res.json({status:'ok'}); 
 });
+// ===================================================================
+
 app.get('/api/competitors-ref', async (req, res) => { const l = await CompRef.find().sort({name:1}); res.json(l.map(convertToClient)); });
 app.post('/api/competitors-ref', checkWrite, async (req, res) => { const c = new CompRef(req.body); await c.save(); res.json(convertToClient(c)); });
 app.put('/api/competitors-ref/:id', checkWrite, async (req, res) => { await CompRef.findByIdAndUpdate(req.params.id, req.body); res.json({status:'ok'}); });
@@ -365,7 +407,7 @@ const reclamationSchema = new mongoose.Schema({
     floor: String,
     houseType: String,
     totalArea: String,
-    purchasedVolume: String, // Было defectVolume
+    purchasedVolume: String,
     batchNumbers: [String],
     baseType: String,
     underlayment: String,
@@ -417,9 +459,3 @@ app.delete('/api/reclamations/:id', checkWrite, async (req, res) => {
 });
 
 app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
-
-
-
-
-
-
