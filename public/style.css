@@ -1904,3 +1904,68 @@ body.modal-open {
     overflow: auto !important;
     padding-right: 0 !important;
 }
+
+
+/* ========================================= */
+/* ПЕЧАТЬ СТРАНИЦЫ ПРОДАЖ (SALES.HTML)       */
+/* ========================================= */
+@media print {
+    @page {
+        size: A4 portrait; /* Если колонок станет очень много, поменяйте portrait на landscape */
+        margin: 8mm; /* Делаем узкие поля, чтобы влезло больше данных */
+    }
+
+    /* 1. Жестко скрываем интерфейс: нижнее меню, вкладки, кнопки сохранения/печати */
+    .bottom-nav, 
+    .nav-tabs, 
+    .btn, 
+    .no-print,
+    .toast-container-custom {
+        display: none !important;
+    }
+
+    /* 2. Раскрываем скроллящиеся блоки. 
+       Это критически важно, чтобы на печать вывелись ВСЕ строки дилеров, а не только те, что поместились на экране */
+    #sales-container, 
+    .summary-list-container,
+    .card-body,
+    .table-responsive {
+        max-height: none !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    /* 3. Убираем лишние рамки и тени карточек для экономии краски и места */
+    .card {
+        border: none !important;
+        box-shadow: none !important;
+        margin-bottom: 0 !important;
+    }
+    .card-header {
+        background-color: transparent !important;
+        border-bottom: 2px solid #000 !important;
+        padding-left: 0 !important;
+    }
+
+    /* 4. Масштабируем контент (уменьшаем на 30%), чтобы всё уместилось по ширине */
+    body {
+        zoom: 0.70 !important; 
+        background-color: white !important;
+    }
+
+    /* Альтернативный фикс масштаба для Firefox */
+    @-moz-document url-prefix() {
+        body {
+            transform: scale(0.70);
+            transform-origin: top left;
+            width: 142%; 
+        }
+    }
+
+    /* 5. Запрещаем принтеру "резать" строки продаж пополам при переходе на новый лист */
+    .list-group-item, 
+    .summary-list-container div, 
+    tr {
+        page-break-inside: avoid !important;
+    }
+}
