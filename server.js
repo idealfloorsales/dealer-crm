@@ -1,7 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-// const basicAuth = require('express-basic-auth'); 
 const fs = require('fs'); 
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -330,18 +329,30 @@ app.get('/api/matrix', async (req, res) => { try { const prods = await Product.f
 
 app.get('/api/sales', async (req, res) => { const {month} = req.query; const s = await Sales.find(month ? {month} : {}).lean(); res.json(s); });
 
-// ===== ИСПРАВЛЕННЫЙ БЛОК: СОХРАНЕНИЕ И УДАЛЕНИЕ РАЗОВЫХ ПРОДАЖ =====
+// ===== ИСПРАВЛЕННЫЙ БЛОК: СОХРАНЕНИЕ, АГРЕГАЦИЯ И УДАЛЕНИЕ =====
 app.post('/api/sales', checkWrite, async (req, res) => {
     const now = new Date();
-    
-    // 1. Формируем операции обновления/добавления строк
-    const ops = req.body.data.map(i => {
-        // Жестко разделяем фильтры, чтобы дилеры и разовые продажи никогда не путались
+    const role = req.user ? req.user.role : 'guest';
+
+    // 1. Агрегируем дубликаты из присланных данных (если ввели несколько с одинаковым именем)
+    const aggregatedData = {};
+    req.body.data.forEach(i => {
+        const key = i.isCustom ? `custom_${i.group}_${i.dealerName}` : `dealer_${i.dealerId}`;
+        if (!aggregatedData[key]) {
+            aggregatedData[key] = { ...i };
+        } else {
+            aggregatedData[key].fact = (Number(aggregatedData[key].fact) || 0) + (Number(i.fact) || 0);
+            aggregatedData[key].plan = (Number(aggregatedData[key].plan) || 0) + (Number(i.plan) || 0);
+        }
+    });
+
+    // 2. Обновляем/Добавляем записи
+    const ops = Object.values(aggregatedData).map(i => {
         const filter = { month: req.body.month };
         if (i.isCustom) {
             filter.isCustom = true;
             filter.dealerName = i.dealerName;
-            if (i.group) filter.group = i.group; // Учитываем регион/группу
+            if (i.group) filter.group = i.group; 
         } else {
             filter.dealerId = i.dealerId;
         }
@@ -355,25 +366,47 @@ app.post('/api/sales', checkWrite, async (req, res) => {
         };
     }); 
     
-    // Применяем сохранения
-    await Sales.bulkWrite(ops); 
+    if (ops.length > 0) {
+        await Sales.bulkWrite(ops); 
+    }
 
-    // 2. Логика удаления (очистка)
-    // Собираем все сектора, с которыми сейчас работает менеджер (чтобы случайно не удалить чужие)
-    const incomingGroups = [...new Set(req.body.data.map(i => i.group).filter(Boolean))];
-    
-    // Собираем названия всех разовых продаж, которые менеджер ОСТАВИЛ на экране
-    const incomingCustomNames = req.body.data.filter(i => i.isCustom).map(i => i.dealerName);
+    // 3. Умное удаление (Очистка разовых продаж)
+    // Определяем, к каким группам имеет доступ текущий пользователь
+    let groupFilter = {};
+    if (role === 'astana') {
+        const sectors = await Sector.find({ type: 'astana' });
+        groupFilter = { group: { $in: sectors.map(s => s.name) } };
+    } else if (role === 'regions') {
+        const sectors = await Sector.find({ type: 'region' });
+        groupFilter = { group: { $in: sectors.map(s => s.name) } };
+    }
+    // Если admin или all, groupFilter остается пустым (имеет доступ ко всем)
 
-    if (incomingGroups.length > 0) {
-        // Удаляем из базы те разовые продажи, которых НЕТ в присланных данных, 
-        // но ТОЛЬКО в рамках тех секторов (групп), которые были присланы.
-        await Sales.deleteMany({
-            month: req.body.month,
-            isCustom: true,
-            group: { $in: incomingGroups },
-            dealerName: { $nin: incomingCustomNames } // Если имени нет в списке с экрана - удаляем из БД
-        });
+    // Ищем все разовые продажи за этот месяц в базе (в рамках доступа пользователя)
+    const dbCustomSales = await Sales.find({ 
+        month: req.body.month, 
+        isCustom: true, 
+        ...groupFilter 
+    });
+
+    const idsToDelete = [];
+    const incomingArray = Object.values(aggregatedData);
+
+    dbCustomSales.forEach(dbSale => {
+        // Проверяем, осталась ли эта продажа в присланных данных
+        const existsInIncoming = incomingArray.some(
+            i => i.isCustom && i.group === dbSale.group && i.dealerName === dbSale.dealerName
+        );
+        
+        // Если в присланных данных её больше нет — помечаем на удаление
+        if (!existsInIncoming) {
+            idsToDelete.push(dbSale._id);
+        }
+    });
+
+    // Удаляем всё лишнее
+    if (idsToDelete.length > 0) {
+        await Sales.deleteMany({ _id: { $in: idsToDelete } });
     }
 
     res.json({status:'ok'}); 
