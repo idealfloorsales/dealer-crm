@@ -1906,66 +1906,117 @@ body.modal-open {
 }
 
 
-/* ========================================= */
-/* ПЕЧАТЬ СТРАНИЦЫ ПРОДАЖ (SALES.HTML)       */
-/* ========================================= */
+/* ========================================================= */
+/* ТОТАЛЬНОЕ СЖАТИЕ ДЛЯ ПЕЧАТИ СТРАНИЦЫ ПРОДАЖ НА 1 СТР. А4 */
+/* ========================================================= */
 @media print {
     @page {
-        size: A4 portrait; /* Если колонок станет очень много, поменяйте portrait на landscape */
-        margin: 8mm; /* Делаем узкие поля, чтобы влезло больше данных */
+        size: A4 portrait;
+        margin: 4mm !important; /* Минимальные поля бумаги (4 миллиметра) */
     }
 
-    /* 1. Жестко скрываем интерфейс: нижнее меню, вкладки, кнопки сохранения/печати */
+    /* 1. Скрываем всё лишнее: навигацию, вкладки, кнопки, уведомления */
     .bottom-nav, 
     .nav-tabs, 
     .btn, 
     .no-print,
-    .toast-container-custom {
+    .toast-container-custom,
+    footer,
+    header {
         display: none !important;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
     }
 
-    /* 2. Раскрываем скроллящиеся блоки. 
-       Это критически важно, чтобы на печать вывелись ВСЕ строки дилеров, а не только те, что поместились на экране */
-    #sales-container, 
-    .summary-list-container,
-    .card-body,
-    .table-responsive {
-        max-height: none !important;
-        height: auto !important;
-        overflow: visible !important;
-    }
-
-    /* 3. Убираем лишние рамки и тени карточек для экономии краски и места */
-    .card {
-        border: none !important;
-        box-shadow: none !important;
-        margin-bottom: 0 !important;
-    }
-    .card-header {
-        background-color: transparent !important;
-        border-bottom: 2px solid #000 !important;
-        padding-left: 0 !important;
-    }
-
-    /* 4. Масштабируем контент (уменьшаем на 30%), чтобы всё уместилось по ширине */
+    /* 2. Экстремальное масштабирование всего документа */
     body {
-        zoom: 0.70 !important; 
+        zoom: 0.52 !important; /* Жестко сжимаем масштаб до 52% */
+        font-size: 11px !important;
         background-color: white !important;
+        color: #000 !important;
+        line-height: 1.1 !important;
     }
 
-    /* Альтернативный фикс масштаба для Firefox */
+    /* Поддержка корректного масштаба в Firefox */
     @-moz-document url-prefix() {
         body {
-            transform: scale(0.70);
+            transform: scale(0.52);
             transform-origin: top left;
-            width: 142%; 
+            width: 192%; 
         }
     }
 
-    /* 5. Запрещаем принтеру "резать" строки продаж пополам при переходе на новый лист */
+    /* 3. Уничтожаем отступы и раскрываем контейнеры */
+    html, body, .container, .container-fluid, .row, [class*="col-"] {
+        margin: 0 !important;
+        padding: 0 !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+    }
+
+    /* Фиксируем сетку Bootstrap, чтобы колонки ввода и сводки стояли компактно рядом */
+    .row {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 10px !important;
+    }
+
+    /* 4. Раскрываем таблицы и списки, убирая внутренний скролл */
+    #sales-container, 
+    .summary-list-container,
+    .card-body,
+    .table-responsive,
+    .list-group {
+        max-height: none !important;
+        height: auto !important;
+        overflow: visible !important;
+        display: block !important;
+    }
+
+    /* 5. Ультра-компактные карточки и верхний дашборд */
+    .card {
+        border: 1px solid #dee2e6 !important;
+        box-shadow: none !important;
+        margin-bottom: 6px !important;
+        padding: 2px !important;
+    }
+    
+    #sales-top-dashboard {
+        margin-bottom: 8px !important;
+    }
+    
+    #sales-top-dashboard .card {
+        padding: 4px !important;
+    }
+
+    /* 6. Экстремальное сжатие строк таблиц и списков */
+    .table th, .table td, 
     .list-group-item, 
     .summary-list-container div, 
-    tr {
-        page-break-inside: avoid !important;
+    tr, td, th {
+        padding: 2px 4px !important; /* Сжимаем ячейки до минимума */
+        margin: 0 !important;
+        font-size: 11px !important;
+        page-break-inside: avoid !important; /* Запрещаем разрывать строки */
+    }
+
+    /* Уменьшаем заголовки */
+    h1, h2, h3, h4, h5, h6, .card-title {
+        font-size: 14px !important;
+        margin-top: 2px !important;
+        margin-bottom: 4px !important;
+        font-weight: bold !important;
+    }
+
+    /* Поля ввода делаем плоскими и компактными */
+    input, select, .form-control, .form-select {
+        padding: 2px 4px !important;
+        font-size: 11px !important;
+        height: auto !important;
+        border: none !important;
+        background: transparent !important;
     }
 }
