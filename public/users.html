@@ -147,11 +147,19 @@
                                         <input type="text" id="u_password" class="form-control" placeholder="Оставьте пустым, если не меняете">
                                     </div>
                                     <div class="col-md-6">
-                                        <label class="form-label small fw-bold text-muted">Регион (Scope)</label>
+                                        <label class="form-label small fw-bold text-muted">Роль</label>
+                                        <select id="u_role" class="form-select">
+                                            <option value="manager">Менеджер</option>
+                                            <option value="marketing">Маркетинг</option>
+                                            <option value="guest">Гость</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold text-muted">Регион доступа</label>
                                         <select id="u_scope" class="form-select">
-                                            <option value="all">Вся компания (All)</option>
+                                            <option value="all">Вся компания</option>
                                             <option value="astana">Только Астана</option>
-                                            <option value="regions">Только Регионы</option>
+                                            <option value="regions">Только регионы</option>
                                         </select>
                                     </div>
                                 </div>
