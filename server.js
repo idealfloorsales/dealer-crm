@@ -79,9 +79,28 @@ async function seedUsers() {
     const adminPermissions = {
         is_admin: true,
         can_manage_users: true,
-        can_view_map: true, can_view_dealers: true, can_view_sales: true, 
-        can_view_competitors: true, can_view_report: true,
-        can_edit_dealer: true, can_delete_dealer: true, can_edit_sales: true
+        can_view_dealers: true,
+        can_view_map: true,
+        can_view_products: true,
+        can_view_report: true,
+        can_view_sales: true,
+        can_view_competitors: true,
+        can_view_knowledge: true,
+        can_view_dashboard: true,
+        can_view_reclamations: true,
+        can_create_dealer: true,
+        can_edit_dealer: true,
+        can_delete_dealer: true,
+        can_manage_visits: true,
+        can_edit_matrix: true,
+        can_edit_sales_fact: true,
+        can_edit_sales_plan: true,
+        can_manage_products: true,
+        can_manage_competitors: true,
+        can_manage_knowledge: true,
+        can_manage_reclamations: true,
+        can_export_base: true,
+        can_export_prices: true
     };
 
     if (!admin) {
@@ -92,12 +111,14 @@ async function seedUsers() {
             username: 'admin',
             password: hashedPassword,
             fullName: 'Главный Администратор',
+            role: 'manager',
             scope: 'all',
             permissions: adminPermissions
         });
         console.log('Администратор создан.');
     } else {
         admin.permissions = adminPermissions;
+        admin.role = 'manager';
         admin.scope = 'all';
         if (admin.isBlocked === undefined) admin.isBlocked = false;
         await admin.save();
@@ -117,10 +138,25 @@ const authMiddleware = (req, res, next) => {
 
     if (!token) return res.status(401).json({ error: 'Требуется авторизация' });
 
-    jwt.verify(token, JWT_SECRET, (err, user) => {
+    jwt.verify(token, JWT_SECRET, async (err, tokenUser) => {
         if (err) return res.status(403).json({ error: 'Токен недействителен' });
-        req.user = user; 
-        next();
+        try {
+            const dbUser = await User.findById(tokenUser.id).lean();
+            if (!dbUser || dbUser.isBlocked) {
+                return res.status(403).json({ error: 'Доступ заблокирован' });
+            }
+            req.user = {
+                id: dbUser._id.toString(),
+                username: dbUser.username,
+                fullName: dbUser.fullName,
+                role: dbUser.role || 'manager',
+                scope: dbUser.scope || 'all',
+                permissions: dbUser.permissions || {}
+            };
+            next();
+        } catch (e) {
+            return res.status(500).json({ error: 'Ошибка проверки доступа' });
+        }
     });
 };
 app.use(authMiddleware);
@@ -154,12 +190,30 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // API УПРАВЛЕНИЯ ПОЛЬЗОВАТЕЛЯМИ
-const requireAdmin = (req, res, next) => {
-    if (!req.user || !req.user.permissions || !req.user.permissions.is_admin) {
-        return res.status(403).json({ error: 'Доступ только для администраторов' });
+function hasPermission(req, permission) {
+    return Boolean(
+        req.user &&
+        req.user.permissions &&
+        (req.user.permissions.is_admin || req.user.permissions[permission])
+    );
+}
+
+const requirePermission = (permission) => (req, res, next) => {
+    if (!hasPermission(req, permission)) {
+        return res.status(403).json({ error: 'Недостаточно прав', permission });
     }
     next();
 };
+
+const requireAnyPermission = (...permissions) => (req, res, next) => {
+    if (req.user && req.user.permissions && req.user.permissions.is_admin) return next();
+    if (!permissions.some(permission => hasPermission(req, permission))) {
+        return res.status(403).json({ error: 'Недостаточно прав', permissions });
+    }
+    next();
+};
+
+const requireAdmin = requirePermission('can_manage_users');
 
 app.get('/api/admin/users', requireAdmin, async (req, res) => {
     try {
@@ -170,12 +224,12 @@ app.get('/api/admin/users', requireAdmin, async (req, res) => {
 
 app.post('/api/admin/users', requireAdmin, async (req, res) => {
     try {
-        const { username, password, fullName, scope, permissions } = req.body;
+        const { username, password, fullName, role, scope, permissions } = req.body;
         const exists = await User.findOne({ username });
         if (exists) return res.status(400).json({ error: 'Логин уже занят' });
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
-        const newUser = new User({ username, password: hashedPassword, fullName, scope, permissions });
+        const newUser = new User({ username, password: hashedPassword, fullName, role: role || 'manager', scope, permissions });
         await newUser.save();
         res.json({ status: 'ok' });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -183,8 +237,8 @@ app.post('/api/admin/users', requireAdmin, async (req, res) => {
 
 app.put('/api/admin/users/:id', requireAdmin, async (req, res) => {
     try {
-        const { fullName, scope, permissions, isBlocked, password } = req.body;
-        const updateData = { fullName, scope, permissions, isBlocked };
+        const { fullName, role, scope, permissions, isBlocked, password } = req.body;
+        const updateData = { fullName, role: role || 'manager', scope, permissions, isBlocked };
         if (password && password.trim() !== "") {
             const salt = await bcrypt.genSalt(10);
             updateData.password = await bcrypt.hash(password, salt);
