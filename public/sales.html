@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>KPI Продажи</title>
+    <title>Продажи</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="style.css?v={{VER}}"> <link rel="icon" href="favicon.gif" type="image/gif">
@@ -48,7 +48,7 @@
         }
     </style>
 </head>
-<body class="bg-light">
+<body class="bg-light sales-page">
     
     <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-4 desktop-nav">
         <div class="container-fluid">
@@ -72,50 +72,105 @@
         </div>
     </nav>
     
-    <div class="container"> 
-        <div class="bg-white p-3 rounded-4 shadow-sm mb-4 border border-light sticky-filters" id="page-header">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <div class="d-flex flex-column">
-                    <h1 class="mb-0 border-0 pt-0 mt-0 fs-4 fw-bold text-dark">KPI Продажи</h1>
-                    <small id="last-update-info" class="text-secondary fw-bold" style="font-size: 0.75rem;"><i class="bi bi-clock-history me-1"></i>Нет данных (нажмите сохранить)</small>
+    <main class="container sales-shell">
+        <section class="sales-hero" id="page-header">
+            <div class="sales-hero-copy">
+                <div class="sales-eyebrow">IDEAL FLOOR CRM</div>
+                <h1>Продажи</h1>
+                <div id="last-update-info" class="sales-update-status">
+                    <i class="bi bi-clock-history"></i> Нет данных
                 </div>
-                <button id="save-btn" class="btn btn-success shadow-sm px-3 rounded-pill btn-sm fw-bold"><i class="bi bi-check-lg me-1"></i>Сохранить</button>
-            </div>
-            
-            <div class="d-flex gap-2 align-items-center justify-content-between">
-                <input type="month" id="month-picker" class="form-control fw-bold border bg-light form-control-sm" style="width: 220px;">
-                <button id="print-btn" class="btn btn-light border text-secondary shadow-sm px-3 rounded-pill btn-sm d-none d-md-block"><i class="bi bi-printer-fill me-1"></i>Отчет</button>
             </div>
 
-            <div class="mobile-view-toggler mt-3 p-1 bg-light rounded-pill border">
-                <button class="btn btn-sm w-50 rounded-pill fw-bold btn-white shadow-sm text-primary" id="tab-input-btn">Ввод данных</button>
-                <button class="btn btn-sm w-50 rounded-pill fw-bold text-muted" id="tab-summary-btn">Сводка</button>
+            <div class="sales-hero-controls">
+                <div class="sales-month-control">
+                    <button id="month-prev" class="sales-control-btn" type="button" title="Предыдущий месяц"><i class="bi bi-chevron-left"></i></button>
+                    <input type="month" id="month-picker" class="sales-month-input">
+                    <button id="month-next" class="sales-control-btn" type="button" title="Следующий месяц"><i class="bi bi-chevron-right"></i></button>
+                    <button id="month-current" class="sales-current-btn" type="button">Текущий месяц</button>
+                </div>
+
+                <div class="sales-hero-actions">
+                    <button id="print-btn" class="sales-secondary-btn" type="button"><i class="bi bi-printer"></i><span>Печать</span></button>
+                    <button id="save-btn" class="sales-save-btn" type="button"><i class="bi bi-check-lg"></i><span>Сохранить</span></button>
+                </div>
             </div>
+        </section>
+
+        <div class="mobile-view-toggler sales-mobile-switch">
+            <button class="sales-mobile-tab active" id="tab-input-btn" type="button">Ввод продаж</button>
+            <button class="sales-mobile-tab" id="tab-summary-btn" type="button">Сводка</button>
         </div>
 
-        <div id="sales-top-dashboard" class="row g-2 mb-4"></div>
+        <section class="sales-toolbar">
+            <div class="sales-search-box">
+                <i class="bi bi-search"></i>
+                <input id="sales-search" type="search" placeholder="Найти дилера…">
+            </div>
+            <select id="sales-area-filter" class="sales-area-filter" aria-label="Фильтр">
+                <option value="all">Все группы</option>
+                <option value="astana">Астана</option>
+                <option value="regions">Регионы</option>
+                <option value="vip">Индивидуальные планы</option>
+                <option value="other">Без категории</option>
+            </select>
+            <button id="collapse-groups-btn" class="sales-toolbar-btn" type="button"><i class="bi bi-arrows-collapse"></i> Свернуть группы</button>
+        </section>
 
-        <div class="row g-4 mb-5">
-            <div class="col-lg-7" id="sales-container-col">
-                <div id="sales-container" class="d-flex flex-column gap-3">
-                    <p class="text-center mt-5 text-muted"><span class="spinner-border spinner-border-sm"></span> Загрузка...</p>
-                </div>
+        <div class="row g-3 g-xl-4 mb-5 sales-layout">
+            <div class="col-xl-7 col-lg-7" id="sales-container-col">
+                <section class="sales-work-panel">
+                    <div class="sales-section-head">
+                        <div>
+                            <h2>Фактические продажи</h2>
+                            <p>Введите объём продаж в м² по каждому дилеру.</p>
+                        </div>
+                        <div class="sales-column-label">Факт, м²</div>
+                    </div>
+                    <div id="sales-container" class="sales-groups">
+                        <div class="cc-empty"><span class="spinner-border spinner-border-sm me-2"></span>Загрузка…</div>
+                    </div>
+                    <div id="sales-no-results" class="sales-no-results d-none">
+                        <i class="bi bi-search"></i>
+                        <strong>Ничего не найдено</strong>
+                        <span>Измените поиск или фильтр.</span>
+                    </div>
+                </section>
             </div>
 
-            <div class="col-lg-5 mobile-hidden" id="summary-col">
-                <div class="card border-0 shadow-sm rounded-4 overflow-hidden sticky-top" style="top: 20px; z-index: 10;">
-                    <div class="card-header bg-white border-0 pt-4 px-4 pb-2">
-                        <h5 class="fw-bold mb-0">Сводная ведомость</h5>
+            <div class="col-xl-5 col-lg-5 mobile-hidden" id="summary-col">
+                <section class="sales-summary-panel sticky-top">
+                    <div class="sales-section-head">
+                        <div>
+                            <h2>Сводка</h2>
+                            <p>План, факт и прогноз на выбранный месяц.</p>
+                        </div>
                     </div>
-                    <div class="card-body px-0 pt-0 custom-scroll" style="max-height: calc(100vh - 200px); overflow-y: auto;">
-                        <div id="summary-list" class="summary-list-container"></div>
+                    <div id="summary-list" class="summary-list-container sales-summary-list"></div>
+                    <div class="sales-summary-note">
+                        <i class="bi bi-info-circle"></i>
+                        <span>Прогноз рассчитывается по темпу продаж на текущую дату.</span>
                     </div>
-                    <div class="card-footer bg-white border-top p-3 no-print">
-                         <div class="d-flex align-items-center gap-2 small text-muted">
-                             <i class="bi bi-info-circle-fill text-primary"></i> 
-                             <span>Прогноз от текущего дня.</span>
-                         </div>
-                    </div>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <div class="modal fade" id="sales-custom-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content sales-modal">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title">Добавить продажу</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label small text-muted">Название дилера или примечание</label>
+                    <input id="custom-sale-name" type="text" class="form-control" placeholder="Например: разовая продажа">
+                    <div id="custom-sale-group-label" class="small text-muted mt-2"></div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="sales-secondary-btn" data-bs-dismiss="modal">Отмена</button>
+                    <button id="custom-sale-save" type="button" class="sales-save-btn">Добавить</button>
                 </div>
             </div>
         </div>
@@ -130,8 +185,8 @@
     </div>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="sales.js?v={{VER}}"></script> 
-    <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(err => console.error(err)); }</script>
     <script src="permissions.js?v={{VER}}"></script>
+    <script src="sales.js?v={{VER}}"></script>
+    <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(err => console.error(err)); }</script>
 </body>
 </html>
