@@ -257,106 +257,322 @@
         </div>
     </div>
 
-    <div class="modal fade" id="add-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-        <div class="modal-dialog modal-xl modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header border-0 pb-0"><h5 class="modal-title fw-bold">Новый дилер</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-                <div class="modal-body pt-0">
-                    <div class="wizard-progress-container my-4">
-                        <div class="wizard-progress-bar"></div>
-                        <div class="wizard-steps-wrapper"><div class="step-circle active" id="step-ind-1">1</div><div class="step-circle" id="step-ind-2">2</div><div class="step-circle" id="step-ind-3">3</div><div class="step-circle" id="step-ind-4">4</div></div>
-                        <div class="d-flex justify-content-between px-2 mt-2 text-muted small fw-bold"><span>Основное</span><span>Контакты</span><span>Маркетинг</span><span>Матрица</span></div>
+    <div class="modal fade dealer-form-modal" id="add-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
+            <div class="modal-content dealer-form-content">
+                <div class="dealer-modal-header">
+                    <div>
+                        <div class="dealer-modal-kicker">IDEAL FLOOR CRM</div>
+                        <h2 class="modal-title">Новый дилер</h2>
+                        <p>Добавьте основные данные, контакты и информацию для работы с дилером.</p>
                     </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                </div>
+
+                <div class="dealer-wizard-nav">
+                    <div class="dealer-wizard-step-label active" data-step="1">
+                        <span class="step-circle active" id="step-ind-1">1</span>
+                        <div><strong>Основное</strong><small>Кто и где</small></div>
+                    </div>
+                    <div class="dealer-wizard-step-label" data-step="2">
+                        <span class="step-circle" id="step-ind-2">2</span>
+                        <div><strong>Контакты</strong><small>Условия и реквизиты</small></div>
+                    </div>
+                    <div class="dealer-wizard-step-label" data-step="3">
+                        <span class="step-circle" id="step-ind-3">3</span>
+                        <div><strong>Работа</strong><small>Локация, визиты, фото</small></div>
+                    </div>
+                    <div class="dealer-wizard-step-label" data-step="4">
+                        <span class="step-circle" id="step-ind-4">4</span>
+                        <div><strong>Товары</strong><small>Стенды и рынок</small></div>
+                    </div>
+                </div>
+
+                <div class="modal-body dealer-modal-body">
                     <form id="add-dealer-form">
                         <div class="wizard-step active" id="step-1">
-                            <div class="row g-4">
-                                <div class="col-md-3"><label class="form-label text-secondary small fw-bold">ID Дилера *</label><input type="text" id="dealer_id" class="form-control fw-bold" placeholder="IF000" required></div>
-                                <div class="col-md-9"><label class="form-label text-secondary small fw-bold">Название Компании *</label><input type="text" id="name" class="form-control fw-bold" placeholder="Название торговой точки" required></div>
-                                <div class="col-md-4"><label class="form-label text-secondary small fw-bold">Город</label><input type="text" id="city" class="form-control" placeholder="Астана"></div>
-                                <div class="col-md-8"><label class="form-label text-secondary small fw-bold">Адрес (текст)</label><input type="text" id="address" class="form-control" placeholder="Улица, дом..."></div>
-                                <div class="col-12"><div class="p-3 bg-light rounded-3 border"><div class="row align-items-center"><div class="col-auto"><img id="add-avatar-preview" class="avatar-preview bg-white shadow-sm" src="" alt="Avatar"></div><div class="col"><label class="form-label fw-bold mb-1">Логотип / Фото фасада</label><input type="file" id="add-avatar-input" class="form-control form-control-sm" accept="image/*"></div></div></div></div>
-                                
-                                <div class="col-md-6">
-                                    <label class="form-label text-secondary small fw-bold">Ответственный</label>
-                                    <div class="d-flex flex-column gap-2">
+                            <div class="dealer-step-intro">
+                                <div>
+                                    <span class="dealer-step-number">01</span>
+                                    <h3>Основная информация</h3>
+                                    <p>Сначала заполним то, что нужно для появления дилера в CRM.</p>
+                                </div>
+                                <span class="dealer-required-note"><i class="bi bi-asterisk"></i> обязательные поля</span>
+                            </div>
+
+                            <section class="dealer-form-section">
+                                <div class="dealer-section-title">
+                                    <span class="dealer-section-icon"><i class="bi bi-shop"></i></span>
+                                    <div><strong>Дилер</strong><small>Название, ID и статус</small></div>
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label class="dealer-field-label">ID дилера <em>*</em></label>
+                                        <input type="text" id="dealer_id" class="form-control" placeholder="Например: IF001" required>
+                                        <div class="dealer-field-hint">Внутренний уникальный код.</div>
+                                    </div>
+                                    <div class="col-md-8">
+                                        <label class="dealer-field-label">Название <em>*</em></label>
+                                        <input type="text" id="name" class="form-control" placeholder="Название магазина или компании" required>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="dealer-field-label">Статус</label>
+                                        <select id="status" class="form-select">
+                                            <option value="potential">Потенциальный</option>
+                                            <option value="active">Активный</option>
+                                            <option value="standard" selected>Стандарт</option>
+                                            <option value="problem">Проблемный</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="dealer-field-label">Город</label>
+                                        <input type="text" id="city" class="form-control" placeholder="Астана">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="dealer-field-label">Адрес</label>
+                                        <input type="text" id="address" class="form-control" placeholder="Улица, дом">
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="dealer-form-section">
+                                <div class="dealer-section-title">
+                                    <span class="dealer-section-icon"><i class="bi bi-person-badge"></i></span>
+                                    <div><strong>Ответственный и план</strong><small>Кто ведёт дилера и как учитывать продажи</small></div>
+                                </div>
+                                <div class="row g-3 align-items-start">
+                                    <div class="col-md-6">
+                                        <label class="dealer-field-label">Ответственный</label>
                                         <select id="responsible" class="form-select" onchange="toggleSectorSelect('add', this.value)">
-                                            <option value="">-- Не выбран --</option>
+                                            <option value="">Не выбран</option>
                                             <option value="regional_astana">Региональный Астана</option>
                                             <option value="regional_regions">Региональный Регионы</option>
                                         </select>
-                                        
-                                        <div id="add_sector_wrapper" class="input-group" style="display:none;">
-                                            <span class="input-group-text bg-light text-muted small">Сектор</span>
+                                        <div id="add_sector_wrapper" class="dealer-sector-row mt-2" style="display:none;">
                                             <select id="add_region_sector" class="form-select"></select>
-                                            <button type="button" class="btn btn-outline-secondary" onclick="openSectorManagerFromModal('add')">
-                                                <i class="bi bi-gear-fill"></i>
-                                            </button>
+                                            <button type="button" class="dealer-small-icon-btn" onclick="openSectorManagerFromModal('add')" title="Настроить сектора"><i class="bi bi-gear"></i></button>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="dealer-toggle-card">
+                                            <div>
+                                                <strong>Индивидуальный план</strong>
+                                                <small>Включите, если у дилера свой отдельный план продаж.</small>
+                                            </div>
+                                            <div class="form-check form-switch m-0">
+                                                <input class="form-check-input" type="checkbox" id="add_has_personal_plan">
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                                <div class="col-md-6"><label class="form-label text-secondary small fw-bold">Статус</label><select id="status" class="form-select"><option value="potential">🔵 Потенциальный</option><option value="active">🟢 Активный</option><option value="standard" selected>🟡 Стандарт</option><option value="problem">🔴 Проблемный</option></select></div>
-                                
-                                <div class="col-12">
-                                    <label class="form-label text-secondary small fw-bold">Геолокация</label>
-                                    <div class="input-group mb-2">
-                                        <input type="text" id="add-smart-search" class="form-control" placeholder="Введите адрес или вставьте координаты (51.12, 71.45)...">
-                                        <button type="button" class="btn btn-outline-secondary" id="btn-search-add"><i class="bi bi-search"></i> Найти</button>
-                                        <button type="button" class="btn btn-outline-primary" id="btn-loc-add" title="Мое местоположение"><i class="bi bi-geo-alt-fill"></i></button>
+                            </section>
+
+                            <section class="dealer-form-section dealer-avatar-section">
+                                <div class="dealer-section-title mb-0">
+                                    <span class="dealer-section-icon"><i class="bi bi-image"></i></span>
+                                    <div><strong>Фото или логотип</strong><small>Необязательно — можно добавить позже</small></div>
+                                </div>
+                                <div class="dealer-avatar-uploader">
+                                    <img id="add-avatar-preview" class="avatar-preview" src="" alt="Фото дилера">
+                                    <div class="flex-grow-1">
+                                        <input type="file" id="add-avatar-input" class="form-control" accept="image/*">
+                                        <div class="dealer-field-hint">Логотип компании или фото фасада магазина.</div>
                                     </div>
-                                    <div id="add-map" class="rounded-3 border" style="height: 300px; width: 100%; background: #eee;"></div>
-                                    <div class="input-group input-group-sm mt-2">
-                                        <span class="input-group-text text-muted">Широта</span><input type="text" id="add_latitude" class="form-control bg-white" readonly>
-                                        <span class="input-group-text text-muted">Долгота</span><input type="text" id="add_longitude" class="form-control bg-white" readonly>
-                                    </div>
+                                </div>
+                            </section>
+                        </div>
+
+                        <div class="wizard-step" id="step-2">
+                            <div class="dealer-step-intro">
+                                <div>
+                                    <span class="dealer-step-number">02</span>
+                                    <h3>Контакты и условия</h3>
+                                    <p>Контактные лица, юридические данные и коммерческие условия.</p>
                                 </div>
                             </div>
-                        </div>
-                        <div class="wizard-step" id="step-2">
+
                             <div class="row g-3">
-                                <div class="col-md-6">
-                                    <label class="form-label text-secondary small fw-bold">Юр. Лица (Организации)</label>
-                                    <div id="add-org-list" class="d-flex flex-column gap-2 mb-2"></div>
-                                    <button type="button" class="btn btn-sm btn-outline-secondary w-100" id="btn-add-org-add">+ Организация</button>
+                                <div class="col-lg-7">
+                                    <section class="dealer-form-section h-100">
+                                        <div class="dealer-section-title">
+                                            <span class="dealer-section-icon"><i class="bi bi-telephone"></i></span>
+                                            <div><strong>Контактные лица</strong><small>Менеджеры, владельцы, закупщики</small></div>
+                                            <button type="button" class="dealer-add-inline" id="add-contact-btn-add-modal"><i class="bi bi-plus-lg"></i> Контакт</button>
+                                        </div>
+                                        <div id="add-contact-list" class="list-container dealer-dynamic-list"></div>
+                                    </section>
                                 </div>
-                                <div class="col-md-6"><label class="form-label text-secondary small fw-bold">Тип цен</label><input type="text" id="price_type" class="form-control"></div>
-                                
-                                <div class="col-12">
-                                    <div class="p-2 border rounded bg-light d-flex align-items-center justify-content-between">
-                                        <div class="form-check form-switch ms-2">
-                                            <input class="form-check-input" type="checkbox" id="add_contract_signed">
-                                            <label class="form-check-label fw-bold" for="add_contract_signed">Договор подписан</label>
+                                <div class="col-lg-5">
+                                    <section class="dealer-form-section h-100">
+                                        <div class="dealer-section-title">
+                                            <span class="dealer-section-icon"><i class="bi bi-building"></i></span>
+                                            <div><strong>Организации</strong><small>Юридические лица дилера</small></div>
                                         </div>
-                                        <div class="d-flex align-items-center gap-2">
-                                            <span class="small text-muted">Дата:</span>
-                                            <input type="date" id="add_contract_date" class="form-control form-control-sm" style="width: auto;">
-                                        </div>
-                                    </div>
+                                        <div id="add-org-list" class="d-flex flex-column gap-2"></div>
+                                        <button type="button" class="dealer-add-wide mt-2" id="btn-add-org-add"><i class="bi bi-plus-lg"></i> Добавить организацию</button>
+                                    </section>
                                 </div>
 
-                                <div class="col-md-4"><label class="form-label text-secondary small fw-bold">Сайт</label><input type="text" id="website" class="form-control"></div>
-                                <div class="col-md-4"><label class="form-label text-secondary small fw-bold">Instagram</label><input type="text" id="instagram" class="form-control"></div>
-                                <div class="col-md-4"><label class="form-label text-secondary small fw-bold">Доставка</label><input type="text" id="delivery" class="form-control"></div>
-                                <div class="col-12 mt-4"><div class="d-flex justify-content-between align-items-center mb-2 border-bottom pb-2"><label class="form-label fw-bold mb-0 text-primary">Контакты</label><button type="button" id="add-contact-btn-add-modal" class="btn btn-sm btn-light border">+ Добавить</button></div><div id="add-contact-list" class="list-container"></div></div>
-                                <div class="col-12 mt-2"><div class="d-flex justify-content-between align-items-center mb-2 border-bottom pb-2"><label class="form-label fw-bold mb-0 text-primary">Доп. адреса</label><button type="button" id="add-address-btn-add-modal" class="btn btn-sm btn-light border">+ Добавить</button></div><div id="add-address-list" class="list-container"></div></div>
+                                <div class="col-12">
+                                    <section class="dealer-form-section">
+                                        <div class="dealer-section-title">
+                                            <span class="dealer-section-icon"><i class="bi bi-receipt"></i></span>
+                                            <div><strong>Условия работы</strong><small>Тип цен, договор, сайт и доставка</small></div>
+                                        </div>
+                                        <div class="row g-3">
+                                            <div class="col-md-4">
+                                                <label class="dealer-field-label">Тип цен</label>
+                                                <input type="text" id="price_type" class="form-control" placeholder="Например: Дилер">
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="dealer-field-label">Доставка</label>
+                                                <input type="text" id="delivery" class="form-control" placeholder="Условия доставки">
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="dealer-field-label">Дата договора</label>
+                                                <input type="date" id="add_contract_date" class="form-control">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="dealer-field-label">Сайт</label>
+                                                <input type="text" id="website" class="form-control" placeholder="https://...">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="dealer-field-label">Instagram</label>
+                                                <input type="text" id="instagram" class="form-control" placeholder="@username">
+                                            </div>
+                                            <div class="col-12">
+                                                <div class="dealer-toggle-card compact">
+                                                    <div><strong>Договор подписан</strong><small>Отметьте, если договор уже действует.</small></div>
+                                                    <div class="form-check form-switch m-0">
+                                                        <input class="form-check-input" type="checkbox" id="add_contract_signed">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </section>
+                                </div>
+
+                                <div class="col-12">
+                                    <section class="dealer-form-section">
+                                        <div class="dealer-section-title">
+                                            <span class="dealer-section-icon"><i class="bi bi-geo-alt"></i></span>
+                                            <div><strong>Дополнительные адреса</strong><small>Филиалы, склады и дополнительные магазины</small></div>
+                                            <button type="button" class="dealer-add-inline" id="add-address-btn-add-modal"><i class="bi bi-plus-lg"></i> Адрес</button>
+                                        </div>
+                                        <div id="add-address-list" class="list-container dealer-dynamic-list"></div>
+                                    </section>
+                                </div>
                             </div>
                         </div>
+
                         <div class="wizard-step" id="step-3">
-                            <div class="row g-4">
-                                <div class="col-12"><div class="d-flex justify-content-between align-items-center mb-2 border-bottom pb-2"><label class="form-label fw-bold mb-0 text-primary">Стенды и Образцы</label><button type="button" id="add-pos-btn-add-modal" class="btn btn-sm btn-light border">+ Стенд</button></div><div id="add-pos-list" class="list-container"></div></div>
-                                <div class="col-12"><div class="d-flex justify-content-between align-items-center mb-2 border-bottom pb-2"><label class="form-label fw-bold mb-0 text-primary">Конкуренты</label><button type="button" id="add-competitor-btn-add-modal" class="btn btn-sm btn-light border">+ Конкурент</button></div><div class="d-none d-md-flex px-2 mb-1 text-muted small fw-bold"><div style="flex: 2;">Бренд</div><div style="flex: 2;">Коллекция</div><div style="flex: 1;">Цена ОПТ</div><div style="flex: 1;">Цена Розница</div><div style="width: 32px;"></div></div><div id="add-competitor-list" class="list-container"></div></div>
-                                <div class="col-12"><label class="form-label fw-bold">Фотоотчет</label><input type="file" id="add-photo-input" class="form-control mb-2" multiple accept="image/*"><div id="add-photo-preview-container" class="photo-preview-grid"></div></div>
-                                <div class="col-12"><div class="d-flex justify-content-between align-items-center mb-2 border-bottom pb-2"><label class="form-label fw-bold mb-0 text-primary">История Визитов</label><button type="button" id="add-visits-btn-add-modal" class="btn btn-sm btn-light border">+ Запись</button></div><div id="add-visits-list" class="list-container"></div></div>
+                            <div class="dealer-step-intro">
+                                <div>
+                                    <span class="dealer-step-number">03</span>
+                                    <h3>Работа с дилером</h3>
+                                    <p>Локация, визиты, фотографии и рабочие заметки.</p>
+                                </div>
+                            </div>
+
+                            <section class="dealer-form-section">
+                                <div class="dealer-section-title">
+                                    <span class="dealer-section-icon"><i class="bi bi-map"></i></span>
+                                    <div><strong>Локация</strong><small>Найдите адрес или поставьте точку на карте</small></div>
+                                </div>
+                                <div class="dealer-location-search">
+                                    <input type="text" id="add-smart-search" class="form-control" placeholder="Введите адрес или координаты">
+                                    <button type="button" class="dealer-secondary-action" id="btn-search-add"><i class="bi bi-search"></i> Найти</button>
+                                    <button type="button" class="dealer-icon-action" id="btn-loc-add" title="Мое местоположение"><i class="bi bi-crosshair"></i></button>
+                                </div>
+                                <div id="add-map" class="dealer-map"></div>
+                                <div class="dealer-coordinates">
+                                    <label>Широта <input type="text" id="add_latitude" class="form-control" readonly></label>
+                                    <label>Долгота <input type="text" id="add_longitude" class="form-control" readonly></label>
+                                </div>
+                            </section>
+
+                            <div class="row g-3">
+                                <div class="col-lg-7">
+                                    <section class="dealer-form-section h-100">
+                                        <div class="dealer-section-title">
+                                            <span class="dealer-section-icon"><i class="bi bi-calendar-check"></i></span>
+                                            <div><strong>История визитов</strong><small>Можно оставить пустой при создании</small></div>
+                                            <button type="button" class="dealer-add-inline" id="add-visits-btn-add-modal"><i class="bi bi-plus-lg"></i> Визит</button>
+                                        </div>
+                                        <div id="add-visits-list" class="list-container dealer-dynamic-list"></div>
+                                    </section>
+                                </div>
+                                <div class="col-lg-5">
+                                    <section class="dealer-form-section h-100">
+                                        <div class="dealer-section-title">
+                                            <span class="dealer-section-icon"><i class="bi bi-camera"></i></span>
+                                            <div><strong>Фотоотчёт</strong><small>Фото магазина, стендов и выкладки</small></div>
+                                        </div>
+                                        <input type="file" id="add-photo-input" class="form-control" multiple accept="image/*">
+                                        <div id="add-photo-preview-container" class="photo-preview-grid mt-2"></div>
+                                    </section>
+                                </div>
+                                <div class="col-12">
+                                    <section class="dealer-form-section">
+                                        <label class="dealer-field-label">Заметки и особые условия</label>
+                                        <textarea id="bonuses" class="form-control" rows="3" placeholder="Бонусы, договорённости, особенности работы с дилером..."></textarea>
+                                    </section>
+                                </div>
                             </div>
                         </div>
+
                         <div class="wizard-step" id="step-4">
-                            <div class="mb-3"><label class="form-label fw-bold">Бонусы и Примечания</label><textarea id="bonuses" class="form-control" rows="3" placeholder="Особые условия..."></textarea></div>
-                            <div><label class="form-label fw-bold">Выставленный товар (Ламинат)</label><div class="alert alert-info py-2 small"><i class="bi bi-info-circle me-2"></i>Отметьте галочками товары на выставке.</div><div id="add-product-checklist" class="product-checklist bg-white"><p class="text-center text-muted">Загрузка каталога...</p></div></div>
+                            <div class="dealer-step-intro">
+                                <div>
+                                    <span class="dealer-step-number">04</span>
+                                    <h3>Товары и рынок</h3>
+                                    <p>Стенды, выставленный ламинат и информация о конкурентах.</p>
+                                </div>
+                            </div>
+
+                            <div class="row g-3">
+                                <div class="col-lg-5">
+                                    <section class="dealer-form-section h-100">
+                                        <div class="dealer-section-title">
+                                            <span class="dealer-section-icon"><i class="bi bi-grid-3x3-gap"></i></span>
+                                            <div><strong>Стенды и образцы</strong><small>POS-материалы у дилера</small></div>
+                                            <button type="button" class="dealer-add-inline" id="add-pos-btn-add-modal"><i class="bi bi-plus-lg"></i> Стенд</button>
+                                        </div>
+                                        <div id="add-pos-list" class="list-container dealer-dynamic-list"></div>
+                                    </section>
+                                </div>
+                                <div class="col-lg-7">
+                                    <section class="dealer-form-section h-100">
+                                        <div class="dealer-section-title">
+                                            <span class="dealer-section-icon"><i class="bi bi-box-seam"></i></span>
+                                            <div><strong>Выставленный товар</strong><small>Отметьте декоры, которые представлены у дилера</small></div>
+                                        </div>
+                                        <div id="add-product-checklist" class="product-checklist dealer-product-checklist"><p class="text-center text-muted">Загрузка каталога...</p></div>
+                                    </section>
+                                </div>
+                                <div class="col-12">
+                                    <section class="dealer-form-section">
+                                        <div class="dealer-section-title">
+                                            <span class="dealer-section-icon"><i class="bi bi-bar-chart"></i></span>
+                                            <div><strong>Конкуренты</strong><small>Бренды и цены, которые представлены рядом</small></div>
+                                            <button type="button" class="dealer-add-inline" id="add-competitor-btn-add-modal"><i class="bi bi-plus-lg"></i> Конкурент</button>
+                                        </div>
+                                        <div id="add-competitor-list" class="list-container dealer-dynamic-list"></div>
+                                    </section>
+                                </div>
+                            </div>
                         </div>
                     </form>
                 </div>
-                <div class="modal-footer justify-content-between border-0 pt-0">
-                    <button type="button" class="btn btn-light px-4" id="btn-prev-step" style="display:none;">Назад</button>
-                    <div><button type="button" class="btn btn-primary px-4 rounded-pill" id="btn-next-step">Далее <i class="bi bi-arrow-right ms-2"></i></button><button type="submit" form="add-dealer-form" class="btn btn-success px-4 rounded-pill" id="btn-finish-step" style="display:none;"><i class="bi bi-check-lg me-2"></i>Сохранить</button></div>
+
+                <div class="modal-footer dealer-modal-footer">
+                    <button type="button" class="dealer-footer-secondary" id="btn-prev-step" style="display:none;"><i class="bi bi-arrow-left"></i> Назад</button>
+                    <div class="dealer-footer-progress"><span id="dealer-step-caption">Шаг 1 из 4</span></div>
+                    <div class="ms-auto d-flex gap-2">
+                        <button type="button" class="dealer-footer-ghost" data-bs-dismiss="modal">Отмена</button>
+                        <button type="button" class="dealer-footer-primary" id="btn-next-step">Далее <i class="bi bi-arrow-right"></i></button>
+                        <button type="submit" form="add-dealer-form" class="dealer-footer-save" id="btn-finish-step" style="display:none;"><i class="bi bi-check-lg"></i> Создать дилера</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -365,120 +581,276 @@
     <datalist id="pos-materials-datalist"></datalist>
     <datalist id="brands-datalist"></datalist>
 
-    <div class="modal fade" id="edit-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-        <div class="modal-dialog modal-xl modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header"><h2 class="modal-title fs-5">Редактировать</h2><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-                <div class="modal-body">
+    <div class="modal fade dealer-form-modal" id="edit-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
+            <div class="modal-content dealer-form-content">
+                <div class="dealer-modal-header">
+                    <div>
+                        <div class="dealer-modal-kicker">КАРТОЧКА ДИЛЕРА</div>
+                        <h2 class="modal-title">Редактирование дилера</h2>
+                        <p id="edit-modal-subtitle">Измените только нужные данные — остальное можно оставить как есть.</p>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                </div>
+
+                <div class="dealer-edit-nav-wrap">
+                    <ul class="nav dealer-edit-nav" id="editTabs" role="tablist">
+                        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-main" type="button"><i class="bi bi-shop"></i><span>Основное</span></button></li>
+                        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-contacts" type="button"><i class="bi bi-person-lines-fill"></i><span>Контакты</span></button></li>
+                        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-map" type="button"><i class="bi bi-map"></i><span>Локация</span></button></li>
+                        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-work" type="button"><i class="bi bi-calendar-check"></i><span>Работа</span></button></li>
+                        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-market" type="button"><i class="bi bi-box-seam"></i><span>Товары и рынок</span></button></li>
+                    </ul>
+                </div>
+
+                <div class="modal-body dealer-modal-body">
                     <form id="edit-dealer-form">
-                        <input type="hidden" id="edit_db_id"><input type="hidden" id="edit-current-avatar-url">
-                        <ul class="nav nav-tabs modal-tabs" id="editTabs" role="tablist">
-                            <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-main" type="button">Основное</button></li>
-                            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-contacts" type="button">Контакты</button></li>
-                            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-map" type="button">Карта</button></li>
-                            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-marketing" type="button">Маркетинг</button></li>
-                            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-samples" type="button">Образцы</button></li>
-                            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-competitors" type="button">Конкуренты</button></li>
-                        </ul>
-                        <div class="tab-content p-2">
+                        <input type="hidden" id="edit_db_id">
+                        <input type="hidden" id="edit-current-avatar-url">
+
+                        <div class="tab-content">
                             <div class="tab-pane fade show active" id="tab-main">
                                 <div class="row g-3">
-                                    <div class="col-md-6"><label class="form-label">ID</label><input type="text" id="edit_dealer_id" class="form-control" required></div>
-                                    <div class="col-md-6"><label class="form-label">Название</label><input type="text" id="edit_name" class="form-control" required></div>
-                                    <div class="col-md-6"><label class="form-label">Аватар:</label><input type="file" id="edit-avatar-input" class="form-control"></div>
-                                    <div class="col-md-6"><img id="edit-avatar-preview" class="avatar-preview" src=""></div>
-                                    
-                                    <div class="col-md-6">
-                                        <label class="form-label">Ответственный:</label>
-                                        <div class="d-flex flex-column gap-2">
-                                            <select id="edit_responsible" class="form-select" onchange="toggleSectorSelect('edit', this.value)">
-                                                <option value="">-- Не выбран --</option>
-                                                <option value="regional_astana">Региональный Астана</option>
-                                                <option value="regional_regions">Региональный Регионы</option>
-                                            </select>
-                                            
-                                            <div id="edit_sector_wrapper" class="input-group" style="display:none;">
-                                                <span class="input-group-text bg-light text-muted small">Сектор</span>
-                                                <select id="edit_region_sector" class="form-select"></select>
-                                                <button type="button" class="btn btn-outline-secondary" onclick="openSectorManagerFromModal('edit')">
-                                                    <i class="bi bi-gear-fill"></i>
-                                                </button>
+                                    <div class="col-lg-8">
+                                        <section class="dealer-form-section h-100">
+                                            <div class="dealer-section-title">
+                                                <span class="dealer-section-icon"><i class="bi bi-shop"></i></span>
+                                                <div><strong>Основная информация</strong><small>Название, статус и ответственный</small></div>
                                             </div>
-                                        </div>
+                                            <div class="row g-3">
+                                                <div class="col-md-4">
+                                                    <label class="dealer-field-label">ID дилера</label>
+                                                    <input type="text" id="edit_dealer_id" class="form-control" required>
+                                                </div>
+                                                <div class="col-md-8">
+                                                    <label class="dealer-field-label">Название</label>
+                                                    <input type="text" id="edit_name" class="form-control" required>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="dealer-field-label">Статус</label>
+                                                    <select id="edit_status" class="form-select">
+                                                        <option value="standard">Стандарт</option>
+                                                        <option value="active">Активный</option>
+                                                        <option value="problem">Проблемный</option>
+                                                        <option value="potential">Потенциальный</option>
+                                                        <option value="archive">Архив</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="dealer-field-label">Город</label>
+                                                    <input type="text" id="edit_city" class="form-control">
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="dealer-field-label">Адрес</label>
+                                                    <input type="text" id="edit_address" class="form-control">
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="dealer-field-label">Ответственный</label>
+                                                    <select id="edit_responsible" class="form-select" onchange="toggleSectorSelect('edit', this.value)">
+                                                        <option value="">Не выбран</option>
+                                                        <option value="regional_astana">Региональный Астана</option>
+                                                        <option value="regional_regions">Региональный Регионы</option>
+                                                    </select>
+                                                    <div id="edit_sector_wrapper" class="dealer-sector-row mt-2" style="display:none;">
+                                                        <select id="edit_region_sector" class="form-select"></select>
+                                                        <button type="button" class="dealer-small-icon-btn" onclick="openSectorManagerFromModal('edit')" title="Настроить сектора"><i class="bi bi-gear"></i></button>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="dealer-toggle-card h-100">
+                                                        <div>
+                                                            <strong>Индивидуальный план</strong>
+                                                            <small>Отдельный план продаж для этого дилера.</small>
+                                                        </div>
+                                                        <div class="form-check form-switch m-0">
+                                                            <input class="form-check-input" type="checkbox" id="edit_has_personal_plan">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-12">
+                                                    <label class="dealer-field-label">Заметки и особые условия</label>
+                                                    <textarea id="edit_bonuses" class="form-control" rows="3"></textarea>
+                                                </div>
+                                            </div>
+                                        </section>
                                     </div>
 
-                                    <div class="col-md-6"><label class="form-label">Статус:</label><select id="edit_status" class="form-select"><option value="standard">🟡 Стандарт</option><option value="active">🟢 Активный</option><option value="problem">🔴 Проблемный</option><option value="potential">🔵 Потенциальный</option><option value="archive">⚫ Архив</option></select></div>
-                                    <div class="col-md-6"><label class="form-label">Город</label><input type="text" id="edit_city" class="form-control"></div>
-                                    <div class="col-md-6"><label class="form-label">Адрес</label><input type="text" id="edit_address" class="form-control"></div>
-                                    
-                                    <div class="col-12 mt-3">
-                                        <div class="p-3 border rounded bg-light">
-                                            <div class="form-check form-switch">
-                                                <input class="form-check-input" type="checkbox" id="edit_has_personal_plan">
-                                                <label class="form-check-label fw-bold" for="edit_has_personal_plan">
-                                                    Персональный план
-                                                </label>
-                                                <div class="form-text text-muted small">Если включено, дилер будет показан отдельной строкой в сводке продаж.</div>
+                                    <div class="col-lg-4">
+                                        <section class="dealer-form-section h-100 dealer-avatar-panel">
+                                            <div class="dealer-section-title">
+                                                <span class="dealer-section-icon"><i class="bi bi-image"></i></span>
+                                                <div><strong>Фото дилера</strong><small>Логотип или фасад</small></div>
                                             </div>
-                                        </div>
+                                            <img id="edit-avatar-preview" class="avatar-preview dealer-edit-avatar" src="" alt="Фото дилера">
+                                            <input type="file" id="edit-avatar-input" class="form-control mt-3" accept="image/*">
+                                        </section>
                                     </div>
-
-                                    <div class="col-12"><label class="form-label">Бонусы:</label><textarea id="edit_bonuses" class="form-control" rows="2"></textarea></div>
                                 </div>
                             </div>
+
                             <div class="tab-pane fade" id="tab-contacts">
                                 <div class="row g-3">
-                                    <div class="col-md-6">
-                                        <label class="form-label">Юр. Лица (Организации)</label>
-                                        <div id="edit-org-list" class="d-flex flex-column gap-2 mb-2"></div>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary w-100" id="btn-edit-org-add">+ Организация</button>
+                                    <div class="col-lg-7">
+                                        <section class="dealer-form-section h-100">
+                                            <div class="dealer-section-title">
+                                                <span class="dealer-section-icon"><i class="bi bi-telephone"></i></span>
+                                                <div><strong>Контактные лица</strong><small>Телефоны и ответственные сотрудники</small></div>
+                                                <button type="button" class="dealer-add-inline" id="add-contact-btn-edit-modal"><i class="bi bi-plus-lg"></i> Контакт</button>
+                                            </div>
+                                            <div id="edit-contact-list" class="list-container dealer-dynamic-list"></div>
+                                        </section>
                                     </div>
-                                    <div class="col-md-6"><label class="form-label">Тип цен</label><input type="text" id="edit_price_type" class="form-control"></div>
-                                    
+                                    <div class="col-lg-5">
+                                        <section class="dealer-form-section h-100">
+                                            <div class="dealer-section-title">
+                                                <span class="dealer-section-icon"><i class="bi bi-building"></i></span>
+                                                <div><strong>Организации</strong><small>Юридические лица</small></div>
+                                            </div>
+                                            <div id="edit-org-list" class="d-flex flex-column gap-2"></div>
+                                            <button type="button" class="dealer-add-wide mt-2" id="btn-edit-org-add"><i class="bi bi-plus-lg"></i> Добавить организацию</button>
+                                        </section>
+                                    </div>
+
                                     <div class="col-12">
-                                        <div class="p-2 border rounded bg-light d-flex align-items-center justify-content-between">
-                                            <div class="form-check form-switch ms-2">
-                                                <input class="form-check-input" type="checkbox" id="edit_contract_signed">
-                                                <label class="form-check-label fw-bold" for="edit_contract_signed">Договор подписан</label>
+                                        <section class="dealer-form-section">
+                                            <div class="dealer-section-title">
+                                                <span class="dealer-section-icon"><i class="bi bi-receipt"></i></span>
+                                                <div><strong>Условия работы</strong><small>Коммерческие и договорные данные</small></div>
                                             </div>
-                                            <div class="d-flex align-items-center gap-2">
-                                                <span class="small text-muted">Дата:</span>
-                                                <input type="date" id="edit_contract_date" class="form-control form-control-sm" style="width: auto;">
+                                            <div class="row g-3">
+                                                <div class="col-md-4">
+                                                    <label class="dealer-field-label">Тип цен</label>
+                                                    <input type="text" id="edit_price_type" class="form-control">
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="dealer-field-label">Доставка</label>
+                                                    <input type="text" id="edit_delivery" class="form-control">
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="dealer-field-label">Дата договора</label>
+                                                    <input type="date" id="edit_contract_date" class="form-control">
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="dealer-field-label">Сайт</label>
+                                                    <input type="text" id="edit_website" class="form-control">
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="dealer-field-label">Instagram</label>
+                                                    <input type="text" id="edit_instagram" class="form-control">
+                                                </div>
+                                                <div class="col-12">
+                                                    <div class="dealer-toggle-card compact">
+                                                        <div><strong>Договор подписан</strong><small>Договор действует.</small></div>
+                                                        <div class="form-check form-switch m-0">
+                                                            <input class="form-check-input" type="checkbox" id="edit_contract_signed">
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
-                                        </div>
+                                        </section>
                                     </div>
 
-                                    <div class="col-md-4"><label class="form-label">Сайт</label><input type="text" id="edit_website" class="form-control"></div>
-                                    <div class="col-md-4"><label class="form-label">Inst</label><input type="text" id="edit_instagram" class="form-control"></div>
-                                    <div class="col-md-4"><label class="form-label">Доставка</label><input type="text" id="edit_delivery" class="form-control"></div>
-                                    <div class="col-12"><label class="form-label">Контакты:</label><div id="edit-contact-list" class="list-container"></div><button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-contact-btn-edit-modal">+ Контакт</button></div>
-                                    <div class="col-12"><label class="form-label">Доп. адреса:</label><div id="edit-address-list" class="list-container"></div><button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-address-btn-edit-modal">+ Адрес</button></div>
+                                    <div class="col-12">
+                                        <section class="dealer-form-section">
+                                            <div class="dealer-section-title">
+                                                <span class="dealer-section-icon"><i class="bi bi-geo-alt"></i></span>
+                                                <div><strong>Дополнительные адреса</strong><small>Филиалы, склады и другие точки</small></div>
+                                                <button type="button" class="dealer-add-inline" id="add-address-btn-edit-modal"><i class="bi bi-plus-lg"></i> Адрес</button>
+                                            </div>
+                                            <div id="edit-address-list" class="list-container dealer-dynamic-list"></div>
+                                        </section>
+                                    </div>
                                 </div>
                             </div>
-                            
+
                             <div class="tab-pane fade" id="tab-map">
-                                <div class="col-12">
-                                    <label class="form-label fw-bold">Изменить локацию</label>
-                                    <div class="input-group mb-2">
-                                        <input type="text" id="edit-smart-search" class="form-control" placeholder="Введите адрес или вставьте координаты...">
-                                        <button type="button" class="btn btn-outline-secondary" id="btn-search-edit"><i class="bi bi-search"></i> Найти</button>
-                                        <button type="button" class="btn btn-outline-primary" id="btn-loc-edit" title="Мое местоположение"><i class="bi bi-geo-alt-fill"></i></button>
+                                <section class="dealer-form-section">
+                                    <div class="dealer-section-title">
+                                        <span class="dealer-section-icon"><i class="bi bi-map"></i></span>
+                                        <div><strong>Локация дилера</strong><small>Поиск по адресу или ручная точка на карте</small></div>
                                     </div>
-                                    <div id="edit-map" class="rounded-3 border" style="height: 400px; width: 100%; background: #eee;"></div>
-                                    <div class="input-group mt-2">
-                                        <span class="input-group-text text-muted">Lat</span><input type="text" id="edit_latitude" class="form-control bg-white" readonly>
-                                        <span class="input-group-text text-muted">Lng</span><input type="text" id="edit_longitude" class="form-control bg-white" readonly>
+                                    <div class="dealer-location-search">
+                                        <input type="text" id="edit-smart-search" class="form-control" placeholder="Введите адрес или координаты">
+                                        <button type="button" class="dealer-secondary-action" id="btn-search-edit"><i class="bi bi-search"></i> Найти</button>
+                                        <button type="button" class="dealer-icon-action" id="btn-loc-edit" title="Мое местоположение"><i class="bi bi-crosshair"></i></button>
+                                    </div>
+                                    <div id="edit-map" class="dealer-map dealer-map-large"></div>
+                                    <div class="dealer-coordinates">
+                                        <label>Широта <input type="text" id="edit_latitude" class="form-control" readonly></label>
+                                        <label>Долгота <input type="text" id="edit_longitude" class="form-control" readonly></label>
+                                    </div>
+                                </section>
+                            </div>
+
+                            <div class="tab-pane fade" id="tab-work">
+                                <div class="row g-3">
+                                    <div class="col-lg-7">
+                                        <section class="dealer-form-section h-100">
+                                            <div class="dealer-section-title">
+                                                <span class="dealer-section-icon"><i class="bi bi-calendar-check"></i></span>
+                                                <div><strong>Визиты</strong><small>История встреч и задач</small></div>
+                                                <button type="button" class="dealer-add-inline" id="add-visits-btn-edit-modal"><i class="bi bi-plus-lg"></i> Визит</button>
+                                            </div>
+                                            <div id="edit-visits-list" class="list-container dealer-dynamic-list"></div>
+                                        </section>
+                                    </div>
+                                    <div class="col-lg-5">
+                                        <section class="dealer-form-section h-100">
+                                            <div class="dealer-section-title">
+                                                <span class="dealer-section-icon"><i class="bi bi-camera"></i></span>
+                                                <div><strong>Фотоотчёт</strong><small>Магазин, стенды, выкладка</small></div>
+                                            </div>
+                                            <input type="file" id="edit-photo-input" class="form-control" multiple accept="image/*">
+                                            <div id="edit-photo-preview-container" class="photo-preview-grid mt-2"></div>
+                                        </section>
                                     </div>
                                 </div>
                             </div>
 
-                            <div class="tab-pane fade" id="tab-marketing"><div class="col-12"><label class="form-label">Визиты:</label><div id="edit-visits-list" class="list-container"></div><button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-visits-btn-edit-modal">+ Визит</button></div><div class="col-12 mt-3"><label class="form-label">Галерея:</label><input type="file" id="edit-photo-input" class="form-control mb-2" multiple accept="image/*"><div id="edit-photo-preview-container" class="photo-preview-grid"></div></div></div>
-                            <div class="tab-pane fade" id="tab-samples"><div class="col-12 mb-3"><label class="form-label">Стенды:</label><div id="edit-pos-list" class="list-container"></div><button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-pos-btn-edit-modal">+ Стенд</button></div><div class="col-12"><label class="form-label">Товары (Ламинат):</label><div id="edit-product-checklist" class="product-checklist"><p>Загрузка...</p></div></div></div>
-                            <div class="tab-pane fade" id="tab-competitors"><div class="col-12"><label class="form-label">Мониторинг:</label><div id="edit-competitor-list" class="list-scrollable"></div><button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-competitor-btn-edit-modal">+ Конкурент</button></div></div>
+                            <div class="tab-pane fade" id="tab-market">
+                                <div class="row g-3">
+                                    <div class="col-lg-5">
+                                        <section class="dealer-form-section">
+                                            <div class="dealer-section-title">
+                                                <span class="dealer-section-icon"><i class="bi bi-grid-3x3-gap"></i></span>
+                                                <div><strong>Стенды и образцы</strong><small>POS-материалы у дилера</small></div>
+                                                <button type="button" class="dealer-add-inline" id="add-pos-btn-edit-modal"><i class="bi bi-plus-lg"></i> Стенд</button>
+                                            </div>
+                                            <div id="edit-pos-list" class="list-container dealer-dynamic-list"></div>
+                                        </section>
+                                    </div>
+                                    <div class="col-lg-7">
+                                        <section class="dealer-form-section">
+                                            <div class="dealer-section-title">
+                                                <span class="dealer-section-icon"><i class="bi bi-box-seam"></i></span>
+                                                <div><strong>Выставленный товар</strong><small>Декоры IDEAL FLOOR у дилера</small></div>
+                                            </div>
+                                            <div id="edit-product-checklist" class="product-checklist dealer-product-checklist"><p class="text-muted">Загрузка...</p></div>
+                                        </section>
+                                    </div>
+                                    <div class="col-12">
+                                        <section class="dealer-form-section">
+                                            <div class="dealer-section-title">
+                                                <span class="dealer-section-icon"><i class="bi bi-bar-chart"></i></span>
+                                                <div><strong>Конкуренты</strong><small>Мониторинг брендов и цен</small></div>
+                                                <button type="button" class="dealer-add-inline" id="add-competitor-btn-edit-modal"><i class="bi bi-plus-lg"></i> Конкурент</button>
+                                            </div>
+                                            <div id="edit-competitor-list" class="list-scrollable dealer-dynamic-list"></div>
+                                        </section>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </form>
                 </div>
-                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button><button type="submit" form="edit-dealer-form" class="btn btn-primary">Сохранить</button></div>
+
+                <div class="modal-footer dealer-modal-footer">
+                    <div class="dealer-footer-note"><i class="bi bi-info-circle"></i> Изменения применятся после сохранения.</div>
+                    <div class="ms-auto d-flex gap-2">
+                        <button type="button" class="dealer-footer-ghost" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" form="edit-dealer-form" class="dealer-footer-save"><i class="bi bi-check-lg"></i> Сохранить изменения</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
