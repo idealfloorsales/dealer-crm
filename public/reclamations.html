@@ -30,7 +30,6 @@
             .container { padding-left: 15px; padding-right: 15px; }
             #mobile-fab-add { position: fixed; bottom: 90px; right: 20px; width: 56px; height: 56px; border-radius: 50%; background: #B9040A; color: white; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(185, 4, 10, 0.4); z-index: 1040; font-size: 24px; border: none; }
         }
-        .admin-only { display: none !important; }
         
         /* Стили для фото и видео превью */
         .photo-preview-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
@@ -70,20 +69,6 @@
             .sig-text { font-size: 12px; text-align: center; color: #555; }
         }
     </style>
-    <script>
-        if (!localStorage.getItem('crm_token')) window.location.href = '/login.html';
-        document.addEventListener("DOMContentLoaded", () => {
-            try {
-                const token = localStorage.getItem('crm_token');
-                if(token) {
-                    const payload = JSON.parse(atob(token.split('.')[1]));
-                    if (payload.permissions && payload.permissions.is_admin) {
-                        document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('admin-only'));
-                    }
-                }
-            } catch(e) {}
-        });
-    </script>
 </head>
 <body class="bg-light">
 
@@ -99,7 +84,7 @@
                     <li class="nav-item"><a class="nav-link" href="/report.html">Выставленность</a></li>
                     <li class="nav-item"><a class="nav-link" href="/sales.html">Продажи</a></li>
                     <li class="nav-item"><a class="nav-link active fw-bold text-brand" href="/reclamations.html">Рекламации</a></li>
-                    <li class="nav-item admin-only"><a class="nav-link text-brand fw-bold" href="/users.html">Сотрудники</a></li>
+                    <li class="nav-item" data-permission="can_manage_users"><a class="nav-link text-brand fw-bold" href="/users.html">Сотрудники</a></li>
                 </ul>
                 <button id="logout-btn" class="btn btn-sm btn-outline-danger">Выход</button>
             </div>
