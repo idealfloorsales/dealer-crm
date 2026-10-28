@@ -49,22 +49,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let allDealers = [];
     let currentSales = [];
-    let allSectors = []; 
+    let allSectors = [];
+    let canEditFact = false;
+    let canEditPlan = false; 
     
     // Загрузка настроек видимости планов
     let planVisibility = JSON.parse(localStorage.getItem('sales_plan_config')) || {};
 
     async function init() {
         try {
-            const authRes = await fetch('/api/auth/me');
-            if (authRes.ok) {
-                const authData = await authRes.json();
-                const user = authData.user || {};
-                const canEdit = user.permissions && user.permissions.can_edit_sales;
-                if (!canEdit && saveBtn) { 
-                    saveBtn.disabled = true; 
-                    saveBtn.innerHTML = '<i class="bi bi-lock"></i> Только чтение'; 
-                }
+            if (window.CRMAuth && CRMAuth.ready) await CRMAuth.ready;
+            canEditFact = window.CRMAuth ? CRMAuth.can('can_edit_sales_fact') : false;
+            canEditPlan = window.CRMAuth ? CRMAuth.can('can_edit_sales_plan') : false;
+
+            if (saveBtn && !canEditFact && !canEditPlan) {
+                saveBtn.disabled = true;
+                saveBtn.innerHTML = '<i class="bi bi-lock"></i> Только чтение';
             }
         } catch (e) { console.error(e); }
 
@@ -204,7 +204,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function captureState() {
-        document.querySelectorAll('.sales-input.inp-fact').forEach(inp => {
+        if (canEditFact) document.querySelectorAll('.sales-input.inp-fact').forEach(inp => {
             const row = inp.closest('.sales-row');
             const dealerId = row.dataset.id === "null" ? null : row.dataset.id;
             const dealerName = row.dataset.name;
@@ -217,7 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (val !== 0) { currentSales.push({ month: monthPicker.value, group, dealerId, dealerName, isCustom, plan: 0, fact: val }); }
         });
         
-        document.querySelectorAll('.plan-input').forEach(inp => {
+        if (canEditPlan) document.querySelectorAll('.plan-input').forEach(inp => {
             const planKey = inp.dataset.planKey;
             const val = parseFloat(inp.value.replace(',', '.')) || 0;
             let record = currentSales.find(s => s.dealerId === `PLAN_${planKey}`);
@@ -278,9 +278,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                         <div class="d-flex align-items-center gap-2">
                             <div class="sales-input-group">
-                                <input type="number" step="0.01" class="form-control form-control-sm sales-input inp-fact" value="${fact!==0?fact:''}" placeholder="0">
+                                <input type="number" step="0.01" class="form-control form-control-sm sales-input inp-fact" value="${fact!==0?fact:''}" placeholder="0" ${canEditFact ? '' : 'disabled'}>
                             </div>
-                            ${item.isCustom ? `<button class="btn btn-sm text-danger btn-del-row p-0"><i class="bi bi-x-circle"></i></button>` : ''}
+                            ${item.isCustom && canEditFact ? `<button class="btn btn-sm text-danger btn-del-row p-0"><i class="bi bi-x-circle"></i></button>` : ''}
                         </div>
                     </div>`;
             });
@@ -299,7 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 ${eyeIcon}
                             </button>
                         </div>
-                        <button class="btn btn-sm btn-light border-0 text-primary py-0 btn-add-custom" data-group="${grp.key}">+ Добавить</button>
+                        ${canEditFact ? `<button class="btn btn-sm btn-light border-0 text-primary py-0 btn-add-custom" data-group="${grp.key}">+ Добавить</button>` : ''}
                     </div>
                     <div class="region-body">${rowsHtml || '<div class="text-center text-muted small py-3">Нет записей</div>'}</div>
                 </div>`;
@@ -352,7 +352,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="summary-header">
                         <span class="summary-title">
                             ${title}
-                            <input type="number" class="plan-input" data-plan-key="${planKey}" value="${planVal}" placeholder="План">
+                            <input type="number" class="plan-input" data-plan-key="${planKey}" value="${planVal}" placeholder="План" ${canEditPlan ? '' : 'disabled'}>
                         </span>
                         <span class="summary-percent ${colorClass} fw-bold">${fmt(percent)}%</span>
                     </div>
