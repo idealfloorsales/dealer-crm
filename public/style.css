@@ -8975,3 +8975,37 @@ body.bg-light {
         justify-content: center;
     }
 }
+
+
+/* Dealer dropdown layering fix */
+.dealer-list-v6-card {
+    z-index: 1;
+}
+
+.dealer-list-v6-card:hover {
+    z-index: 2;
+}
+
+.dealer-list-v6-card:has(.dealer-v3-menu.show) {
+    z-index: 2000;
+    transform: none;
+    border-color: rgba(185,4,10,.14);
+    box-shadow: 0 14px 34px rgba(28,24,24,.10);
+}
+
+.dealer-list-v6-card:has(.dealer-v3-menu.show):hover {
+    transform: none;
+}
+
+.dealer-list-v6-card:has(.dealer-v3-menu.show) .dealer-v3-more {
+    z-index: 2100;
+}
+
+.dealer-list-v6-card .dealer-v3-menu {
+    z-index: 2200;
+    pointer-events: auto;
+}
+
+.dealer-list-v6-card:has(.dealer-v3-menu.show) + .dealer-list-v6-card {
+    z-index: 0;
+}
