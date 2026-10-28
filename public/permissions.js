@@ -102,11 +102,29 @@
 
         const permission = PAGE_PERMISSIONS[window.location.pathname];
         if (permission && !can(permission)) {
+            const preferredRoutes = [
+                ['/', 'can_view_dealers'],
+                ['/sales.html', 'can_view_sales'],
+                ['/competitors.html', 'can_view_competitors'],
+                ['/products.html', 'can_view_products'],
+                ['/report.html', 'can_view_report'],
+                ['/knowledge.html', 'can_view_knowledge'],
+                ['/reclamations.html', 'can_view_reclamations'],
+                ['/map.html', 'can_view_map'],
+                ['/users.html', 'can_manage_users']
+            ];
+            const target = preferredRoutes.find(([, right]) => can(right));
+
+            if (target && target[0] !== window.location.pathname) {
+                window.location.replace(target[0]);
+                return window.CRMAuth.user;
+            }
+
             document.body.innerHTML =
                 '<div style="font-family:Inter,Arial,sans-serif;max-width:560px;margin:12vh auto;padding:32px;text-align:center">' +
-                '<h2>Нет доступа к разделу</h2>' +
-                '<p style="color:#6c757d">Для вашей учетной записи этот раздел отключен администратором.</p>' +
-                '<a href="/" style="color:#b9040a;font-weight:700">Вернуться на главную</a></div>';
+                '<h2>Нет доступных разделов</h2>' +
+                '<p style="color:#6c757d">Для вашей учетной записи пока не включено ни одного раздела. Обратитесь к администратору CRM.</p>' +
+                '<button onclick="CRMAuth.logout()" style="border:0;border-radius:20px;padding:10px 18px;background:#b9040a;color:#fff;font-weight:700;cursor:pointer">Выйти</button></div>';
             return window.CRMAuth.user;
         }
 
