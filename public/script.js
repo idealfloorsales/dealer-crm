@@ -36,8 +36,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSectorTypeMode = ''; // 'astana' или 'region'
 
     // Настройки дашборда
-    const defaultDashConfig = { showHealth: true, showGrowth: true, showCityPen: true, showMatrix: false, showVisits: false };
-    let dashConfig = JSON.parse(localStorage.getItem('dash_config')) || defaultDashConfig;
+    const defaultDashConfig = { showPulse: true, showAttention: true, showPlan: true, showActivity: true };
+    let dashConfig = { ...defaultDashConfig, ...(JSON.parse(localStorage.getItem('dash_config') || '{}')) };
 
     // Список POS-материалов
     const posMaterialsList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"];
@@ -456,25 +456,21 @@ document.addEventListener('DOMContentLoaded', () => {
             const list = document.getElementById('dash-settings-list');
             if(list) {
                 list.innerHTML = `
-                    <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" id="set-showHealth" ${dashConfig.showHealth ? 'checked' : ''}>
-                        <label class="form-check-label" for="set-showHealth">Продажи тт (Актив/Спят)</label>
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="set-showPulse" ${dashConfig.showPulse ? 'checked' : ''}>
+                        <label class="form-check-label" for="set-showPulse">Пульс бизнеса</label>
                     </div>
-                    <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" id="set-showGrowth" ${dashConfig.showGrowth ? 'checked' : ''}>
-                        <label class="form-check-label" for="set-showGrowth">Прирост (Новые)</label>
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="set-showAttention" ${dashConfig.showAttention ? 'checked' : ''}>
+                        <label class="form-check-label" for="set-showAttention">Требует внимания</label>
                     </div>
-                    <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" id="set-showCityPen" ${dashConfig.showCityPen ? 'checked' : ''}>
-                        <label class="form-check-label" for="set-showCityPen">Потенциал городов</label>
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="set-showPlan" ${dashConfig.showPlan ? 'checked' : ''}>
+                        <label class="form-check-label" for="set-showPlan">План на сегодня</label>
                     </div>
-                    <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" id="set-showMatrix" ${dashConfig.showMatrix ? 'checked' : ''}>
-                        <label class="form-check-label" for="set-showMatrix">Матрица (Среднее SKU)</label>
-                    </div>
-                    <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" id="set-showVisits" ${dashConfig.showVisits ? 'checked' : ''}>
-                        <label class="form-check-label" for="set-showVisits">Активность (Визиты)</label>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="set-showActivity" ${dashConfig.showActivity ? 'checked' : ''}>
+                        <label class="form-check-label" for="set-showActivity">Последние события</label>
                     </div>
                 `;
             }
@@ -483,15 +479,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     window.saveDashboardConfig = () => {
-        dashConfig.showHealth = document.getElementById('set-showHealth').checked;
-        dashConfig.showGrowth = document.getElementById('set-showGrowth').checked;
-        dashConfig.showCityPen = document.getElementById('set-showCityPen').checked;
-        dashConfig.showMatrix = document.getElementById('set-showMatrix').checked;
-        dashConfig.showVisits = document.getElementById('set-showVisits').checked;
-        
+        dashConfig.showPulse = document.getElementById('set-showPulse')?.checked ?? true;
+        dashConfig.showAttention = document.getElementById('set-showAttention')?.checked ?? true;
+        dashConfig.showPlan = document.getElementById('set-showPlan')?.checked ?? true;
+        dashConfig.showActivity = document.getElementById('set-showActivity')?.checked ?? true;
         localStorage.setItem('dash_config', JSON.stringify(dashConfig));
         if(settingsModal) settingsModal.hide();
-        renderDashboard(); 
+        renderDashboard();
     };
 
     // --- RENDER DASHBOARD (V3) ---
@@ -511,28 +505,32 @@ document.addEventListener('DOMContentLoaded', () => {
         if (dealer.status === 'problem') { score -= 24; reasons.push('проблемный статус'); }
         if (dealer.status === 'potential') score -= 5;
 
-        const sales = getSalesForDealer(dealer.id);
-        const fact = sales.reduce((sum, s) => sum + (Number(s.fact) || 0), 0);
-        const plan = sales.reduce((sum, s) => sum + (Number(s.plan) || 0), 0);
-        if (fact > 0) score += 12; else { score -= 8; reasons.push('нет продаж в месяце'); }
-        if (plan > 0) {
-            const achievement = fact / plan;
-            if (achievement >= 1) score += 10;
-            else if (achievement < .55) { score -= 10; reasons.push('низкое выполнение плана'); }
+        if (window.CRMAuth && CRMAuth.can('can_view_sales')) {
+            const sales = getSalesForDealer(dealer.id);
+            const fact = sales.reduce((sum, s) => sum + (Number(s.fact) || 0), 0);
+            const plan = sales.reduce((sum, s) => sum + (Number(s.plan) || 0), 0);
+            if (fact > 0) score += 12; else { score -= 8; reasons.push('нет продаж в месяце'); }
+            if (plan > 0) {
+                const achievement = fact / plan;
+                if (achievement >= 1) score += 10;
+                else if (achievement < .55) { score -= 10; reasons.push('низкое выполнение плана'); }
+            }
         }
 
-        const taskDealer = getTaskDealer(dealer.id);
-        const completed = (taskDealer?.visits || [])
-            .filter(v => v.isCompleted && v.date)
-            .sort((a,b) => new Date(b.date) - new Date(a.date));
-        if (completed.length) {
-            const days = Math.floor((Date.now() - new Date(completed[0].date).getTime()) / 86400000);
-            if (days <= 21) score += 10;
-            else if (days > 60) { score -= 12; reasons.push(`без визита ${days} дн.`); }
-            else if (days > 35) { score -= 6; reasons.push(`без визита ${days} дн.`); }
-        } else {
-            score -= 10;
-            reasons.push('нет истории визитов');
+        if (window.CRMAuth && CRMAuth.can('can_view_dashboard')) {
+            const taskDealer = getTaskDealer(dealer.id);
+            const completed = (taskDealer?.visits || [])
+                .filter(v => v.isCompleted && v.date)
+                .sort((a,b) => new Date(b.date) - new Date(a.date));
+            if (completed.length) {
+                const days = Math.floor((Date.now() - new Date(completed[0].date).getTime()) / 86400000);
+                if (days <= 21) score += 10;
+                else if (days > 60) { score -= 12; reasons.push(`без визита ${days} дн.`); }
+                else if (days > 35) { score -= 6; reasons.push(`без визита ${days} дн.`); }
+            } else {
+                score -= 10;
+                reasons.push('нет истории визитов');
+            }
         }
 
         if (dealer.contacts?.length) score += 5;
@@ -801,10 +799,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (dateEl) dateEl.textContent = new Date().toLocaleDateString('ru-RU', { day:'numeric', month:'long', weekday:'long' });
         if (scopeEl) scopeEl.textContent = user.scope === 'astana' ? 'Астана' : user.scope === 'regions' ? 'Регионы' : 'Вся компания';
 
-        renderPulseChart();
-        renderAttentionFeed();
-        renderUpcomingPlan();
-        renderActivityFeed();
+        const pulsePanel = document.getElementById('cc-pulse-panel');
+        const attentionPanel = document.getElementById('cc-attention-panel');
+        const planPanel = document.getElementById('cc-plan-panel');
+        const activityPanel = document.getElementById('cc-activity-panel');
+        if (pulsePanel) pulsePanel.style.display = dashConfig.showPulse ? '' : 'none';
+        if (attentionPanel) attentionPanel.style.display = dashConfig.showAttention ? '' : 'none';
+        if (planPanel) planPanel.style.display = dashConfig.showPlan ? '' : 'none';
+        if (activityPanel) activityPanel.style.display = dashConfig.showActivity ? '' : 'none';
+
+        if (dashConfig.showPulse) renderPulseChart();
+        if (dashConfig.showAttention) renderAttentionFeed();
+        if (dashConfig.showPlan) renderUpcomingPlan();
+        if (dashConfig.showActivity) renderActivityFeed();
     }
 
     function renderTaskList(container, tasks, type) { if (!container) return; if (tasks.length === 0) { const msg = type === 'cooling' ? 'Все посещены недавно' : 'Задач нет'; container.innerHTML = `<div class="text-center py-4 text-muted"><i class="bi bi-check-circle display-6 d-block mb-2 text-success opacity-50"></i><small>${msg}</small></div>`; return; } container.innerHTML = tasks.map(t => { let badgeHtml = ''; let metaHtml = ''; if (type === 'upcoming') { const dateStr = t.date.toLocaleDateString('ru-RU', {day:'numeric', month:'short'}); badgeHtml = t.isToday ? `<span class="task-badge tb-today mt-1 d-inline-block">Сегодня</span>` : `<span class="task-badge tb-future mt-1 d-inline-block">${dateStr}</span>`; metaHtml = `<span class="text-muted small">${safeText(t.comment)}</span>`; } else if (type === 'problem') { if (t.type === 'overdue') { const dateStr = t.date.toLocaleDateString('ru-RU'); badgeHtml = `<span class="task-badge tb-overdue mt-1 d-inline-block">Просрок: ${dateStr}</span>`; metaHtml = `<span class="text-danger small fw-bold">${safeText(t.comment)}</span>`; } else { badgeHtml = `<span class="task-badge tb-overdue mt-1 d-inline-block">Проблема</span>`; metaHtml = `<span class="small text-muted">Внимание!</span>`; } } else if (type === 'cooling') { const daysStr = t.days === 999 ? 'Никогда' : `${t.days} дн.`; badgeHtml = `<span class="task-badge tb-cooling mt-1 d-inline-block">Без визитов: ${daysStr}</span>`; metaHtml = `<span class="text-muted small">Пора навестить</span>`; } const showCheckBtn = (window.CRMAuth && CRMAuth.can('can_manage_visits')) && (type === 'upcoming' || (type === 'problem' && t.type === 'overdue')); const btnHtml = showCheckBtn ? `<button class="btn-task-check btn-complete-task" data-id="${t.dealerId}" data-index="${t.visitIndex}" title="Выполнить"><i class="bi bi-check-lg"></i></button>` : ''; return `<div class="task-item-modern align-items-start"><div class="task-content"><a href="dealer.html?id=${t.dealerId}" target="_blank" class="task-title text-truncate d-block" style="max-width: 200px;">${safeText(t.dealerName)}</a>${badgeHtml}<div class="mt-1">${metaHtml}</div></div><div class="mt-1">${btnHtml}</div></div>`; }).join(''); }
@@ -1082,7 +1089,10 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
     }
 
     let globalSearchIndex = 0;
+    let globalSearchReady = false;
     function setupGlobalSearch() {
+        if (globalSearchReady) return;
+        globalSearchReady = true;
         const overlay = document.getElementById('global-search-overlay');
         const trigger = document.getElementById('global-search-trigger');
         const input = document.getElementById('global-search-input');
