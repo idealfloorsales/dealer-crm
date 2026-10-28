@@ -24,6 +24,7 @@ const ASSETS = [
     '/knowledge.js?v={{VER}}',
     '/reclamations.js?v={{VER}}',
     '/permissions.js?v={{VER}}',
+    '/dealer-score.js?v={{VER}}',
     '/dealer.js?v={{VER}}',
     '/map.js?v={{VER}}',
     '/logo.png',
