@@ -71,16 +71,15 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchDealerDetails() {
         try {
             try {
-                const authRes = await fetch('/api/auth/me');
-                if (authRes.ok) {
-                    const authData = await authRes.json();
-                    // Поддержка и старой и новой структуры пользователя
-                    currentUserRole = authData.user ? authData.user.role : authData.role;
-                    
-                    if (currentUserRole === 'guest') {
-                        if(editBtn) editBtn.style.display = 'none';
-                        if(deleteBtn) deleteBtn.style.display = 'none';
-                    }
+                if (window.CRMAuth && CRMAuth.ready) await CRMAuth.ready;
+                const user = window.CRMAuth ? CRMAuth.user : null;
+                currentUserRole = user ? user.role : 'guest';
+
+                if (editBtn && (!window.CRMAuth || !CRMAuth.can('can_edit_dealer'))) {
+                    editBtn.style.display = 'none';
+                }
+                if (deleteBtn && (!window.CRMAuth || !CRMAuth.can('can_delete_dealer'))) {
+                    deleteBtn.style.display = 'none';
                 }
             } catch(e) { console.warn('Auth check skipped'); }
 
@@ -335,9 +334,21 @@ document.addEventListener('DOMContentLoaded', () => {
         competitorsListContainer.innerHTML = html + '</tbody></table></div>';
     }
 
-    if(editBtn) editBtn.addEventListener('click', () => { localStorage.setItem('pendingEditDealerId', dealerId); window.location.href = '/'; });
+    if(editBtn) editBtn.addEventListener('click', () => {
+        if (!window.CRMAuth || !CRMAuth.can('can_edit_dealer')) return;
+        localStorage.setItem('pendingEditDealerId', dealerId);
+        window.location.href = '/';
+    });
     if(navigateBtn) navigateBtn.addEventListener('click', () => { if (dealerLat && dealerLng) window.open(`http://googleusercontent.com/maps/google.com/?q=${dealerLat},${dealerLng}`, '_blank'); else alert("Координаты не заданы."); });
-    if(deleteBtn) deleteBtn.addEventListener('click', async () => { if (confirm(`Удалить дилера ${currentDealerName}?`)) { try { const response = await fetch(`${API_DEALERS_URL}/${dealerId}`, { method: 'DELETE' }); if (response.ok) window.location.href = '/'; } catch (error) { alert('Ошибка.'); } } });
+    if(deleteBtn) deleteBtn.addEventListener('click', async () => {
+        if (!window.CRMAuth || !CRMAuth.can('can_delete_dealer')) return;
+        if (confirm(`Удалить дилера ${currentDealerName}?`)) {
+            try {
+                const response = await fetch(`${API_DEALERS_URL}/${dealerId}`, { method: 'DELETE' });
+                if (response.ok) window.location.href = '/';
+            } catch (error) { alert('Ошибка.'); }
+        }
+    });
 
     window.printDiv = (divId, title) => {
         const content = document.getElementById(divId).innerHTML;
