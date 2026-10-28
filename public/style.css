@@ -4081,8 +4081,8 @@ body.bg-light {
         margin: 0 !important;
         padding: 0 !important;
         background: #fff !important;
-        color: #000 !important;
-        font-family: Arial, Helvetica, sans-serif !important;
+        color: #202124 !important;
+        font-family: 'Onest', Arial, Helvetica, sans-serif !important;
         font-size: 9pt !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
@@ -4095,208 +4095,344 @@ body.bg-light {
     .sales-print-report {
         display: block !important;
         width: 100%;
-        color: #000;
+        color: #202124;
+    }
+
+    .sales-print-report::before {
+        content: "";
+        display: block;
+        height: 3.2mm;
+        margin-bottom: 5mm;
+        border-radius: 2mm;
+        background: linear-gradient(90deg, #b9040a 0%, #8d0207 72%, #3a2023 100%) !important;
     }
 
     .sales-print-header {
         display: flex;
         align-items: flex-end;
         justify-content: space-between;
-        gap: 20px;
-        padding-bottom: 7mm;
-        border-bottom: 1.2pt solid #111;
+        gap: 12mm;
+        padding: 0 0 5mm;
+        border-bottom: 1pt solid #eadadc;
     }
 
     .sales-print-header > div:first-child {
         display: flex;
         align-items: center;
         gap: 5mm;
+        min-width: 0;
     }
 
     .sales-print-header img {
-        width: 34mm;
-        max-height: 14mm;
+        width: 31mm;
+        max-height: 13mm;
         object-fit: contain;
-        filter: grayscale(1) contrast(1.4);
+        filter: none !important;
     }
 
     .sales-print-header h1 {
-        margin: 0 0 1.5mm;
-        color: #000 !important;
-        font-size: 20pt;
+        margin: 0 0 1.2mm;
+        color: #1f2024 !important;
+        font-size: 21pt;
         line-height: 1;
-        font-weight: 700;
-        letter-spacing: -.4pt;
+        font-weight: 750;
+        letter-spacing: -.45pt;
     }
 
     #print-period {
+        color: #b9040a;
         font-size: 10pt;
-        font-weight: 600;
+        font-weight: 700;
     }
 
     .sales-print-meta {
         text-align: right;
-        font-size: 7.5pt;
+        white-space: nowrap;
+        font-size: 7pt;
     }
 
     .sales-print-meta span {
         display: block;
         margin-bottom: 1mm;
-        color: #555;
+        color: #96989e;
     }
 
     .sales-print-meta strong {
-        font-size: 8.5pt;
-        font-weight: 700;
+        color: #4f5157;
+        font-size: 8pt;
+        font-weight: 650;
     }
 
     .sales-print-overview {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0,1fr));
+        grid-template-columns: repeat(2, minmax(0,1fr));
         gap: 3mm;
-        margin: 5mm 0;
+        margin: 5mm 0 6mm;
     }
 
     .sales-print-overview-card {
-        padding: 3.2mm 3.5mm;
-        border: 1pt solid #222;
-        break-inside: avoid;
-    }
-
-    .sales-print-overview-card span {
-        display: block;
-        font-size: 7pt;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: .3pt;
-    }
-
-    .sales-print-overview-card strong {
-        display: block;
-        margin-top: 1mm;
-        font-size: 16pt;
-        line-height: 1;
-        font-weight: 800;
-    }
-
-    .sales-print-overview-card small {
-        display: block;
-        margin-top: 1.2mm;
-        color: #333;
-        font-size: 7pt;
-    }
-
-    .sales-print-table-wrap {
-        width: 100%;
-    }
-
-    .sales-print-table {
-        width: 100%;
-        border-collapse: collapse;
-        table-layout: fixed;
-        font-size: 7.6pt;
-    }
-
-    .sales-print-table th,
-    .sales-print-table td {
-        padding: 2.1mm 2.2mm;
-        border: .6pt solid #777;
-        vertical-align: middle;
-    }
-
-    .sales-print-table thead th {
-        border-color: #222;
-        background: #e8e8e8 !important;
-        color: #000;
-        font-size: 6.7pt;
-        font-weight: 800;
-        text-transform: uppercase;
-        letter-spacing: .2pt;
-    }
-
-    .sales-print-table th:nth-child(1) { width: 30%; }
-    .sales-print-table th:nth-child(2) { width: 11%; }
-    .sales-print-table th:nth-child(3) { width: 11%; }
-    .sales-print-table th:nth-child(4) { width: 11%; }
-    .sales-print-table th:nth-child(5) { width: 11%; }
-    .sales-print-table th:nth-child(6) { width: 26%; }
-
-    .sales-print-table .num {
-        text-align: right;
-        white-space: nowrap;
-    }
-
-    .sales-print-section-row td {
-        padding-top: 2.6mm;
-        padding-bottom: 1.8mm;
-        border-left-color: #222;
-        border-right-color: #222;
-        background: #d6d6d6 !important;
-        font-size: 7pt;
-        font-weight: 800;
-        text-transform: uppercase;
-        letter-spacing: .35pt;
-    }
-
-    .sales-print-table tr.is-total td {
-        border-top: 1.2pt solid #111;
-        border-bottom: 1.2pt solid #111;
-        font-weight: 700;
-    }
-
-    .sales-print-progress {
         position: relative;
-        height: 4.2mm;
+        padding: 3.5mm 4mm 3.2mm;
         overflow: hidden;
-        border: .8pt solid #111;
-        background: #fff !important;
-    }
-
-    .sales-print-progress::after {
-        content: "0        25        50        75       100";
-        position: absolute;
-        inset: 0;
-        display: flex;
-        align-items: center;
-        justify-content: space-around;
-        padding: 0 .5mm;
-        color: #444;
-        font-size: 4.5pt;
-        line-height: 1;
-        pointer-events: none;
-        mix-blend-mode: multiply;
-    }
-
-    .sales-print-progress span {
-        position: relative;
-        z-index: 0;
-        display: block;
-        height: 100%;
-        background:
-            repeating-linear-gradient(
-                135deg,
-                #333 0,
-                #333 1.1mm,
-                #777 1.1mm,
-                #777 2.2mm
-            ) !important;
-        border-right: .8pt solid #000;
-    }
-
-    .sales-print-footer {
-        display: flex;
-        justify-content: space-between;
-        gap: 10mm;
-        margin-top: 5mm;
-        padding-top: 2.5mm;
-        border-top: .8pt solid #777;
-        color: #444;
-        font-size: 6.5pt;
-    }
-
-    .sales-print-table tr,
-    .sales-print-overview-card {
+        border: .8pt solid #e2d7d8;
+        border-radius: 3mm;
+        background: #fffafa !important;
         break-inside: avoid;
         page-break-inside: avoid;
     }
+
+    .sales-print-overview-card.is-good {
+        border-color: #b7dccb;
+        background: #f2fbf6 !important;
+    }
+
+    .sales-print-overview-card.is-mid {
+        border-color: #ead3a7;
+        background: #fff9ee !important;
+    }
+
+    .sales-print-overview-card.is-low {
+        border-color: #e6b4b7;
+        background: #fff5f5 !important;
+    }
+
+    .sales-print-overview-card.is-none {
+        border-color: #d9dadd;
+        background: #f8f8f8 !important;
+    }
+
+    .sales-print-overview-card::after {
+        content: "";
+        position: absolute;
+        width: 22mm;
+        height: 22mm;
+        right: -9mm;
+        top: -10mm;
+        border-radius: 50%;
+        background: rgba(185,4,10,.07) !important;
+    }
+
+    .sales-print-overview-top {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 5mm;
+    }
+
+    .sales-print-overview-top > span {
+        color: #4b4d52;
+        font-size: 7.3pt;
+        font-weight: 700;
+        letter-spacing: .15pt;
+    }
+
+    .sales-print-overview-top > strong {
+        flex: 0 0 auto;
+        color: #b9040a;
+        font-size: 17pt;
+        line-height: 1;
+        font-weight: 800;
+    }
+
+    .sales-print-overview-card.is-good .sales-print-overview-top > strong { color: #177452; }
+    .sales-print-overview-card.is-mid .sales-print-overview-top > strong { color: #a16b0b; }
+    .sales-print-overview-card.is-low .sales-print-overview-top > strong { color: #b9040a; }
+    .sales-print-overview-card.is-none .sales-print-overview-top > strong { color: #8b8d93; font-size: 9pt; }
+
+    .sales-print-overview-values {
+        display: flex;
+        gap: 5mm;
+        margin-top: 2.4mm;
+        color: #888a90;
+        font-size: 6.4pt;
+    }
+
+    .sales-print-overview-values b {
+        color: #35363a;
+        font-weight: 700;
+    }
+
+    .sales-print-overview-bar {
+        height: 2.1mm;
+        margin-top: 2.5mm;
+        overflow: hidden;
+        border-radius: 99mm;
+        background: #e9e6e2 !important;
+    }
+
+    .sales-print-overview-bar i {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: #b9040a !important;
+    }
+
+    .sales-print-overview-card.is-good .sales-print-overview-bar i { background: #178256 !important; }
+    .sales-print-overview-card.is-mid .sales-print-overview-bar i { background: #d89526 !important; }
+    .sales-print-overview-card.is-low .sales-print-overview-bar i { background: #b9040a !important; }
+
+    .sales-print-sections {
+        display: block;
+    }
+
+    .sales-print-section {
+        margin-bottom: 5mm;
+        break-inside: auto;
+    }
+
+    .sales-print-section-title {
+        margin-bottom: 2.3mm;
+        padding: 2mm 3mm;
+        border-left: 2.2mm solid #b9040a;
+        border-radius: 1.4mm;
+        background: #f9eeee !important;
+        color: #7f0308;
+        font-size: 8pt;
+        font-weight: 800;
+        letter-spacing: .55pt;
+        text-transform: uppercase;
+        break-after: avoid;
+        page-break-after: avoid;
+    }
+
+    .sales-print-section-items {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0,1fr));
+        gap: 2.4mm;
+    }
+
+    .sales-print-item {
+        padding: 3mm 3.2mm 2.8mm;
+        border: .65pt solid #e3e0dc;
+        border-radius: 2.3mm;
+        background: #fff !important;
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    .sales-print-item.is-total {
+        grid-column: 1 / -1;
+        border-color: #d9a8aa;
+        border-width: .9pt;
+        background: #fff7f7 !important;
+    }
+
+    .sales-print-item.is-good { border-top: 2.1pt solid #178256; }
+    .sales-print-item.is-mid { border-top: 2.1pt solid #d89526; }
+    .sales-print-item.is-low { border-top: 2.1pt solid #b9040a; }
+    .sales-print-item.is-none { border-top: 2.1pt solid #a5a7ac; }
+
+    .sales-print-item-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 3mm;
+        margin-bottom: 2.4mm;
+    }
+
+    .sales-print-item-title {
+        min-width: 0;
+        color: #303136;
+        font-size: 7.7pt;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    .sales-print-item-percent {
+        flex: 0 0 auto;
+        padding: 1mm 1.7mm;
+        border-radius: 99mm;
+        background: #f9eeee !important;
+        color: #b9040a;
+        font-size: 7.5pt;
+        font-weight: 800;
+        line-height: 1;
+    }
+
+    .sales-print-item.is-good .sales-print-item-percent {
+        background: #eaf6f0 !important;
+        color: #177452;
+    }
+
+    .sales-print-item.is-mid .sales-print-item-percent {
+        background: #fff4de !important;
+        color: #95620b;
+    }
+
+    .sales-print-item.is-low .sales-print-item-percent {
+        background: #fbeaec !important;
+        color: #a70910;
+    }
+
+    .sales-print-item.is-none .sales-print-item-percent {
+        background: #f0f0f1 !important;
+        color: #7d7f84;
+        font-size: 6.3pt;
+    }
+
+    .sales-print-item-metrics {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0,1fr));
+        gap: 1.6mm;
+    }
+
+    .sales-print-item-metrics > div {
+        min-width: 0;
+        padding: 1.8mm 2mm;
+        border-radius: 1.6mm;
+        background: #f7f6f4 !important;
+    }
+
+    .sales-print-item-metrics span {
+        display: block;
+        margin-bottom: .6mm;
+        color: #999ba0;
+        font-size: 5.4pt;
+        font-weight: 650;
+    }
+
+    .sales-print-item-metrics strong {
+        display: block;
+        overflow: hidden;
+        color: #34353a;
+        font-size: 6.7pt;
+        font-weight: 750;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .sales-print-item-progress {
+        height: 2.1mm;
+        margin-top: 2.5mm;
+        overflow: hidden;
+        border-radius: 99mm;
+        background: #ece9e5 !important;
+    }
+
+    .sales-print-item-progress span {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: #b9040a !important;
+    }
+
+    .sales-print-item.is-good .sales-print-item-progress span { background: #178256 !important; }
+    .sales-print-item.is-mid .sales-print-item-progress span { background: #d89526 !important; }
+    .sales-print-item.is-low .sales-print-item-progress span { background: #b9040a !important; }
+    .sales-print-item.is-none .sales-print-item-progress span { background: #a5a7ac !important; }
+
+    .sales-print-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8mm;
+        margin-top: 5mm;
+        padding-top: 2.5mm;
+        border-top: .8pt solid #eadadc;
+        color: #8e9095;
+        font-size: 6pt;
+    }
 }
+
