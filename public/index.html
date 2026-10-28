@@ -204,6 +204,7 @@
                     <option value="sales_desc">Продажи: больше</option>
                     <option value="achievement_asc">Выполнение: ниже</option>
                     <option value="health_asc">Оценка: ниже</option>
+                    <option value="health_desc">Оценка: выше</option>
                     <option value="visit_desc">Давно не были</option>
                 </select>
                 <button type="button" id="dealer-filter-toggle" class="dealer-filter-toggle"><i class="bi bi-sliders2"></i> Фильтры</button>
@@ -221,6 +222,14 @@
                     <option value="">Все ответственные</option>
                     <option value="regional_astana">Астана</option>
                     <option value="regional_regions">Регионы</option>
+                </select>
+                <select id="filter-health" class="form-select" aria-label="Оценка дилера">
+                    <option value="">Любая оценка</option>
+                    <option value="excellent">90–100 · Отлично</option>
+                    <option value="good">75–89 · Хорошо</option>
+                    <option value="normal">60–74 · Нормально</option>
+                    <option value="attention">40–59 · Требует внимания</option>
+                    <option value="problem">0–39 · Проблемный</option>
                 </select>
                 <button type="button" id="dealer-reset-filters" class="dealer-reset-filters"><i class="bi bi-arrow-counterclockwise"></i> Сбросить</button>
             </div>

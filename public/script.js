@@ -75,6 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const dealerResetFilters = document.getElementById('dealer-reset-filters');
     const dealerQuickFilters = document.getElementById('dealer-quick-filters');
     const dealerFilterToggle = document.getElementById('dealer-filter-toggle');
+    const filterHealth = document.getElementById('filter-health');
     const btnExportDealers = document.getElementById('export-dealers-btn'); const btnExportCompetitors = document.getElementById('export-competitors-prices-btn');
     const addOrgList = document.getElementById('add-org-list'); const editOrgList = document.getElementById('edit-org-list'); const btnAddOrgAdd = document.getElementById('btn-add-org-add'); const btnEditOrgAdd = document.getElementById('btn-edit-org-add');
     const logoutBtn = document.getElementById('logout-btn');
@@ -465,6 +466,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(filterPriceType) filterPriceType.onchange = renderDealerList;
         if(filterStatus) filterStatus.onchange = renderDealerList;
         if(filterResponsible) filterResponsible.onchange = renderDealerList;
+        if(filterHealth) filterHealth.onchange = renderDealerList;
         const sectorFilter = document.getElementById('filter-sector');
         if(sectorFilter) sectorFilter.onchange = renderDealerList;
         if(searchBar) searchBar.oninput = renderDealerList;
@@ -497,6 +499,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (filterCity) filterCity.value = '';
                 if (filterPriceType) filterPriceType.value = '';
                 if (filterResponsible) filterResponsible.value = '';
+                if (filterHealth) filterHealth.value = '';
                 if (sectorFilter) sectorFilter.value = '';
                 if (dealerSortSelect) dealerSortSelect.value = 'dealer_id_asc';
                 dealerQuickFilter = 'all';
@@ -1195,11 +1198,31 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
 
     function responsibleLabel(value) {
         const labels = {
-            regional_astana: 'Астана',
-            regional_regions: 'Регионы',
+            regional_astana: 'Региональный Астана',
+            regional_regions: 'Региональный Регионы',
             office: 'Офис'
         };
         return labels[value] || value || 'Не назначен';
+    }
+
+    function dealerInfoChips(dealer) {
+        const seen = new Set();
+        const items = [];
+        const add = (label, value, icon) => {
+            const raw = String(value || '').trim();
+            if (!raw) return;
+            const key = raw.toLocaleLowerCase('ru-RU').replace(/\s+/g, ' ');
+            if (seen.has(key)) return;
+            seen.add(key);
+            items.push({ label, value: raw, icon });
+        };
+
+        add('Город', dealer.city, 'geo-alt');
+        add('Сектор', dealer.region_sector, 'diagram-3');
+        add('Тип цен', dealer.price_type, 'tag');
+        add('Ответственный', responsibleLabel(dealer.responsible), 'person');
+
+        return items;
     }
 
     function updateDealerQuickCounts(dealersWithMetrics) {
@@ -1224,6 +1247,7 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
         const salesQuick = dealerQuickFilters?.querySelector('[data-filter="sales"]');
         const planQuick = dealerQuickFilters?.querySelector('[data-filter="plan"]');
         const visitQuick = dealerQuickFilters?.querySelector('[data-filter="visit"]');
+
         if (salesQuick) salesQuick.style.display = canViewSalesForList ? '' : 'none';
         if (planQuick) planQuick.style.display = canViewSalesForList ? '' : 'none';
         if (visitQuick) visitQuick.style.display = canViewVisitsForList ? '' : 'none';
@@ -1240,6 +1264,7 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
         const type = filterPriceType?.value || '';
         const status = filterStatus?.value || '';
         const responsible = filterResponsible?.value || '';
+        const healthFilter = filterHealth?.value || '';
         const search = (searchBar?.value || '').trim().toLowerCase();
         const sector = document.getElementById('filter-sector')?.value || '';
 
@@ -1270,9 +1295,13 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
             metrics: getDealerListMetrics(dealer)
         }));
 
-        updateDealerQuickCounts(enriched);
+        const scoreFiltered = healthFilter
+            ? enriched.filter(({metrics}) => metrics.health.level === healthFilter)
+            : enriched;
 
-        let filtered = enriched.filter(({metrics}) => {
+        updateDealerQuickCounts(scoreFiltered);
+
+        let filtered = scoreFiltered.filter(({metrics}) => {
             if (dealerQuickFilter === 'sales') return metrics.fact > 0;
             if (dealerQuickFilter === 'plan') return metrics.planRisk;
             if (dealerQuickFilter === 'visit') return metrics.needsVisit;
@@ -1292,6 +1321,7 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
                 return av - bv;
             }
             if (sortValue === 'health_asc') return a.metrics.health.score - b.metrics.health.score;
+            if (sortValue === 'health_desc') return b.metrics.health.score - a.metrics.health.score;
             if (sortValue === 'visit_desc') {
                 const av = a.metrics.daysSinceVisit === null ? Number.POSITIVE_INFINITY : a.metrics.daysSinceVisit;
                 const bv = b.metrics.daysSinceVisit === null ? Number.POSITIVE_INFINITY : b.metrics.daysSinceVisit;
@@ -1320,16 +1350,11 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
         const canViewSales = Boolean(window.CRMAuth && CRMAuth.can('can_view_sales'));
         const canEdit = Boolean(window.CRMAuth && CRMAuth.can('can_edit_dealer'));
 
-        dealerGrid.innerHTML = filtered.map(({dealer:d, metrics}, index) => {
+        dealerGrid.innerHTML = filtered.map(({dealer:d, metrics}) => {
             const statusObj = statusList.find(s => s.value === (d.status || 'standard')) || {
                 label: d.status || 'Стандарт',
                 color: '#72747a'
             };
-
-            const avatarUrl = d.photo_url || d.avatarUrl || '';
-            const avatarHtml = avatarUrl
-                ? `<img src="${safeAttr(avatarUrl)}" alt="">`
-                : '<i class="bi bi-shop"></i>';
 
             let phoneBtn = '';
             let waBtn = '';
@@ -1337,29 +1362,27 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
                 const phone = d.contacts.find(contact => contact?.contactInfo)?.contactInfo || '';
                 const cleanPhone = phone.replace(/[^0-9]/g, '');
                 if (cleanPhone.length >= 10) {
-                    phoneBtn = `<a href="tel:+${cleanPhone}" class="dealer-card-action is-phone" onclick="event.stopPropagation()" title="Позвонить"><i class="bi bi-telephone"></i></a>`;
-                    waBtn = `<a href="https://wa.me/${cleanPhone}" target="_blank" rel="noopener" class="dealer-card-action is-whatsapp" onclick="event.stopPropagation()" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>`;
+                    phoneBtn = `<a href="tel:+${cleanPhone}" class="dealer-v3-action is-phone" onclick="event.stopPropagation()" title="Позвонить"><i class="bi bi-telephone"></i></a>`;
+                    waBtn = `<a href="https://wa.me/${cleanPhone}" target="_blank" rel="noopener" class="dealer-v3-action is-whatsapp" onclick="event.stopPropagation()" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>`;
                 }
             }
 
             const mapBtn = d.latitude && d.longitude
-                ? `<a href="https://yandex.kz/maps/?pt=${encodeURIComponent(d.longitude)},${encodeURIComponent(d.latitude)}&z=17&l=map" target="_blank" rel="noopener" class="dealer-card-action" onclick="event.stopPropagation()" title="Маршрут"><i class="bi bi-geo-alt"></i></a>`
+                ? `<a href="https://yandex.kz/maps/?pt=${encodeURIComponent(d.longitude)},${encodeURIComponent(d.latitude)}&z=17&l=map" target="_blank" rel="noopener" class="dealer-v3-action" onclick="event.stopPropagation()" title="Маршрут"><i class="bi bi-geo-alt"></i></a>`
                 : '';
 
             let instaBtn = '';
             if (d.instagram) {
                 let url = String(d.instagram).trim();
-                if (!/^https?:\/\//i.test(url)) {
-                    url = 'https://instagram.com/' + url.replace(/^@/, '');
-                }
-                instaBtn = `<a href="${safeAttr(url)}" target="_blank" rel="noopener" class="dealer-card-action" onclick="event.stopPropagation()" title="Instagram"><i class="bi bi-instagram"></i></a>`;
+                if (!/^https?:\/\//i.test(url)) url = 'https://instagram.com/' + url.replace(/^@/, '');
+                instaBtn = `<a href="${safeAttr(url)}" target="_blank" rel="noopener" class="dealer-v3-action" onclick="event.stopPropagation()" title="Instagram"><i class="bi bi-instagram"></i></a>`;
             }
 
-            const editBtn = canEdit
-                ? `<button class="dealer-card-action" type="button" onclick="event.stopPropagation(); openEditModal('${safeAttr(d.id)}')" title="Редактировать"><i class="bi bi-pencil"></i></button>`
-                : '';
             const quickVisitBtn = (window.CRMAuth && CRMAuth.can('can_manage_visits'))
-                ? `<button class="dealer-card-action" type="button" onclick="event.stopPropagation(); showQuickVisit('${safeAttr(d.id)}')" title="Запланировать визит"><i class="bi bi-calendar-plus"></i></button>`
+                ? `<button class="dealer-v3-action" type="button" onclick="event.stopPropagation(); showQuickVisit('${safeAttr(d.id)}')" title="Запланировать визит"><i class="bi bi-calendar-plus"></i></button>`
+                : '';
+            const editBtn = canEdit
+                ? `<button class="dealer-v3-action" type="button" onclick="event.stopPropagation(); openEditModal('${safeAttr(d.id)}')" title="Редактировать"><i class="bi bi-pencil"></i></button>`
                 : '';
 
             const visit = formatDealerVisit(metrics);
@@ -1373,7 +1396,7 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
                 planFoot = 'Нет доступа';
             } else if (metrics.plan > 0) {
                 planValue = `${metrics.achievement}%`;
-                planFoot = `План ${formatExactSqm(metrics.plan)} м²`;
+                planFoot = `${formatExactSqm(metrics.fact)} из ${formatExactSqm(metrics.plan)} м²`;
                 progressWidth = Math.min(metrics.achievement, 100);
                 progressLevel = metrics.achievement >= 90 ? 'good' : metrics.achievement >= 70 ? 'mid' : 'risk';
             } else if (d.hasPersonalPlan) {
@@ -1381,60 +1404,77 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
                 planFoot = 'Нужно заполнить план';
             }
 
+            const infoChips = dealerInfoChips(d);
+            const infoHtml = infoChips.length
+                ? infoChips.map(item => `<span class="dealer-v3-info"><i class="bi bi-${item.icon}"></i><b>${safeText(item.label)}</b><span>${safeText(item.value)}</span></span>`).join('')
+                : '<span class="dealer-v3-info is-muted"><i class="bi bi-info-circle"></i><span>Основные данные не заполнены</span></span>';
+
             const signals = metrics.signals.slice(0, 2);
             const signalsHtml = signals.length
-                ? signals.map(signal => `<span class="dealer-signal is-${signal.level}"><i class="bi bi-${signal.icon}"></i>${safeText(signal.text)}</span>`).join('')
-                : '<span class="dealer-signal is-ok"><i class="bi bi-check2-circle"></i>Без критичных сигналов</span>';
+                ? signals.map(signal => `<span class="dealer-v3-signal is-${signal.level}"><i class="bi bi-${signal.icon}"></i>${safeText(signal.text)}</span>`).join('')
+                : '<span class="dealer-v3-signal is-ok"><i class="bi bi-check2-circle"></i>Без критичных сигналов</span>';
 
-            const locationMeta = [d.city, d.region_sector].filter(Boolean).map(safeText).join(' · ') || 'Локация не указана';
-            const secondaryMeta = [responsibleLabel(d.responsible), d.price_type].filter(Boolean).map(safeText).join(' · ');
+            const score = Math.max(0, Math.min(100, Number(metrics.health.score) || 0));
+            const initial = safeText((d.name || 'Д').trim().charAt(0).toUpperCase());
 
-            return `<article class="dealer-smart-card ${metrics.problem ? 'has-risk' : ''}" onclick="window.location.href='dealer.html?id=${encodeURIComponent(d.id)}'">
-                <div class="dealer-smart-index">${index + 1}</div>
-
-                <div class="dealer-smart-identity">
-                    <div class="dealer-smart-avatar">${avatarHtml}</div>
-                    <div class="dealer-smart-copy">
-                        <div class="dealer-smart-title-row">
-                            <a href="dealer.html?id=${encodeURIComponent(d.id)}" class="dealer-smart-name" onclick="event.stopPropagation()">${safeText(d.name)}</a>
-                            <span class="dealer-card-status" style="border-color:${safeAttr(statusObj.color || '#72747a')};color:${safeAttr(statusObj.color || '#72747a')}">${safeText(statusObj.label)}</span>
+            return `<article class="dealer-v3-card ${metrics.problem ? 'has-risk' : ''}" onclick="window.location.href='dealer.html?id=${encodeURIComponent(d.id)}'">
+                <div class="dealer-v3-top">
+                    <div class="dealer-v3-identity">
+                        <div class="dealer-v3-monogram">${initial}</div>
+                        <div class="dealer-v3-name-wrap">
+                            <div class="dealer-v3-name-line">
+                                <a href="dealer.html?id=${encodeURIComponent(d.id)}" class="dealer-v3-name" onclick="event.stopPropagation()">${safeText(d.name)}</a>
+                                <span class="dealer-v3-status" style="--status-color:${safeAttr(statusObj.color || '#72747a')}">${safeText(statusObj.label)}</span>
+                            </div>
+                            <div class="dealer-v3-id">ID ${safeText(d.dealer_id || '—')}</div>
                         </div>
-                        <div class="dealer-smart-id">#${safeText(d.dealer_id || '—')}</div>
-                        <div class="dealer-smart-meta"><i class="bi bi-geo-alt"></i>${locationMeta}</div>
-                        <div class="dealer-smart-meta"><i class="bi bi-person"></i>${secondaryMeta || 'Ответственный не назначен'}</div>
                     </div>
-                </div>
 
-                <div class="dealer-smart-metrics">
-                    <div class="dealer-list-metric">
-                        <span>Продажи</span>
-                        <strong>${canViewSales ? formatExactSqm(metrics.fact) + ' м²' : '—'}</strong>
-                        <small>${canViewSales ? (metrics.fact > 0 ? 'Текущий месяц' : 'Продаж пока нет') : 'Нет доступа'}</small>
-                    </div>
-                    <div class="dealer-list-metric is-plan">
-                        <span>Выполнение плана</span>
-                        <strong>${planValue}</strong>
-                        <small>${planFoot}</small>
-                        <div class="dealer-list-progress is-${progressLevel}"><i style="width:${progressWidth}%"></i></div>
-                    </div>
-                    <div class="dealer-list-metric">
-                        <span>Последний визит</span>
-                        <strong>${visit.value}</strong>
-                        <small>${visit.foot}</small>
-                    </div>
-                    <div class="dealer-list-metric is-score">
-                        <span>Оценка дилера</span>
-                        <strong>${metrics.health.score}<em>/100</em></strong>
+                    <div class="dealer-v3-score is-${metrics.health.level}">
+                        <div class="dealer-v3-score-number">${score}<span>/100</span></div>
+                        <div class="dealer-v3-score-label">Оценка дилера</div>
+                        <div class="dealer-v3-score-bar"><i style="width:${score}%"></i></div>
                         <small>${safeText(metrics.health.label)}</small>
-                        <div class="dealer-score-mini is-${metrics.health.level}"><i style="width:${metrics.health.score}%"></i></div>
                     </div>
                 </div>
 
-                <div class="dealer-smart-side">
-                    <div class="dealer-signal-list">${signalsHtml}</div>
-                    <div class="dealer-card-actions">
+                <div class="dealer-v3-info-row">${infoHtml}</div>
+
+                <div class="dealer-v3-metrics">
+                    <div class="dealer-v3-metric">
+                        <div class="dealer-v3-metric-icon"><i class="bi bi-graph-up-arrow"></i></div>
+                        <div>
+                            <span>Продажи за месяц</span>
+                            <strong>${canViewSales ? formatExactSqm(metrics.fact) + ' м²' : '—'}</strong>
+                            <small>${canViewSales ? (metrics.fact > 0 ? 'Факт текущего месяца' : 'Продаж пока нет') : 'Нет доступа'}</small>
+                        </div>
+                    </div>
+
+                    <div class="dealer-v3-metric">
+                        <div class="dealer-v3-metric-icon"><i class="bi bi-bullseye"></i></div>
+                        <div class="dealer-v3-metric-main">
+                            <span>Выполнение плана</span>
+                            <strong>${planValue}</strong>
+                            <small>${planFoot}</small>
+                            <div class="dealer-v3-progress is-${progressLevel}"><i style="width:${progressWidth}%"></i></div>
+                        </div>
+                    </div>
+
+                    <div class="dealer-v3-metric">
+                        <div class="dealer-v3-metric-icon"><i class="bi bi-calendar-check"></i></div>
+                        <div>
+                            <span>Последний визит</span>
+                            <strong>${visit.value}</strong>
+                            <small>${visit.foot}</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dealer-v3-bottom">
+                    <div class="dealer-v3-signals">${signalsHtml}</div>
+                    <div class="dealer-v3-actions">
                         ${waBtn}${phoneBtn}${mapBtn}${instaBtn}${quickVisitBtn}${editBtn}
-                        <a href="dealer.html?id=${encodeURIComponent(d.id)}" class="dealer-open-card" onclick="event.stopPropagation()">Открыть <i class="bi bi-arrow-right"></i></a>
+                        <a href="dealer.html?id=${encodeURIComponent(d.id)}" class="dealer-v3-open" onclick="event.stopPropagation()">Открыть карточку <i class="bi bi-arrow-right"></i></a>
                     </div>
                 </div>
             </article>`;
