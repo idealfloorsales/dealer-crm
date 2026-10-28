@@ -74,6 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const dealerSortSelect = document.getElementById('dealer-sort-select');
     const dealerResetFilters = document.getElementById('dealer-reset-filters');
     const dealerQuickFilters = document.getElementById('dealer-quick-filters');
+    const dealerFilterToggle = document.getElementById('dealer-filter-toggle');
     const btnExportDealers = document.getElementById('export-dealers-btn'); const btnExportCompetitors = document.getElementById('export-competitors-prices-btn');
     const addOrgList = document.getElementById('add-org-list'); const editOrgList = document.getElementById('edit-org-list'); const btnAddOrgAdd = document.getElementById('btn-add-org-add'); const btnEditOrgAdd = document.getElementById('btn-edit-org-add');
     const logoutBtn = document.getElementById('logout-btn');
@@ -466,6 +467,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     el.classList.toggle('active', el === btn);
                 });
                 renderDealerList();
+            };
+        }
+
+        if (dealerFilterToggle) {
+            dealerFilterToggle.onclick = () => {
+                const toolbar = dealerFilterToggle.closest('.dealer-list-toolbar');
+                toolbar?.classList.toggle('filters-open');
+                dealerFilterToggle.classList.toggle('active');
             };
         }
 
@@ -1257,6 +1266,9 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
             const editBtn = canEdit
                 ? `<button class="dealer-card-action" type="button" onclick="event.stopPropagation(); openEditModal('${safeAttr(d.id)}')" title="Редактировать"><i class="bi bi-pencil"></i></button>`
                 : '';
+            const quickVisitBtn = (window.CRMAuth && CRMAuth.can('can_manage_visits'))
+                ? `<button class="dealer-card-action" type="button" onclick="event.stopPropagation(); showQuickVisit('${safeAttr(d.id)}')" title="Запланировать визит"><i class="bi bi-calendar-plus"></i></button>`
+                : '';
 
             const visit = formatDealerVisit(metrics);
             let planValue = 'Без плана';
@@ -1329,7 +1341,7 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
                 <div class="dealer-smart-side">
                     <div class="dealer-signal-list">${signalsHtml}</div>
                     <div class="dealer-card-actions">
-                        ${waBtn}${phoneBtn}${mapBtn}${instaBtn}${editBtn}
+                        ${waBtn}${phoneBtn}${mapBtn}${instaBtn}${quickVisitBtn}${editBtn}
                         <a href="dealer.html?id=${encodeURIComponent(d.id)}" class="dealer-open-card" onclick="event.stopPropagation()">Открыть <i class="bi bi-arrow-right"></i></a>
                     </div>
                 </div>
