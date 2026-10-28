@@ -8,7 +8,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const monthPicker = document.getElementById('month-picker');
     const container = document.getElementById('sales-container');
     const summaryList = document.getElementById('summary-list');
-    const dashboardTop = document.getElementById('sales-top-dashboard'); 
     const saveBtn = document.getElementById('save-btn');
     const printBtn = document.getElementById('print-btn');
     const summaryCol = document.getElementById('summary-col');
@@ -49,6 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let loadedMonth = '';
     let pendingCustomGroup = '';
     let groupsCollapsed = false;
+    let currentScope = 'all';
     
     // Загрузка настроек видимости планов
     let planVisibility = JSON.parse(localStorage.getItem('sales_plan_config')) || {};
@@ -58,6 +58,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (window.CRMAuth && CRMAuth.ready) await CRMAuth.ready;
             canEditFact = window.CRMAuth ? CRMAuth.can('can_edit_sales_fact') : false;
             canEditPlan = window.CRMAuth ? CRMAuth.can('can_edit_sales_plan') : false;
+            currentScope = window.CRMAuth?.user?.scope || 'all';
+
+            if (areaFilter && currentScope !== 'all') {
+                areaFilter.querySelectorAll('option').forEach(option => {
+                    if (currentScope === 'astana' && option.value === 'regions') option.remove();
+                    if (currentScope === 'regions' && option.value === 'astana') option.remove();
+                });
+            }
 
             if (saveBtn && !canEditFact && !canEditPlan) {
                 saveBtn.disabled = true;
@@ -291,7 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return Math.round(num * 100) / 100;
     }
 
-    function calculateKPI(plan, fact, daysInMonth, currentDay) {
+    function calculateProgress(plan, fact, daysInMonth, currentDay) {
         plan = parseFloat(plan) || 0;
         fact = parseFloat(fact) || 0;
         let forecast = 0;
@@ -310,7 +318,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const group = row.closest('.region-card').dataset.group;
             const val = parseFloat(inp.value.replace(',', '.')) || 0;
 
-            let record = currentSales.find(s => (isCustom && s.isCustom && s.dealerName === dealerName) || (!isCustom && !s.isCustom && s.dealerId === dealerId));
+            let record = currentSales.find(s => (isCustom && s.isCustom && s.group === group && s.dealerName === dealerName) || (!isCustom && !s.isCustom && s.dealerId === dealerId));
             if (record) { record.fact = val; } 
             else if (val !== 0) { currentSales.push({ month: monthPicker.value, group, dealerId, dealerName, isCustom, plan: 0, fact: val }); }
         });
@@ -360,7 +368,7 @@ document.addEventListener('DOMContentLoaded', () => {
             items.sort((a,b) => a.name.localeCompare(b.name));
 
             items.forEach(item => {
-                const sale = currentSales.find(s => (item.isCustom && s.isCustom && s.dealerName === item.name) || (!item.isCustom && !s.isCustom && s.dealerId === item.id)) || {};
+                const sale = currentSales.find(s => (item.isCustom && s.isCustom && s.group === grp.key && s.dealerName === item.name) || (!item.isCustom && !s.isCustom && s.dealerId === item.id)) || {};
                 const fact = parseFloat(sale.fact) || 0;
                 groupFact += fact;
                 
@@ -450,7 +458,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const plan = plans[planKey] || 0;
-            const { percent, forecast, diff } = calculateKPI(plan, factVal, daysInMonth, currentDay);
+            const { percent, forecast, diff } = calculateProgress(plan, factVal, daysInMonth, currentDay);
             const level = percent >= 90 ? 'good' : percent >= 70 ? 'mid' : 'low';
             const planVal = plan !== 0 ? plan : '';
             const width = Math.min(percent, 100);
@@ -476,12 +484,35 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>`;
         };
 
+        const rootPlanKey = currentScope === 'astana'
+            ? 'astana_all'
+            : currentScope === 'regions'
+                ? 'regions_all'
+                : 'total_all';
+        const rootTitle = currentScope === 'astana'
+            ? 'Астана'
+            : currentScope === 'regions'
+                ? 'Регионы'
+                : 'Вся компания';
+        const rootFact = currentScope === 'astana'
+            ? totalAstanaFact + totalVipFact + totalOtherFact
+            : currentScope === 'regions'
+                ? totalRegionsFact + totalVipFact + totalOtherFact
+                : totalFactAll;
+
         let summaryHtml = '';
-        summaryHtml += `<div class="sales-summary-group is-company"><div class="sales-summary-group-title">Компания</div>${renderSumItem("Вся компания", "total_all", totalFactAll, false, true)}</div>`;
-        summaryHtml += `<div class="sales-summary-group"><div class="sales-summary-group-title">Астана</div>`;
-        summaryHtml += renderSumItem("Астана — всего", "astana_all", totalAstanaFact, false, true);
-        groupsConfig.forEach(g => { if (g.type === 'astana') summaryHtml += renderSumItem(g.title.replace('Астана — ', ''), g.key, facts[g.key], true); });
-        summaryHtml += '</div>';
+        summaryHtml += `<div class="sales-summary-group is-company"><div class="sales-summary-group-title">${currentScope === 'all' ? 'Компания' : 'Моя зона'}</div>${renderSumItem(rootTitle, rootPlanKey, rootFact, false, true)}</div>`;
+
+        if (currentScope !== 'regions') {
+            summaryHtml += `<div class="sales-summary-group"><div class="sales-summary-group-title">Астана</div>`;
+            summaryHtml += renderSumItem("Астана — всего", "astana_all", totalAstanaFact, false, true);
+            groupsConfig.forEach(g => {
+                if (g.type === 'astana' && ((facts[g.key] || 0) !== 0 || (plans[g.key] || 0) !== 0)) {
+                    summaryHtml += renderSumItem(g.title.replace('Астана — ', ''), g.key, facts[g.key], true);
+                }
+            });
+            summaryHtml += '</div>';
+        }
 
         if (facts.vip.length > 0) {
             summaryHtml += '<div class="sales-summary-group"><div class="sales-summary-group-title">Индивидуальные планы</div>';
@@ -489,10 +520,16 @@ document.addEventListener('DOMContentLoaded', () => {
             summaryHtml += '</div>';
         }
 
-        summaryHtml += '<div class="sales-summary-group"><div class="sales-summary-group-title">Регионы</div>';
-        summaryHtml += renderSumItem("Регионы — всего", "regions_all", totalRegionsFact, false, true);
-        groupsConfig.forEach(g => { if (g.type === 'region') summaryHtml += renderSumItem(g.title.replace('Регион ', ''), g.key, facts[g.key], true); });
-        summaryHtml += '</div>';
+        if (currentScope !== 'astana') {
+            summaryHtml += '<div class="sales-summary-group"><div class="sales-summary-group-title">Регионы</div>';
+            summaryHtml += renderSumItem("Регионы — всего", "regions_all", totalRegionsFact, false, true);
+            groupsConfig.forEach(g => {
+                if (g.type === 'region' && ((facts[g.key] || 0) !== 0 || (plans[g.key] || 0) !== 0)) {
+                    summaryHtml += renderSumItem(g.title.replace('Регион ', ''), g.key, facts[g.key], true);
+                }
+            });
+            summaryHtml += '</div>';
+        }
         
         if (facts.other && facts.other !== 0) {
             summaryHtml += `<div class="sales-summary-group"><div class="sales-summary-group-title">Без категории</div>
@@ -504,20 +541,6 @@ document.addEventListener('DOMContentLoaded', () => {
         setupEventListeners();
         applyViewFilters();
         if (groupsCollapsed) setGroupsCollapsed(true);
-    }
-
-    function renderTopDashboard(facts, plans, totalRegionsFact, totalAstanaFact) {
-        if (!dashboardTop) return;
-        const createCard = (title, fact, plan, iconClass='bi-graph-up', color='primary') => {
-            const { percent } = calculateKPI(plan, fact, 1, 1);
-            let badgeColor = 'bg-danger'; if (percent >= 100) badgeColor = 'bg-success'; else if (percent >= 80) badgeColor = 'bg-warning text-dark';
-            return `<div class="col-md-3 col-sm-6 col-6"><div class="card dash-card h-100 rounded-4"><div class="card-body p-2 p-md-3"><div class="d-flex justify-content-between align-items-start mb-2"><span class="dash-label text-truncate" style="max-width: 80%">${title}</span><div class="icon-circle bg-${color}-subtle text-${color} small d-none d-md-flex"><i class="bi ${iconClass}"></i></div></div><div class="d-flex align-items-baseline gap-2 mb-1 flex-wrap"><span class="dash-value fs-5 fs-md-4">${fmt(fact)}</span><span class="badge ${badgeColor} rounded-pill" style="font-size: 0.65rem">${fmt(percent)}%</span></div><div class="progress" style="height: 4px;"><div class="progress-bar ${badgeColor}" style="width: ${Math.min(percent, 100)}%"></div></div><div class="small text-muted mt-2 d-none d-md-block">План: ${fmt(plan)}</div></div></div></div>`;
-        };
-        let html = '';
-        html += createCard('Астана', totalAstanaFact, plans.astana_all, 'bi-building', 'primary');
-        html += createCard('Регионы', totalRegionsFact, plans.regions_all, 'bi-globe', 'info');
-        facts.vip.slice(0, 2).forEach(v => { const plan = plans[`vip_${v.id}`] || 0; html += createCard(v.name, v.fact, plan, 'bi-star', 'warning'); });
-        dashboardTop.innerHTML = html;
     }
 
     function setupEventListeners() {
@@ -538,7 +561,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     captureState();
                     const row = e.target.closest('.sales-row');
                     const name = row.dataset.name;
-                    currentSales = currentSales.filter(s => !(s.isCustom && s.dealerName === name));
+                    const group = row.closest('.region-card')?.dataset.group;
+                    currentSales = currentSales.filter(s => !(s.isCustom && s.group === group && s.dealerName === name));
                     markDirty();
                     renderAll();
                 }
@@ -630,6 +654,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.addEventListener('input', e => {
         if (e.target.matches('.sales-input, .plan-input')) markDirty();
+    });
+
+    document.addEventListener('change', e => {
+        if (!e.target.matches('.sales-input, .plan-input')) return;
+        captureState();
+        renderAll();
+    });
+
+    document.addEventListener('keydown', e => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+            e.preventDefault();
+            if (!saveBtn?.disabled) saveBtn?.click();
+        }
     });
 
     window.addEventListener('beforeunload', e => {
