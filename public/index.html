@@ -236,6 +236,21 @@
         </section>
 
         <div id="dealer-grid" class="d-flex flex-column gap-3"></div>
+
+        <div id="dealer-route-bar" class="dealer-route-bar" hidden>
+            <div class="dealer-route-bar-summary">
+                <span class="dealer-route-bar-icon"><i class="bi bi-signpost-split"></i></span>
+                <div>
+                    <strong><span id="dealer-route-count">0</span> в маршруте</strong>
+                    <small id="dealer-route-names">Выберите дилеров из списка</small>
+                </div>
+            </div>
+            <div class="dealer-route-bar-actions">
+                <button type="button" id="dealer-route-clear" class="dealer-route-clear">Очистить</button>
+                <button type="button" id="dealer-route-review" class="dealer-route-review"><i class="bi bi-map"></i> Маршрут</button>
+            </div>
+        </div>
+
         <p id="no-data-msg" class="text-center text-muted mt-5" style="display: none;">Ничего не найдено</p>
     </div>
 
@@ -882,7 +897,78 @@
         </div>
     </div>
 
-    <div class="modal fade" id="quick-visit-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Быстрый визит</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="quick-visit-form"><input type="hidden" id="qv_dealer_id"><div class="mb-3"><textarea class="form-control" id="qv_comment" rows="3" required placeholder="Комментарий..."></textarea></div><div class="d-grid"><button type="submit" class="btn btn-success">Сохранить</button></div></form></div></div></div></div>
+    <div class="modal fade" id="quick-visit-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content quick-visit-card">
+                <div class="modal-header border-0 pb-0">
+                    <div>
+                        <div class="quick-visit-eyebrow">РАБОТА С ДИЛЕРОМ</div>
+                        <h5 class="modal-title">Быстрый визит</h5>
+                        <div id="qv_dealer_name" class="quick-visit-dealer">Дилер</div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body pt-3">
+                    <form id="quick-visit-form">
+                        <input type="hidden" id="qv_dealer_id">
+
+                        <div class="quick-visit-mode">
+                            <input class="btn-check" type="radio" name="qv_mode" id="qv_mode_plan" value="plan" checked>
+                            <label for="qv_mode_plan"><i class="bi bi-calendar-plus"></i><span>Поставить в план<small>Нужно сделать позже</small></span></label>
+
+                            <input class="btn-check" type="radio" name="qv_mode" id="qv_mode_completed" value="completed">
+                            <label for="qv_mode_completed"><i class="bi bi-check2-circle"></i><span>Визит выполнен<small>Уже сделал сейчас</small></span></label>
+                        </div>
+
+                        <div class="quick-visit-field">
+                            <label for="qv_date" id="qv_date_label">Дата визита</label>
+                            <input type="date" class="form-control" id="qv_date" required>
+                        </div>
+
+                        <div class="quick-visit-field">
+                            <label>Быстрые варианты</label>
+                            <div id="qv_presets" class="quick-visit-presets">
+                                <button type="button" data-visit-preset="Заменить ценники">Ценники</button>
+                                <button type="button" data-visit-preset="Обновить стенд">Стенд</button>
+                                <button type="button" data-visit-preset="Проверить выставленность">Выставленность</button>
+                                <button type="button" data-visit-preset="Провести обучение менеджеров">Обучение</button>
+                            </div>
+                        </div>
+
+                        <div class="quick-visit-field mb-0">
+                            <label for="qv_comment" id="qv_comment_label">Что нужно сделать?</label>
+                            <textarea class="form-control" id="qv_comment" rows="3" required placeholder="Например: заменить ценники"></textarea>
+                            <div id="qv_mode_hint" class="quick-visit-hint">Этот визит попадёт в план и останется невыполненным.</div>
+                        </div>
+
+                        <button type="submit" id="qv_submit" class="quick-visit-submit"><i class="bi bi-calendar-plus"></i> Добавить в план</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="dealer-route-modal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content dealer-route-modal">
+                <div class="modal-header border-0 pb-0">
+                    <div>
+                        <div class="dealer-route-eyebrow">ВЫЕЗД ПО ДИЛЕРАМ</div>
+                        <h5 class="modal-title">Маршрут</h5>
+                        <p>Порядок можно менять. Дилеры без координат останутся в списке, но не попадут в навигацию.</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body pt-2">
+                    <div id="dealer-route-list" class="dealer-route-list"></div>
+                </div>
+                <div class="modal-footer border-0 pt-0 dealer-route-modal-footer">
+                    <button type="button" id="dealer-route-clear-modal" class="dealer-route-clear-modal">Очистить</button>
+                    <button type="button" id="dealer-route-open" class="dealer-route-open"><i class="bi bi-signpost-2"></i> Открыть в Яндекс Картах</button>
+                </div>
+            </div>
+        </div>
+    </div>
     
     <div class="modal fade" id="status-manager-modal" tabindex="-1"><div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title fw-bold">Управление статусами</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="card bg-light border-0 mb-4"><div class="card-body"><form id="status-form" class="row g-2 align-items-end"><input type="hidden" id="st_id"><div class="col-md-3"><label class="form-label small fw-bold text-muted">Код (ID)</label><input type="text" id="st_value" class="form-control" placeholder="vip" required><div class="form-text" style="font-size: 0.7rem; margin-top: 2px;">На латинице</div></div><div class="col-md-4"><label class="form-label small fw-bold text-muted">Название</label><input type="text" id="st_label" class="form-control" placeholder="VIP Клиент" required></div><div class="col-md-2 col-3"><label class="form-label small fw-bold text-muted">Цвет</label><input type="color" id="st_color" class="form-control form-control-color w-100" value="#B9040A" title="Выберите цвет"></div><div class="col-md-3 col-9"><div class="form-check mb-2"><input class="form-check-input" type="checkbox" id="st_visible" checked><label class="form-check-label small" for="st_visible">В списке</label></div></div><div class="col-12 mt-2 text-end"><button type="button" id="btn-cancel-edit-status" class="btn btn-sm btn-link text-muted me-2" style="display:none;">Отмена</button><button type="submit" class="btn btn-primary px-4" id="btn-save-status">Сохранить</button></div></form></div></div><div class="table-responsive"><table class="table table-hover align-middle"><thead class="table-light small text-muted text-uppercase"><tr><th>Цвет</th><th>Название</th><th>Код (ID)</th><th class="text-center">В списке</th><th class="text-end">Действия</th></tr></thead><tbody id="status-manager-list"></tbody></table></div></div></div></div></div>
     

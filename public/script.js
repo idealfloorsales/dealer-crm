@@ -25,6 +25,15 @@ document.addEventListener('DOMContentLoaded', () => {
     
     let currentSort = { column: 'dealer_id', direction: 'asc' };
     let dealerQuickFilter = 'all';
+    let dealerRouteIds = [];
+    try {
+        const savedRoute = JSON.parse(localStorage.getItem('dealer_route_v1') || '[]');
+        dealerRouteIds = Array.isArray(savedRoute) ? savedRoute.map(String).filter(Boolean) : [];
+    } catch (e) {
+        dealerRouteIds = [];
+    }
+    const dealerAvatarCache = new Map();
+    let dealerAvatarObserver = null;
     let isSaving = false; 
     let addPhotosData = []; 
     let editPhotosData = []; 
@@ -47,6 +56,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const addModalEl = document.getElementById('add-modal'); const addModal = new bootstrap.Modal(addModalEl, { backdrop: 'static', keyboard: false }); const addForm = document.getElementById('add-dealer-form');
     const editModalEl = document.getElementById('edit-modal'); const editModal = new bootstrap.Modal(editModalEl, { backdrop: 'static', keyboard: false }); const editForm = document.getElementById('edit-dealer-form');
     const qvModalEl = document.getElementById('quick-visit-modal'); const qvModal = new bootstrap.Modal(qvModalEl, { backdrop: 'static', keyboard: false }); const qvForm = document.getElementById('quick-visit-form');
+    const dealerRouteBar = document.getElementById('dealer-route-bar');
+    const dealerRouteModalEl = document.getElementById('dealer-route-modal');
+    const dealerRouteModal = dealerRouteModalEl ? new bootstrap.Modal(dealerRouteModalEl) : null;
+    const dealerRouteList = document.getElementById('dealer-route-list');
+    const dealerRouteReview = document.getElementById('dealer-route-review');
+    const dealerRouteClear = document.getElementById('dealer-route-clear');
+    const dealerRouteClearModal = document.getElementById('dealer-route-clear-modal');
+    const dealerRouteOpen = document.getElementById('dealer-route-open');
     
     // Status Manager
     const statusModalEl = document.getElementById('status-manager-modal'); const statusModal = statusModalEl ? new bootstrap.Modal(statusModalEl) : null; const btnManageStatuses = document.getElementById('btn-manage-statuses'); const statusForm = document.getElementById('status-form'); const statusListContainer = document.getElementById('status-manager-list');
@@ -134,6 +151,35 @@ document.addEventListener('DOMContentLoaded', () => {
     const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
     const safeText = (text) => (text || '').toString().replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const safeAttr = (text) => (text || '').toString().replace(/"/g, '&quot;');
+
+    function normalizeDisplayValue(value) {
+        let text = String(value || '').trim().replace(/\s+/g, ' ');
+        if (!text) return '';
+
+        const chunks = text.split(/\s*(?:,|;|\||\/)\s*/).filter(Boolean);
+        if (chunks.length > 1) {
+            const unique = [];
+            const seen = new Set();
+            chunks.forEach(chunk => {
+                const key = chunk.toLocaleLowerCase('ru-RU');
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    unique.push(chunk);
+                }
+            });
+            text = unique.join(' · ');
+        }
+
+        const words = text.split(' ').filter(Boolean);
+        if (words.length >= 2 && words.length % 2 === 0) {
+            const half = words.length / 2;
+            const left = words.slice(0, half).join(' ');
+            const right = words.slice(half).join(' ');
+            if (left.toLocaleLowerCase('ru-RU') === right.toLocaleLowerCase('ru-RU')) text = left;
+        }
+
+        return text;
+    }
     const compressImage = (file, maxWidth = 1000, quality = 0.7) => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = event => { const img = new Image(); img.src = event.target.result; img.onload = () => { const elem = document.createElement('canvas'); let width = img.width; let height = img.height; if (width > maxWidth) { height *= maxWidth / width; width = maxWidth; } elem.width = width; elem.height = height; const ctx = elem.getContext('2d'); ctx.drawImage(img, 0, 0, width, height); resolve(elem.toDataURL('image/jpeg', quality)); }; img.onerror = error => reject(error); }; reader.onerror = error => reject(error); });
     function cleanCsv(text) { return `"${String(text || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`; }
     function downloadCsv(content, filename) { const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); document.body.removeChild(a); }
@@ -471,6 +517,29 @@ document.addEventListener('DOMContentLoaded', () => {
         if(sectorFilter) sectorFilter.onchange = renderDealerList;
         if(searchBar) searchBar.oninput = renderDealerList;
         if(dealerSortSelect) dealerSortSelect.onchange = renderDealerList;
+
+        qvForm?.querySelectorAll('input[name="qv_mode"]').forEach(input => {
+            input.onchange = syncQuickVisitMode;
+        });
+        const qvPresets = document.getElementById('qv_presets');
+        if (qvPresets) {
+            qvPresets.onclick = (e) => {
+                const btn = e.target.closest('[data-visit-preset]');
+                if (!btn) return;
+                const comment = document.getElementById('qv_comment');
+                if (!comment) return;
+                comment.value = btn.dataset.visitPreset || '';
+                comment.focus();
+            };
+        }
+
+        if (dealerRouteReview) dealerRouteReview.onclick = () => {
+            renderDealerRouteModal();
+            dealerRouteModal?.show();
+        };
+        if (dealerRouteClear) dealerRouteClear.onclick = clearDealerRouteSelection;
+        if (dealerRouteClearModal) dealerRouteClearModal.onclick = clearDealerRouteSelection;
+        if (dealerRouteOpen) dealerRouteOpen.onclick = openDealerRouteInYandex;
 
         if (dealerQuickFilters) {
             dealerQuickFilters.onclick = (e) => {
@@ -1008,13 +1077,54 @@ document.addEventListener('DOMContentLoaded', () => {
     // EXPOSE TO WINDOW
     window.openEditModal = openEditModal;
 
-    window.showQuickVisit = (id) => {
+    function syncQuickVisitMode() {
+        if (!qvForm) return;
+        const mode = qvForm.querySelector('input[name="qv_mode"]:checked')?.value || 'plan';
+        const completed = mode === 'completed';
+        const dateInput = document.getElementById('qv_date');
+        const comment = document.getElementById('qv_comment');
+        const commentLabel = document.getElementById('qv_comment_label');
+        const hint = document.getElementById('qv_mode_hint');
+        const submit = document.getElementById('qv_submit');
+        const today = new Date().toISOString().slice(0,10);
+
+        if (dateInput) {
+            if (!dateInput.value) dateInput.value = today;
+            dateInput.min = completed ? '' : today;
+            dateInput.max = completed ? today : '';
+            if (completed && dateInput.value > today) dateInput.value = today;
+        }
+
+        if (commentLabel) commentLabel.textContent = completed ? 'Что сделано?' : 'Что нужно сделать?';
+        if (comment) comment.placeholder = completed ? 'Например: заменил ценники' : 'Например: заменить ценники';
+        if (hint) hint.textContent = completed
+            ? 'Визит сразу попадёт в историю как выполненный.'
+            : 'Этот визит попадёт в план и останется невыполненным.';
+        if (submit) submit.innerHTML = completed
+            ? '<i class="bi bi-check2-circle"></i> Завершить визит'
+            : '<i class="bi bi-calendar-plus"></i> Добавить в план';
+    }
+
+    window.showQuickVisit = (id, preferredMode = 'plan') => {
         if (!window.CRMAuth || !CRMAuth.can('can_manage_visits')) {
             window.showToast("Нет права добавлять визиты", "error");
             return;
         }
+
+        const dealer = allDealers.find(d => String(d.id) === String(id));
+        const dealerName = document.getElementById('qv_dealer_name');
+        const planMode = document.getElementById('qv_mode_plan');
+        const completedMode = document.getElementById('qv_mode_completed');
+
         document.getElementById('qv_dealer_id').value = id;
         document.getElementById('qv_comment').value = '';
+        document.getElementById('qv_date').value = new Date().toISOString().slice(0,10);
+        if (dealerName) dealerName.textContent = dealer ? dealer.name : 'Дилер';
+
+        if (preferredMode === 'completed' && completedMode) completedMode.checked = true;
+        else if (planMode) planMode.checked = true;
+
+        syncQuickVisitMode();
         qvModal.show();
     };
 
@@ -1205,11 +1315,211 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
         return labels[value] || value || 'Не назначен';
     }
 
+
+    function persistDealerRoute() {
+        localStorage.setItem('dealer_route_v1', JSON.stringify(dealerRouteIds));
+    }
+
+    function cleanDealerRoute() {
+        if (!allDealers.length || !dealerRouteIds.length) return;
+        const validIds = new Set(allDealers.map(d => String(d.id)));
+        const cleaned = dealerRouteIds.filter((id, index, arr) => validIds.has(String(id)) && arr.indexOf(id) === index);
+        if (cleaned.length !== dealerRouteIds.length) {
+            dealerRouteIds = cleaned;
+            persistDealerRoute();
+        }
+    }
+
+    function selectedRouteDealers() {
+        return dealerRouteIds
+            .map(id => allDealers.find(d => String(d.id) === String(id)))
+            .filter(Boolean);
+    }
+
+    function refreshRouteSelectionUI() {
+        cleanDealerRoute();
+        const selected = selectedRouteDealers();
+        const count = selected.length;
+        document.body.classList.toggle('dealer-route-active', count > 0);
+
+        if (dealerRouteBar) dealerRouteBar.hidden = count === 0;
+        const countEl = document.getElementById('dealer-route-count');
+        const namesEl = document.getElementById('dealer-route-names');
+        if (countEl) countEl.textContent = String(count);
+        if (namesEl) {
+            const names = selected.slice(0, 3).map(d => d.name).filter(Boolean);
+            namesEl.textContent = names.length
+                ? names.join(' · ') + (count > 3 ? ` +${count - 3}` : '')
+                : 'Выберите дилеров из списка';
+        }
+
+        document.querySelectorAll('[data-route-toggle]').forEach(btn => {
+            const active = dealerRouteIds.includes(String(btn.dataset.routeToggle));
+            btn.classList.toggle('active', active);
+            btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+            const text = btn.querySelector('span');
+            const icon = btn.querySelector('i');
+            if (text) text.textContent = active ? 'В маршруте' : 'В маршрут';
+            if (icon) icon.className = active ? 'bi bi-check2' : 'bi bi-plus-lg';
+        });
+    }
+
+    window.toggleDealerRoute = function(id) {
+        const key = String(id);
+        const index = dealerRouteIds.indexOf(key);
+        if (index >= 0) dealerRouteIds.splice(index, 1);
+        else dealerRouteIds.push(key);
+        persistDealerRoute();
+        refreshRouteSelectionUI();
+        if (dealerRouteModalEl?.classList.contains('show')) renderDealerRouteModal();
+    };
+
+    window.moveDealerRoute = function(id, direction) {
+        const key = String(id);
+        const index = dealerRouteIds.indexOf(key);
+        const next = index + Number(direction);
+        if (index < 0 || next < 0 || next >= dealerRouteIds.length) return;
+        [dealerRouteIds[index], dealerRouteIds[next]] = [dealerRouteIds[next], dealerRouteIds[index]];
+        persistDealerRoute();
+        renderDealerRouteModal();
+        refreshRouteSelectionUI();
+    };
+
+    window.removeDealerFromRoute = function(id) {
+        dealerRouteIds = dealerRouteIds.filter(x => String(x) !== String(id));
+        persistDealerRoute();
+        renderDealerRouteModal();
+        refreshRouteSelectionUI();
+    };
+
+    function clearDealerRouteSelection() {
+        dealerRouteIds = [];
+        persistDealerRoute();
+        renderDealerRouteModal();
+        refreshRouteSelectionUI();
+    }
+
+    function renderDealerRouteModal() {
+        if (!dealerRouteList) return;
+        const selected = selectedRouteDealers();
+
+        if (!selected.length) {
+            dealerRouteList.innerHTML = '<div class="dealer-route-empty"><i class="bi bi-signpost-split"></i><strong>Маршрут пуст</strong><span>Отметьте нужных дилеров в списке.</span></div>';
+            if (dealerRouteOpen) dealerRouteOpen.disabled = true;
+            return;
+        }
+
+        dealerRouteList.innerHTML = selected.map((d, index) => {
+            const hasCoords = Number.isFinite(Number(d.latitude)) && Number.isFinite(Number(d.longitude));
+            const meta = [normalizeDisplayValue(d.city), normalizeDisplayValue(d.address)].filter(Boolean).join(' · ') || 'Адрес не указан';
+            return `<div class="dealer-route-row">
+                <span class="dealer-route-order">${index + 1}</span>
+                <span class="dealer-route-row-main">
+                    <strong>${safeText(d.name)}</strong>
+                    <small>${safeText(meta)}</small>
+                </span>
+                <span class="dealer-route-coords ${hasCoords ? 'ok' : 'missing'}" title="${hasCoords ? 'Координаты есть' : 'Нет координат'}"><i class="bi bi-${hasCoords ? 'geo-alt-fill' : 'geo-alt'}"></i></span>
+                <span class="dealer-route-row-actions">
+                    <button type="button" onclick="moveDealerRoute('${safeAttr(d.id)}',-1)" ${index === 0 ? 'disabled' : ''} title="Выше"><i class="bi bi-chevron-up"></i></button>
+                    <button type="button" onclick="moveDealerRoute('${safeAttr(d.id)}',1)" ${index === selected.length - 1 ? 'disabled' : ''} title="Ниже"><i class="bi bi-chevron-down"></i></button>
+                    <button type="button" class="remove" onclick="removeDealerFromRoute('${safeAttr(d.id)}')" title="Убрать"><i class="bi bi-x-lg"></i></button>
+                </span>
+            </div>`;
+        }).join('');
+
+        if (dealerRouteOpen) {
+            const coordsCount = selected.filter(d => Number.isFinite(Number(d.latitude)) && Number.isFinite(Number(d.longitude))).length;
+            dealerRouteOpen.disabled = coordsCount === 0;
+            dealerRouteOpen.innerHTML = `<i class="bi bi-signpost-2"></i> Открыть маршрут · ${coordsCount}`;
+        }
+    }
+
+    function openDealerRouteInYandex() {
+        const selected = selectedRouteDealers();
+        const withCoords = selected.filter(d => Number.isFinite(Number(d.latitude)) && Number.isFinite(Number(d.longitude)));
+        const missing = selected.length - withCoords.length;
+
+        if (!withCoords.length) {
+            window.showToast('У выбранных дилеров нет координат', 'error');
+            return;
+        }
+
+        let url = '';
+        if (withCoords.length === 1) {
+            const d = withCoords[0];
+            url = `https://yandex.kz/maps/?pt=${encodeURIComponent(d.longitude)},${encodeURIComponent(d.latitude)}&z=17&l=map`;
+        } else {
+            const rtext = withCoords.map(d => `${Number(d.latitude)},${Number(d.longitude)}`).join('~');
+            url = `https://yandex.kz/maps/?rtext=${encodeURIComponent(rtext)}&rtt=auto`;
+        }
+
+        if (missing > 0) window.showToast(`${missing} дилер(а) без координат не добавлены в навигацию`, 'info');
+        window.open(url, '_blank', 'noopener');
+    }
+
+    function applyDealerAvatar(img, url) {
+        if (!img || !url) return;
+        img.onload = () => img.closest('.dealer-v3-photo')?.classList.add('has-image');
+        img.onerror = () => img.closest('.dealer-v3-photo')?.classList.remove('has-image');
+        img.src = url;
+    }
+
+    async function loadDealerAvatar(img) {
+        if (!img || img.dataset.avatarLoaded === '1' || img.dataset.avatarLoading === '1') return;
+        const dealerId = img.dataset.dealerAvatar;
+        if (!dealerId) return;
+
+        if (dealerAvatarCache.has(dealerId)) {
+            img.dataset.avatarLoaded = '1';
+            applyDealerAvatar(img, dealerAvatarCache.get(dealerId));
+            return;
+        }
+
+        img.dataset.avatarLoading = '1';
+        try {
+            const response = await fetch(`${API_DEALERS_URL}/${encodeURIComponent(dealerId)}/avatar`);
+            if (!response.ok) throw new Error('avatar');
+            const data = await response.json();
+            const url = data.avatarUrl || '';
+            dealerAvatarCache.set(dealerId, url);
+            img.dataset.avatarLoaded = '1';
+            applyDealerAvatar(img, url);
+        } catch (e) {
+            dealerAvatarCache.set(dealerId, '');
+            img.dataset.avatarLoaded = '1';
+        } finally {
+            delete img.dataset.avatarLoading;
+        }
+    }
+
+    function hydrateDealerAvatars() {
+        if (!dealerGrid) return;
+        const images = [...dealerGrid.querySelectorAll('img[data-dealer-avatar]')];
+        if (!images.length) return;
+
+        if (dealerAvatarObserver) dealerAvatarObserver.disconnect();
+
+        if (!('IntersectionObserver' in window)) {
+            images.slice(0, 12).forEach(loadDealerAvatar);
+            return;
+        }
+
+        dealerAvatarObserver = new IntersectionObserver(entries => {
+            entries.forEach(entry => {
+                if (!entry.isIntersecting) return;
+                dealerAvatarObserver.unobserve(entry.target);
+                loadDealerAvatar(entry.target);
+            });
+        }, { rootMargin: '220px 0px' });
+
+        images.forEach(img => dealerAvatarObserver.observe(img));
+    }
+
     function dealerInfoChips(dealer) {
         const seen = new Set();
         const items = [];
         const add = (label, value, icon) => {
-            const raw = String(value || '').trim();
+            const raw = normalizeDisplayValue(value);
             if (!raw) return;
             const key = raw.toLocaleLowerCase('ru-RU').replace(/\s+/g, ' ');
             if (seen.has(key)) return;
@@ -1344,6 +1654,7 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
                     <p>Измените поиск или сбросьте фильтры.</p>
                     <button type="button" onclick="document.getElementById('dealer-reset-filters')?.click()">Сбросить фильтры</button>
                 </div>`;
+            refreshRouteSelectionUI();
             return;
         }
 
@@ -1379,8 +1690,10 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
             }
 
             const quickVisitBtn = (window.CRMAuth && CRMAuth.can('can_manage_visits'))
-                ? `<button class="dealer-v3-action" type="button" onclick="event.stopPropagation(); showQuickVisit('${safeAttr(d.id)}')" title="Запланировать визит"><i class="bi bi-calendar-plus"></i></button>`
+                ? `<button class="dealer-v3-action is-visit" type="button" onclick="event.stopPropagation(); showQuickVisit('${safeAttr(d.id)}')" title="Быстрый визит"><i class="bi bi-journal-check"></i></button>`
                 : '';
+            const routeActive = dealerRouteIds.includes(String(d.id));
+            const routeToggleBtn = `<button class="dealer-route-toggle ${routeActive ? 'active' : ''}" type="button" data-route-toggle="${safeAttr(d.id)}" aria-pressed="${routeActive ? 'true' : 'false'}" onclick="event.stopPropagation(); toggleDealerRoute('${safeAttr(d.id)}')"><i class="bi bi-${routeActive ? 'check2' : 'plus-lg'}"></i><span>${routeActive ? 'В маршруте' : 'В маршрут'}</span></button>`;
             const editBtn = canEdit
                 ? `<button class="dealer-v3-action" type="button" onclick="event.stopPropagation(); openEditModal('${safeAttr(d.id)}')" title="Редактировать"><i class="bi bi-pencil"></i></button>`
                 : '';
@@ -1420,7 +1733,10 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
             return `<article class="dealer-v3-card ${metrics.problem ? 'has-risk' : ''}" onclick="window.location.href='dealer.html?id=${encodeURIComponent(d.id)}'">
                 <div class="dealer-v3-top">
                     <div class="dealer-v3-identity">
-                        <div class="dealer-v3-monogram">${initial}</div>
+                        <div class="dealer-v3-photo">
+                            <img data-dealer-avatar="${safeAttr(d.id)}" alt="" loading="lazy">
+                            <span>${initial}</span>
+                        </div>
                         <div class="dealer-v3-name-wrap">
                             <div class="dealer-v3-name-line">
                                 <a href="dealer.html?id=${encodeURIComponent(d.id)}" class="dealer-v3-name" onclick="event.stopPropagation()">${safeText(d.name)}</a>
@@ -1473,12 +1789,14 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
                 <div class="dealer-v3-bottom">
                     <div class="dealer-v3-signals">${signalsHtml}</div>
                     <div class="dealer-v3-actions">
-                        ${waBtn}${phoneBtn}${mapBtn}${instaBtn}${quickVisitBtn}${editBtn}
+                        ${routeToggleBtn}${quickVisitBtn}${waBtn}${phoneBtn}${mapBtn}${instaBtn}${editBtn}
                         <a href="dealer.html?id=${encodeURIComponent(d.id)}" class="dealer-v3-open" onclick="event.stopPropagation()">Открыть карточку <i class="bi bi-arrow-right"></i></a>
                     </div>
                 </div>
             </article>`;
         }).join('');
+        hydrateDealerAvatars();
+        refreshRouteSelectionUI();
     }
 
     let globalSearchIndex = 0;
@@ -1656,19 +1974,18 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
         isSaving = true;
         const id = document.getElementById('qv_dealer_id').value;
         const comment = document.getElementById('qv_comment').value.trim();
-        const btn = qvForm.querySelector('button');
-        if(!id || !comment) { isSaving = false; return; }
+        const date = document.getElementById('qv_date').value || new Date().toISOString().slice(0,10);
+        const mode = qvForm.querySelector('input[name="qv_mode"]:checked')?.value || 'plan';
+        const isCompleted = mode === 'completed';
+        const btn = document.getElementById('qv_submit');
+        if(!id || !comment || !date) { isSaving = false; return; }
 
         try {
-            btn.disabled = true;
+            if (btn) btn.disabled = true;
             const response = await fetch(`${API_DEALERS_URL}/${id}/visits`, {
                 method: 'POST',
                 headers: {'Content-Type':'application/json'},
-                body: JSON.stringify({
-                    date: new Date().toISOString().slice(0,10),
-                    comment,
-                    isCompleted: true
-                })
+                body: JSON.stringify({ date, comment, isCompleted })
             });
             if (!response.ok) {
                 const data = await response.json().catch(() => ({}));
@@ -1676,7 +1993,7 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
             }
             qvModal.hide();
             qvForm.reset();
-            window.showToast("Визит добавлен!");
+            window.showToast(isCompleted ? "Визит отмечен как выполненный" : "Визит добавлен в план");
             await initApp();
         } catch(e) {
             window.showToast(e.message || "Ошибка", "error");
