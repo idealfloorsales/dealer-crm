@@ -16,6 +16,19 @@
             .sort((a, b) => b._date - a._date)[0] || null;
     }
 
+    function getSalesTotals(salesRows) {
+        const rows = Array.isArray(salesRows) ? salesRows : [];
+        const fact = rows
+            .filter(row => !String(row.dealerId || '').startsWith('PLAN_'))
+            .reduce((sum, row) => sum + number(row.fact), 0);
+
+        const explicitPlanRows = rows.filter(row => String(row.dealerId || '').startsWith('PLAN_'));
+        const planSource = explicitPlanRows.length ? explicitPlanRows : rows;
+        const plan = planSource.reduce((sum, row) => sum + number(row.plan), 0);
+
+        return { fact, plan };
+    }
+
     function calculateDealerScore(options) {
         options = options || {};
         const dealer = options.dealer || {};
@@ -29,8 +42,7 @@
         let availableMax = 0;
 
         if (canViewSales) {
-            const fact = salesRows.reduce((sum, row) => sum + number(row.fact), 0);
-            const plan = salesRows.reduce((sum, row) => sum + number(row.plan), 0);
+            const { fact, plan } = getSalesTotals(salesRows);
             let score = 0;
             let note = 'Нет продаж в текущем месяце';
 
@@ -148,6 +160,7 @@
 
     window.CRMScore = {
         calculateDealerScore,
-        latestCompletedVisit
+        latestCompletedVisit,
+        getSalesTotals
     };
 })();

@@ -493,8 +493,14 @@ document.addEventListener('DOMContentLoaded', () => {
         return allTasksData.find(d => String(d.id) === String(dealerId));
     }
 
-    function getSalesForDealer(dealerId) {
-        return (currentMonthSales || []).filter(s => String(s.dealerId) === String(dealerId));
+    function getSalesForDealer(dealer) {
+        const dealerId = String(dealer?.id || dealer?._id || '');
+        const personalPlanKey = `PLAN_vip_${dealerId}`;
+
+        return (currentMonthSales || []).filter(s => {
+            const rowDealerId = String(s.dealerId || '');
+            return rowDealerId === dealerId || (dealer?.hasPersonalPlan && rowDealerId === personalPlanKey);
+        });
     }
 
     function getDealerHealth(dealer) {
@@ -505,7 +511,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.CRMScore && typeof CRMScore.calculateDealerScore === 'function') {
             return CRMScore.calculateDealerScore({
                 dealer,
-                salesRows: canViewSales ? getSalesForDealer(dealer.id) : [],
+                salesRows: canViewSales ? getSalesForDealer(dealer) : [],
                 visits: canViewVisits ? (taskDealer?.visits || []) : [],
                 canViewSales,
                 canViewVisits

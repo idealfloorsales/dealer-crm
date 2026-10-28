@@ -469,6 +469,7 @@ app.get('/api/sales', requirePermission('can_view_sales'), async (req, res) => {
         if (scope !== 'all') {
             const dealers = await Dealer.find(getDealerFilter(req)).select('_id').lean();
             const dealerIds = dealers.map(d => String(d._id));
+            const personalPlanIds = dealerIds.map(id => `PLAN_vip_${id}`);
 
             const sectorType = scope === 'astana' ? 'astana' : 'region';
             const sectors = await Sector.find({ type: sectorType }).select('name').lean();
@@ -480,6 +481,7 @@ app.get('/api/sales', requirePermission('can_view_sales'), async (req, res) => {
                     {
                         $or: [
                             { isCustom: { $ne: true }, dealerId: { $in: dealerIds } },
+                            { isCustom: { $ne: true }, dealerId: { $in: personalPlanIds } },
                             { isCustom: true, group: { $in: groups } }
                         ]
                     }
