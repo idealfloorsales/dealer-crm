@@ -19,6 +19,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let statusList = []; 
     let allTasksData = [];
     let currentMonthSales = [];
+    let salesHistory = [];
+    let reclamationsData = [];
     let allSectors = []; // <--- ХРАНИЛИЩЕ СЕКТОРОВ
     
     let currentSort = { column: 'dealer_id', direction: 'asc' };
@@ -34,8 +36,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSectorTypeMode = ''; // 'astana' или 'region'
 
     // Настройки дашборда
-    const defaultDashConfig = { showHealth: true, showGrowth: true, showCityPen: true, showMatrix: false, showVisits: false };
-    let dashConfig = JSON.parse(localStorage.getItem('dash_config')) || defaultDashConfig;
+    const defaultDashConfig = { showPulse: true, showAttention: true, showPlan: true, showActivity: true };
+    let dashConfig = { ...defaultDashConfig, ...(JSON.parse(localStorage.getItem('dash_config') || '{}')) };
 
     // Список POS-материалов
     const posMaterialsList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"];
@@ -394,14 +396,24 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (window.CRMAuth && CRMAuth.can('can_view_sales')) {
-                try { await fetchCurrentMonthSales(); } catch(e) { currentMonthSales = []; console.warn(e); }
+                try {
+                    await Promise.all([fetchCurrentMonthSales(), fetchSalesHistory()]);
+                } catch(e) {
+                    currentMonthSales = [];
+                    salesHistory = [];
+                    console.warn(e);
+                }
             } else {
                 currentMonthSales = [];
+                salesHistory = [];
             }
+
+            await fetchReclamationsForDashboard();
 
             // 4. Render
             populateFilters(allDealers);
-            renderDashboard(); 
+            renderDashboard();
+            setupGlobalSearch(); 
             renderDealerList();
             
             // 5. Setup Listeners
@@ -444,25 +456,21 @@ document.addEventListener('DOMContentLoaded', () => {
             const list = document.getElementById('dash-settings-list');
             if(list) {
                 list.innerHTML = `
-                    <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" id="set-showHealth" ${dashConfig.showHealth ? 'checked' : ''}>
-                        <label class="form-check-label" for="set-showHealth">Продажи тт (Актив/Спят)</label>
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="set-showPulse" ${dashConfig.showPulse ? 'checked' : ''}>
+                        <label class="form-check-label" for="set-showPulse">Пульс бизнеса</label>
                     </div>
-                    <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" id="set-showGrowth" ${dashConfig.showGrowth ? 'checked' : ''}>
-                        <label class="form-check-label" for="set-showGrowth">Прирост (Новые)</label>
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="set-showAttention" ${dashConfig.showAttention ? 'checked' : ''}>
+                        <label class="form-check-label" for="set-showAttention">Требует внимания</label>
                     </div>
-                    <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" id="set-showCityPen" ${dashConfig.showCityPen ? 'checked' : ''}>
-                        <label class="form-check-label" for="set-showCityPen">Потенциал городов</label>
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="set-showPlan" ${dashConfig.showPlan ? 'checked' : ''}>
+                        <label class="form-check-label" for="set-showPlan">План на сегодня</label>
                     </div>
-                    <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" id="set-showMatrix" ${dashConfig.showMatrix ? 'checked' : ''}>
-                        <label class="form-check-label" for="set-showMatrix">Матрица (Среднее SKU)</label>
-                    </div>
-                    <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" id="set-showVisits" ${dashConfig.showVisits ? 'checked' : ''}>
-                        <label class="form-check-label" for="set-showVisits">Активность (Визиты)</label>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="set-showActivity" ${dashConfig.showActivity ? 'checked' : ''}>
+                        <label class="form-check-label" for="set-showActivity">Последние события</label>
                     </div>
                 `;
             }
@@ -471,164 +479,339 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     window.saveDashboardConfig = () => {
-        dashConfig.showHealth = document.getElementById('set-showHealth').checked;
-        dashConfig.showGrowth = document.getElementById('set-showGrowth').checked;
-        dashConfig.showCityPen = document.getElementById('set-showCityPen').checked;
-        dashConfig.showMatrix = document.getElementById('set-showMatrix').checked;
-        dashConfig.showVisits = document.getElementById('set-showVisits').checked;
-        
+        dashConfig.showPulse = document.getElementById('set-showPulse')?.checked ?? true;
+        dashConfig.showAttention = document.getElementById('set-showAttention')?.checked ?? true;
+        dashConfig.showPlan = document.getElementById('set-showPlan')?.checked ?? true;
+        dashConfig.showActivity = document.getElementById('set-showActivity')?.checked ?? true;
         localStorage.setItem('dash_config', JSON.stringify(dashConfig));
         if(settingsModal) settingsModal.hide();
-        renderDashboard(); 
+        renderDashboard();
     };
 
     // --- RENDER DASHBOARD (V3) ---
-    function renderDashboard() {
-        if (!dashboardStats) return; 
-        if (!allDealers || allDealers.length === 0) { dashboardStats.innerHTML = ''; return; }
+    function getTaskDealer(dealerId) {
+        return allTasksData.find(d => String(d.id) === String(dealerId));
+    }
 
-        let html = '';
-        
-        // 1. Calculations
-        const activeIds = new Set();
-        if(currentMonthSales) currentMonthSales.forEach(s => { if(s.fact > 0) activeIds.add(s.dealerId); });
-        
-        let activeCount = 0;
-        let sleepingCount = 0;
-        let newCount = 0;
-        let totalSKU = 0;
-        let totalDealersWithProducts = 0;
+    function getSalesForDealer(dealerId) {
+        return (currentMonthSales || []).filter(s => String(s.dealerId) === String(dealerId));
+    }
 
-        const cityStats = {}; 
-        const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    function getDealerHealth(dealer) {
+        let score = 52;
+        const reasons = [];
 
-        allDealers.forEach(d => {
-            if (d.status === 'archive') return;
+        if (dealer.status === 'active') score += 12;
+        if (dealer.status === 'problem') { score -= 24; reasons.push('проблемный статус'); }
+        if (dealer.status === 'potential') score -= 5;
 
-            const isActive = activeIds.has(d.id);
-            if (isActive) activeCount++; else sleepingCount++;
-
-            if (d.createdAt && new Date(d.createdAt) >= startOfMonth) newCount++;
-
-            if (d.products && d.products.length > 0) {
-                const realProducts = d.products.filter(p => !posMaterialsList.includes(p.name));
-                totalSKU += realProducts.length;
-                if(realProducts.length > 0) totalDealersWithProducts++;
+        if (window.CRMAuth && CRMAuth.can('can_view_sales')) {
+            const sales = getSalesForDealer(dealer.id);
+            const fact = sales.reduce((sum, s) => sum + (Number(s.fact) || 0), 0);
+            const plan = sales.reduce((sum, s) => sum + (Number(s.plan) || 0), 0);
+            if (fact > 0) score += 12; else { score -= 8; reasons.push('нет продаж в месяце'); }
+            if (plan > 0) {
+                const achievement = fact / plan;
+                if (achievement >= 1) score += 10;
+                else if (achievement < .55) { score -= 10; reasons.push('низкое выполнение плана'); }
             }
-
-            const city = d.city || 'Не указан';
-            if (!cityStats[city]) cityStats[city] = { active: 0, potential: 0, total: 0 };
-            
-            if (isActive) cityStats[city].active++;
-            else cityStats[city].potential++;
-            
-            cityStats[city].total++;
-        });
-
-        const avgSKU = totalDealersWithProducts > 0 ? (totalSKU / totalDealersWithProducts).toFixed(1) : 0;
-
-        // 2. Widgets
-        if (dashConfig.showHealth && window.CRMAuth && CRMAuth.can('can_view_sales')) {
-            html += `
-            <div class="col-6">
-                <div class="stat-card-modern h-100 flex-column align-items-start justify-content-center p-3">
-                    <div class="d-flex align-items-center gap-2 mb-2">
-                        <div class="icon-circle bg-success-subtle text-success"><i class="bi bi-heart-pulse-fill"></i></div>
-                        <span class="small fw-bold text-muted">Продажи по дилерам</span>
-                    </div>
-                    <div class="stat-dual-value">
-                        <span class="stat-val-active">${activeCount}</span>
-                        <span class="text-muted fw-light" style="font-size:1rem;">/</span>
-                        <span class="stat-val-sleep">${sleepingCount}</span>
-                    </div>
-                    <div class="stat-sublabel">Актив / Спят</div>
-                </div>
-            </div>`;
         }
 
-        if (dashConfig.showGrowth) {
-            html += `
-            <div class="col-6">
-                <div class="stat-card-modern h-100 flex-column align-items-start justify-content-center p-3">
-                    <div class="d-flex align-items-center gap-2 mb-2">
-                        <div class="icon-circle bg-primary-subtle text-primary"><i class="bi bi-graph-up-arrow"></i></div>
-                        <span class="small fw-bold text-muted">Прирост</span>
-                    </div>
-                    <h3 class="mb-0 text-primary fw-bolder">+${newCount}</h3>
-                    <div class="stat-sublabel">Новых в этом мес.</div>
-                </div>
-            </div>`;
+        if (window.CRMAuth && CRMAuth.can('can_view_dashboard')) {
+            const taskDealer = getTaskDealer(dealer.id);
+            const completed = (taskDealer?.visits || [])
+                .filter(v => v.isCompleted && v.date)
+                .sort((a,b) => new Date(b.date) - new Date(a.date));
+            if (completed.length) {
+                const days = Math.floor((Date.now() - new Date(completed[0].date).getTime()) / 86400000);
+                if (days <= 21) score += 10;
+                else if (days > 60) { score -= 12; reasons.push(`без визита ${days} дн.`); }
+                else if (days > 35) { score -= 6; reasons.push(`без визита ${days} дн.`); }
+            } else {
+                score -= 10;
+                reasons.push('нет истории визитов');
+            }
         }
 
-        if (dashConfig.showMatrix) {
-            html += `
-            <div class="col-6">
-                <div class="stat-card-modern h-100 flex-column align-items-start justify-content-center p-3">
-                    <div class="d-flex align-items-center gap-2 mb-2">
-                        <div class="icon-circle bg-warning-subtle text-warning"><i class="bi bi-grid-3x3-gap-fill"></i></div>
-                        <span class="small fw-bold text-muted">Матрица</span>
-                    </div>
-                    <h3 class="mb-0 text-dark fw-bolder">${avgSKU}</h3>
-                    <div class="stat-sublabel">Среднее SKU</div>
-                </div>
-            </div>`;
-        }
+        if (dealer.contacts?.length) score += 5;
+        if (dealer.latitude && dealer.longitude) score += 4;
+        if (dealer.instagram || dealer.website) score += 3;
 
-        if (dashConfig.showCityPen) {
-            const sortedCities = Object.entries(cityStats).sort((a, b) => b[1].total - a[1].total);
-            let citiesHtml = '';
-            sortedCities.forEach(([name, stats]) => {
-                const activePct = Math.round((stats.active / stats.total) * 100);
-                const potPct = 100 - activePct; 
-                citiesHtml += `
-                <div class="city-stat-row">
-                    <div class="city-bar-header d-flex justify-content-between align-items-center">
-                        <span>${name}</span>
-                        <span class="text-muted" style="font-size:0.75rem">${stats.active} / ${stats.potential}</span>
-                    </div>
-                    <div class="city-stacked-bar">
-                        <div class="bar-active" style="width: ${activePct}%" title="Активные (${stats.active})"></div>
-                        <div class="bar-potential" style="width: ${potPct}%" title="Потенциал (${stats.potential})"></div>
-                    </div>
-                </div>`;
-            });
+        score = Math.max(0, Math.min(100, Math.round(score)));
+        const level = score >= 75 ? 'good' : score >= 50 ? 'mid' : 'risk';
+        const label = score >= 75 ? 'Стабильно' : score >= 50 ? 'Внимание' : 'Риск';
+        return { score, level, label, reasons };
+    }
 
-            html += `
-            <div class="col-12 mt-2">
-                <div class="stat-card-modern d-block p-3">
-                    <div class="d-flex justify-content-between align-items-center mb-0">
-                         <h6 class="text-muted fw-bold small mb-0 text-uppercase" style="letter-spacing:1px;">Потенциал городов</h6>
-                         <div class="d-flex gap-2 small">
-                            <span class="text-success fw-bold" style="font-size:0.7rem">● Актив</span>
-                            <span class="text-primary fw-bold" style="font-size:0.7rem">● Потенциал</span>
-                         </div>
-                    </div>
-                    <hr class="my-2" style="border-top: 1px solid #ccc; opacity: 1;">
-                    <div style="max-height: 250px; overflow-y: auto; padding-right: 5px;">
-                        ${citiesHtml || '<div class="text-center text-muted small">Нет данных</div>'}
-                    </div>
-                </div>
-            </div>`;
-        }
+    function formatCompactNumber(value) {
+        const n = Number(value) || 0;
+        if (Math.abs(n) >= 1000000) return (n / 1000000).toFixed(1).replace('.0','') + ' млн';
+        if (Math.abs(n) >= 1000) return (n / 1000).toFixed(1).replace('.0','') + ' тыс';
+        return n.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
+    }
 
-        dashboardStats.innerHTML = html;
+    function getMonthLabel(key) {
+        const [y,m] = key.split('-').map(Number);
+        return new Date(y, m - 1, 1).toLocaleDateString('ru-RU', { month: 'short' }).replace('.', '');
+    }
 
-        // --- TASKS ---
-        if (!window.CRMAuth || !CRMAuth.can('can_view_dashboard')) {
-            const taskBoxes = ['tasks-list-upcoming', 'tasks-list-problem', 'tasks-list-cooling'];
-            taskBoxes.forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.closest('.col-md-6')?.remove();
-            });
+    function renderPulseChart() {
+        const chart = document.getElementById('pulse-chart');
+        const summary = document.getElementById('pulse-summary');
+        if (!chart || !summary) return;
+
+        if (!window.CRMAuth || !CRMAuth.can('can_view_sales')) {
+            chart.innerHTML = '<div class="cc-empty">Нет доступа к продажам</div>';
+            summary.innerHTML = '';
             return;
         }
 
-        const today = new Date(); today.setHours(0,0,0,0); const coolingLimit = new Date(today.getTime() - (15 * 24 * 60 * 60 * 1000));
-        const tasksUpcoming = [], tasksProblem = [], tasksCooling = [];
-        allTasksData.forEach(d => { if (d.status === 'archive') return; const isPotential = d.status === 'potential'; let lastVisitDate = null; let hasFutureTasks = false; if (d.visits && Array.isArray(d.visits)) { d.visits.forEach((v, index) => { const vDate = new Date(v.date); if (!v.date) return; vDate.setHours(0,0,0,0); if (v.isCompleted && (!lastVisitDate || vDate > lastVisitDate)) lastVisitDate = vDate; if (!v.isCompleted) { const taskData = { dealerName: d.name, dealerId: d.id, date: vDate, comment: v.comment || "Без комментария", visitIndex: index }; if (vDate < today) tasksProblem.push({...taskData, type: 'overdue'}); else { tasksUpcoming.push({...taskData, isToday: vDate.getTime() === today.getTime()}); hasFutureTasks = true; } } }); } if (d.status === 'problem') { if (!tasksProblem.some(t => t.dealerId === d.id && t.type === 'overdue')) tasksProblem.push({ dealerName: d.name, dealerId: d.id, type: 'status', comment: 'Статус: Проблемный' }); } if (!hasFutureTasks && d.status !== 'problem' && !isPotential) { if (!lastVisitDate) tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: 999 }); else if (lastVisitDate < coolingLimit) { const days = Math.floor((today - lastVisitDate) / (1000 * 60 * 60 * 24)); tasksCooling.push({ dealerName: d.name, dealerId: d.id, days: days }); } } });
-        tasksUpcoming.sort((a, b) => a.date - b.date); tasksProblem.sort((a, b) => (a.date || 0) - (b.date || 0)); tasksCooling.sort((a, b) => b.days - a.days);
-        renderTaskList(document.getElementById('tasks-list-upcoming'), tasksUpcoming, 'upcoming'); renderTaskList(document.getElementById('tasks-list-problem'), tasksProblem, 'problem'); renderTaskList(document.getElementById('tasks-list-cooling'), tasksCooling, 'cooling');
+        const months = [];
+        const now = new Date();
+        for (let i = 5; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            months.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+        }
+
+        const totals = months.map(month => {
+            const rows = salesHistory.filter(s => s.month === month);
+            return {
+                month,
+                fact: rows.reduce((a,s) => a + (Number(s.fact)||0), 0),
+                plan: rows.reduce((a,s) => a + (Number(s.plan)||0), 0)
+            };
+        });
+
+        const current = totals[totals.length - 1] || { fact:0, plan:0 };
+        const previous = totals[totals.length - 2] || { fact:0, plan:0 };
+        const achievement = current.plan > 0 ? Math.round(current.fact / current.plan * 100) : 0;
+        const delta = previous.fact > 0 ? Math.round((current.fact - previous.fact) / previous.fact * 100) : null;
+
+        summary.innerHTML = `
+            <div class="pulse-summary-item"><span>Факт месяца</span><strong>${formatCompactNumber(current.fact)} м²</strong></div>
+            <div class="pulse-summary-item"><span>План</span><strong>${formatCompactNumber(current.plan)} м²</strong></div>
+            <div class="pulse-summary-item"><span>Выполнение</span><strong>${achievement}%</strong></div>
+            <div class="pulse-summary-item"><span>К прошлому месяцу</span><strong>${delta === null ? '—' : (delta >= 0 ? '+' : '') + delta + '%'}</strong></div>
+        `;
+
+        const width = 720, height = 205, left = 28, right = 16, top = 15, bottom = 30;
+        const max = Math.max(1, ...totals.flatMap(x => [x.fact, x.plan])) * 1.08;
+        const x = idx => left + idx * ((width-left-right) / Math.max(1, totals.length-1));
+        const y = val => top + (height-top-bottom) * (1 - val/max);
+        const factPts = totals.map((d,i) => `${x(i)},${y(d.fact)}`).join(' ');
+        const planPts = totals.map((d,i) => `${x(i)},${y(d.plan)}`).join(' ');
+        const areaPts = `${left},${height-bottom} ${factPts} ${x(totals.length-1)},${height-bottom}`;
+
+        const grid = [0,.25,.5,.75,1].map(p => {
+            const gy = top + (height-top-bottom)*p;
+            return `<line class="grid-line" x1="${left}" x2="${width-right}" y1="${gy}" y2="${gy}"/>`;
+        }).join('');
+        const labels = totals.map((d,i) => `<text class="axis-label" x="${x(i)}" y="${height-8}" text-anchor="middle">${getMonthLabel(d.month)}</text>`).join('');
+        const points = totals.map((d,i) => `<circle class="point" cx="${x(i)}" cy="${y(d.fact)}" r="4"><title>${getMonthLabel(d.month)}: ${d.fact.toFixed(0)} м²</title></circle>`).join('');
+
+        chart.innerHTML = `
+            <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
+                <defs>
+                    <linearGradient id="pulseGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#b9040a" stop-opacity=".18"/>
+                        <stop offset="100%" stop-color="#b9040a" stop-opacity="0"/>
+                    </linearGradient>
+                </defs>
+                ${grid}
+                <polygon class="area" points="${areaPts}"/>
+                <polyline class="plan-line" points="${planPts}"/>
+                <polyline class="fact-line" points="${factPts}"/>
+                ${points}
+                ${labels}
+            </svg>`;
+    }
+
+    function buildAttentionItems() {
+        const items = [];
+        const today = new Date(); today.setHours(0,0,0,0);
+
+        allDealers.filter(d => d.status !== 'archive').forEach(dealer => {
+            const health = getDealerHealth(dealer);
+            if (dealer.status === 'problem') {
+                items.push({ priority: 100, type:'risk', icon:'exclamation-diamond', title:dealer.name, meta:'Статус дилера: проблемный', dealerId:dealer.id, health });
+            } else if (health.score < 50) {
+                items.push({ priority: 80 + (50-health.score), type:'risk', icon:'heart-pulse', title:dealer.name, meta:health.reasons[0] || 'Низкий Dealer Health', dealerId:dealer.id, health });
+            }
+        });
+
+        (allTasksData || []).forEach(d => {
+            (d.visits || []).forEach((v,index) => {
+                if (v.isCompleted || !v.date) return;
+                const date = new Date(v.date); date.setHours(0,0,0,0);
+                if (date < today) {
+                    const days = Math.max(1, Math.floor((today-date)/86400000));
+                    items.push({ priority:90+Math.min(days,10), type:'warn', icon:'calendar-x', title:d.name, meta:`Просрочена задача на ${days} дн.`, dealerId:d.id, visitIndex:index });
+                }
+            });
+        });
+
+        reclamationsData.filter(r => !r.resolution).slice(0,10).forEach(r => {
+            items.push({ priority:88, type:'risk', icon:'shield-exclamation', title:r.dealerName || 'Рекламация', meta:'Рекламация без решения', dealerId:r.dealerId });
+        });
+
+        return items.sort((a,b) => b.priority-a.priority).slice(0,7);
+    }
+
+    function renderAttentionFeed() {
+        const container = document.getElementById('attention-feed');
+        const count = document.getElementById('attention-count');
+        if (!container) return;
+        const items = buildAttentionItems();
+        if (count) count.textContent = items.length;
+
+        if (!items.length) {
+            container.innerHTML = '<div class="cc-empty"><i class="bi bi-check2-circle d-block fs-3 mb-2"></i>Критичных сигналов нет</div>';
+            return;
+        }
+        container.innerHTML = items.map(item => `
+            <a class="attention-item is-${item.type}" href="${item.dealerId ? 'dealer.html?id='+item.dealerId : '#'}">
+                <span class="attention-icon"><i class="bi bi-${item.icon}"></i></span>
+                <span class="attention-copy">
+                    <span class="attention-title">${safeText(item.title)}</span>
+                    <span class="attention-meta">${safeText(item.meta)}</span>
+                </span>
+                ${item.health ? `<span class="cc-health-pill ${item.health.level}">${item.health.score}</span>` : '<i class="bi bi-chevron-right text-muted small"></i>'}
+            </a>`).join('');
+    }
+
+    function renderActivityFeed() {
+        const container = document.getElementById('activity-feed');
+        if (!container) return;
+        const events = [];
+
+        allDealers.forEach(d => {
+            if (d.createdAt) events.push({ date:new Date(d.createdAt), icon:'shop-window', title:`Добавлен дилер ${d.name}`, meta:d.city || d.dealer_id, href:`dealer.html?id=${d.id}` });
+        });
+
+        allTasksData.forEach(d => (d.visits || []).forEach(v => {
+            if (v.isCompleted && v.date) events.push({ date:new Date(v.date), icon:'geo-alt', title:`Визит · ${d.name}`, meta:v.comment || 'Визит завершён', href:`dealer.html?id=${d.id}` });
+        }));
+
+        reclamationsData.forEach(r => {
+            if (r.createdAt) events.push({ date:new Date(r.createdAt), icon:'shield-exclamation', title:`Рекламация · ${r.dealerName || 'Дилер'}`, meta:r.productName || 'Новая рекламация', href:'/reclamations.html' });
+        });
+
+        salesHistory.filter(s => s.updatedAt && Number(s.fact) > 0).forEach(s => {
+            events.push({ date:new Date(s.updatedAt), icon:'graph-up-arrow', title:`Продажи · ${s.dealerName || 'Дилер'}`, meta:`${Number(s.fact).toLocaleString('ru-RU')} м²`, href:'/sales.html' });
+        });
+
+        events.sort((a,b) => b.date-a.date);
+        const top = events.slice(0,8);
+        container.innerHTML = top.length ? top.map(e => `
+            <a class="cc-event-item" href="${e.href}">
+                <span class="cc-event-icon"><i class="bi bi-${e.icon}"></i></span>
+                <span class="cc-event-copy">
+                    <span class="cc-event-title">${safeText(e.title)}</span>
+                    <span class="cc-event-meta">${e.date.toLocaleDateString('ru-RU', {day:'numeric',month:'short'})} · ${safeText(e.meta)}</span>
+                </span>
+            </a>`).join('') : '<div class="cc-empty">Событий пока нет</div>';
+    }
+
+    function renderUpcomingPlan() {
+        const container = document.getElementById('tasks-list-upcoming');
+        if (!container) return;
+        const today = new Date(); today.setHours(0,0,0,0);
+        const tasks = [];
+
+        allTasksData.forEach(d => (d.visits || []).forEach((v,index) => {
+            if (v.isCompleted || !v.date) return;
+            const date = new Date(v.date); date.setHours(0,0,0,0);
+            if (date >= today) tasks.push({ dealerName:d.name, dealerId:d.id, date, comment:v.comment || 'Без комментария', visitIndex:index });
+        }));
+        tasks.sort((a,b)=>a.date-b.date);
+
+        const top=tasks.slice(0,7);
+        container.innerHTML = top.length ? top.map(t => {
+            const isToday=t.date.getTime()===today.getTime();
+            const canComplete=window.CRMAuth && CRMAuth.can('can_manage_visits');
+            return `<div class="cc-task-row">
+                <span class="attention-icon"><i class="bi bi-${isToday?'calendar-check':'calendar3'}"></i></span>
+                <span class="attention-copy">
+                    <a class="attention-title text-decoration-none" href="dealer.html?id=${t.dealerId}">${safeText(t.dealerName)}</a>
+                    <span class="attention-meta">${isToday?'Сегодня':t.date.toLocaleDateString('ru-RU',{day:'numeric',month:'short'})} · ${safeText(t.comment)}</span>
+                </span>
+                ${canComplete?`<button class="btn-task-check btn-complete-task" data-id="${t.dealerId}" data-index="${t.visitIndex}" title="Выполнить"><i class="bi bi-check-lg"></i></button>`:''}
+            </div>`;
+        }).join('') : '<div class="cc-empty"><i class="bi bi-calendar2-check d-block fs-3 mb-2"></i>Ближайших задач нет</div>';
+    }
+
+    function renderDashboard() {
+        if (!dashboardStats || !allDealers) return;
+
+        const network = allDealers.filter(d => d.status !== 'archive');
+        const activeIds = new Set((currentMonthSales || []).filter(s => Number(s.fact)>0).map(s => String(s.dealerId)));
+        const activeCount = network.filter(d => activeIds.has(String(d.id))).length;
+        const problemCount = network.filter(d => d.status === 'problem' || getDealerHealth(d).score < 50).length;
+        const currentFact = (currentMonthSales || []).reduce((a,s)=>a+(Number(s.fact)||0),0);
+        const currentPlan = (currentMonthSales || []).reduce((a,s)=>a+(Number(s.plan)||0),0);
+        const achievement = currentPlan > 0 ? Math.round(currentFact/currentPlan*100) : 0;
+
+        const scores = network.map(getDealerHealth);
+        const avgHealth = scores.length ? Math.round(scores.reduce((a,h)=>a+h.score,0)/scores.length) : 0;
+
+        dashboardStats.innerHTML = `
+            <div class="cc-kpi-card">
+                <span class="cc-kpi-icon"><i class="bi bi-buildings"></i></span>
+                <div class="cc-kpi-label">Дилеров в сети</div>
+                <div class="cc-kpi-value">${network.length}</div>
+                <div class="cc-kpi-foot">${activeCount} с продажами в этом месяце</div>
+            </div>
+            <div class="cc-kpi-card is-good">
+                <span class="cc-kpi-icon"><i class="bi bi-activity"></i></span>
+                <div class="cc-kpi-label">Dealer Health</div>
+                <div class="cc-kpi-value">${avgHealth}<span style="font-size:.85rem;color:#9a9ca1"> / 100</span></div>
+                <div class="cc-kpi-foot">Средний индекс сети</div>
+            </div>
+            <div class="cc-kpi-card">
+                <span class="cc-kpi-icon"><i class="bi bi-graph-up-arrow"></i></span>
+                <div class="cc-kpi-label">Продажи месяца</div>
+                <div class="cc-kpi-value">${formatCompactNumber(currentFact)}</div>
+                <div class="cc-kpi-foot">м² · факт</div>
+            </div>
+            <div class="cc-kpi-card ${achievement>=90?'is-good':''}">
+                <span class="cc-kpi-icon"><i class="bi bi-bullseye"></i></span>
+                <div class="cc-kpi-label">Выполнение плана</div>
+                <div class="cc-kpi-value">${achievement}%</div>
+                <div class="cc-kpi-foot">План: ${formatCompactNumber(currentPlan)} м²</div>
+            </div>
+            <div class="cc-kpi-card is-alert">
+                <span class="cc-kpi-icon"><i class="bi bi-exclamation-triangle"></i></span>
+                <div class="cc-kpi-label">Требуют внимания</div>
+                <div class="cc-kpi-value">${problemCount}</div>
+                <div class="cc-kpi-foot">Проблемный статус или низкий health</div>
+            </div>`;
+
+        const user = window.CRMAuth?.user || {};
+        const greeting = document.getElementById('cc-greeting');
+        const dateEl = document.getElementById('cc-date');
+        const scopeEl = document.getElementById('cc-scope');
+        if (greeting) {
+            const hour = new Date().getHours();
+            const hello = hour < 12 ? 'Доброе утро' : hour < 18 ? 'Добрый день' : 'Добрый вечер';
+            const firstName = (user.fullName || '').trim().split(/\s+/)[0];
+            greeting.textContent = firstName ? `${hello}, ${firstName}` : hello;
+        }
+        if (dateEl) dateEl.textContent = new Date().toLocaleDateString('ru-RU', { day:'numeric', month:'long', weekday:'long' });
+        if (scopeEl) scopeEl.textContent = user.scope === 'astana' ? 'Астана' : user.scope === 'regions' ? 'Регионы' : 'Вся компания';
+
+        const pulsePanel = document.getElementById('cc-pulse-panel');
+        const attentionPanel = document.getElementById('cc-attention-panel');
+        const planPanel = document.getElementById('cc-plan-panel');
+        const activityPanel = document.getElementById('cc-activity-panel');
+        if (pulsePanel) pulsePanel.style.display = dashConfig.showPulse ? '' : 'none';
+        if (attentionPanel) attentionPanel.style.display = dashConfig.showAttention ? '' : 'none';
+        if (planPanel) planPanel.style.display = dashConfig.showPlan ? '' : 'none';
+        if (activityPanel) activityPanel.style.display = dashConfig.showActivity ? '' : 'none';
+
+        if (dashConfig.showPulse) renderPulseChart();
+        if (dashConfig.showAttention) renderAttentionFeed();
+        if (dashConfig.showPlan) renderUpcomingPlan();
+        if (dashConfig.showActivity) renderActivityFeed();
     }
 
     function renderTaskList(container, tasks, type) { if (!container) return; if (tasks.length === 0) { const msg = type === 'cooling' ? 'Все посещены недавно' : 'Задач нет'; container.innerHTML = `<div class="text-center py-4 text-muted"><i class="bi bi-check-circle display-6 d-block mb-2 text-success opacity-50"></i><small>${msg}</small></div>`; return; } container.innerHTML = tasks.map(t => { let badgeHtml = ''; let metaHtml = ''; if (type === 'upcoming') { const dateStr = t.date.toLocaleDateString('ru-RU', {day:'numeric', month:'short'}); badgeHtml = t.isToday ? `<span class="task-badge tb-today mt-1 d-inline-block">Сегодня</span>` : `<span class="task-badge tb-future mt-1 d-inline-block">${dateStr}</span>`; metaHtml = `<span class="text-muted small">${safeText(t.comment)}</span>`; } else if (type === 'problem') { if (t.type === 'overdue') { const dateStr = t.date.toLocaleDateString('ru-RU'); badgeHtml = `<span class="task-badge tb-overdue mt-1 d-inline-block">Просрок: ${dateStr}</span>`; metaHtml = `<span class="text-danger small fw-bold">${safeText(t.comment)}</span>`; } else { badgeHtml = `<span class="task-badge tb-overdue mt-1 d-inline-block">Проблема</span>`; metaHtml = `<span class="small text-muted">Внимание!</span>`; } } else if (type === 'cooling') { const daysStr = t.days === 999 ? 'Никогда' : `${t.days} дн.`; badgeHtml = `<span class="task-badge tb-cooling mt-1 d-inline-block">Без визитов: ${daysStr}</span>`; metaHtml = `<span class="text-muted small">Пора навестить</span>`; } const showCheckBtn = (window.CRMAuth && CRMAuth.can('can_manage_visits')) && (type === 'upcoming' || (type === 'problem' && t.type === 'overdue')); const btnHtml = showCheckBtn ? `<button class="btn-task-check btn-complete-task" data-id="${t.dealerId}" data-index="${t.visitIndex}" title="Выполнить"><i class="bi bi-check-lg"></i></button>` : ''; return `<div class="task-item-modern align-items-start"><div class="task-content"><a href="dealer.html?id=${t.dealerId}" target="_blank" class="task-title text-truncate d-block" style="max-width: 200px;">${safeText(t.dealerName)}</a>${badgeHtml}<div class="mt-1">${metaHtml}</div></div><div class="mt-1">${btnHtml}</div></div>`; }).join(''); }
@@ -744,7 +927,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchDealers() { const response = await fetch(API_DEALERS_URL); if (!response.ok) throw new Error("Не удалось загрузить список дилеров"); allDealers = await response.json(); }
     async function fetchTasks() { const response = await fetch(API_TASKS_URL); if(response.ok) allTasksData = await response.json(); else throw new Error("Ошибка задач"); }
-    async function fetchCurrentMonthSales() { const month = new Date().toISOString().slice(0, 7); const r = await fetch(`${API_SALES_URL}?month=${month}`); if(r.ok) currentMonthSales = await r.json(); else throw new Error("Ошибка продаж"); }
+    async function fetchCurrentMonthSales() {
+        const month = new Date().toISOString().slice(0, 7);
+        const r = await fetch(`${API_SALES_URL}?month=${month}`);
+        if(r.ok) currentMonthSales = await r.json();
+        else throw new Error("Ошибка продаж");
+    }
+
+    async function fetchSalesHistory() {
+        const r = await fetch(API_SALES_URL);
+        if (r.ok) salesHistory = await r.json();
+        else salesHistory = [];
+    }
+
+    async function fetchReclamationsForDashboard() {
+        if (!window.CRMAuth || !CRMAuth.can('can_view_reclamations')) {
+            reclamationsData = [];
+            return;
+        }
+        try {
+            const r = await fetch('/api/reclamations');
+            reclamationsData = r.ok ? await r.json() : [];
+        } catch (_) {
+            reclamationsData = [];
+        }
+    }
     async function fetchStatuses() { const res = await fetch(API_STATUSES_URL); if(res.ok) { statusList = await res.json(); populateStatusSelects(); renderStatusManagerList(); if(typeof renderDealerList === 'function') renderDealerList(); } else throw new Error("Ошибка статусов"); }
     
     function populateStatusSelects(selectedStatus = null) { let filterHtml = '<option value="">Все статусы</option>'; statusList.forEach(s => { filterHtml += `<option value="${s.value}">${s.label}</option>`; }); if(filterStatus) filterStatus.innerHTML = filterHtml; const modalHtml = statusList.map(s => `<option value="${s.value}" ${selectedStatus === s.value ? 'selected' : ''}>${s.label}</option>`).join(''); const addStatusSel = document.getElementById('status'); if(addStatusSel) addStatusSel.innerHTML = modalHtml; const editStatusSel = document.getElementById('edit_status'); if(editStatusSel) editStatusSel.innerHTML = modalHtml; }
@@ -853,6 +1060,11 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
             const salesFact = salesMap[d.id] || 0;
             let salesColorClass = 'bg-danger'; if (salesFact >= 200) salesColorClass = 'bg-success'; else if (salesFact >= 100) salesColorClass = 'bg-warning text-dark'; 
             const salesBadge = `<span class="badge ${salesColorClass} rounded-pill ms-2" title="Продажи за текущий месяц">${salesFact.toFixed(2)} м²</span>`;
+            const health = getDealerHealth(d);
+            const healthHtml = `<div class="dealer-health-wrap">
+                <div class="dealer-health-top"><span>Dealer Health</span><strong>${health.score}</strong></div>
+                <div class="dealer-health-bar ${health.level}"><span style="width:${health.score}%"></span></div>
+            </div>`;
 
             return `<div class="dealer-item" onclick="window.open('dealer.html?id=${d.id}', '_blank')">
                 <div class="dealer-index-number">${index + 1}</div>
@@ -870,9 +1082,80 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
                         ${salesBadge}
                     </div>
                 </div>
+                ${healthHtml}
                 <div class="dealer-actions">${instaBtn} ${waBtn} ${phoneBtn} ${mapBtn} ${editBtn}</div>
             </div>`;
         }).join('');
+    }
+
+    let globalSearchIndex = 0;
+    let globalSearchReady = false;
+    function setupGlobalSearch() {
+        if (globalSearchReady) return;
+        globalSearchReady = true;
+        const overlay = document.getElementById('global-search-overlay');
+        const trigger = document.getElementById('global-search-trigger');
+        const input = document.getElementById('global-search-input');
+        const results = document.getElementById('global-search-results');
+        if (!overlay || !input || !results) return;
+
+        const open = () => {
+            overlay.classList.add('open');
+            overlay.setAttribute('aria-hidden','false');
+            globalSearchIndex = 0;
+            input.value = '';
+            renderGlobalSearchResults('');
+            setTimeout(() => input.focus(), 20);
+        };
+        const close = () => {
+            overlay.classList.remove('open');
+            overlay.setAttribute('aria-hidden','true');
+        };
+
+        if (trigger) trigger.onclick = open;
+        overlay.onclick = e => { if (e.target === overlay) close(); };
+
+        function searchableText(d) {
+            return [
+                d.dealer_id,d.name,d.city,d.address,d.region_sector,d.price_type,
+                ...(d.contacts || []).flatMap(x => [x.name,x.position,x.contactInfo])
+            ].filter(Boolean).join(' ').toLowerCase();
+        }
+
+        window.renderGlobalSearchResults = function(query) {
+            const q = (query || '').trim().toLowerCase();
+            const matches = allDealers
+                .filter(d => d.status !== 'archive' && (!q || searchableText(d).includes(q)))
+                .slice(0,10);
+
+            globalSearchIndex = Math.min(globalSearchIndex, Math.max(0,matches.length-1));
+            results.innerHTML = matches.length ? matches.map((d,i) => {
+                const health=getDealerHealth(d);
+                const avatar=d.photo_url ? `<img src="${d.photo_url}" alt="">` : '<i class="bi bi-shop"></i>';
+                return `<a class="global-search-result ${i===globalSearchIndex?'active':''}" data-index="${i}" href="dealer.html?id=${d.id}">
+                    <span class="global-search-avatar">${avatar}</span>
+                    <span class="global-search-main">
+                        <span class="global-search-name">${safeText(d.name)}</span>
+                        <span class="global-search-meta">${safeText(d.dealer_id)} · ${safeText(d.city || 'Город не указан')}</span>
+                    </span>
+                    <span class="cc-health-pill ${health.level}">${health.score}</span>
+                </a>`;
+            }).join('') : '<div class="cc-empty">Ничего не найдено</div>';
+        };
+
+        input.oninput = () => { globalSearchIndex = 0; renderGlobalSearchResults(input.value); };
+        input.onkeydown = e => {
+            const rows=[...results.querySelectorAll('.global-search-result')];
+            if (e.key === 'ArrowDown') { e.preventDefault(); globalSearchIndex=Math.min(globalSearchIndex+1,rows.length-1); renderGlobalSearchResults(input.value); }
+            if (e.key === 'ArrowUp') { e.preventDefault(); globalSearchIndex=Math.max(globalSearchIndex-1,0); renderGlobalSearchResults(input.value); }
+            if (e.key === 'Enter' && rows.length) { e.preventDefault(); const active=results.querySelector('.global-search-result.active') || rows[0]; window.location.href=active.href; }
+            if (e.key === 'Escape') close();
+        };
+
+        document.addEventListener('keydown', e => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); open(); }
+            else if (e.key === 'Escape' && overlay.classList.contains('open')) close();
+        });
     }
 
     if(addModalEl) { addModalEl.addEventListener('shown.bs.modal', () => { if (refreshAddMap) refreshAddMap(); }); }

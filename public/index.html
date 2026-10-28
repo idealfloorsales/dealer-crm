@@ -7,7 +7,7 @@
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
@@ -82,68 +82,100 @@
         </div>
     </nav>
 
-    <div class="container">
-        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3 mt-3 mt-lg-0">
-            <div class="d-flex align-items-center gap-2">
-                <h1 class="mb-0 border-0 pt-0 mt-0 fw-bold fs-2 text-dark">Дилеры</h1>
-                <button class="btn-dash-settings" id="btn-dash-settings" title="Настроить дашборд"><i class="bi bi-gear-fill fs-5"></i></button>
+    <div class="container command-center-shell">
+        <section class="cc-hero mb-4">
+            <div>
+                <div class="cc-eyebrow">IDEAL FLOOR · CRM</div>
+                <h1 id="cc-greeting">Добрый день</h1>
+                <div class="cc-subline">
+                    <span id="cc-date">Сегодня</span>
+                    <span class="cc-dot"></span>
+                    <span id="cc-scope">Вся компания</span>
+                </div>
             </div>
-            
-            <div class="d-flex gap-2">
-                <a href="/users.html" class="btn btn-light shadow-sm text-primary d-lg-none data-permission="can_manage_users""><i class="bi bi-people-fill"></i></a>
-                
-                <button id="export-competitors-prices-btn" class="btn btn-light shadow-sm text-info d-none d-md-block" title="Цены"><i class="bi bi-tags-fill"></i> Цены</button>
-                
-                <button id="export-dealers-btn" class="btn btn-light shadow-sm text-success d-none d-md-block"><i class="bi bi-file-earmark-excel"></i> База</button>
-                
-                <button id="open-add-modal-btn" class="btn btn-primary shadow-sm px-4 d-none d-lg-block"><i class="bi bi-plus-lg me-2"></i>Добавить</button>
+            <div class="cc-hero-actions">
+                <button class="cc-search-trigger" id="global-search-trigger" type="button">
+                    <i class="bi bi-search"></i>
+                    <span>Быстрый поиск</span>
+                    <kbd>Ctrl K</kbd>
+                </button>
+                <button id="btn-dash-settings" class="cc-icon-btn" title="Настроить дашборд"><i class="bi bi-sliders2"></i></button>
+                <button id="open-add-modal-btn" class="cc-primary-btn d-none d-lg-inline-flex" data-permission="can_create_dealer"><i class="bi bi-plus-lg"></i> Новый дилер</button>
             </div>
-        </div>
+        </section>
 
-        <div class="row g-3 mb-4" id="dashboard-container">
-            <div class="col-md-6">
-                <div id="dashboard-stats" class="row g-3 h-100"></div>
-            </div>
-            <div class="col-md-6">
-                <div class="card border-0 shadow-sm rounded-4 h-100 overflow-hidden" style="background: #fff5f5;">
-                    <div class="card-header bg-transparent border-0 pt-3 px-3 pb-0">
-                        <div class="d-flex align-items-center gap-2 mb-2">
-                            <div class="icon-circle bg-danger text-white shadow-sm"><i class="bi bi-exclamation-triangle-fill"></i></div>
-                            <h6 class="fw-bold mb-0 text-danger">Проблемы</h6>
+        <section id="dashboard-container" class="mb-4">
+            <div id="dashboard-stats" class="cc-kpi-grid mb-3"></div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-xl-8" id="cc-pulse-panel">
+                    <div class="cc-panel h-100">
+                        <div class="cc-panel-head">
+                            <div>
+                                <div class="cc-panel-kicker">ПУЛЬС БИЗНЕСА</div>
+                                <h2>Продажи и выполнение плана</h2>
+                            </div>
+                            <a href="/sales.html" class="cc-panel-link" data-permission="can_view_sales">Открыть продажи <i class="bi bi-arrow-up-right"></i></a>
                         </div>
+                        <div id="pulse-summary" class="pulse-summary"></div>
+                        <div id="pulse-chart" class="pulse-chart" aria-label="График продаж"></div>
                     </div>
-                    <div class="card-body px-2 pt-0">
-                        <div id="tasks-list-problem" class="task-list-modern"><p class="text-center text-muted py-3 small">Загрузка...</p></div>
+                </div>
+                <div class="col-xl-4" id="cc-attention-panel">
+                    <div class="cc-panel h-100">
+                        <div class="cc-panel-head">
+                            <div>
+                                <div class="cc-panel-kicker">ФОКУС</div>
+                                <h2>Требует внимания</h2>
+                            </div>
+                            <span id="attention-count" class="cc-count-badge">0</span>
+                        </div>
+                        <div id="attention-feed" class="attention-feed">
+                            <div class="cc-empty">Анализируем сеть…</div>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-6">
-                <div class="card border-0 shadow-sm rounded-4 h-100">
-                    <div class="card-header bg-white border-0 pt-3 px-3 pb-0">
-                        <div class="d-flex align-items-center gap-2 mb-2">
-                            <div class="icon-circle bg-primary-subtle text-primary"><i class="bi bi-calendar-check-fill"></i></div>
-                            <h6 class="fw-bold mb-0">План на сегодня</h6>
+
+            <div class="row g-3">
+                <div class="col-xl-6" id="cc-plan-panel">
+                    <div class="cc-panel h-100">
+                        <div class="cc-panel-head">
+                            <div>
+                                <div class="cc-panel-kicker">СЕГОДНЯ</div>
+                                <h2>План и ближайшие действия</h2>
+                            </div>
                         </div>
+                        <div id="tasks-list-upcoming" class="cc-task-list"><div class="cc-empty">Загрузка…</div></div>
                     </div>
-                    <div class="card-body px-2 pt-0">
-                        <div id="tasks-list-upcoming" class="task-list-modern"><p class="text-center text-muted py-3 small">Загрузка...</p></div>
+                </div>
+                <div class="col-xl-6" id="cc-activity-panel">
+                    <div class="cc-panel h-100">
+                        <div class="cc-panel-head">
+                            <div>
+                                <div class="cc-panel-kicker">ИСТОРИЯ</div>
+                                <h2>Последние события</h2>
+                            </div>
+                        </div>
+                        <div id="activity-feed" class="cc-activity-feed"><div class="cc-empty">Собираем события…</div></div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-6">
-                <div class="card border-0 shadow-sm rounded-4 h-100">
-                    <div class="card-header bg-white border-0 pt-3 px-3 pb-0">
-                        <div class="d-flex align-items-center gap-2 mb-2">
-                            <div class="icon-circle bg-warning-subtle text-warning"><i class="bi bi-hourglass-split"></i></div>
-                            <h6 class="fw-bold mb-0">Давно не были</h6>
-                        </div>
-                    </div>
-                    <div class="card-body px-2 pt-0">
-                        <div id="tasks-list-cooling" class="task-list-modern"><p class="text-center text-muted py-3 small">Загрузка...</p></div>
-                    </div>
-                </div>
+
+            <div id="tasks-list-problem" class="d-none"></div>
+            <div id="tasks-list-cooling" class="d-none"></div>
+        </section>
+
+        <section class="dealer-directory-head">
+            <div>
+                <div class="cc-panel-kicker">СЕТЬ</div>
+                <h2>Дилеры</h2>
             </div>
-        </div>
+            <div class="dealer-directory-actions">
+                <button id="export-competitors-prices-btn" class="cc-secondary-btn d-none d-md-inline-flex" title="Цены"><i class="bi bi-tags"></i> Цены</button>
+                <button id="export-dealers-btn" class="cc-secondary-btn d-none d-md-inline-flex"><i class="bi bi-download"></i> База</button>
+            </div>
+        </section>
 
         <div class="bg-white p-3 rounded-4 shadow-sm mb-4 border border-light sticky-filters">
             <div class="row g-2 align-items-center">
@@ -183,6 +215,18 @@
 
         <div id="dealer-grid" class="d-flex flex-column gap-3"></div>
         <p id="no-data-msg" class="text-center text-muted mt-5" style="display: none;">Ничего не найдено</p>
+    </div>
+
+    <div id="global-search-overlay" class="global-search-overlay" aria-hidden="true">
+        <div class="global-search-dialog">
+            <div class="global-search-input-wrap">
+                <i class="bi bi-search"></i>
+                <input id="global-search-input" type="text" placeholder="Дилер, ID, город, телефон…" autocomplete="off">
+                <kbd>ESC</kbd>
+            </div>
+            <div id="global-search-results" class="global-search-results"></div>
+            <div class="global-search-hint">Enter — открыть · ↑↓ — выбрать · Esc — закрыть</div>
+        </div>
     </div>
 
     <button id="mobile-fab-add" class="d-lg-none" data-permission="can_create_dealer" onclick="document.getElementById('open-add-modal-btn').click()">
