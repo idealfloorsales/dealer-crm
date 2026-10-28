@@ -143,6 +143,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const imgPreview = document.getElementById('comp_logo_preview');
     const imgPlaceholder = document.getElementById('comp_logo_placeholder');
     let currentLogoBase64 = "";
+    let canManageCompetitors = false;
+    let canExportPrices = false;
 
     const defaultTypes = [
         { val: 'std', label: 'Стандарт', css: 'cb-std', dot: '#94a3b8' },
@@ -211,7 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
         competitors.forEach(c => { (c.collections || []).forEach(col => { totalCols++; const t = (typeof col === 'string') ? 'std' : (col.type || 'std'); if (t.includes('eng')) countEng++; else if (t.includes('fr')) countFr++; else if (t.includes('art') || t.includes('mix')) countArt++; else if (t !== 'std') countCustom++; }); });
         dashboardContainer.innerHTML = `<div class="col-xl-3 col-md-6"><div class="stat-card-modern"><div class="stat-icon-box bg-primary-subtle text-primary"><i class="bi bi-shop"></i></div><div class="stat-info"><h3>${totalBrands}</h3><p>Брендов</p></div></div></div><div class="col-xl-3 col-md-6"><div class="stat-card-modern"><div class="stat-icon-box bg-secondary-subtle text-secondary"><i class="bi bi-collection"></i></div><div class="stat-info"><h3>${totalCols}</h3><p>Коллекций</p></div></div></div><div class="col-xl-3 col-md-6"><div class="stat-card-modern"><div class="stat-icon-box bg-success-subtle text-success"><i class="bi bi-chevron-double-up"></i></div><div class="stat-info"><h3>${countEng + countFr}</h3><p>Елочка</p></div></div></div><div class="col-xl-3 col-md-6"><div class="stat-card-modern"><div class="stat-icon-box bg-info-subtle text-info"><i class="bi bi-stars"></i></div><div class="stat-info"><h3>${countCustom + countArt}</h3><p>Арт / Другое</p></div></div></div>`;
     }
-    if(btnManageTypes) btnManageTypes.onclick = () => { renderTypesManager(); typesModal.show(); };
+    if(btnManageTypes) btnManageTypes.onclick = () => { if (!canManageCompetitors) return; renderTypesManager(); typesModal.show(); };
     function renderTypesManager() {
         if(!typesListContainer) return; if(dynamicTypes.length === 0) { typesListContainer.innerHTML = '<div class="text-center text-muted py-4">Нет пользовательских типов.</div>'; return; }
         typesListContainer.innerHTML = dynamicTypes.map(t => `<div class="list-group-item d-flex justify-content-between align-items-center"><span class="badge ${t.css} fs-6">${t.label}</span><div><button class="btn btn-sm btn-light border me-1" onclick="renameCustomType('${t.val}')"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-light text-danger border" onclick="deleteCustomType('${t.val}')"><i class="bi bi-trash"></i></button></div></div>`).join('');
@@ -294,7 +296,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 addressHtml += '</div>';
             }
 
-            return `<div class="col-xl-3 col-lg-4 col-md-6"><div class="comp-card-modern" id="card-${c.id}"><button class="btn-card-edit-abs" onclick="openEditModal('${c.id}')"><i class="bi bi-pencil-fill"></i></button><div class="comp-front"><span class="comp-flag">${c.country || ''}</span>${headerContent}${addressHtml}<div class="comp-meta"><i class="bi bi-box-seam"></i> <span>${c.supplier || '-'}</span></div><div class="comp-meta"><i class="bi bi-building"></i> <span>${c.warehouse || '-'}</span></div>${socialBlock}<div class="comp-badges">${badgesHtml}</div>${dealersBtn}<button class="btn-flip" onclick="toggleCard('${c.id}')">Коллекции (${(c.collections||[]).length}) <i class="bi bi-chevron-down ms-1"></i></button></div><div class="comp-back"><div class="d-flex justify-content-between align-items-center mb-2"><h6 class="fw-bold mb-0">Коллекции</h6><button class="btn-close-flip" onclick="toggleCard('${c.id}')"><i class="bi bi-x"></i></button></div><div class="comp-list-scroll">${listHtml || '<div class="text-center text-muted small mt-4">Пусто</div>'}</div></div></div></div>`;
+            return `<div class="col-xl-3 col-lg-4 col-md-6"><div class="comp-card-modern" id="card-${c.id}">${canManageCompetitors ? `<button class="btn-card-edit-abs" onclick="openEditModal('${c.id}')"><i class="bi bi-pencil-fill"></i></button>` : ''}<div class="comp-front"><span class="comp-flag">${c.country || ''}</span>${headerContent}${addressHtml}<div class="comp-meta"><i class="bi bi-box-seam"></i> <span>${c.supplier || '-'}</span></div><div class="comp-meta"><i class="bi bi-building"></i> <span>${c.warehouse || '-'}</span></div>${socialBlock}<div class="comp-badges">${badgesHtml}</div>${dealersBtn}<button class="btn-flip" onclick="toggleCard('${c.id}')">Коллекции (${(c.collections||[]).length}) <i class="bi bi-chevron-down ms-1"></i></button></div><div class="comp-back"><div class="d-flex justify-content-between align-items-center mb-2"><h6 class="fw-bold mb-0">Коллекции</h6><button class="btn-close-flip" onclick="toggleCard('${c.id}')"><i class="bi bi-x"></i></button></div><div class="comp-list-scroll">${listHtml || '<div class="text-center text-muted small mt-4">Пусто</div>'}</div></div></div></div>`;
         }).join('');
     }
 
@@ -302,6 +304,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- ОТКРЫТИЕ МОДАЛКИ (Заполняем данные) ---
     window.openEditModal = (id) => {
+        if (!canManageCompetitors) return;
         const c = competitors.find(x => x.id === id); if (!c) return;
         inpId.value = c.id; modalTitle.textContent = `Редактировать: ${c.name}`; if(delBtn) delBtn.style.display = 'block';
         inpName.value = c.name; inpCountry.value = c.country || ''; 
@@ -321,7 +324,8 @@ document.addEventListener('DOMContentLoaded', () => {
         modal.show();
     };
 
-    if(addBtn) addBtn.onclick = () => { 
+    if(addBtn) addBtn.onclick = () => {
+        if (!canManageCompetitors) return; 
         inpId.value = ''; form.reset(); modalTitle.textContent = 'Новый Бренд'; if(delBtn) delBtn.style.display = 'none'; 
         currentLogoBase64 = ""; imgPreview.classList.add('d-none'); imgPlaceholder.classList.remove('d-none'); inpLogoFile.value = '';
         collectionsContainer.innerHTML = ''; contactsContainer.innerHTML = ''; addressesContainer.innerHTML = ''; 
@@ -354,6 +358,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- SAVE ---
     if(saveBtn) saveBtn.onclick = async () => {
+        if (!canManageCompetitors) return;
         if(isSaving) return; if(!inpName.value.trim()) return alert("Введите название!");
         isSaving = true; const oldText = saveBtn.innerHTML; saveBtn.disabled = true; saveBtn.innerHTML = '...';
         
@@ -374,7 +379,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try { const res = await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) }); if (res.ok) { await loadList(); modal.hide(); } else alert("Ошибка"); } catch (e) { alert("Ошибка сети"); } finally { isSaving = false; saveBtn.disabled = false; saveBtn.innerHTML = oldText; }
     };
 
-    if(delBtn) delBtn.onclick = async () => { const id = inpId.value; if (!id) return; if (confirm('Удалить?')) { await fetch(`${API_URL}/${id}`, { method: 'DELETE' }); modal.hide(); loadList(); } };
+    if(delBtn) delBtn.onclick = async () => { if (!canManageCompetitors) return; const id = inpId.value; if (!id) return; if (confirm('Удалить?')) { await fetch(`${API_URL}/${id}`, { method: 'DELETE' }); modal.hide(); loadList(); } };
     if(searchInput) searchInput.addEventListener('input', renderGrid);
     if(filterType) filterType.addEventListener('change', renderGrid);
     if(exportBtn) exportBtn.onclick = () => { if (!competitors.length) return alert("Пусто"); const clean = (text) => `"${String(text || '').replace(/"/g, '""')}"`; let csv = "\uFEFFБренд;Страна;Коллекция;Тип;Поставщик;Склад;Контакты;Адреса;Сайт;Instagram;Инфо\n"; competitors.forEach(c => { const contactsStr = (c.contacts || []).map(cnt => `${cnt.name} (${cnt.phone})`).join(', '); const addrStr = (c.addresses || []).map(a => `${a.city}: ${a.address}`).join(' | '); const bp = `${clean(c.name)};${clean(c.country)}`; const tp = `${clean(c.supplier)};${clean(c.warehouse)};${clean(contactsStr)};${clean(addrStr)};${clean(c.website)};${clean(c.instagram)};${clean(c.info)}`; if (c.collections && c.collections.length > 0) { c.collections.forEach(col => { const cn = (typeof col === 'string') ? col : col.name; const ct = (typeof col === 'string') ? 'std' : col.type; csv += `${bp};${clean(cn)};${clean(ct)};${tp}\n`; }); } else { csv += `${bp};;;${tp}\n`; } }); const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `Competitors_Ref.csv`; document.body.appendChild(a); a.click(); document.body.removeChild(a); };
@@ -397,5 +402,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    loadList();
+    async function initPermissionsAndLoad() {
+        if (window.CRMAuth && CRMAuth.ready) await CRMAuth.ready;
+        canManageCompetitors = window.CRMAuth ? CRMAuth.can('can_manage_competitors') : false;
+        canExportPrices = window.CRMAuth ? CRMAuth.can('can_export_prices') : false;
+
+        if (addBtn) addBtn.style.display = canManageCompetitors ? '' : 'none';
+        if (btnManageTypes) btnManageTypes.style.display = canManageCompetitors ? '' : 'none';
+        if (exportBtn) exportBtn.style.display = canExportPrices ? '' : 'none';
+        if (saveBtn && !canManageCompetitors) saveBtn.style.display = 'none';
+        if (delBtn && !canManageCompetitors) delBtn.style.display = 'none';
+        if (addCollRowBtn && !canManageCompetitors) addCollRowBtn.style.display = 'none';
+        if (addContactBtn && !canManageCompetitors) addContactBtn.style.display = 'none';
+        if (addAddressBtn && !canManageCompetitors) addAddressBtn.style.display = 'none';
+
+        await loadList();
+    }
+
+    initPermissionsAndLoad();
 });
