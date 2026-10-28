@@ -26,16 +26,18 @@
     };
 
     const NAV_ITEMS = [
-        { path: '/', label: 'Дилеры', permission: 'can_view_dealers' },
-        { path: '/map.html', label: 'Карта', permission: 'can_view_map' },
-        { path: '/products.html', label: 'Матрица', permission: 'can_view_products' },
-        { path: '/report.html', label: 'Выставленность', permission: 'can_view_report' },
-        { path: '/sales.html', label: 'Продажи', permission: 'can_view_sales' },
-        { path: '/competitors.html', label: 'Конкуренты', permission: 'can_view_competitors' },
-        { path: '/knowledge.html', label: 'Статьи', permission: 'can_view_knowledge' },
-        { path: '/reclamations.html', label: 'Рекламации', permission: 'can_view_reclamations' },
-        { path: '/users.html', label: 'Сотрудники', permission: 'can_manage_users' }
+        { path: '/', label: 'Дилеры', permission: 'can_view_dealers', icon: 'shop' },
+        { path: '/map.html', label: 'Карта', permission: 'can_view_map', icon: 'geo-alt' },
+        { path: '/products.html', label: 'Матрица', permission: 'can_view_products', icon: 'grid-3x3-gap' },
+        { path: '/report.html', label: 'Выставленность', permission: 'can_view_report', icon: 'bar-chart' },
+        { path: '/sales.html', label: 'Продажи', permission: 'can_view_sales', icon: 'graph-up-arrow' },
+        { path: '/competitors.html', label: 'Конкуренты', permission: 'can_view_competitors', icon: 'globe2' },
+        { path: '/knowledge.html', label: 'Статьи', permission: 'can_view_knowledge', icon: 'journal-text' },
+        { path: '/reclamations.html', label: 'Рекламации', permission: 'can_view_reclamations', icon: 'shield-exclamation' },
+        { path: '/users.html', label: 'Сотрудники', permission: 'can_manage_users', icon: 'people' }
     ];
+
+    const MOBILE_PRIMARY_PATHS = ['/', '/map.html', '/sales.html', '/products.html'];
 
     function getToken() {
         return localStorage.getItem('crm_token');
@@ -91,6 +93,405 @@
 
         const logoutButton = document.getElementById('logout-btn');
         if (logoutButton) logoutButton.addEventListener('click', logout);
+    }
+
+
+    function ensureMobileNavStyles() {
+        if (document.getElementById('crm-mobile-nav-styles')) return;
+        const style = document.createElement('style');
+        style.id = 'crm-mobile-nav-styles';
+        style.textContent = `
+            @media (max-width: 991.98px) {
+                body {
+                    padding-bottom: calc(84px + env(safe-area-inset-bottom)) !important;
+                }
+
+                body.crm-mobile-sheet-open {
+                    overflow: hidden;
+                }
+
+                .bottom-nav {
+                    display: none !important;
+                }
+
+                .crm-mobile-nav {
+                    position: fixed;
+                    left: 10px;
+                    right: 10px;
+                    bottom: calc(8px + env(safe-area-inset-bottom));
+                    z-index: 1085;
+                    display: grid;
+                    grid-template-columns: repeat(5, minmax(0,1fr));
+                    align-items: center;
+                    height: 64px;
+                    padding: 6px;
+                    border: 1px solid rgba(23,24,27,.08);
+                    border-radius: 19px;
+                    background: rgba(255,255,255,.96);
+                    box-shadow: 0 14px 40px rgba(28,24,24,.16);
+                    backdrop-filter: blur(18px);
+                    -webkit-backdrop-filter: blur(18px);
+                }
+
+                .crm-mobile-nav-item,
+                .crm-mobile-nav-more {
+                    position: relative;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 3px;
+                    min-width: 0;
+                    height: 52px;
+                    padding: 0 4px;
+                    border: 0;
+                    border-radius: 13px;
+                    background: transparent;
+                    color: #909298;
+                    text-decoration: none;
+                    font-family: inherit;
+                }
+
+                .crm-mobile-nav-item i,
+                .crm-mobile-nav-more i {
+                    font-size: 1.18rem;
+                    line-height: 1;
+                }
+
+                .crm-mobile-nav-item span,
+                .crm-mobile-nav-more span {
+                    max-width: 100%;
+                    overflow: hidden;
+                    font-size: .57rem;
+                    font-weight: 700;
+                    line-height: 1;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                }
+
+                .crm-mobile-nav-item.active,
+                .crm-mobile-nav-more.active {
+                    background: #fff1f1;
+                    color: #b9040a;
+                }
+
+                .crm-mobile-nav-item.active::after,
+                .crm-mobile-nav-more.active::after {
+                    content: "";
+                    position: absolute;
+                    top: 3px;
+                    width: 18px;
+                    height: 2px;
+                    border-radius: 99px;
+                    background: #b9040a;
+                }
+
+                .crm-mobile-sheet-backdrop {
+                    position: fixed;
+                    inset: 0;
+                    z-index: 1090;
+                    opacity: 0;
+                    visibility: hidden;
+                    background: rgba(17,17,19,.38);
+                    backdrop-filter: blur(3px);
+                    -webkit-backdrop-filter: blur(3px);
+                    transition: opacity .18s ease, visibility .18s ease;
+                }
+
+                .crm-mobile-sheet-backdrop.open {
+                    opacity: 1;
+                    visibility: visible;
+                }
+
+                .crm-mobile-sheet {
+                    position: absolute;
+                    left: 8px;
+                    right: 8px;
+                    bottom: calc(8px + env(safe-area-inset-bottom));
+                    max-height: min(78vh, 680px);
+                    overflow: hidden;
+                    border: 1px solid rgba(23,24,27,.07);
+                    border-radius: 26px;
+                    background: #f7f5f2;
+                    box-shadow: 0 28px 70px rgba(15,15,17,.3);
+                    transform: translateY(calc(100% + 28px));
+                    transition: transform .22s cubic-bezier(.2,.8,.2,1);
+                }
+
+                .crm-mobile-sheet-backdrop.open .crm-mobile-sheet {
+                    transform: translateY(0);
+                }
+
+                .crm-mobile-sheet-handle {
+                    width: 38px;
+                    height: 4px;
+                    margin: 9px auto 3px;
+                    border-radius: 99px;
+                    background: #d2ceca;
+                }
+
+                .crm-mobile-sheet-head {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 12px;
+                    padding: 12px 16px 10px;
+                }
+
+                .crm-mobile-sheet-head strong {
+                    display: block;
+                    color: #25262a;
+                    font-size: 1rem;
+                    font-weight: 780;
+                }
+
+                .crm-mobile-sheet-head small {
+                    display: block;
+                    margin-top: 3px;
+                    color: #96989d;
+                    font-size: .62rem;
+                    font-weight: 600;
+                }
+
+                .crm-mobile-sheet-close {
+                    display: grid;
+                    place-items: center;
+                    flex: 0 0 auto;
+                    width: 36px;
+                    height: 36px;
+                    padding: 0;
+                    border: 0;
+                    border-radius: 11px;
+                    background: #ebe7e3;
+                    color: #66686d;
+                    font-size: 1rem;
+                }
+
+                .crm-mobile-sheet-scroll {
+                    max-height: calc(min(78vh, 680px) - 126px);
+                    overflow-y: auto;
+                    padding: 3px 12px 14px;
+                    overscroll-behavior: contain;
+                }
+
+                .crm-mobile-sheet-grid {
+                    display: grid;
+                    grid-template-columns: repeat(3, minmax(0,1fr));
+                    gap: 8px;
+                }
+
+                .crm-mobile-sheet-link {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: flex-start;
+                    justify-content: space-between;
+                    min-height: 86px;
+                    padding: 12px;
+                    border: 1px solid rgba(23,24,27,.055);
+                    border-radius: 15px;
+                    background: #fff;
+                    color: #55575c;
+                    text-decoration: none;
+                }
+
+                .crm-mobile-sheet-link i {
+                    display: grid;
+                    place-items: center;
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 10px;
+                    background: #f1eeea;
+                    color: #77797e;
+                    font-size: .93rem;
+                }
+
+                .crm-mobile-sheet-link span {
+                    width: 100%;
+                    margin-top: 9px;
+                    overflow: hidden;
+                    font-size: .66rem;
+                    font-weight: 730;
+                    line-height: 1.15;
+                    text-overflow: ellipsis;
+                }
+
+                .crm-mobile-sheet-link.active {
+                    border-color: rgba(185,4,10,.16);
+                    background: #fff5f5;
+                    color: #a20a10;
+                }
+
+                .crm-mobile-sheet-link.active i {
+                    background: #b9040a;
+                    color: #fff;
+                }
+
+                .crm-mobile-sheet-account {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 10px;
+                    margin-top: 10px;
+                    padding: 11px 12px;
+                    border: 1px solid rgba(23,24,27,.055);
+                    border-radius: 15px;
+                    background: #fff;
+                }
+
+                .crm-mobile-sheet-user {
+                    min-width: 0;
+                }
+
+                .crm-mobile-sheet-user strong {
+                    display: block;
+                    overflow: hidden;
+                    color: #333438;
+                    font-size: .72rem;
+                    font-weight: 750;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                }
+
+                .crm-mobile-sheet-user small {
+                    display: block;
+                    margin-top: 2px;
+                    color: #999ba0;
+                    font-size: .58rem;
+                }
+
+                .crm-mobile-sheet-logout {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    flex: 0 0 auto;
+                    min-height: 36px;
+                    padding: 0 11px;
+                    border: 0;
+                    border-radius: 10px;
+                    background: #fff0f0;
+                    color: #a20a10;
+                    font-size: .63rem;
+                    font-weight: 750;
+                }
+
+                #mobile-fab-add {
+                    bottom: calc(86px + env(safe-area-inset-bottom)) !important;
+                }
+
+                .dealer-route-bar {
+                    bottom: calc(82px + env(safe-area-inset-bottom)) !important;
+                }
+
+                .dealer-route-active #mobile-fab-add {
+                    bottom: calc(150px + env(safe-area-inset-bottom)) !important;
+                }
+            }
+
+            @media (min-width: 992px) {
+                .crm-mobile-nav,
+                .crm-mobile-sheet-backdrop {
+                    display: none !important;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    function renderMobileNavigation() {
+        if (window.location.pathname === '/login.html') return;
+        ensureMobileNavStyles();
+
+        document.querySelectorAll('.crm-mobile-nav, .crm-mobile-sheet-backdrop').forEach(el => el.remove());
+
+        const currentPath = getCurrentNavPath();
+        const primaryItems = MOBILE_PRIMARY_PATHS
+            .map(path => NAV_ITEMS.find(item => item.path === path))
+            .filter(Boolean);
+
+        const nav = document.createElement('nav');
+        nav.className = 'crm-mobile-nav';
+        nav.setAttribute('aria-label', 'Мобильная навигация');
+
+        nav.innerHTML = primaryItems.map(item => {
+            const active = item.path === currentPath;
+            return `<a href="${item.path}" class="crm-mobile-nav-item${active ? ' active' : ''}" data-permission="${item.permission}">
+                <i class="bi bi-${item.icon}"></i>
+                <span>${item.label}</span>
+            </a>`;
+        }).join('') + `
+            <button type="button" class="crm-mobile-nav-more${MOBILE_PRIMARY_PATHS.includes(currentPath) ? '' : ' active'}" id="crm-mobile-more">
+                <i class="bi bi-grid"></i>
+                <span>Ещё</span>
+            </button>`;
+
+        const backdrop = document.createElement('div');
+        backdrop.className = 'crm-mobile-sheet-backdrop';
+        backdrop.id = 'crm-mobile-sheet-backdrop';
+        backdrop.innerHTML = `
+            <div class="crm-mobile-sheet" role="dialog" aria-modal="true" aria-label="Все разделы CRM">
+                <div class="crm-mobile-sheet-handle"></div>
+                <div class="crm-mobile-sheet-head">
+                    <div>
+                        <strong>Меню</strong>
+                        <small>Все разделы CRM</small>
+                    </div>
+                    <button type="button" class="crm-mobile-sheet-close" id="crm-mobile-sheet-close" aria-label="Закрыть"><i class="bi bi-x-lg"></i></button>
+                </div>
+                <div class="crm-mobile-sheet-scroll">
+                    <div class="crm-mobile-sheet-grid">
+                        ${NAV_ITEMS.map(item => {
+                            const active = item.path === currentPath;
+                            return `<a href="${item.path}" class="crm-mobile-sheet-link${active ? ' active' : ''}" data-permission="${item.permission}">
+                                <i class="bi bi-${item.icon}"></i>
+                                <span>${item.label}</span>
+                            </a>`;
+                        }).join('')}
+                    </div>
+                    <div class="crm-mobile-sheet-account">
+                        <div class="crm-mobile-sheet-user">
+                            <strong id="crm-mobile-user-name">Пользователь</strong>
+                            <small id="crm-mobile-user-role">CRM IDEAL FLOOR</small>
+                        </div>
+                        <button type="button" class="crm-mobile-sheet-logout" id="crm-mobile-logout"><i class="bi bi-box-arrow-right"></i> Выйти</button>
+                    </div>
+                </div>
+            </div>`;
+
+        document.body.appendChild(nav);
+        document.body.appendChild(backdrop);
+
+        const openButton = nav.querySelector('#crm-mobile-more');
+        const closeButton = backdrop.querySelector('#crm-mobile-sheet-close');
+        const logoutButton = backdrop.querySelector('#crm-mobile-logout');
+
+        const openSheet = () => {
+            backdrop.classList.add('open');
+            document.body.classList.add('crm-mobile-sheet-open');
+        };
+        const closeSheet = () => {
+            backdrop.classList.remove('open');
+            document.body.classList.remove('crm-mobile-sheet-open');
+        };
+
+        openButton?.addEventListener('click', openSheet);
+        closeButton?.addEventListener('click', closeSheet);
+        logoutButton?.addEventListener('click', logout);
+        backdrop.addEventListener('click', e => {
+            if (e.target === backdrop) closeSheet();
+        });
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape' && backdrop.classList.contains('open')) closeSheet();
+        }, { once: false });
+    }
+
+    function updateMobileUserInfo() {
+        const user = window.CRMAuth?.user;
+        if (!user) return;
+        const name = document.getElementById('crm-mobile-user-name');
+        const role = document.getElementById('crm-mobile-user-role');
+        const roleNames = { manager: 'Менеджер', marketing: 'Маркетинг', guest: 'Гость' };
+        if (name) name.textContent = user.name || user.username || user.email || 'Пользователь';
+        if (role) role.textContent = roleNames[user.role] || user.role || 'CRM IDEAL FLOOR';
     }
 
     async function apiFetch(url, options) {
@@ -186,8 +587,10 @@
             return window.CRMAuth.user;
         }
 
+        renderMobileNavigation();
         applyNavigation();
         applyRoleBadge();
+        updateMobileUserInfo();
         return window.CRMAuth.user;
     }
 
@@ -205,6 +608,7 @@
         logout,
         applyNavigation,
         renderTopNavigation,
+        renderMobileNavigation,
         init
     };
 
