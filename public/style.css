@@ -3860,3 +3860,443 @@ body.bg-light {
         overflow: visible !important;
     }
 }
+
+
+/* =========================================================
+   SALES PERFORMANCE CARDS + PRINT REPORT
+   ========================================================= */
+.sales-performance-section {
+    margin-bottom: 14px;
+    padding: 17px;
+    border: 1px solid rgba(23,24,27,.08);
+    border-radius: 20px;
+    background: rgba(255,255,255,.9);
+    box-shadow: 0 12px 30px rgba(29,24,24,.04);
+    backdrop-filter: blur(12px);
+}
+
+.sales-performance-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.sales-performance-head h2 {
+    margin: 0;
+    color: #242529;
+    font-size: 1.05rem;
+    font-weight: 650;
+    letter-spacing: -.02em;
+}
+
+.sales-performance-head p {
+    margin: 4px 0 0;
+    color: #96989e;
+    font-size: .7rem;
+}
+
+.sales-performance-legend {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #8f9197;
+    font-size: .62rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.sales-performance-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.sales-performance-legend i {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+}
+
+.sales-performance-legend i.is-good { background: #178256; }
+.sales-performance-legend i.is-mid { background: #d89526; }
+.sales-performance-legend i.is-low { background: #b9040a; }
+
+.sales-performance-cards {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0,1fr));
+    gap: 9px;
+}
+
+.sales-performance-card {
+    position: relative;
+    min-width: 0;
+    padding: 13px;
+    overflow: hidden;
+    border: 1px solid rgba(23,24,27,.075);
+    border-radius: 15px;
+    background: #fbfaf8;
+}
+
+.sales-performance-card::after {
+    content: "";
+    position: absolute;
+    width: 54px;
+    height: 54px;
+    right: -22px;
+    top: -22px;
+    border-radius: 50%;
+    opacity: .7;
+}
+
+.sales-performance-card.is-good::after { background: #dff0e8; }
+.sales-performance-card.is-mid::after { background: #f6ead2; }
+.sales-performance-card.is-low::after { background: #f6dfe0; }
+.sales-performance-card.is-none::after { background: #eceae7; }
+
+.sales-performance-card-top {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.sales-performance-card-title {
+    min-width: 0;
+    overflow: hidden;
+    color: #34353a;
+    font-size: .75rem;
+    font-weight: 650;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sales-performance-card-percent {
+    flex: 0 0 auto;
+    font-size: .9rem;
+    font-weight: 750;
+    letter-spacing: -.02em;
+}
+
+.sales-performance-card.is-good .sales-performance-card-percent { color: #197450; }
+.sales-performance-card.is-mid .sales-performance-card-percent { color: #9b690e; }
+.sales-performance-card.is-low .sales-performance-card-percent { color: #b9040a; }
+.sales-performance-card.is-none .sales-performance-card-percent { color: #92949a; font-size: .65rem; }
+
+.sales-performance-card-values {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 11px;
+}
+
+.sales-performance-card-values > div {
+    min-width: 0;
+}
+
+.sales-performance-card-values span {
+    display: block;
+    color: #a0a2a7;
+    font-size: .54rem;
+    font-weight: 600;
+}
+
+.sales-performance-card-values strong {
+    display: block;
+    margin-top: 1px;
+    overflow: hidden;
+    color: #38393e;
+    font-size: .68rem;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sales-performance-bar {
+    height: 5px;
+    margin-top: 10px;
+    overflow: hidden;
+    border-radius: 99px;
+    background: #e9e6e2;
+}
+
+.sales-performance-bar span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+}
+
+.sales-performance-card.is-good .sales-performance-bar span { background: #178256; }
+.sales-performance-card.is-mid .sales-performance-bar span { background: #d89526; }
+.sales-performance-card.is-low .sales-performance-bar span { background: #b9040a; }
+
+.sales-performance-card-meta {
+    margin-top: 6px;
+    color: #9a9ca1;
+    font-size: .55rem;
+    font-weight: 550;
+}
+
+.sales-print-report {
+    display: none;
+}
+
+@media (max-width: 1199px) {
+    .sales-performance-cards {
+        grid-template-columns: repeat(3, minmax(0,1fr));
+    }
+}
+
+@media (max-width: 767px) {
+    .sales-performance-head {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+    .sales-performance-legend {
+        width: 100%;
+        overflow-x: auto;
+    }
+    .sales-performance-cards {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding-bottom: 3px;
+        scroll-snap-type: x proximity;
+    }
+    .sales-performance-card {
+        flex: 0 0 220px;
+        scroll-snap-align: start;
+    }
+}
+
+@media print {
+    html, body {
+        width: 100% !important;
+        min-width: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+        color: #000 !important;
+        font-family: Arial, Helvetica, sans-serif !important;
+        font-size: 9pt !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    body > *:not(.sales-print-report) {
+        display: none !important;
+    }
+
+    .sales-print-report {
+        display: block !important;
+        width: 100%;
+        color: #000;
+    }
+
+    .sales-print-header {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 20px;
+        padding-bottom: 7mm;
+        border-bottom: 1.2pt solid #111;
+    }
+
+    .sales-print-header > div:first-child {
+        display: flex;
+        align-items: center;
+        gap: 5mm;
+    }
+
+    .sales-print-header img {
+        width: 34mm;
+        max-height: 14mm;
+        object-fit: contain;
+        filter: grayscale(1) contrast(1.4);
+    }
+
+    .sales-print-header h1 {
+        margin: 0 0 1.5mm;
+        color: #000 !important;
+        font-size: 20pt;
+        line-height: 1;
+        font-weight: 700;
+        letter-spacing: -.4pt;
+    }
+
+    #print-period {
+        font-size: 10pt;
+        font-weight: 600;
+    }
+
+    .sales-print-meta {
+        text-align: right;
+        font-size: 7.5pt;
+    }
+
+    .sales-print-meta span {
+        display: block;
+        margin-bottom: 1mm;
+        color: #555;
+    }
+
+    .sales-print-meta strong {
+        font-size: 8.5pt;
+        font-weight: 700;
+    }
+
+    .sales-print-overview {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0,1fr));
+        gap: 3mm;
+        margin: 5mm 0;
+    }
+
+    .sales-print-overview-card {
+        padding: 3.2mm 3.5mm;
+        border: 1pt solid #222;
+        break-inside: avoid;
+    }
+
+    .sales-print-overview-card span {
+        display: block;
+        font-size: 7pt;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .3pt;
+    }
+
+    .sales-print-overview-card strong {
+        display: block;
+        margin-top: 1mm;
+        font-size: 16pt;
+        line-height: 1;
+        font-weight: 800;
+    }
+
+    .sales-print-overview-card small {
+        display: block;
+        margin-top: 1.2mm;
+        color: #333;
+        font-size: 7pt;
+    }
+
+    .sales-print-table-wrap {
+        width: 100%;
+    }
+
+    .sales-print-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        font-size: 7.6pt;
+    }
+
+    .sales-print-table th,
+    .sales-print-table td {
+        padding: 2.1mm 2.2mm;
+        border: .6pt solid #777;
+        vertical-align: middle;
+    }
+
+    .sales-print-table thead th {
+        border-color: #222;
+        background: #e8e8e8 !important;
+        color: #000;
+        font-size: 6.7pt;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: .2pt;
+    }
+
+    .sales-print-table th:nth-child(1) { width: 30%; }
+    .sales-print-table th:nth-child(2) { width: 11%; }
+    .sales-print-table th:nth-child(3) { width: 11%; }
+    .sales-print-table th:nth-child(4) { width: 11%; }
+    .sales-print-table th:nth-child(5) { width: 11%; }
+    .sales-print-table th:nth-child(6) { width: 26%; }
+
+    .sales-print-table .num {
+        text-align: right;
+        white-space: nowrap;
+    }
+
+    .sales-print-section-row td {
+        padding-top: 2.6mm;
+        padding-bottom: 1.8mm;
+        border-left-color: #222;
+        border-right-color: #222;
+        background: #d6d6d6 !important;
+        font-size: 7pt;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: .35pt;
+    }
+
+    .sales-print-table tr.is-total td {
+        border-top: 1.2pt solid #111;
+        border-bottom: 1.2pt solid #111;
+        font-weight: 700;
+    }
+
+    .sales-print-progress {
+        position: relative;
+        height: 4.2mm;
+        overflow: hidden;
+        border: .8pt solid #111;
+        background: #fff !important;
+    }
+
+    .sales-print-progress::after {
+        content: "0        25        50        75       100";
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-around;
+        padding: 0 .5mm;
+        color: #444;
+        font-size: 4.5pt;
+        line-height: 1;
+        pointer-events: none;
+        mix-blend-mode: multiply;
+    }
+
+    .sales-print-progress span {
+        position: relative;
+        z-index: 0;
+        display: block;
+        height: 100%;
+        background:
+            repeating-linear-gradient(
+                135deg,
+                #333 0,
+                #333 1.1mm,
+                #777 1.1mm,
+                #777 2.2mm
+            ) !important;
+        border-right: .8pt solid #000;
+    }
+
+    .sales-print-footer {
+        display: flex;
+        justify-content: space-between;
+        gap: 10mm;
+        margin-top: 5mm;
+        padding-top: 2.5mm;
+        border-top: .8pt solid #777;
+        color: #444;
+        font-size: 6.5pt;
+    }
+
+    .sales-print-table tr,
+    .sales-print-overview-card {
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+}

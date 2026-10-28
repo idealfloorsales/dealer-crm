@@ -34,18 +34,9 @@
             .container { padding-left: 15px; padding-right: 15px; }
         }
         @media print {
-            @page { margin: 1cm; size: A4 portrait; }
-            body { background-color: white !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; padding-bottom: 0 !important; font-family: sans-serif; }
-            .bottom-nav, .mobile-view-toggler, .navbar, #page-header, #sales-top-dashboard, #sales-container-col, .card-footer, #logout-btn, .btn, .sales-input-group { display: none !important; }
-            .container, .row { max-width: 100% !important; width: 100% !important; padding: 0 !important; margin: 0 !important; }
-            #summary-col { display: block !important; width: 100% !important; flex: 0 0 100% !important; max-width: 100% !important; }
-            .mobile-hidden { display: block !important; }
-            .card { border: none !important; box-shadow: none !important; }
-            .card-header { background: none !important; border-bottom: 2px solid #000 !important; padding-left: 0 !important; }
-            .sticky-top { position: static !important; }
-            .card-body.custom-scroll { max-height: none !important; overflow: visible !important; }
-            #summary-col::after { content: "Сформировано: " attr(data-print-date); display: block; margin-top: 30px; font-size: 10pt; color: #666; text-align: right; border-top: 1px solid #ddd; padding-top: 10px; }
+            @page { size: A4 landscape; margin: 10mm; }
         }
+
     </style>
 </head>
 <body class="bg-light sales-page">
@@ -94,6 +85,23 @@
                     <button id="print-btn" class="sales-secondary-btn" type="button"><i class="bi bi-printer"></i><span>Печать</span></button>
                     <button id="save-btn" class="sales-save-btn" type="button"><i class="bi bi-check-lg"></i><span>Сохранить</span></button>
                 </div>
+            </div>
+        </section>
+
+        <section class="sales-performance-section">
+            <div class="sales-performance-head">
+                <div>
+                    <h2>Выполнение плана</h2>
+                    <p>Краткая картина по выбранному месяцу.</p>
+                </div>
+                <div class="sales-performance-legend">
+                    <span><i class="is-good"></i> 90%+</span>
+                    <span><i class="is-mid"></i> 70–89%</span>
+                    <span><i class="is-low"></i> до 70%</span>
+                </div>
+            </div>
+            <div id="sales-performance-cards" class="sales-performance-cards">
+                <div class="cc-empty">Загрузка…</div>
             </div>
         </section>
 
@@ -155,6 +163,45 @@
             </div>
         </div>
     </main>
+
+    <section id="sales-print-report" class="sales-print-report" aria-hidden="true">
+        <header class="sales-print-header">
+            <div>
+                <img src="logo.png" alt="IDEAL FLOOR">
+                <div>
+                    <h1>Продажи</h1>
+                    <div id="print-period">—</div>
+                </div>
+            </div>
+            <div class="sales-print-meta">
+                <span>Сформировано</span>
+                <strong id="print-generated">—</strong>
+            </div>
+        </header>
+
+        <div id="print-overview" class="sales-print-overview"></div>
+
+        <div class="sales-print-table-wrap">
+            <table class="sales-print-table">
+                <thead>
+                    <tr>
+                        <th>Раздел / дилер</th>
+                        <th class="num">План, м²</th>
+                        <th class="num">Факт, м²</th>
+                        <th class="num">Выполнение</th>
+                        <th class="num">Прогноз, м²</th>
+                        <th>Шкала</th>
+                    </tr>
+                </thead>
+                <tbody id="print-sales-body"></tbody>
+            </table>
+        </div>
+
+        <footer class="sales-print-footer">
+            <span>IDEAL FLOOR CRM</span>
+            <span>Шкала показывает выполнение плана от 0 до 100%.</span>
+        </footer>
+    </section>
 
     <div class="modal fade" id="sales-custom-modal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-sm">

@@ -23,6 +23,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const customNameInput = document.getElementById('custom-sale-name');
     const customGroupLabel = document.getElementById('custom-sale-group-label');
     const customSaveBtn = document.getElementById('custom-sale-save');
+    const performanceCards = document.getElementById('sales-performance-cards');
+    const printReport = document.getElementById('sales-print-report');
+    const printPeriod = document.getElementById('print-period');
+    const printGenerated = document.getElementById('print-generated');
+    const printOverview = document.getElementById('print-overview');
+    const printSalesBody = document.getElementById('print-sales-body');
     const customModal = customModalEl ? new bootstrap.Modal(customModalEl) : null;
     
     // Табы
@@ -334,6 +340,170 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function getProgressLevel(percent, hasPlan = true) {
+        if (!hasPlan) return 'none';
+        if (percent >= 90) return 'good';
+        if (percent >= 70) return 'mid';
+        return 'low';
+    }
+
+    function buildPerformanceCard(title, fact, plan, meta = '') {
+        const hasPlan = Number(plan) > 0;
+        const percent = hasPlan ? (Number(fact) / Number(plan)) * 100 : 0;
+        const level = getProgressLevel(percent, hasPlan);
+        const shownPercent = hasPlan ? Math.round(percent) + '%' : 'Без плана';
+        const width = hasPlan ? Math.min(percent, 100) : 0;
+
+        return `<article class="sales-performance-card is-${level}">
+            <div class="sales-performance-card-top">
+                <div class="sales-performance-card-title">${escapeHtml(title)}</div>
+                <div class="sales-performance-card-percent">${shownPercent}</div>
+            </div>
+            <div class="sales-performance-card-values">
+                <div><span>Факт</span><strong>${fmt(Number(fact) || 0)} м²</strong></div>
+                <div><span>План</span><strong>${hasPlan ? fmt(Number(plan)) + ' м²' : '—'}</strong></div>
+            </div>
+            <div class="sales-performance-bar"><span style="width:${width}%"></span></div>
+            ${meta ? `<div class="sales-performance-card-meta">${escapeHtml(meta)}</div>` : ''}
+        </article>`;
+    }
+
+    function renderPerformanceCards(facts, plans, totalRegionsFact, totalAstanaFact, totalVipFact, totalOtherFact) {
+        if (!performanceCards) return;
+
+        const cards = [];
+        const totalFactAll = totalRegionsFact + totalAstanaFact + totalVipFact + totalOtherFact;
+
+        if (currentScope === 'all') {
+            cards.push({ title: 'Вся компания', fact: totalFactAll, plan: plans.total_all || 0, meta: 'Общий результат' });
+            cards.push({ title: 'Астана', fact: totalAstanaFact, plan: plans.astana_all || 0, meta: 'Итого по Астане' });
+            cards.push({ title: 'Регионы', fact: totalRegionsFact, plan: plans.regions_all || 0, meta: 'Итого по регионам' });
+        } else if (currentScope === 'astana') {
+            cards.push({ title: 'Астана', fact: totalAstanaFact, plan: plans.astana_all || 0, meta: 'Моя зона' });
+        } else if (currentScope === 'regions') {
+            cards.push({ title: 'Регионы', fact: totalRegionsFact, plan: plans.regions_all || 0, meta: 'Моя зона' });
+        }
+
+        facts.vip
+            .slice()
+            .sort((a,b) => {
+                const pa = Number(plans[`vip_${a.id}`]) || 0;
+                const pb = Number(plans[`vip_${b.id}`]) || 0;
+                const aa = pa > 0 ? a.fact / pa : 0;
+                const ab = pb > 0 ? b.fact / pb : 0;
+                return ab - aa;
+            })
+            .forEach(v => {
+                cards.push({
+                    title: v.name,
+                    fact: v.fact,
+                    plan: plans[`vip_${v.id}`] || 0,
+                    meta: 'Индивидуальный план'
+                });
+            });
+
+        performanceCards.innerHTML = cards.length
+            ? cards.map(card => buildPerformanceCard(card.title, card.fact, card.plan, card.meta)).join('')
+            : '<div class="cc-empty">Нет данных для отображения</div>';
+    }
+
+    function renderPrintReport(facts, plans, totalRegionsFact, totalAstanaFact, totalVipFact, totalOtherFact, daysInMonth, currentDay) {
+        if (!printSalesBody || !printOverview) return;
+
+        const selected = new Date(monthPicker.value + '-01T00:00:00');
+        const monthTitle = selected.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
+        if (printPeriod) printPeriod.textContent = monthTitle.charAt(0).toUpperCase() + monthTitle.slice(1);
+        if (printGenerated) printGenerated.textContent = new Date().toLocaleString('ru-RU', {
+            day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'
+        });
+
+        const totalFactAll = totalRegionsFact + totalAstanaFact + totalVipFact + totalOtherFact;
+        const overview = [];
+        if (currentScope === 'all') {
+            overview.push(['Вся компания', totalFactAll, plans.total_all || 0]);
+            overview.push(['Астана', totalAstanaFact, plans.astana_all || 0]);
+            overview.push(['Регионы', totalRegionsFact, plans.regions_all || 0]);
+        } else if (currentScope === 'astana') {
+            overview.push(['Астана', totalAstanaFact, plans.astana_all || 0]);
+        } else {
+            overview.push(['Регионы', totalRegionsFact, plans.regions_all || 0]);
+        }
+
+        printOverview.innerHTML = overview.map(([title,fact,plan]) => {
+            const pct = plan > 0 ? Math.round(fact / plan * 100) : 0;
+            return `<div class="sales-print-overview-card">
+                <span>${escapeHtml(title)}</span>
+                <strong>${plan > 0 ? pct + '%' : 'Без плана'}</strong>
+                <small>Факт ${fmt(fact)} м² · План ${plan > 0 ? fmt(plan) + ' м²' : '—'}</small>
+            </div>`;
+        }).join('');
+
+        const rows = [];
+        const addRow = (section, title, fact, plan, isTotal = false) => {
+            const hasPlan = Number(plan) > 0;
+            const progress = calculateProgress(plan, fact, daysInMonth, currentDay);
+            rows.push({
+                section, title, fact: Number(fact)||0, plan:Number(plan)||0,
+                percent: hasPlan ? progress.percent : null,
+                forecast: progress.forecast,
+                isTotal
+            });
+        };
+
+        if (currentScope === 'all') {
+            addRow('Компания', 'Вся компания', totalFactAll, plans.total_all || 0, true);
+        }
+
+        if (currentScope !== 'regions') {
+            addRow('Астана', 'Астана — всего', totalAstanaFact, plans.astana_all || 0, true);
+            groupsConfig.forEach(g => {
+                if (g.type === 'astana' && ((facts[g.key] || 0) !== 0 || (plans[g.key] || 0) !== 0)) {
+                    addRow('Астана', g.title.replace('Астана — ', ''), facts[g.key] || 0, plans[g.key] || 0);
+                }
+            });
+        }
+
+        facts.vip.forEach(v => {
+            addRow('Индивидуальные планы', v.name, v.fact, plans[`vip_${v.id}`] || 0);
+        });
+
+        if (currentScope !== 'astana') {
+            addRow('Регионы', 'Регионы — всего', totalRegionsFact, plans.regions_all || 0, true);
+            groupsConfig.forEach(g => {
+                if (g.type === 'region' && ((facts[g.key] || 0) !== 0 || (plans[g.key] || 0) !== 0)) {
+                    addRow('Регионы', g.title.replace('Регион ', ''), facts[g.key] || 0, plans[g.key] || 0);
+                }
+            });
+        }
+
+        if (totalOtherFact > 0) {
+            addRow('Без категории', 'Не распределено', totalOtherFact, 0);
+        }
+
+        let lastSection = '';
+        printSalesBody.innerHTML = rows.map(row => {
+            const sectionRow = row.section !== lastSection
+                ? `<tr class="sales-print-section-row"><td colspan="6">${escapeHtml(row.section)}</td></tr>`
+                : '';
+            lastSection = row.section;
+
+            const pctText = row.percent === null ? '—' : Math.round(row.percent) + '%';
+            const barWidth = row.percent === null ? 0 : Math.min(row.percent, 100);
+            return sectionRow + `<tr class="${row.isTotal ? 'is-total' : ''}">
+                <td>${escapeHtml(row.title)}</td>
+                <td class="num">${row.plan > 0 ? fmt(row.plan) : '—'}</td>
+                <td class="num"><strong>${fmt(row.fact)}</strong></td>
+                <td class="num"><strong>${pctText}</strong></td>
+                <td class="num">${fmt(row.forecast)}</td>
+                <td>
+                    <div class="sales-print-progress">
+                        <span style="width:${barWidth}%"></span>
+                    </div>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
     function renderAll() {
         const date = new Date(monthPicker.value);
         const daysInMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -441,6 +611,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let totalVipFact = 0; facts.vip.forEach(v => totalVipFact += v.fact);
         const totalFactAll = totalRegionsFact + totalAstanaFact + totalVipFact + totalOtherFact;
+
+        renderPerformanceCards(facts, plans, totalRegionsFact, totalAstanaFact, totalVipFact, totalOtherFact);
+        renderPrintReport(facts, plans, totalRegionsFact, totalAstanaFact, totalVipFact, totalOtherFact, daysInMonth, currentDay);
         
         const renderSumItem = (title, planKey, factVal, isSubItem = false, forcePlan = false) => {
             const isVisible = forcePlan || (planVisibility[planKey] !== false);
@@ -579,8 +752,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (printBtn) {
         printBtn.onclick = () => {
-            if(summaryCol) summaryCol.setAttribute('data-print-date', new Date().toLocaleDateString('ru-RU'));
+            captureState();
+            renderAll();
+            if (printReport) printReport.setAttribute('aria-hidden', 'false');
             window.print();
+            if (printReport) printReport.setAttribute('aria-hidden', 'true');
         };
     }
 
