@@ -42,16 +42,31 @@ const userSchema = new mongoose.Schema({
     password: { type: String, required: true },
     fullName: String,
     isBlocked: { type: Boolean, default: false },
-    scope: { type: String, default: 'all' }, 
+    role: { type: String, enum: ['manager', 'guest', 'marketing'], default: 'manager' },
+    scope: { type: String, enum: ['all', 'astana', 'regions'], default: 'all' },
     permissions: {
-        can_view_map: { type: Boolean, default: true },
         can_view_dealers: { type: Boolean, default: true },
+        can_view_map: { type: Boolean, default: true },
+        can_view_products: { type: Boolean, default: true },
+        can_view_report: { type: Boolean, default: true },
         can_view_sales: { type: Boolean, default: true },
         can_view_competitors: { type: Boolean, default: true },
-        can_view_report: { type: Boolean, default: true },
+        can_view_knowledge: { type: Boolean, default: true },
+        can_view_dashboard: { type: Boolean, default: true },
+        can_view_reclamations: { type: Boolean, default: true },
+        can_create_dealer: { type: Boolean, default: false },
         can_edit_dealer: { type: Boolean, default: false },
         can_delete_dealer: { type: Boolean, default: false },
-        can_edit_sales: { type: Boolean, default: false },
+        can_manage_visits: { type: Boolean, default: false },
+        can_edit_matrix: { type: Boolean, default: false },
+        can_edit_sales_fact: { type: Boolean, default: false },
+        can_edit_sales_plan: { type: Boolean, default: false },
+        can_manage_products: { type: Boolean, default: false },
+        can_manage_competitors: { type: Boolean, default: false },
+        can_manage_knowledge: { type: Boolean, default: false },
+        can_manage_reclamations: { type: Boolean, default: false },
+        can_export_base: { type: Boolean, default: false },
+        can_export_prices: { type: Boolean, default: false },
         can_manage_users: { type: Boolean, default: false },
         is_admin: { type: Boolean, default: false }
     }
@@ -122,17 +137,18 @@ app.post('/api/auth/login', async (req, res) => {
         if (!validPass) return res.status(400).json({ error: 'Неверный пароль' });
 
         const token = jwt.sign(
-            { id: user._id, role: user.scope, permissions: user.permissions }, 
-            JWT_SECRET, 
+            { id: user._id, role: user.role || 'manager', scope: user.scope || 'all' },
+            JWT_SECRET,
             { expiresIn: '7d' }
         );
 
-        res.json({ 
-            token, 
-            user: { 
-                id: user._id, username: user.username, fullName: user.fullName, 
-                scope: user.scope, permissions: user.permissions 
-            } 
+        res.json({
+            token,
+            user: {
+                id: user._id, username: user.username, fullName: user.fullName,
+                role: user.role || 'manager', scope: user.scope || 'all',
+                permissions: user.permissions || {}
+            }
         });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
