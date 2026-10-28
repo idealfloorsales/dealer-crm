@@ -2596,3 +2596,17 @@ body.bg-light {
     .dealer-directory-head { align-items: flex-start; }
     .dealer-health-wrap { display: none; }
 }
+
+
+/* Dashboard greeting contrast fix */
+.cc-hero h1,
+#cc-greeting {
+    color: #ffffff !important;
+    text-shadow: 0 2px 14px rgba(0,0,0,.28);
+}
+.cc-hero .cc-eyebrow {
+    color: rgba(255,255,255,.72) !important;
+}
+.cc-hero .cc-subline {
+    color: rgba(255,255,255,.78) !important;
+}
