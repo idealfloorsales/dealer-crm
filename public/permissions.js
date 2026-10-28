@@ -25,6 +25,18 @@
         '/users.html': 'can_manage_users'
     };
 
+    const NAV_ITEMS = [
+        { path: '/', label: 'Дилеры', permission: 'can_view_dealers' },
+        { path: '/map.html', label: 'Карта', permission: 'can_view_map' },
+        { path: '/products.html', label: 'Матрица', permission: 'can_view_products' },
+        { path: '/report.html', label: 'Выставленность', permission: 'can_view_report' },
+        { path: '/sales.html', label: 'Продажи', permission: 'can_view_sales' },
+        { path: '/competitors.html', label: 'Конкуренты', permission: 'can_view_competitors' },
+        { path: '/knowledge.html', label: 'Статьи', permission: 'can_view_knowledge' },
+        { path: '/reclamations.html', label: 'Рекламации', permission: 'can_view_reclamations' },
+        { path: '/users.html', label: 'Сотрудники', permission: 'can_manage_users' }
+    ];
+
     function getToken() {
         return localStorage.getItem('crm_token');
     }
@@ -33,6 +45,52 @@
         localStorage.removeItem('crm_token');
         localStorage.removeItem('crm_user');
         window.location.href = '/login.html';
+    }
+
+    function getCurrentNavPath() {
+        const path = window.location.pathname;
+        if (path === '/index.html' || path === '/dealer.html') return '/';
+        return path;
+    }
+
+    function renderTopNavigation() {
+        const nav = document.querySelector('nav.navbar');
+        if (!nav || window.location.pathname === '/login.html') return;
+
+        nav.classList.add('desktop-nav');
+        const currentPath = getCurrentNavPath();
+
+        const itemsHtml = NAV_ITEMS.map(item => {
+            const active = item.path === currentPath;
+            return `
+                <li class="nav-item" data-permission="${item.permission}">
+                    <a class="nav-link${active ? ' active fw-bold' : ''}" href="${item.path}">${item.label}</a>
+                </li>`;
+        }).join('');
+
+        nav.innerHTML = `
+            <div class="container-fluid">
+                <a class="navbar-brand" href="/">
+                    <img src="logo.png" alt="IDEAL FLOOR CRM" height="40">
+                </a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Открыть меню">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav me-auto">
+                        ${itemsHtml}
+                    </ul>
+                    <div class="d-flex align-items-center gap-3">
+                        <span id="user-role-badge" class="badge bg-light text-dark border">...</span>
+                        <button id="logout-btn" class="btn btn-sm btn-outline-danger" type="button">
+                            <i class="bi bi-box-arrow-right me-1"></i>Выход
+                        </button>
+                    </div>
+                </div>
+            </div>`;
+
+        const logoutButton = document.getElementById('logout-btn');
+        if (logoutButton) logoutButton.addEventListener('click', logout);
     }
 
     async function apiFetch(url, options) {
@@ -133,6 +191,10 @@
         return window.CRMAuth.user;
     }
 
+    // Меню строится синхронно до DOMContentLoaded, чтобы все страницы
+    // получили один и тот же набор пунктов и порядок.
+    renderTopNavigation();
+
     window.__crmOriginalFetch = window.fetch.bind(window);
     window.fetch = apiFetch;
 
@@ -142,6 +204,7 @@
         can,
         logout,
         applyNavigation,
+        renderTopNavigation,
         init
     };
 
