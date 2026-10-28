@@ -84,7 +84,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await fetch(API_SALES_URL);
             if (!res.ok) return [];
             const rows = await res.json();
-            return rows.filter(s => String(s.dealerId) === String(dealerId));
+            const dealerKey = String(dealerId);
+            const personalPlanKey = `PLAN_vip_${dealerKey}`;
+
+            return rows.filter(s => {
+                const rowDealerId = String(s.dealerId || '');
+                return rowDealerId === dealerKey || rowDealerId === personalPlanKey;
+            });
         } catch (e) {
             console.warn('Не удалось загрузить продажи дилера', e);
             return [];
