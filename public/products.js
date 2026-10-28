@@ -66,7 +66,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let allProducts = [];
     let unmappedItems = [];
     let sortMode = 'sku'; 
-    let filterMode = 'all'; 
+    let filterMode = 'all';
+    let canManageProducts = false; 
     
     // Текущий товар в калькуляторе
     let calcCurrentProduct = null;
@@ -200,7 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             return `
-            <div class="${bgClass} p-3 rounded-4 shadow-sm border border-light mb-2 d-flex align-items-center justify-content-between" onclick="openModal('${p.id}')" style="cursor:pointer; min-height: 60px;">
+            <div class="${bgClass} p-3 rounded-4 shadow-sm border border-light mb-2 d-flex align-items-center justify-content-between" ${canManageProducts ? `onclick="openModal('${p.id}')"` : ''} style="cursor:${canManageProducts ? 'pointer' : 'default'}; min-height: 60px;">
                 <div style="overflow: hidden; flex-grow: 1;">
                     <div class="d-flex align-items-center gap-2 mb-1">
                         <span class="badge bg-light text-secondary border border-secondary-subtle fw-normal font-monospace">${p.sku || '---'}</span>
@@ -216,9 +217,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="d-flex flex-column align-items-end">
                        ${stockHtml}
                     </div>
-                    <button class="btn btn-sm btn-light border ms-3 text-secondary" title="Редактировать">
+                    ${canManageProducts ? `<button class="btn btn-sm btn-light border ms-3 text-secondary" title="Редактировать">
                         <i class="bi bi-pencil"></i>
-                    </button>
+                    </button>` : ''}
                 </div>
             </div>`;
         }).join('');
@@ -333,6 +334,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- ОБЫЧНЫЕ ФУНКЦИИ ---
     window.openModal = (id) => {
+        if (!canManageProducts) return;
         form.reset();
         if(btnDelete) btnDelete.style.display = 'none';
         
@@ -371,6 +373,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     window.deleteProduct = async (id) => {
+        if (!canManageProducts) return;
         if(confirm('Удалить товар?')) {
             try { await fetch(`${API_URL}/${id}`, { method: 'DELETE' }); loadProducts(); modal.hide(); } catch(e) { alert('Ошибка'); }
         }
@@ -379,6 +382,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(form) {
         form.onsubmit = async (e) => {
             e.preventDefault();
+            if (!canManageProducts) return;
             const chars = {
                 class: charClass ? charClass.value.trim() : '',
                 thickness: charThick ? charThick.value.trim() : '',
@@ -409,7 +413,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    if(btnImport) btnImport.onclick = () => { if(fileInput) fileInput.click(); };
+    if(btnImport) btnImport.onclick = () => { if(canManageProducts && fileInput) fileInput.click(); };
     if(fileInput) fileInput.onchange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -499,10 +503,25 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     searchInput.addEventListener('input', applyLogic);
-    addBtn.onclick = () => openModal();
-    if(resetBtn) resetBtn.onclick = () => { if(!confirm('Очистить весь каталог?')) return; alert('Функция временно отключена'); };
 
-    loadProducts();
+    async function initPermissionsAndLoad() {
+        if (window.CRMAuth && CRMAuth.ready) await CRMAuth.ready;
+        canManageProducts = window.CRMAuth ? CRMAuth.can('can_manage_products') : false;
+
+        if (addBtn) addBtn.style.display = canManageProducts ? '' : 'none';
+        if (btnImport) btnImport.style.display = canManageProducts ? '' : 'none';
+        if (resetBtn) resetBtn.style.display = 'none';
+        if (form) {
+            form.querySelectorAll('input, select, textarea, button[type="submit"]').forEach(el => {
+                if (!canManageProducts) el.disabled = true;
+            });
+        }
+
+        await loadProducts();
+    }
+
+    if (addBtn) addBtn.onclick = () => openModal();
+    initPermissionsAndLoad();
 });
 
 
