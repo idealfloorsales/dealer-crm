@@ -49,9 +49,20 @@ const userSchema = new mongoose.Schema({
         can_view_sales: { type: Boolean, default: true },
         can_view_competitors: { type: Boolean, default: true },
         can_view_report: { type: Boolean, default: true },
+        can_view_products: { type: Boolean, default: true },
+        can_view_knowledge: { type: Boolean, default: true },
+        can_view_dashboard: { type: Boolean, default: true },
+        can_create_dealer: { type: Boolean, default: false },
         can_edit_dealer: { type: Boolean, default: false },
         can_delete_dealer: { type: Boolean, default: false },
+        can_manage_visits: { type: Boolean, default: false },
         can_edit_sales: { type: Boolean, default: false },
+        can_edit_sales_fact: { type: Boolean, default: false },
+        can_edit_sales_plan: { type: Boolean, default: false },
+        can_manage_products: { type: Boolean, default: false },
+        can_manage_competitors: { type: Boolean, default: false },
+        can_export_base: { type: Boolean, default: false },
+        can_export_prices: { type: Boolean, default: false },
         can_manage_users: { type: Boolean, default: false },
         is_admin: { type: Boolean, default: false }
     }
@@ -113,7 +124,57 @@ app.use(authMiddleware);
 // --- API ВХОДА ---
 app.post('/api/auth/login', async (req, res) => {
     try {
-        const { username, password } = req.body;
+        const { username, password, dealerId, pin } = req.body;
+
+        // Дилеры входят отдельно по коду IFxxx + PIN.
+        if (dealerId) {
+            const code = normalizeDealerCode(dealerId);
+            const dealer = await Dealer.findOne({ dealer_id: code }).select('+accessPinHash');
+
+            if (!dealer || !dealer.accessEnabled || !dealer.accessPinHash) {
+                return res.status(400).json({ error: 'Неверный ID дилера или PIN' });
+            }
+
+            const validPin = await bcrypt.compare(String(pin || ''), dealer.accessPinHash);
+            if (!validPin) return res.status(400).json({ error: 'Неверный ID дилера или PIN' });
+
+            dealer.lastDealerLoginAt = new Date();
+            await dealer.save();
+
+            const dealerPermissions = {
+                can_view_dealers: true,
+                can_view_products: true,
+                can_view_sales: true,
+                can_view_knowledge: true
+            };
+
+            const token = jwt.sign(
+                {
+                    id: 'dealer:' + dealer._id,
+                    role: 'dealer',
+                    dealerId: dealer._id.toString(),
+                    dealerCode: dealer.dealer_id,
+                    permissions: dealerPermissions
+                },
+                JWT_SECRET,
+                { expiresIn: '7d' }
+            );
+
+            return res.json({
+                token,
+                user: {
+                    id: dealer._id,
+                    username: dealer.dealer_id,
+                    fullName: dealer.name,
+                    scope: 'dealer',
+                    dealerId: dealer._id,
+                    dealerCode: dealer.dealer_id,
+                    permissions: dealerPermissions
+                }
+            });
+        }
+
+        // Сотрудники продолжают входить по логину и паролю.
         const user = await User.findOne({ username });
         if (!user) return res.status(400).json({ error: 'Неверный логин' });
         if (user.isBlocked) return res.status(403).json({ error: 'Аккаунт заблокирован' });
@@ -122,17 +183,17 @@ app.post('/api/auth/login', async (req, res) => {
         if (!validPass) return res.status(400).json({ error: 'Неверный пароль' });
 
         const token = jwt.sign(
-            { id: user._id, role: user.scope, permissions: user.permissions }, 
-            JWT_SECRET, 
+            { id: user._id, role: user.scope, permissions: user.permissions },
+            JWT_SECRET,
             { expiresIn: '7d' }
         );
 
-        res.json({ 
-            token, 
-            user: { 
-                id: user._id, username: user.username, fullName: user.fullName, 
-                scope: user.scope, permissions: user.permissions 
-            } 
+        res.json({
+            token,
+            user: {
+                id: user._id, username: user.username, fullName: user.fullName,
+                scope: user.scope, permissions: user.permissions
+            }
         });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -264,8 +325,84 @@ const compRefSchema = new mongoose.Schema({
 });
 const CompRef = mongoose.model('CompRef', compRefSchema);
 
-const dealerSchema = new mongoose.Schema({ dealer_id: String, name: String, price_type: String, city: String, address: String, contacts: [contactSchema], bonuses: String, photos: [photoSchema], organizations: [String], contract: { isSigned: Boolean, date: String }, region_sector: String, hasPersonalPlan: { type: Boolean, default: false }, delivery: String, website: String, instagram: String, additional_addresses: [additionalAddressSchema], pos_materials: [posMaterialSchema], visits: [visitSchema], products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }], latitude: Number, longitude: Number, status: { type: String, default: 'standard' }, avatarUrl: String, competitors: [competitorSchema], responsible: String });
+const dealerSchema = new mongoose.Schema({
+    dealer_id: { type: String, trim: true, uppercase: true, index: true },
+    name: String,
+    price_type: String,
+    city: String,
+    address: String,
+    contacts: [contactSchema],
+    bonuses: String,
+    photos: [photoSchema],
+    organizations: [String],
+    contract: { isSigned: Boolean, date: String },
+    region_sector: String,
+    hasPersonalPlan: { type: Boolean, default: false },
+    delivery: String,
+    website: String,
+    instagram: String,
+    additional_addresses: [additionalAddressSchema],
+    pos_materials: [posMaterialSchema],
+    visits: [visitSchema],
+    products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
+    latitude: Number,
+    longitude: Number,
+    status: { type: String, default: 'standard' },
+    avatarUrl: String,
+    competitors: [competitorSchema],
+    responsible: String,
+    accessEnabled: { type: Boolean, default: false },
+    accessPinHash: { type: String, select: false },
+    lastDealerLoginAt: Date
+});
 const Dealer = mongoose.model('Dealer', dealerSchema);
+
+const counterSchema = new mongoose.Schema({
+    _id: String,
+    seq: { type: Number, default: 0 }
+});
+const Counter = mongoose.model('Counter', counterSchema);
+
+function normalizeDealerCode(value) {
+    return String(value || '').trim().toUpperCase();
+}
+
+function isValidDealerCode(value) {
+    return /^IF\d{3,}$/.test(value);
+}
+
+async function syncDealerCounter() {
+    const dealers = await Dealer.find({ dealer_id: /^IF\d+$/i }).select('dealer_id').lean();
+    const maxNumber = dealers.reduce((max, dealer) => {
+        const match = normalizeDealerCode(dealer.dealer_id).match(/^IF(\d+)$/);
+        return match ? Math.max(max, Number(match[1])) : max;
+    }, 0);
+
+    await Counter.findByIdAndUpdate(
+        'dealer_id',
+        { $max: { seq: maxNumber } },
+        { upsert: true, setDefaultsOnInsert: true }
+    );
+}
+
+async function nextDealerCode() {
+    const counter = await Counter.findByIdAndUpdate(
+        'dealer_id',
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+    return 'IF' + String(counter.seq).padStart(3, '0');
+}
+
+async function bumpDealerCounter(code) {
+    const match = normalizeDealerCode(code).match(/^IF(\d+)$/);
+    if (!match) return;
+    await Counter.findByIdAndUpdate(
+        'dealer_id',
+        { $max: { seq: Number(match[1]) } },
+        { upsert: true, setDefaultsOnInsert: true }
+    );
+}
 
 const salesSchema = new mongoose.Schema({ month: String, group: String, dealerId: String, dealerName: String, plan: Number, fact: Number, isCustom: { type: Boolean, default: false } 
 }, { timestamps: true }); 
@@ -280,20 +417,22 @@ async function connectToDB() {
         console.log('MongoDB Connected'); 
         await seedStatuses(); 
         await seedUsers(); 
-        await seedSectors(); 
+        await seedSectors();
+        await syncDealerCounter(); 
     } catch (e) { console.error(e); }
 }
 
 async function seedStatuses() { const count = await Status.countDocuments(); if (count === 0) { await Status.insertMany([{ value: 'active', label: 'Активный', color: '#198754', isVisible: true, sortOrder: 1 }, { value: 'standard', label: 'Стандарт', color: '#ffc107', isVisible: true, sortOrder: 2 }, { value: 'problem', label: 'Проблемный', color: '#dc3545', isVisible: true, sortOrder: 3 }, { value: 'potential', label: 'Потенциальный', color: '#0d6efd', isVisible: true, sortOrder: 4 }, { value: 'archive', label: 'Архив', color: '#6c757d', isVisible: false, sortOrder: 5 }]); } }
-function convertToClient(doc) { if(!doc) return null; const obj = doc.toObject ? doc.toObject() : doc; obj.id = obj._id; delete obj._id; delete obj.__v; delete obj.password; if(obj.products) obj.products = obj.products.map(p => { if(p){p.id=p._id; delete p._id;} return p;}); if (obj.organization && (!obj.organizations || obj.organizations.length === 0)) { obj.organizations = [obj.organization]; } return obj; }
+function convertToClient(doc) { if(!doc) return null; const obj = doc.toObject ? doc.toObject() : doc; obj.id = obj._id; delete obj._id; delete obj.__v; delete obj.password; delete obj.accessPinHash; if(obj.products) obj.products = obj.products.map(p => { if(p){p.id=p._id; delete p._id;} return p;}); if (obj.organization && (!obj.organizations || obj.organizations.length === 0)) { obj.organizations = [obj.organization]; } return obj; }
 
 function getUserRole(req) { return req.user ? req.user.role : 'guest'; }
-function canWrite(req) { return req.user && req.user.role !== 'guest'; }
+function canWrite(req) { return req.user && req.user.role !== 'guest' && req.user.role !== 'dealer'; }
 const checkWrite = (req, res, next) => { if (canWrite(req)) next(); else res.status(403).json({error:'Read Only'}); };
 
 function getDealerFilter(req) {
     if (!req.user) return { _id: null }; 
-    const role = req.user.role; 
+    const role = req.user.role;
+    if (role === 'dealer') return { _id: req.user.dealerId };
     if (role === 'admin' || role === 'guest' || role === 'all') return {}; 
     if (role === 'astana') return { $or: [{ responsible: 'regional_astana' }, { city: { $regex: /астана/i } }, { city: { $regex: /astana/i } }] };
     if (role === 'regions') return { $or: [{ responsible: 'regional_regions' }, { city: { $not: { $regex: /астана/i } }, responsible: { $ne: 'regional_astana' } }] };
@@ -315,11 +454,76 @@ app.delete('/api/sectors/:id', checkWrite, async (req, res) => { await Sector.fi
 
 app.get('/api/dealers', async (req, res) => { try { let filter = getDealerFilter(req); if (req.query.scope === 'all') { filter = {}; } const dealers = await Dealer.find(filter).select('-photos -visits -products').lean(); res.json(dealers.map(d => ({ id: d._id, ...d, photo_url: d.avatarUrl }))); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.get('/api/dealers/:id', async (req, res) => { try { const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).populate('products'); res.json(convertToClient(d)); } catch (e) { res.status(500).json({ error: e.message }); } });
-app.post('/api/dealers', checkWrite, async (req, res) => { try { const role = getUserRole(req); if (role === 'astana') req.body.responsible = 'regional_astana'; if (role === 'regions') req.body.responsible = 'regional_regions'; const d = new Dealer(req.body); await d.save(); res.status(201).json(convertToClient(d)); } catch (e) { res.status(500).json({ error: e.message }); } });
-app.put('/api/dealers/:id', checkWrite, async (req, res) => { try { await Dealer.findOneAndUpdate({ _id: req.params.id, ...getDealerFilter(req) }, req.body); res.json({status:'ok'}); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.post('/api/dealers', checkWrite, async (req, res) => {
+    try {
+        const role = getUserRole(req);
+        if (role === 'astana') req.body.responsible = 'regional_astana';
+        if (role === 'regions') req.body.responsible = 'regional_regions';
+
+        let dealerCode = normalizeDealerCode(req.body.dealer_id);
+        if (dealerCode) {
+            if (!isValidDealerCode(dealerCode)) return res.status(400).json({ error: 'ID дилера должен быть в формате IF001' });
+            if (await Dealer.exists({ dealer_id: dealerCode })) return res.status(400).json({ error: 'Такой ID дилера уже существует' });
+            await bumpDealerCounter(dealerCode);
+        } else {
+            dealerCode = await nextDealerCode();
+        }
+
+        req.body.dealer_id = dealerCode;
+        const d = new Dealer(req.body);
+        await d.save();
+        res.status(201).json(convertToClient(d));
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.put('/api/dealers/:id', checkWrite, async (req, res) => {
+    try {
+        const dealer = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) });
+        if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
+
+        if (Object.prototype.hasOwnProperty.call(req.body, 'dealer_id')) {
+            const dealerCode = normalizeDealerCode(req.body.dealer_id);
+            if (!isValidDealerCode(dealerCode)) return res.status(400).json({ error: 'ID дилера должен быть в формате IF001' });
+            const duplicate = await Dealer.exists({ dealer_id: dealerCode, _id: { $ne: dealer._id } });
+            if (duplicate) return res.status(400).json({ error: 'Такой ID дилера уже существует' });
+            req.body.dealer_id = dealerCode;
+            await bumpDealerCounter(dealerCode);
+        }
+
+        await Dealer.findByIdAndUpdate(dealer._id, req.body);
+        res.json({status:'ok'});
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
 app.delete('/api/dealers/:id', checkWrite, async (req, res) => { try { await Dealer.findOneAndDelete({ _id: req.params.id, ...getDealerFilter(req) }); res.json({status:'deleted'}); } catch (e) { res.status(500).json({ error: e.message }); } });
-app.get('/api/dealers/:id/products', async (req, res) => { const d = await Dealer.findById(req.params.id).populate('products'); res.json(d.products.map(convertToClient)); });
-app.put('/api/dealers/:id/products', async (req, res) => { await Dealer.findByIdAndUpdate(req.params.id, { products: req.body.productIds }); res.json({status:'ok'}); });
+app.put('/api/admin/dealers/:id/access', requireAdmin, async (req, res) => {
+    try {
+        const dealer = await Dealer.findById(req.params.id).select('+accessPinHash');
+        if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
+
+        const enabled = Boolean(req.body.enabled);
+        const pin = String(req.body.pin || '').trim();
+
+        if (pin) {
+            if (!/^\d{4,8}$/.test(pin)) return res.status(400).json({ error: 'PIN должен содержать от 4 до 8 цифр' });
+            dealer.accessPinHash = await bcrypt.hash(pin, 10);
+        }
+        if (enabled && !dealer.accessPinHash) return res.status(400).json({ error: 'Сначала задайте PIN дилера' });
+
+        dealer.accessEnabled = enabled;
+        await dealer.save();
+        res.json({ status: 'ok', dealer_id: dealer.dealer_id, accessEnabled: dealer.accessEnabled });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/dealers/:id/products', async (req, res) => {
+    const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).populate('products');
+    if (!d) return res.status(404).json({ error: 'Дилер не найден' });
+    res.json(d.products.map(convertToClient));
+});
+app.put('/api/dealers/:id/products', checkWrite, async (req, res) => {
+    const d = await Dealer.findOneAndUpdate({ _id: req.params.id, ...getDealerFilter(req) }, { products: req.body.productIds });
+    if (!d) return res.status(404).json({ error: 'Дилер не найден' });
+    res.json({status:'ok'});
+});
 app.get('/api/products', async (req, res) => { const s = new RegExp(req.query.search||'', 'i'); const p = await Product.find({$or:[{sku:s},{name:s}]}).sort({sku:1}).lean(); res.json(p.map(x=>{x.id=x._id;return x;})); });
 app.post('/api/products', checkWrite, async (req, res) => { const p = new Product(req.body); await p.save(); res.json(convertToClient(p)); });
 app.put('/api/products/:id', checkWrite, async (req, res) => { const p = await Product.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(p)); });
@@ -327,7 +531,13 @@ app.delete('/api/products/:id', checkWrite, async (req, res) => { await Product.
 app.post('/api/admin/import-catalog', async (req, res) => { if(getUserRole(req) !== 'admin') return res.status(403).json({error:'Admin only'}); res.json({status: 'ok'}); });
 app.get('/api/matrix', async (req, res) => { try { const prods = await Product.find().sort({sku:1}).lean(); const dealers = await Dealer.find(getDealerFilter(req)).lean(); const map = new Map(); dealers.forEach(d => map.set(d._id.toString(), new Set(d.products.map(String)))); const posList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"]; const matrix = prods.map(p => ({ sku: p.sku, name: p.name, type: 'product', dealers: dealers.map(d => ({ value: map.get(d._id.toString()).has(p._id.toString()) ? 1 : 0, is_pos: false })) })); posList.forEach(pn => { matrix.push({ sku: "POS", name: pn, type: 'pos', dealers: dealers.map(d => ({ value: (d.pos_materials||[]).find(m=>m.name===pn)?.quantity||0, is_pos: true })) }); }); res.json({ headers: dealers.map(d=>({id:d._id, name:d.name, city:d.city, responsible:d.responsible})), matrix }); } catch (e) { res.status(500).json({error:e.message}); } });
 
-app.get('/api/sales', async (req, res) => { const {month} = req.query; const s = await Sales.find(month ? {month} : {}).lean(); res.json(s); });
+app.get('/api/sales', async (req, res) => {
+    const {month} = req.query;
+    const filter = month ? {month} : {};
+    if (getUserRole(req) === 'dealer') filter.dealerId = req.user.dealerId;
+    const s = await Sales.find(filter).lean();
+    res.json(s);
+});
 
 // ===== ИСПРАВЛЕННЫЙ БЛОК: СОХРАНЕНИЕ, АГРЕГАЦИЯ И УДАЛЕНИЕ =====
 app.post('/api/sales', checkWrite, async (req, res) => {
@@ -466,7 +676,9 @@ const Reclamation = mongoose.model('Reclamation', reclamationSchema);
 
 app.get('/api/reclamations', async (req, res) => {
     try { 
-        const list = await Reclamation.find().sort({createdAt: -1}); 
+        const filter = {};
+        if (getUserRole(req) === 'dealer') filter.dealerId = req.user.dealerId;
+        const list = await Reclamation.find(filter).sort({createdAt: -1}); 
         res.json(list.map(convertToClient)); 
     } catch(e) { res.status(500).json({error: e.message}); }
 });
