@@ -136,7 +136,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const inpReserve = document.getElementById('comp_reserve');
     const inpWebsite = document.getElementById('comp_website');      
     const inpInstagram = document.getElementById('comp_instagram'); 
-    const inpAddress = document.getElementById('comp_address'); // Если вдруг остался старый ID
     
     // Логотип
     const inpLogoFile = document.getElementById('comp_logo_input');
