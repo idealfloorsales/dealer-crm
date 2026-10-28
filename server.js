@@ -225,11 +225,14 @@ app.get('/api/admin/users', requireAdmin, async (req, res) => {
 app.post('/api/admin/users', requireAdmin, async (req, res) => {
     try {
         const { username, password, fullName, role, scope, permissions } = req.body;
-        const exists = await User.findOne({ username });
+        if (!username || !String(username).trim()) return res.status(400).json({ error: 'Укажите логин' });
+        if (!password || String(password).length < 6) return res.status(400).json({ error: 'Пароль должен быть не короче 6 символов' });
+        const normalizedUsername = String(username).trim().toLowerCase();
+        const exists = await User.findOne({ username: normalizedUsername });
         if (exists) return res.status(400).json({ error: 'Логин уже занят' });
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
-        const newUser = new User({ username, password: hashedPassword, fullName, role: role || 'manager', scope, permissions });
+        const newUser = new User({ username: normalizedUsername, password: hashedPassword, fullName, role: role || 'manager', scope, permissions });
         await newUser.save();
         res.json({ status: 'ok' });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -237,9 +240,18 @@ app.post('/api/admin/users', requireAdmin, async (req, res) => {
 
 app.put('/api/admin/users/:id', requireAdmin, async (req, res) => {
     try {
-        const { fullName, role, scope, permissions, isBlocked, password } = req.body;
+        const { username, fullName, role, scope, permissions, isBlocked, password } = req.body;
         const updateData = { fullName, role: role || 'manager', scope, permissions, isBlocked };
+
+        if (username && String(username).trim()) {
+            const normalizedUsername = String(username).trim().toLowerCase();
+            const duplicate = await User.exists({ username: normalizedUsername, _id: { $ne: req.params.id } });
+            if (duplicate) return res.status(400).json({ error: 'Логин уже занят' });
+            updateData.username = normalizedUsername;
+        }
+
         if (password && password.trim() !== "") {
+            if (password.length < 6) return res.status(400).json({ error: 'Пароль должен быть не короче 6 символов' });
             const salt = await bcrypt.genSalt(10);
             updateData.password = await bcrypt.hash(password, salt);
         }
