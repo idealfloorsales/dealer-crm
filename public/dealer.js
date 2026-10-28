@@ -78,7 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return n.toLocaleString('ru-RU', { maximumFractionDigits: 1 });
     }
 
-    async function loadDealerSales() {
+    async function loadDealerSales(dealer) {
         if (!can('can_view_sales')) return [];
         try {
             const res = await fetch(API_SALES_URL);
@@ -89,7 +89,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             return rows.filter(s => {
                 const rowDealerId = String(s.dealerId || '');
-                return rowDealerId === dealerKey || rowDealerId === personalPlanKey;
+                if (rowDealerId === dealerKey) return true;
+                return dealer?.hasPersonalPlan === true && rowDealerId === personalPlanKey;
             });
         } catch (e) {
             console.warn('Не удалось загрузить продажи дилера', e);
@@ -101,8 +102,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const canViewSales = can('can_view_sales');
         const month = new Date().toISOString().slice(0, 7);
         const monthRows = canViewSales ? salesRows.filter(s => s.month === month) : [];
-        const fact = monthRows.reduce((sum, row) => sum + (Number(row.fact) || 0), 0);
-        const plan = monthRows.reduce((sum, row) => sum + (Number(row.plan) || 0), 0);
+        const totals = window.CRMScore && CRMScore.getSalesTotals
+            ? CRMScore.getSalesTotals(monthRows)
+            : {
+                fact: monthRows.reduce((sum, row) => sum + (Number(row.fact) || 0), 0),
+                plan: monthRows.reduce((sum, row) => sum + (Number(row.plan) || 0), 0)
+            };
+        const { fact, plan } = totals;
 
         const score = window.CRMScore
             ? CRMScore.calculateDealerScore({
@@ -176,7 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!dealerRes.ok) throw new Error(`Дилер не найден.`);
             const dealer = await dealerRes.json();
             currentDealerName = dealer.name;
-            currentDealerSales = await loadDealerSales();
+            currentDealerSales = await loadDealerSales(dealer);
 
             const productsRes = await fetch(API_PRODUCTS_URL);
             const allProducts = await productsRes.json();
