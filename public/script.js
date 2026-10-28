@@ -458,11 +458,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 list.innerHTML = `
                     <div class="form-check form-switch mb-3">
                         <input class="form-check-input" type="checkbox" id="set-showPulse" ${dashConfig.showPulse ? 'checked' : ''}>
-                        <label class="form-check-label" for="set-showPulse">Пульс бизнеса</label>
+                        <label class="form-check-label" for="set-showPulse">Продажи</label>
                     </div>
                     <div class="form-check form-switch mb-3">
                         <input class="form-check-input" type="checkbox" id="set-showAttention" ${dashConfig.showAttention ? 'checked' : ''}>
-                        <label class="form-check-label" for="set-showAttention">Требует внимания</label>
+                        <label class="form-check-label" for="set-showAttention">Требуют внимания</label>
                     </div>
                     <div class="form-check form-switch mb-3">
                         <input class="form-check-input" type="checkbox" id="set-showPlan" ${dashConfig.showPlan ? 'checked' : ''}>
@@ -757,19 +757,19 @@ document.addEventListener('DOMContentLoaded', () => {
         dashboardStats.innerHTML = `
             <div class="cc-kpi-card">
                 <span class="cc-kpi-icon"><i class="bi bi-buildings"></i></span>
-                <div class="cc-kpi-label">Дилеров в сети</div>
+                <div class="cc-kpi-label">Всего дилеров</div>
                 <div class="cc-kpi-value">${network.length}</div>
                 <div class="cc-kpi-foot">${activeCount} с продажами в этом месяце</div>
             </div>
             <div class="cc-kpi-card is-good">
                 <span class="cc-kpi-icon"><i class="bi bi-activity"></i></span>
-                <div class="cc-kpi-label">Dealer Health</div>
+                <div class="cc-kpi-label">Состояние дилеров</div>
                 <div class="cc-kpi-value">${avgHealth}<span style="font-size:.85rem;color:#9a9ca1"> / 100</span></div>
-                <div class="cc-kpi-foot">Средний индекс сети</div>
+                <div class="cc-kpi-foot">Средняя оценка</div>
             </div>
             <div class="cc-kpi-card">
                 <span class="cc-kpi-icon"><i class="bi bi-graph-up-arrow"></i></span>
-                <div class="cc-kpi-label">Продажи месяца</div>
+                <div class="cc-kpi-label">Продажи за месяц</div>
                 <div class="cc-kpi-value">${formatCompactNumber(currentFact)}</div>
                 <div class="cc-kpi-foot">м² · факт</div>
             </div>
@@ -781,9 +781,9 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
             <div class="cc-kpi-card is-alert">
                 <span class="cc-kpi-icon"><i class="bi bi-exclamation-triangle"></i></span>
-                <div class="cc-kpi-label">Требуют внимания</div>
+                <div class="cc-kpi-label">Проблемные дилеры</div>
                 <div class="cc-kpi-value">${problemCount}</div>
-                <div class="cc-kpi-foot">Проблемный статус или низкий health</div>
+                <div class="cc-kpi-foot">Нужна проверка или визит</div>
             </div>`;
 
         const user = window.CRMAuth?.user || {};
@@ -1062,7 +1062,7 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
             const salesBadge = `<span class="badge ${salesColorClass} rounded-pill ms-2" title="Продажи за текущий месяц">${salesFact.toFixed(2)} м²</span>`;
             const health = getDealerHealth(d);
             const healthHtml = `<div class="dealer-health-wrap">
-                <div class="dealer-health-top"><span>Dealer Health</span><strong>${health.score}</strong></div>
+                <div class="dealer-health-top"><span>Состояние</span><strong>${health.score}</strong></div>
                 <div class="dealer-health-bar ${health.level}"><span style="width:${health.score}%"></span></div>
             </div>`;
 
