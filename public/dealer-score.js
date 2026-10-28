@@ -129,13 +129,20 @@
         else if (score >= 60) { level = 'normal'; label = 'Нормально'; }
         else if (score >= 40) { level = 'attention'; label = 'Требует внимания'; }
 
+        const reasons = Object.values(breakdown)
+            .filter(part => part.max > 0 && (part.score / part.max) < 0.6)
+            .sort((a, b) => (a.score / a.max) - (b.score / b.max))
+            .map(part => part.note)
+            .filter(Boolean);
+
         return {
             score,
             level,
             label,
             rawScore,
             availableMax,
-            breakdown
+            breakdown,
+            reasons
         };
     }
 
