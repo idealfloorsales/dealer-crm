@@ -495,9 +495,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? 'Регионы'
                 : 'Вся компания';
         const rootFact = currentScope === 'astana'
-            ? totalAstanaFact + totalVipFact + totalOtherFact
+            ? totalAstanaFact
             : currentScope === 'regions'
-                ? totalRegionsFact + totalVipFact + totalOtherFact
+                ? totalRegionsFact
                 : totalFactAll;
 
         let summaryHtml = '';
