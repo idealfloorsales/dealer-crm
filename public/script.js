@@ -1180,7 +1180,42 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
     }
     function updateBrandsDatalist() { if (!brandsDatalist) return; let html = ''; competitorsRef.forEach(ref => { html += `<option value="${ref.name}">`; }); brandsDatalist.innerHTML = html; }
     function updatePosDatalist() { if (!posDatalist) return; let html = ''; posMaterialsList.forEach(s => { html += `<option value="${s}">`; }); posDatalist.innerHTML = html; }
-    function populateFilters(dealers) { if(!filterCity || !filterPriceType) return; const cities = [...new Set(dealers.map(d => d.city).filter(Boolean))].sort(); const types = [...new Set(dealers.map(d => d.price_type).filter(Boolean))].sort(); const sectors = [...new Set(dealers.map(d => d.region_sector).filter(Boolean))].sort(); const sc = filterCity.value; const st = filterPriceType.value; filterCity.innerHTML = '<option value="">Город</option>'; filterPriceType.innerHTML = '<option value="">Тип цен</option>'; cities.forEach(c => filterCity.add(new Option(c, c))); types.forEach(t => filterPriceType.add(new Option(t, t))); filterCity.value = sc; filterPriceType.value = st; const fs = document.getElementById('filter-sector'); if(fs) { const currSec = fs.value; fs.innerHTML = '<option value="">Сектор</option>'; sectors.forEach(s => fs.add(new Option(s, s))); fs.value = currSec; } }
+    function populateFilters(dealers) {
+        if(!filterCity || !filterPriceType) return;
+
+        const uniqueNormalized = (values) => {
+            const map = new Map();
+            values.forEach(value => {
+                const clean = normalizeDisplayValue(value);
+                if (!clean) return;
+                const key = clean.toLocaleLowerCase('ru-RU');
+                if (!map.has(key)) map.set(key, clean);
+            });
+            return [...map.values()].sort((a,b) => a.localeCompare(b, 'ru'));
+        };
+
+        const cities = uniqueNormalized(dealers.map(d => d.city));
+        const types = uniqueNormalized(dealers.map(d => d.price_type));
+        const sectors = uniqueNormalized(dealers.map(d => d.region_sector));
+
+        const sc = normalizeDisplayValue(filterCity.value);
+        const st = normalizeDisplayValue(filterPriceType.value);
+
+        filterCity.innerHTML = '<option value="">Все города</option>';
+        filterPriceType.innerHTML = '<option value="">Все типы цен</option>';
+        cities.forEach(c => filterCity.add(new Option(c, c)));
+        types.forEach(t => filterPriceType.add(new Option(t, t)));
+        if (cities.includes(sc)) filterCity.value = sc;
+        if (types.includes(st)) filterPriceType.value = st;
+
+        const fs = document.getElementById('filter-sector');
+        if(fs) {
+            const currSec = normalizeDisplayValue(fs.value);
+            fs.innerHTML = '<option value="">Все сектора</option>';
+            sectors.forEach(s => fs.add(new Option(s, s)));
+            if (sectors.includes(currSec)) fs.value = currSec;
+        }
+    }
     async function saveProducts(dealerId, ids) {
         if (!window.CRMAuth || !CRMAuth.can('can_edit_matrix')) return;
         const response = await fetch(`${API_DEALERS_URL}/${dealerId}/products`, {
@@ -1587,16 +1622,19 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
                 isVisible = d.status === status;
             }
 
+            const normalizedCity = normalizeDisplayValue(d.city);
+            const normalizedType = normalizeDisplayValue(d.price_type);
+            const normalizedSector = normalizeDisplayValue(d.region_sector);
             const searchable = [
-                d.name, d.dealer_id, d.city, d.address, d.region_sector, d.price_type,
+                d.name, d.dealer_id, normalizedCity, d.address, normalizedSector, normalizedType,
                 responsibleLabel(d.responsible)
             ].filter(Boolean).join(' ').toLowerCase();
 
             return isVisible &&
-                (!city || d.city === city) &&
-                (!type || d.price_type === type) &&
+                (!city || normalizedCity === city) &&
+                (!type || normalizedType === type) &&
                 (!responsible || d.responsible === responsible) &&
-                (!sector || d.region_sector === sector) &&
+                (!sector || normalizedSector === sector) &&
                 (!search || searchable.includes(search));
         });
 
@@ -1667,36 +1705,44 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
                 color: '#72747a'
             };
 
-            let phoneBtn = '';
-            let waBtn = '';
+            const secondaryActions = [];
             if (Array.isArray(d.contacts) && d.contacts.length) {
                 const phone = d.contacts.find(contact => contact?.contactInfo)?.contactInfo || '';
                 const cleanPhone = phone.replace(/[^0-9]/g, '');
                 if (cleanPhone.length >= 10) {
-                    phoneBtn = `<a href="tel:+${cleanPhone}" class="dealer-v3-action is-phone" onclick="event.stopPropagation()" title="Позвонить"><i class="bi bi-telephone"></i></a>`;
-                    waBtn = `<a href="https://wa.me/${cleanPhone}" target="_blank" rel="noopener" class="dealer-v3-action is-whatsapp" onclick="event.stopPropagation()" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>`;
+                    secondaryActions.push(`<a class="dealer-v3-menu-item" href="tel:+${cleanPhone}"><i class="bi bi-telephone"></i><span>Позвонить</span></a>`);
+                    secondaryActions.push(`<a class="dealer-v3-menu-item is-whatsapp" href="https://wa.me/${cleanPhone}" target="_blank" rel="noopener"><i class="bi bi-whatsapp"></i><span>WhatsApp</span></a>`);
                 }
             }
 
-            const mapBtn = d.latitude && d.longitude
-                ? `<a href="https://yandex.kz/maps/?pt=${encodeURIComponent(d.longitude)},${encodeURIComponent(d.latitude)}&z=17&l=map" target="_blank" rel="noopener" class="dealer-v3-action" onclick="event.stopPropagation()" title="Маршрут"><i class="bi bi-geo-alt"></i></a>`
-                : '';
+            if (d.latitude && d.longitude) {
+                secondaryActions.push(`<a class="dealer-v3-menu-item" href="https://yandex.kz/maps/?pt=${encodeURIComponent(d.longitude)},${encodeURIComponent(d.latitude)}&z=17&l=map" target="_blank" rel="noopener"><i class="bi bi-geo-alt"></i><span>Открыть на карте</span></a>`);
+            }
 
-            let instaBtn = '';
             if (d.instagram) {
                 let url = String(d.instagram).trim();
                 if (!/^https?:\/\//i.test(url)) url = 'https://instagram.com/' + url.replace(/^@/, '');
-                instaBtn = `<a href="${safeAttr(url)}" target="_blank" rel="noopener" class="dealer-v3-action" onclick="event.stopPropagation()" title="Instagram"><i class="bi bi-instagram"></i></a>`;
+                secondaryActions.push(`<a class="dealer-v3-menu-item" href="${safeAttr(url)}" target="_blank" rel="noopener"><i class="bi bi-instagram"></i><span>Instagram</span></a>`);
             }
 
+            if (canEdit) {
+                secondaryActions.push(`<button class="dealer-v3-menu-item" type="button" onclick="openEditModal('${safeAttr(d.id)}')"><i class="bi bi-pencil"></i><span>Редактировать</span></button>`);
+            }
+
+            const moreMenu = secondaryActions.length
+                ? `<div class="dropdown dealer-v3-more" onclick="event.stopPropagation()">
+                    <button class="dealer-v3-more-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Ещё">
+                        <i class="bi bi-three-dots"></i>
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end dealer-v3-menu">${secondaryActions.join('')}</div>
+                </div>`
+                : '';
+
             const quickVisitBtn = (window.CRMAuth && CRMAuth.can('can_manage_visits'))
-                ? `<button class="dealer-v3-action is-visit" type="button" onclick="event.stopPropagation(); showQuickVisit('${safeAttr(d.id)}')" title="Быстрый визит"><i class="bi bi-journal-check"></i></button>`
+                ? `<button class="dealer-v3-primary-action is-visit" type="button" onclick="event.stopPropagation(); showQuickVisit('${safeAttr(d.id)}')"><i class="bi bi-journal-check"></i><span>Визит</span></button>`
                 : '';
             const routeActive = dealerRouteIds.includes(String(d.id));
-            const routeToggleBtn = `<button class="dealer-route-toggle ${routeActive ? 'active' : ''}" type="button" data-route-toggle="${safeAttr(d.id)}" aria-pressed="${routeActive ? 'true' : 'false'}" onclick="event.stopPropagation(); toggleDealerRoute('${safeAttr(d.id)}')"><i class="bi bi-${routeActive ? 'check2' : 'plus-lg'}"></i><span>${routeActive ? 'В маршруте' : 'В маршрут'}</span></button>`;
-            const editBtn = canEdit
-                ? `<button class="dealer-v3-action" type="button" onclick="event.stopPropagation(); openEditModal('${safeAttr(d.id)}')" title="Редактировать"><i class="bi bi-pencil"></i></button>`
-                : '';
+            const routeToggleBtn = `<button class="dealer-v3-primary-action is-route ${routeActive ? 'active' : ''}" type="button" data-route-toggle="${safeAttr(d.id)}" aria-pressed="${routeActive ? 'true' : 'false'}" onclick="event.stopPropagation(); toggleDealerRoute('${safeAttr(d.id)}')"><i class="bi bi-${routeActive ? 'check2' : 'plus-lg'}"></i><span>${routeActive ? 'В маршруте' : 'В маршрут'}</span></button>`;
 
             const visit = formatDealerVisit(metrics);
             let planValue = 'Без плана';
@@ -1719,7 +1765,7 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
 
             const infoChips = dealerInfoChips(d);
             const infoHtml = infoChips.length
-                ? infoChips.map(item => `<span class="dealer-v3-info"><i class="bi bi-${item.icon}"></i><b>${safeText(item.label)}</b><span>${safeText(item.value)}</span></span>`).join('')
+                ? infoChips.map(item => `<span class="dealer-v3-info" title="${safeAttr(item.label + ': ' + item.value)}"><i class="bi bi-${item.icon}"></i><span>${safeText(item.value)}</span></span>`).join('')
                 : '<span class="dealer-v3-info is-muted"><i class="bi bi-info-circle"></i><span>Основные данные не заполнены</span></span>';
 
             const signals = metrics.signals.slice(0, 2);
@@ -1789,8 +1835,8 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
                 <div class="dealer-v3-bottom">
                     <div class="dealer-v3-signals">${signalsHtml}</div>
                     <div class="dealer-v3-actions">
-                        ${routeToggleBtn}${quickVisitBtn}${waBtn}${phoneBtn}${mapBtn}${instaBtn}${editBtn}
-                        <a href="dealer.html?id=${encodeURIComponent(d.id)}" class="dealer-v3-open" onclick="event.stopPropagation()">Открыть карточку <i class="bi bi-arrow-right"></i></a>
+                        ${routeToggleBtn}${quickVisitBtn}${moreMenu}
+                        <a href="dealer.html?id=${encodeURIComponent(d.id)}" class="dealer-v3-open" onclick="event.stopPropagation()">Карточка <i class="bi bi-arrow-right"></i></a>
                     </div>
                 </div>
             </article>`;
