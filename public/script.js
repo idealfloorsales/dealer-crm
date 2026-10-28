@@ -1144,6 +1144,23 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
     function renderDealerList() {
         if (!dealerGrid) return;
 
+        const canViewSalesForList = Boolean(window.CRMAuth && CRMAuth.can('can_view_sales'));
+        const canViewVisitsForList = Boolean(window.CRMAuth && CRMAuth.can('can_view_dashboard'));
+        const salesQuick = dealerQuickFilters?.querySelector('[data-filter="sales"]');
+        const planQuick = dealerQuickFilters?.querySelector('[data-filter="plan"]');
+        const visitQuick = dealerQuickFilters?.querySelector('[data-filter="visit"]');
+        if (salesQuick) salesQuick.style.display = canViewSalesForList ? '' : 'none';
+        if (planQuick) planQuick.style.display = canViewSalesForList ? '' : 'none';
+        if (visitQuick) visitQuick.style.display = canViewVisitsForList ? '' : 'none';
+
+        if ((!canViewSalesForList && ['sales','plan'].includes(dealerQuickFilter)) ||
+            (!canViewVisitsForList && dealerQuickFilter === 'visit')) {
+            dealerQuickFilter = 'all';
+            dealerQuickFilters?.querySelectorAll('.dealer-quick-filter').forEach(el => {
+                el.classList.toggle('active', el.dataset.filter === 'all');
+            });
+        }
+
         const city = filterCity?.value || '';
         const type = filterPriceType?.value || '';
         const status = filterStatus?.value || '';
