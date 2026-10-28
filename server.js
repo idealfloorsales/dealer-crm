@@ -460,7 +460,39 @@ app.delete('/api/products/:id', requirePermission('can_manage_products'), async 
 app.post('/api/admin/import-catalog', requirePermission('can_manage_products'), async (req, res) => { res.json({status: 'ok'}); });
 app.get('/api/matrix', requireAnyPermission('can_view_products', 'can_view_report'), async (req, res) => { try { const prods = await Product.find().sort({sku:1}).lean(); const dealers = await Dealer.find(getDealerFilter(req)).lean(); const map = new Map(); dealers.forEach(d => map.set(d._id.toString(), new Set(d.products.map(String)))); const posList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"]; const matrix = prods.map(p => ({ sku: p.sku, name: p.name, type: 'product', dealers: dealers.map(d => ({ value: map.get(d._id.toString()).has(p._id.toString()) ? 1 : 0, is_pos: false })) })); posList.forEach(pn => { matrix.push({ sku: "POS", name: pn, type: 'pos', dealers: dealers.map(d => ({ value: (d.pos_materials||[]).find(m=>m.name===pn)?.quantity||0, is_pos: true })) }); }); res.json({ headers: dealers.map(d=>({id:d._id, name:d.name, city:d.city, responsible:d.responsible})), matrix }); } catch (e) { res.status(500).json({error:e.message}); } });
 
-app.get('/api/sales', requirePermission('can_view_sales'), async (req, res) => { const {month} = req.query; const s = await Sales.find(month ? {month} : {}).lean(); res.json(s); });
+app.get('/api/sales', requirePermission('can_view_sales'), async (req, res) => {
+    try {
+        const { month } = req.query;
+        let filter = month ? { month } : {};
+        const scope = getUserScope(req);
+
+        if (scope !== 'all') {
+            const dealers = await Dealer.find(getDealerFilter(req)).select('_id').lean();
+            const dealerIds = dealers.map(d => String(d._id));
+
+            const sectorType = scope === 'astana' ? 'astana' : 'region';
+            const sectors = await Sector.find({ type: sectorType }).select('name').lean();
+            const groups = sectors.map(s => s.name);
+
+            filter = {
+                $and: [
+                    filter,
+                    {
+                        $or: [
+                            { isCustom: { $ne: true }, dealerId: { $in: dealerIds } },
+                            { isCustom: true, group: { $in: groups } }
+                        ]
+                    }
+                ]
+            };
+        }
+
+        const s = await Sales.find(filter).lean();
+        res.json(s);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
 
 // ===== ИСПРАВЛЕННЫЙ БЛОК: СОХРАНЕНИЕ, АГРЕГАЦИЯ И УДАЛЕНИЕ =====
 app.post('/api/sales', async (req, res) => {
