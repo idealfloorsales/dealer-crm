@@ -144,7 +144,7 @@
                                     </div>
                                     <div class="col-md-6">
                                         <label class="form-label small fw-bold text-muted">Пароль</label>
-                                        <input type="text" id="u_password" class="form-control" placeholder="Оставьте пустым, если не меняете">
+                                        <input type="password" id="u_password" class="form-control" minlength="6" placeholder="Оставьте пустым, если не меняете">
                                     </div>
                                     <div class="col-md-6">
                                         <label class="form-label small fw-bold text-muted">Роль</label>
@@ -393,6 +393,9 @@
             document.getElementById('userForm').reset();
             document.getElementById('u_id').value = '';
             document.getElementById('modalTitle').innerText = 'Новый сотрудник';
+            document.getElementById('u_password').required = true;
+            document.getElementById('u_role').value = 'manager';
+            document.getElementById('u_scope').value = 'all';
             document.querySelectorAll('.perm-check').forEach(cb => cb.checked = false);
             
             // Базовые права по умолчанию
@@ -410,6 +413,7 @@
             document.getElementById('u_fullName').value = u.fullName || '';
             document.getElementById('u_username').value = u.username;
             document.getElementById('u_password').value = '';
+            document.getElementById('u_password').required = false;
             document.getElementById('u_role').value = u.role || 'manager';
             document.getElementById('u_scope').value = u.scope;
             document.getElementById('u_isBlocked').checked = u.isBlocked;
@@ -464,7 +468,10 @@
                     body: JSON.stringify(data)
                 });
                 
-                if(!res.ok) throw new Error('Ошибка сохранения');
+                if(!res.ok) {
+                    const result = await res.json().catch(() => ({}));
+                    throw new Error(result.error || 'Ошибка сохранения');
+                }
                 
                 modal.hide();
                 loadUsers();
