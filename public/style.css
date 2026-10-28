@@ -5262,3 +5262,176 @@ body.bg-light {
         padding: 0 11px;
     }
 }
+
+
+/* =========================================================
+   DEALER MODALS — HEADER / LAYOUT STABILITY
+   ========================================================= */
+.dealer-form-modal .modal-dialog {
+    height: min(860px, calc(100vh - 32px));
+    max-height: calc(100vh - 32px);
+}
+
+.dealer-form-modal .dealer-form-content {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    max-height: 100%;
+    min-height: 0;
+}
+
+.dealer-form-modal .dealer-modal-header {
+    flex: 0 0 auto;
+    min-height: 116px;
+    box-sizing: border-box;
+}
+
+.dealer-form-modal .dealer-modal-header > div:first-child {
+    min-width: 0;
+    max-width: calc(100% - 58px);
+    padding-right: 10px;
+}
+
+.dealer-form-modal .dealer-modal-header .btn-close {
+    position: relative;
+    flex: 0 0 auto;
+    width: 34px;
+    height: 34px;
+    margin: 0;
+    padding: 8px;
+    border-radius: 10px;
+    background-color: rgba(255,255,255,.08);
+    opacity: .82;
+}
+
+.dealer-form-modal .dealer-modal-header .btn-close:hover {
+    background-color: rgba(255,255,255,.14);
+    opacity: 1;
+}
+
+.dealer-form-modal .dealer-modal-header .modal-title,
+.dealer-form-modal .dealer-modal-header p,
+.dealer-form-modal .dealer-modal-kicker {
+    position: relative;
+    max-width: 100%;
+    overflow-wrap: break-word;
+    word-break: normal;
+}
+
+.dealer-form-modal .dealer-modal-header p {
+    line-height: 1.45;
+}
+
+.dealer-form-modal .dealer-wizard-nav,
+.dealer-form-modal .dealer-edit-nav-wrap,
+.dealer-form-modal .dealer-modal-footer {
+    flex: 0 0 auto;
+}
+
+.dealer-form-modal .dealer-modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.dealer-form-modal .dealer-wizard-nav {
+    min-height: 63px;
+}
+
+.dealer-form-modal .dealer-wizard-step-label {
+    overflow: hidden;
+}
+
+.dealer-form-modal .dealer-wizard-step-label > div {
+    min-width: 0;
+    overflow: hidden;
+}
+
+.dealer-form-modal .dealer-wizard-step-label strong,
+.dealer-form-modal .dealer-wizard-step-label small {
+    max-width: 100%;
+}
+
+.dealer-form-modal .dealer-edit-nav-wrap {
+    min-height: 62px;
+    display: flex;
+    align-items: center;
+}
+
+.dealer-form-modal .dealer-edit-nav {
+    width: 100%;
+}
+
+@media (max-width: 1100px) {
+    .dealer-form-modal .dealer-wizard-step-label small {
+        display: none;
+    }
+
+    .dealer-form-modal .dealer-wizard-step-label {
+        gap: 7px;
+        padding-left: 8px;
+        padding-right: 8px;
+    }
+}
+
+@media (max-width: 767px) {
+    .dealer-form-modal .modal-dialog {
+        height: calc(100dvh - 16px);
+        max-height: calc(100dvh - 16px);
+        margin: 8px;
+        max-width: calc(100% - 16px);
+    }
+
+    .dealer-form-modal .dealer-modal-header {
+        min-height: 104px;
+        padding: 17px 16px 15px;
+    }
+
+    .dealer-form-modal .dealer-modal-header > div:first-child {
+        max-width: calc(100% - 48px);
+        padding-right: 4px;
+    }
+
+    .dealer-form-modal .dealer-modal-header .btn-close {
+        width: 32px;
+        height: 32px;
+        padding: 7px;
+    }
+
+    .dealer-form-modal .dealer-modal-header p {
+        margin-top: 5px;
+        line-height: 1.35;
+    }
+
+    .dealer-form-modal .dealer-wizard-nav,
+    .dealer-form-modal .dealer-edit-nav-wrap {
+        min-height: 52px;
+    }
+}
+
+@media (max-width: 480px) {
+    .dealer-form-modal .dealer-modal-header {
+        min-height: 88px;
+    }
+
+    .dealer-form-modal .dealer-modal-header p {
+        display: none;
+    }
+
+    .dealer-form-modal .dealer-modal-kicker {
+        margin-bottom: 3px;
+        font-size: .56rem;
+    }
+
+    .dealer-form-modal .dealer-modal-header .modal-title {
+        font-size: 1.15rem;
+        line-height: 1.18;
+    }
+
+    .dealer-form-modal .dealer-wizard-nav {
+        min-height: 48px;
+    }
+}
