@@ -6152,3 +6152,71 @@ body.bg-light {
         margin-left: 0;
     }
 }
+
+
+.dealer-filter-toggle {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 40px;
+    padding: 0 11px;
+    border: 1px solid rgba(23,24,27,.08);
+    border-radius: 11px;
+    background: #fff;
+    color: #74767c;
+    font: 650 .65rem 'Onest', sans-serif;
+}
+
+.dealer-filter-toggle.active {
+    border-color: rgba(185,4,10,.18);
+    background: #fff2f2;
+    color: #b9040a;
+}
+
+@media (max-width: 767px) {
+    .dealer-filter-toggle {
+        display: inline-flex;
+    }
+
+    .dealer-toolbar-main {
+        grid-template-columns: 1fr auto;
+    }
+
+    .dealer-search-field,
+    .dealer-quick-filters {
+        grid-column: 1 / -1;
+    }
+
+    .dealer-sort-select {
+        min-width: 0;
+    }
+
+    .dealer-toolbar-filters {
+        display: none;
+        grid-template-columns: 1fr 1fr;
+        margin-top: 7px;
+    }
+
+    .dealer-list-toolbar.filters-open .dealer-toolbar-filters {
+        display: grid;
+    }
+}
+
+@media (max-width: 480px) {
+    .dealer-toolbar-main {
+        grid-template-columns: 1fr;
+    }
+
+    .dealer-filter-toggle {
+        width: 100%;
+    }
+
+    .dealer-toolbar-filters {
+        grid-template-columns: 1fr;
+    }
+
+    .dealer-reset-filters {
+        grid-column: auto;
+    }
+}
