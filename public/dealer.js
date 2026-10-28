@@ -1,16 +1,3 @@
-// --- АВТОРИЗАЦИЯ (ВСТАВИТЬ В НАЧАЛО ФАЙЛА) ---
-const originalFetch = window.fetch;
-window.fetch = async function (url, options) {
-    options = options || {};
-    options.headers = options.headers || {};
-    const token = localStorage.getItem('crm_token');
-    if (token) options.headers['Authorization'] = 'Bearer ' + token;
-    const response = await originalFetch(url, options);
-    if (response.status === 401) window.location.href = '/login.html';
-    return response;
-};
-// -------------------------------------------
-
 document.addEventListener('DOMContentLoaded', () => {
     
     // UI Elements
@@ -31,6 +18,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const dealerCityEl = document.getElementById('dealer-city-badge');
     const dealerStatusEl = document.getElementById('dealer-status-badge');
     const dealerAvatarImg = document.getElementById('dealer-avatar-img');
+    const dealerScoreValueEl = document.getElementById('dealer-score-value');
+    const dealerScoreLabelEl = document.getElementById('dealer-score-label');
+    const dealerScoreBreakdownEl = document.getElementById('dealer-score-breakdown');
+    const dealerSalesMonthEl = document.getElementById('dealer-sales-month');
+    const dealerPlanProgressEl = document.getElementById('dealer-plan-progress');
+    const dealerLastVisitEl = document.getElementById('dealer-last-visit');
     
     // Buttons
     const deleteBtn = document.getElementById('delete-dealer-btn'); 
@@ -51,6 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let galleryCarouselContent = '';
     let currentDealerName = '';
     let currentUserRole = 'guest';
+    let currentDealerSales = [];
 
     if (!dealerId) { 
         if(dealerNameEl) dealerNameEl.textContent = 'Ошибка: ID не указан'; 
@@ -67,6 +61,91 @@ document.addEventListener('DOMContentLoaded', () => {
         return val || '---';
     };
 
+    const statusLabels = {
+        active: 'Активный',
+        standard: 'Стандарт',
+        potential: 'Потенциальный',
+        problem: 'Проблемный',
+        archive: 'Архив'
+    };
+
+    function can(permission) {
+        return Boolean(window.CRMAuth && CRMAuth.can(permission));
+    }
+
+    function formatMetric(value) {
+        const n = Number(value) || 0;
+        return n.toLocaleString('ru-RU', { maximumFractionDigits: 1 });
+    }
+
+    async function loadDealerSales() {
+        if (!can('can_view_sales')) return [];
+        try {
+            const res = await fetch(API_SALES_URL);
+            if (!res.ok) return [];
+            const rows = await res.json();
+            return rows.filter(s => String(s.dealerId) === String(dealerId));
+        } catch (e) {
+            console.warn('Не удалось загрузить продажи дилера', e);
+            return [];
+        }
+    }
+
+    function renderDealerOverview(dealer, salesRows) {
+        const canViewSales = can('can_view_sales');
+        const month = new Date().toISOString().slice(0, 7);
+        const monthRows = canViewSales ? salesRows.filter(s => s.month === month) : [];
+        const fact = monthRows.reduce((sum, row) => sum + (Number(row.fact) || 0), 0);
+        const plan = monthRows.reduce((sum, row) => sum + (Number(row.plan) || 0), 0);
+
+        const score = window.CRMScore
+            ? CRMScore.calculateDealerScore({
+                dealer,
+                salesRows: monthRows,
+                visits: dealer.visits || [],
+                canViewSales,
+                canViewVisits: true
+            })
+            : { score: 0, label: 'Нет оценки', level: 'problem', breakdown: {} };
+
+        if (dealerScoreValueEl) dealerScoreValueEl.textContent = score.score;
+        if (dealerScoreLabelEl) {
+            dealerScoreLabelEl.textContent = score.label;
+            dealerScoreLabelEl.className = `dealer-score-label score-${score.level}`;
+        }
+
+        if (dealerScoreBreakdownEl) {
+            dealerScoreBreakdownEl.innerHTML = Object.values(score.breakdown).map(part => {
+                const pct = part.max > 0 ? Math.round(part.score / part.max * 100) : 0;
+                return `<div class="dealer-score-part" title="${safeText(part.note)}">
+                    <div class="dealer-score-part-head">
+                        <span>${safeText(part.label)}</span>
+                        <strong>${part.score}/${part.max}</strong>
+                    </div>
+                    <div class="dealer-score-part-bar"><span style="width:${pct}%"></span></div>
+                </div>`;
+            }).join('');
+        }
+
+        if (dealerSalesMonthEl) {
+            dealerSalesMonthEl.textContent = canViewSales ? formatMetric(fact) : 'Нет доступа';
+        }
+
+        if (dealerPlanProgressEl) {
+            if (!canViewSales) dealerPlanProgressEl.textContent = 'Нет доступа';
+            else if (plan > 0) dealerPlanProgressEl.textContent = `${Math.round(fact / plan * 100)}%`;
+            else if (dealer.hasPersonalPlan) dealerPlanProgressEl.textContent = 'Не задан';
+            else dealerPlanProgressEl.textContent = 'Без плана';
+        }
+
+        if (dealerLastVisitEl) {
+            const lastVisit = window.CRMScore ? CRMScore.latestCompletedVisit(dealer.visits || []) : null;
+            dealerLastVisitEl.textContent = lastVisit
+                ? lastVisit._date.toLocaleDateString('ru-RU', { day:'numeric', month:'short', year:'numeric' })
+                : 'Не было';
+        }
+    }
+
     // --- MAIN FETCH ---
     async function fetchDealerDetails() {
         try {
@@ -81,12 +160,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (deleteBtn && (!window.CRMAuth || !CRMAuth.can('can_delete_dealer'))) {
                     deleteBtn.style.display = 'none';
                 }
+                if (!can('can_view_sales')) {
+                    const salesTab = document.querySelector('[data-bs-target="#sales-pane"]');
+                    if (salesTab) salesTab.closest('.nav-item')?.remove();
+                }
             } catch(e) { console.warn('Auth check skipped'); }
 
             const dealerRes = await fetch(`${API_DEALERS_URL}/${dealerId}`);
             if (!dealerRes.ok) throw new Error(`Дилер не найден.`);
             const dealer = await dealerRes.json();
             currentDealerName = dealer.name;
+            currentDealerSales = await loadDealerSales();
 
             const productsRes = await fetch(API_PRODUCTS_URL);
             const allProducts = await productsRes.json();
@@ -100,7 +184,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if(dealerNameEl) dealerNameEl.textContent = safeText(dealer.name);
             if(dealerIdEl) dealerIdEl.innerHTML = `<i class="bi bi-hash"></i> ${safeText(dealer.dealer_id)}`;
             if(dealerCityEl) dealerCityEl.innerHTML = `<i class="bi bi-geo-alt"></i> ${safeText(dealer.city)}`;
-            if(dealerStatusEl) dealerStatusEl.textContent = (dealer.status || 'standard').toUpperCase();
+            if(dealerStatusEl) {
+                const status = dealer.status || 'standard';
+                dealerStatusEl.textContent = statusLabels[status] || status;
+                dealerStatusEl.className = `dealer-status-pill dealer-status-${status}`;
+            }
             
             if (dealerAvatarImg) {
                 if (dealer.avatarUrl) {
@@ -162,8 +250,9 @@ document.addEventListener('DOMContentLoaded', () => {
             renderDealerContacts(dealer.contacts || []);
             renderDealerCompetitors(dealer.competitors || []); 
             renderDealerPhotos(dealer.photos || []); 
-            fetchDealerProducts(dealer.products); 
-            fetchDealerSales(); 
+            fetchDealerProducts(dealer.products);
+            renderDealerOverview(dealer, currentDealerSales);
+            renderDealerSales(currentDealerSales); 
 
         } catch (error) { 
             console.error(error); 
@@ -172,15 +261,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- RENDER SALES ---
-    async function fetchDealerSales() {
+    function renderDealerSales(mySales) {
         if (!salesHistoryContainer) return;
+        if (!can('can_view_sales')) {
+            salesHistoryContainer.innerHTML = '<div class="cc-empty">Нет доступа к продажам</div>';
+            return;
+        }
         try {
-            const res = await fetch(`${API_SALES_URL}?dealerId=${dealerId}`); 
-            if (!res.ok) throw new Error();
-            const rawSales = await res.json();
-            
-            // Фильтрация
-            const mySales = rawSales.filter(s => s.dealerId === dealerId);
 
             if (!mySales || mySales.length === 0) { 
                 salesHistoryContainer.innerHTML = '<div class="text-center py-4 text-muted bg-light rounded">Нет данных о продажах.</div>'; 
