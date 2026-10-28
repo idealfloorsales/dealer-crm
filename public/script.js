@@ -351,7 +351,8 @@ document.addEventListener('DOMContentLoaded', () => {
     async function initApp() {
         try {
             console.log("Starting app init...");
-            // 1. Auth
+
+            // 1. Auth / permissions.
             try {
                 if (window.CRMAuth && CRMAuth.ready) await CRMAuth.ready;
                 const user = window.CRMAuth ? CRMAuth.user : null;
@@ -367,68 +368,79 @@ document.addEventListener('DOMContentLoaded', () => {
                     dashboardContainer.style.display = 'none';
                 }
                 if (btnDashSettings && !CRMAuth.can('can_view_dashboard')) btnDashSettings.style.display = 'none';
-            } catch (e) { console.warn('Не удалось применить права пользователя', e); }
+            } catch (e) {
+                console.warn('Не удалось применить права пользователя', e);
+            }
 
-            // 2. Load dictionaries needed by the dealer screen.
+            const canDashboard = Boolean(window.CRMAuth && CRMAuth.can('can_view_dashboard'));
+            const canSales = Boolean(window.CRMAuth && CRMAuth.can('can_view_sales'));
+
+            // 2. Start everything needed for the first screen at the same time.
+            // Dealers/statuses/sectors are required for the directory.
+            // Tasks/current sales enrich it with visit and sales metrics.
+            const statusesPromise = fetchStatuses().catch(e => {
+                console.warn('Не удалось загрузить статусы', e);
+                statusList = [];
+            });
+            const sectorsPromise = fetchSectors().catch(e => {
+                console.warn('Не удалось загрузить сектора', e);
+                allSectors = [];
+            });
+            const dealersPromise = fetchDealers();
+            const tasksPromise = canDashboard
+                ? fetchTasks().catch(e => { allTasksData = []; console.warn(e); })
+                : Promise.resolve(allTasksData = []);
+            const currentSalesPromise = canSales
+                ? fetchCurrentMonthSales().catch(e => { currentMonthSales = []; console.warn(e); })
+                : Promise.resolve(currentMonthSales = []);
+
             await Promise.all([
-                fetchStatuses(),
-                fetchProductCatalog(),
-                fetchSectors()
+                statusesPromise,
+                sectorsPromise,
+                dealersPromise,
+                tasksPromise,
+                currentSalesPromise
             ]);
+
             updatePosDatalist();
 
-            // Справочник конкурентов нужен только тем, у кого есть доступ к конкурентам.
-            if (window.CRMAuth && CRMAuth.can('can_view_competitors')) {
-                try {
-                    const compRes = await fetch(API_COMPETITORS_REF_URL);
-                    if (compRes.ok) {
-                        competitorsRef = await compRes.json();
-                        updateBrandsDatalist();
-                    }
-                } catch(e) { console.warn('Не удалось загрузить справочник конкурентов', e); }
-            } else {
-                competitorsRef = [];
-                updateBrandsDatalist();
-            }
-
-            // 3. Load main data. Дополнительные виджеты не должны ломать список дилеров.
-            console.log("Fetching main data...");
-            await fetchDealers();
-
-            if (window.CRMAuth && CRMAuth.can('can_view_dashboard')) {
-                try { await fetchTasks(); } catch(e) { allTasksData = []; console.warn(e); }
-            } else {
-                allTasksData = [];
-            }
-
-            if (window.CRMAuth && CRMAuth.can('can_view_sales')) {
-                try {
-                    await Promise.all([fetchCurrentMonthSales(), fetchSalesHistory()]);
-                } catch(e) {
-                    currentMonthSales = [];
-                    salesHistory = [];
-                    console.warn(e);
-                }
-            } else {
-                currentMonthSales = [];
-                salesHistory = [];
-            }
-
-            await fetchReclamationsForDashboard();
-
-            // 4. Render
+            // 3. First meaningful paint: dashboard + dealer directory.
             populateFilters(allDealers);
             renderDashboard();
-            setupGlobalSearch(); 
+            setupGlobalSearch();
             renderDealerList();
-            
-            // 5. Setup Listeners
             setupEventListeners();
-            
+
             const pendingId = localStorage.getItem('pendingEditDealerId');
             if (pendingId) {
                 localStorage.removeItem('pendingEditDealerId');
                 if (window.CRMAuth && CRMAuth.can('can_edit_dealer')) openEditModal(pendingId);
+            }
+
+            // 4. Non-critical data must never delay the first screen.
+            const backgroundLoads = [];
+            if (canSales) backgroundLoads.push(fetchSalesHistory());
+            if (window.CRMAuth && CRMAuth.can('can_view_reclamations')) {
+                backgroundLoads.push(fetchReclamationsForDashboard());
+            }
+
+            Promise.allSettled(backgroundLoads).then(() => {
+                renderDashboard();
+                renderDealerList();
+            });
+
+            // 5. Product/competitor dictionaries are only needed inside add/edit dialogs.
+            // Prefetch them when the browser is idle, but don't block the home page.
+            const prefetchAuxiliary = () => {
+                const jobs = [];
+                if (window.CRMAuth && CRMAuth.can('can_view_dealers')) jobs.push(fetchProductCatalog());
+                if (window.CRMAuth && CRMAuth.can('can_view_competitors')) jobs.push(fetchCompetitorsRef());
+                Promise.allSettled(jobs);
+            };
+            if ('requestIdleCallback' in window) {
+                window.requestIdleCallback(prefetchAuxiliary, { timeout: 4000 });
+            } else {
+                setTimeout(prefetchAuxiliary, 1800);
             }
 
         } catch (error) {
@@ -945,7 +957,13 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         try {
-            const res = await fetch(`${API_DEALERS_URL}/${id}`); if(!res.ok) throw new Error("Ошибка"); const d = await res.json();
+            const [res] = await Promise.all([
+                fetch(`${API_DEALERS_URL}/${id}`),
+                fetchProductCatalog(),
+                fetchCompetitorsRef()
+            ]);
+            if(!res.ok) throw new Error("Ошибка");
+            const d = await res.json();
             const titleEl = document.querySelector('#edit-modal .modal-title');
             if(titleEl) titleEl.textContent = 'Редактирование дилера';
             const subtitleEl = document.getElementById('edit-modal-subtitle');
@@ -1007,7 +1025,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function fetchSalesHistory() {
-        const r = await fetch(API_SALES_URL);
+        const r = await fetch(`${API_SALES_URL}?months=6`);
         if (r.ok) salesHistory = await r.json();
         else salesHistory = [];
     }
@@ -1018,7 +1036,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         try {
-            const r = await fetch('/api/reclamations');
+            const r = await fetch('/api/reclamations/dashboard');
             reclamationsData = r.ok ? await r.json() : [];
         } catch (_) {
             reclamationsData = [];
@@ -1035,6 +1053,18 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
     if(statusForm) { statusForm.addEventListener('submit', async (e) => { e.preventDefault(); const id = document.getElementById('st_id').value; const val = document.getElementById('st_value').value.trim(); const label = document.getElementById('st_label').value; const color = document.getElementById('st_color').value; const isVisible = document.getElementById('st_visible').checked; const body = { value: val, label, color, isVisible }; let url = API_STATUSES_URL; let method = 'POST'; if(id) { url += `/${id}`; method = 'PUT'; } else { body.sortOrder = statusList.length + 10; } try { const res = await fetch(url, { method: method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) }); if(res.ok) { window.showToast(id ? "Обновлено" : "Создано"); resetStatusForm(); fetchStatuses(); } else { throw new Error(); } } catch(e) { window.showToast("Ошибка сохранения", "error"); } }); }
     // --- STANDARD API ---
     async function fetchProductCatalog() { if (fullProductCatalog.length > 0) return; const response = await fetch(API_PRODUCTS_URL); if (!response.ok) throw new Error("Ошибка каталога"); fullProductCatalog = await response.json(); fullProductCatalog.sort((a, b) => a.sku.localeCompare(b.sku, 'ru', { numeric: true })); }
+    async function fetchCompetitorsRef() {
+        if (competitorsRef.length > 0) return;
+        if (!window.CRMAuth || !CRMAuth.can('can_view_competitors')) {
+            competitorsRef = [];
+            updateBrandsDatalist();
+            return;
+        }
+        const response = await fetch(API_COMPETITORS_REF_URL);
+        if (!response.ok) throw new Error("Ошибка справочника конкурентов");
+        competitorsRef = await response.json();
+        updateBrandsDatalist();
+    }
     function updateBrandsDatalist() { if (!brandsDatalist) return; let html = ''; competitorsRef.forEach(ref => { html += `<option value="${ref.name}">`; }); brandsDatalist.innerHTML = html; }
     function updatePosDatalist() { if (!posDatalist) return; let html = ''; posMaterialsList.forEach(s => { html += `<option value="${s}">`; }); posDatalist.innerHTML = html; }
     function populateFilters(dealers) { if(!filterCity || !filterPriceType) return; const cities = [...new Set(dealers.map(d => d.city).filter(Boolean))].sort(); const types = [...new Set(dealers.map(d => d.price_type).filter(Boolean))].sort(); const sectors = [...new Set(dealers.map(d => d.region_sector).filter(Boolean))].sort(); const sc = filterCity.value; const st = filterPriceType.value; filterCity.innerHTML = '<option value="">Город</option>'; filterPriceType.innerHTML = '<option value="">Тип цен</option>'; cities.forEach(c => filterCity.add(new Option(c, c))); types.forEach(t => filterPriceType.add(new Option(t, t))); filterCity.value = sc; filterPriceType.value = st; const fs = document.getElementById('filter-sector'); if(fs) { const currSec = fs.value; fs.innerHTML = '<option value="">Сектор</option>'; sectors.forEach(s => fs.add(new Option(s, s))); fs.value = currSec; } }
@@ -1482,10 +1512,15 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
     }
 
     if(editModalEl) { const tabMapBtn = document.querySelector('button[data-bs-target="#tab-map"]'); if(tabMapBtn) { tabMapBtn.addEventListener('shown.bs.tab', () => { if (refreshEditMap) refreshEditMap(); }); } }
-    if(openAddModalBtn) openAddModalBtn.onclick = () => {
+    if(openAddModalBtn) openAddModalBtn.onclick = async () => {
         if (!window.CRMAuth || !CRMAuth.can('can_create_dealer')) {
             window.showToast("Нет права создавать дилеров", "error");
             return;
+        }
+        try {
+            await Promise.all([fetchProductCatalog(), fetchCompetitorsRef()]);
+        } catch (e) {
+            console.warn('Не удалось заранее загрузить справочники формы', e);
         }
         if(addForm) addForm.reset(); populateStatusSelects(); renderProductChecklist(addProductChecklist); renderList(addContactList, [], createContactEntryHTML); renderList(addAddressList, [], createAddressEntryHTML); renderList(addPosList, [], createPosEntryHTML); renderList(addVisitsList, [], createVisitEntryHTML); renderList(addCompetitorList, [], createCompetitorEntryHTML); if(document.getElementById('add_latitude')) { document.getElementById('add_latitude').value = ''; document.getElementById('add_longitude').value = ''; } addPhotosData = []; renderPhotoPreviews(addPhotoPreviewContainer, []); if(addAvatarPreview) { addAvatarPreview.src = ''; addAvatarPreview.style.display='none'; } newAvatarBase64 = null; 
         document.getElementById('add-org-list').innerHTML = ''; addOrgList.insertAdjacentHTML('beforeend', createOrgInputHTML());
