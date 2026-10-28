@@ -4,10 +4,12 @@ const cors = require('cors');
 const fs = require('fs'); 
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000; 
-const JWT_SECRET = process.env.JWT_SECRET || 'CHANGE_THIS_SECRET_KEY_123'; 
+const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(64).toString('hex');
+if (!process.env.JWT_SECRET) console.warn('JWT_SECRET is not configured: sessions will reset after server restart.'); 
 
 app.use(express.json({ limit: '50mb' })); 
 app.use(cors());
@@ -105,8 +107,13 @@ async function seedUsers() {
 
     if (!admin) {
         console.log('Создание первого администратора...');
+        const initialAdminPassword = process.env.INITIAL_ADMIN_PASSWORD;
+        if (!initialAdminPassword) {
+            console.warn('Admin user is missing. Set INITIAL_ADMIN_PASSWORD to create the first administrator.');
+            return;
+        }
         const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash('admin123', salt);
+        const hashedPassword = await bcrypt.hash(initialAdminPassword, salt);
         await User.create({
             username: 'admin',
             password: hashedPassword,
@@ -115,7 +122,7 @@ async function seedUsers() {
             scope: 'all',
             permissions: adminPermissions
         });
-        console.log('Администратор создан.');
+        console.log('Администратор создан из INITIAL_ADMIN_PASSWORD.');
     } else {
         admin.permissions = adminPermissions;
         admin.role = 'manager';
@@ -396,7 +403,7 @@ app.delete('/api/sectors/:id', requirePermission('can_edit_dealer'), async (req,
 
 app.get('/api/dealers', requireAnyPermission('can_view_dealers', 'can_view_map', 'can_view_reclamations'), async (req, res) => { try { let filter = getDealerFilter(req); if (req.query.scope === 'all' && req.user.permissions && req.user.permissions.is_admin) { filter = {}; } const dealers = await Dealer.find(filter).select('-photos -visits -products').lean(); res.json(dealers.map(d => ({ id: d._id, ...d, photo_url: d.avatarUrl }))); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.get('/api/dealers/:id', requirePermission('can_view_dealers'), async (req, res) => { try { const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).populate('products'); res.json(convertToClient(d)); } catch (e) { res.status(500).json({ error: e.message }); } });
-app.post('/api/dealers', requirePermission('can_create_dealer'), async (req, res) => { try { const role = getUserRole(req); if (role === 'astana') req.body.responsible = 'regional_astana'; if (role === 'regions') req.body.responsible = 'regional_regions'; const d = new Dealer(req.body); await d.save(); res.status(201).json(convertToClient(d)); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.post('/api/dealers', requirePermission('can_create_dealer'), async (req, res) => { try { const scope = getUserScope(req); if (scope === 'astana') req.body.responsible = 'regional_astana'; if (scope === 'regions') req.body.responsible = 'regional_regions'; const d = new Dealer(req.body); await d.save(); res.status(201).json(convertToClient(d)); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.post('/api/dealers/:id/visits', requirePermission('can_manage_visits'), async (req, res) => {
     try {
         const dealer = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) });
