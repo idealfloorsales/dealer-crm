@@ -385,6 +385,26 @@ app.delete('/api/sectors/:id', requirePermission('can_edit_dealer'), async (req,
 app.get('/api/dealers', requireAnyPermission('can_view_dealers', 'can_view_map', 'can_view_reclamations'), async (req, res) => { try { let filter = getDealerFilter(req); if (req.query.scope === 'all') { filter = {}; } const dealers = await Dealer.find(filter).select('-photos -visits -products').lean(); res.json(dealers.map(d => ({ id: d._id, ...d, photo_url: d.avatarUrl }))); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.get('/api/dealers/:id', requirePermission('can_view_dealers'), async (req, res) => { try { const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).populate('products'); res.json(convertToClient(d)); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.post('/api/dealers', requirePermission('can_create_dealer'), async (req, res) => { try { const role = getUserRole(req); if (role === 'astana') req.body.responsible = 'regional_astana'; if (role === 'regions') req.body.responsible = 'regional_regions'; const d = new Dealer(req.body); await d.save(); res.status(201).json(convertToClient(d)); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.post('/api/dealers/:id/visits', requirePermission('can_manage_visits'), async (req, res) => {
+    try {
+        const dealer = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) });
+        if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
+
+        const visit = {
+            date: req.body.date || new Date().toISOString().slice(0, 10),
+            comment: String(req.body.comment || '').trim(),
+            isCompleted: req.body.isCompleted !== false
+        };
+        if (!visit.comment) return res.status(400).json({ error: 'Комментарий визита обязателен' });
+
+        dealer.visits = dealer.visits || [];
+        dealer.visits.push(visit);
+        await dealer.save();
+
+        res.status(201).json({ status: 'ok', visit });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.put('/api/dealers/:id', requirePermission('can_edit_dealer'), async (req, res) => { try { await Dealer.findOneAndUpdate({ _id: req.params.id, ...getDealerFilter(req) }, req.body); res.json({status:'ok'}); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.delete('/api/dealers/:id', requirePermission('can_delete_dealer'), async (req, res) => { try { await Dealer.findOneAndDelete({ _id: req.params.id, ...getDealerFilter(req) }); res.json({status:'deleted'}); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.get('/api/dealers/:id/products', requireAnyPermission('can_view_dealers', 'can_view_products'), async (req, res) => { const d = await Dealer.findById(req.params.id).populate('products'); res.json(d.products.map(convertToClient)); });
