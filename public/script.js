@@ -574,6 +574,49 @@ document.addEventListener('DOMContentLoaded', () => {
         return n.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
     }
 
+    function formatExactSqm(value) {
+        const n = Number(value) || 0;
+        return n.toLocaleString('ru-RU', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2
+        });
+    }
+
+    function getDashboardPlanKey(scope) {
+        if (scope === 'astana') return 'astana_all';
+        if (scope === 'regions') return 'regions_all';
+        return 'total_all';
+    }
+
+    function getDashboardMonthTotals(rows, scope = 'all') {
+        const source = Array.isArray(rows) ? rows : [];
+        const factRows = source.filter(row => !String(row.dealerId || '').startsWith('PLAN_'));
+        const fact = factRows.reduce((sum, row) => sum + (Number(row.fact) || 0), 0);
+
+        const rootKey = `PLAN_${getDashboardPlanKey(scope)}`;
+        const rootPlan = source.find(row => String(row.dealerId || '') === rootKey);
+        if (rootPlan) {
+            return { fact, plan: Number(rootPlan.plan) || 0 };
+        }
+
+        // For full-company legacy months, prefer the two regional totals rather than
+        // summing every PLAN_* row (group + region + VIP), which double-counts plans.
+        if (scope === 'all') {
+            const astanaPlan = source.find(row => String(row.dealerId || '') === 'PLAN_astana_all');
+            const regionsPlan = source.find(row => String(row.dealerId || '') === 'PLAN_regions_all');
+            if (astanaPlan || regionsPlan) {
+                return {
+                    fact,
+                    plan: (Number(astanaPlan?.plan) || 0) + (Number(regionsPlan?.plan) || 0)
+                };
+            }
+        }
+
+        // Compatibility with old records where plan was stored on the sales row.
+        const legacyPlan = factRows.reduce((sum, row) => sum + (Number(row.plan) || 0), 0);
+        return { fact, plan: legacyPlan };
+    }
+
     function getMonthLabel(key) {
         const [y,m] = key.split('-').map(Number);
         return new Date(y, m - 1, 1).toLocaleDateString('ru-RU', { month: 'short' }).replace('.', '');
@@ -597,12 +640,12 @@ document.addEventListener('DOMContentLoaded', () => {
             months.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
         }
 
+        const userScope = window.CRMAuth?.user?.scope || 'all';
         const totals = months.map(month => {
             const rows = salesHistory.filter(s => s.month === month);
             return {
                 month,
-                fact: rows.reduce((a,s) => a + (Number(s.fact)||0), 0),
-                plan: rows.reduce((a,s) => a + (Number(s.plan)||0), 0)
+                ...getDashboardMonthTotals(rows, userScope)
             };
         });
 
@@ -612,8 +655,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const delta = previous.fact > 0 ? Math.round((current.fact - previous.fact) / previous.fact * 100) : null;
 
         summary.innerHTML = `
-            <div class="pulse-summary-item"><span>Факт месяца</span><strong>${formatCompactNumber(current.fact)} м²</strong></div>
-            <div class="pulse-summary-item"><span>План</span><strong>${formatCompactNumber(current.plan)} м²</strong></div>
+            <div class="pulse-summary-item"><span>Факт месяца</span><strong>${formatExactSqm(current.fact)} м²</strong></div>
+            <div class="pulse-summary-item"><span>План</span><strong>${formatExactSqm(current.plan)} м²</strong></div>
             <div class="pulse-summary-item"><span>Выполнение</span><strong>${achievement}%</strong></div>
             <div class="pulse-summary-item"><span>К прошлому месяцу</span><strong>${delta === null ? '—' : (delta >= 0 ? '+' : '') + delta + '%'}</strong></div>
         `;
@@ -771,39 +814,41 @@ document.addEventListener('DOMContentLoaded', () => {
         const activeIds = new Set((currentMonthSales || []).filter(s => Number(s.fact)>0).map(s => String(s.dealerId)));
         const activeCount = network.filter(d => activeIds.has(String(d.id))).length;
         const problemCount = network.filter(d => d.status === 'problem' || getDealerHealth(d).score < 60).length;
-        const currentFact = (currentMonthSales || []).reduce((a,s)=>a+(Number(s.fact)||0),0);
-        const currentPlan = (currentMonthSales || []).reduce((a,s)=>a+(Number(s.plan)||0),0);
+        const userScope = window.CRMAuth?.user?.scope || 'all';
+        const currentTotals = getDashboardMonthTotals(currentMonthSales, userScope);
+        const currentFact = currentTotals.fact;
+        const currentPlan = currentTotals.plan;
         const achievement = currentPlan > 0 ? Math.round(currentFact/currentPlan*100) : 0;
 
         const scores = network.map(getDealerHealth);
         const avgHealth = scores.length ? Math.round(scores.reduce((a,h)=>a+h.score,0)/scores.length) : 0;
 
         dashboardStats.innerHTML = `
-            <div class="cc-kpi-card">
+            <div class="cc-kpi-card cc-kpi-dealers">
                 <span class="cc-kpi-icon"><i class="bi bi-buildings"></i></span>
                 <div class="cc-kpi-label">Всего дилеров</div>
                 <div class="cc-kpi-value">${network.length}</div>
                 <div class="cc-kpi-foot">${activeCount} с продажами в этом месяце</div>
             </div>
-            <div class="cc-kpi-card is-good">
+            <div class="cc-kpi-card is-good cc-kpi-score">
                 <span class="cc-kpi-icon"><i class="bi bi-activity"></i></span>
                 <div class="cc-kpi-label">Средняя оценка дилеров</div>
                 <div class="cc-kpi-value">${avgHealth}<span style="font-size:.85rem;color:#9a9ca1"> / 100</span></div>
                 <div class="cc-kpi-foot">По шкале от 0 до 100</div>
             </div>
-            <div class="cc-kpi-card">
+            <div class="cc-kpi-card cc-kpi-sales">
                 <span class="cc-kpi-icon"><i class="bi bi-graph-up-arrow"></i></span>
                 <div class="cc-kpi-label">Продажи за месяц</div>
-                <div class="cc-kpi-value">${formatCompactNumber(currentFact)}</div>
-                <div class="cc-kpi-foot">м² · факт</div>
+                <div class="cc-kpi-value cc-kpi-value-exact">${formatExactSqm(currentFact)} <span>м²</span></div>
+                <div class="cc-kpi-foot">Точная квадратура за текущий месяц</div>
             </div>
-            <div class="cc-kpi-card ${achievement>=90?'is-good':''}">
+            <div class="cc-kpi-card cc-kpi-plan ${achievement>=90?'is-good':''}">
                 <span class="cc-kpi-icon"><i class="bi bi-bullseye"></i></span>
                 <div class="cc-kpi-label">Выполнение плана</div>
-                <div class="cc-kpi-value">${achievement}%</div>
-                <div class="cc-kpi-foot">План: ${formatCompactNumber(currentPlan)} м²</div>
+                <div class="cc-kpi-value">${currentPlan > 0 ? achievement + '%' : '—'}</div>
+                <div class="cc-kpi-foot">${currentPlan > 0 ? 'План: ' + formatExactSqm(currentPlan) + ' м²' : 'План не задан'}</div>
             </div>
-            <div class="cc-kpi-card is-alert">
+            <div class="cc-kpi-card is-alert cc-kpi-problems">
                 <span class="cc-kpi-icon"><i class="bi bi-exclamation-triangle"></i></span>
                 <div class="cc-kpi-label">Проблемные дилеры</div>
                 <div class="cc-kpi-value">${problemCount}</div>
@@ -1298,7 +1343,7 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
                 planFoot = 'Нет доступа';
             } else if (metrics.plan > 0) {
                 planValue = `${metrics.achievement}%`;
-                planFoot = `План ${formatCompactNumber(metrics.plan)} м²`;
+                planFoot = `План ${formatExactSqm(metrics.plan)} м²`;
                 progressWidth = Math.min(metrics.achievement, 100);
                 progressLevel = metrics.achievement >= 90 ? 'good' : metrics.achievement >= 70 ? 'mid' : 'risk';
             } else if (d.hasPersonalPlan) {
@@ -1333,7 +1378,7 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
                 <div class="dealer-smart-metrics">
                     <div class="dealer-list-metric">
                         <span>Продажи</span>
-                        <strong>${canViewSales ? formatCompactNumber(metrics.fact) + ' м²' : '—'}</strong>
+                        <strong>${canViewSales ? formatExactSqm(metrics.fact) + ' м²' : '—'}</strong>
                         <small>${canViewSales ? (metrics.fact > 0 ? 'Текущий месяц' : 'Продаж пока нет') : 'Нет доступа'}</small>
                     </div>
                     <div class="dealer-list-metric is-plan">
