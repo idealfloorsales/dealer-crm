@@ -1396,6 +1396,7 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
             const icon = btn.querySelector('i');
             if (text) text.textContent = active ? 'В маршруте' : 'В маршрут';
             if (icon) icon.className = active ? 'bi bi-check2' : 'bi bi-plus-lg';
+            btn.title = active ? 'Убрать из маршрута' : 'Добавить в маршрут';
         });
     }
 
@@ -1776,68 +1777,68 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
             const score = Math.max(0, Math.min(100, Number(metrics.health.score) || 0));
             const initial = safeText((d.name || 'Д').trim().charAt(0).toUpperCase());
 
-            return `<article class="dealer-v3-card ${metrics.problem ? 'has-risk' : ''}" onclick="window.location.href='dealer.html?id=${encodeURIComponent(d.id)}'">
-                <div class="dealer-v3-top">
-                    <div class="dealer-v3-identity">
-                        <div class="dealer-v3-photo">
-                            <img data-dealer-avatar="${safeAttr(d.id)}" alt="" loading="lazy">
-                            <span>${initial}</span>
-                        </div>
-                        <div class="dealer-v3-name-wrap">
-                            <div class="dealer-v3-name-line">
-                                <a href="dealer.html?id=${encodeURIComponent(d.id)}" class="dealer-v3-name" onclick="event.stopPropagation()">${safeText(d.name)}</a>
-                                <span class="dealer-v3-status" style="--status-color:${safeAttr(statusObj.color || '#72747a')}">${safeText(statusObj.label)}</span>
-                            </div>
-                            <div class="dealer-v3-id">ID ${safeText(d.dealer_id || '—')}</div>
-                        </div>
+            const metaHtml = infoChips
+                .filter(item => ['Город','Сектор','Тип цен'].includes(item.label))
+                .slice(0,3)
+                .map(item => `<span><i class="bi bi-${item.icon}"></i>${safeText(item.value)}</span>`)
+                .join('');
+
+            const mainSignal = signals[0]
+                ? `<span class="dealer-list-v6-signal is-${signals[0].level}"><i class="bi bi-${signals[0].icon}"></i>${safeText(signals[0].text)}</span>`
+                : '<span class="dealer-list-v6-signal is-ok"><i class="bi bi-check2-circle"></i>Без критичных сигналов</span>';
+
+            const routeSelect = `<button class="dealer-list-v6-route ${routeActive ? 'active' : ''}" type="button" data-route-toggle="${safeAttr(d.id)}" aria-pressed="${routeActive ? 'true' : 'false'}" onclick="event.stopPropagation(); toggleDealerRoute('${safeAttr(d.id)}')" title="${routeActive ? 'Убрать из маршрута' : 'Добавить в маршрут'}"><i class="bi bi-${routeActive ? 'check2' : 'plus-lg'}"></i></button>`;
+
+            return `<article class="dealer-list-v6-card ${metrics.problem ? 'has-risk' : ''}" onclick="window.location.href='dealer.html?id=${encodeURIComponent(d.id)}'">
+                <div class="dealer-list-v6-route-cell">${routeSelect}</div>
+
+                <div class="dealer-list-v6-main">
+                    <div class="dealer-v3-photo dealer-list-v6-photo">
+                        <img data-dealer-avatar="${safeAttr(d.id)}" alt="" loading="lazy">
+                        <span>${initial}</span>
                     </div>
-
-                    <div class="dealer-v3-score is-${metrics.health.level}">
-                        <div class="dealer-v3-score-number">${score}<span>/100</span></div>
-                        <div class="dealer-v3-score-label">Оценка дилера</div>
-                        <div class="dealer-v3-score-bar"><i style="width:${score}%"></i></div>
-                        <small>${safeText(metrics.health.label)}</small>
-                    </div>
-                </div>
-
-                <div class="dealer-v3-info-row">${infoHtml}</div>
-
-                <div class="dealer-v3-metrics">
-                    <div class="dealer-v3-metric">
-                        <div class="dealer-v3-metric-icon"><i class="bi bi-graph-up-arrow"></i></div>
-                        <div>
-                            <span>Продажи за месяц</span>
-                            <strong>${canViewSales ? formatExactSqm(metrics.fact) + ' м²' : '—'}</strong>
-                            <small>${canViewSales ? (metrics.fact > 0 ? 'Факт текущего месяца' : 'Продаж пока нет') : 'Нет доступа'}</small>
+                    <div class="dealer-list-v6-copy">
+                        <div class="dealer-list-v6-name-line">
+                            <a href="dealer.html?id=${encodeURIComponent(d.id)}" class="dealer-list-v6-name" onclick="event.stopPropagation()">${safeText(d.name)}</a>
+                            <span class="dealer-list-v6-status" style="--status-color:${safeAttr(statusObj.color || '#72747a')}">${safeText(statusObj.label)}</span>
                         </div>
-                    </div>
-
-                    <div class="dealer-v3-metric">
-                        <div class="dealer-v3-metric-icon"><i class="bi bi-bullseye"></i></div>
-                        <div class="dealer-v3-metric-main">
-                            <span>Выполнение плана</span>
-                            <strong>${planValue}</strong>
-                            <small>${planFoot}</small>
-                            <div class="dealer-v3-progress is-${progressLevel}"><i style="width:${progressWidth}%"></i></div>
-                        </div>
-                    </div>
-
-                    <div class="dealer-v3-metric">
-                        <div class="dealer-v3-metric-icon"><i class="bi bi-calendar-check"></i></div>
-                        <div>
-                            <span>Последний визит</span>
-                            <strong>${visit.value}</strong>
-                            <small>${visit.foot}</small>
+                        <div class="dealer-list-v6-meta">${metaHtml || '<span>Данные не заполнены</span>'}</div>
+                        <div class="dealer-list-v6-sub">
+                            <span>ID ${safeText(d.dealer_id || '—')}</span>
+                            ${mainSignal}
                         </div>
                     </div>
                 </div>
 
-                <div class="dealer-v3-bottom">
-                    <div class="dealer-v3-signals">${signalsHtml}</div>
-                    <div class="dealer-v3-actions">
-                        ${routeToggleBtn}${quickVisitBtn}${moreMenu}
-                        <a href="dealer.html?id=${encodeURIComponent(d.id)}" class="dealer-v3-open" onclick="event.stopPropagation()">Карточка <i class="bi bi-arrow-right"></i></a>
-                    </div>
+                <div class="dealer-list-v6-cell">
+                    <span class="dealer-list-v6-label">Продажи</span>
+                    <strong>${canViewSales ? formatExactSqm(metrics.fact) + ' м²' : '—'}</strong>
+                    <small>${canViewSales ? (metrics.fact > 0 ? 'текущий месяц' : 'нет продаж') : 'нет доступа'}</small>
+                </div>
+
+                <div class="dealer-list-v6-cell">
+                    <span class="dealer-list-v6-label">План</span>
+                    <strong>${planValue}</strong>
+                    <small>${planFoot}</small>
+                    <div class="dealer-list-v6-progress is-${progressLevel}"><i style="width:${progressWidth}%"></i></div>
+                </div>
+
+                <div class="dealer-list-v6-cell">
+                    <span class="dealer-list-v6-label">Последний визит</span>
+                    <strong>${visit.value}</strong>
+                    <small>${visit.foot}</small>
+                </div>
+
+                <div class="dealer-list-v6-score is-${metrics.health.level}">
+                    <strong>${score}</strong>
+                    <span>/100</span>
+                    <small>${safeText(metrics.health.label)}</small>
+                </div>
+
+                <div class="dealer-list-v6-actions" onclick="event.stopPropagation()">
+                    ${quickVisitBtn}
+                    ${moreMenu}
+                    <a href="dealer.html?id=${encodeURIComponent(d.id)}" class="dealer-list-v6-open" title="Открыть карточку"><i class="bi bi-arrow-right"></i></a>
                 </div>
             </article>`;
         }).join('');
