@@ -184,12 +184,25 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- ЗАГРУЗКА ДАННЫХ ---
     async function loadList() {
         try {
-            const [compRes, dealersRes] = await Promise.all([ fetch(API_URL), fetch(API_DEALERS) ]);
-            if(!compRes.ok || !dealersRes.ok) throw new Error(`Ошибка загрузки`);
+            const compRes = await fetch(API_URL);
+            if(!compRes.ok) throw new Error('Ошибка загрузки конкурентов');
             competitors = await compRes.json();
-            allDealers = await dealersRes.json();
+
+            allDealers = [];
+            if (window.CRMAuth && CRMAuth.can('can_view_dealers')) {
+                try {
+                    const dealersRes = await fetch(API_DEALERS);
+                    if (dealersRes.ok) allDealers = await dealersRes.json();
+                } catch (e) {
+                    console.warn('Список дилеров недоступен для раздела конкурентов', e);
+                }
+            }
+
             competitors.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-            refreshDynamicTypes(); updateFilterOptions(); renderDashboard(); renderGrid();
+            refreshDynamicTypes();
+            updateFilterOptions();
+            renderDashboard();
+            renderGrid();
         } catch(e) { gridContainer.innerHTML = `<p class="text-danger text-center m-5">Ошибка: ${e.message}</p>`; }
     }
 
