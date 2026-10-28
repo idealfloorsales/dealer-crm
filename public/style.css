@@ -6594,3 +6594,312 @@ body.bg-light {
         padding-right: 0;
     }
 }
+
+
+/* =========================================================
+   DESKTOP READABILITY — DEALERS + SALES
+   Keep mobile compact, make PC work comfortably readable.
+   ========================================================= */
+@media (min-width: 992px) {
+    /* Dealer directory */
+    .dealer-directory-head-v2 p {
+        font-size: .82rem;
+        color: #7f8187;
+    }
+
+    .dealer-visible-count {
+        min-height: 28px;
+        font-size: .74rem;
+    }
+
+    .dealer-search-field {
+        min-height: 46px;
+    }
+
+    .dealer-search-field input {
+        font-size: .86rem !important;
+    }
+
+    .dealer-quick-filter {
+        min-height: 42px;
+        padding: 0 11px;
+        font-size: .72rem;
+    }
+
+    .dealer-quick-count {
+        min-width: 22px;
+        height: 22px;
+        font-size: .64rem;
+    }
+
+    .dealer-sort-select {
+        min-height: 46px;
+        font-size: .76rem;
+    }
+
+    .dealer-toolbar-filters .form-select {
+        min-height: 41px;
+        font-size: .72rem !important;
+        color: #5f6167;
+    }
+
+    .dealer-filter-settings {
+        flex-basis: 41px;
+        width: 41px;
+    }
+
+    .dealer-reset-filters {
+        min-height: 41px;
+        font-size: .7rem;
+    }
+
+    .dealer-smart-card {
+        min-height: 146px;
+        padding: 17px 18px 17px 21px;
+        gap: 18px;
+    }
+
+    .dealer-smart-avatar {
+        width: 64px;
+        height: 64px;
+        font-size: 1.4rem;
+    }
+
+    .dealer-smart-name {
+        font-size: 1.02rem;
+        line-height: 1.25;
+    }
+
+    .dealer-card-status {
+        min-height: 25px;
+        padding: 0 8px;
+        font-size: .63rem;
+    }
+
+    .dealer-smart-id {
+        margin-top: 5px;
+        font-size: .69rem;
+        color: #8d8f95;
+    }
+
+    .dealer-smart-meta {
+        margin-top: 5px;
+        font-size: .71rem;
+        color: #6f7177;
+    }
+
+    .dealer-list-metric {
+        min-height: 92px;
+        padding: 12px 11px 10px;
+    }
+
+    .dealer-list-metric > span {
+        font-size: .64rem;
+        color: #85878d;
+    }
+
+    .dealer-list-metric > strong {
+        margin-top: 5px;
+        font-size: .94rem;
+    }
+
+    .dealer-list-metric > strong em {
+        font-size: .63rem;
+    }
+
+    .dealer-list-metric > small {
+        margin-top: 4px;
+        font-size: .6rem;
+        color: #8f9197;
+    }
+
+    .dealer-list-progress,
+    .dealer-score-mini {
+        height: 5px;
+        margin-top: 8px;
+    }
+
+    .dealer-signal {
+        min-height: 28px;
+        padding: 0 9px;
+        font-size: .62rem;
+    }
+
+    .dealer-card-action {
+        width: 36px;
+        height: 36px;
+        font-size: .8rem;
+    }
+
+    .dealer-open-card {
+        min-height: 36px;
+        padding: 0 11px;
+        font-size: .65rem;
+    }
+
+    /* Sales page toolbar */
+    .sales-section-head h2 {
+        font-size: 1.14rem;
+    }
+
+    .sales-section-head p {
+        font-size: .8rem;
+        color: #7f8187;
+    }
+
+    .sales-column-label {
+        font-size: .75rem;
+    }
+
+    .sales-search-box {
+        height: 44px;
+    }
+
+    .sales-search-box input {
+        font-size: .86rem;
+    }
+
+    .sales-area-filter,
+    .sales-toolbar-btn {
+        min-height: 44px;
+        font-size: .76rem;
+    }
+
+    /* Sales groups */
+    .sales-page .region-header {
+        padding: 13px 14px;
+    }
+
+    .sales-page .region-title {
+        font-size: .9rem;
+    }
+
+    .sales-group-meta {
+        font-size: .72rem;
+        color: #85878d;
+    }
+
+    .sales-plan-state,
+    .sales-add-row {
+        min-height: 33px;
+        padding: 0 10px;
+        font-size: .7rem;
+    }
+
+    .sales-page .region-body {
+        padding: 0 14px;
+    }
+
+    .sales-page .sales-row {
+        min-height: 58px;
+        padding: 9px 0;
+    }
+
+    .sales-page .sales-dealer-name {
+        font-size: .88rem;
+        color: #303136;
+    }
+
+    .sales-page .sales-dealer-name small {
+        margin-top: 3px;
+        font-size: .66rem;
+        color: #85878d;
+    }
+
+    .sales-page .sales-input-group {
+        width: 132px;
+        height: 40px;
+        padding: 0 10px;
+    }
+
+    .sales-page .sales-input {
+        font-size: .92rem;
+    }
+
+    .sales-page .sales-input-group > span {
+        font-size: .66rem;
+    }
+
+    /* Sales summary */
+    .sales-page .summary-item {
+        padding: 14px 18px 15px;
+    }
+
+    .sales-summary-group-title {
+        font-size: .69rem;
+    }
+
+    .sales-page .summary-title {
+        font-size: .86rem;
+    }
+
+    .sales-page .summary-percent {
+        font-size: .82rem;
+    }
+
+    .summary-values > div,
+    .summary-values > label {
+        padding: 9px 10px;
+    }
+
+    .summary-values span {
+        font-size: .62rem;
+        color: #85878d;
+    }
+
+    .summary-values strong,
+    .sales-page .plan-input {
+        font-size: .84rem;
+    }
+
+    .sales-page .plan-input {
+        height: 24px;
+    }
+
+    .summary-diff {
+        margin-top: 7px;
+        font-size: .66rem;
+    }
+
+    .sales-no-plan,
+    .sales-summary-note {
+        font-size: .7rem;
+    }
+
+    /* Performance cards on sales page */
+    .sales-performance-head h2 {
+        font-size: 1.14rem;
+    }
+
+    .sales-performance-head p {
+        font-size: .79rem;
+    }
+
+    .sales-performance-legend {
+        font-size: .69rem;
+    }
+
+    .sales-performance-card {
+        padding: 15px;
+    }
+
+    .sales-performance-card-title {
+        font-size: .84rem;
+    }
+
+    .sales-performance-card-percent {
+        font-size: 1.02rem;
+    }
+
+    .sales-performance-card-values span {
+        font-size: .61rem;
+    }
+
+    .sales-performance-card-values strong {
+        font-size: .78rem;
+    }
+
+    .sales-performance-card-meta {
+        font-size: .62rem;
+    }
+}
