@@ -1295,10 +1295,13 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
             metrics: getDealerListMetrics(dealer)
         }));
 
-        updateDealerQuickCounts(enriched);
+        const scoreFiltered = healthFilter
+            ? enriched.filter(({metrics}) => metrics.health.level === healthFilter)
+            : enriched;
 
-        let filtered = enriched.filter(({metrics}) => {
-            if (healthFilter && metrics.health.level !== healthFilter) return false;
+        updateDealerQuickCounts(scoreFiltered);
+
+        let filtered = scoreFiltered.filter(({metrics}) => {
             if (dealerQuickFilter === 'sales') return metrics.fact > 0;
             if (dealerQuickFilter === 'plan') return metrics.planRisk;
             if (dealerQuickFilter === 'visit') return metrics.needsVisit;
@@ -1318,6 +1321,7 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
                 return av - bv;
             }
             if (sortValue === 'health_asc') return a.metrics.health.score - b.metrics.health.score;
+            if (sortValue === 'health_desc') return b.metrics.health.score - a.metrics.health.score;
             if (sortValue === 'visit_desc') {
                 const av = a.metrics.daysSinceVisit === null ? Number.POSITIVE_INFINITY : a.metrics.daysSinceVisit;
                 const bv = b.metrics.daysSinceVisit === null ? Number.POSITIVE_INFINITY : b.metrics.daysSinceVisit;
