@@ -113,7 +113,7 @@
                 <button class="btn btn-light border text-secondary shadow-sm" onclick="printBlankForm()" title="Распечатать пустой акт для заполнения от руки">
                     <i class="bi bi-printer me-2"></i>Печать бланка
                 </button>
-                <button class="btn btn-primary shadow-sm d-none d-lg-block" onclick="openAddModal()">
+                <button class="btn btn-primary shadow-sm d-none d-lg-block" data-permission="can_manage_reclamations" onclick="openAddModal()">
                     <i class="bi bi-plus-lg me-2"></i>Новая рекламация
                 </button>
             </div>
@@ -321,9 +321,9 @@
                 <div class="modal-body bg-light" id="view-body">
                     </div>
                 <div class="modal-footer border-0 d-flex justify-content-between align-items-center bg-light">
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteCurrentReclamation()"><i class="bi bi-trash"></i> Удалить</button>
+                    <button class="btn btn-sm btn-outline-danger" data-permission="can_manage_reclamations" onclick="deleteCurrentReclamation()"><i class="bi bi-trash"></i> Удалить</button>
                     <div>
-                        <button class="btn btn-outline-brand btn-sm px-3 rounded-pill me-2" onclick="openEditModal()"><i class="bi bi-pencil"></i> Редактировать</button>
+                        <button class="btn btn-outline-brand btn-sm px-3 rounded-pill me-2" data-permission="can_manage_reclamations" onclick="openEditModal()"><i class="bi bi-pencil"></i> Редактировать</button>
                         <button class="btn btn-primary btn-sm px-4 rounded-pill" onclick="printFilledForm()"><i class="bi bi-printer me-2"></i>Печать акта</button>
                     </div>
                 </div>
@@ -343,7 +343,7 @@
         </div>
     </div>
 
-    <button id="mobile-fab-add" class="d-lg-none" onclick="openAddModal()"><i class="bi bi-plus-lg"></i></button>
+    <button id="mobile-fab-add" class="d-lg-none" data-permission="can_manage_reclamations" onclick="openAddModal()"><i class="bi bi-plus-lg"></i></button>
     
     <datalist id="products-datalist"></datalist>
     <datalist id="house-type-list"><option value="Многоэтажный дом"><option value="Частный дом / Коттедж"><option value="Коммерческое помещение"></datalist>
