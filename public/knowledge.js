@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const articleForm = document.getElementById('article-form');
     
     let allArticles = []; // Кэш
+    let canManageKnowledge = false;
 
     // (ВОЗВРАЩЕННАЯ ФУНКЦИЯ)
     const safeText = (text) => text ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
@@ -67,14 +68,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="accordion-body knowledge-item-content">
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <small class="text-muted">Создано: ${date}</small>
-                                <div>
+                                ${canManageKnowledge ? `<div>
                                     <button class="btn btn-warning btn-sm btn-edit" data-id="${articleId}">
                                         <i class="bi bi-pencil me-1"></i> Редактировать
                                     </button>
                                     <button class="btn btn-danger btn-sm btn-delete" data-id="${articleId}" data-name="${safeText(article.title)}">
                                         <i class="bi bi-trash me-1"></i> Удалить
                                     </button>
-                                </div>
+                                </div>` : ''}
                             </div>
                             <div class="knowledge-content-display" id="content-${articleId}">
                                 Загрузка...
@@ -119,6 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Логика модального окна "Добавить" ---
     openAddBtn.onclick = () => {
+        if (!canManageKnowledge) return;
         articleForm.reset();
         document.getElementById('article_id').value = ''; 
         modalTitle.textContent = 'Добавить статью';
@@ -131,7 +133,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const editButton = target.closest('.btn-edit');
         if (editButton) {
-            e.stopPropagation(); 
+            e.stopPropagation();
+            if (!canManageKnowledge) return; 
             const id = editButton.dataset.id;
             
             try {
@@ -152,7 +155,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const deleteButton = target.closest('.btn-delete');
         if (deleteButton) {
-            e.stopPropagation(); 
+            e.stopPropagation();
+            if (!canManageKnowledge) return; 
             const id = deleteButton.dataset.id;
             const name = deleteButton.dataset.name;
             if (confirm(`Вы уверены, что хотите удалить статью "${name}"?`)) {
@@ -169,6 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Обработчик: Сохранение (Добавление/Редактирование) ---
     articleForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (!canManageKnowledge) return;
         
         const id = document.getElementById('article_id').value;
         const title = document.getElementById('article_title').value;
@@ -197,5 +202,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Первоначальная загрузка ---
-    fetchArticles();
+    (async () => {
+        if (window.CRMAuth && CRMAuth.ready) await CRMAuth.ready;
+        canManageKnowledge = window.CRMAuth ? CRMAuth.can('can_manage_knowledge') : false;
+        if (openAddBtn) openAddBtn.style.display = canManageKnowledge ? '' : 'none';
+        await fetchArticles();
+    })();
 });

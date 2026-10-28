@@ -6,7 +6,7 @@ window.fetch = async function (url, options) {
     const token = localStorage.getItem('crm_token');
     if (token) options.headers['Authorization'] = 'Bearer ' + token;
     const response = await originalFetch(url, options);
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
         localStorage.removeItem('crm_token');
         window.location.href = '/login.html';
     }
@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let allProducts = [];
     let uploadedPhotos = []; // Теперь элементы: { photo_url: base64, isVideo: boolean }
     let currentViewId = null;
+    let canManageReclamations = false;
 
     const listEl = document.getElementById('reclamations-list');
     const searchInput = document.getElementById('search-input');
@@ -31,6 +32,14 @@ document.addEventListener('DOMContentLoaded', () => {
     init();
 
     async function init() {
+        if (window.CRMAuth && CRMAuth.ready) await CRMAuth.ready;
+        canManageReclamations = window.CRMAuth ? CRMAuth.can('can_manage_reclamations') : false;
+
+        const saveBtn = document.getElementById('btn-save');
+        const mediaInput = document.getElementById('r_photos');
+        if (saveBtn && !canManageReclamations) saveBtn.style.display = 'none';
+        if (mediaInput && !canManageReclamations) mediaInput.disabled = true;
+
         document.getElementById('r_date').value = new Date().toISOString().slice(0, 10);
         await Promise.all([
             fetchDealers(),
@@ -148,6 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     window.openAddModal = () => {
+        if (!canManageReclamations) return;
         form.reset();
         document.getElementById('r_id').value = ''; 
         document.getElementById('add-modal-title').textContent = 'Оформление рекламации';
@@ -159,6 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     window.openEditModal = () => {
+        if (!canManageReclamations) return;
         if(!currentViewId) return;
         const r = allReclamations.find(x => x.id === currentViewId);
         if(!r) return;
@@ -279,10 +290,15 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>`;
         }).join('');
     }
-    window.removePhoto = (index) => { uploadedPhotos.splice(index, 1); renderPhotoPreviews(); };
+    window.removePhoto = (index) => {
+        if (!canManageReclamations) return;
+        uploadedPhotos.splice(index, 1);
+        renderPhotoPreviews();
+    };
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (!canManageReclamations) return;
         const btn = document.getElementById('btn-save');
         btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
 
@@ -466,6 +482,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     window.deleteCurrentReclamation = async () => {
+        if (!canManageReclamations) return;
         if(!currentViewId) return;
         if(!confirm("Удалить эту рекламацию навсегда?")) return;
         try {

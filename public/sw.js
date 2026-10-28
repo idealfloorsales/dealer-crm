@@ -11,6 +11,8 @@ const ASSETS = [
     '/products.html',
     '/competitors.html',
     '/knowledge.html',
+    '/reclamations.html',
+    '/users.html',
     '/dealer.html',
     // ВАЖНО: Добавлена версия к файлам, чтобы совпадать с HTML
     '/style.css?v={{VER}}',
@@ -20,6 +22,8 @@ const ASSETS = [
     '/products.js?v={{VER}}',
     '/competitors.js?v={{VER}}',
     '/knowledge.js?v={{VER}}',
+    '/reclamations.js?v={{VER}}',
+    '/permissions.js?v={{VER}}',
     '/dealer.js?v={{VER}}',
     '/map.js?v={{VER}}',
     '/logo.png',
@@ -49,21 +53,11 @@ self.addEventListener('fetch', (e) => {
     if (e.request.method !== 'GET') return;
     const url = new URL(e.request.url);
 
-    // СТРАТЕГИЯ 1: API (ДАННЫЕ) -> Network First (Сначала сеть, потом кэш)
+    // API содержит персональные и коммерческие данные.
+    // Никогда не кладем API-ответы в общий service-worker cache:
+    // иначе на одном устройстве можно случайно показать данные предыдущего пользователя.
     if (url.pathname.startsWith('/api/')) {
-        e.respondWith(
-            fetch(e.request)
-                .then((response) => {
-                    // Копия ответа в кэш на случай офлайна
-                    const responseClone = response.clone();
-                    caches.open(CACHE_NAME).then((cache) => cache.put(e.request, responseClone));
-                    return response;
-                })
-                .catch(() => {
-                    // Если сети нет, берем из кэша
-                    return caches.match(e.request);
-                })
-        );
+        e.respondWith(fetch(e.request));
         return;
     }
 

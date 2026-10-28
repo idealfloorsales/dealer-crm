@@ -55,24 +55,7 @@
                 border: none;
             }
         }
-        .admin-only { display: none !important; }
     </style>
-    <script>
-        if (!localStorage.getItem('crm_token')) {
-            window.location.href = '/login.html';
-        }
-        document.addEventListener("DOMContentLoaded", () => {
-            try {
-                const token = localStorage.getItem('crm_token');
-                if(token) {
-                    const payload = JSON.parse(atob(token.split('.')[1]));
-                    if (payload.permissions && payload.permissions.is_admin) {
-                        document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('admin-only'));
-                    }
-                }
-            } catch(e) { console.error('Token Error', e); }
-        });
-    </script>
 </head>
 <body class="bg-light">
     
@@ -89,7 +72,7 @@
                     <li class="nav-item"><a class="nav-link" href="/sales.html">Продажи</a></li>
                     <li class="nav-item"><a class="nav-link" href="/competitors.html">Конкуренты</a></li>
                     <li class="nav-item"><a class="nav-link" href="/reclamations.html">Рекламации</a></li>
-                    <li class="nav-item admin-only"><a class="nav-link text-primary fw-bold" href="/users.html"><i class="bi bi-people-fill me-1"></i>Сотрудники</a></li>
+                    <li class="nav-item data-permission="can_manage_users""><a class="nav-link text-primary fw-bold" href="/users.html"><i class="bi bi-people-fill me-1"></i>Сотрудники</a></li>
                 </ul>
                 <div class="d-flex align-items-center gap-3">
                     <span id="user-role-badge" class="badge bg-light text-dark border">...</span>
@@ -107,7 +90,7 @@
             </div>
             
             <div class="d-flex gap-2">
-                <a href="/users.html" class="btn btn-light shadow-sm text-primary d-lg-none admin-only"><i class="bi bi-people-fill"></i></a>
+                <a href="/users.html" class="btn btn-light shadow-sm text-primary d-lg-none data-permission="can_manage_users""><i class="bi bi-people-fill"></i></a>
                 
                 <button id="export-competitors-prices-btn" class="btn btn-light shadow-sm text-info d-none d-md-block" title="Цены"><i class="bi bi-tags-fill"></i> Цены</button>
                 
@@ -202,7 +185,7 @@
         <p id="no-data-msg" class="text-center text-muted mt-5" style="display: none;">Ничего не найдено</p>
     </div>
 
-    <button id="mobile-fab-add" class="d-lg-none" onclick="document.getElementById('open-add-modal-btn').click()">
+    <button id="mobile-fab-add" class="d-lg-none" data-permission="can_create_dealer" onclick="document.getElementById('open-add-modal-btn').click()">
         <i class="bi bi-plus-lg"></i>
     </button>
 
@@ -505,6 +488,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="script.js?v={{VER}}"></script> <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(err => console.error(err)); }</script>
+    <script src="permissions.js?v={{VER}}"></script>
 </body>
 </html>
 

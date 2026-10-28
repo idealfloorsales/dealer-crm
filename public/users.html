@@ -144,14 +144,22 @@
                                     </div>
                                     <div class="col-md-6">
                                         <label class="form-label small fw-bold text-muted">Пароль</label>
-                                        <input type="text" id="u_password" class="form-control" placeholder="Оставьте пустым, если не меняете">
+                                        <input type="password" id="u_password" class="form-control" minlength="6" placeholder="Оставьте пустым, если не меняете">
                                     </div>
                                     <div class="col-md-6">
-                                        <label class="form-label small fw-bold text-muted">Регион (Scope)</label>
+                                        <label class="form-label small fw-bold text-muted">Роль</label>
+                                        <select id="u_role" class="form-select">
+                                            <option value="manager">Менеджер</option>
+                                            <option value="marketing">Маркетинг</option>
+                                            <option value="guest">Гость</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold text-muted">Регион доступа</label>
                                         <select id="u_scope" class="form-select">
-                                            <option value="all">Вся компания (All)</option>
+                                            <option value="all">Вся компания</option>
                                             <option value="astana">Только Астана</option>
-                                            <option value="regions">Только Регионы</option>
+                                            <option value="regions">Только регионы</option>
                                         </select>
                                     </div>
                                 </div>
@@ -183,6 +191,7 @@
                                         <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_view_sales"><label class="form-check-label" for="p_can_view_sales">Продажи (Таблица)</label></div>
                                         <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_view_competitors"><label class="form-check-label" for="p_can_view_competitors">Конкуренты</label></div>
                                         <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_view_knowledge"><label class="form-check-label" for="p_can_view_knowledge">База знаний</label></div>
+                                        <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_view_reclamations"><label class="form-check-label" for="p_can_view_reclamations">Рекламации</label></div>
                                         <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_view_dashboard"><label class="form-check-label" for="p_can_view_dashboard">Дашборд (Статистика)</label></div>
                                     </div>
                                 </div>
@@ -196,11 +205,14 @@
                                         <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_create_dealer"><label class="form-check-label" for="p_can_create_dealer">Создавать дилера</label></div>
                                         <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_edit_dealer"><label class="form-check-label" for="p_can_edit_dealer">Редактировать дилера</label></div>
                                         <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_manage_visits"><label class="form-check-label" for="p_can_manage_visits">Добавлять визиты</label></div>
+                                        <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_edit_matrix"><label class="form-check-label" for="p_can_edit_matrix">Редактировать матрицу дилера</label></div>
                                         <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_edit_sales_fact"><label class="form-check-label" for="p_can_edit_sales_fact">Вносить Факт продаж</label></div>
                                         
                                         <div class="perm-group-header text-success mt-3">Справочники</div>
                                         <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_manage_products"><label class="form-check-label" for="p_can_manage_products">Управлять товарами (SKU)</label></div>
                                         <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_manage_competitors"><label class="form-check-label" for="p_can_manage_competitors">Управлять брендами</label></div>
+                                        <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_manage_knowledge"><label class="form-check-label" for="p_can_manage_knowledge">Управлять базой знаний</label></div>
+                                        <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_manage_reclamations"><label class="form-check-label" for="p_can_manage_reclamations">Управлять рекламациями</label></div>
                                     </div>
                                 </div>
                             </div>
@@ -258,6 +270,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="permissions.js?v={{VER}}"></script>
     <script>
         // --- AUTH INTERCEPTOR ---
         const originalFetch = window.fetch;
@@ -321,9 +334,10 @@
                 const color = getAvatarColor(u.fullName || u.username);
                 const initials = getInitials(u.fullName || u.username);
                 
-                const roleBadge = u.permissions.is_admin 
-                    ? '<span class="badge bg-warning text-dark border border-warning"><i class="bi bi-star-fill me-1"></i>Админ</span>' 
-                    : '<span class="badge bg-light text-secondary border">Менеджер</span>';
+                const roleNames = { manager: 'Менеджер', marketing: 'Маркетинг', guest: 'Гость' };
+                const roleBadge = u.permissions.is_admin
+                    ? '<span class="badge bg-warning text-dark border border-warning"><i class="bi bi-star-fill me-1"></i>Админ</span>'
+                    : '<span class="badge bg-light text-secondary border">' + (roleNames[u.role] || 'Менеджер') + '</span>';
                 
                 const statusBadge = u.isBlocked 
                     ? '<span class="badge bg-danger-subtle text-danger"><i class="bi bi-lock-fill me-1"></i>Блок</span>' 
@@ -356,7 +370,8 @@
             mobileList.innerHTML = filtered.map(u => {
                 const color = getAvatarColor(u.fullName || u.username);
                 const initials = getInitials(u.fullName || u.username);
-                const roleText = u.permissions.is_admin ? 'Администратор' : 'Менеджер';
+                const roleNames = { manager: 'Менеджер', marketing: 'Маркетинг', guest: 'Гость' };
+                const roleText = u.permissions.is_admin ? 'Администратор' : (roleNames[u.role] || 'Менеджер');
                 const roleClass = u.permissions.is_admin ? 'text-warning' : 'text-muted';
 
                 return `
@@ -378,10 +393,13 @@
             document.getElementById('userForm').reset();
             document.getElementById('u_id').value = '';
             document.getElementById('modalTitle').innerText = 'Новый сотрудник';
+            document.getElementById('u_password').required = true;
+            document.getElementById('u_role').value = 'manager';
+            document.getElementById('u_scope').value = 'all';
             document.querySelectorAll('.perm-check').forEach(cb => cb.checked = false);
             
             // Базовые права по умолчанию
-            ['p_can_view_map', 'p_can_view_dealers', 'p_can_view_sales', 'p_can_add_visit', 'p_can_view_dashboard'].forEach(id => {
+            ['p_can_view_map', 'p_can_view_dealers', 'p_can_view_products', 'p_can_view_sales', 'p_can_view_knowledge', 'p_can_view_reclamations', 'p_can_view_dashboard'].forEach(id => {
                 const el = document.getElementById(id); if(el) el.checked = true;
             });
             modal.show();
@@ -394,7 +412,9 @@
             document.getElementById('u_id').value = u._id;
             document.getElementById('u_fullName').value = u.fullName || '';
             document.getElementById('u_username').value = u.username;
-            document.getElementById('u_password').value = ''; 
+            document.getElementById('u_password').value = '';
+            document.getElementById('u_password').required = false;
+            document.getElementById('u_role').value = u.role || 'manager';
             document.getElementById('u_scope').value = u.scope;
             document.getElementById('u_isBlocked').checked = u.isBlocked;
 
@@ -432,6 +452,7 @@
                 fullName: document.getElementById('u_fullName').value,
                 username: document.getElementById('u_username').value,
                 password: document.getElementById('u_password').value,
+                role: document.getElementById('u_role').value,
                 scope: document.getElementById('u_scope').value,
                 isBlocked: document.getElementById('u_isBlocked').checked,
                 permissions
@@ -447,7 +468,10 @@
                     body: JSON.stringify(data)
                 });
                 
-                if(!res.ok) throw new Error('Ошибка сохранения');
+                if(!res.ok) {
+                    const result = await res.json().catch(() => ({}));
+                    throw new Error(result.error || 'Ошибка сохранения');
+                }
                 
                 modal.hide();
                 loadUsers();
