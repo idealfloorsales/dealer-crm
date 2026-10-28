@@ -418,6 +418,15 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         const totalFactAll = totalRegionsFact + totalAstanaFact + totalVipFact + totalOtherFact;
+
+        const levelFor = (fact, plan) => {
+            if (!(Number(plan) > 0)) return 'none';
+            const pct = Number(fact) / Number(plan) * 100;
+            if (pct >= 90) return 'good';
+            if (pct >= 70) return 'mid';
+            return 'low';
+        };
+
         const overview = [];
         if (currentScope === 'all') {
             overview.push(['Вся компания', totalFactAll, plans.total_all || 0]);
@@ -429,13 +438,22 @@ document.addEventListener('DOMContentLoaded', () => {
             overview.push(['Регионы', totalRegionsFact, plans.regions_all || 0]);
         }
 
-        printOverview.innerHTML = overview.map(([title,fact,plan]) => {
-            const pct = plan > 0 ? Math.round(fact / plan * 100) : 0;
-            return `<div class="sales-print-overview-card">
-                <span>${escapeHtml(title)}</span>
-                <strong>${plan > 0 ? pct + '%' : 'Без плана'}</strong>
-                <small>Факт ${fmt(fact)} м² · План ${plan > 0 ? fmt(plan) + ' м²' : '—'}</small>
-            </div>`;
+        printOverview.innerHTML = overview.map(([title, fact, plan]) => {
+            const hasPlan = Number(plan) > 0;
+            const pct = hasPlan ? Math.round(Number(fact) / Number(plan) * 100) : null;
+            const level = levelFor(fact, plan);
+            const width = pct === null ? 0 : Math.min(pct, 100);
+            return `<article class="sales-print-overview-card is-${level}">
+                <div class="sales-print-overview-top">
+                    <span>${escapeHtml(title)}</span>
+                    <strong>${pct === null ? 'Без плана' : pct + '%'}</strong>
+                </div>
+                <div class="sales-print-overview-values">
+                    <span>Факт <b>${fmt(fact)} м²</b></span>
+                    <span>План <b>${hasPlan ? fmt(plan) + ' м²' : '—'}</b></span>
+                </div>
+                <div class="sales-print-overview-bar"><i style="width:${width}%"></i></div>
+            </article>`;
         }).join('');
 
         const rows = [];
@@ -443,10 +461,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const hasPlan = Number(plan) > 0;
             const progress = calculateProgress(plan, fact, daysInMonth, currentDay);
             rows.push({
-                section, title, fact: Number(fact)||0, plan:Number(plan)||0,
+                section,
+                title,
+                fact: Number(fact) || 0,
+                plan: Number(plan) || 0,
                 percent: hasPlan ? progress.percent : null,
                 forecast: progress.forecast,
-                isTotal
+                isTotal,
+                level: hasPlan ? getProgressLevel(progress.percent, true) : 'none'
             });
         };
 
@@ -480,27 +502,36 @@ document.addEventListener('DOMContentLoaded', () => {
             addRow('Без категории', 'Не распределено', totalOtherFact, 0);
         }
 
-        let lastSection = '';
-        printSalesBody.innerHTML = rows.map(row => {
-            const sectionRow = row.section !== lastSection
-                ? `<tr class="sales-print-section-row"><td colspan="6">${escapeHtml(row.section)}</td></tr>`
-                : '';
-            lastSection = row.section;
+        const grouped = new Map();
+        rows.forEach(row => {
+            if (!grouped.has(row.section)) grouped.set(row.section, []);
+            grouped.get(row.section).push(row);
+        });
 
-            const pctText = row.percent === null ? '—' : Math.round(row.percent) + '%';
-            const barWidth = row.percent === null ? 0 : Math.min(row.percent, 100);
-            return sectionRow + `<tr class="${row.isTotal ? 'is-total' : ''}">
-                <td>${escapeHtml(row.title)}</td>
-                <td class="num">${row.plan > 0 ? fmt(row.plan) : '—'}</td>
-                <td class="num"><strong>${fmt(row.fact)}</strong></td>
-                <td class="num"><strong>${pctText}</strong></td>
-                <td class="num">${fmt(row.forecast)}</td>
-                <td>
-                    <div class="sales-print-progress">
-                        <span style="width:${barWidth}%"></span>
+        printSalesBody.innerHTML = [...grouped.entries()].map(([section, sectionRows]) => {
+            const items = sectionRows.map(row => {
+                const pctText = row.percent === null ? 'Без плана' : Math.round(row.percent) + '%';
+                const barWidth = row.percent === null ? 0 : Math.min(row.percent, 100);
+                const planText = row.plan > 0 ? fmt(row.plan) + ' м²' : '—';
+
+                return `<article class="sales-print-item is-${row.level} ${row.isTotal ? 'is-total' : ''}">
+                    <div class="sales-print-item-head">
+                        <div class="sales-print-item-title">${escapeHtml(row.title)}</div>
+                        <div class="sales-print-item-percent">${pctText}</div>
                     </div>
-                </td>
-            </tr>`;
+                    <div class="sales-print-item-metrics">
+                        <div><span>План</span><strong>${planText}</strong></div>
+                        <div><span>Факт</span><strong>${fmt(row.fact)} м²</strong></div>
+                        <div><span>Прогноз</span><strong>${fmt(row.forecast)} м²</strong></div>
+                    </div>
+                    <div class="sales-print-item-progress"><span style="width:${barWidth}%"></span></div>
+                </article>`;
+            }).join('');
+
+            return `<section class="sales-print-section">
+                <div class="sales-print-section-title">${escapeHtml(section)}</div>
+                <div class="sales-print-section-items">${items}</div>
+            </section>`;
         }).join('');
     }
 
