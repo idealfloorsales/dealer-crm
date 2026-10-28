@@ -1,23 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
     
 // --- 1. АВТОРИЗАЦИЯ ---
-    const originalFetch = window.fetch;
-    window.fetch = async function (url, options) {
-        options = options || {};
-        options.headers = options.headers || {};
-        const token = localStorage.getItem('crm_token');
-        if (token) options.headers['Authorization'] = 'Bearer ' + token;
-        
-        const response = await originalFetch(url, options);
-        
-        // ИСПРАВЛЕНИЕ: Добавили проверку 403 (Forbidden)
-        if (response.status === 401 || response.status === 403) {
-            localStorage.removeItem('crm_token'); // Удаляем просроченный токен
-            window.location.href = '/login.html'; // Выкидываем на логин
-        }
-        
-        return response;
-    };
+    // Общая авторизация и права находятся в permissions.js.
+    // Важно: 403 означает "нет права", а не "токен просрочен".
 
     // --- 2. КОНСТАНТЫ И ПЕРЕМЕННЫЕ ---
     const API_DEALERS_URL = '/api/dealers';
@@ -358,7 +343,16 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             console.log("Starting app init...");
             // 1. Auth
-            try { const authRes = await fetch('/api/auth/me'); if (authRes.ok) { const authData = await authRes.json(); currentUserRole = authData.user ? authData.user.role : 'guest'; const badge = document.getElementById('user-role-badge'); if(badge) { const names = { 'admin': 'Админ', 'astana': 'Астана', 'regions': 'Регионы', 'guest': 'Гость' }; badge.textContent = names[currentUserRole] || currentUserRole; } if (currentUserRole === 'guest') { if (openAddModalBtn) openAddModalBtn.style.display = 'none'; } } } catch (e) {}
+            try {
+                if (window.CRMAuth && CRMAuth.ready) await CRMAuth.ready;
+                const user = window.CRMAuth ? CRMAuth.user : null;
+                currentUserRole = user ? user.role : 'guest';
+
+                if (openAddModalBtn && !CRMAuth.can('can_create_dealer')) openAddModalBtn.style.display = 'none';
+                if (btnManageStatuses && !CRMAuth.can('can_edit_dealer')) btnManageStatuses.style.display = 'none';
+                if (btnExportDealers && !CRMAuth.can('can_export_base')) btnExportDealers.style.display = 'none';
+                if (btnExportCompetitors && !CRMAuth.can('can_export_prices')) btnExportCompetitors.style.display = 'none';
+            } catch (e) { console.warn('Не удалось применить права пользователя', e); }
 
             // 2. Load Dictionaries
             await Promise.all([
@@ -768,7 +762,7 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
             }
             
             const avatarHtml = d.photo_url ? `<img src="${d.photo_url}" alt="${d.name}">` : `<i class="bi bi-shop"></i>`;
-            const editBtn = (currentUserRole !== 'guest') ? `<button class="btn-circle" onclick="event.stopPropagation(); openEditModal('${d.id}')" title="Редактировать"><i class="bi bi-pencil"></i></button>` : '';
+            const editBtn = (window.CRMAuth && CRMAuth.can('can_edit_dealer')) ? `<button class="btn-circle" onclick="event.stopPropagation(); openEditModal('${d.id}')" title="Редактировать"><i class="bi bi-pencil"></i></button>` : '';
             
             const salesFact = salesMap[d.id] || 0;
             let salesColorClass = 'bg-danger'; if (salesFact >= 200) salesColorClass = 'bg-success'; else if (salesFact >= 100) salesColorClass = 'bg-warning text-dark'; 
@@ -814,7 +808,46 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
             contract: { isSigned: document.getElementById('edit_contract_signed').checked, date: getVal('edit_contract_date') }, avatarUrl: avatarToSend, contacts: collectData(editContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]), additional_addresses: collectData(editAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]), pos_materials: collectData(editPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]), visits: collectData(editVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'},{key:'isCompleted',class:'.visit-completed'}]), photos: editPhotosData, competitors: collectData(editCompetitorList, '.competitor-entry', [{key:'brand',class:'.competitor-brand'},{key:'collection',class:'.competitor-collection'},{key:'price_opt',class:'.competitor-price-opt'},{key:'price_retail',class:'.competitor-price-retail'}]) 
         }; 
         try { await fetch(`${API_DEALERS_URL}/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); await saveProducts(id, getSelectedProductIds('edit-product-checklist')); editModal.hide(); window.showToast("Изменения сохранены!"); initApp(); } catch (e) { window.showToast("Ошибка сохранения", "error"); } finally { isSaving = false; if(btn) { btn.disabled = false; btn.innerHTML = oldText; } } });
-    if(qvForm) qvForm.addEventListener('submit', async (e) => { e.preventDefault(); if (isSaving) return; isSaving = true; const id = document.getElementById('qv_dealer_id').value; const comment = document.getElementById('qv_comment').value; const btn = qvForm.querySelector('button'); if(!id || !comment) { isSaving = false; return; } try { btn.disabled = true; const getRes = await fetch(`${API_DEALERS_URL}/${id}`); const dealer = await getRes.json(); const newVisit = { date: new Date().toISOString().slice(0,10), comment: comment, isCompleted: true }; const visits = [...(dealer.visits || []), newVisit]; await fetch(`${API_DEALERS_URL}/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ visits }) }); qvModal.hide(); alert("Визит добавлен!"); } catch(e) { alert("Ошибка"); } finally { isSaving = false; btn.disabled = false; } });
+    if(qvForm) qvForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (isSaving) return;
+        if (window.CRMAuth && !CRMAuth.can('can_manage_visits')) {
+            window.showToast("Нет права добавлять визиты", "error");
+            return;
+        }
+
+        isSaving = true;
+        const id = document.getElementById('qv_dealer_id').value;
+        const comment = document.getElementById('qv_comment').value.trim();
+        const btn = qvForm.querySelector('button');
+        if(!id || !comment) { isSaving = false; return; }
+
+        try {
+            btn.disabled = true;
+            const response = await fetch(`${API_DEALERS_URL}/${id}/visits`, {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({
+                    date: new Date().toISOString().slice(0,10),
+                    comment,
+                    isCompleted: true
+                })
+            });
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || "Не удалось добавить визит");
+            }
+            qvModal.hide();
+            qvForm.reset();
+            window.showToast("Визит добавлен!");
+            await initApp();
+        } catch(e) {
+            window.showToast(e.message || "Ошибка", "error");
+        } finally {
+            isSaving = false;
+            if (btn) btn.disabled = false;
+        }
+    });
 
     // --- EVENT LISTENERS ---
     if(filterCity) filterCity.onchange = renderDealerList; 
