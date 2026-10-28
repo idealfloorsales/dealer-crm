@@ -55,6 +55,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let pendingCustomGroup = '';
     let groupsCollapsed = false;
     let currentScope = 'all';
+    let autoSaveTimer = null;
+    let autoSaveInFlight = false;
+    let autoSaveQueued = false;
+    let autoSaveRevision = 0;
     
     // Загрузка настроек видимости планов
     let planVisibility = JSON.parse(localStorage.getItem('sales_plan_config')) || {};
@@ -74,8 +78,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (saveBtn && !canEditFact && !canEditPlan) {
-                saveBtn.disabled = true;
-                saveBtn.innerHTML = '<i class="bi bi-lock"></i> Только чтение';
+                setSaveButtonState('readonly');
+            } else {
+                setSaveButtonState('saved');
             }
         } catch (e) { console.error(e); }
 
@@ -135,13 +140,65 @@ document.addEventListener('DOMContentLoaded', () => {
         tabSummaryBtn.onclick = showSummary;
     }
 
+    function setSaveButtonState(state) {
+        if (!saveBtn) return;
+
+        if (!canEditFact && !canEditPlan) {
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="bi bi-lock"></i><span>Только чтение</span>';
+            return;
+        }
+
+        saveBtn.disabled = state === 'saving';
+
+        if (state === 'saving') {
+            saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span><span>Сохраняем…</span>';
+        } else if (state === 'dirty') {
+            saveBtn.innerHTML = '<i class="bi bi-cloud-arrow-up"></i><span>Есть изменения</span>';
+        } else if (state === 'error') {
+            saveBtn.innerHTML = '<i class="bi bi-exclamation-triangle"></i><span>Сохранить снова</span>';
+        } else {
+            saveBtn.innerHTML = '<i class="bi bi-cloud-check"></i><span>Сохранено</span>';
+        }
+    }
+
+    function setAutoSaveInfo(state) {
+        if (!lastUpdateInfo) return;
+        lastUpdateInfo.classList.toggle('is-dirty', state === 'dirty' || state === 'error');
+
+        if (state === 'saving') {
+            lastUpdateInfo.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Автосохранение…';
+        } else if (state === 'dirty') {
+            lastUpdateInfo.innerHTML = '<i class="bi bi-circle-fill"></i> Изменения сохранятся автоматически';
+        } else if (state === 'error') {
+            lastUpdateInfo.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>Не удалось сохранить. Повторим автоматически';
+        } else {
+            const time = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+            lastUpdateInfo.innerHTML = '<i class="bi bi-cloud-check me-1"></i>Сохранено автоматически · ' + time;
+        }
+    }
+
+    function cancelScheduledAutoSave() {
+        if (autoSaveTimer) clearTimeout(autoSaveTimer);
+        autoSaveTimer = null;
+    }
+
+    function scheduleAutoSave(delay = 900) {
+        if (!canEditFact && !canEditPlan) return;
+        cancelScheduledAutoSave();
+        autoSaveTimer = setTimeout(() => {
+            autoSaveTimer = null;
+            persistSales(false);
+        }, delay);
+    }
+
     function markDirty() {
         if (!canEditFact && !canEditPlan) return;
         isDirty = true;
-        if (lastUpdateInfo) {
-            lastUpdateInfo.classList.add('is-dirty');
-            lastUpdateInfo.innerHTML = '<i class="bi bi-circle-fill"></i> Есть несохранённые изменения';
-        }
+        autoSaveRevision += 1;
+        setSaveButtonState('dirty');
+        setAutoSaveInfo('dirty');
+        scheduleAutoSave();
     }
 
     function clearDirty() {
@@ -158,6 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const [year, month] = monthPicker.value.split('-').map(Number);
         const d = new Date(year, month - 1 + delta, 1);
         monthPicker.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        cancelScheduledAutoSave();
         isDirty = false;
         loadData();
     }
@@ -165,6 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function goToCurrentMonth() {
         if (!canLeaveCurrentMonth()) return;
         monthPicker.value = new Date().toISOString().slice(0, 7);
+        cancelScheduledAutoSave();
         isDirty = false;
         loadData();
     }
@@ -208,7 +267,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const str = maxDate.toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
             lastUpdateInfo.innerHTML = `<i class="bi bi-clock-history me-1"></i>Обновлено: ${str}`;
         } else {
-            lastUpdateInfo.innerHTML = '<i class="bi bi-exclamation-circle me-1"></i>Нажмите "Сохранить"';
+            lastUpdateInfo.innerHTML = '<i class="bi bi-cloud-check me-1"></i>Автосохранение включено';
         }
     }
 
@@ -338,6 +397,82 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentSales.push({ month: monthPicker.value, group: 'PLAN', dealerId: `PLAN_${planKey}`, dealerName: `Plan ${planKey}`, isCustom: false, plan: val, fact: 0 });
             }
         });
+    }
+
+    async function persistSales(manual = false) {
+        if (!canEditFact && !canEditPlan) return true;
+
+        cancelScheduledAutoSave();
+
+        if (autoSaveInFlight) {
+            autoSaveQueued = true;
+            return false;
+        }
+
+        if (!isDirty && !manual) return true;
+        if (!isDirty && manual) {
+            setSaveButtonState('saved');
+            setAutoSaveInfo('saved');
+            return true;
+        }
+
+        captureState();
+
+        const revisionAtStart = autoSaveRevision;
+        const monthAtStart = monthPicker.value;
+        const payload = JSON.parse(JSON.stringify(currentSales));
+
+        autoSaveInFlight = true;
+        autoSaveQueued = false;
+        setSaveButtonState('saving');
+        setAutoSaveInfo('saving');
+
+        try {
+            const res = await fetch(API_SALES, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ month: monthAtStart, data: payload })
+            });
+
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error || 'Ошибка при сохранении');
+            }
+
+            const noNewChanges = revisionAtStart === autoSaveRevision && monthAtStart === monthPicker.value;
+            if (noNewChanges) {
+                clearDirty();
+                setSaveButtonState('saved');
+                setAutoSaveInfo('saved');
+            } else {
+                setSaveButtonState('dirty');
+                setAutoSaveInfo('dirty');
+                autoSaveQueued = true;
+            }
+
+            return true;
+        } catch (e) {
+            console.error('Sales autosave error', e);
+            isDirty = true;
+            setSaveButtonState('error');
+            setAutoSaveInfo('error');
+
+            if (manual) {
+                if (window.showToast) window.showToast(e.message || 'Не удалось сохранить продажи', 'error');
+                else alert(e.message || 'Не удалось сохранить продажи');
+            } else {
+                scheduleAutoSave(5000);
+            }
+
+            return false;
+        } finally {
+            autoSaveInFlight = false;
+
+            if (autoSaveQueued || isDirty && revisionAtStart !== autoSaveRevision) {
+                autoSaveQueued = false;
+                scheduleAutoSave(250);
+            }
+        }
     }
 
     function getProgressLevel(percent, hasPlan = true) {
@@ -769,6 +904,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     currentSales = currentSales.filter(s => !(s.isCustom && s.group === group && s.dealerName === name));
                     markDirty();
                     renderAll();
+                    scheduleAutoSave(180);
                 }
             };
         });
@@ -806,6 +942,7 @@ document.addEventListener('DOMContentLoaded', () => {
             markDirty();
             customModal?.hide();
             renderAll();
+            scheduleAutoSave(180);
         };
     }
 
@@ -816,30 +953,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (saveBtn) {
-        saveBtn.onclick = async () => {
-            captureState();
-            try {
-                saveBtn.disabled = true;
-                saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span><span>Сохраняем…</span>';
-                const res = await fetch(API_SALES, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ month: monthPicker.value, data: currentSales })
-                });
-                if (!res.ok) throw new Error('Ошибка при сохранении');
-
-                clearDirty();
-                if (window.showToast) window.showToast('Продажи сохранены');
-                saveBtn.innerHTML = '<i class="bi bi-check-lg"></i><span>Сохранено</span>';
-                await loadData();
-                saveBtn.innerHTML = '<i class="bi bi-check-lg"></i><span>Сохранить</span>';
-                saveBtn.disabled = !canEditFact && !canEditPlan;
-            } catch (e) {
-                alert(e.message);
-                saveBtn.disabled = false;
-                saveBtn.innerHTML = '<i class="bi bi-check-lg"></i><span>Сохранить</span>';
-            }
-        };
+        saveBtn.onclick = () => persistSales(true);
     }
 
     monthPicker.addEventListener('change', () => {
@@ -847,6 +961,7 @@ document.addEventListener('DOMContentLoaded', () => {
             monthPicker.value = loadedMonth;
             return;
         }
+        cancelScheduledAutoSave();
         isDirty = false;
         loadData();
     });
@@ -867,6 +982,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!e.target.matches('.sales-input, .plan-input')) return;
         captureState();
         renderAll();
+        scheduleAutoSave(180);
     });
 
     document.addEventListener('keydown', e => {
