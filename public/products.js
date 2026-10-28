@@ -7,7 +7,8 @@ window.fetch = async function (url, options) {
     if (token) options.headers['Authorization'] = 'Bearer ' + token;
     
     const response = await originalFetch(url, options);
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
+        localStorage.removeItem('crm_token');
         window.location.href = '/login.html';
     }
     return response;
