@@ -419,9 +419,15 @@ app.get('/api/matrix', requireAnyPermission('can_view_products', 'can_view_repor
 app.get('/api/sales', requirePermission('can_view_sales'), async (req, res) => { const {month} = req.query; const s = await Sales.find(month ? {month} : {}).lean(); res.json(s); });
 
 // ===== ИСПРАВЛЕННЫЙ БЛОК: СОХРАНЕНИЕ, АГРЕГАЦИЯ И УДАЛЕНИЕ =====
-app.post('/api/sales', checkWrite, async (req, res) => {
+app.post('/api/sales', async (req, res) => {
+    const canFact = hasPermission(req, 'can_edit_sales_fact');
+    const canPlan = hasPermission(req, 'can_edit_sales_plan');
+    if (!canFact && !canPlan) {
+        return res.status(403).json({ error: 'Недостаточно прав для изменения продаж' });
+    }
+
     const now = new Date();
-    const role = req.user ? req.user.role : 'guest';
+    const scope = req.user ? req.user.scope : 'none';
 
     // 1. Агрегируем дубликаты из присланных данных (если ввели несколько с одинаковым именем)
     const aggregatedData = {};
@@ -462,10 +468,10 @@ app.post('/api/sales', checkWrite, async (req, res) => {
     // 3. Умное удаление (Очистка разовых продаж)
     // Определяем, к каким группам имеет доступ текущий пользователь
     let groupFilter = {};
-    if (role === 'astana') {
+    if (scope === 'astana') {
         const sectors = await Sector.find({ type: 'astana' });
         groupFilter = { group: { $in: sectors.map(s => s.name) } };
-    } else if (role === 'regions') {
+    } else if (scope === 'regions') {
         const sectors = await Sector.find({ type: 'region' });
         groupFilter = { group: { $in: sectors.map(s => s.name) } };
     }
