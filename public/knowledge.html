@@ -42,10 +42,31 @@
         <p id="no-data-msg" class="alert alert-info mt-3" style="display: none;"></p>
     </div>
     
-    <div class="modal fade" id="knowledge-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-        <div class="modal-dialog">
-            <div class="modal-content">
+    <div class="modal fade" id="article-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content border-0 rounded-4 shadow">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold" id="article-modal-title">Добавить статью</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
+                <div class="modal-body">
+                    <form id="article-form">
+                        <input type="hidden" id="article_id">
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-muted">Название</label>
+                            <input type="text" id="article_title" class="form-control" required placeholder="Название статьи">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-muted">Содержание</label>
+                            <textarea id="article_content" class="form-control" rows="12" required placeholder="Текст статьи, инструкция или памятка"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-light border rounded-pill px-4" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" form="article-form" class="btn btn-primary rounded-pill px-4">Сохранить</button>
+                </div>
+            </div>
         </div>
     </div>
     
