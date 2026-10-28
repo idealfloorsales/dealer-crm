@@ -606,8 +606,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const health = getDealerHealth(dealer);
             if (dealer.status === 'problem') {
                 items.push({ priority: 100, type:'risk', icon:'exclamation-diamond', title:dealer.name, meta:'Статус дилера: проблемный', dealerId:dealer.id, health });
-            } else if (health.score < 50) {
-                items.push({ priority: 80 + (50-health.score), type:'risk', icon:'heart-pulse', title:dealer.name, meta:health.reasons[0] || 'Низкая оценка дилера', dealerId:dealer.id, health });
+            } else if (health.score < 60) {
+                items.push({ priority: 80 + (60-health.score), type:'risk', icon:'heart-pulse', title:dealer.name, meta:health.reasons[0] || 'Низкая оценка дилера', dealerId:dealer.id, health });
             }
         });
 
@@ -718,7 +718,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const network = allDealers.filter(d => d.status !== 'archive');
         const activeIds = new Set((currentMonthSales || []).filter(s => Number(s.fact)>0).map(s => String(s.dealerId)));
         const activeCount = network.filter(d => activeIds.has(String(d.id))).length;
-        const problemCount = network.filter(d => d.status === 'problem' || getDealerHealth(d).score < 50).length;
+        const problemCount = network.filter(d => d.status === 'problem' || getDealerHealth(d).score < 60).length;
         const currentFact = (currentMonthSales || []).reduce((a,s)=>a+(Number(s.fact)||0),0);
         const currentPlan = (currentMonthSales || []).reduce((a,s)=>a+(Number(s.plan)||0),0);
         const achievement = currentPlan > 0 ? Math.round(currentFact/currentPlan*100) : 0;
