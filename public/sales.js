@@ -273,6 +273,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function escapeAttr(value) {
+        return escapeHtml(value);
+    }
+
     function fmt(num) {
         if (typeof num !== 'number' || isNaN(num)) return 0;
         return Math.round(num * 100) / 100;
@@ -358,9 +371,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 rowsHtml += `
-                    <div class="sales-row" data-id="${item.id || ''}" data-name="${safeText ? '' : ''}" data-search="${String(item.name).replace(/"/g, '&quot;')}" data-custom="${item.isCustom}">
+                    <div class="sales-row" data-id="${item.id || ''}" data-name="${escapeAttr(item.name)}" data-search="${escapeAttr(item.name)}" data-custom="${item.isCustom}">
                         <div class="sales-dealer-name">
-                            <span>${item.name}</span>
+                            <span>${escapeHtml(item.name)}</span>
                             ${item.isCustom ? '<small>Разовая запись</small>' : ''}
                         </div>
                         <div class="sales-row-actions">
@@ -391,7 +404,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                         <div class="sales-group-actions">
                             ${planControl}
-                            ${canEditFact ? `<button class="sales-add-row btn-add-custom" type="button" data-group="${grp.key}" data-title="${grp.title}"><i class="bi bi-plus-lg"></i> Добавить</button>` : ''}
+                            ${canEditFact && grp.key !== 'vip' ? `<button class="sales-add-row btn-add-custom" type="button" data-group="${grp.key}" data-title="${escapeAttr(grp.title)}"><i class="bi bi-plus-lg"></i> Добавить</button>` : ''}
                         </div>
                     </div>
                     <div class="region-body">${rowsHtml || '<div class="cc-empty">Нет записей</div>'}</div>
