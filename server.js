@@ -432,12 +432,16 @@ app.post('/api/sales', async (req, res) => {
     // 1. Агрегируем дубликаты из присланных данных (если ввели несколько с одинаковым именем)
     const aggregatedData = {};
     req.body.data.forEach(i => {
-        const key = i.isCustom ? `custom_${i.group}_${i.dealerName}` : `dealer_${i.dealerId}`;
+        const row = { ...i };
+        if (!canFact) delete row.fact;
+        if (!canPlan) delete row.plan;
+
+        const key = row.isCustom ? `custom_${row.group}_${row.dealerName}` : `dealer_${row.dealerId}`;
         if (!aggregatedData[key]) {
-            aggregatedData[key] = { ...i };
+            aggregatedData[key] = row;
         } else {
-            aggregatedData[key].fact = (Number(aggregatedData[key].fact) || 0) + (Number(i.fact) || 0);
-            aggregatedData[key].plan = (Number(aggregatedData[key].plan) || 0) + (Number(i.plan) || 0);
+            if (canFact) aggregatedData[key].fact = (Number(aggregatedData[key].fact) || 0) + (Number(row.fact) || 0);
+            if (canPlan) aggregatedData[key].plan = (Number(aggregatedData[key].plan) || 0) + (Number(row.plan) || 0);
         }
     });
 
@@ -487,7 +491,7 @@ app.post('/api/sales', async (req, res) => {
     const idsToDelete = [];
     const incomingArray = Object.values(aggregatedData);
 
-    dbCustomSales.forEach(dbSale => {
+    if (canFact) dbCustomSales.forEach(dbSale => {
         // Проверяем, осталась ли эта продажа в присланных данных
         const existsInIncoming = incomingArray.some(
             i => i.isCustom && i.group === dbSale.group && i.dealerName === dbSale.dealerName
@@ -500,7 +504,7 @@ app.post('/api/sales', async (req, res) => {
     });
 
     // Удаляем всё лишнее
-    if (idsToDelete.length > 0) {
+    if (canFact && idsToDelete.length > 0) {
         await Sales.deleteMany({ _id: { $in: idsToDelete } });
     }
 
