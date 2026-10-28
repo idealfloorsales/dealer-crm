@@ -358,46 +358,45 @@ async function seedStatuses() { const count = await Status.countDocuments(); if 
 function convertToClient(doc) { if(!doc) return null; const obj = doc.toObject ? doc.toObject() : doc; obj.id = obj._id; delete obj._id; delete obj.__v; delete obj.password; if(obj.products) obj.products = obj.products.map(p => { if(p){p.id=p._id; delete p._id;} return p;}); if (obj.organization && (!obj.organizations || obj.organizations.length === 0)) { obj.organizations = [obj.organization]; } return obj; }
 
 function getUserRole(req) { return req.user ? req.user.role : 'guest'; }
-function canWrite(req) { return req.user && req.user.role !== 'guest'; }
-const checkWrite = (req, res, next) => { if (canWrite(req)) next(); else res.status(403).json({error:'Read Only'}); };
+function getUserScope(req) { return req.user ? req.user.scope : 'none'; }
 
 function getDealerFilter(req) {
-    if (!req.user) return { _id: null }; 
-    const role = req.user.role; 
-    if (role === 'admin' || role === 'guest' || role === 'all') return {}; 
-    if (role === 'astana') return { $or: [{ responsible: 'regional_astana' }, { city: { $regex: /астана/i } }, { city: { $regex: /astana/i } }] };
-    if (role === 'regions') return { $or: [{ responsible: 'regional_regions' }, { city: { $not: { $regex: /астана/i } }, responsible: { $ne: 'regional_astana' } }] };
-    return { _id: null }; 
+    if (!req.user) return { _id: null };
+    const scope = getUserScope(req);
+    if (scope === 'all') return {};
+    if (scope === 'astana') return { $or: [{ responsible: 'regional_astana' }, { city: { $regex: /астана/i } }, { city: { $regex: /astana/i } }] };
+    if (scope === 'regions') return { $or: [{ responsible: 'regional_regions' }, { city: { $not: { $regex: /астана/i } }, responsible: { $ne: 'regional_astana' } }] };
+    return { _id: null };
 }
 
 app.get('/api/auth/me', (req, res) => { res.json({ user: req.user }); });
 
 // --- API ROUTES ---
-app.get('/api/statuses', async (req, res) => { const s = await Status.find().sort({sortOrder: 1}).lean(); res.json(s.map(convertToClient)); });
-app.post('/api/statuses', checkWrite, async (req, res) => { try { const s = new Status(req.body); await s.save(); res.json(convertToClient(s)); } catch(e){ res.status(500).json({error:e.message}); } });
-app.put('/api/statuses/:id', checkWrite, async (req, res) => { try { await Status.findByIdAndUpdate(req.params.id, req.body); res.json({status:'ok'}); } catch(e){ res.status(500).json({error:e.message}); } });
-app.delete('/api/statuses/:id', checkWrite, async (req, res) => { await Status.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
+app.get('/api/statuses', requireAnyPermission('can_view_dealers', 'can_view_map'), async (req, res) => { const s = await Status.find().sort({sortOrder: 1}).lean(); res.json(s.map(convertToClient)); });
+app.post('/api/statuses', requirePermission('can_edit_dealer'), async (req, res) => { try { const s = new Status(req.body); await s.save(); res.json(convertToClient(s)); } catch(e){ res.status(500).json({error:e.message}); } });
+app.put('/api/statuses/:id', requirePermission('can_edit_dealer'), async (req, res) => { try { await Status.findByIdAndUpdate(req.params.id, req.body); res.json({status:'ok'}); } catch(e){ res.status(500).json({error:e.message}); } });
+app.delete('/api/statuses/:id', requirePermission('can_edit_dealer'), async (req, res) => { await Status.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
 
 // --- API СЕКТОРОВ ---
-app.get('/api/sectors', async (req, res) => { const list = await Sector.find().sort({name:1}); res.json(list.map(convertToClient)); });
-app.post('/api/sectors', checkWrite, async (req, res) => { const s = new Sector(req.body); await s.save(); res.json(convertToClient(s)); });
-app.delete('/api/sectors/:id', checkWrite, async (req, res) => { await Sector.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
+app.get('/api/sectors', requirePermission('can_view_dealers'), async (req, res) => { const list = await Sector.find().sort({name:1}); res.json(list.map(convertToClient)); });
+app.post('/api/sectors', requirePermission('can_edit_dealer'), async (req, res) => { const s = new Sector(req.body); await s.save(); res.json(convertToClient(s)); });
+app.delete('/api/sectors/:id', requirePermission('can_edit_dealer'), async (req, res) => { await Sector.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
 
-app.get('/api/dealers', async (req, res) => { try { let filter = getDealerFilter(req); if (req.query.scope === 'all') { filter = {}; } const dealers = await Dealer.find(filter).select('-photos -visits -products').lean(); res.json(dealers.map(d => ({ id: d._id, ...d, photo_url: d.avatarUrl }))); } catch (e) { res.status(500).json({ error: e.message }); } });
-app.get('/api/dealers/:id', async (req, res) => { try { const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).populate('products'); res.json(convertToClient(d)); } catch (e) { res.status(500).json({ error: e.message }); } });
-app.post('/api/dealers', checkWrite, async (req, res) => { try { const role = getUserRole(req); if (role === 'astana') req.body.responsible = 'regional_astana'; if (role === 'regions') req.body.responsible = 'regional_regions'; const d = new Dealer(req.body); await d.save(); res.status(201).json(convertToClient(d)); } catch (e) { res.status(500).json({ error: e.message }); } });
-app.put('/api/dealers/:id', checkWrite, async (req, res) => { try { await Dealer.findOneAndUpdate({ _id: req.params.id, ...getDealerFilter(req) }, req.body); res.json({status:'ok'}); } catch (e) { res.status(500).json({ error: e.message }); } });
-app.delete('/api/dealers/:id', checkWrite, async (req, res) => { try { await Dealer.findOneAndDelete({ _id: req.params.id, ...getDealerFilter(req) }); res.json({status:'deleted'}); } catch (e) { res.status(500).json({ error: e.message }); } });
-app.get('/api/dealers/:id/products', async (req, res) => { const d = await Dealer.findById(req.params.id).populate('products'); res.json(d.products.map(convertToClient)); });
-app.put('/api/dealers/:id/products', async (req, res) => { await Dealer.findByIdAndUpdate(req.params.id, { products: req.body.productIds }); res.json({status:'ok'}); });
-app.get('/api/products', async (req, res) => { const s = new RegExp(req.query.search||'', 'i'); const p = await Product.find({$or:[{sku:s},{name:s}]}).sort({sku:1}).lean(); res.json(p.map(x=>{x.id=x._id;return x;})); });
-app.post('/api/products', checkWrite, async (req, res) => { const p = new Product(req.body); await p.save(); res.json(convertToClient(p)); });
-app.put('/api/products/:id', checkWrite, async (req, res) => { const p = await Product.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(p)); });
-app.delete('/api/products/:id', checkWrite, async (req, res) => { await Product.findByIdAndDelete(req.params.id); res.json({}); });
-app.post('/api/admin/import-catalog', async (req, res) => { if(getUserRole(req) !== 'admin') return res.status(403).json({error:'Admin only'}); res.json({status: 'ok'}); });
-app.get('/api/matrix', async (req, res) => { try { const prods = await Product.find().sort({sku:1}).lean(); const dealers = await Dealer.find(getDealerFilter(req)).lean(); const map = new Map(); dealers.forEach(d => map.set(d._id.toString(), new Set(d.products.map(String)))); const posList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"]; const matrix = prods.map(p => ({ sku: p.sku, name: p.name, type: 'product', dealers: dealers.map(d => ({ value: map.get(d._id.toString()).has(p._id.toString()) ? 1 : 0, is_pos: false })) })); posList.forEach(pn => { matrix.push({ sku: "POS", name: pn, type: 'pos', dealers: dealers.map(d => ({ value: (d.pos_materials||[]).find(m=>m.name===pn)?.quantity||0, is_pos: true })) }); }); res.json({ headers: dealers.map(d=>({id:d._id, name:d.name, city:d.city, responsible:d.responsible})), matrix }); } catch (e) { res.status(500).json({error:e.message}); } });
+app.get('/api/dealers', requireAnyPermission('can_view_dealers', 'can_view_map', 'can_view_reclamations'), async (req, res) => { try { let filter = getDealerFilter(req); if (req.query.scope === 'all') { filter = {}; } const dealers = await Dealer.find(filter).select('-photos -visits -products').lean(); res.json(dealers.map(d => ({ id: d._id, ...d, photo_url: d.avatarUrl }))); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.get('/api/dealers/:id', requirePermission('can_view_dealers'), async (req, res) => { try { const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).populate('products'); res.json(convertToClient(d)); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.post('/api/dealers', requirePermission('can_create_dealer'), async (req, res) => { try { const role = getUserRole(req); if (role === 'astana') req.body.responsible = 'regional_astana'; if (role === 'regions') req.body.responsible = 'regional_regions'; const d = new Dealer(req.body); await d.save(); res.status(201).json(convertToClient(d)); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.put('/api/dealers/:id', requirePermission('can_edit_dealer'), async (req, res) => { try { await Dealer.findOneAndUpdate({ _id: req.params.id, ...getDealerFilter(req) }, req.body); res.json({status:'ok'}); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.delete('/api/dealers/:id', requirePermission('can_delete_dealer'), async (req, res) => { try { await Dealer.findOneAndDelete({ _id: req.params.id, ...getDealerFilter(req) }); res.json({status:'deleted'}); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.get('/api/dealers/:id/products', requireAnyPermission('can_view_dealers', 'can_view_products'), async (req, res) => { const d = await Dealer.findById(req.params.id).populate('products'); res.json(d.products.map(convertToClient)); });
+app.put('/api/dealers/:id/products', requirePermission('can_edit_matrix'), async (req, res) => { await Dealer.findByIdAndUpdate(req.params.id, { products: req.body.productIds }); res.json({status:'ok'}); });
+app.get('/api/products', requireAnyPermission('can_view_products', 'can_view_reclamations', 'can_view_dealers'), async (req, res) => { const s = new RegExp(req.query.search||'', 'i'); const p = await Product.find({$or:[{sku:s},{name:s}]}).sort({sku:1}).lean(); res.json(p.map(x=>{x.id=x._id;return x;})); });
+app.post('/api/products', requirePermission('can_manage_products'), async (req, res) => { const p = new Product(req.body); await p.save(); res.json(convertToClient(p)); });
+app.put('/api/products/:id', requirePermission('can_manage_products'), async (req, res) => { const p = await Product.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(p)); });
+app.delete('/api/products/:id', requirePermission('can_manage_products'), async (req, res) => { await Product.findByIdAndDelete(req.params.id); res.json({}); });
+app.post('/api/admin/import-catalog', requirePermission('can_manage_products'), async (req, res) => { res.json({status: 'ok'}); });
+app.get('/api/matrix', requireAnyPermission('can_view_products', 'can_view_report'), async (req, res) => { try { const prods = await Product.find().sort({sku:1}).lean(); const dealers = await Dealer.find(getDealerFilter(req)).lean(); const map = new Map(); dealers.forEach(d => map.set(d._id.toString(), new Set(d.products.map(String)))); const posList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"]; const matrix = prods.map(p => ({ sku: p.sku, name: p.name, type: 'product', dealers: dealers.map(d => ({ value: map.get(d._id.toString()).has(p._id.toString()) ? 1 : 0, is_pos: false })) })); posList.forEach(pn => { matrix.push({ sku: "POS", name: pn, type: 'pos', dealers: dealers.map(d => ({ value: (d.pos_materials||[]).find(m=>m.name===pn)?.quantity||0, is_pos: true })) }); }); res.json({ headers: dealers.map(d=>({id:d._id, name:d.name, city:d.city, responsible:d.responsible})), matrix }); } catch (e) { res.status(500).json({error:e.message}); } });
 
-app.get('/api/sales', async (req, res) => { const {month} = req.query; const s = await Sales.find(month ? {month} : {}).lean(); res.json(s); });
+app.get('/api/sales', requirePermission('can_view_sales'), async (req, res) => { const {month} = req.query; const s = await Sales.find(month ? {month} : {}).lean(); res.json(s); });
 
 // ===== ИСПРАВЛЕННЫЙ БЛОК: СОХРАНЕНИЕ, АГРЕГАЦИЯ И УДАЛЕНИЕ =====
 app.post('/api/sales', checkWrite, async (req, res) => {
