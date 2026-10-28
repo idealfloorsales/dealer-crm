@@ -533,27 +533,27 @@ const reclamationSchema = new mongoose.Schema({
 }, { timestamps: true });
 const Reclamation = mongoose.model('Reclamation', reclamationSchema);
 
-app.get('/api/reclamations', async (req, res) => {
+app.get('/api/reclamations', requirePermission('can_view_reclamations'), async (req, res) => {
     try { 
         const list = await Reclamation.find().sort({createdAt: -1}); 
         res.json(list.map(convertToClient)); 
     } catch(e) { res.status(500).json({error: e.message}); }
 });
 
-app.post('/api/reclamations', checkWrite, async (req, res) => {
+app.post('/api/reclamations', requirePermission('can_manage_reclamations'), async (req, res) => {
     try { 
         const r = new Reclamation(req.body); 
         await r.save(); 
         res.json(convertToClient(r)); 
     } catch(e) { res.status(500).json({error: e.message}); }
 });
-app.put('/api/reclamations/:id', checkWrite, async (req, res) => {
+app.put('/api/reclamations/:id', requirePermission('can_manage_reclamations'), async (req, res) => {
     try { 
         const r = await Reclamation.findByIdAndUpdate(req.params.id, req.body, { new: true }); 
         res.json(convertToClient(r)); 
     } catch(e) { res.status(500).json({error: e.message}); }
 });
-app.delete('/api/reclamations/:id', checkWrite, async (req, res) => {
+app.delete('/api/reclamations/:id', requirePermission('can_manage_reclamations'), async (req, res) => {
     try { 
         await Reclamation.findByIdAndDelete(req.params.id); 
         res.json({status: 'deleted'}); 
