@@ -635,7 +635,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (dealer.status === 'problem') {
                 items.push({ priority: 100, type:'risk', icon:'exclamation-diamond', title:dealer.name, meta:'Статус дилера: проблемный', dealerId:dealer.id, health });
             } else if (health.score < 50) {
-                items.push({ priority: 80 + (50-health.score), type:'risk', icon:'heart-pulse', title:dealer.name, meta:health.reasons[0] || 'Низкий Dealer Health', dealerId:dealer.id, health });
+                items.push({ priority: 80 + (50-health.score), type:'risk', icon:'heart-pulse', title:dealer.name, meta:health.reasons[0] || 'Низкая оценка дилера', dealerId:dealer.id, health });
             }
         });
 
