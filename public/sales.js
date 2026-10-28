@@ -8,7 +8,7 @@ window.fetch = async function (url, options) {
     
     const response = await originalFetch(url, options);
     
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
         localStorage.removeItem('crm_token');
         window.location.href = '/login.html';
     }
