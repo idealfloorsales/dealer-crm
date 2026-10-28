@@ -6220,3 +6220,333 @@ body.bg-light {
         grid-column: auto;
     }
 }
+
+
+/* =========================================================
+   DASHBOARD — EXACT SALES + FIELD MOBILE UX
+   ========================================================= */
+.cc-kpi-value-exact {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.cc-kpi-value-exact > span {
+    margin-left: 3px;
+    color: #92949a;
+    font-size: .72rem;
+    font-weight: 650;
+    letter-spacing: 0;
+}
+
+.cc-mobile-shortcuts {
+    display: none;
+}
+
+@media (max-width: 767px) {
+    .command-center-shell {
+        padding-top: 8px;
+    }
+
+    .cc-hero {
+        gap: 15px;
+        margin-bottom: 12px !important;
+        padding: 17px 16px;
+        border-radius: 19px;
+    }
+
+    .cc-hero h1 {
+        font-size: 1.72rem;
+        letter-spacing: -.045em;
+    }
+
+    .cc-eyebrow {
+        margin-bottom: 3px;
+        font-size: .58rem;
+    }
+
+    .cc-subline {
+        gap: 7px;
+        margin-top: 6px;
+        font-size: .68rem;
+    }
+
+    .cc-hero-actions {
+        gap: 6px;
+    }
+
+    .cc-search-trigger {
+        min-height: 42px;
+        padding: 0 12px;
+        border-radius: 11px;
+    }
+
+    .cc-search-trigger kbd {
+        display: none;
+    }
+
+    .cc-icon-btn {
+        width: 42px;
+        height: 42px;
+        border-radius: 11px;
+    }
+
+    .cc-kpi-grid {
+        grid-template-columns: repeat(2, minmax(0,1fr));
+        gap: 8px;
+        margin-bottom: 9px !important;
+    }
+
+    .cc-kpi-card {
+        min-height: 108px;
+        padding: 12px;
+        border-radius: 16px;
+    }
+
+    .cc-kpi-sales { order: 1; }
+    .cc-kpi-plan { order: 2; }
+    .cc-kpi-problems {
+        order: 3;
+        grid-column: 1 / -1;
+        min-height: 92px;
+    }
+    .cc-kpi-dealers { order: 4; }
+    .cc-kpi-score { order: 5; }
+
+    .cc-kpi-icon {
+        width: 29px;
+        height: 29px;
+        margin-bottom: 9px;
+        border-radius: 9px;
+        font-size: .76rem;
+    }
+
+    .cc-kpi-label {
+        font-size: .62rem;
+    }
+
+    .cc-kpi-value {
+        margin-top: 2px;
+        font-size: 1.48rem;
+        line-height: 1.05;
+    }
+
+    .cc-kpi-value-exact {
+        overflow: hidden;
+        font-size: clamp(1.12rem, 5vw, 1.42rem);
+        text-overflow: ellipsis;
+    }
+
+    .cc-kpi-value-exact > span {
+        font-size: .58rem;
+    }
+
+    .cc-kpi-foot {
+        margin-top: 5px;
+        font-size: .57rem;
+        line-height: 1.25;
+    }
+
+    .cc-kpi-problems {
+        display: grid;
+        grid-template-columns: 34px minmax(0,1fr) auto;
+        grid-template-rows: auto auto;
+        column-gap: 10px;
+        align-items: center;
+    }
+
+    .cc-kpi-problems .cc-kpi-icon {
+        grid-row: 1 / 3;
+        margin: 0;
+    }
+
+    .cc-kpi-problems .cc-kpi-label {
+        align-self: end;
+    }
+
+    .cc-kpi-problems .cc-kpi-value {
+        grid-column: 3;
+        grid-row: 1 / 3;
+        align-self: center;
+        font-size: 1.9rem;
+    }
+
+    .cc-kpi-problems .cc-kpi-foot {
+        grid-column: 2;
+        align-self: start;
+    }
+
+    .cc-mobile-shortcuts {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0,1fr));
+        gap: 6px;
+        margin-bottom: 10px;
+    }
+
+    .cc-mobile-shortcuts a {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 3px;
+        min-height: 55px;
+        padding: 7px 4px;
+        border: 1px solid rgba(23,24,27,.075);
+        border-radius: 13px;
+        background: rgba(255,255,255,.92);
+        color: #5f6167;
+        text-decoration: none;
+        font-size: .56rem;
+        font-weight: 700;
+        box-shadow: 0 6px 18px rgba(29,24,24,.025);
+        touch-action: manipulation;
+    }
+
+    .cc-mobile-shortcuts a i {
+        color: #b9040a;
+        font-size: .92rem;
+    }
+
+    .cc-panel {
+        padding: 14px;
+        border-radius: 18px;
+    }
+
+    .cc-panel-head {
+        align-items: center;
+        margin-bottom: 11px;
+    }
+
+    .cc-panel h2,
+    .dealer-directory-head h2 {
+        font-size: .98rem;
+    }
+
+    .cc-dashboard-primary-row > #cc-attention-panel {
+        order: 1;
+    }
+
+    .cc-dashboard-primary-row > #cc-pulse-panel {
+        order: 2;
+    }
+
+    .attention-item,
+    .cc-event-item,
+    .cc-task-row {
+        min-height: 52px;
+        padding: 9px;
+        border-radius: 12px;
+    }
+
+    .attention-icon,
+    .cc-event-icon {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+    }
+
+    .attention-title,
+    .cc-event-title {
+        font-size: .73rem;
+    }
+
+    .attention-meta,
+    .cc-event-meta {
+        font-size: .61rem;
+    }
+
+    .btn-task-check {
+        width: 40px;
+        height: 40px;
+        flex: 0 0 40px;
+    }
+
+    .pulse-summary {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+
+    .pulse-summary-item {
+        padding: 8px 9px;
+        border-radius: 10px;
+        background: #f8f6f3;
+    }
+
+    .pulse-summary-item span {
+        font-size: .57rem;
+    }
+
+    .pulse-summary-item strong {
+        margin-top: 2px;
+        font-size: .78rem;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .pulse-chart {
+        height: 155px;
+    }
+
+    .dealer-directory-head-v2 {
+        scroll-margin-top: 12px;
+        margin-top: 18px;
+    }
+
+    .dealer-smart-name {
+        font-size: .86rem;
+    }
+
+    .dealer-list-metric > strong {
+        font-size: .73rem;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
+    .dealer-list-metric > small {
+        white-space: normal;
+        line-height: 1.2;
+    }
+
+    .dealer-card-action {
+        width: 40px;
+        height: 40px;
+        border-radius: 11px;
+        font-size: .86rem;
+    }
+
+    .dealer-open-card {
+        min-height: 40px;
+        padding: 0 12px;
+        border-radius: 11px;
+        font-size: .64rem;
+    }
+
+    #cc-plan-panel,
+    #cc-attention-panel,
+    #dealer-directory {
+        scroll-margin-top: 10px;
+    }
+}
+
+@media (max-width: 390px) {
+    .cc-kpi-card {
+        min-height: 104px;
+        padding: 11px;
+    }
+
+    .cc-kpi-value-exact {
+        font-size: 1.05rem;
+    }
+
+    .cc-mobile-shortcuts a {
+        min-height: 52px;
+        font-size: .53rem;
+    }
+
+    .dealer-smart-metrics {
+        gap: 6px;
+    }
+
+    .dealer-list-metric {
+        padding: 8px;
+    }
+}
