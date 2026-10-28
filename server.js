@@ -482,10 +482,10 @@ app.post('/api/sales', checkWrite, async (req, res) => {
 });
 // ===================================================================
 
-app.get('/api/competitors-ref', async (req, res) => { const l = await CompRef.find().sort({name:1}); res.json(l.map(convertToClient)); });
-app.post('/api/competitors-ref', checkWrite, async (req, res) => { const c = new CompRef(req.body); await c.save(); res.json(convertToClient(c)); });
-app.put('/api/competitors-ref/:id', checkWrite, async (req, res) => { await CompRef.findByIdAndUpdate(req.params.id, req.body); res.json({status:'ok'}); });
-app.delete('/api/competitors-ref/:id', checkWrite, async (req, res) => { await CompRef.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
+app.get('/api/competitors-ref', requirePermission('can_view_competitors'), async (req, res) => { const l = await CompRef.find().sort({name:1}); res.json(l.map(convertToClient)); });
+app.post('/api/competitors-ref', requirePermission('can_manage_competitors'), async (req, res) => { const c = new CompRef(req.body); await c.save(); res.json(convertToClient(c)); });
+app.put('/api/competitors-ref/:id', requirePermission('can_manage_competitors'), async (req, res) => { await CompRef.findByIdAndUpdate(req.params.id, req.body); res.json({status:'ok'}); });
+app.delete('/api/competitors-ref/:id', requirePermission('can_manage_competitors'), async (req, res) => { await CompRef.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
 app.get('/api/knowledge', async (req, res) => { const l = await Knowledge.find().sort({title:1}); res.json(l.map(convertToClient)); });
 app.get('/api/knowledge/:id', async (req, res) => { res.json(convertToClient(await Knowledge.findById(req.params.id))); });
 app.post('/api/knowledge', checkWrite, async (req, res) => { const a = new Knowledge(req.body); await a.save(); res.json(convertToClient(a)); });
