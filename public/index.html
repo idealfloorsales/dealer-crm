@@ -107,7 +107,14 @@
         <section id="dashboard-container" class="mb-4">
             <div id="dashboard-stats" class="cc-kpi-grid mb-3"></div>
 
-            <div class="row g-3 mb-3">
+            <nav class="cc-mobile-shortcuts" aria-label="Быстрые действия">
+                <a href="#cc-plan-panel"><i class="bi bi-calendar-check"></i><span>План</span></a>
+                <a href="#cc-attention-panel"><i class="bi bi-exclamation-triangle"></i><span>Проблемы</span></a>
+                <a href="#dealer-directory"><i class="bi bi-shop"></i><span>Дилеры</span></a>
+                <a href="/sales.html" data-permission="can_view_sales"><i class="bi bi-graph-up-arrow"></i><span>Продажи</span></a>
+            </nav>
+
+            <div class="row g-3 mb-3 cc-dashboard-primary-row">
                 <div class="col-xl-8" id="cc-pulse-panel">
                     <div class="cc-panel h-100">
                         <div class="cc-panel-head">
@@ -135,7 +142,7 @@
                 </div>
             </div>
 
-            <div class="row g-3">
+            <div class="row g-3 cc-dashboard-secondary-row">
                 <div class="col-xl-6" id="cc-plan-panel">
                     <div class="cc-panel h-100">
                         <div class="cc-panel-head">
@@ -162,7 +169,7 @@
             <div id="tasks-list-cooling" class="d-none"></div>
         </section>
 
-        <section class="dealer-directory-head dealer-directory-head-v2">
+        <section class="dealer-directory-head dealer-directory-head-v2" id="dealer-directory">
             <div>
                 <div class="dealer-directory-title-line">
                     <h2>Дилеры</h2>
