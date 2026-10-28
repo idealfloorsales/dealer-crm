@@ -405,6 +405,31 @@ app.post('/api/dealers/:id/visits', requirePermission('can_manage_visits'), asyn
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+app.put('/api/dealers/:id/visits/:index', requirePermission('can_manage_visits'), async (req, res) => {
+    try {
+        const dealer = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) });
+        if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
+
+        const index = Number(req.params.index);
+        if (!Number.isInteger(index) || index < 0 || !dealer.visits || !dealer.visits[index]) {
+            return res.status(404).json({ error: 'Визит не найден' });
+        }
+
+        if (Object.prototype.hasOwnProperty.call(req.body, 'isCompleted')) {
+            dealer.visits[index].isCompleted = Boolean(req.body.isCompleted);
+        }
+        if (Object.prototype.hasOwnProperty.call(req.body, 'comment')) {
+            dealer.visits[index].comment = String(req.body.comment || '').trim();
+        }
+        if (Object.prototype.hasOwnProperty.call(req.body, 'date')) {
+            dealer.visits[index].date = String(req.body.date || '');
+        }
+
+        await dealer.save();
+        res.json({ status: 'ok', visit: dealer.visits[index] });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.put('/api/dealers/:id', requirePermission('can_edit_dealer'), async (req, res) => { try { await Dealer.findOneAndUpdate({ _id: req.params.id, ...getDealerFilter(req) }, req.body); res.json({status:'ok'}); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.delete('/api/dealers/:id', requirePermission('can_delete_dealer'), async (req, res) => { try { await Dealer.findOneAndDelete({ _id: req.params.id, ...getDealerFilter(req) }); res.json({status:'deleted'}); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.get('/api/dealers/:id/products', requireAnyPermission('can_view_dealers', 'can_view_products'), async (req, res) => { const d = await Dealer.findById(req.params.id).populate('products'); res.json(d.products.map(convertToClient)); });
