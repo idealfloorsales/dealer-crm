@@ -162,9 +162,13 @@
             <div id="tasks-list-cooling" class="d-none"></div>
         </section>
 
-        <section class="dealer-directory-head">
+        <section class="dealer-directory-head dealer-directory-head-v2">
             <div>
-                <h2>Дилеры</h2>
+                <div class="dealer-directory-title-line">
+                    <h2>Дилеры</h2>
+                    <span id="dealer-visible-count" class="dealer-visible-count">—</span>
+                </div>
+                <p>Продажи, выполнение плана, визиты и важные сигналы — в одном списке.</p>
             </div>
             <div class="dealer-directory-actions">
                 <button id="export-competitors-prices-btn" class="cc-secondary-btn d-none d-md-inline-flex" title="Цены"><i class="bi bi-tags"></i> Цены</button>
@@ -172,41 +176,48 @@
             </div>
         </section>
 
-        <div class="bg-white p-3 rounded-4 shadow-sm mb-4 border border-light sticky-filters">
-            <div class="row g-2 align-items-center">
-                <div class="col-xl-2 col-md-12">
-                    <div class="input-group">
-                        <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-search"></i></span>
-                        <input type="text" id="search-bar" class="form-control border-start-0 ps-0" placeholder="Поиск...">
-                    </div>
+        <section class="dealer-list-toolbar sticky-filters">
+            <div class="dealer-toolbar-main">
+                <div class="dealer-search-field">
+                    <i class="bi bi-search"></i>
+                    <input type="search" id="search-bar" placeholder="Дилер, ID, город…" autocomplete="off">
                 </div>
-                <div class="col-xl-2 col-md-2 col-6">
-                    <div class="input-group">
-                        <select id="filter-status" class="form-select border-0 bg-light text-truncate"><option value="">Загрузка...</option></select>
-                        <button class="btn btn-light border-0 text-secondary" id="btn-manage-statuses" title="Статусы"><i class="bi bi-gear-fill"></i></button>
-                    </div>
+
+                <div class="dealer-quick-filters" id="dealer-quick-filters">
+                    <button type="button" class="dealer-quick-filter active" data-filter="all">Все <span class="dealer-quick-count" data-quick-count="all">0</span></button>
+                    <button type="button" class="dealer-quick-filter" data-filter="sales"><i class="bi bi-graph-up-arrow"></i> С продажами <span class="dealer-quick-count" data-quick-count="sales">0</span></button>
+                    <button type="button" class="dealer-quick-filter" data-filter="plan"><i class="bi bi-bullseye"></i> План отстаёт <span class="dealer-quick-count" data-quick-count="plan">0</span></button>
+                    <button type="button" class="dealer-quick-filter" data-filter="visit"><i class="bi bi-geo-alt"></i> Нужен визит <span class="dealer-quick-count" data-quick-count="visit">0</span></button>
+                    <button type="button" class="dealer-quick-filter" data-filter="problem"><i class="bi bi-exclamation-triangle"></i> Проблемные <span class="dealer-quick-count" data-quick-count="problem">0</span></button>
                 </div>
-                <div class="col-xl-2 col-md-2 col-6">
-                    <select id="filter-city" class="form-select border-0 bg-light text-truncate"><option value="">Все города</option></select>
-                </div>
-                <div class="col-xl-2 col-md-2 col-6">
-                    <select id="filter-price-type" class="form-select border-0 bg-light text-truncate"><option value="">Тип цен</option></select> 
-                </div>
-                <div class="col-xl-2 col-md-2 col-6">
-                    <select id="filter-sector" class="form-select border-0 bg-light text-truncate"><option value="">Сектор</option></select> 
-                </div>
-                <div class="col-xl-2 col-md-2 col-12">
-                    <div class="d-flex gap-2">
-                        <select id="filter-responsible" class="form-select border-0 bg-light text-truncate" style="flex:1">
-                            <option value="">Ответств.</option>
-                            <option value="regional_astana">Астана</option>
-                            <option value="regional_regions">Регионы</option>
-                        </select>
-                        <button class="btn btn-sm btn-white sort-btn border" data-sort="dealer_id">ID</button>
-                    </div>
-                </div>
+
+                <select id="dealer-sort-select" class="dealer-sort-select" aria-label="Сортировка">
+                    <option value="dealer_id_asc">По ID</option>
+                    <option value="name_asc">По названию</option>
+                    <option value="sales_desc">Продажи: больше</option>
+                    <option value="achievement_asc">Выполнение: ниже</option>
+                    <option value="health_asc">Оценка: ниже</option>
+                    <option value="visit_desc">Давно не были</option>
+                </select>
+                <button type="button" id="dealer-filter-toggle" class="dealer-filter-toggle"><i class="bi bi-sliders2"></i> Фильтры</button>
             </div>
-        </div>
+
+            <div class="dealer-toolbar-filters">
+                <div class="dealer-filter-field">
+                    <select id="filter-status" class="form-select"><option value="">Загрузка...</option></select>
+                    <button class="dealer-filter-settings" id="btn-manage-statuses" title="Настроить статусы"><i class="bi bi-gear"></i></button>
+                </div>
+                <select id="filter-city" class="form-select"><option value="">Все города</option></select>
+                <select id="filter-price-type" class="form-select"><option value="">Все типы цен</option></select>
+                <select id="filter-sector" class="form-select"><option value="">Все сектора</option></select>
+                <select id="filter-responsible" class="form-select">
+                    <option value="">Все ответственные</option>
+                    <option value="regional_astana">Астана</option>
+                    <option value="regional_regions">Регионы</option>
+                </select>
+                <button type="button" id="dealer-reset-filters" class="dealer-reset-filters"><i class="bi bi-arrow-counterclockwise"></i> Сбросить</button>
+            </div>
+        </section>
 
         <div id="dealer-grid" class="d-flex flex-column gap-3"></div>
         <p id="no-data-msg" class="text-center text-muted mt-5" style="display: none;">Ничего не найдено</p>

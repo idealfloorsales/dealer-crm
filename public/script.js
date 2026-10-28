@@ -24,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let allSectors = []; // <--- ХРАНИЛИЩЕ СЕКТОРОВ
     
     let currentSort = { column: 'dealer_id', direction: 'asc' };
+    let dealerQuickFilter = 'all';
     let isSaving = false; 
     let addPhotosData = []; 
     let editPhotosData = []; 
@@ -68,7 +69,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const addProductChecklist = document.getElementById('add-product-checklist'); const addContactList = document.getElementById('add-contact-list'); const addAddressList = document.getElementById('add-address-list'); const addPosList = document.getElementById('add-pos-list'); const addVisitsList = document.getElementById('add-visits-list'); const addCompetitorList = document.getElementById('add-competitor-list'); const addPhotoInput = document.getElementById('add-photo-input'); const addPhotoPreviewContainer = document.getElementById('add-photo-preview-container'); const addAvatarInput = document.getElementById('add-avatar-input'); const addAvatarPreview = document.getElementById('add-avatar-preview');
     const editProductChecklist = document.getElementById('edit-product-checklist'); const editContactList = document.getElementById('edit-contact-list'); const editAddressList = document.getElementById('edit-address-list'); const editPosList = document.getElementById('edit-pos-list'); const editVisitsList = document.getElementById('edit-visits-list'); const editCompetitorList = document.getElementById('edit-competitor-list'); const editPhotoInput = document.getElementById('edit-photo-input'); const editPhotoPreviewContainer = document.getElementById('edit-photo-preview-container'); const editAvatarInput = document.getElementById('edit-avatar-input'); const editAvatarPreview = document.getElementById('edit-avatar-preview'); const editCurrentAvatarUrl = document.getElementById('edit-current-avatar-url');
     
-    const filterCity = document.getElementById('filter-city'); const filterPriceType = document.getElementById('filter-price-type'); const filterStatus = document.getElementById('filter-status'); const filterResponsible = document.getElementById('filter-responsible'); const searchBar = document.getElementById('search-bar'); 
+    const filterCity = document.getElementById('filter-city'); const filterPriceType = document.getElementById('filter-price-type'); const filterStatus = document.getElementById('filter-status'); const filterResponsible = document.getElementById('filter-responsible'); const searchBar = document.getElementById('search-bar');
+    const dealerVisibleCount = document.getElementById('dealer-visible-count');
+    const dealerSortSelect = document.getElementById('dealer-sort-select');
+    const dealerResetFilters = document.getElementById('dealer-reset-filters');
+    const dealerQuickFilters = document.getElementById('dealer-quick-filters');
+    const dealerFilterToggle = document.getElementById('dealer-filter-toggle');
     const btnExportDealers = document.getElementById('export-dealers-btn'); const btnExportCompetitors = document.getElementById('export-competitors-prices-btn');
     const addOrgList = document.getElementById('add-org-list'); const editOrgList = document.getElementById('edit-org-list'); const btnAddOrgAdd = document.getElementById('btn-add-org-add'); const btnEditOrgAdd = document.getElementById('btn-edit-org-add');
     const logoutBtn = document.getElementById('logout-btn');
@@ -443,11 +449,51 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // --- SAFE LISTENERS ---
     function setupEventListeners() {
-        if(filterCity) filterCity.onchange = renderDealerList; 
-        if(filterPriceType) filterPriceType.onchange = renderDealerList; 
-        if(filterStatus) filterStatus.onchange = renderDealerList; 
-        if(filterResponsible) filterResponsible.onchange = renderDealerList; 
+        if(filterCity) filterCity.onchange = renderDealerList;
+        if(filterPriceType) filterPriceType.onchange = renderDealerList;
+        if(filterStatus) filterStatus.onchange = renderDealerList;
+        if(filterResponsible) filterResponsible.onchange = renderDealerList;
+        const sectorFilter = document.getElementById('filter-sector');
+        if(sectorFilter) sectorFilter.onchange = renderDealerList;
         if(searchBar) searchBar.oninput = renderDealerList;
+        if(dealerSortSelect) dealerSortSelect.onchange = renderDealerList;
+
+        if (dealerQuickFilters) {
+            dealerQuickFilters.onclick = (e) => {
+                const btn = e.target.closest('.dealer-quick-filter');
+                if (!btn) return;
+                dealerQuickFilter = btn.dataset.filter || 'all';
+                dealerQuickFilters.querySelectorAll('.dealer-quick-filter').forEach(el => {
+                    el.classList.toggle('active', el === btn);
+                });
+                renderDealerList();
+            };
+        }
+
+        if (dealerFilterToggle) {
+            dealerFilterToggle.onclick = () => {
+                const toolbar = dealerFilterToggle.closest('.dealer-list-toolbar');
+                toolbar?.classList.toggle('filters-open');
+                dealerFilterToggle.classList.toggle('active');
+            };
+        }
+
+        if (dealerResetFilters) {
+            dealerResetFilters.onclick = () => {
+                if (searchBar) searchBar.value = '';
+                if (filterStatus) filterStatus.value = '';
+                if (filterCity) filterCity.value = '';
+                if (filterPriceType) filterPriceType.value = '';
+                if (filterResponsible) filterResponsible.value = '';
+                if (sectorFilter) sectorFilter.value = '';
+                if (dealerSortSelect) dealerSortSelect.value = 'dealer_id_asc';
+                dealerQuickFilter = 'all';
+                dealerQuickFilters?.querySelectorAll('.dealer-quick-filter').forEach(el => {
+                    el.classList.toggle('active', el.dataset.filter === 'all');
+                });
+                renderDealerList();
+            };
+        }
     }
 
     // --- DASHBOARD SETTINGS LOGIC ---
@@ -984,88 +1030,339 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
         }
     }
 
-   function renderDealerList() {
-        if (!dealerGrid) return;
-        const city = filterCity ? filterCity.value : ''; const type = filterPriceType ? filterPriceType.value : ''; const status = filterStatus ? filterStatus.value : ''; const responsible = filterResponsible ? filterResponsible.value : ''; const search = searchBar ? searchBar.value.toLowerCase() : '';
-        const sectorEl = document.getElementById('filter-sector'); const sector = sectorEl ? sectorEl.value : '';
-        
-        const filtered = allDealers.filter(d => { 
-            let isVisible = true;
-            if (!status) { 
-                const statusObj = statusList.find(s => s.value === (d.status || 'standard')); 
-                // Железобетонная проверка: если глазик выключен (как boolean или как текст)
-                if (statusObj && (statusObj.isVisible === false || String(statusObj.isVisible) === 'false')) isVisible = false; 
-            } else { 
-                // Если пользователь принудительно выбрал этот статус в фильтре сверху - показываем
-                isVisible = (d.status === status); 
-            }
-            return isVisible && (!city || d.city === city) && (!type || d.price_type === type) && (!responsible || d.responsible === responsible) && (!sector || d.region_sector === sector) && (!search || ((d.name||'').toLowerCase().includes(search) || (d.dealer_id||'').toLowerCase().includes(search)));
-        });
-       
-        filtered.sort((a, b) => { let valA = (a[currentSort.column] || '').toString(); let valB = (b[currentSort.column] || '').toString(); let res = currentSort.column === 'dealer_id' ? valA.localeCompare(valB, undefined, {numeric:true}) : valA.toLowerCase().localeCompare(valB.toLowerCase(), 'ru'); return currentSort.direction === 'asc' ? res : -res; });
-        
-        if (filtered.length === 0) { dealerGrid.innerHTML = ` <div class="empty-state"><i class="bi bi-search empty-state-icon"></i><h5 class="text-muted">Ничего не найдено</h5><p class="text-secondary small mb-3">Попробуйте изменить фильтры</p><button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('search-bar').value=''; document.getElementById('filter-city').value=''; document.getElementById('filter-status').value=''; if(document.getElementById('filter-sector')) document.getElementById('filter-sector').value=''; renderDealerList()">Сбросить фильтры</button></div>`; return; }
-        
-        const salesMap = {};
-        if(currentMonthSales && currentMonthSales.length > 0) {
-            currentMonthSales.forEach(s => { if(s.dealerId) salesMap[s.dealerId] = (salesMap[s.dealerId] || 0) + (s.fact || 0); });
+   function getDealerListMetrics(dealer) {
+        const canViewSales = Boolean(window.CRMAuth && CRMAuth.can('can_view_sales'));
+        const canViewVisits = Boolean(window.CRMAuth && CRMAuth.can('can_view_dashboard'));
+        const rows = canViewSales ? getSalesForDealer(dealer) : [];
+        const totals = window.CRMScore?.getSalesTotals
+            ? CRMScore.getSalesTotals(rows)
+            : {
+                fact: rows.reduce((sum, row) => sum + (Number(row.fact) || 0), 0),
+                plan: rows.reduce((sum, row) => sum + (Number(row.plan) || 0), 0)
+            };
+
+        const fact = Number(totals.fact) || 0;
+        const plan = Number(totals.plan) || 0;
+        const achievement = plan > 0 ? Math.round(fact / plan * 100) : null;
+
+        const taskDealer = getTaskDealer(dealer.id);
+        const visits = canViewVisits ? (taskDealer?.visits || dealer.visits || []) : [];
+        const latestVisit = window.CRMScore?.latestCompletedVisit
+            ? CRMScore.latestCompletedVisit(visits)
+            : null;
+
+        let daysSinceVisit = null;
+        if (latestVisit?._date) {
+            daysSinceVisit = Math.max(0, Math.floor((Date.now() - latestVisit._date.getTime()) / 86400000));
         }
 
-        dealerGrid.innerHTML = filtered.map((d, index) => {
-            const statusObj = statusList.find(s => s.value === (d.status || 'standard')) || { label: d.status, color: '#6c757d' };
-            const statusStyle = `background-color: ${statusObj.color}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 500;`;
-            
-            let phoneBtn = ''; let waBtn = ''; 
-            if (d.contacts && d.contacts.length > 0) { 
-                const phone = d.contacts.find(c => c.contactInfo)?.contactInfo || ''; 
-                const cleanPhone = phone.replace(/[^0-9]/g, ''); 
-                if (cleanPhone.length >= 10) { 
-                    phoneBtn = `<a href="tel:+${cleanPhone}" class="btn-circle btn-circle-call" onclick="event.stopPropagation()" title="Позвонить"><i class="bi bi-telephone-fill"></i></a>`; 
-                    waBtn = `<a href="https://wa.me/${cleanPhone}" target="_blank" class="btn-circle btn-circle-wa" onclick="event.stopPropagation()" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>`; 
-                } 
-            }
-            
-            let mapBtn = ''; 
-            if (d.latitude && d.longitude) mapBtn = `<a href="https://yandex.kz/maps/?pt=${d.longitude},${d.latitude}&z=17&l=map" target="_blank" class="btn-circle" onclick="event.stopPropagation()" title="Маршрут"><i class="bi bi-geo-alt-fill"></i></a>`;
-            
-            let instaBtn = ''; 
-            if (d.instagram) { 
-                let url = d.instagram.trim(); 
-                if (!url.startsWith('http')) { url = url.startsWith('@') ? 'https://instagram.com/' + url.substring(1) : 'https://instagram.com/' + url; } 
-                instaBtn = `<a href="${url}" target="_blank" class="btn-circle btn-circle-insta" onclick="event.stopPropagation()" title="Instagram"><i class="bi bi-instagram"></i></a>`; 
-            }
-            
-            const avatarHtml = d.photo_url ? `<img src="${d.photo_url}" alt="${d.name}">` : `<i class="bi bi-shop"></i>`;
-            const editBtn = (window.CRMAuth && CRMAuth.can('can_edit_dealer')) ? `<button class="btn-circle" onclick="event.stopPropagation(); openEditModal('${d.id}')" title="Редактировать"><i class="bi bi-pencil"></i></button>` : '';
-            
-            const salesFact = salesMap[d.id] || 0;
-            let salesColorClass = 'bg-danger'; if (salesFact >= 200) salesColorClass = 'bg-success'; else if (salesFact >= 100) salesColorClass = 'bg-warning text-dark'; 
-            const salesBadge = `<span class="badge ${salesColorClass} rounded-pill ms-2" title="Продажи за текущий месяц">${salesFact.toFixed(2)} м²</span>`;
-            const health = getDealerHealth(d);
-            const healthHtml = `<div class="dealer-health-wrap">
-                <div class="dealer-health-top"><span>Оценка дилера</span><strong>${health.score}</strong></div>
-                <div class="dealer-health-bar ${health.level}"><span style="width:${health.score}%"></span></div>
-            </div>`;
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const pendingVisits = visits
+            .filter(v => v && !v.isCompleted && v.date)
+            .map(v => ({ ...v, _date: new Date(v.date) }))
+            .filter(v => !Number.isNaN(v._date.getTime()))
+            .sort((a,b) => a._date - b._date);
 
-            return `<div class="dealer-item" onclick="window.open('dealer.html?id=${d.id}', '_blank')">
-                <div class="dealer-index-number">${index + 1}</div>
-                <div class="dealer-avatar-box">${avatarHtml}</div>
-                <div class="dealer-content">
-                    <div class="d-flex align-items-center gap-2 mb-1">
-                        <a href="dealer.html?id=${d.id}" class="dealer-name" target="_blank">${safeText(d.name)}</a>
-                        <span style="${statusStyle}">${statusObj.label}</span>
-                    </div>
-                    <div class="dealer-meta">
-                        <span><i class="bi bi-hash"></i>${safeText(d.dealer_id)}</span>
-                        <span><i class="bi bi-geo-alt"></i>${safeText(d.city)}</span>
-                        ${d.region_sector ? `<span><i class="bi bi-pin-map"></i>${safeText(d.region_sector)}</span>` : ''}
-                        ${d.price_type ? `<span><i class="bi bi-tag"></i>${safeText(d.price_type)}</span>` : ''}
-                        ${salesBadge}
+        const overdueVisit = pendingVisits.find(v => {
+            const d = new Date(v._date);
+            d.setHours(0,0,0,0);
+            return d < today;
+        }) || null;
+
+        const openClaims = (reclamationsData || []).filter(r =>
+            !r.resolution && String(r.dealerId || '') === String(dealer.id)
+        ).length;
+
+        const health = getDealerHealth(dealer);
+        const needsVisit = canViewVisits && (!latestVisit || daysSinceVisit > 60 || Boolean(overdueVisit));
+        const planRisk = plan > 0 && achievement < 70;
+        const problem = dealer.status === 'problem' || health.score < 40 || openClaims > 0;
+
+        const signals = [];
+        if (dealer.status === 'problem') signals.push({ level:'risk', icon:'exclamation-diamond', text:'Проблемный статус' });
+        if (openClaims > 0) signals.push({ level:'risk', icon:'shield-exclamation', text:`Рекламаций: ${openClaims}` });
+        if (overdueVisit) signals.push({ level:'risk', icon:'calendar-x', text:'Просрочен визит' });
+        if (planRisk) signals.push({ level:achievement < 50 ? 'risk' : 'warn', icon:'bullseye', text:`План ${achievement}%` });
+        if (canViewSales && fact <= 0 && ['active','standard'].includes(dealer.status || 'standard')) {
+            signals.push({ level:'warn', icon:'graph-down', text:'Нет продаж' });
+        }
+        if (canViewVisits && !overdueVisit && (!latestVisit || daysSinceVisit > 60)) {
+            signals.push({
+                level:'warn',
+                icon:'geo-alt',
+                text: latestVisit ? `Не были ${daysSinceVisit} дн.` : 'Нет визитов'
+            });
+        }
+
+        return {
+            fact, plan, achievement, health,
+            latestVisit, daysSinceVisit, overdueVisit, openClaims,
+            needsVisit, planRisk, problem, signals
+        };
+    }
+
+    function formatDealerVisit(metrics) {
+        if (!window.CRMAuth || !CRMAuth.can('can_view_dashboard')) {
+            return { value:'—', foot:'Нет доступа' };
+        }
+        if (!metrics.latestVisit?._date) {
+            return { value:'Не было', foot:'Визитов нет' };
+        }
+        if (metrics.daysSinceVisit === 0) {
+            return { value:'Сегодня', foot:metrics.latestVisit._date.toLocaleDateString('ru-RU') };
+        }
+        return {
+            value:`${metrics.daysSinceVisit} дн.`,
+            foot:metrics.latestVisit._date.toLocaleDateString('ru-RU', {day:'numeric', month:'short'})
+        };
+    }
+
+    function responsibleLabel(value) {
+        const labels = {
+            regional_astana: 'Астана',
+            regional_regions: 'Регионы',
+            office: 'Офис'
+        };
+        return labels[value] || value || 'Не назначен';
+    }
+
+    function updateDealerQuickCounts(dealersWithMetrics) {
+        const counts = {
+            all: dealersWithMetrics.length,
+            sales: dealersWithMetrics.filter(x => x.metrics.fact > 0).length,
+            plan: dealersWithMetrics.filter(x => x.metrics.planRisk).length,
+            visit: dealersWithMetrics.filter(x => x.metrics.needsVisit).length,
+            problem: dealersWithMetrics.filter(x => x.metrics.problem).length
+        };
+        Object.entries(counts).forEach(([key,value]) => {
+            const el = document.querySelector(`[data-quick-count="${key}"]`);
+            if (el) el.textContent = value;
+        });
+    }
+
+    function renderDealerList() {
+        if (!dealerGrid) return;
+
+        const canViewSalesForList = Boolean(window.CRMAuth && CRMAuth.can('can_view_sales'));
+        const canViewVisitsForList = Boolean(window.CRMAuth && CRMAuth.can('can_view_dashboard'));
+        const salesQuick = dealerQuickFilters?.querySelector('[data-filter="sales"]');
+        const planQuick = dealerQuickFilters?.querySelector('[data-filter="plan"]');
+        const visitQuick = dealerQuickFilters?.querySelector('[data-filter="visit"]');
+        if (salesQuick) salesQuick.style.display = canViewSalesForList ? '' : 'none';
+        if (planQuick) planQuick.style.display = canViewSalesForList ? '' : 'none';
+        if (visitQuick) visitQuick.style.display = canViewVisitsForList ? '' : 'none';
+
+        if ((!canViewSalesForList && ['sales','plan'].includes(dealerQuickFilter)) ||
+            (!canViewVisitsForList && dealerQuickFilter === 'visit')) {
+            dealerQuickFilter = 'all';
+            dealerQuickFilters?.querySelectorAll('.dealer-quick-filter').forEach(el => {
+                el.classList.toggle('active', el.dataset.filter === 'all');
+            });
+        }
+
+        const city = filterCity?.value || '';
+        const type = filterPriceType?.value || '';
+        const status = filterStatus?.value || '';
+        const responsible = filterResponsible?.value || '';
+        const search = (searchBar?.value || '').trim().toLowerCase();
+        const sector = document.getElementById('filter-sector')?.value || '';
+
+        const baseFiltered = allDealers.filter(d => {
+            let isVisible = true;
+            if (!status) {
+                const statusObj = statusList.find(s => s.value === (d.status || 'standard'));
+                if (statusObj && (statusObj.isVisible === false || String(statusObj.isVisible) === 'false')) isVisible = false;
+            } else {
+                isVisible = d.status === status;
+            }
+
+            const searchable = [
+                d.name, d.dealer_id, d.city, d.address, d.region_sector, d.price_type,
+                responsibleLabel(d.responsible)
+            ].filter(Boolean).join(' ').toLowerCase();
+
+            return isVisible &&
+                (!city || d.city === city) &&
+                (!type || d.price_type === type) &&
+                (!responsible || d.responsible === responsible) &&
+                (!sector || d.region_sector === sector) &&
+                (!search || searchable.includes(search));
+        });
+
+        const enriched = baseFiltered.map(dealer => ({
+            dealer,
+            metrics: getDealerListMetrics(dealer)
+        }));
+
+        updateDealerQuickCounts(enriched);
+
+        let filtered = enriched.filter(({metrics}) => {
+            if (dealerQuickFilter === 'sales') return metrics.fact > 0;
+            if (dealerQuickFilter === 'plan') return metrics.planRisk;
+            if (dealerQuickFilter === 'visit') return metrics.needsVisit;
+            if (dealerQuickFilter === 'problem') return metrics.problem;
+            return true;
+        });
+
+        const sortValue = dealerSortSelect?.value || 'dealer_id_asc';
+        filtered.sort((a,b) => {
+            if (sortValue === 'name_asc') {
+                return String(a.dealer.name || '').localeCompare(String(b.dealer.name || ''), 'ru');
+            }
+            if (sortValue === 'sales_desc') return b.metrics.fact - a.metrics.fact;
+            if (sortValue === 'achievement_asc') {
+                const av = a.metrics.achievement === null ? Number.POSITIVE_INFINITY : a.metrics.achievement;
+                const bv = b.metrics.achievement === null ? Number.POSITIVE_INFINITY : b.metrics.achievement;
+                return av - bv;
+            }
+            if (sortValue === 'health_asc') return a.metrics.health.score - b.metrics.health.score;
+            if (sortValue === 'visit_desc') {
+                const av = a.metrics.daysSinceVisit === null ? Number.POSITIVE_INFINITY : a.metrics.daysSinceVisit;
+                const bv = b.metrics.daysSinceVisit === null ? Number.POSITIVE_INFINITY : b.metrics.daysSinceVisit;
+                return bv - av;
+            }
+            return String(a.dealer.dealer_id || '').localeCompare(String(b.dealer.dealer_id || ''), undefined, {numeric:true});
+        });
+
+        if (dealerVisibleCount) {
+            dealerVisibleCount.textContent = filtered.length === baseFiltered.length
+                ? String(filtered.length)
+                : `${filtered.length} из ${baseFiltered.length}`;
+        }
+
+        if (filtered.length === 0) {
+            dealerGrid.innerHTML = `
+                <div class="dealer-directory-empty">
+                    <span><i class="bi bi-search"></i></span>
+                    <strong>Дилеры не найдены</strong>
+                    <p>Измените поиск или сбросьте фильтры.</p>
+                    <button type="button" onclick="document.getElementById('dealer-reset-filters')?.click()">Сбросить фильтры</button>
+                </div>`;
+            return;
+        }
+
+        const canViewSales = Boolean(window.CRMAuth && CRMAuth.can('can_view_sales'));
+        const canEdit = Boolean(window.CRMAuth && CRMAuth.can('can_edit_dealer'));
+
+        dealerGrid.innerHTML = filtered.map(({dealer:d, metrics}, index) => {
+            const statusObj = statusList.find(s => s.value === (d.status || 'standard')) || {
+                label: d.status || 'Стандарт',
+                color: '#72747a'
+            };
+
+            const avatarUrl = d.photo_url || d.avatarUrl || '';
+            const avatarHtml = avatarUrl
+                ? `<img src="${safeAttr(avatarUrl)}" alt="">`
+                : '<i class="bi bi-shop"></i>';
+
+            let phoneBtn = '';
+            let waBtn = '';
+            if (Array.isArray(d.contacts) && d.contacts.length) {
+                const phone = d.contacts.find(contact => contact?.contactInfo)?.contactInfo || '';
+                const cleanPhone = phone.replace(/[^0-9]/g, '');
+                if (cleanPhone.length >= 10) {
+                    phoneBtn = `<a href="tel:+${cleanPhone}" class="dealer-card-action is-phone" onclick="event.stopPropagation()" title="Позвонить"><i class="bi bi-telephone"></i></a>`;
+                    waBtn = `<a href="https://wa.me/${cleanPhone}" target="_blank" rel="noopener" class="dealer-card-action is-whatsapp" onclick="event.stopPropagation()" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>`;
+                }
+            }
+
+            const mapBtn = d.latitude && d.longitude
+                ? `<a href="https://yandex.kz/maps/?pt=${encodeURIComponent(d.longitude)},${encodeURIComponent(d.latitude)}&z=17&l=map" target="_blank" rel="noopener" class="dealer-card-action" onclick="event.stopPropagation()" title="Маршрут"><i class="bi bi-geo-alt"></i></a>`
+                : '';
+
+            let instaBtn = '';
+            if (d.instagram) {
+                let url = String(d.instagram).trim();
+                if (!/^https?:\/\//i.test(url)) {
+                    url = 'https://instagram.com/' + url.replace(/^@/, '');
+                }
+                instaBtn = `<a href="${safeAttr(url)}" target="_blank" rel="noopener" class="dealer-card-action" onclick="event.stopPropagation()" title="Instagram"><i class="bi bi-instagram"></i></a>`;
+            }
+
+            const editBtn = canEdit
+                ? `<button class="dealer-card-action" type="button" onclick="event.stopPropagation(); openEditModal('${safeAttr(d.id)}')" title="Редактировать"><i class="bi bi-pencil"></i></button>`
+                : '';
+            const quickVisitBtn = (window.CRMAuth && CRMAuth.can('can_manage_visits'))
+                ? `<button class="dealer-card-action" type="button" onclick="event.stopPropagation(); showQuickVisit('${safeAttr(d.id)}')" title="Запланировать визит"><i class="bi bi-calendar-plus"></i></button>`
+                : '';
+
+            const visit = formatDealerVisit(metrics);
+            let planValue = 'Без плана';
+            let planFoot = 'Индивидуальный план не задан';
+            let progressWidth = 0;
+            let progressLevel = 'none';
+
+            if (!canViewSales) {
+                planValue = '—';
+                planFoot = 'Нет доступа';
+            } else if (metrics.plan > 0) {
+                planValue = `${metrics.achievement}%`;
+                planFoot = `План ${formatCompactNumber(metrics.plan)} м²`;
+                progressWidth = Math.min(metrics.achievement, 100);
+                progressLevel = metrics.achievement >= 90 ? 'good' : metrics.achievement >= 70 ? 'mid' : 'risk';
+            } else if (d.hasPersonalPlan) {
+                planValue = 'Не задан';
+                planFoot = 'Нужно заполнить план';
+            }
+
+            const signals = metrics.signals.slice(0, 2);
+            const signalsHtml = signals.length
+                ? signals.map(signal => `<span class="dealer-signal is-${signal.level}"><i class="bi bi-${signal.icon}"></i>${safeText(signal.text)}</span>`).join('')
+                : '<span class="dealer-signal is-ok"><i class="bi bi-check2-circle"></i>Без критичных сигналов</span>';
+
+            const locationMeta = [d.city, d.region_sector].filter(Boolean).map(safeText).join(' · ') || 'Локация не указана';
+            const secondaryMeta = [responsibleLabel(d.responsible), d.price_type].filter(Boolean).map(safeText).join(' · ');
+
+            return `<article class="dealer-smart-card ${metrics.problem ? 'has-risk' : ''}" onclick="window.location.href='dealer.html?id=${encodeURIComponent(d.id)}'">
+                <div class="dealer-smart-index">${index + 1}</div>
+
+                <div class="dealer-smart-identity">
+                    <div class="dealer-smart-avatar">${avatarHtml}</div>
+                    <div class="dealer-smart-copy">
+                        <div class="dealer-smart-title-row">
+                            <a href="dealer.html?id=${encodeURIComponent(d.id)}" class="dealer-smart-name" onclick="event.stopPropagation()">${safeText(d.name)}</a>
+                            <span class="dealer-card-status" style="border-color:${safeAttr(statusObj.color || '#72747a')};color:${safeAttr(statusObj.color || '#72747a')}">${safeText(statusObj.label)}</span>
+                        </div>
+                        <div class="dealer-smart-id">#${safeText(d.dealer_id || '—')}</div>
+                        <div class="dealer-smart-meta"><i class="bi bi-geo-alt"></i>${locationMeta}</div>
+                        <div class="dealer-smart-meta"><i class="bi bi-person"></i>${secondaryMeta || 'Ответственный не назначен'}</div>
                     </div>
                 </div>
-                ${healthHtml}
-                <div class="dealer-actions">${instaBtn} ${waBtn} ${phoneBtn} ${mapBtn} ${editBtn}</div>
-            </div>`;
+
+                <div class="dealer-smart-metrics">
+                    <div class="dealer-list-metric">
+                        <span>Продажи</span>
+                        <strong>${canViewSales ? formatCompactNumber(metrics.fact) + ' м²' : '—'}</strong>
+                        <small>${canViewSales ? (metrics.fact > 0 ? 'Текущий месяц' : 'Продаж пока нет') : 'Нет доступа'}</small>
+                    </div>
+                    <div class="dealer-list-metric is-plan">
+                        <span>Выполнение плана</span>
+                        <strong>${planValue}</strong>
+                        <small>${planFoot}</small>
+                        <div class="dealer-list-progress is-${progressLevel}"><i style="width:${progressWidth}%"></i></div>
+                    </div>
+                    <div class="dealer-list-metric">
+                        <span>Последний визит</span>
+                        <strong>${visit.value}</strong>
+                        <small>${visit.foot}</small>
+                    </div>
+                    <div class="dealer-list-metric is-score">
+                        <span>Оценка дилера</span>
+                        <strong>${metrics.health.score}<em>/100</em></strong>
+                        <small>${safeText(metrics.health.label)}</small>
+                        <div class="dealer-score-mini is-${metrics.health.level}"><i style="width:${metrics.health.score}%"></i></div>
+                    </div>
+                </div>
+
+                <div class="dealer-smart-side">
+                    <div class="dealer-signal-list">${signalsHtml}</div>
+                    <div class="dealer-card-actions">
+                        ${waBtn}${phoneBtn}${mapBtn}${instaBtn}${quickVisitBtn}${editBtn}
+                        <a href="dealer.html?id=${encodeURIComponent(d.id)}" class="dealer-open-card" onclick="event.stopPropagation()">Открыть <i class="bi bi-arrow-right"></i></a>
+                    </div>
+                </div>
+            </article>`;
         }).join('');
     }
 
