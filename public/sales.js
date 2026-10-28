@@ -1,22 +1,3 @@
-// --- АВТОРИЗАЦИЯ ---
-const originalFetch = window.fetch;
-window.fetch = async function (url, options) {
-    options = options || {};
-    options.headers = options.headers || {};
-    const token = localStorage.getItem('crm_token');
-    if (token) options.headers['Authorization'] = 'Bearer ' + token;
-    
-    const response = await originalFetch(url, options);
-    
-    if (response.status === 401) {
-        localStorage.removeItem('crm_token');
-        window.location.href = '/login.html';
-    }
-    
-    return response;
-};
-// --------------------
-
 document.addEventListener('DOMContentLoaded', () => {
     
     const API_DEALERS = '/api/dealers';
@@ -32,6 +13,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const printBtn = document.getElementById('print-btn');
     const summaryCol = document.getElementById('summary-col');
     const lastUpdateInfo = document.getElementById('last-update-info');
+    const searchInput = document.getElementById('sales-search');
+    const areaFilter = document.getElementById('sales-area-filter');
+    const collapseBtn = document.getElementById('collapse-groups-btn');
+    const monthPrevBtn = document.getElementById('month-prev');
+    const monthNextBtn = document.getElementById('month-next');
+    const monthCurrentBtn = document.getElementById('month-current');
+    const noResults = document.getElementById('sales-no-results');
+    const customModalEl = document.getElementById('sales-custom-modal');
+    const customNameInput = document.getElementById('custom-sale-name');
+    const customGroupLabel = document.getElementById('custom-sale-group-label');
+    const customSaveBtn = document.getElementById('custom-sale-save');
+    const customModal = customModalEl ? new bootstrap.Modal(customModalEl) : null;
     
     // Табы
     const tabInputBtn = document.getElementById('tab-input-btn');
@@ -44,14 +37,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // КОНФИГУРАЦИЯ ГРУПП
     let groupsConfig = [
-        { key: 'vip', title: 'Спец. Клиенты (VIP)', isSystem: true }
+        { key: 'vip', title: 'Индивидуальные планы', isSystem: true, type: 'vip' }
     ];
 
     let allDealers = [];
     let currentSales = [];
     let allSectors = [];
     let canEditFact = false;
-    let canEditPlan = false; 
+    let canEditPlan = false;
+    let isDirty = false;
+    let loadedMonth = '';
+    let pendingCustomGroup = '';
+    let groupsCollapsed = false;
     
     // Загрузка настроек видимости планов
     let planVisibility = JSON.parse(localStorage.getItem('sales_plan_config')) || {};
@@ -84,9 +81,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 astanaSectors.forEach(s => {
                     const key = 'astana_' + s.name.replace(/\s+/g, '_').toLowerCase();
                     if (!groupsConfig.find(g => g.key === key)) {
-                        groupsConfig.push({ key: key, title: `Астана - ${s.name}`, sectorName: s.name, type: 'astana' });
+                        groupsConfig.push({ key: key, title: `Астана — ${s.name}`, sectorName: s.name, type: 'astana' });
                     }
                 });
+                if (!groupsConfig.find(g => g.key === 'regional_astana')) {
+                    groupsConfig.push({ key: 'regional_astana', title: 'Астана — без сектора', isSystem: true, type: 'astana' });
+                }
 
                 // РЕГИОНЫ
                 const regionSectors = allSectors.filter(s => s.type === 'region');
@@ -105,16 +105,54 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function setupMobileTabs() {
         if(!tabInputBtn || !tabSummaryBtn) return;
-        tabInputBtn.onclick = () => {
-            tabInputBtn.classList.add('btn-white', 'shadow-sm', 'text-primary'); tabInputBtn.classList.remove('text-muted');
-            tabSummaryBtn.classList.remove('btn-white', 'shadow-sm', 'text-primary'); tabSummaryBtn.classList.add('text-muted');
-            colInput.classList.remove('mobile-hidden'); colSummary.classList.add('mobile-hidden'); window.scrollTo(0, 0);
+        const showInput = () => {
+            tabInputBtn.classList.add('active');
+            tabSummaryBtn.classList.remove('active');
+            colInput.classList.remove('mobile-hidden');
+            colSummary.classList.add('mobile-hidden');
         };
-        tabSummaryBtn.onclick = () => {
-            tabSummaryBtn.classList.add('btn-white', 'shadow-sm', 'text-primary'); tabSummaryBtn.classList.remove('text-muted');
-            tabInputBtn.classList.remove('btn-white', 'shadow-sm', 'text-primary'); tabInputBtn.classList.add('text-muted');
-            colSummary.classList.remove('mobile-hidden'); colInput.classList.add('mobile-hidden'); window.scrollTo(0, 0);
+        const showSummary = () => {
+            tabSummaryBtn.classList.add('active');
+            tabInputBtn.classList.remove('active');
+            colSummary.classList.remove('mobile-hidden');
+            colInput.classList.add('mobile-hidden');
         };
+        tabInputBtn.onclick = showInput;
+        tabSummaryBtn.onclick = showSummary;
+    }
+
+    function markDirty() {
+        if (!canEditFact && !canEditPlan) return;
+        isDirty = true;
+        if (lastUpdateInfo) {
+            lastUpdateInfo.classList.add('is-dirty');
+            lastUpdateInfo.innerHTML = '<i class="bi bi-circle-fill"></i> Есть несохранённые изменения';
+        }
+    }
+
+    function clearDirty() {
+        isDirty = false;
+        if (lastUpdateInfo) lastUpdateInfo.classList.remove('is-dirty');
+    }
+
+    function canLeaveCurrentMonth() {
+        return !isDirty || confirm('Есть несохранённые изменения. Перейти к другому месяцу без сохранения?');
+    }
+
+    function shiftMonth(delta) {
+        if (!canLeaveCurrentMonth()) return;
+        const [year, month] = monthPicker.value.split('-').map(Number);
+        const d = new Date(year, month - 1 + delta, 1);
+        monthPicker.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        isDirty = false;
+        loadData();
+    }
+
+    function goToCurrentMonth() {
+        if (!canLeaveCurrentMonth()) return;
+        monthPicker.value = new Date().toISOString().slice(0, 7);
+        isDirty = false;
+        loadData();
     }
 
     async function loadData() {
@@ -129,6 +167,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             allDealers = await dealersRes.json();
             currentSales = await salesRes.json();
+            loadedMonth = monthPicker.value;
+            clearDirty();
             renderAll();
             updateLastModifiedText();
         } catch (e) { 
@@ -138,6 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateLastModifiedText() {
         if (!lastUpdateInfo) return;
+        lastUpdateInfo.classList.remove('is-dirty');
         if (!currentSales || currentSales.length === 0) {
             lastUpdateInfo.innerHTML = '<i class="bi bi-clock-history me-1"></i>Нет данных';
             return;
@@ -186,6 +227,50 @@ document.addEventListener('DOMContentLoaded', () => {
             return 'regional_regions';
         }
         return 'other';
+    }
+
+    function getGroupArea(grp) {
+        if (grp.key === 'vip') return 'vip';
+        if (grp.key === 'other') return 'other';
+        if (grp.type === 'astana') return 'astana';
+        if (grp.type === 'region') return 'regions';
+        return 'other';
+    }
+
+    function applyViewFilters() {
+        const query = (searchInput?.value || '').trim().toLowerCase();
+        const area = areaFilter?.value || 'all';
+        let visibleCards = 0;
+
+        document.querySelectorAll('#sales-container .region-card').forEach(card => {
+            const areaMatch = area === 'all' || card.dataset.area === area;
+            let visibleRows = 0;
+
+            card.querySelectorAll('.sales-row').forEach(row => {
+                const name = (row.dataset.search || '').toLowerCase();
+                const show = areaMatch && (!query || name.includes(query));
+                row.classList.toggle('d-none', !show);
+                if (show) visibleRows++;
+            });
+
+            const showCard = areaMatch && visibleRows > 0;
+            card.classList.toggle('d-none', !showCard);
+            if (showCard) visibleCards++;
+        });
+
+        if (noResults) noResults.classList.toggle('d-none', visibleCards > 0);
+    }
+
+    function setGroupsCollapsed(collapsed) {
+        groupsCollapsed = collapsed;
+        document.querySelectorAll('#sales-container .region-card').forEach(card => {
+            card.classList.toggle('is-collapsed', collapsed);
+        });
+        if (collapseBtn) {
+            collapseBtn.innerHTML = collapsed
+                ? '<i class="bi bi-arrows-expand"></i> Развернуть группы'
+                : '<i class="bi bi-arrows-collapse"></i> Свернуть группы';
+        }
     }
 
     function fmt(num) {
@@ -237,7 +322,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         container.innerHTML = '';
         summaryList.innerHTML = '';
-        if(dashboardTop) dashboardTop.innerHTML = '';
 
         const facts = {};
         groupsConfig.forEach(g => facts[g.key] = 0);
@@ -255,6 +339,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (groupDealers.length === 0 && customSales.length === 0 && grp.key !== 'other') return;
 
             let rowsHtml = '';
+            let groupFact = 0;
             const items = [
                 ...groupDealers.map(d => ({ id: d.id, name: d.name, isCustom: false })),
                 ...customSales.map(s => ({ id: null, name: s.dealerName, isCustom: true }))
@@ -264,44 +349,52 @@ document.addEventListener('DOMContentLoaded', () => {
             items.forEach(item => {
                 const sale = currentSales.find(s => (item.isCustom && s.isCustom && s.dealerName === item.name) || (!item.isCustom && !s.isCustom && s.dealerId === item.id)) || {};
                 const fact = parseFloat(sale.fact) || 0;
+                groupFact += fact;
                 
                 if (grp.key === 'vip') {
-                    facts.vip.push({ id: item.id || item.name, name: item.name, fact: fact });
+                    facts.vip.push({ id: item.id || item.name, name: item.name, fact });
                 } else {
                     facts[grp.key] = (facts[grp.key] || 0) + fact;
                 }
 
                 rowsHtml += `
-                    <div class="sales-row" data-id="${item.id || ''}" data-name="${item.name}" data-custom="${item.isCustom}">
-                        <div class="sales-dealer-name text-truncate">
-                            <span class="${grp.key === 'vip' ? 'fw-bold text-primary' : ''}">${item.name}</span>
+                    <div class="sales-row" data-id="${item.id || ''}" data-name="${safeText ? '' : ''}" data-search="${String(item.name).replace(/"/g, '&quot;')}" data-custom="${item.isCustom}">
+                        <div class="sales-dealer-name">
+                            <span>${item.name}</span>
+                            ${item.isCustom ? '<small>Разовая запись</small>' : ''}
                         </div>
-                        <div class="d-flex align-items-center gap-2">
+                        <div class="sales-row-actions">
                             <div class="sales-input-group">
-                                <input type="number" step="0.01" class="form-control form-control-sm sales-input inp-fact" value="${fact!==0?fact:''}" placeholder="0" ${canEditFact ? '' : 'disabled'}>
+                                <input type="number" step="0.01" min="0" inputmode="decimal" class="sales-input inp-fact" value="${fact!==0?fact:''}" placeholder="0" ${canEditFact ? '' : 'disabled'}>
+                                <span>м²</span>
                             </div>
-                            ${item.isCustom && canEditFact ? `<button class="btn btn-sm text-danger btn-del-row p-0"><i class="bi bi-x-circle"></i></button>` : ''}
+                            ${item.isCustom && canEditFact ? `<button class="sales-delete-row btn-del-row" type="button" title="Удалить"><i class="bi bi-x-lg"></i></button>` : ''}
                         </div>
                     </div>`;
             });
             
-            const isPlanVisible = planVisibility[grp.key] !== false; 
-            const eyeIcon = isPlanVisible ? '<i class="bi bi-bullseye"></i>' : '<i class="bi bi-circle"></i>';
-            const eyeTitle = isPlanVisible ? 'Скрыть план' : 'Включить план';
-            const eyeClass = isPlanVisible ? 'text-success' : 'text-muted';
+            const isPlanVisible = planVisibility[grp.key] !== false;
+            const planControl = grp.key === 'vip'
+                ? '<span class="sales-plan-state is-personal"><i class="bi bi-person-check"></i> Индивидуально</span>'
+                : `<button class="sales-plan-state ${isPlanVisible ? 'is-on' : ''}" type="button" onclick="toggleGroupPlan('${grp.key}')">
+                    <i class="bi bi-${isPlanVisible ? 'bullseye' : 'dash-circle'}"></i>
+                    ${isPlanVisible ? 'План включён' : 'Без плана'}
+                   </button>`;
 
             container.innerHTML += `
-                <div class="region-card" data-group="${grp.key}">
+                <div class="region-card" data-group="${grp.key}" data-area="${getGroupArea(grp)}">
                     <div class="region-header">
-                        <div class="d-flex align-items-center gap-2">
+                        <button class="sales-group-toggle" type="button" aria-label="Свернуть группу"><i class="bi bi-chevron-down"></i></button>
+                        <div class="sales-group-title-wrap">
                             <span class="region-title">${grp.title}</span>
-                            <button class="btn btn-sm border-0 ${eyeClass} py-0" onclick="toggleGroupPlan('${grp.key}')" title="${eyeTitle}" style="font-size: 1.1rem;">
-                                ${eyeIcon}
-                            </button>
+                            <span class="sales-group-meta">${items.length} дил. · ${fmt(groupFact)} м²</span>
                         </div>
-                        ${canEditFact ? `<button class="btn btn-sm btn-light border-0 text-primary py-0 btn-add-custom" data-group="${grp.key}">+ Добавить</button>` : ''}
+                        <div class="sales-group-actions">
+                            ${planControl}
+                            ${canEditFact ? `<button class="sales-add-row btn-add-custom" type="button" data-group="${grp.key}" data-title="${grp.title}"><i class="bi bi-plus-lg"></i> Добавить</button>` : ''}
+                        </div>
                     </div>
-                    <div class="region-body">${rowsHtml || '<div class="text-center text-muted small py-3">Нет записей</div>'}</div>
+                    <div class="region-body">${rowsHtml || '<div class="cc-empty">Нет записей</div>'}</div>
                 </div>`;
         });
 
@@ -328,80 +421,76 @@ document.addEventListener('DOMContentLoaded', () => {
         let totalVipFact = 0; facts.vip.forEach(v => totalVipFact += v.fact);
         const totalFactAll = totalRegionsFact + totalAstanaFact + totalVipFact + totalOtherFact;
         
-        renderTopDashboard(facts, plans, totalRegionsFact, totalAstanaFact);
-
         const renderSumItem = (title, planKey, factVal, isSubItem = false, forcePlan = false) => {
             const isVisible = forcePlan || (planVisibility[planKey] !== false);
 
-            let innerContent = '';
-            if (isVisible) {
-                const plan = plans[planKey] || 0;
-                const { percent, forecast, diff } = calculateKPI(plan, factVal, daysInMonth, currentDay);
-                let colorClass = 'text-warning'; let bgClass = 'bg-warning';
-                if (percent >= 90) { colorClass = 'text-success'; bgClass = 'bg-success'; }
-                if (percent < 70) { colorClass = 'text-danger'; bgClass = 'bg-danger'; }
-                let diffHtml = '';
-                if (plan > 0) {
-                    if (diff < 0) diffHtml = `<span class="text-danger fw-bold" title="Не хватает">Ещё: ${fmt(Math.abs(diff))}</span>`;
-                    else diffHtml = `<span class="text-success fw-bold" title="Сверх"> +${fmt(diff)}</span>`;
-                }
-                const width = Math.min(percent, 100);
-                const planVal = plan !== 0 ? plan : '';
-
-                innerContent = `
+            if (!isVisible) {
+                return `<div class="summary-item ${isSubItem ? 'is-sub' : ''}">
                     <div class="summary-header">
-                        <span class="summary-title">
-                            ${title}
-                            <input type="number" class="plan-input" data-plan-key="${planKey}" value="${planVal}" placeholder="План" ${canEditPlan ? '' : 'disabled'}>
-                        </span>
-                        <span class="summary-percent ${colorClass} fw-bold">${fmt(percent)}%</span>
+                        <span class="summary-title">${title}</span>
+                        <span class="sales-no-plan">Без плана</span>
                     </div>
-                    <div class="progress mb-2" style="height: 6px;">
-                        <div class="progress-bar ${bgClass}" style="width: ${width}%"></div>
+                    <div class="summary-values single">
+                        <div><span>Факт</span><strong>${fmt(factVal)} м²</strong></div>
                     </div>
-                    <div class="d-flex justify-content-between align-items-center small mt-1">
-                        <span class="text-dark">Факт: <strong>${fmt(factVal)}</strong></span>
-                        ${diffHtml}
-                    </div>
-                    <div class="text-end small text-muted mt-1" style="font-size: 0.7rem;">Прогноз: <strong>${fmt(forecast)}</strong></div>
-                `;
-            } else {
-                innerContent = `
-                    <div class="summary-header mb-1">
-                        <span class="summary-title text-dark">${title}</span>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center small">
-                        <span class="text-muted fst-italic" style="font-size: 0.75rem;">Без плана</span>
-                        <span class="text-dark fs-6">Факт: <strong>${fmt(factVal)}</strong></span>
-                    </div>
-                `;
+                </div>`;
             }
 
-            return `<div class="summary-item ${isSubItem ? 'ps-4 bg-light bg-opacity-25' : ''}">${innerContent}</div>`;
+            const plan = plans[planKey] || 0;
+            const { percent, forecast, diff } = calculateKPI(plan, factVal, daysInMonth, currentDay);
+            const level = percent >= 90 ? 'good' : percent >= 70 ? 'mid' : 'low';
+            const planVal = plan !== 0 ? plan : '';
+            const width = Math.min(percent, 100);
+            const diffText = plan > 0
+                ? (diff < 0 ? `Осталось ${fmt(Math.abs(diff))} м²` : `Сверх плана ${fmt(diff)} м²`)
+                : 'План не заполнен';
+
+            return `<div class="summary-item ${isSubItem ? 'is-sub' : ''}">
+                <div class="summary-header">
+                    <span class="summary-title">${title}</span>
+                    <span class="summary-percent is-${level}">${plan > 0 ? fmt(percent) + '%' : '—'}</span>
+                </div>
+                <div class="summary-values">
+                    <label>
+                        <span>План, м²</span>
+                        <input type="number" min="0" step="0.01" inputmode="decimal" class="plan-input" data-plan-key="${planKey}" value="${planVal}" placeholder="0" ${canEditPlan ? '' : 'disabled'}>
+                    </label>
+                    <div><span>Факт, м²</span><strong>${fmt(factVal)}</strong></div>
+                    <div><span>Прогноз, м²</span><strong>${fmt(forecast)}</strong></div>
+                </div>
+                <div class="sales-summary-progress"><span class="is-${level}" style="width:${width}%"></span></div>
+                <div class="summary-diff ${diff >= 0 && plan > 0 ? 'is-good' : ''}">${diffText}</div>
+            </div>`;
         };
 
         let summaryHtml = '';
-        summaryHtml += `<div class="p-3 bg-primary-subtle border-bottom"><h6 class="fw-bold mb-3 text-primary text-uppercase small ls-1">Общий результат</h6>${renderSumItem("ВСЕГО ПО КОМПАНИИ", "total_all", totalFactAll, false, true)}</div>`;
-        
-        summaryHtml += `<div class="mt-2 mb-1 px-3 pt-2 border-top"><span class="small fw-bold text-muted text-uppercase">Астана</span></div>`;
-        summaryHtml += renderSumItem("Астана (Итого)", "astana_all", totalAstanaFact, false, true);
-        groupsConfig.forEach(g => { if (g.type === 'astana') summaryHtml += renderSumItem(g.title.replace('Астана - ', ''), g.key, facts[g.key], true); });
+        summaryHtml += `<div class="sales-summary-group is-company"><div class="sales-summary-group-title">Компания</div>${renderSumItem("Вся компания", "total_all", totalFactAll, false, true)}</div>`;
+        summaryHtml += `<div class="sales-summary-group"><div class="sales-summary-group-title">Астана</div>`;
+        summaryHtml += renderSumItem("Астана — всего", "astana_all", totalAstanaFact, false, true);
+        groupsConfig.forEach(g => { if (g.type === 'astana') summaryHtml += renderSumItem(g.title.replace('Астана — ', ''), g.key, facts[g.key], true); });
+        summaryHtml += '</div>';
 
         if (facts.vip.length > 0) {
-            summaryHtml += `<div class="mt-2 mb-1 px-3 pt-2 border-top"><span class="small fw-bold text-muted text-uppercase">VIP Клиенты</span></div>`;
+            summaryHtml += '<div class="sales-summary-group"><div class="sales-summary-group-title">Индивидуальные планы</div>';
             facts.vip.forEach(v => summaryHtml += renderSumItem(v.name, `vip_${v.id}`, v.fact, false, true));
+            summaryHtml += '</div>';
         }
 
-        summaryHtml += `<div class="mt-2 mb-1 px-3 pt-2 border-top"><span class="small fw-bold text-muted text-uppercase">Регионы</span></div>`;
-        summaryHtml += renderSumItem("Регионы (Итого)", "regions_all", totalRegionsFact, false, true);
+        summaryHtml += '<div class="sales-summary-group"><div class="sales-summary-group-title">Регионы</div>';
+        summaryHtml += renderSumItem("Регионы — всего", "regions_all", totalRegionsFact, false, true);
         groupsConfig.forEach(g => { if (g.type === 'region') summaryHtml += renderSumItem(g.title.replace('Регион ', ''), g.key, facts[g.key], true); });
+        summaryHtml += '</div>';
         
         if (facts.other && facts.other !== 0) {
-            summaryHtml += `<div class="summary-item"><div class="summary-header"><span class="summary-title text-danger">⚠️ Без категории</span></div><div class="summary-meta"><span>Факт: <strong>${fmt(facts.other)}</strong></span></div></div>`;
+            summaryHtml += `<div class="sales-summary-group"><div class="sales-summary-group-title">Без категории</div>
+                <div class="summary-item"><div class="summary-header"><span class="summary-title">Не распределено</span></div>
+                <div class="summary-values single"><div><span>Факт</span><strong>${fmt(facts.other)} м²</strong></div></div></div></div>`;
         }
 
         summaryList.innerHTML = summaryHtml;
         setupEventListeners();
+        applyViewFilters();
+        if (groupsCollapsed) setGroupsCollapsed(true);
     }
 
     function renderTopDashboard(facts, plans, totalRegionsFact, totalAstanaFact) {
@@ -422,44 +511,119 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.btn-add-custom').forEach(btn => {
             btn.onclick = () => {
                 captureState();
-                const name = prompt("Название (Имя дилера или пометка):");
-                if (name) {
-                    currentSales.push({ month: monthPicker.value, group: btn.dataset.group, dealerName: name, isCustom: true, plan: 0, fact: 0 });
-                    renderAll();
-                }
+                pendingCustomGroup = btn.dataset.group;
+                if (customGroupLabel) customGroupLabel.textContent = btn.dataset.title || '';
+                if (customNameInput) customNameInput.value = '';
+                customModal?.show();
+                setTimeout(() => customNameInput?.focus(), 150);
             };
         });
+
         document.querySelectorAll('.btn-del-row').forEach(btn => {
             btn.onclick = (e) => {
-                if(confirm('Удалить эту запись?')) {
+                if(confirm('Удалить эту разовую запись?')) {
                     captureState();
                     const row = e.target.closest('.sales-row');
                     const name = row.dataset.name;
                     currentSales = currentSales.filter(s => !(s.isCustom && s.dealerName === name));
+                    markDirty();
                     renderAll();
                 }
             };
         });
+
+        document.querySelectorAll('.sales-group-toggle').forEach(btn => {
+            btn.onclick = () => {
+                const card = btn.closest('.region-card');
+                card.classList.toggle('is-collapsed');
+            };
+        });
     }
 
-    if (printBtn) { printBtn.onclick = () => { if(summaryCol) summaryCol.setAttribute('data-print-date', new Date().toLocaleDateString()); window.print(); }; }
+    if (printBtn) {
+        printBtn.onclick = () => {
+            if(summaryCol) summaryCol.setAttribute('data-print-date', new Date().toLocaleDateString('ru-RU'));
+            window.print();
+        };
+    }
+
+    if (customSaveBtn) {
+        customSaveBtn.onclick = () => {
+            const name = (customNameInput?.value || '').trim();
+            if (!name || !pendingCustomGroup) return;
+            currentSales.push({
+                month: monthPicker.value,
+                group: pendingCustomGroup,
+                dealerName: name,
+                isCustom: true,
+                plan: 0,
+                fact: 0
+            });
+            markDirty();
+            customModal?.hide();
+            renderAll();
+        };
+    }
+
+    if (customNameInput) {
+        customNameInput.addEventListener('keydown', e => {
+            if (e.key === 'Enter') customSaveBtn?.click();
+        });
+    }
 
     if (saveBtn) {
         saveBtn.onclick = async () => {
             captureState();
             try {
-                saveBtn.disabled = true; saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-                const res = await fetch(API_SALES, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ month: monthPicker.value, data: currentSales }) });
-                if (res.ok) { 
-                    if (window.showToast) { window.showToast('Сохранено!'); } else { alert('Сохранено!'); }
-                    saveBtn.className = 'btn btn-success shadow-sm px-4 rounded-pill'; saveBtn.innerHTML = '<i class="bi bi-check-lg"></i> OK'; 
-                    setTimeout(() => { saveBtn.innerHTML = '<i class="bi bi-save me-2"></i>Сохранить'; saveBtn.className='btn btn-success shadow-sm px-4 rounded-pill'; saveBtn.disabled = false; }, 2000);
-                    loadData(); 
-                } else throw new Error('Ошибка при сохранении');
-            } catch (e) { alert(e.message); saveBtn.disabled = false; saveBtn.innerHTML = '<i class="bi bi-save me-2"></i>Сохранить'; } 
+                saveBtn.disabled = true;
+                saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span><span>Сохраняем…</span>';
+                const res = await fetch(API_SALES, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ month: monthPicker.value, data: currentSales })
+                });
+                if (!res.ok) throw new Error('Ошибка при сохранении');
+
+                clearDirty();
+                if (window.showToast) window.showToast('Продажи сохранены');
+                saveBtn.innerHTML = '<i class="bi bi-check-lg"></i><span>Сохранено</span>';
+                await loadData();
+                saveBtn.innerHTML = '<i class="bi bi-check-lg"></i><span>Сохранить</span>';
+                saveBtn.disabled = !canEditFact && !canEditPlan;
+            } catch (e) {
+                alert(e.message);
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="bi bi-check-lg"></i><span>Сохранить</span>';
+            }
         };
     }
 
-    monthPicker.addEventListener('change', loadData);
+    monthPicker.addEventListener('change', () => {
+        if (!canLeaveCurrentMonth()) {
+            monthPicker.value = loadedMonth;
+            return;
+        }
+        isDirty = false;
+        loadData();
+    });
+
+    monthPrevBtn?.addEventListener('click', () => shiftMonth(-1));
+    monthNextBtn?.addEventListener('click', () => shiftMonth(1));
+    monthCurrentBtn?.addEventListener('click', goToCurrentMonth);
+
+    searchInput?.addEventListener('input', applyViewFilters);
+    areaFilter?.addEventListener('change', applyViewFilters);
+    collapseBtn?.addEventListener('click', () => setGroupsCollapsed(!groupsCollapsed));
+
+    document.addEventListener('input', e => {
+        if (e.target.matches('.sales-input, .plan-input')) markDirty();
+    });
+
+    window.addEventListener('beforeunload', e => {
+        if (!isDirty) return;
+        e.preventDefault();
+        e.returnValue = '';
+    });
+
     init();
 });
