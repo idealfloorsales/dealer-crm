@@ -473,7 +473,14 @@ app.get('/api/sales', requirePermission('can_view_sales'), async (req, res) => {
 
             const sectorType = scope === 'astana' ? 'astana' : 'region';
             const sectors = await Sector.find({ type: sectorType }).select('name').lean();
-            const groups = sectors.map(s => s.name);
+            const slug = name => String(name || '').trim().replace(/\s+/g, '_').toLowerCase();
+            const groupKeys = scope === 'astana'
+                ? [...sectors.map(s => `astana_${slug(s.name)}`), 'regional_astana']
+                : [...sectors.map(s => `sector_${slug(s.name)}`), 'regional_regions'];
+
+            const groupPlanIds = groupKeys.map(key => `PLAN_${key}`);
+            groupPlanIds.push(scope === 'astana' ? 'PLAN_astana_all' : 'PLAN_regions_all');
+            const allowedPlanIds = [...personalPlanIds, ...groupPlanIds];
 
             filter = {
                 $and: [
@@ -481,8 +488,8 @@ app.get('/api/sales', requirePermission('can_view_sales'), async (req, res) => {
                     {
                         $or: [
                             { isCustom: { $ne: true }, dealerId: { $in: dealerIds } },
-                            { isCustom: { $ne: true }, dealerId: { $in: personalPlanIds } },
-                            { isCustom: true, group: { $in: groups } }
+                            { isCustom: { $ne: true }, dealerId: { $in: allowedPlanIds } },
+                            { isCustom: true, group: { $in: groupKeys } }
                         ]
                     }
                 ]
