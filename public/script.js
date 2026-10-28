@@ -378,7 +378,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // 2. Start everything needed for the first screen at the same time.
             // Dealers/statuses/sectors are required for the directory.
             // Tasks/current sales enrich it with visit and sales metrics.
-            const statusesPromise = fetchStatuses().catch(e => {
+            const statusesPromise = fetchStatuses(false).catch(e => {
                 console.warn('Не удалось загрузить статусы', e);
                 statusList = [];
             });
@@ -959,8 +959,8 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const [res] = await Promise.all([
                 fetch(`${API_DEALERS_URL}/${id}`),
-                fetchProductCatalog(),
-                fetchCompetitorsRef()
+                fetchProductCatalog().catch(e => console.warn('Каталог недоступен', e)),
+                fetchCompetitorsRef().catch(e => console.warn('Справочник конкурентов недоступен', e))
             ]);
             if(!res.ok) throw new Error("Ошибка");
             const d = await res.json();
@@ -1042,7 +1042,7 @@ document.addEventListener('DOMContentLoaded', () => {
             reclamationsData = [];
         }
     }
-    async function fetchStatuses() { const res = await fetch(API_STATUSES_URL); if(res.ok) { statusList = await res.json(); populateStatusSelects(); renderStatusManagerList(); if(typeof renderDealerList === 'function') renderDealerList(); } else throw new Error("Ошибка статусов"); }
+    async function fetchStatuses(rerender = true) { const res = await fetch(API_STATUSES_URL); if(res.ok) { statusList = await res.json(); populateStatusSelects(); renderStatusManagerList(); if(rerender && typeof renderDealerList === 'function') renderDealerList(); } else throw new Error("Ошибка статусов"); }
     
     function populateStatusSelects(selectedStatus = null) { let filterHtml = '<option value="">Все статусы</option>'; statusList.forEach(s => { filterHtml += `<option value="${s.value}">${s.label}</option>`; }); if(filterStatus) filterStatus.innerHTML = filterHtml; const modalHtml = statusList.map(s => `<option value="${s.value}" ${selectedStatus === s.value ? 'selected' : ''}>${s.label}</option>`).join(''); const addStatusSel = document.getElementById('status'); if(addStatusSel) addStatusSel.innerHTML = modalHtml; const editStatusSel = document.getElementById('edit_status'); if(editStatusSel) editStatusSel.innerHTML = modalHtml; }
     function renderStatusManagerList() { if(!statusListContainer) return; statusListContainer.innerHTML = statusList.map(s => `<tr><td style="width: 50px;"><div style="width:20px;height:20px;background:${s.color};border-radius:50%;"></div></td><td class="fw-bold">${s.label}</td><td class="text-muted small">${s.value}</td><td class="text-center">${s.isVisible !== false ? '<i class="bi bi-eye-fill text-success"></i>' : '<i class="bi bi-eye-slash-fill text-muted"></i>'}</td><td class="text-end"><button class="btn btn-sm btn-light border me-1" onclick="editStatus('${s.id}')"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-light border text-danger" onclick="deleteStatus('${s.id}')"><i class="bi bi-trash"></i></button></td></tr>`).join(''); }
