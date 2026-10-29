@@ -590,7 +590,25 @@ app.put('/api/dealers/:id/visits/:index', requirePermission('can_manage_visits')
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.put('/api/dealers/:id', requirePermission('can_edit_dealer'), async (req, res) => { try { await Dealer.findOneAndUpdate({ _id: req.params.id, ...getDealerFilter(req) }, req.body); res.json({status:'ok'}); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.put('/api/dealers/:id', requirePermission('can_edit_dealer'), async (req, res) => {
+    try {
+        if (req.user.role === 'manager' && !isGlobalViewer(req)) {
+            req.body.responsibleUserId = String(req.user.id);
+            if (req.user.scope === 'astana') req.body.responsible = 'regional_astana';
+            if (req.user.scope === 'regions') req.body.responsible = 'regional_regions';
+        }
+
+        const updated = await Dealer.findOneAndUpdate(
+            { _id: req.params.id, ...getDealerFilter(req) },
+            req.body,
+            { new: true }
+        );
+        if (!updated) return res.status(404).json({ error: 'Дилер не найден' });
+        res.json({status:'ok'});
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
 app.delete('/api/dealers/:id', requirePermission('can_delete_dealer'), async (req, res) => { try { await Dealer.findOneAndDelete({ _id: req.params.id, ...getDealerFilter(req) }); res.json({status:'deleted'}); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.get('/api/dealers/:id/products', requireAnyPermission('can_view_dealers', 'can_view_products'), async (req, res) => { const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).populate('products'); if (!d) return res.status(404).json({ error: 'Дилер не найден' }); res.json(d.products.map(convertToClient)); });
 app.put('/api/dealers/:id/products', requirePermission('can_edit_matrix'), async (req, res) => { const d = await Dealer.findOneAndUpdate({ _id: req.params.id, ...getDealerFilter(req) }, { products: req.body.productIds }); if (!d) return res.status(404).json({ error: 'Дилер не найден' }); res.json({status:'ok'}); });
@@ -800,6 +818,12 @@ app.put('/api/knowledge/:id', requirePermission('can_manage_knowledge'), async (
 app.delete('/api/knowledge/:id', requirePermission('can_manage_knowledge'), async (req, res) => { await Knowledge.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
 app.get('/api/tasks', requirePermission('can_view_dashboard'), async (req, res) => { try { const data = await Dealer.find(getDealerFilter(req)).select('name visits status responsible').lean(); res.json(data.map(d => ({ id: d._id, name: d.name, status: d.status, visits: d.visits || [], responsible: d.responsible }))); } catch (e) { res.status(500).json([]); } });
 
+async function getScopedDealerIds(req) {
+    if (isGlobalViewer(req)) return null;
+    const dealers = await Dealer.find(getDealerFilter(req)).select('_id').lean();
+    return dealers.map(d => String(d._id));
+}
+
 // ==========================================
 // РЕКВИЗИТЫ И РЕКЛАМАЦИИ
 // ==========================================
@@ -842,13 +866,17 @@ const Reclamation = mongoose.model('Reclamation', reclamationSchema);
 
 app.get('/api/reclamations/dashboard', requirePermission('can_view_reclamations'), async (req, res) => {
     try {
-        const list = await Reclamation.find({
+        const dealerIds = await getScopedDealerIds(req);
+        const query = {
             $or: [
                 { resolution: { $exists: false } },
                 { resolution: null },
                 { resolution: '' }
             ]
-        })
+        };
+        if (dealerIds) query.dealerId = { $in: dealerIds };
+
+        const list = await Reclamation.find(query)
             .select('dealerId dealerName resolution createdAt date')
             .sort({ createdAt: -1 })
             .lean();
@@ -858,7 +886,10 @@ app.get('/api/reclamations/dashboard', requirePermission('can_view_reclamations'
 
 app.get('/api/reclamations', requirePermission('can_view_reclamations'), async (req, res) => {
     try {
-        const list = await Reclamation.aggregate([
+        const dealerIds = await getScopedDealerIds(req);
+        const pipeline = [];
+        if (dealerIds) pipeline.push({ $match: { dealerId: { $in: dealerIds } } });
+        pipeline.push(
             { $sort: { createdAt: -1 } },
             { $project: {
                 dealerId: 1,
@@ -873,13 +904,17 @@ app.get('/api/reclamations', requirePermission('can_view_reclamations'), async (
                 updatedAt: 1,
                 photoCount: { $size: { $ifNull: ['$photos', []] } }
             } }
-        ]);
+        );
+        const list = await Reclamation.aggregate(pipeline);
         res.json(list.map(item => ({ ...item, id: String(item._id), _id: undefined })));
     } catch(e) { res.status(500).json({error: e.message}); }
 });
 app.get('/api/reclamations/:id', requirePermission('can_view_reclamations'), async (req, res) => {
     try {
-        const item = await Reclamation.findById(req.params.id).lean();
+        const dealerIds = await getScopedDealerIds(req);
+        const query = { _id: req.params.id };
+        if (dealerIds) query.dealerId = { $in: dealerIds };
+        const item = await Reclamation.findOne(query).lean();
         if (!item) return res.status(404).json({ error: 'Рекламация не найдена' });
         res.json(convertToClient(item));
     } catch(e) { res.status(500).json({error: e.message}); }
