@@ -2,140 +2,514 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Вход в систему</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Вход — IDEAL FLOOR CRM</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="style.css?v={{VER}}">
     <link rel="stylesheet" href="ui-motion.css?v={{VER}}">
     <meta name="theme-color" content="#b9040a">
     <style>
-        body {
-            background-color: #f8f9fa;
-            height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        :root{
+            --login-red:#b9040a;
+            --login-red-dark:#920309;
+            --login-ink:#222326;
+            --login-muted:#8b8d93;
+            --login-line:#e7e2dd;
+            --login-soft:#f6f3ef;
         }
-        .login-card {
-            width: 100%;
-            max-width: 400px;
-            padding: 2rem;
-            border-radius: 1rem;
-            background: white;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+        *{box-sizing:border-box}
+        html,body{width:100%;min-height:100%;margin:0}
+        body.login-page{
+            min-height:100vh;
+            min-height:100dvh;
+            overflow-x:hidden;
+            font-family:Onest,Inter,sans-serif;
+            color:var(--login-ink);
+            background:
+                radial-gradient(circle at 12% 12%,rgba(185,4,10,.08),transparent 26rem),
+                radial-gradient(circle at 88% 86%,rgba(50,45,42,.08),transparent 28rem),
+                #eeeae5;
         }
-        .btn-primary {
-            background-color: #B9040A;
-            border-color: #B9040A;
-            padding: 0.8rem;
-            font-weight: 500;
+        .login-page-wrap{
+            min-height:100vh;
+            min-height:100dvh;
+            display:grid;
+            place-items:center;
+            padding:max(18px,env(safe-area-inset-top)) 18px max(18px,env(safe-area-inset-bottom));
         }
-        .btn-primary:hover {
-            background-color: #960308;
-            border-color: #960308;
+        .login-stage{
+            width:min(100%,940px);
+            min-height:570px;
+            display:grid;
+            grid-template-columns:minmax(0,.92fr) minmax(400px,1.08fr);
+            overflow:hidden;
+            border:1px solid rgba(42,39,37,.08);
+            border-radius:30px;
+            background:#fff;
+            box-shadow:0 28px 90px rgba(35,31,29,.13);
         }
-        .form-control:focus {
-            border-color: #B9040A;
-            box-shadow: 0 0 0 0.25rem rgba(185, 4, 10, 0.25);
+        .login-brand-panel{
+            position:relative;
+            min-width:0;
+            padding:42px;
+            display:flex;
+            flex-direction:column;
+            justify-content:space-between;
+            overflow:hidden;
+            color:#fff;
+            background:
+                radial-gradient(circle at 100% 0,rgba(185,4,10,.64),transparent 18rem),
+                linear-gradient(145deg,#1f1f22 0%,#272427 58%,#351719 100%);
         }
-        .logo-img {
-            max-height: 50px;
-            margin-bottom: 1.5rem;
+        .login-brand-panel:before{
+            content:"";
+            position:absolute;
+            width:310px;height:310px;
+            right:-150px;bottom:-135px;
+            border:1px solid rgba(255,255,255,.09);
+            border-radius:50%;
+            box-shadow:0 0 0 44px rgba(255,255,255,.025),0 0 0 88px rgba(255,255,255,.02);
+        }
+        .login-brand-top,.login-brand-copy{position:relative;z-index:1}
+        .login-logo-box{
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            min-height:60px;
+            max-width:190px;
+            padding:9px 13px;
+            border-radius:14px;
+            background:#fff;
+            box-shadow:0 10px 30px rgba(0,0,0,.12);
+        }
+        .login-logo-box img{display:block;max-width:100%;max-height:42px}
+        .login-brand-chip{
+            display:inline-flex;
+            align-items:center;
+            gap:6px;
+            margin-bottom:13px;
+            padding:5px 8px;
+            border:1px solid rgba(255,255,255,.12);
+            border-radius:999px;
+            background:rgba(255,255,255,.06);
+            color:rgba(255,255,255,.66);
+            font-size:.58rem;
+            font-weight:700;
+            letter-spacing:.08em;
+            text-transform:uppercase;
+        }
+        .login-brand-copy h1{
+            max-width:340px;
+            margin:0;
+            font-size:2.2rem;
+            line-height:1.02;
+            font-weight:800;
+            letter-spacing:-.055em;
+        }
+        .login-brand-copy p{
+            max-width:330px;
+            margin:13px 0 0;
+            color:rgba(255,255,255,.55);
+            font-size:.72rem;
+            line-height:1.55;
+        }
+        .login-form-panel{
+            min-width:0;
+            padding:48px 54px;
+            display:flex;
+            align-items:center;
+            background:#fff;
+        }
+        .login-form-shell{width:100%;max-width:390px;margin:0 auto}
+        .login-mobile-logo{display:none}
+        .login-eyebrow{
+            color:var(--login-red);
+            font-size:.58rem;
+            font-weight:800;
+            letter-spacing:.13em;
+        }
+        .login-form-shell h2{
+            margin:7px 0 4px;
+            font-size:1.55rem;
+            font-weight:800;
+            letter-spacing:-.035em;
+        }
+        .login-subtitle{
+            margin:0 0 27px;
+            color:var(--login-muted);
+            font-size:.67rem;
+            line-height:1.45;
+        }
+        .login-field{margin-bottom:14px}
+        .login-field-head{
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:10px;
+            margin:0 2px 6px;
+        }
+        .login-field-head label{
+            margin:0;
+            color:#65676c;
+            font-size:.59rem;
+            font-weight:800;
+        }
+        .login-input-wrap{
+            position:relative;
+            display:flex;
+            align-items:center;
+            width:100%;
+            min-height:52px;
+            border:1px solid var(--login-line);
+            border-radius:14px;
+            background:#fbfaf8;
+            transition:border-color .16s ease,box-shadow .16s ease,background .16s ease;
+        }
+        .login-input-wrap:focus-within{
+            border-color:rgba(185,4,10,.52);
+            background:#fff;
+            box-shadow:0 0 0 4px rgba(185,4,10,.07);
+        }
+        .login-input-icon{
+            width:44px;
+            flex:0 0 44px;
+            display:grid;
+            place-items:center;
+            color:#9b9da2;
+            font-size:1rem;
+        }
+        .login-input-wrap input{
+            width:100%;
+            min-width:0;
+            height:50px;
+            padding:0 12px 0 0;
+            border:0!important;
+            outline:0!important;
+            background:transparent!important;
+            color:#303136;
+            font:inherit;
+            font-size:.72rem;
+            box-shadow:none!important;
+        }
+        .login-input-wrap input::placeholder{color:#b2b3b7}
+        .login-password-input{padding-right:48px!important}
+        .login-password-toggle{
+            position:absolute;
+            right:5px;
+            top:50%;
+            width:40px;
+            height:40px;
+            transform:translateY(-50%);
+            display:grid;
+            place-items:center;
+            border:0;
+            border-radius:10px;
+            background:transparent;
+            color:#8d8f94;
+            font-size:1rem;
+            transition:background .15s ease,color .15s ease;
+        }
+        .login-password-toggle:hover,.login-password-toggle:focus-visible{
+            background:#f0ece8;
+            color:#4e5055;
+            outline:0;
+        }
+        .login-caps{
+            display:none;
+            align-items:center;
+            gap:5px;
+            color:#a17119;
+            font-size:.51rem;
+            font-weight:700;
+        }
+        .login-caps.is-visible{display:inline-flex}
+        .login-error{
+            display:none;
+            align-items:flex-start;
+            gap:8px;
+            margin:2px 0 13px;
+            padding:9px 10px;
+            border:1px solid #f0c6c8;
+            border-radius:10px;
+            background:#fff4f4;
+            color:#a4252b;
+            font-size:.56rem;
+            line-height:1.35;
+        }
+        .login-error.is-visible{display:flex}
+        .login-error i{margin-top:1px;flex:0 0 auto}
+        .login-submit{
+            width:100%;
+            min-height:50px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            gap:8px;
+            margin-top:7px;
+            border:0;
+            border-radius:14px;
+            background:linear-gradient(135deg,var(--login-red),#cf171d);
+            color:#fff;
+            font-size:.66rem;
+            font-weight:800;
+            box-shadow:0 10px 24px rgba(185,4,10,.19);
+            transition:transform .15s ease,box-shadow .15s ease,opacity .15s ease;
+        }
+        .login-submit:hover:not(:disabled){
+            transform:translateY(-1px);
+            box-shadow:0 14px 28px rgba(185,4,10,.23);
+        }
+        .login-submit:active:not(:disabled){transform:translateY(0)}
+        .login-submit:disabled{opacity:.7;cursor:wait}
+        .login-footnote{
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            gap:5px;
+            margin-top:19px;
+            color:#a0a2a7;
+            font-size:.51rem;
+        }
+        @media(max-width:760px){
+            .login-page-wrap{
+                display:block;
+                padding:0;
+                background:#fff;
+            }
+            .login-stage{
+                width:100%;
+                min-height:100vh;
+                min-height:100dvh;
+                display:block;
+                border:0;
+                border-radius:0;
+                box-shadow:none;
+            }
+            .login-brand-panel{display:none}
+            .login-form-panel{
+                min-height:100vh;
+                min-height:100dvh;
+                padding:max(36px,env(safe-area-inset-top)) 20px max(24px,env(safe-area-inset-bottom));
+                align-items:center;
+            }
+            .login-form-shell{max-width:430px}
+            .login-mobile-logo{
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                width:150px;
+                min-height:54px;
+                margin:0 0 32px;
+                padding:8px 11px;
+                border:1px solid #eee9e4;
+                border-radius:13px;
+                background:#fff;
+                box-shadow:0 7px 24px rgba(34,31,29,.06);
+            }
+            .login-mobile-logo img{display:block;max-width:100%;max-height:38px}
+            .login-form-shell h2{font-size:1.65rem}
+            .login-subtitle{font-size:.7rem;margin-bottom:28px}
+            .login-input-wrap{min-height:55px}
+            .login-input-wrap input{height:53px;font-size:.78rem}
+            .login-submit{min-height:54px;font-size:.7rem}
+        }
+        @media(max-width:380px){
+            .login-form-panel{padding-left:15px;padding-right:15px}
+            .login-mobile-logo{margin-bottom:26px}
         }
     </style>
 </head>
 <body class="login-page crm-ui-enhanced">
-
-    <div class="container d-flex justify-content-center login-shell">
-        <div class="login-card app-login-card">
-            <div class="text-center">
-                <img src="logo.png" alt="Logo" class="logo-img">
-                <div class="login-eyebrow">IDEAL FLOOR CRM</div><h4 class="mb-2 fw-bold">Вход в систему</h4><p class="login-subtitle">Рабочая область дилерской сети</p>
-            </div>
-            
-            <form id="login-form">
-                <div class="mb-3">
-                    <label class="form-label text-muted small fw-bold">Логин</label>
-                    <div class="input-group">
-                        <span class="input-group-text bg-light border-end-0"><i class="bi bi-person text-muted"></i></span>
-                        <input type="text" id="username" class="form-control border-start-0 ps-0" placeholder="Введите логин" required>
-                    </div>
+    <main class="login-page-wrap">
+        <section class="login-stage" aria-label="Вход в IDEAL FLOOR CRM">
+            <aside class="login-brand-panel">
+                <div class="login-brand-top">
+                    <div class="login-logo-box"><img src="logo.png" alt="IDEAL FLOOR"></div>
                 </div>
-                
-                <div class="mb-4">
-                    <label class="form-label text-muted small fw-bold">Пароль</label>
-                    <div class="input-group">
-                        <span class="input-group-text bg-light border-end-0"><i class="bi bi-lock text-muted"></i></span>
-                        <input type="password" id="password" class="form-control border-start-0 ps-0" placeholder="Введите пароль" required>
-                    </div>
+                <div class="login-brand-copy">
+                    <div class="login-brand-chip"><i class="bi bi-grid-1x2-fill"></i> IDEAL FLOOR CRM</div>
+                    <h1>Рабочая область команды</h1>
+                    <p>Дилеры, продажи, карта, матрица, цех и внутренние процессы — в одной системе.</p>
                 </div>
+            </aside>
 
-                <div id="error-msg" class="alert alert-danger d-none text-center p-2 small mb-3"></div>
+            <section class="login-form-panel">
+                <div class="login-form-shell">
+                    <div class="login-mobile-logo"><img src="logo.png" alt="IDEAL FLOOR"></div>
+                    <div class="login-eyebrow">IDEAL FLOOR CRM</div>
+                    <h2>Вход в систему</h2>
+                    <p class="login-subtitle">Введите данные своей учётной записи.</p>
 
-                <button type="submit" class="btn btn-primary w-100 rounded-pill shadow-sm" id="login-btn">
-                    Войти в систему
-                </button>
-            </form>
-            
-            <div class="text-center mt-4 text-muted small">
-                
-            </div>
-        </div>
-    </div>
+                    <form id="login-form" novalidate>
+                        <div class="login-field">
+                            <div class="login-field-head">
+                                <label for="username">Логин</label>
+                            </div>
+                            <div class="login-input-wrap">
+                                <span class="login-input-icon"><i class="bi bi-person"></i></span>
+                                <input
+                                    type="text"
+                                    id="username"
+                                    name="username"
+                                    placeholder="Введите логин"
+                                    autocomplete="username"
+                                    autocapitalize="none"
+                                    spellcheck="false"
+                                    required
+                                >
+                            </div>
+                        </div>
+
+                        <div class="login-field">
+                            <div class="login-field-head">
+                                <label for="password">Пароль</label>
+                                <span id="caps-warning" class="login-caps"><i class="bi bi-capslock-fill"></i> Caps Lock включён</span>
+                            </div>
+                            <div class="login-input-wrap">
+                                <span class="login-input-icon"><i class="bi bi-lock"></i></span>
+                                <input
+                                    type="password"
+                                    id="password"
+                                    name="password"
+                                    class="login-password-input"
+                                    placeholder="Введите пароль"
+                                    autocomplete="current-password"
+                                    required
+                                >
+                                <button
+                                    type="button"
+                                    id="password-toggle"
+                                    class="login-password-toggle"
+                                    aria-label="Показать пароль"
+                                    aria-pressed="false"
+                                    title="Показать пароль"
+                                >
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="error-msg" class="login-error" role="alert" aria-live="polite">
+                            <i class="bi bi-exclamation-circle-fill"></i>
+                            <span id="error-text"></span>
+                        </div>
+
+                        <button type="submit" class="login-submit" id="login-btn">
+                            <span class="login-btn-label">Войти в систему</span>
+                            <i class="bi bi-arrow-right"></i>
+                        </button>
+                    </form>
+
+                    <div class="login-footnote"><i class="bi bi-person-lock"></i> Вход только для сотрудников компании</div>
+                </div>
+            </section>
+        </section>
+    </main>
 
     <script>
         const form = document.getElementById('login-form');
+        const usernameInput = document.getElementById('username');
+        const passwordInput = document.getElementById('password');
+        const passwordToggle = document.getElementById('password-toggle');
+        const capsWarning = document.getElementById('caps-warning');
         const errorMsg = document.getElementById('error-msg');
+        const errorText = document.getElementById('error-text');
         const loginBtn = document.getElementById('login-btn');
 
-        // Если токен уже есть — возвращаем сотрудника в его основной раздел.
-        if (localStorage.getItem('crm_token')) {
-            let cachedUser = null;
-            try { cachedUser = JSON.parse(localStorage.getItem('crm_user') || 'null'); } catch (_) {}
-            window.location.href = cachedUser?.role === 'workshop' ? '/workshop.html' : '/';
+        function getCachedUser() {
+            try { return JSON.parse(localStorage.getItem('crm_user') || 'null'); }
+            catch (_) { return null; }
         }
 
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const username = document.getElementById('username').value.trim();
-            const password = document.getElementById('password').value.trim();
-            
-            if (!username || !password) return;
+        function getHomeForUser(user) {
+            return user?.role === 'workshop' ? '/workshop.html' : '/';
+        }
 
-            // Блокируем кнопку
-            loginBtn.disabled = true;
-            loginBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Вход...';
-            errorMsg.classList.add('d-none');
+        function setError(message = '') {
+            errorText.textContent = message;
+            errorMsg.classList.toggle('is-visible', Boolean(message));
+        }
+
+        function setLoading(loading) {
+            loginBtn.disabled = loading;
+            loginBtn.innerHTML = loading
+                ? '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span><span>Входим…</span>'
+                : '<span class="login-btn-label">Войти в систему</span><i class="bi bi-arrow-right"></i>';
+        }
+
+        function updateCapsLock(event) {
+            const isOn = Boolean(event.getModifierState && event.getModifierState('CapsLock'));
+            capsWarning.classList.toggle('is-visible', isOn);
+        }
+
+        // Если авторизация уже сохранена, возвращаем сотрудника в его основной раздел.
+        if (localStorage.getItem('crm_token')) {
+            window.location.replace(getHomeForUser(getCachedUser()));
+        } else {
+            requestAnimationFrame(() => usernameInput.focus({ preventScroll: true }));
+        }
+
+        passwordToggle.addEventListener('click', () => {
+            const show = passwordInput.type === 'password';
+            passwordInput.type = show ? 'text' : 'password';
+            passwordToggle.setAttribute('aria-pressed', String(show));
+            passwordToggle.setAttribute('aria-label', show ? 'Скрыть пароль' : 'Показать пароль');
+            passwordToggle.setAttribute('title', show ? 'Скрыть пароль' : 'Показать пароль');
+            passwordToggle.innerHTML = show
+                ? '<i class="bi bi-eye-slash"></i>'
+                : '<i class="bi bi-eye"></i>';
+            passwordInput.focus({ preventScroll: true });
+            const pos = passwordInput.value.length;
+            try { passwordInput.setSelectionRange(pos, pos); } catch (_) {}
+        });
+
+        passwordInput.addEventListener('keydown', updateCapsLock);
+        passwordInput.addEventListener('keyup', updateCapsLock);
+        passwordInput.addEventListener('blur', () => capsWarning.classList.remove('is-visible'));
+
+        [usernameInput, passwordInput].forEach(input => {
+            input.addEventListener('input', () => {
+                if (errorMsg.classList.contains('is-visible')) setError('');
+            });
+        });
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            const username = usernameInput.value.trim();
+            const password = passwordInput.value;
+
+            if (!username || !password) {
+                setError('Введите логин и пароль.');
+                (!username ? usernameInput : passwordInput).focus();
+                return;
+            }
+
+            setLoading(true);
+            setError('');
 
             try {
-                const res = await fetch('/api/auth/login', {
+                const response = await fetch('/api/auth/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, password })
                 });
 
-                const data = await res.json();
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(data.error || 'Не удалось войти в систему');
 
-                if (!res.ok) {
-                    throw new Error(data.error || 'Ошибка входа');
-                }
-
-                // УСПЕХ!
-                // 1. Сохраняем Токен (ключ от двери)
                 localStorage.setItem('crm_token', data.token);
-                // 2. Сохраняем данные пользователя (права, имя)
                 localStorage.setItem('crm_user', JSON.stringify(data.user));
-
-                // 3. Сотрудников цеха сразу отправляем в их рабочий раздел.
-                window.location.href = data.user?.role === 'workshop' ? '/workshop.html' : '/';
-
-            } catch (err) {
-                errorMsg.textContent = err.message;
-                errorMsg.classList.remove('d-none');
-                loginBtn.disabled = false;
-                loginBtn.textContent = 'Войти в систему';
+                window.location.replace(getHomeForUser(data.user));
+            } catch (error) {
+                setError(error.message || 'Не удалось войти в систему');
+                setLoading(false);
+                passwordInput.focus({ preventScroll: true });
+                passwordInput.select();
             }
         });
     </script>
