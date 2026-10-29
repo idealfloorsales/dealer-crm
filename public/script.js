@@ -1201,6 +1201,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- ОТКРЫТИЕ РЕДАКТИРОВАНИЯ (С УЧЕТОМ СЕКТОРА) ---
     async function openEditModal(id) {
+        document.querySelectorAll('.dealer-v3-menu.show').forEach(menu => {
+            const toggle = menu.parentElement?.querySelector('[data-bs-toggle="dropdown"]');
+            try {
+                if (toggle && window.bootstrap?.Dropdown) {
+                    const instance = bootstrap.Dropdown.getInstance(toggle) || bootstrap.Dropdown.getOrCreateInstance(toggle);
+                    instance.hide();
+                }
+            } catch (_) {}
+            menu.classList.remove('show');
+        });
+
         if (!window.CRMAuth || !CRMAuth.can('can_edit_dealer')) {
             window.showToast("Нет права редактировать дилеров", "error");
             return;
