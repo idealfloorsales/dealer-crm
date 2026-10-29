@@ -590,7 +590,8 @@ async function connectToDB() {
         await seedStatuses(); 
         await seedUsers(); 
         await seedSectors();
-        await seedWorkshopMaterials(); 
+        await seedWorkshopMaterials();
+        await seedWorkshopRecipes(); 
     } catch (e) { console.error(e); }
 }
 
@@ -613,6 +614,30 @@ async function seedWorkshopMaterials() {
             { $setOnInsert: { ...item, stockQty: 0, minQty: 0, active: true } },
             { upsert: true }
         );
+    }
+}
+
+async function seedWorkshopRecipes() {
+    const arabica = await Product.findOne({
+        name: /Арабика/i,
+        sku: /702/i
+    }).lean();
+    if (arabica) {
+        const exists = await WorkshopRecipe.findOne({ product: arabica._id, outputType: 'sample' }).lean();
+        if (!exists) {
+            await WorkshopRecipe.create({
+                name: `Планшет ${arabica.sku || ''} ${arabica.name || 'Дуб Арабика'}`.trim(),
+                outputType: 'sample',
+                sku: `SAMPLE-${arabica.sku || '702'}`,
+                product: arabica._id,
+                sideA: 'Палубная укладка',
+                sideB: 'Ёлочка',
+                planksPerUnit: 24,
+                stockQty: 0,
+                active: true,
+                note: 'Норма: 24 планки на двухсторонний планшет. 4 упаковки по 30 планок = 5 планшетов без отхода.'
+            });
+        }
     }
 }
 
@@ -1240,8 +1265,8 @@ app.get('/api/workshop/bootstrap', requirePermission('can_view_workshop'), async
 
         const today = new Date();
         today.setHours(0,0,0,0);
-        const todayProduction = productions.filter(item => new Date(item.date) >= today)
-            .reduce((sum, item) => sum + (Number(item.outputQty) || 0), 0);
+        const todayRows = await WorkshopProduction.find({ date: { $gte: today } }).select('outputQty').lean();
+        const todayProduction = todayRows.reduce((sum, item) => sum + (Number(item.outputQty) || 0), 0);
         const finishedStock = recipes.reduce((sum, item) => sum + (Number(item.stockQty) || 0), 0);
         const lowMaterials = materials.filter(item => Number(item.minQty) > 0 && Number(item.stockQty) <= Number(item.minQty)).length;
         const laminatePlanks = laminateStocks.reduce((sum, item) => sum + (Number(item.planksQty) || 0), 0);
