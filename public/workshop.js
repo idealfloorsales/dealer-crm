@@ -160,7 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="workshop-memo-card-lines">${lines}</div>
                 <div class="workshop-memo-card-foot">
-                    <small>${(memo.lines || []).length} поз. · ${(memo.lines || []).reduce((sum,line)=>sum+n(line.requestedPacks),0)} уп.</small>
+                    <small>${(memo.lines || []).length} поз. · ${(memo.lines || []).reduce((sum,line)=>sum+n(line.requestedPacks),0)} уп. · ${(memo.lines || []).reduce((sum,line)=>sum+n(line.plannedOutputQty),0)} изделий</small>
                     ${actionable ? `<button type="button" class="workshop-link-btn" data-receive-memo="${idOf(memo)}"><i class="bi bi-check2-square"></i>${memo.status === 'mismatch' ? 'Повторно сверить' : 'Сверить приход'}</button>` : '<span class="text-success small fw-bold"><i class="bi bi-check-circle me-1"></i>Оприходовано</span>'}
                 </div>
             </article>`;
@@ -420,7 +420,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const per = n(selectedRecipe?.planksPerUnit);
         const stock = n(selectedRecipe?.stockQty);
         const minimum = n(selectedRecipe?.minStockQty);
-        const needs = selectedRecipe ? ((minimum > 0 && stock <= minimum) || (minimum === 0 && stock <= 0)) : false;
+        const needs = product?.is_liquid !== false && selectedRecipe
+            ? ((minimum > 0 && stock <= minimum) || (minimum === 0 && stock <= 0))
+            : false;
         const suggestedPacks = selectedRecipe ? recommendedPacksForRecipe(selectedRecipe) : 0;
         return { recipes, selectedRecipe, pq, per, stock, minimum, needs, suggestedPacks };
     }
@@ -477,7 +479,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const stockClass = meta.needs ? 'is-low' : '';
             const urgency = meta.needs
                 ? `<span class="ws-memo-need"><i class="bi bi-exclamation-circle"></i> нужно пополнить</span>`
-                : '';
+                : (product.is_liquid === false
+                    ? '<span class="ws-memo-need is-old"><i class="bi bi-clock-history"></i> неактуален</span>'
+                    : '');
             const suggestion = meta.suggestedPacks > 0
                 ? `<button type="button" class="ws-memo-suggest" data-suggest-packs="${meta.suggestedPacks}" title="Подставить рекомендуемое количество">${meta.suggestedPacks} уп. рекоменд.</button>`
                 : '';
