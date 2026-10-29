@@ -259,17 +259,6 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="permissions.js?v={{VER}}"></script>
     <script>
-        // --- AUTH INTERCEPTOR ---
-        const originalFetch = window.fetch;
-        window.fetch = async function (url, options) {
-            options = options || {}; options.headers = options.headers || {};
-            const token = localStorage.getItem('crm_token');
-            if (token) options.headers['Authorization'] = 'Bearer ' + token;
-            const response = await originalFetch(url, options);
-            if (response.status === 401) window.location.href = '/login.html';
-            return response;
-        };
-
         const modal = new bootstrap.Modal(document.getElementById('userModal'));
         const tbody = document.getElementById('users-table-body');
         const mobileList = document.getElementById('users-mobile-list');
@@ -468,7 +457,12 @@
         });
 
         searchInput.addEventListener('input', render);
-        loadUsers();
+
+        (async () => {
+            if (window.CRMAuth?.ready) await CRMAuth.ready;
+            if (!window.CRMAuth?.can('can_manage_users')) return;
+            loadUsers();
+        })();
     </script>
 </body>
 </html>
