@@ -524,6 +524,7 @@ app.get('/api/dealers/:id', requirePermission('can_view_dealers'), async (req, r
         }
         const d = await query.lean();
         if (!d) return res.status(404).json({ error: 'Дилер не найден' });
+        if (req.query.view === 'profile') res.set('Cache-Control', 'private, max-age=30');
         res.json(convertToClient(d));
     } catch (e) {
         res.status(500).json({ error: e.message });
