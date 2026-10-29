@@ -263,7 +263,19 @@
         const tbody = document.getElementById('users-table-body');
         const mobileList = document.getElementById('users-mobile-list');
         const searchInput = document.getElementById('user-search');
+        const userRoleSelect = document.getElementById('u_role');
+        const userScopeSelect = document.getElementById('u_scope');
         let allUsers = [];
+
+        function syncRoleScope() {
+            if (!userRoleSelect || !userScopeSelect) return;
+            const isMarketing = userRoleSelect.value === 'marketing';
+            if (isMarketing) userScopeSelect.value = 'all';
+            userScopeSelect.disabled = isMarketing;
+            userScopeSelect.title = isMarketing ? 'Маркетинг всегда видит всю дилерскую сеть' : '';
+        }
+
+        userRoleSelect?.addEventListener('change', syncRoleScope);
 
         async function loadUsers() {
             try {
@@ -372,6 +384,7 @@
             document.getElementById('u_password').required = true;
             document.getElementById('u_role').value = 'manager';
             document.getElementById('u_scope').value = 'all';
+            syncRoleScope();
             document.querySelectorAll('.perm-check').forEach(cb => cb.checked = false);
             
             // Базовые права по умолчанию
@@ -391,7 +404,8 @@
             document.getElementById('u_password').value = '';
             document.getElementById('u_password').required = false;
             document.getElementById('u_role').value = u.role || 'manager';
-            document.getElementById('u_scope').value = u.scope;
+            document.getElementById('u_scope').value = u.role === 'marketing' ? 'all' : u.scope;
+            syncRoleScope();
             document.getElementById('u_isBlocked').checked = u.isBlocked;
 
             // Сброс
