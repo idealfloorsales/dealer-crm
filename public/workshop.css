@@ -196,3 +196,7 @@ radial-gradient(circle at 90% 0,rgba(185,4,10,.35),transparent 20rem),linear-gra
   .workshop-receipt-line-status{grid-column:1/-1;grid-row:auto}
   .workshop-document-note{font-size:.53rem}
 }
+
+@media(max-width:767.98px){
+  .workshop-quick-actions button:last-child{grid-column:auto!important}
+}
