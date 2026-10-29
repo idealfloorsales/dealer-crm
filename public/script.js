@@ -834,6 +834,18 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function isPersonalManagerView() {
+        const user = window.CRMAuth?.user;
+        return Boolean(user && user.role === 'manager' && !user.permissions?.is_admin);
+    }
+
+    function getEffectiveDashboardScope() {
+        const user = window.CRMAuth?.user;
+        if (!user) return 'all';
+        if (user.role === 'marketing' || user.permissions?.is_admin) return 'all';
+        return user.scope || 'all';
+    }
+
     function getDashboardPlanKey(scope) {
         if (scope === 'astana') return 'astana_all';
         if (scope === 'regions') return 'regions_all';
@@ -845,14 +857,28 @@ document.addEventListener('DOMContentLoaded', () => {
         const factRows = source.filter(row => !String(row.dealerId || '').startsWith('PLAN_'));
         const fact = factRows.reduce((sum, row) => sum + (Number(row.fact) || 0), 0);
 
+        if (isPersonalManagerView()) {
+            const userId = String(window.CRMAuth?.user?.id || '');
+            const managerPlan = source.find(row => String(row.dealerId || '') === `PLAN_manager_${userId}`);
+            if (managerPlan) {
+                return { fact, plan: Number(managerPlan.plan) || 0 };
+            }
+
+            // Старые месяцы: если личный план менеджера еще не задан,
+            // используем только планы его дилеров, никогда общий PLAN_astana_all/regions_all.
+            const dealerPlan = source
+                .filter(row => String(row.dealerId || '').startsWith('PLAN_vip_'))
+                .reduce((sum, row) => sum + (Number(row.plan) || 0), 0);
+            const legacyDealerPlan = factRows.reduce((sum, row) => sum + (Number(row.plan) || 0), 0);
+            return { fact, plan: dealerPlan || legacyDealerPlan };
+        }
+
         const rootKey = `PLAN_${getDashboardPlanKey(scope)}`;
         const rootPlan = source.find(row => String(row.dealerId || '') === rootKey);
         if (rootPlan) {
             return { fact, plan: Number(rootPlan.plan) || 0 };
         }
 
-        // For full-company legacy months, prefer the two regional totals rather than
-        // summing every PLAN_* row (group + region + VIP), which double-counts plans.
         if (scope === 'all') {
             const astanaPlan = source.find(row => String(row.dealerId || '') === 'PLAN_astana_all');
             const regionsPlan = source.find(row => String(row.dealerId || '') === 'PLAN_regions_all');
@@ -864,7 +890,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Compatibility with old records where plan was stored on the sales row.
         const legacyPlan = factRows.reduce((sum, row) => sum + (Number(row.plan) || 0), 0);
         return { fact, plan: legacyPlan };
     }
@@ -892,7 +917,7 @@ document.addEventListener('DOMContentLoaded', () => {
             months.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
         }
 
-        const userScope = window.CRMAuth?.user?.scope || 'all';
+        const userScope = getEffectiveDashboardScope();
         const totals = months.map(month => {
             const rows = salesHistory.filter(s => s.month === month);
             return {
@@ -1066,7 +1091,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const activeIds = new Set((currentMonthSales || []).filter(s => Number(s.fact)>0).map(s => String(s.dealerId)));
         const activeCount = network.filter(d => activeIds.has(String(d.id))).length;
         const problemCount = network.filter(d => d.status === 'problem' || getDealerHealth(d).score < 60).length;
-        const userScope = window.CRMAuth?.user?.scope || 'all';
+        const userScope = getEffectiveDashboardScope();
         const currentTotals = getDashboardMonthTotals(currentMonthSales, userScope);
         const currentFact = currentTotals.fact;
         const currentPlan = currentTotals.plan;
