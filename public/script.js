@@ -94,7 +94,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const dealerFilterToggle = document.getElementById('dealer-filter-toggle');
     const filterHealth = document.getElementById('filter-health');
     const btnExportDealers = document.getElementById('export-dealers-btn'); const btnExportCompetitors = document.getElementById('export-competitors-prices-btn');
-    const addOrgList = document.getElementById('add-org-list'); const editOrgList = document.getElementById('edit-org-list'); const btnAddOrgAdd = document.getElementById('btn-add-org-add'); const btnEditOrgAdd = document.getElementById('btn-edit-org-add');
+    const addLegalEntityList = document.getElementById('add-legal-entity-list');
+    const editLegalEntityList = document.getElementById('edit-legal-entity-list');
+    const btnAddLegalEntityAdd = document.getElementById('btn-add-legal-entity-add');
+    const btnAddLegalEntityEdit = document.getElementById('btn-add-legal-entity-edit');
     const logoutBtn = document.getElementById('logout-btn');
 
     let mapInstances = { add: null, edit: null };
@@ -197,7 +200,81 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderPhotoPreviews(container, photosArray) { if(container) container.innerHTML = photosArray.map((p, index) => `<div class="photo-preview-item"><img src="${p.photo_url}"><button type="button" class="btn-remove-photo" data-index="${index}"><i class="bi bi-x"></i></button></div>`).join(''); }
     function createPosEntryHTML(p={}) { return `<div class="pos-entry"><input type="text" class="form-control pos-name" list="pos-materials-datalist" placeholder="Название стенда" value="${safeAttr(p.name||'')}" autocomplete="off"><input type="number" class="form-control pos-quantity" value="${p.quantity||1}" min="1" placeholder="Шт"><button type="button" class="btn-remove-entry" onclick="this.closest('.pos-entry').remove()" title="Удалить"><i class="bi bi-x-lg"></i></button></div>`; }
     function createCompetitorEntryHTML(c={}) { let brandOpts = `<option value="">-- Бренд --</option>`; competitorsRef.forEach(ref => { const sel = ref.name === c.brand ? 'selected' : ''; brandOpts += `<option value="${ref.name}" ${sel}>${ref.name}</option>`; }); let collOpts = `<option value="">-- Коллекция --</option>`; if (c.brand) { const ref = competitorsRef.find(r => r.name === c.brand); if (ref && ref.collections) { const sortedCols = [...ref.collections].sort((a, b) => { const typeA = (typeof a === 'object') ? a.type : 'std'; const typeB = (typeof b === 'object') ? b.type : 'std'; if (typeA === 'std' && typeB !== 'std') return 1; if (typeA !== 'std' && typeB === 'std') return -1; return 0; }); sortedCols.forEach(col => { const colName = (typeof col === 'string') ? col : col.name; const colType = (typeof col === 'object') ? col.type : 'std'; let label = ''; if(colType.includes('eng')) label = ' (Елка)'; else if(colType.includes('french')) label = ' (Фр. Елка)'; else if(colType.includes('art')) label = ' (Арт)'; const sel = colName === c.collection ? 'selected' : ''; collOpts += `<option value="${colName}" ${sel}>${colName}${label}</option>`; }); } } return `<div class="competitor-entry"><select class="form-select competitor-brand" onchange="updateCollections(this)">${brandOpts}</select><select class="form-select competitor-collection">${collOpts}</select><input type="text" class="form-control competitor-price-opt" placeholder="ОПТ" value="${c.price_opt||''}"><input type="text" class="form-control competitor-price-retail" placeholder="Розн" value="${c.price_retail||''}"><button type="button" class="btn-remove-entry" onclick="this.closest('.competitor-entry').remove()" title="Удалить"><i class="bi bi-x-lg"></i></button></div>`; }
-    function createOrgInputHTML(value='') { return `<div class="input-group mb-1 org-entry"><input type="text" class="form-control org-input" placeholder="Юр. лицо" value="${safeAttr(value)}"><button type="button" class="btn btn-outline-danger" onclick="this.closest('.org-entry').remove()">X</button></div>`; }
+    function inferLegalEntityType(type, name='') {
+        const explicit = String(type || '').trim();
+        if (explicit) return explicit;
+        const value = String(name || '').trim();
+        if (/^ИП\b/i.test(value)) return 'ИП';
+        if (/^(ЧС|ФЛ|Физ|частн)/i.test(value)) return 'Частное лицо';
+        return 'ТОО';
+    }
+
+    function getDealerLegalEntities(d={}) {
+        if (Array.isArray(d.legal_entities) && d.legal_entities.length) return d.legal_entities;
+        const req = d.requisites || {};
+        const orgs = Array.isArray(d.organizations) ? d.organizations.filter(Boolean) : [];
+        const primaryName = req.organizationName || orgs[0] || d.organization || '';
+        const result = [];
+        if (primaryName || Object.values(req).some(Boolean)) {
+            result.push({
+                type: inferLegalEntityType('', primaryName),
+                organizationName: primaryName,
+                director: req.director || '',
+                legalAddress: req.legalAddress || d.address || '',
+                bin: req.bin || '',
+                iik: req.iik || '',
+                bank: req.bank || '',
+                bik: req.bik || '',
+                kbe: req.kbe || '',
+                email: req.email || ''
+            });
+        }
+        orgs.slice(1).forEach(name => result.push({ type: inferLegalEntityType('', name), organizationName: name }));
+        return result;
+    }
+
+    function createLegalEntityHTML(entity={}) {
+        const type = inferLegalEntityType(entity.type, entity.organizationName);
+        const options = ['ТОО','ИП','Частное лицо'].map(value => `<option value="${value}" ${value === type ? 'selected' : ''}>${value}</option>`).join('');
+        return `
+            <div class="legal-entity-entry">
+                <div class="legal-entity-entry-head">
+                    <div>
+                        <strong>Организация для документов</strong>
+                        <small>У каждого юрлица свои банковские и юридические реквизиты</small>
+                    </div>
+                    <button type="button" class="btn-remove-entry" onclick="this.closest('.legal-entity-entry').remove()" title="Удалить"><i class="bi bi-x-lg"></i></button>
+                </div>
+                <div class="legal-entity-grid">
+                    <label><span>Тип</span><select class="form-select legal-entity-type">${options}</select></label>
+                    <label class="span-2"><span>Наименование / ФИО</span><input type="text" class="form-control legal-entity-name" value="${safeAttr(entity.organizationName || '')}" placeholder="ТОО «Компания», ИП «...», ФИО"></label>
+                    <label class="span-2"><span>Директор / руководитель</span><input type="text" class="form-control legal-entity-director" value="${safeAttr(entity.director || '')}" placeholder="ФИО"></label>
+                    <label class="span-3"><span>Юридический адрес</span><input type="text" class="form-control legal-entity-address" value="${safeAttr(entity.legalAddress || '')}"></label>
+                    <label><span>БИН / ИИН</span><input type="text" class="form-control legal-entity-bin" value="${safeAttr(entity.bin || '')}"></label>
+                    <label class="span-2"><span>ИИК</span><input type="text" class="form-control legal-entity-iik" value="${safeAttr(entity.iik || '')}"></label>
+                    <label class="span-2"><span>Банк</span><input type="text" class="form-control legal-entity-bank" value="${safeAttr(entity.bank || '')}"></label>
+                    <label><span>БИК</span><input type="text" class="form-control legal-entity-bik" value="${safeAttr(entity.bik || '')}"></label>
+                    <label><span>КБе</span><input type="text" class="form-control legal-entity-kbe" value="${safeAttr(entity.kbe || '')}"></label>
+                    <label class="span-2"><span>E-mail</span><input type="email" class="form-control legal-entity-email" value="${safeAttr(entity.email || '')}"></label>
+                </div>
+            </div>`;
+    }
+
+    function collectLegalEntities(container) {
+        if (!container) return [];
+        return Array.from(container.querySelectorAll('.legal-entity-entry')).map(entry => ({
+            type: entry.querySelector('.legal-entity-type')?.value || 'ТОО',
+            organizationName: entry.querySelector('.legal-entity-name')?.value.trim() || '',
+            director: entry.querySelector('.legal-entity-director')?.value.trim() || '',
+            legalAddress: entry.querySelector('.legal-entity-address')?.value.trim() || '',
+            bin: entry.querySelector('.legal-entity-bin')?.value.trim() || '',
+            iik: entry.querySelector('.legal-entity-iik')?.value.trim() || '',
+            bank: entry.querySelector('.legal-entity-bank')?.value.trim() || '',
+            bik: entry.querySelector('.legal-entity-bik')?.value.trim() || '',
+            kbe: entry.querySelector('.legal-entity-kbe')?.value.trim() || '',
+            email: entry.querySelector('.legal-entity-email')?.value.trim() || ''
+        })).filter(entity => entity.organizationName || entity.bin || entity.iik);
+    }
     window.updateCollections = function(select) { const brandName = select.value; const row = select.closest('.competitor-entry'); const collSelect = row.querySelector('.competitor-collection'); let html = `<option value="">-- Коллекция --</option>`; const ref = competitorsRef.find(r => r.name === brandName); if (ref && ref.collections) { const sortedCols = [...ref.collections].sort((a, b) => { const typeA = (typeof a === 'object') ? a.type : 'std'; const typeB = (typeof b === 'object') ? b.type : 'std'; if (typeA === 'std' && typeB !== 'std') return 1; if (typeA !== 'std' && typeB === 'std') return -1; return 0; }); html += sortedCols.map(col => { const colName = (typeof col === 'string') ? col : col.name; const colType = (typeof col === 'object') ? col.type : 'std'; let label = ''; if(colType.includes('eng')) label = ' (Елка)'; else if(colType.includes('french')) label = ' (Фр. Елка)'; else if(colType.includes('art')) label = ' (Арт)'; return `<option value="${colName}">${colName}${label}</option>`; }).join(''); } collSelect.innerHTML = html; };
     window.showToast = function(message, type = 'success') { let container = document.getElementById('toast-container-custom'); if (!container) { container = document.createElement('div'); container.id = 'toast-container-custom'; container.className = 'toast-container-custom'; document.body.appendChild(container); } const toast = document.createElement('div'); toast.className = `toast-modern toast-${type}`; const icon = type === 'success' ? 'check-circle-fill' : (type === 'error' ? 'exclamation-triangle-fill' : 'info-circle-fill'); toast.innerHTML = `<i class="bi bi-${icon} fs-5"></i><span class="fw-bold text-dark">${message}</span>`; container.appendChild(toast); setTimeout(() => { toast.style.animation = 'toastFadeOut 0.5s forwards'; setTimeout(() => toast.remove(), 500); }, 3000); };
     
@@ -331,15 +408,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function getSelectedProductIds(containerId) { const el=document.getElementById(containerId); if(!el) return []; return Array.from(el.querySelectorAll('input:checked')).map(cb=>cb.value); }
     function collectData(container, selector, fields) { if (!container) return []; const data = []; container.querySelectorAll(selector).forEach(entry => { const item = {}; let hasData = false; fields.forEach(f => { const inp = entry.querySelector(f.class); if(inp){item[f.key]=inp.value; if(item[f.key]) hasData=true;} }); if(hasData) data.push(item); }); return data; }
     function renderList(container, data, htmlGen) { if(container) container.innerHTML = (data && data.length > 0) ? data.map(htmlGen).join('') : htmlGen(); }
-    function collectOrgs(container) { const orgs = []; container.querySelectorAll('.org-input').forEach(inp => { if(inp.value.trim()) orgs.push(inp.value.trim()); }); return orgs; }
 
     // --- SETUP BUTTONS ---
     const setupListBtn = (id, list, genFunc) => { const btn = document.getElementById(id); if(btn) btn.onclick = () => list.insertAdjacentHTML('beforeend', genFunc()); };
     setupListBtn('add-contact-btn-add-modal', addContactList, createContactEntryHTML); setupListBtn('add-address-btn-add-modal', addAddressList, createAddressEntryHTML); setupListBtn('add-pos-btn-add-modal', addPosList, createPosEntryHTML); setupListBtn('add-visits-btn-add-modal', addVisitsList, createVisitEntryHTML); setupListBtn('add-competitor-btn-add-modal', addCompetitorList, createCompetitorEntryHTML);
     setupListBtn('add-contact-btn-edit-modal', editContactList, createContactEntryHTML); setupListBtn('add-address-btn-edit-modal', editAddressList, createAddressEntryHTML); setupListBtn('add-pos-btn-edit-modal', editPosList, createPosEntryHTML); setupListBtn('add-visits-btn-edit-modal', editVisitsList, createVisitEntryHTML); setupListBtn('add-competitor-btn-edit-modal', editCompetitorList, createCompetitorEntryHTML);
 
-    if(btnAddOrgAdd) btnAddOrgAdd.onclick = () => addOrgList.insertAdjacentHTML('beforeend', createOrgInputHTML());
-    if(btnEditOrgAdd) btnEditOrgAdd.onclick = () => editOrgList.insertAdjacentHTML('beforeend', createOrgInputHTML());
+    if(btnAddLegalEntityAdd) btnAddLegalEntityAdd.onclick = () => addLegalEntityList?.insertAdjacentHTML('beforeend', createLegalEntityHTML());
+    if(btnAddLegalEntityEdit) btnAddLegalEntityEdit.onclick = () => editLegalEntityList?.insertAdjacentHTML('beforeend', createLegalEntityHTML());
 
     if(addAvatarInput) addAvatarInput.addEventListener('change', async (e) => { const file = e.target.files[0]; if (file) { newAvatarBase64 = await compressImage(file, 800, 0.8); addAvatarPreview.src = newAvatarBase64; addAvatarPreview.style.display='block'; } });
     if(editAvatarInput) editAvatarInput.addEventListener('change', async (e) => { const file = e.target.files[0]; if (file) { newAvatarBase64 = await compressImage(file, 800, 0.8); editAvatarPreview.src = newAvatarBase64; editAvatarPreview.style.display='block'; } });
@@ -1060,19 +1136,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if(d.contract) { document.getElementById('edit_contract_signed').checked = d.contract.isSigned || false; document.getElementById('edit_contract_date').value = d.contract.date || ''; document.getElementById('edit_contract_number').value = d.contract.number || ''; } else { document.getElementById('edit_contract_signed').checked = false; document.getElementById('edit_contract_date').value = ''; document.getElementById('edit_contract_number').value = ''; }
-            const req = d.requisites || {};
-            document.getElementById('edit_req_org').value = req.organizationName || (d.organizations && d.organizations[0]) || d.organization || '';
-            document.getElementById('edit_req_director').value = req.director || '';
-            document.getElementById('edit_req_address').value = req.legalAddress || d.address || '';
-            document.getElementById('edit_req_bin').value = req.bin || '';
-            document.getElementById('edit_req_iik').value = req.iik || '';
-            document.getElementById('edit_req_bank').value = req.bank || '';
-            document.getElementById('edit_req_bik').value = req.bik || '';
-            document.getElementById('edit_req_kbe').value = req.kbe || '';
-            document.getElementById('edit_req_email').value = req.email || '';
-
-            editOrgList.innerHTML = '';
-            if (d.organizations && d.organizations.length > 0) { d.organizations.forEach(org => editOrgList.insertAdjacentHTML('beforeend', createOrgInputHTML(org))); } else { editOrgList.insertAdjacentHTML('beforeend', createOrgInputHTML('')); }
+            if (editLegalEntityList) {
+                editLegalEntityList.innerHTML = '';
+                const legalEntities = getDealerLegalEntities(d);
+                (legalEntities.length ? legalEntities : [{}]).forEach(entity => editLegalEntityList.insertAdjacentHTML('beforeend', createLegalEntityHTML(entity)));
+            }
 
             const vipCheck = document.getElementById('edit_has_personal_plan');
             if(vipCheck) vipCheck.checked = d.hasPersonalPlan || false;
@@ -1938,9 +2006,8 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
             console.warn('Не удалось заранее загрузить справочники формы', e);
         }
         if(addForm) addForm.reset(); populateStatusSelects(); renderProductChecklist(addProductChecklist); renderList(addContactList, [], createContactEntryHTML); renderList(addAddressList, [], createAddressEntryHTML); renderList(addPosList, [], createPosEntryHTML); renderList(addVisitsList, [], createVisitEntryHTML); renderList(addCompetitorList, [], createCompetitorEntryHTML); if(document.getElementById('add_latitude')) { document.getElementById('add_latitude').value = ''; document.getElementById('add_longitude').value = ''; } addPhotosData = []; renderPhotoPreviews(addPhotoPreviewContainer, []); if(addAvatarPreview) { addAvatarPreview.src = ''; addAvatarPreview.style.display='none'; } newAvatarBase64 = null; 
-        document.getElementById('add-org-list').innerHTML = ''; addOrgList.insertAdjacentHTML('beforeend', createOrgInputHTML());
+        if (addLegalEntityList) { addLegalEntityList.innerHTML = ''; addLegalEntityList.insertAdjacentHTML('beforeend', createLegalEntityHTML()); }
         document.getElementById('add_contract_signed').checked = false; document.getElementById('add_contract_date').value = ''; document.getElementById('add_contract_number').value = '';
-        ['add_req_org','add_req_director','add_req_address','add_req_bin','add_req_iik','add_req_bank','add_req_bik','add_req_kbe','add_req_email'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
         const personalPlanAdd = document.getElementById('add_has_personal_plan');
         if (personalPlanAdd) personalPlanAdd.checked = false;
         toggleSectorSelect('add', '');
@@ -2012,13 +2079,17 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
     }
 
     if(addForm) addForm.addEventListener('submit', async (e) => { e.preventDefault(); if (!window.CRMAuth || !CRMAuth.can('can_create_dealer')) { window.showToast("Нет права создавать дилеров", "error"); return; } if (isSaving) return; isSaving = true; const btn = document.getElementById('btn-finish-step'); const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; 
-        const data = { dealer_id: getVal('dealer_id'), name: getVal('name'), organizations: collectOrgs(document.getElementById('add-org-list')), price_type: getVal('price_type'), city: getVal('city'), address: getVal('address'), delivery: getVal('delivery'), website: getVal('website'), instagram: getVal('instagram'), latitude: getVal('add_latitude'), longitude: getVal('add_longitude'), bonuses: getVal('bonuses'), status: getVal('status'), responsible: document.getElementById('responsible').value, region_sector: document.getElementById('add_region_sector').value, hasPersonalPlan: document.getElementById('add_has_personal_plan')?.checked || false, requisites: { organizationName: getVal('add_req_org'), director: getVal('add_req_director'), legalAddress: getVal('add_req_address'), bin: getVal('add_req_bin'), iik: getVal('add_req_iik'), bank: getVal('add_req_bank'), bik: getVal('add_req_bik'), kbe: getVal('add_req_kbe'), email: getVal('add_req_email') }, contract: { isSigned: document.getElementById('add_contract_signed').checked, date: getVal('add_contract_date'), number: getVal('add_contract_number') }, contacts: collectData(addContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]), additional_addresses: collectData(addAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]), pos_materials: collectData(addPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]), visits: collectData(addVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'}]), photos: addPhotosData, avatarUrl: newAvatarBase64, competitors: collectData(addCompetitorList, '.competitor-entry', [{key:'brand',class:'.competitor-brand'},{key:'collection',class:'.competitor-collection'},{key:'price_opt',class:'.competitor-price-opt'},{key:'price_retail',class:'.competitor-price-retail'}]) }; 
+        const legalEntities = collectLegalEntities(addLegalEntityList);
+        const primaryEntity = legalEntities[0] || {};
+        const data = { dealer_id: getVal('dealer_id'), name: getVal('name'), organizations: legalEntities.map(entity => entity.organizationName).filter(Boolean), legal_entities: legalEntities, price_type: getVal('price_type'), city: getVal('city'), address: getVal('address'), delivery: getVal('delivery'), website: getVal('website'), instagram: getVal('instagram'), latitude: getVal('add_latitude'), longitude: getVal('add_longitude'), bonuses: getVal('bonuses'), status: getVal('status'), responsible: document.getElementById('responsible').value, region_sector: document.getElementById('add_region_sector').value, hasPersonalPlan: document.getElementById('add_has_personal_plan')?.checked || false, requisites: { organizationName: primaryEntity.organizationName || '', director: primaryEntity.director || '', legalAddress: primaryEntity.legalAddress || '', bin: primaryEntity.bin || '', iik: primaryEntity.iik || '', bank: primaryEntity.bank || '', bik: primaryEntity.bik || '', kbe: primaryEntity.kbe || '', email: primaryEntity.email || '' }, contract: { isSigned: document.getElementById('add_contract_signed').checked, date: getVal('add_contract_date'), number: getVal('add_contract_number') }, contacts: collectData(addContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]), additional_addresses: collectData(addAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]), pos_materials: collectData(addPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]), visits: collectData(addVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'}]), photos: addPhotosData, avatarUrl: newAvatarBase64, competitors: collectData(addCompetitorList, '.competitor-entry', [{key:'brand',class:'.competitor-brand'},{key:'collection',class:'.competitor-collection'},{key:'price_opt',class:'.competitor-price-opt'},{key:'price_retail',class:'.competitor-price-retail'}]) }; 
         try { const res = await fetch(API_DEALERS_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); if (!res.ok) throw new Error(await res.text()); const newD = await res.json(); const pIds = getSelectedProductIds('add-product-checklist'); if(window.CRMAuth && CRMAuth.can('can_edit_matrix') && pIds.length) await saveProducts(newD.id, pIds); addModal.hide(); window.showToast("Дилер добавлен!"); initApp(); } catch (e) { window.showToast("Ошибка сохранения", "error"); } finally { isSaving = false; btn.disabled = false; btn.innerHTML = oldText; } });
     if(editForm) editForm.addEventListener('submit', async (e) => { e.preventDefault(); if (!window.CRMAuth || !CRMAuth.can('can_edit_dealer')) { window.showToast("Нет права редактировать дилеров", "error"); return; } if (isSaving) return; isSaving = true; const btn = document.querySelector('button[form="edit-dealer-form"]'); const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; const id = document.getElementById('edit_db_id').value; let avatarToSend = getVal('edit-current-avatar-url'); if (newAvatarBase64) avatarToSend = newAvatarBase64; 
+        const legalEntities = collectLegalEntities(editLegalEntityList);
+        const primaryEntity = legalEntities[0] || {};
         const data = { 
-            dealer_id: getVal('edit_dealer_id'), name: getVal('edit_name'), organizations: collectOrgs(document.getElementById('edit-org-list')), price_type: getVal('edit_price_type'), city: getVal('edit_city'), address: getVal('edit_address'), delivery: getVal('edit_delivery'), website: getVal('edit_website'), instagram: getVal('edit_instagram'), latitude: getVal('edit_latitude'), longitude: getVal('edit_longitude'), bonuses: getVal('edit_bonuses'), status: getVal('edit_status'), responsible: document.getElementById('edit_responsible').value, region_sector: document.getElementById('edit_region_sector').value, 
+            dealer_id: getVal('edit_dealer_id'), name: getVal('edit_name'), organizations: legalEntities.map(entity => entity.organizationName).filter(Boolean), legal_entities: legalEntities, price_type: getVal('edit_price_type'), city: getVal('edit_city'), address: getVal('edit_address'), delivery: getVal('edit_delivery'), website: getVal('edit_website'), instagram: getVal('edit_instagram'), latitude: getVal('edit_latitude'), longitude: getVal('edit_longitude'), bonuses: getVal('edit_bonuses'), status: getVal('edit_status'), responsible: document.getElementById('edit_responsible').value, region_sector: document.getElementById('edit_region_sector').value, 
             hasPersonalPlan: document.getElementById('edit_has_personal_plan').checked,
-            requisites: { organizationName: getVal('edit_req_org'), director: getVal('edit_req_director'), legalAddress: getVal('edit_req_address'), bin: getVal('edit_req_bin'), iik: getVal('edit_req_iik'), bank: getVal('edit_req_bank'), bik: getVal('edit_req_bik'), kbe: getVal('edit_req_kbe'), email: getVal('edit_req_email') }, contract: { isSigned: document.getElementById('edit_contract_signed').checked, date: getVal('edit_contract_date'), number: getVal('edit_contract_number') }, avatarUrl: avatarToSend, contacts: collectData(editContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]), additional_addresses: collectData(editAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]), pos_materials: collectData(editPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]), visits: collectData(editVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'},{key:'isCompleted',class:'.visit-completed'}]), photos: editPhotosData, competitors: collectData(editCompetitorList, '.competitor-entry', [{key:'brand',class:'.competitor-brand'},{key:'collection',class:'.competitor-collection'},{key:'price_opt',class:'.competitor-price-opt'},{key:'price_retail',class:'.competitor-price-retail'}]) 
+            requisites: { organizationName: primaryEntity.organizationName || '', director: primaryEntity.director || '', legalAddress: primaryEntity.legalAddress || '', bin: primaryEntity.bin || '', iik: primaryEntity.iik || '', bank: primaryEntity.bank || '', bik: primaryEntity.bik || '', kbe: primaryEntity.kbe || '', email: primaryEntity.email || '' }, contract: { isSigned: document.getElementById('edit_contract_signed').checked, date: getVal('edit_contract_date'), number: getVal('edit_contract_number') }, avatarUrl: avatarToSend, contacts: collectData(editContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]), additional_addresses: collectData(editAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]), pos_materials: collectData(editPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]), visits: collectData(editVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'},{key:'isCompleted',class:'.visit-completed'}]), photos: editPhotosData, competitors: collectData(editCompetitorList, '.competitor-entry', [{key:'brand',class:'.competitor-brand'},{key:'collection',class:'.competitor-collection'},{key:'price_opt',class:'.competitor-price-opt'},{key:'price_retail',class:'.competitor-price-retail'}]) 
         }; 
         try { const updateRes = await fetch(`${API_DEALERS_URL}/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); if(!updateRes.ok) throw new Error("Не удалось сохранить карточку дилера"); if(window.CRMAuth && CRMAuth.can('can_edit_matrix')) await saveProducts(id, getSelectedProductIds('edit-product-checklist')); editModal.hide(); window.showToast("Изменения сохранены!"); initApp(); } catch (e) { window.showToast("Ошибка сохранения", "error"); } finally { isSaving = false; if(btn) { btn.disabled = false; btn.innerHTML = oldText; } } });
     if(qvForm) qvForm.addEventListener('submit', async (e) => {
