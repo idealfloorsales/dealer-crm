@@ -110,7 +110,7 @@
 
                 <div class="crm-topbar-mobile-status" aria-hidden="true">
                     <span class="crm-topbar-live-dot"></span>
-                    <span id="user-role-badge-mobile">CRM</span>
+                    <span>Онлайн</span>
                 </div>
             </div>`;
 
@@ -1013,9 +1013,7 @@
         const names = { manager: 'Менеджер', marketing: 'Маркетинг', workshop: 'Цех', guest: 'Гость' };
         const label = names[user.role] || user.role || 'Пользователь';
         const badge = document.getElementById('user-role-badge');
-        const mobileBadge = document.getElementById('user-role-badge-mobile');
         if (badge) badge.textContent = label;
-        if (mobileBadge) mobileBadge.textContent = label;
     }
 
     async function init() {
