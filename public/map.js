@@ -1,7 +1,3 @@
-// --- АВТОРИЗАЦИЯ (ВСТАВИТЬ В НАЧАЛО ФАЙЛА) ---
-const originalFetch = window.fetch;
-window.fetch = async function (url, options) {
-    options = options || {};
     options.headers = options.headers || {};
     const token = localStorage.getItem('crm_token');
     if (token) options.headers['Authorization'] = 'Bearer ' + token;
