@@ -50,6 +50,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let catalogLoaded = false;
     let catalogPromise = null;
     let photoPromise = null;
+    let editorReferencePromise = null;
+    let editorStatuses = [];
+    let editorSectors = [];
     const profileCacheKey = `crm:dealer-profile:${dealerId}`;
 
     if (!dealerId) { 
@@ -281,6 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (previousPhotos) dealer.photos = previousPhotos;
             currentDealer = dealer;
             currentDealerName = dealer.name;
+            if (window.CRMAuth?.can('can_edit_dealer')) ensureEditorReferences();
             if (window.DealerDocuments) {
                 window.DealerDocuments.setDealer(dealer, window.CRMAuth ? CRMAuth.user : null);
             }
@@ -724,18 +728,28 @@ document.addEventListener('DOMContentLoaded', () => {
         select.disabled = !type;
     }
 
+    async function ensureEditorReferences() {
+        if (editorReferencePromise) return editorReferencePromise;
+        editorReferencePromise = Promise.all([
+            fetch('/api/statuses', { crmTrackLoading: false }).then(r => r.ok ? r.json() : []).catch(() => []),
+            fetch('/api/sectors', { crmTrackLoading: false }).then(r => r.ok ? r.json() : []).catch(() => [])
+        ]).then(([statuses, sectors]) => {
+            editorStatuses = Array.isArray(statuses) ? statuses : [];
+            editorSectors = Array.isArray(sectors) ? sectors : [];
+            return { statuses: editorStatuses, sectors: editorSectors };
+        }).finally(() => {
+            // Keep the resolved arrays; a new request is only needed after a full page refresh.
+        });
+        return editorReferencePromise;
+    }
+
     async function fillProfileEditor(section = 'main') {
         if (!currentDealer) return;
         const modalEl = ensureProfileEditModal();
         const subtitle = document.getElementById('dealer-profile-edit-subtitle');
         if (subtitle) subtitle.textContent = currentDealer.name || 'Карточка дилера';
 
-        const [statusesRes, sectorsRes] = await Promise.all([
-            fetch('/api/statuses', { crmTrackLoading: false }).catch(() => null),
-            fetch('/api/sectors', { crmTrackLoading: false }).catch(() => null)
-        ]);
-        const statuses = statusesRes?.ok ? await statusesRes.json() : [];
-        const sectors = sectorsRes?.ok ? await sectorsRes.json() : [];
+        const { statuses, sectors } = await ensureEditorReferences();
 
         const statusSelect = document.getElementById('profile-edit-status');
         if (statusSelect) {
