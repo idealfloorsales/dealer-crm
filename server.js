@@ -417,6 +417,8 @@ const workshopProductionSchema = new mongoose.Schema({
     standardPlanksPerUnit: { type: Number, default: 0 },
     actualPlanksPerUnit: { type: Number, default: 0 },
     customNormReason: String,
+    customOrderName: String,
+    customDimensions: String,
     consumedPlanks: { type: Number, default: 0 },
     scrapPlanks: { type: Number, default: 0 },
     operations: [workshopOperationSchema],
@@ -1854,6 +1856,8 @@ app.post('/api/workshop/production', requirePermission('can_manage_workshop'), a
         const requestedActualNorm = Math.max(0, workshopNumber(req.body.actualPlanksPerUnit));
         const actualPlanksPerUnit = requestedActualNorm > 0 ? requestedActualNorm : standardPlanksPerUnit;
         const customNormReason = String(req.body.customNormReason || '').trim();
+        const customOrderName = String(req.body.customOrderName || '').trim();
+        const customDimensions = String(req.body.customDimensions || '').trim();
         if (requestedActualNorm > 0 && Math.abs(requestedActualNorm - standardPlanksPerUnit) > 0.0001 && !customNormReason) {
             return res.status(400).json({ error: 'При изменении стандартной нормы укажите причину (например, индивидуальный образец)' });
         }
@@ -1891,7 +1895,7 @@ app.post('/api/workshop/production', requirePermission('can_manage_workshop'), a
                 entityType: 'laminate', product: recipe.product._id, direction: 'out',
                 qty: consumedPlanks, unit: 'планка', note: String(req.body.note || '').trim(),
                 serviceMemoNumber: sourceMemo?.number || '',
-                meta: { recipeId: recipe._id, outputQty, scrapPlanks, standardPlanksPerUnit, actualPlanksPerUnit, customNormReason, memoId: sourceMemo?._id || null, memoLineId: sourceMemoLine?._id || null }, createdBy: workshopUser(req)
+                meta: { recipeId: recipe._id, outputQty, scrapPlanks, standardPlanksPerUnit, actualPlanksPerUnit, customNormReason, customOrderName, customDimensions, memoId: sourceMemo?._id || null, memoLineId: sourceMemoLine?._id || null }, createdBy: workshopUser(req)
             });
         }
 
@@ -1956,6 +1960,8 @@ app.post('/api/workshop/production', requirePermission('can_manage_workshop'), a
             standardPlanksPerUnit,
             actualPlanksPerUnit,
             customNormReason,
+            customOrderName,
+            customDimensions,
             consumedPlanks,
             scrapPlanks,
             operations: Array.isArray(req.body.operations)
