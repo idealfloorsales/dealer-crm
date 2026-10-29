@@ -1495,12 +1495,18 @@ app.post('/api/workshop/memos', requirePermission('can_manage_workshop'), async 
         if (!inputLines.length) return res.status(400).json({ error: 'Добавьте хотя бы одну позицию' });
 
         const lines = [];
+        const seenProducts = new Set();
         for (const input of inputLines) {
             const requestedPacks = Math.max(0, Math.floor(workshopNumber(input.requestedPacks)));
             if (!input.productId || requestedPacks <= 0) continue;
 
             const product = await Product.findById(input.productId).lean();
             if (!product) continue;
+            const productKey = String(product._id);
+            if (seenProducts.has(productKey)) {
+                return res.status(400).json({ error: `Позиция «${product.sku || product.name}» добавлена в служебку дважды` });
+            }
+            seenProducts.add(productKey);
 
             let recipe = null;
             if (input.recipeId) {
