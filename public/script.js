@@ -852,26 +852,16 @@ document.addEventListener('DOMContentLoaded', () => {
         return 'total_all';
     }
 
+    function getDashboardPlanLabel(scope) {
+        if (scope === 'astana') return 'План Астана';
+        if (scope === 'regions') return 'План Регионы';
+        return 'Общий план';
+    }
+
     function getDashboardMonthTotals(rows, scope = 'all') {
         const source = Array.isArray(rows) ? rows : [];
         const factRows = source.filter(row => !String(row.dealerId || '').startsWith('PLAN_'));
         const fact = factRows.reduce((sum, row) => sum + (Number(row.fact) || 0), 0);
-
-        if (isPersonalManagerView()) {
-            const userId = String(window.CRMAuth?.user?.id || '');
-            const managerPlan = source.find(row => String(row.dealerId || '') === `PLAN_manager_${userId}`);
-            if (managerPlan) {
-                return { fact, plan: Number(managerPlan.plan) || 0 };
-            }
-
-            // Старые месяцы: если личный план менеджера еще не задан,
-            // используем только планы его дилеров, никогда общий PLAN_astana_all/regions_all.
-            const dealerPlan = source
-                .filter(row => String(row.dealerId || '').startsWith('PLAN_vip_'))
-                .reduce((sum, row) => sum + (Number(row.plan) || 0), 0);
-            const legacyDealerPlan = factRows.reduce((sum, row) => sum + (Number(row.plan) || 0), 0);
-            return { fact, plan: dealerPlan || legacyDealerPlan };
-        }
 
         const rootKey = `PLAN_${getDashboardPlanKey(scope)}`;
         const rootPlan = source.find(row => String(row.dealerId || '') === rootKey);
@@ -1123,7 +1113,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span class="cc-kpi-icon"><i class="bi bi-bullseye"></i></span>
                 <div class="cc-kpi-label">Выполнение плана</div>
                 <div class="cc-kpi-value">${currentPlan > 0 ? achievement + '%' : '—'}</div>
-                <div class="cc-kpi-foot">${currentPlan > 0 ? 'План: ' + formatExactSqm(currentPlan) + ' м²' : 'План не задан'}</div>
+                <div class="cc-kpi-foot">${currentPlan > 0 ? getDashboardPlanLabel(userScope) + ': ' + formatExactSqm(currentPlan) + ' м²' : 'План не задан'}</div>
             </div>
             <div class="cc-kpi-card is-alert cc-kpi-problems">
                 <span class="cc-kpi-icon"><i class="bi bi-exclamation-triangle"></i></span>
