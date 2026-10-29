@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
         dealerAssets: [], productions: [], movements: [], memos: [], stats: {}
     };
     const memoDraft = new Map();
-    let memoFilter = 'need';
+    let memoFilter = 'all';
 
     const $ = id => document.getElementById(id);
     const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[ch]));
@@ -363,7 +363,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const currentUser = window.CRMAuth?.user || {};
         $('ws-memo-signed').value = currentUser.fullName || currentUser.name || currentUser.username || '';
         memoDraft.clear();
-        memoFilter = 'need';
+        memoFilter = 'all';
         if ($('ws-memo-search')) $('ws-memo-search').value = '';
         document.querySelectorAll('[data-memo-filter]').forEach(button => {
             button.classList.toggle('active', button.dataset.memoFilter === memoFilter);
@@ -438,7 +438,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function memoRecipeSelectHtml(productId, recipes, selectedRecipe) {
-        if (!recipes.length) return '<span class="ws-memo-no-recipe"><i class="bi bi-exclamation-triangle"></i> Настройте рецептуру</span>';
+        if (!recipes.length) return `<button type="button" class="ws-memo-quick-norm" data-quick-norm-product="${esc(productId)}"><i class="bi bi-sliders"></i> Задать норму</button>`;
         if (recipes.length === 1) {
             return `<span class="ws-memo-recipe-static"><strong>${recipeTypeLabel(selectedRecipe)}</strong><small>${esc(selectedRecipe.name || '')}</small></span>`;
         }
@@ -564,6 +564,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 renderMemoProductPicker();
             });
+
+            row.querySelector('[data-quick-norm-product]')?.addEventListener('click', event => {
+                event.preventDefault();
+                openQuickNorm(event.currentTarget.dataset.quickNormProduct);
+            });
         });
 
         updateMemoSummary();
@@ -666,6 +671,57 @@ document.addEventListener('DOMContentLoaded', () => {
             note: $('ws-memo-note').value,
             lines
         }, 'Служебная записка создана', 'memo');
+    });
+
+    function openQuickNorm(productId) {
+        const product = productById(productId);
+        if (!product) return;
+        $('ws-quick-norm-product').value = productId;
+        $('ws-quick-norm-title').textContent = `${product.sku || '—'} · ${product.name || ''}`;
+        $('ws-quick-norm-pack').value = packQty(product) || '';
+        $('ws-quick-norm-planks').value = '';
+        $('ws-quick-norm-min').value = 0;
+        $('ws-quick-norm-name').value = `Планшет ${product.sku || ''} ${product.name || ''}`.trim();
+        $('ws-quick-norm-note').value = '';
+        bootstrap.Modal.getOrCreateInstance($('ws-quick-norm-modal')).show();
+    }
+
+    $('ws-quick-norm-form')?.addEventListener('submit', async event => {
+        event.preventDefault();
+        const productId = $('ws-quick-norm-product').value;
+        const product = productById(productId);
+        if (!product) return;
+        try {
+            const response = await fetch(API + '/recipes', {
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({
+                    name:$('ws-quick-norm-name').value,
+                    outputType:'sample',
+                    sku:`SAMPLE-${product.sku || productId.slice(-6)}`,
+                    productId,
+                    planksPerUnit:n($('ws-quick-norm-planks').value),
+                    packQtyOverride:n($('ws-quick-norm-pack').value),
+                    minStockQty:n($('ws-quick-norm-min').value),
+                    note:$('ws-quick-norm-note').value
+                })
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.error || 'Не удалось сохранить норму');
+            bootstrap.Modal.getOrCreateInstance($('ws-quick-norm-modal')).hide();
+            toast('Норма сохранена', 'success');
+            await load();
+            const recipe = state.recipes.find(item => idOf(item.product) === productId && item.outputType === 'sample');
+            if (recipe) {
+                memoDraft.set(productId, {
+                    recipeId:idOf(recipe),
+                    packs:recommendedPacksForRecipe(recipe) || noWasteBatch(recipePack(recipe), recipe.planksPerUnit)?.packs || 1
+                });
+            }
+            renderMemoProductPicker();
+        } catch (error) {
+            toast(error.message || 'Ошибка сохранения нормы', 'error');
+        }
     });
 
     function resetReceipt(selectedMemoId = '') {
@@ -818,6 +874,10 @@ document.addEventListener('DOMContentLoaded', () => {
         $('ws-production-form')?.reset();
         $('ws-production-date').value = todayValue();
         $('ws-production-output').value = 1;
+        if ($('ws-production-custom-toggle')) $('ws-production-custom-toggle').checked = false;
+        if ($('ws-production-custom-fields')) $('ws-production-custom-fields').hidden = true;
+        if ($('ws-production-actual-planks')) $('ws-production-actual-planks').value = '';
+        if ($('ws-production-custom-reason')) $('ws-production-custom-reason').value = '';
         populateFormSelects();
         updateProductionMemoOptions();
         updateProductionCalc();
@@ -828,26 +888,87 @@ document.addEventListener('DOMContentLoaded', () => {
         const stock = state.laminateStocks.find(item => idOf(item.product) === productId);
         return n(stock?.planksQty);
     }
+    function productionMaterialNeeds(recipe, outputQty) {
+        return (recipe?.materials || []).map(line => {
+            const material = line.material || {};
+            return {
+                name: material.name || 'Материал',
+                unit: material.unit || 'шт',
+                qty: n(line.qty) * outputQty,
+                mode: line.mode || 'strict',
+                stock: n(material.stockQty)
+            };
+        });
+    }
+
+    function updateProductionCustomVisibility() {
+        const recipe = productionRecipe();
+        const box = $('ws-production-custom-fields');
+        const toggle = $('ws-production-custom-toggle');
+        const shell = toggle?.closest('.workshop-custom-norm');
+        if (!box || !toggle || !shell) return;
+        const hasLaminate = Boolean(recipe?.product && n(recipe?.planksPerUnit) > 0);
+        shell.classList.toggle('is-hidden', !hasLaminate);
+        if (!hasLaminate) {
+            toggle.checked = false;
+            box.hidden = true;
+        } else {
+            box.hidden = !toggle.checked;
+            if (toggle.checked && !$('ws-production-actual-planks').value) {
+                $('ws-production-actual-planks').value = n(recipe.planksPerUnit) || '';
+            }
+        }
+    }
+
     function updateProductionCalc() {
         const recipe = productionRecipe();
-        if (!recipe) { $('ws-production-calc').textContent='Выберите изделие — CRM покажет норму и возможный выпуск.'; return; }
+        if (!recipe) {
+            $('ws-production-calc').textContent='Выберите изделие — CRM покажет норму и возможный выпуск.';
+            updateProductionCustomVisibility();
+            return;
+        }
+
+        updateProductionCustomVisibility();
+        const output = Math.max(0, n($('ws-production-output')?.value));
+        const scrap = Math.max(0, n($('ws-production-scrap')?.value));
+        const materialNeeds = productionMaterialNeeds(recipe, output);
+
+        if (!recipe.product || n(recipe.planksPerUnit) <= 0) {
+            const lines = materialNeeds.map(item => {
+                const availability = item.mode === 'estimate'
+                    ? 'расчётно, остаток не блокирует'
+                    : `остаток ${fmt(item.stock,3)} ${esc(item.unit)}`;
+                return `<span><strong>${esc(item.name)}</strong>: ${fmt(item.qty,3)} ${esc(item.unit)} · ${availability}</span>`;
+            });
+            $('ws-production-calc').innerHTML = `Изготавливаем: <strong>${fmt(output)} шт</strong>.
+                ${lines.length ? '<div class="ws-production-material-needs">'+lines.join('')+'</div>' : 'Материалы в рецептуре не заданы.'}`;
+            return;
+        }
+
         const pq = recipePack(recipe);
-        const output = n($('ws-production-output')?.value);
-        const scrap = n($('ws-production-scrap')?.value);
-        const need = output*n(recipe.planksPerUnit) + scrap;
+        const standardPer = Math.max(0, n(recipe.planksPerUnit));
+        const custom = Boolean($('ws-production-custom-toggle')?.checked);
+        const actualPer = custom ? Math.max(0, n($('ws-production-actual-planks')?.value)) : standardPer;
+        const need = output * actualPer + scrap;
         const available = laminateAvailableForRecipe(recipe);
-        const maxOutput = n(recipe.planksPerUnit) > 0 ? Math.floor(available / n(recipe.planksPerUnit)) : 0;
-        const batch = noWasteBatch(pq, recipe.planksPerUnit);
-        $('ws-production-calc').innerHTML = `Норма: <strong>${fmt(recipe.planksPerUnit)} планок / изделие</strong>${pq ? ' · '+pq+' планок в упаковке':''}. 
+        const maxOutput = actualPer > 0 ? Math.floor(available / actualPer) : 0;
+        const batch = noWasteBatch(pq, standardPer);
+        const deviation = custom && Math.abs(actualPer-standardPer) > 0.0001
+            ? ` · фактическая норма <strong>${fmt(actualPer,3)} пл./шт</strong> вместо ${fmt(standardPer,3)}`
+            : '';
+
+        $('ws-production-calc').innerHTML = `Стандарт: <strong>${fmt(standardPer,3)} планок / изделие</strong>${pq ? ' · '+pq+' планок в упаковке':''}${deviation}.
         В доступном остатке цеха: <strong>${fmt(available)} планок</strong> → можно изготовить до <strong>${maxOutput} шт</strong>.
-        На указанное производство будет списано: <strong class="${need>available?'text-danger':''}">${fmt(need)} планок</strong>.
-        ${batch ? `Безотходная партия: <strong>${batch.packs} уп. → ${batch.output} шт</strong>.` : ''}`;
+        На эту партию будет списано: <strong class="${need>available?'text-danger':''}">${fmt(need,3)} планок</strong>.
+        ${batch ? `Стандартная безотходная партия: <strong>${batch.packs} уп. → ${batch.output} шт</strong>.` : ''}`;
     }
+
     $('ws-production-recipe')?.addEventListener('change', () => {
         updateProductionMemoOptions();
         updateProductionCalc();
     });
-    ['ws-production-output','ws-production-scrap'].forEach(id => $(id)?.addEventListener('input',updateProductionCalc));
+    $('ws-production-custom-toggle')?.addEventListener('change', updateProductionCalc);
+    ['ws-production-output','ws-production-scrap','ws-production-actual-planks'].forEach(id => $(id)?.addEventListener('input',updateProductionCalc));
 
     $('ws-production-form')?.addEventListener('submit', async event => {
         event.preventDefault();
@@ -862,6 +983,8 @@ document.addEventListener('DOMContentLoaded', () => {
             memoId:source[0] || null,
             memoLineId:source[1] || null,
             outputQty:n($('ws-production-output').value),
+            actualPlanksPerUnit:$('ws-production-custom-toggle')?.checked ? n($('ws-production-actual-planks').value) : 0,
+            customNormReason:$('ws-production-custom-toggle')?.checked ? $('ws-production-custom-reason').value : '',
             scrapPlanks:n($('ws-production-scrap').value),
             date:$('ws-production-date').value,
             operations,
@@ -889,12 +1012,47 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 'Движение по дилеру проведено', 'dealer');
     });
 
-    function resetMaterialMovement(){ $('ws-material-form')?.reset(); $('ws-material-date').value=todayValue(); populateFormSelects(); }
+    function resetMaterialMovement(){
+        $('ws-material-form')?.reset();
+        $('ws-material-date').value=todayValue();
+        populateFormSelects();
+        updateMaterialConversion();
+    }
+    function selectedMaterial() { return materialById($('ws-material-id')?.value); }
+    function updateMaterialConversion() {
+        const material = selectedMaterial();
+        const direction = $('ws-material-direction')?.value || 'in';
+        const qty = Math.max(0, n($('ws-material-qty')?.value));
+        const label = $('ws-material-qty-label');
+        const box = $('ws-material-conversion');
+        if (!material) {
+            if (label) label.textContent = 'Количество';
+            if (box) box.textContent = 'Выберите материал.';
+            return;
+        }
+        const purchaseUnit = material.purchaseUnit || material.unit || 'шт';
+        const purchaseSize = Math.max(0.0001, n(material.purchaseUnitSize) || 1);
+        if (direction === 'in') {
+            if (label) label.textContent = `Количество, ${purchaseUnit}`;
+            if (box) box.innerHTML = qty
+                ? `Будет оприходовано: <strong>${fmt(qty * purchaseSize,3)} ${esc(material.unit || 'шт')}</strong>${purchaseSize !== 1 ? ` · 1 ${esc(purchaseUnit)} = ${fmt(purchaseSize,3)} ${esc(material.unit || '')}` : ''}`
+                : `Приход вводится в закупочных единицах: <strong>${esc(purchaseUnit)}</strong>.`;
+        } else {
+            if (label) label.textContent = `Фактический расход, ${material.unit || 'шт'}`;
+            if (box) box.innerHTML = `Расход списывается в базовой единице <strong>${esc(material.unit || 'шт')}</strong>. Остаток: <strong>${fmt(material.stockQty,3)} ${esc(material.unit || '')}</strong>.`;
+        }
+    }
+    ['ws-material-id','ws-material-direction','ws-material-qty'].forEach(id => $(id)?.addEventListener('input', updateMaterialConversion));
+    $('ws-material-id')?.addEventListener('change', updateMaterialConversion);
+    $('ws-material-direction')?.addEventListener('change', updateMaterialConversion);
     $('ws-material-form')?.addEventListener('submit', async event => {
         event.preventDefault();
         const direction=$('ws-material-direction').value;
+        const material=selectedMaterial();
+        const enteredQty=n($('ws-material-qty').value);
+        const qty=direction==='in' ? enteredQty*Math.max(0.0001,n(material?.purchaseUnitSize)||1) : enteredQty;
         await post(API+'/material-movement', {
-            materialId:$('ws-material-id').value, direction, qty:n($('ws-material-qty').value), date:$('ws-material-date').value,
+            materialId:$('ws-material-id').value, direction, qty, date:$('ws-material-date').value,
             type:direction==='in'?'material_receipt':'material_issue', note:$('ws-material-note').value
         }, 'Движение материала проведено', 'material');
     });
@@ -903,7 +1061,10 @@ document.addEventListener('DOMContentLoaded', () => {
         event.preventDefault();
         await post(API+'/materials', {
             code:$('ws-new-material-code').value, name:$('ws-new-material-name').value, category:$('ws-new-material-category').value,
-            unit:$('ws-new-material-unit').value, stockQty:n($('ws-new-material-stock').value), minQty:n($('ws-new-material-min').value),
+            unit:$('ws-new-material-unit').value,
+            purchaseUnit:$('ws-new-material-purchase-unit').value,
+            purchaseUnitSize:n($('ws-new-material-purchase-size').value),
+            stockQty:n($('ws-new-material-stock').value), minQty:n($('ws-new-material-min').value),
             note:$('ws-new-material-note').value
         }, 'Материал добавлен', 'new-material');
     });
