@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let uploadedPhotos = []; // Теперь элементы: { photo_url: base64, isVideo: boolean }
     let currentViewId = null;
     let canManageReclamations = false;
+    const reclamationDetailCache = new Map();
 
     const listEl = document.getElementById('reclamations-list');
     const searchInput = document.getElementById('search-input');
@@ -38,7 +39,10 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchReclamations() {
         try {
             const res = await fetch('/api/reclamations');
-            if (res.ok) allReclamations = await res.json();
+            if (res.ok) {
+                allReclamations = await res.json();
+                reclamationDetailCache.clear();
+            }
         } catch (e) { console.error(e); }
     }
 
@@ -93,7 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         listEl.innerHTML = filtered.map((r, index) => {
             const dateStr = new Date(r.createdAt || r.date).toLocaleDateString('ru-RU');
-            const imgBadge = r.photos && r.photos.length > 0 ? `<i class="bi bi-image text-brand ms-2"></i> ${r.photos.length}` : '';
+            const imgBadge = Number(r.photoCount) > 0 ? `<i class="bi bi-image text-brand ms-2"></i> ${r.photoCount}` : '';
             
             // Внешний вид статуса
             const statusBadge = r.resolution 
@@ -359,19 +363,40 @@ document.addEventListener('DOMContentLoaded', () => {
         fullscreenModal.show();
     };
 
-    window.viewReclamation = (id) => {
-        const r = allReclamations.find(x => x.id === id);
-        if(!r) return;
+    window.viewReclamation = async (id) => {
+        const summary = allReclamations.find(x => x.id === id);
+        if(!summary) return;
         currentViewId = id;
 
-        // Ищем индекс для номера в заголовке
-        // Поскольку список фильтруется и сортируется, нужно искать индекс в текущем отсортированном списке
-        // Но для простоты акту можно присваивать абсолютный номер по дате создания
         const sortedAll = [...allReclamations].sort((a,b) => new Date(a.createdAt) - new Date(b.createdAt));
         const absIndex = sortedAll.findIndex(x => x.id === id);
         const seqNumStr = `№${String(absIndex + 1).padStart(3, '0')} - `;
 
-        document.getElementById('v_title').textContent = `Акт ${seqNumStr}${r.dealerName}`;
+        document.getElementById('v_title').textContent = `Акт ${seqNumStr}${summary.dealerName}`;
+        document.getElementById('view-body').innerHTML = '<div class="text-center text-muted py-5"><span class="spinner-border spinner-border-sm me-2"></span>Загрузка акта...</div>';
+        viewModal.show();
+
+        let r = reclamationDetailCache.get(id);
+        if (!r) {
+            try {
+                const res = await fetch(`/api/reclamations/${id}`);
+                if (!res.ok) throw new Error('Не удалось загрузить рекламацию');
+                r = await res.json();
+                reclamationDetailCache.set(id, r);
+
+                const listIndex = allReclamations.findIndex(x => x.id === id);
+                if (listIndex >= 0) {
+                    allReclamations[listIndex] = {
+                        ...summary,
+                        ...r,
+                        photoCount: summary.photoCount ?? (r.photos ? r.photos.length : 0)
+                    };
+                }
+            } catch (error) {
+                document.getElementById('view-body').innerHTML = `<div class="alert alert-danger mb-0">${error.message}</div>`;
+                return;
+            }
+        }
         
         let photosHtml = '';
         if(r.photos && r.photos.length > 0) {
