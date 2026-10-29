@@ -402,8 +402,7 @@ async function connectToDB() {
         console.log('MongoDB Connected'); 
         await seedStatuses(); 
         await seedUsers(); 
-        await seedSectors();
-        await cleanupAmbiguousLegacyOwnership(); 
+        await seedSectors(); 
     } catch (e) { console.error(e); }
 }
 
@@ -422,29 +421,8 @@ function isGlobalViewer(req) {
     );
 }
 function getLegacyScopeFilter(scope) {
-    if (scope === 'astana') {
-        return {
-            $or: [
-                { responsible: 'regional_astana' },
-                { city: { $regex: /астана/i } },
-                { city: { $regex: /astana/i } }
-            ]
-        };
-    }
-    if (scope === 'regions') {
-        return {
-            $or: [
-                { responsible: 'regional_regions' },
-                {
-                    $and: [
-                        { city: { $not: { $regex: /астана/i } } },
-                        { city: { $not: { $regex: /astana/i } } },
-                        { responsible: { $ne: 'regional_astana' } }
-                    ]
-                }
-            ]
-        };
-    }
+    if (scope === 'astana') return { responsible: 'regional_astana' };
+    if (scope === 'regions') return { responsible: 'regional_regions' };
     return {};
 }
 
@@ -452,13 +430,15 @@ function getDealerFilter(req) {
     if (!req.user) return { _id: null };
     if (isGlobalViewer(req)) return {};
 
-    if (req.user.role === 'manager') {
-        return { responsibleUserId: String(req.user.id) };
-    }
-
     const scope = getUserScope(req);
     if (scope === 'all') return {};
-    if (scope === 'astana' || scope === 'regions') return getLegacyScopeFilter(scope);
+
+    // Принадлежность дилера определяется только полем "Ответственный"
+    // в карточке дилера. Город и сектор не участвуют.
+    if (scope === 'astana' || scope === 'regions') {
+        return getLegacyScopeFilter(scope);
+    }
+
     return { _id: null };
 }
 
@@ -538,8 +518,8 @@ app.get('/api/dealers/:id', requirePermission('can_view_dealers'), async (req, r
 app.post('/api/dealers', requirePermission('can_create_dealer'), async (req, res) => { try {
     const scope = getUserScope(req);
     if (req.user.role === 'manager' && !isGlobalViewer(req)) {
-        req.body.responsibleUserId = String(req.user.id);
-        req.body.responsibleAssignmentSource = 'self';
+        req.body.responsibleUserId = '';
+        req.body.responsibleAssignmentSource = '';
         if (scope === 'astana') req.body.responsible = 'regional_astana';
         if (scope === 'regions') req.body.responsible = 'regional_regions';
     }
@@ -595,8 +575,8 @@ app.put('/api/dealers/:id/visits/:index', requirePermission('can_manage_visits')
 app.put('/api/dealers/:id', requirePermission('can_edit_dealer'), async (req, res) => {
     try {
         if (req.user.role === 'manager' && !isGlobalViewer(req)) {
-            req.body.responsibleUserId = String(req.user.id);
-            req.body.responsibleAssignmentSource = 'self';
+            req.body.responsibleUserId = '';
+            req.body.responsibleAssignmentSource = '';
             if (req.user.scope === 'astana') req.body.responsible = 'regional_astana';
             if (req.user.scope === 'regions') req.body.responsible = 'regional_regions';
         }
