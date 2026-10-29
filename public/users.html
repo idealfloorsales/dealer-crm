@@ -150,6 +150,7 @@
                                         <select id="u_role" class="form-select">
                                             <option value="manager">Менеджер</option>
                                             <option value="marketing">Маркетинг</option>
+                                            <option value="workshop">Цех</option>
                                             <option value="guest">Гость</option>
                                         </select>
                                     </div>
@@ -191,6 +192,7 @@
                                         <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_view_competitors"><label class="form-check-label" for="p_can_view_competitors">Конкуренты</label></div>
                                         <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_view_knowledge"><label class="form-check-label" for="p_can_view_knowledge">База знаний</label></div>
                                         <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_view_reclamations"><label class="form-check-label" for="p_can_view_reclamations">Рекламации</label></div>
+                                        <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_view_workshop"><label class="form-check-label fw-bold text-danger" for="p_can_view_workshop"><i class="bi bi-tools me-1"></i>Цех</label></div>
                                         <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_view_dashboard"><label class="form-check-label" for="p_can_view_dashboard">Дашборд (Статистика)</label></div>
                                     </div>
                                 </div>
@@ -206,6 +208,7 @@
                                         <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_manage_visits"><label class="form-check-label" for="p_can_manage_visits">Добавлять визиты</label></div>
                                         <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_edit_matrix"><label class="form-check-label" for="p_can_edit_matrix">Редактировать матрицу дилера</label></div>
                                         <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_edit_sales_fact"><label class="form-check-label" for="p_can_edit_sales_fact">Вносить Факт продаж</label></div>
+                                        <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_manage_workshop"><label class="form-check-label fw-bold text-danger" for="p_can_manage_workshop">Вносить операции цеха</label></div>
                                         
                                         <div class="perm-group-header text-success mt-3">Справочники</div>
                                         <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_manage_products"><label class="form-check-label" for="p_can_manage_products">Управлять товарами (SKU)</label></div>
@@ -269,13 +272,28 @@
 
         function syncRoleScope() {
             if (!userRoleSelect || !userScopeSelect) return;
-            const isMarketing = userRoleSelect.value === 'marketing';
-            if (isMarketing) userScopeSelect.value = 'all';
-            userScopeSelect.disabled = isMarketing;
-            userScopeSelect.title = isMarketing ? 'Маркетинг всегда видит всю дилерскую сеть' : '';
+            const role = userRoleSelect.value;
+            const isCompanyWide = role === 'marketing' || role === 'workshop';
+            if (isCompanyWide) userScopeSelect.value = 'all';
+            userScopeSelect.disabled = isCompanyWide;
+            userScopeSelect.title = role === 'marketing'
+                ? 'Маркетинг всегда видит всю дилерскую сеть'
+                : role === 'workshop'
+                    ? 'Цех работает с общим производственным учетом'
+                    : '';
         }
 
-        userRoleSelect?.addEventListener('change', syncRoleScope);
+        function applyRolePreset() {
+            syncRoleScope();
+            if (userRoleSelect?.value !== 'workshop') return;
+            document.querySelectorAll('.perm-check').forEach(cb => cb.checked = false);
+            ['p_can_view_workshop', 'p_can_manage_workshop'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.checked = true;
+            });
+        }
+
+        userRoleSelect?.addEventListener('change', applyRolePreset);
 
         async function loadUsers() {
             try {
@@ -322,7 +340,7 @@
                 const color = getAvatarColor(u.fullName || u.username);
                 const initials = getInitials(u.fullName || u.username);
                 
-                const roleNames = { manager: 'Менеджер', marketing: 'Маркетинг', guest: 'Гость' };
+                const roleNames = { manager: 'Менеджер', marketing: 'Маркетинг', workshop: 'Цех', guest: 'Гость' };
                 const roleBadge = u.permissions.is_admin
                     ? '<span class="badge bg-warning text-dark border border-warning"><i class="bi bi-star-fill me-1"></i>Админ</span>'
                     : '<span class="badge bg-light text-secondary border">' + (roleNames[u.role] || 'Менеджер') + '</span>';
@@ -358,7 +376,7 @@
             mobileList.innerHTML = filtered.map(u => {
                 const color = getAvatarColor(u.fullName || u.username);
                 const initials = getInitials(u.fullName || u.username);
-                const roleNames = { manager: 'Менеджер', marketing: 'Маркетинг', guest: 'Гость' };
+                const roleNames = { manager: 'Менеджер', marketing: 'Маркетинг', workshop: 'Цех', guest: 'Гость' };
                 const roleText = u.permissions.is_admin ? 'Администратор' : (roleNames[u.role] || 'Менеджер');
                 const roleClass = u.permissions.is_admin ? 'text-warning' : 'text-muted';
 
@@ -404,7 +422,7 @@
             document.getElementById('u_password').value = '';
             document.getElementById('u_password').required = false;
             document.getElementById('u_role').value = u.role || 'manager';
-            document.getElementById('u_scope').value = u.role === 'marketing' ? 'all' : u.scope;
+            document.getElementById('u_scope').value = (u.role === 'marketing' || u.role === 'workshop') ? 'all' : u.scope;
             syncRoleScope();
             document.getElementById('u_isBlocked').checked = u.isBlocked;
 
