@@ -799,19 +799,51 @@
             }
         }, true);
 
+        function syncModalStack(modalEl) {
+            if (!modalEl) return;
+            const shown = Array.from(document.querySelectorAll('.modal.show'));
+            const index = Math.max(0, shown.indexOf(modalEl));
+            const modalZ = 30010 + index * 20;
+            modalEl.style.setProperty('z-index', String(modalZ), 'important');
+
+            requestAnimationFrame(() => {
+                const backdrops = Array.from(document.querySelectorAll('.modal-backdrop'));
+                const backdrop = backdrops[backdrops.length - 1];
+                if (backdrop) backdrop.style.setProperty('z-index', String(modalZ - 10), 'important');
+            });
+        }
+
         document.addEventListener('show.bs.modal', event => {
             closeTransientOverlays();
             document.body.classList.add('crm-modal-transitioning');
+
+            const alreadyOpen = document.querySelectorAll('.modal.show').length;
+            const modalZ = 30010 + alreadyOpen * 20;
+            event.target.style.setProperty('z-index', String(modalZ), 'important');
+
+            requestAnimationFrame(() => {
+                const backdrops = Array.from(document.querySelectorAll('.modal-backdrop'));
+                const backdrop = backdrops[backdrops.length - 1];
+                if (backdrop) backdrop.style.setProperty('z-index', String(modalZ - 10), 'important');
+            });
+
             scheduleReveal(event.target);
         });
 
         document.addEventListener('shown.bs.modal', event => {
             document.body.classList.remove('crm-modal-transitioning');
+            syncModalStack(event.target);
             scheduleReveal(event.target);
         });
 
-        document.addEventListener('hidden.bs.modal', () => {
-            if (!document.querySelector('.modal.show')) {
+        document.addEventListener('hidden.bs.modal', event => {
+            event.target.style.removeProperty('z-index');
+
+            const remaining = Array.from(document.querySelectorAll('.modal.show'));
+            if (remaining.length) {
+                document.body.classList.add('modal-open');
+                remaining.forEach(syncModalStack);
+            } else {
                 document.body.classList.remove('crm-modal-transitioning');
             }
         });
