@@ -15,6 +15,7 @@ const LOCAL_ASSETS = [
     '/dealer.html',
     '/login.html',
     '/style.css?v={{VER}}',
+    '/ui-motion.css?v={{VER}}',
     '/script.js?v={{VER}}',
     '/sales.js?v={{VER}}',
     '/report.js?v={{VER}}',
