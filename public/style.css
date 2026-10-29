@@ -10397,3 +10397,100 @@ body.bg-light {
     .map-summary-card span { font-size:.49rem; }
     .map-card-actions { padding-left:10px; }
 }
+
+
+/* Workshop integration in dealer profile / matrix */
+.matrix-cell-with-samples{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:5px;
+    min-width:34px;
+}
+.matrix-sample-qty{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-width:20px;
+    height:18px;
+    padding:0 5px;
+    border-radius:999px;
+    background:#f1ece9;
+    color:#7c4b4e;
+    font-size:.58rem;
+    font-weight:800;
+}
+.dealer-workshop-grid{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:8px;
+}
+.dealer-workshop-item{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:11px 12px;
+    border:1px solid rgba(23,24,27,.07);
+    border-radius:13px;
+    background:#fbfaf8;
+}
+.dealer-workshop-item-main{
+    display:flex;
+    align-items:center;
+    gap:9px;
+    min-width:0;
+}
+.dealer-workshop-icon{
+    display:grid;
+    place-items:center;
+    width:34px;
+    height:34px;
+    flex:0 0 34px;
+    border-radius:10px;
+    background:#f2eeeb;
+    color:#9e3439;
+}
+.dealer-workshop-item strong{
+    display:block;
+    color:#343539;
+    font-size:.68rem;
+    font-weight:800;
+}
+.dealer-workshop-item small{
+    display:block;
+    margin-top:2px;
+    color:#96989d;
+    font-size:.54rem;
+}
+.dealer-workshop-item em{
+    display:inline-flex;
+    align-items:center;
+    gap:4px;
+    margin-top:4px;
+    color:#aa7a20;
+    font-size:.5rem;
+    font-style:normal;
+    font-weight:700;
+}
+.dealer-workshop-item>b{
+    flex:0 0 auto;
+    color:#2f3034;
+    font-size:.8rem;
+}
+.dealer-workshop-empty{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    min-height:150px;
+    padding:22px;
+    flex-direction:column;
+    color:#999ba0;
+    text-align:center;
+}
+.dealer-workshop-empty i{font-size:1.2rem;margin-bottom:7px}
+.dealer-workshop-empty strong{color:#55575d;font-size:.68rem}
+.dealer-workshop-empty span{margin-top:3px;font-size:.56rem}
+@media(max-width:767.98px){
+    .dealer-workshop-grid{grid-template-columns:1fr}
+}
