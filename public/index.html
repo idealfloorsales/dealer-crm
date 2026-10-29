@@ -220,8 +220,6 @@
                 <select id="filter-sector" class="form-select"><option value="">Все сектора</option></select>
                 <select id="filter-responsible" class="form-select">
                     <option value="">Все ответственные</option>
-                    <option value="regional_astana">Астана</option>
-                    <option value="regional_regions">Регионы</option>
                 </select>
                 <select id="filter-health" class="form-select" aria-label="Оценка дилера">
                     <option value="">Любая оценка</option>
@@ -388,8 +386,6 @@
                                         <label class="dealer-field-label">Ответственный</label>
                                         <select id="responsible" class="form-select" onchange="toggleSectorSelect('add', this.value)">
                                             <option value="">Не выбран</option>
-                                            <option value="regional_astana">Региональный Астана</option>
-                                            <option value="regional_regions">Региональный Регионы</option>
                                         </select>
                                         <div id="add_sector_wrapper" class="dealer-sector-row mt-2" style="display:none;">
                                             <select id="add_region_sector" class="form-select"></select>
@@ -695,8 +691,6 @@
                                                     <label class="dealer-field-label">Ответственный</label>
                                                     <select id="edit_responsible" class="form-select" onchange="toggleSectorSelect('edit', this.value)">
                                                         <option value="">Не выбран</option>
-                                                        <option value="regional_astana">Региональный Астана</option>
-                                                        <option value="regional_regions">Региональный Регионы</option>
                                                     </select>
                                                     <div id="edit_sector_wrapper" class="dealer-sector-row mt-2" style="display:none;">
                                                         <select id="edit_region_sector" class="form-select"></select>
