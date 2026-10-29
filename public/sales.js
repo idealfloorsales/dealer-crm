@@ -522,8 +522,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const cards = [];
         const totalFactAll = totalRegionsFact + totalAstanaFact + totalVipFact + totalOtherFact;
+        const authUser = window.CRMAuth?.user;
+        const personalManagerView = Boolean(authUser && authUser.role === 'manager' && !authUser.permissions?.is_admin);
 
-        if (currentScope === 'all') {
+        if (personalManagerView) {
+            cards.push({
+                title: authUser.fullName || authUser.username || 'Мой план',
+                fact: totalFactAll,
+                plan: plans[`manager_${authUser.id}`] || 0,
+                meta: 'Личный результат'
+            });
+        } else if (currentScope === 'all') {
             cards.push({ title: 'Вся компания', fact: totalFactAll, plan: plans.total_all || 0, meta: 'Общий результат' });
             cards.push({ title: 'Астана', fact: totalAstanaFact, plan: plans.astana_all || 0, meta: 'Итого по Астане' });
             cards.push({ title: 'Регионы', fact: totalRegionsFact, plan: plans.regions_all || 0, meta: 'Итого по регионам' });
@@ -567,6 +576,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         const totalFactAll = totalRegionsFact + totalAstanaFact + totalVipFact + totalOtherFact;
+        const authUser = window.CRMAuth?.user;
+        const personalManagerView = Boolean(authUser && authUser.role === 'manager' && !authUser.permissions?.is_admin);
+        const managerPlanKey = personalManagerView ? `manager_${authUser.id}` : '';
 
         const levelFor = (fact, plan) => {
             if (!(Number(plan) > 0)) return 'none';
@@ -577,7 +589,13 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const overview = [];
-        if (currentScope === 'all') {
+        if (personalManagerView) {
+            overview.push([
+                authUser.fullName || authUser.username || 'Мой план',
+                totalFactAll,
+                plans[managerPlanKey] || 0
+            ]);
+        } else if (currentScope === 'all') {
             overview.push(['Вся компания', totalFactAll, plans.total_all || 0]);
             overview.push(['Астана', totalAstanaFact, plans.astana_all || 0]);
             overview.push(['Регионы', totalRegionsFact, plans.regions_all || 0]);
@@ -621,7 +639,9 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         };
 
-        if (currentScope === 'all') {
+        if (personalManagerView) {
+            addRow('Мой результат', authUser.fullName || authUser.username || 'Мой план', totalFactAll, plans[managerPlanKey] || 0, true);
+        } else if (currentScope === 'all') {
             addRow('Компания', 'Вся компания', totalFactAll, plans.total_all || 0, true);
         }
 
