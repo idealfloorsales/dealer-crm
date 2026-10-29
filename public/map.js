@@ -23,6 +23,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnToggleSidebar = document.getElementById('btn-toggle-sidebar'); 
     const visibleCountBadge = document.getElementById('map-visible-count'); 
 
+    if (typeof window.L === 'undefined') {
+        const mapHost = document.getElementById('main-map');
+        if (mapHost) {
+            mapHost.innerHTML = `
+                <div style="height:100%;display:grid;place-items:center;padding:24px;background:#f4f2ef;">
+                    <div style="max-width:420px;text-align:center;background:#fff;border:1px solid rgba(23,24,27,.08);border-radius:18px;padding:24px;box-shadow:0 14px 36px rgba(23,24,27,.08);">
+                        <div style="font-size:1.7rem;color:#b9040a;margin-bottom:8px;"><i class="bi bi-map"></i></div>
+                        <strong style="display:block;margin-bottom:6px;">Карта не загрузилась</strong>
+                        <span style="display:block;color:#888;font-size:.75rem;margin-bottom:14px;">Не удалось загрузить библиотеку карты. Проверьте интернет и обновите страницу.</span>
+                        <button type="button" onclick="window.location.reload()" class="btn btn-sm btn-outline-danger">Обновить</button>
+                    </div>
+                </div>`;
+        }
+        if (dealerListContainer) dealerListContainer.innerHTML = '<p class="text-center text-muted mt-4">Карта временно недоступна</p>';
+        return;
+    }
+
     // --- 1. Инициализация карты ---
     const container = L.DomUtil.get('main-map');
     if(container != null){
@@ -40,7 +57,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let userLat = null; 
     let userLng = null;
     
-    let markersCluster = L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 50 });
+    let markersCluster = typeof L.markerClusterGroup === 'function'
+        ? L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 50 })
+        : L.layerGroup();
     let heatLayer = null;
     let isHeatmapMode = false;
 
