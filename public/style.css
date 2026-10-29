@@ -1888,22 +1888,14 @@ nav a.nav-link.active { background: var(--primary-color) !important; color: whit
 
 
 
-/* ЭКСТРЕННОЕ ИСПРАВЛЕНИЕ: Убираем зависшую шторку */
-.modal-backdrop {
-    display: none !important; /* Скрываем затемнение */
-}
-
-/* Восстанавливаем затемнение ТОЛЬКО когда модалка реально открыта */
-.modal.show ~ .modal-backdrop, 
-.modal.show .modal-backdrop {
+/* Modal fallback: keep Bootstrap's backdrop and body lock predictable. */
+.modal-backdrop.show {
     display: block !important;
-    opacity: 0.5 !important;
-    z-index: 1050 !important;
+    opacity: .5 !important;
 }
 
-/* Если всё равно не нажимается — разблокируем body */
 body.modal-open {
-    overflow: auto !important;
+    overflow: hidden !important;
     padding-right: 0 !important;
 }
 
@@ -8987,7 +8979,7 @@ body.bg-light {
 }
 
 .dealer-list-v6-card:has(.dealer-v3-menu.show) {
-    z-index: 2000;
+    z-index: 1120;
     transform: none;
     border-color: rgba(185,4,10,.14);
     box-shadow: 0 14px 34px rgba(28,24,24,.10);
@@ -8998,11 +8990,11 @@ body.bg-light {
 }
 
 .dealer-list-v6-card:has(.dealer-v3-menu.show) .dealer-v3-more {
-    z-index: 2100;
+    z-index: 1130;
 }
 
 .dealer-list-v6-card .dealer-v3-menu {
-    z-index: 2200;
+    z-index: 1140;
     pointer-events: auto;
 }
 
