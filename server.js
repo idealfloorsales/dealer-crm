@@ -401,11 +401,11 @@ app.put('/api/statuses/:id', requirePermission('can_edit_dealer'), async (req, r
 app.delete('/api/statuses/:id', requirePermission('can_edit_dealer'), async (req, res) => { await Status.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
 
 // --- API СЕКТОРОВ ---
-app.get('/api/sectors', requirePermission('can_view_dealers'), async (req, res) => { const list = await Sector.find().sort({name:1}); res.json(list.map(convertToClient)); });
+app.get('/api/sectors', requireAnyPermission('can_view_dealers', 'can_view_sales'), async (req, res) => { const list = await Sector.find().sort({name:1}); res.json(list.map(convertToClient)); });
 app.post('/api/sectors', requirePermission('can_edit_dealer'), async (req, res) => { const s = new Sector(req.body); await s.save(); res.json(convertToClient(s)); });
 app.delete('/api/sectors/:id', requirePermission('can_edit_dealer'), async (req, res) => { await Sector.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
 
-app.get('/api/dealers', requireAnyPermission('can_view_dealers', 'can_view_map', 'can_view_reclamations'), async (req, res) => { try { let filter = getDealerFilter(req); if (req.query.scope === 'all' && req.user.permissions && req.user.permissions.is_admin) { filter = {}; } const dealers = await Dealer.find(filter).select('-photos -visits -products -avatarUrl').lean(); res.json(dealers.map(d => ({ id: d._id, ...d }))); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.get('/api/dealers', requireAnyPermission('can_view_dealers', 'can_view_map', 'can_view_sales', 'can_view_competitors', 'can_view_reclamations'), async (req, res) => { try { let filter = getDealerFilter(req); if (req.query.scope === 'all' && req.user.permissions && req.user.permissions.is_admin) { filter = {}; } const dealers = await Dealer.find(filter).select('-photos -visits -products -avatarUrl').lean(); res.json(dealers.map(d => ({ id: d._id, ...d }))); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.get('/api/dealers/:id/avatar', requirePermission('can_view_dealers'), async (req, res) => {
     try {
         const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).select('avatarUrl').lean();
