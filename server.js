@@ -551,7 +551,7 @@ app.get('/api/sectors', requireAnyPermission('can_view_dealers', 'can_view_sales
 app.post('/api/sectors', requirePermission('can_edit_dealer'), async (req, res) => { const s = new Sector(req.body); await s.save(); res.json(convertToClient(s)); });
 app.delete('/api/sectors/:id', requirePermission('can_edit_dealer'), async (req, res) => { await Sector.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
 
-app.get('/api/dealers', requireAnyPermission('can_view_dealers', 'can_view_map', 'can_view_sales', 'can_view_competitors', 'can_view_reclamations'), async (req, res) => { try { let filter = getDealerFilter(req); if (req.query.scope === 'all' && req.user.permissions && req.user.permissions.is_admin) { filter = {}; } let query = Dealer.find(filter); if (req.query.view === 'map') query = query.select('_id name city address contacts latitude longitude status responsible responsibleUserId'); else query = query.select('-photos -visits -products -avatarUrl'); const dealers = await query.lean(); res.json(dealers.map(d => ({ id: d._id, ...d }))); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.get('/api/dealers', requireAnyPermission('can_view_dealers', 'can_view_map', 'can_view_sales', 'can_view_competitors', 'can_view_reclamations'), async (req, res) => { try { let filter = getDealerFilter(req); if (req.query.scope === 'all' && req.user.permissions && req.user.permissions.is_admin) { filter = {}; } if (req.query.context === 'sales' && hasPermission(req, 'can_view_sales')) { filter = {}; } let query = Dealer.find(filter); if (req.query.view === 'map') query = query.select('_id name city address contacts latitude longitude status responsible responsibleUserId'); else query = query.select('-photos -visits -products -avatarUrl'); const dealers = await query.lean(); res.json(dealers.map(d => ({ id: d._id, ...d }))); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.get('/api/dealers/:id/avatar', requirePermission('can_view_dealers'), async (req, res) => {
     try {
         const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).select('avatarUrl').lean();
@@ -659,8 +659,9 @@ app.get('/api/sales', requirePermission('can_view_sales'), async (req, res) => {
             filter = { month: { $gte: minMonth } };
         }
         const scope = getUserScope(req);
+        const companySalesView = req.query.context === 'sales' && hasPermission(req, 'can_view_sales');
 
-        if (!isGlobalViewer(req) && req.user.role === 'manager') {
+        if (!companySalesView && !isGlobalViewer(req) && req.user.role === 'manager') {
             const dealers = await Dealer.find(getDealerFilter(req)).select('_id').lean();
             const dealerIds = dealers.map(d => String(d._id));
             const personalPlanIds = dealerIds.map(id => `PLAN_vip_${id}`);
@@ -679,7 +680,7 @@ app.get('/api/sales', requirePermission('can_view_sales'), async (req, res) => {
                     }
                 ]
             };
-        } else if (!isGlobalViewer(req) && scope !== 'all') {
+        } else if (!companySalesView && !isGlobalViewer(req) && scope !== 'all') {
             const dealers = await Dealer.find(getDealerFilter(req)).select('_id').lean();
             const dealerIds = dealers.map(d => String(d._id));
             const personalPlanIds = dealerIds.map(id => `PLAN_vip_${id}`);
@@ -726,7 +727,8 @@ app.post('/api/sales', async (req, res) => {
 
     const now = new Date();
     const scope = req.user ? req.user.scope : 'none';
-    const managerRestricted = Boolean(req.user && req.user.role === 'manager' && !isGlobalViewer(req));
+    const companySalesView = req.query.context === 'sales' && hasPermission(req, 'can_view_sales');
+    const managerRestricted = Boolean(req.user && req.user.role === 'manager' && !isGlobalViewer(req) && !companySalesView);
     let managerDealerIds = null;
     if (managerRestricted) {
         const dealers = await Dealer.find(getDealerFilter(req)).select('_id').lean();
