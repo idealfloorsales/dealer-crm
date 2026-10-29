@@ -309,6 +309,7 @@ document.addEventListener('DOMContentLoaded', () => {
             expectedProductId:$('ws-receipt-expected').value, actualProductId:$('ws-receipt-actual').value,
             deliveredPacks:n($('ws-receipt-delivered').value), acceptedPacks:n($('ws-receipt-accepted').value),
             acceptedLoosePlanks:n($('ws-receipt-loose').value), date:$('ws-receipt-date').value,
+            serviceMemoNumber:$('ws-receipt-memo').value,
             discrepancyReason:$('ws-receipt-reason').value, note:$('ws-receipt-note').value
         }, 'Ламинат принят в цех', 'receipt');
     });
