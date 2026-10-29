@@ -231,9 +231,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (dealer.contract) {
                     const isSigned = dealer.contract.isSigned;
                     const date = dealer.contract.date ? ` <small class="text-muted">(${dealer.contract.date})</small>` : '';
+                    const number = dealer.contract.number ? ` <span class="badge bg-light text-dark border ms-1">${safeText(dealer.contract.number)}</span>` : '';
                     contractHtml = isSigned 
-                        ? `<span class="text-success fw-bold"><i class="bi bi-file-earmark-check-fill me-1"></i>Подписан</span>${date}` 
-                        : `<span class="text-danger"><i class="bi bi-file-earmark-x me-1"></i>Не подписан</span>`;
+                        ? `<span class="text-success fw-bold"><i class="bi bi-file-earmark-check-fill me-1"></i>Подписан</span>${number}${date}` 
+                        : `<span class="text-danger"><i class="bi bi-file-earmark-x me-1"></i>Не подписан</span>${number}${date}`;
                 }
 
                 // 3. СЕКТОР (Только если есть)
