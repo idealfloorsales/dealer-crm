@@ -171,6 +171,15 @@
         updateEntityPickerSummary();
     }
 
+    function formatOrganizationForDocument(req) {
+        const name = String(req?.organizationName || '').trim();
+        const type = String(req?.type || '').trim();
+        if (!name) return '';
+        if (type === 'ТОО' && !/^ТОО\b/i.test(name)) return `ТОО «${name.replace(/[«»"]/g, '').trim()}»`;
+        if (type === 'ИП' && !/^ИП\b/i.test(name)) return `ИП «${name.replace(/[«»"]/g, '').trim()}»`;
+        return name;
+    }
+
     function getContact(dealer) {
         const contacts = Array.isArray(dealer.contacts) ? dealer.contacts : [];
         const c = contacts.find(x => x?.name || x?.contactInfo) || {};
@@ -354,7 +363,7 @@
         const n = String(name || '').toLowerCase().replace(/ё/g, 'е');
         if (n.includes('расчес')) return 5600;
         if (n.includes('таблич') || n.includes('орг.стек') || n.includes('орг стек')) return 800;
-        if ((n.includes('стенк') || n.includes('задн')) && (n.includes('600') || n.includes('800'))) return 8000;
+        if ((n.includes('стен') || n.includes('задн')) && (n.includes('600') || n.includes('800'))) return 8000;
         if (n.includes('наклей') && (n.includes('600') || n.includes('800'))) return 2000;
         return 0;
     }
@@ -478,7 +487,7 @@
             DOC_DATE_SLASH: escapeHtml(date.slash),
             CITY: valueOrLine(dealer.city, 'Астана'),
             DEALER_NAME: valueOrLine(dealer.name),
-            DEALER_ORG: valueOrLine(req.organizationName),
+            DEALER_ORG: valueOrLine(formatOrganizationForDocument(req)),
             DEALER_DIRECTOR: valueOrLine(req.director),
             LEGAL_ADDRESS: valueOrLine(req.legalAddress),
             BIN: valueOrLine(req.bin),
