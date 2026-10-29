@@ -121,8 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return custom ? custom.label : (map[d.status] || d.status);
         }},
         { id: 'responsible', label: 'Ответственный', isChecked: true, getValue: d => {
-            const map = { 'regional_astana': 'Региональный Астана', 'regional_regions': 'Региональный Регионы', 'office': 'Офис' };
-            return d.responsibleUserId ? managerDisplayName(d.responsibleUserId) : (map[d.responsible] || d.responsible);
+            return d.responsibleUserId ? managerDisplayName(d.responsibleUserId) : 'Ответственный не назначен';
         }},
         { id: 'sector', label: 'Сектор', isChecked: true, getValue: d => d.region_sector || '' }, // <--- ДОБАВЛЕНО В ЭКСПОРТ
         { id: 'price_type', label: 'Тип цен', isChecked: true, getValue: d => d.price_type },
@@ -325,7 +324,10 @@ document.addEventListener('DOMContentLoaded', () => {
         selectConfigs.forEach(({ el, selected }) => {
             if (!el) return;
             const firstLabel = el === filterResponsible ? 'Все ответственные' : 'Не выбран';
-            el.innerHTML = '<option value="">' + firstLabel + '</option>' +
+            const unassignedOption = el === filterResponsible
+                ? '<option value="__unassigned__">Ответственный не назначен</option>'
+                : '';
+            el.innerHTML = '<option value="">' + firstLabel + '</option>' + unassignedOption +
                 managerUsers.map(manager => {
                     const scopeLabel = manager.scope === 'astana'
                         ? 'Астана'
@@ -1530,12 +1532,7 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
 
     function responsibleLabel(value, responsibleUserId = '') {
         if (responsibleUserId) return managerDisplayName(responsibleUserId);
-        const labels = {
-            regional_astana: 'Региональный Астана',
-            regional_regions: 'Региональный Регионы',
-            office: 'Офис'
-        };
-        return labels[value] || value || 'Не назначен';
+        return 'Ответственный не назначен';
     }
 
 
@@ -1754,7 +1751,7 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
         add('Город', dealer.city, 'geo-alt');
         add('Сектор', dealer.region_sector, 'diagram-3');
         add('Тип цен', dealer.price_type, 'tag');
-        add('Ответственный', responsibleLabel(dealer.responsible), 'person');
+        add('Ответственный', responsibleLabel(dealer.responsible, dealer.responsibleUserId), 'person');
 
         return items;
     }
@@ -1816,13 +1813,15 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
             const normalizedSector = normalizeDisplayValue(d.region_sector);
             const searchable = [
                 d.name, d.dealer_id, normalizedCity, d.address, normalizedSector, normalizedType,
-                responsibleLabel(d.responsible)
+                responsibleLabel(d.responsible, d.responsibleUserId)
             ].filter(Boolean).join(' ').toLowerCase();
 
             return isVisible &&
                 (!city || normalizedCity === city) &&
                 (!type || normalizedType === type) &&
-                (!responsible || String(d.responsibleUserId || '') === String(responsible)) &&
+                (!responsible ||
+                    (responsible === '__unassigned__' && !d.responsibleUserId) ||
+                    (responsible !== '__unassigned__' && String(d.responsibleUserId || '') === String(responsible))) &&
                 (!sector || normalizedSector === sector) &&
                 (!search || searchable.includes(search));
         });
