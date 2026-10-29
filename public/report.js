@@ -1,7 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     
     const API_MATRIX_URL = '/api/matrix';
-    const API_PRODUCTS_URL = '/api/products';
     
     // Элементы
     const matrixHeader = document.getElementById('matrix-header');
@@ -31,7 +30,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const productClear = document.getElementById('product-clear');
     
     let fullData = { headers: [], matrix: [] };
-    let allProducts = [];
     
     let selectedDealerIds = new Set();
     let selectedProductSkus = new Set();
@@ -160,16 +158,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- 2. ЗАГРУЗКА И НАСТРОЙКА ---
     async function initPage() {
         try {
+            if (window.CRMAuth && CRMAuth.ready) await CRMAuth.ready;
+            if (window.CRMAuth && !CRMAuth.can('can_view_report')) return;
             loadingMsg.style.display = 'block';
             
-            const [matrixRes, prodRes] = await Promise.all([
-                fetch(API_MATRIX_URL),
-                fetch(API_PRODUCTS_URL)
-            ]);
-
-            if (!matrixRes.ok || !prodRes.ok) throw new Error('Ошибка сети');
-            fullData = await matrixRes.json(); 
-            allProducts = await prodRes.json();
+            const matrixRes = await fetch(API_MATRIX_URL);
+            if (!matrixRes.ok) throw new Error('Ошибка сети');
+            fullData = await matrixRes.json();
             
             populateGlobalFilters();
             updateDealerListOptions(); 
