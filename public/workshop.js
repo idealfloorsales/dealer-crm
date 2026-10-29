@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const API = '/api/workshop';
     const state = {
         products: [], dealers: [], materials: [], recipes: [], laminateStocks: [],
-        dealerAssets: [], productions: [], movements: [], stats: {}
+        dealerAssets: [], productions: [], movements: [], memos: [], stats: {}
     };
 
     const $ = id => document.getElementById(id);
@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function recipeById(id) { return state.recipes.find(item => idOf(item) === String(id || '')); }
     function materialById(id) { return state.materials.find(item => idOf(item) === String(id || '')); }
     function dealerById(id) { return state.dealers.find(item => idOf(item) === String(id || '')); }
+    function memoById(id) { return state.memos.find(item => idOf(item) === String(id || '')); }
 
     function packQty(product, override = 0) {
         const direct = Math.round(n(override));
@@ -51,13 +52,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const modalIds = {
-        receipt:'ws-receipt-modal', production:'ws-production-modal', dealer:'ws-dealer-modal',
+        memo:'ws-memo-modal', receipt:'ws-receipt-modal', production:'ws-production-modal', dealer:'ws-dealer-modal',
         material:'ws-material-modal', writeoff:'ws-writeoff-modal', recipe:'ws-recipe-modal',
         stocktake:'ws-stocktake-modal', 'new-material':'ws-new-material-modal'
     };
     function showModal(name) {
         const el = $(modalIds[name]);
         if (!el) return;
+        if (name === 'memo') resetMemo();
         if (name === 'receipt') resetReceipt();
         if (name === 'production') resetProduction();
         if (name === 'dealer') resetDealerMovement();
@@ -101,6 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderAll() {
         renderKpis();
+        renderMemos();
         renderProduction();
         renderAttention();
         renderStocks();
@@ -117,7 +120,54 @@ document.addEventListener('DOMContentLoaded', () => {
         $('ws-kpi-low').textContent = fmt(state.stats.lowMaterials);
     }
 
-    function renderProduction() {
+    function memoStatusLabel(status) {
+        return status === 'accepted' ? 'Принято' : status === 'mismatch' ? 'На обмен' : status === 'cancelled' ? 'Отменено' : 'Ожидает склад';
+    }
+
+    function renderMemos() {
+        const host = $('ws-memo-list');
+        if (!host) return;
+        const list = state.memos.slice(0, 16);
+        if (!list.length) {
+            host.innerHTML = '<div class="workshop-empty"><i class="bi bi-file-earmark-text"></i>Служебных записок пока нет</div>';
+            return;
+        }
+        host.innerHTML = list.map(memo => {
+            const lines = (memo.lines || []).map(line => {
+                const requested = Number(line.requestedPacks || 0);
+                const delivered = Number(line.deliveredPacks || 0);
+                const diff = delivered - requested;
+                const productMismatch = line.actualProduct && idOf(line.actualProduct) !== idOf(line.product);
+                const lineState = memo.status === 'accepted' ? 'ok' : (line.isMatch ? 'ok' : (memo.status === 'mismatch' ? 'bad' : 'wait'));
+                const actualText = productMismatch ? ` → ${esc(line.actualProduct?.sku || line.actualProduct?.name || 'другая позиция')}` : '';
+                const deliveryText = memo.status === 'created'
+                    ? `${requested} уп. → ${Number(line.plannedOutputQty || 0)} шт`
+                    : `${requested} уп. / привезли ${delivered} уп.${diff ? ` (${diff > 0 ? '+' : ''}${diff})` : ''}`;
+                return `<div class="workshop-memo-line-summary is-${lineState}">
+                    <span class="workshop-memo-check"><i class="bi bi-${lineState === 'ok' ? 'check2' : lineState === 'bad' ? 'exclamation-lg' : 'dash'}"></i></span>
+                    <div><strong>${esc(line.product?.sku || '—')} · ${esc(line.product?.name || '')}${actualText}</strong><small>${deliveryText}</small></div>
+                </div>`;
+            }).join('');
+            const actionable = memo.status !== 'accepted' && memo.status !== 'cancelled';
+            return `<article class="workshop-memo-card is-${esc(memo.status)}">
+                <div class="workshop-memo-card-head">
+                    <div><span>СЛУЖЕБНАЯ №${esc(memo.number)}</span><strong>${dateText(memo.date)}</strong><small>${esc(memo.signedBy || memo.createdBy?.name || '')}</small></div>
+                    <span class="workshop-memo-status">${memoStatusLabel(memo.status)}</span>
+                </div>
+                <div class="workshop-memo-card-lines">${lines}</div>
+                <div class="workshop-memo-card-foot">
+                    <small>${(memo.lines || []).length} поз. · ${(memo.lines || []).reduce((sum,line)=>sum+n(line.requestedPacks),0)} уп.</small>
+                    ${actionable ? `<button type="button" class="workshop-link-btn" data-receive-memo="${idOf(memo)}"><i class="bi bi-check2-square"></i>${memo.status === 'mismatch' ? 'Повторно сверить' : 'Сверить приход'}</button>` : '<span class="text-success small fw-bold"><i class="bi bi-check-circle me-1"></i>Оприходовано</span>'}
+                </div>
+            </article>`;
+        }).join('');
+
+        host.querySelectorAll('[data-receive-memo]').forEach(button => {
+            button.addEventListener('click', () => openReceiptForMemo(button.dataset.receiveMemo));
+        });
+    }
+
+        function renderProduction() {
         const host = $('ws-production-list');
         if (!host) return;
         if (!state.productions.length) {
@@ -138,6 +188,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const host = $('ws-attention-list');
         if (!host) return;
         const items = [];
+        state.memos.filter(item => item.status === 'mismatch').forEach(item => {
+            const bad = (item.lines || []).filter(line => !line.isMatch).length;
+            items.push({ type:'danger', icon:'arrow-left-right', title:`Служебка №${item.number}`, text:`${bad} поз. требуют обмена / повторной сверки` });
+        });
         state.materials.forEach(item => {
             if (n(item.minQty) > 0 && n(item.stockQty) <= n(item.minQty)) {
                 items.push({ type:'warning', icon:'exclamation-triangle', title:item.name, text:`Остаток ${fmt(item.stockQty,2)} ${item.unit || 'шт'} · минимум ${fmt(item.minQty,2)}` });
@@ -277,46 +331,244 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function populateFormSelects() {
-        ['ws-receipt-expected','ws-receipt-actual','ws-recipe-product'].forEach(id => { if ($(id)) $(id).innerHTML = productOptions(id === 'ws-recipe-product' ? 'Без ламината' : 'Выберите позицию'); });
+        if ($('ws-recipe-product')) $('ws-recipe-product').innerHTML = productOptions('Без ламината');
         ['ws-production-recipe','ws-dealer-recipe'].forEach(id => { if ($(id)) $(id).innerHTML = recipeOptions(); });
         if ($('ws-material-id')) $('ws-material-id').innerHTML = materialOptions();
         if ($('ws-dealer-id')) $('ws-dealer-id').innerHTML = dealerOptions();
+        if ($('ws-receipt-memo')) {
+            const open = state.memos.filter(item => item.status === 'created' || item.status === 'mismatch');
+            $('ws-receipt-memo').innerHTML = option('', 'Выберите служебную записку') + open.map(item => option(idOf(item), `№${item.number} · ${dateText(item.date)} · ${(item.lines || []).length} поз.`)).join('');
+        }
         updateWriteoffItems();
     }
 
-    function resetReceipt() {
+    function resetMemo() {
+        $('ws-memo-form')?.reset();
+        $('ws-memo-date').value = todayValue();
+        const currentUser = window.CRMAuth?.user || {};
+        $('ws-memo-signed').value = currentUser.fullName || currentUser.name || currentUser.username || '';
+        $('ws-memo-lines').innerHTML = '';
+        addMemoLine();
+    }
+
+    function recipesForProduct(productId) {
+        return state.recipes.filter(recipe => idOf(recipe.product) === String(productId || '') && recipe.outputType === 'sample');
+    }
+
+    function memoRecipeOptions(productId, selected = '') {
+        const items = recipesForProduct(productId);
+        return option('', items.length ? 'Выберите рецептуру' : 'Нет рецептуры') +
+            items.map(item => option(idOf(item), item.name, idOf(item) === String(selected || ''))).join('');
+    }
+
+    function addMemoLine(data = {}) {
+        const host = $('ws-memo-lines');
+        if (!host) return;
+        const row = document.createElement('div');
+        row.className = 'workshop-memo-edit-line';
+        row.innerHTML = `
+            <label class="ws-memo-product"><span>Позиция ламината</span><select class="form-select ws-memo-product-select">${productOptions()}</select></label>
+            <label class="ws-memo-recipe"><span>Что изготовим</span><select class="form-select ws-memo-recipe-select"><option value="">Сначала выберите SKU</option></select></label>
+            <label><span>Упаковок</span><input type="number" min="1" step="1" class="form-control ws-memo-packs" value="${esc(data.requestedPacks || 1)}"></label>
+            <label><span>Планшетов / изделий</span><input type="number" min="0" step="1" class="form-control ws-memo-output" value="${esc(data.plannedOutputQty || 0)}"></label>
+            <button type="button" class="ws-memo-remove" aria-label="Удалить позицию"><i class="bi bi-x-lg"></i></button>
+            <div class="ws-memo-line-calc"></div>`;
+        host.appendChild(row);
+
+        const productSelect = row.querySelector('.ws-memo-product-select');
+        const recipeSelect = row.querySelector('.ws-memo-recipe-select');
+        productSelect.value = idOf(data.product || data.productId);
+        recipeSelect.innerHTML = memoRecipeOptions(productSelect.value, idOf(data.recipe || data.recipeId));
+        recipeSelect.value = idOf(data.recipe || data.recipeId);
+
+        const recalc = () => {
+            const product = productById(productSelect.value);
+            const recipe = recipeById(recipeSelect.value);
+            const packs = Math.max(0, Math.floor(n(row.querySelector('.ws-memo-packs').value)));
+            const pq = packQty(product, recipe?.packQtyOverride);
+            const planks = packs * pq;
+            const per = n(recipe?.planksPerUnit);
+            const exact = per > 0 ? planks / per : 0;
+            const whole = per > 0 ? Math.floor(exact) : 0;
+            const leftover = per > 0 ? planks - whole * per : 0;
+            const outputInput = row.querySelector('.ws-memo-output');
+            if (recipe && (!outputInput.dataset.manual || outputInput.dataset.manual === '0')) outputInput.value = whole;
+            row.querySelector('.ws-memo-line-calc').innerHTML = product
+                ? `${pq ? pq+' пл./уп.' : '<span class="text-danger">нет нормы упаковки</span>'} · всего ${planks} пл.${recipe ? ` · ${per} пл./изделие → <strong>${whole} шт</strong>${leftover ? ` · остаток ${leftover} пл.` : ' · без отхода'}` : ' · выберите рецептуру'}`
+                : 'Выберите позицию.';
+        };
+
+        productSelect.addEventListener('change', () => {
+            recipeSelect.innerHTML = memoRecipeOptions(productSelect.value);
+            recipeSelect.value = recipesForProduct(productSelect.value)[0] ? idOf(recipesForProduct(productSelect.value)[0]) : '';
+            row.querySelector('.ws-memo-output').dataset.manual = '0';
+            recalc();
+        });
+        recipeSelect.addEventListener('change', () => {
+            row.querySelector('.ws-memo-output').dataset.manual = '0';
+            recalc();
+        });
+        row.querySelector('.ws-memo-packs').addEventListener('input', () => {
+            row.querySelector('.ws-memo-output').dataset.manual = '0';
+            recalc();
+        });
+        row.querySelector('.ws-memo-output').addEventListener('input', event => event.target.dataset.manual = '1');
+        row.querySelector('.ws-memo-remove').addEventListener('click', () => {
+            if (host.children.length <= 1) return toast('В служебке должна остаться хотя бы одна позиция', 'warning');
+            row.remove();
+        });
+        recalc();
+    }
+
+    $('ws-memo-add-line')?.addEventListener('click', () => addMemoLine());
+
+    $('ws-memo-form')?.addEventListener('submit', async event => {
+        event.preventDefault();
+        const lines = [...document.querySelectorAll('#ws-memo-lines .workshop-memo-edit-line')].map(row => ({
+            productId: row.querySelector('.ws-memo-product-select')?.value,
+            recipeId: row.querySelector('.ws-memo-recipe-select')?.value || null,
+            requestedPacks: Math.max(0, Math.floor(n(row.querySelector('.ws-memo-packs')?.value))),
+            plannedOutputQty: Math.max(0, Math.floor(n(row.querySelector('.ws-memo-output')?.value)))
+        })).filter(line => line.productId && line.requestedPacks > 0);
+
+        if (!lines.length) return toast('Добавьте хотя бы одну позицию и количество упаковок', 'warning');
+
+        await post(API + '/memos', {
+            number: $('ws-memo-number').value,
+            date: $('ws-memo-date').value,
+            signedBy: $('ws-memo-signed').value,
+            note: $('ws-memo-note').value,
+            lines
+        }, 'Служебная записка создана', 'memo');
+    });
+
+    function resetReceipt(selectedMemoId = '') {
         $('ws-receipt-form')?.reset();
         $('ws-receipt-date').value = todayValue();
-        populateFormSelects(); updateReceiptCalc();
+        populateFormSelects();
+        if (selectedMemoId && $('ws-receipt-memo')) $('ws-receipt-memo').value = selectedMemoId;
+        renderReceiptLines();
     }
+
+    function openReceiptForMemo(memoId) {
+        resetReceipt(memoId);
+        bootstrap.Modal.getOrCreateInstance($('ws-receipt-modal')).show();
+    }
+
+    function renderReceiptLines() {
+        const memo = memoById($('ws-receipt-memo')?.value);
+        const host = $('ws-receipt-lines');
+        if (!host) return;
+        if (!memo) {
+            host.innerHTML = '<div class="workshop-empty"><i class="bi bi-check2-square"></i>Выберите служебную записку</div>';
+            updateReceiptCalc();
+            return;
+        }
+
+        host.innerHTML = (memo.lines || []).map(line => {
+            const lineId = idOf(line);
+            const expectedId = idOf(line.product);
+            const actualId = idOf(line.actualProduct) || expectedId;
+            const delivered = memo.status === 'mismatch' ? Number(line.deliveredPacks || 0) : Number(line.requestedPacks || 0);
+            const checked = memo.status === 'mismatch' ? Boolean(line.checked) : true;
+            return `<div class="workshop-receipt-line" data-line-id="${lineId}" data-expected-id="${expectedId}" data-requested="${Number(line.requestedPacks || 0)}">
+                <label class="workshop-check-cell"><input type="checkbox" class="form-check-input ws-receipt-checked" ${checked ? 'checked' : ''}><span>Проверено</span></label>
+                <div class="workshop-receipt-expected"><span>По служебке</span><strong>${esc(line.product?.sku || '—')} · ${esc(line.product?.name || '')}</strong><small>${Number(line.requestedPacks || 0)} уп. → ${Number(line.plannedOutputQty || 0)} изделий</small></div>
+                <label><span>Фактически позиция</span><select class="form-select ws-receipt-actual">${productOptions()}</select></label>
+                <label><span>Привезли, упаковок</span><input type="number" min="0" step="1" class="form-control ws-receipt-packs" value="${delivered}"></label>
+                <label class="workshop-receipt-reason"><span>Расхождение / что обменять</span><input class="form-control ws-receipt-reason-input" value="${esc(line.discrepancyReason || '')}" placeholder="Заполнится при необходимости"></label>
+                <div class="workshop-receipt-line-status"></div>
+            </div>`;
+        }).join('');
+
+        host.querySelectorAll('.workshop-receipt-line').forEach(row => {
+            const actual = row.querySelector('.ws-receipt-actual');
+            const memoLine = (memo.lines || []).find(line => idOf(line) === row.dataset.lineId);
+            actual.value = idOf(memoLine?.actualProduct) || row.dataset.expectedId;
+            row.querySelectorAll('input,select').forEach(input => input.addEventListener('input', () => updateReceiptLine(row)));
+            updateReceiptLine(row);
+        });
+        updateReceiptCalc();
+    }
+
+    function updateReceiptLine(row) {
+        const expectedId = row.dataset.expectedId;
+        const requested = Number(row.dataset.requested || 0);
+        const actualId = row.querySelector('.ws-receipt-actual')?.value || '';
+        const delivered = Math.max(0, Math.floor(n(row.querySelector('.ws-receipt-packs')?.value)));
+        const checked = Boolean(row.querySelector('.ws-receipt-checked')?.checked);
+        const sameProduct = actualId === expectedId;
+        const sameQty = delivered === requested;
+        const match = checked && sameProduct && sameQty;
+        const status = row.querySelector('.workshop-receipt-line-status');
+        row.classList.toggle('is-match', match);
+        row.classList.toggle('is-mismatch', checked && !match);
+        if (match) {
+            status.innerHTML = '<i class="bi bi-check-circle-fill"></i><span>Совпадает</span>';
+        } else if (!checked) {
+            status.innerHTML = '<i class="bi bi-circle"></i><span>Не проверено</span>';
+        } else {
+            const diff = delivered - requested;
+            const parts = [];
+            if (!sameProduct) parts.push('другая позиция');
+            if (!sameQty) parts.push(diff > 0 ? `лишних ${diff} уп.` : `не хватает ${Math.abs(diff)} уп.`);
+            status.innerHTML = `<i class="bi bi-exclamation-triangle-fill"></i><span>${esc(parts.join(' · ') || 'расхождение')}</span>`;
+            const reason = row.querySelector('.ws-receipt-reason-input');
+            if (reason && !reason.value) reason.placeholder = parts.join(' · ');
+        }
+        updateReceiptCalc();
+    }
+
     function updateReceiptCalc() {
-        const expected = productById($('ws-receipt-expected')?.value);
-        const actual = productById($('ws-receipt-actual')?.value);
-        const pq = packQty(actual);
-        const delivered = n($('ws-receipt-delivered')?.value);
-        const accepted = n($('ws-receipt-accepted')?.value);
-        const loose = n($('ws-receipt-loose')?.value);
-        const total = accepted*pq + loose;
-        const mismatch = expected && actual && idOf(expected) !== idOf(actual);
-        $('ws-receipt-calc').innerHTML = actual ? `В упаковке: <strong>${pq || 'не задано'} планок</strong> · В остаток цеха поступит: <strong>${fmt(total)} планок</strong>${mismatch ? ' · <strong class="text-danger">Позиция не совпадает с ожидаемой</strong>' : ''}${delivered !== accepted ? ' · принято не всё количество':''}` : 'Выберите фактически принятую позицию.';
+        const memo = memoById($('ws-receipt-memo')?.value);
+        const rows = [...document.querySelectorAll('#ws-receipt-lines .workshop-receipt-line')];
+        if (!memo || !rows.length) {
+            $('ws-receipt-calc').innerHTML = 'Выберите служебную записку.';
+            return;
+        }
+        const matched = rows.filter(row => row.classList.contains('is-match')).length;
+        const unchecked = rows.filter(row => !row.querySelector('.ws-receipt-checked')?.checked).length;
+        const mismatched = rows.length - matched - unchecked;
+        $('ws-receipt-calc').innerHTML = matched === rows.length
+            ? `<strong class="text-success">Все ${rows.length} позиций совпадают.</strong> После сохранения упаковки будут оприходованы в цех.`
+            : `Совпало: <strong>${matched}/${rows.length}</strong> · расхождений: <strong class="text-danger">${mismatched}</strong> · не проверено: <strong>${unchecked}</strong>. Ламинат пока не будет оприходован.`;
     }
-    ['ws-receipt-expected','ws-receipt-actual','ws-receipt-delivered','ws-receipt-accepted','ws-receipt-loose'].forEach(id => $(id)?.addEventListener('input', updateReceiptCalc));
-    $('ws-receipt-expected')?.addEventListener('change', () => { if (!$('ws-receipt-actual').value) $('ws-receipt-actual').value = $('ws-receipt-expected').value; updateReceiptCalc(); });
+
+    $('ws-receipt-memo')?.addEventListener('change', renderReceiptLines);
 
     $('ws-receipt-form')?.addEventListener('submit', async event => {
         event.preventDefault();
-        await post(API+'/laminate-receipt', {
-            expectedProductId:$('ws-receipt-expected').value, actualProductId:$('ws-receipt-actual').value,
-            deliveredPacks:n($('ws-receipt-delivered').value), acceptedPacks:n($('ws-receipt-accepted').value),
-            acceptedLoosePlanks:n($('ws-receipt-loose').value), date:$('ws-receipt-date').value,
-            serviceMemoNumber:$('ws-receipt-memo').value,
-            discrepancyReason:$('ws-receipt-reason').value, note:$('ws-receipt-note').value
-        }, 'Ламинат принят в цех', 'receipt');
+        const memoId = $('ws-receipt-memo').value;
+        if (!memoId) return toast('Выберите служебную записку', 'warning');
+        const lines = [...document.querySelectorAll('#ws-receipt-lines .workshop-receipt-line')].map(row => ({
+            lineId: row.dataset.lineId,
+            actualProductId: row.querySelector('.ws-receipt-actual')?.value,
+            deliveredPacks: Math.max(0, Math.floor(n(row.querySelector('.ws-receipt-packs')?.value))),
+            checked: Boolean(row.querySelector('.ws-receipt-checked')?.checked),
+            discrepancyReason: row.querySelector('.ws-receipt-reason-input')?.value || ''
+        }));
+        try {
+            const response = await fetch(`${API}/memos/${encodeURIComponent(memoId)}/receive`, {
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({ date:$('ws-receipt-date').value, note:$('ws-receipt-note').value, lines })
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.error || 'Ошибка сверки');
+            hideModal('receipt');
+            toast(data.message || (data.accepted ? 'Приход принят' : 'Есть расхождения'), data.accepted ? 'success' : 'warning');
+            await load();
+        } catch (error) {
+            toast(error.message || 'Ошибка сверки', 'error');
+        }
     });
 
     function resetProduction() {
-        $('ws-production-form')?.reset(); $('ws-production-date').value = todayValue(); $('ws-production-output').value = 1;
-        populateFormSelects(); updateProductionCalc();
+        $('ws-production-form')?.reset();
+        $('ws-production-date').value = todayValue();
+        $('ws-production-output').value = 1;
+        populateFormSelects();
+        updateProductionCalc();
     }
     function productionRecipe() { return recipeById($('ws-production-recipe')?.value); }
     function laminateAvailableForRecipe(recipe) {
@@ -328,21 +580,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const recipe = productionRecipe();
         if (!recipe) { $('ws-production-calc').textContent='Выберите изделие — CRM покажет норму и возможный выпуск.'; return; }
         const pq = recipePack(recipe);
-        const packs = n($('ws-production-packs')?.value);
-        const loose = n($('ws-production-loose')?.value);
         const output = n($('ws-production-output')?.value);
         const scrap = n($('ws-production-scrap')?.value);
-        const accepted = packs*pq + loose;
         const need = output*n(recipe.planksPerUnit) + scrap;
         const available = laminateAvailableForRecipe(recipe);
+        const maxOutput = n(recipe.planksPerUnit) > 0 ? Math.floor(available / n(recipe.planksPerUnit)) : 0;
         const batch = noWasteBatch(pq, recipe.planksPerUnit);
-        const fromAccepted = n(recipe.planksPerUnit)>0 ? Math.floor(accepted/n(recipe.planksPerUnit)) : 0;
         $('ws-production-calc').innerHTML = `Норма: <strong>${fmt(recipe.planksPerUnit)} планок / изделие</strong>${pq ? ' · '+pq+' планок в упаковке':''}. 
-        В цехе: <strong>${fmt(available)} планок</strong>. Принято в работу: <strong>${fmt(accepted)} планок</strong>${accepted ? ' → до '+fromAccepted+' шт':''}. 
+        В доступном остатке цеха: <strong>${fmt(available)} планок</strong> → можно изготовить до <strong>${maxOutput} шт</strong>.
         На указанное производство будет списано: <strong class="${need>available?'text-danger':''}">${fmt(need)} планок</strong>.
         ${batch ? `Безотходная партия: <strong>${batch.packs} уп. → ${batch.output} шт</strong>.` : ''}`;
     }
-    ['ws-production-recipe','ws-production-packs','ws-production-loose','ws-production-output','ws-production-scrap'].forEach(id => $(id)?.addEventListener('input',updateProductionCalc));
+    ['ws-production-recipe','ws-production-output','ws-production-scrap'].forEach(id => $(id)?.addEventListener('input',updateProductionCalc));
 
     $('ws-production-form')?.addEventListener('submit', async event => {
         event.preventDefault();
@@ -352,10 +601,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return cb?.checked ? { type:cb.value, qty:n(qty?.value) } : null;
         }).filter(Boolean);
         await post(API+'/production', {
-            recipeId:$('ws-production-recipe').value, acceptedPacks:n($('ws-production-packs').value),
-            acceptedLoosePlanks:n($('ws-production-loose').value), outputQty:n($('ws-production-output').value),
-            scrapPlanks:n($('ws-production-scrap').value), date:$('ws-production-date').value,
-            operations, note:$('ws-production-note').value
+            recipeId:$('ws-production-recipe').value,
+            outputQty:n($('ws-production-output').value),
+            scrapPlanks:n($('ws-production-scrap').value),
+            date:$('ws-production-date').value,
+            operations,
+            note:$('ws-production-note').value
         }, 'Производство записано', 'production');
     });
 
