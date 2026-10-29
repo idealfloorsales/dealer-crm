@@ -70,17 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (window.CRMAuth && CRMAuth.ready) await CRMAuth.ready;
             canEditFact = window.CRMAuth ? CRMAuth.can('can_edit_sales_fact') : false;
             canEditPlan = window.CRMAuth ? CRMAuth.can('can_edit_sales_plan') : false;
-            const authUser = window.CRMAuth?.user;
-            currentScope = (authUser?.role === 'marketing' || authUser?.permissions?.is_admin)
-                ? 'all'
-                : (authUser?.scope || 'all');
-
-            if (areaFilter && currentScope !== 'all') {
-                areaFilter.querySelectorAll('option').forEach(option => {
-                    if (currentScope === 'astana' && option.value === 'regions') option.remove();
-                    if (currentScope === 'regions' && option.value === 'astana') option.remove();
-                });
-            }
+            currentScope = 'all';
 
             if (saveBtn && !canEditFact && !canEditPlan) {
                 setSaveButtonState('readonly');
@@ -246,8 +236,8 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             container.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div></div>';
             const [dealersRes, salesRes] = await Promise.all([
-                fetch(API_DEALERS + '?scope=all'),
-                fetch(`${API_SALES}?month=${monthPicker.value}`)
+                fetch(API_DEALERS + '?context=sales'),
+                fetch(`${API_SALES}?month=${monthPicker.value}&context=sales`)
             ]);
 
             if (!dealersRes.ok || !salesRes.ok) throw new Error("Ошибка доступа");
@@ -442,7 +432,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setAutoSaveInfo('saving');
 
         try {
-            const res = await fetch(API_SALES, {
+            const res = await fetch(API_SALES + '?context=sales', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ month: monthAtStart, data: payload })
@@ -523,7 +513,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const cards = [];
         const totalFactAll = totalRegionsFact + totalAstanaFact + totalVipFact + totalOtherFact;
         const authUser = window.CRMAuth?.user;
-        const personalManagerView = Boolean(authUser && authUser.role === 'manager' && !authUser.permissions?.is_admin);
+        const personalManagerView = false;
 
         if (personalManagerView) {
             cards.push({
@@ -577,8 +567,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const totalFactAll = totalRegionsFact + totalAstanaFact + totalVipFact + totalOtherFact;
         const authUser = window.CRMAuth?.user;
-        const personalManagerView = Boolean(authUser && authUser.role === 'manager' && !authUser.permissions?.is_admin);
-        const managerPlanKey = personalManagerView ? `manager_${authUser.id}` : '';
+        const personalManagerView = false;
+        const managerPlanKey = '';
 
         const levelFor = (fact, plan) => {
             if (!(Number(plan) > 0)) return 'none';
@@ -859,7 +849,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const authUser = window.CRMAuth?.user;
-        const personalManagerView = Boolean(authUser && authUser.role === 'manager' && !authUser.permissions?.is_admin);
+        const personalManagerView = false;
         const rootPlanKey = personalManagerView
             ? `manager_${authUser.id}`
             : currentScope === 'astana'
