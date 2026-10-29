@@ -1,15 +1,4 @@
 // --- АВТОРИЗАЦИЯ ---
-const originalFetch = window.fetch;
-window.fetch = async function (url, options) {
-    options = options || {};
-    options.headers = options.headers || {};
-    const token = localStorage.getItem('crm_token');
-    if (token) options.headers['Authorization'] = 'Bearer ' + token;
-    const response = await originalFetch(url, options);
-    if (response.status === 401) window.location.href = '/login.html';
-    return response;
-};
-
 document.addEventListener('DOMContentLoaded', () => {
     const API_URL = '/api/competitors-ref';
     const API_DEALERS = '/api/dealers';
@@ -36,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         /* --- ЛИФТ УПРАВЛЕНИЯ --- */
         .elevator-capsule {
-            position: fixed; bottom: 100px; right: 15px; z-index: 1060;
+            position: fixed; bottom: calc(92px + env(safe-area-inset-bottom)); right: 15px; z-index: 1060;
             display: flex; flex-direction: column; gap: 5px;
             background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(4px);
             padding: 5px; border-radius: 50px;
