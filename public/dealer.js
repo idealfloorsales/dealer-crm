@@ -537,19 +537,397 @@ document.addEventListener('DOMContentLoaded', () => {
         competitorsListContainer.innerHTML = html + '</tbody></table></div>';
     }
 
+    function editValue(id) {
+        return document.getElementById(id)?.value?.trim() || '';
+    }
+
+    function ensureProfileEditModal() {
+        let modalEl = document.getElementById('dealer-profile-edit-modal');
+        if (modalEl) return modalEl;
+
+        const shell = document.createElement('div');
+        shell.innerHTML = `
+            <div class="modal fade dealer-profile-edit-modal" id="dealer-profile-edit-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+                <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="dealer-profile-edit-head">
+                            <div>
+                                <span>КАРТОЧКА ДИЛЕРА</span>
+                                <h3>Редактирование</h3>
+                                <p id="dealer-profile-edit-subtitle">Изменения сохраняются сразу в карточку дилера.</p>
+                            </div>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                        </div>
+                        <div class="dealer-profile-edit-tabs">
+                            <button type="button" class="active" data-profile-edit-tab="main"><i class="bi bi-shop"></i><span>Основное</span></button>
+                            <button type="button" data-profile-edit-tab="contacts"><i class="bi bi-people"></i><span>Контакты</span></button>
+                            <button type="button" data-profile-edit-tab="requisites"><i class="bi bi-file-earmark-text"></i><span>Реквизиты</span></button>
+                        </div>
+                        <form id="dealer-profile-edit-form">
+                            <div class="modal-body dealer-profile-edit-body">
+                                <section class="dealer-profile-edit-pane active" data-profile-edit-pane="main">
+                                    <div class="dealer-profile-edit-section">
+                                        <div class="dealer-profile-edit-section-title"><i class="bi bi-shop"></i><div><strong>Основная информация</strong><small>Название, статус, город и ответственный</small></div></div>
+                                        <div class="row g-3">
+                                            <div class="col-md-4"><label>ID дилера</label><input id="profile-edit-dealer-id" class="form-control"></div>
+                                            <div class="col-md-8"><label>Название</label><input id="profile-edit-name" class="form-control" required></div>
+                                            <div class="col-md-4"><label>Статус</label><select id="profile-edit-status" class="form-select"></select></div>
+                                            <div class="col-md-4"><label>Город</label><input id="profile-edit-city" class="form-control"></div>
+                                            <div class="col-md-4"><label>Тип цен</label><input id="profile-edit-price-type" class="form-control"></div>
+                                            <div class="col-md-8"><label>Адрес</label><input id="profile-edit-address" class="form-control"></div>
+                                            <div class="col-md-4"><label>Ответственный</label>
+                                                <select id="profile-edit-responsible" class="form-select">
+                                                    <option value="">Не выбран</option>
+                                                    <option value="regional_astana">Астана</option>
+                                                    <option value="regional_regions">Регионы</option>
+                                                    <option value="office">Офис</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-4"><label>Сектор</label><select id="profile-edit-sector" class="form-select"><option value="">Не выбран</option></select></div>
+                                            <div class="col-md-8"><label>Условия доставки</label><input id="profile-edit-delivery" class="form-control"></div>
+                                            <div class="col-md-6"><label>Сайт</label><input id="profile-edit-website" class="form-control"></div>
+                                            <div class="col-md-6"><label>Instagram</label><input id="profile-edit-instagram" class="form-control"></div>
+                                            <div class="col-12"><label>Заметки и особые условия</label><textarea id="profile-edit-bonuses" class="form-control" rows="3"></textarea></div>
+                                        </div>
+                                    </div>
+                                    <div class="dealer-profile-edit-section">
+                                        <div class="dealer-profile-edit-section-title"><i class="bi bi-file-earmark-check"></i><div><strong>Договор</strong><small>Номер, дата и статус подписания</small></div></div>
+                                        <div class="row g-3 align-items-end">
+                                            <div class="col-md-5"><label>Номер договора</label><input id="profile-edit-contract-number" class="form-control"></div>
+                                            <div class="col-md-4"><label>Дата договора</label><input id="profile-edit-contract-date" type="date" class="form-control"></div>
+                                            <div class="col-md-3">
+                                                <div class="dealer-profile-edit-switch">
+                                                    <span>Договор подписан</span>
+                                                    <div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" id="profile-edit-contract-signed"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <section class="dealer-profile-edit-pane" data-profile-edit-pane="contacts">
+                                    <div class="dealer-profile-edit-section">
+                                        <div class="dealer-profile-edit-section-title">
+                                            <i class="bi bi-people"></i>
+                                            <div><strong>Контакты дилера</strong><small>Менеджеры, руководители и телефоны</small></div>
+                                            <button type="button" class="dealer-profile-edit-add" id="profile-edit-add-contact"><i class="bi bi-plus-lg"></i> Контакт</button>
+                                        </div>
+                                        <div id="profile-edit-contacts" class="dealer-profile-edit-contacts"></div>
+                                    </div>
+                                </section>
+
+                                <section class="dealer-profile-edit-pane" data-profile-edit-pane="requisites">
+                                    <div class="dealer-profile-edit-section">
+                                        <div class="dealer-profile-edit-section-title"><i class="bi bi-building"></i><div><strong>Основное юридическое лицо</strong><small>Используется в документах дилера</small></div></div>
+                                        <div class="row g-3">
+                                            <div class="col-md-7"><label>Наименование организации</label><input id="profile-edit-org-name" class="form-control"></div>
+                                            <div class="col-md-5"><label>БИН</label><input id="profile-edit-bin" class="form-control"></div>
+                                            <div class="col-md-6"><label>Директор</label><input id="profile-edit-director" class="form-control"></div>
+                                            <div class="col-md-6"><label>Email</label><input id="profile-edit-email" type="email" class="form-control"></div>
+                                            <div class="col-12"><label>Юридический адрес</label><input id="profile-edit-legal-address" class="form-control"></div>
+                                            <div class="col-md-6"><label>ИИК</label><input id="profile-edit-iik" class="form-control"></div>
+                                            <div class="col-md-6"><label>Банк</label><input id="profile-edit-bank" class="form-control"></div>
+                                            <div class="col-md-6"><label>БИК</label><input id="profile-edit-bik" class="form-control"></div>
+                                            <div class="col-md-6"><label>КБЕ</label><input id="profile-edit-kbe" class="form-control"></div>
+                                        </div>
+                                    </div>
+                                </section>
+                            </div>
+                            <div class="modal-footer dealer-profile-edit-footer">
+                                <span><i class="bi bi-shield-check"></i> Фото, визиты, матрица и конкуренты этим сохранением не изменяются.</span>
+                                <div>
+                                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button>
+                                    <button type="submit" class="btn btn-dark" id="dealer-profile-edit-save"><i class="bi bi-check2"></i> Сохранить</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>`;
+        modalEl = shell.firstElementChild;
+        document.body.appendChild(modalEl);
+
+        modalEl.querySelectorAll('[data-profile-edit-tab]').forEach(button => {
+            button.addEventListener('click', () => activateProfileEditTab(button.dataset.profileEditTab));
+        });
+
+        document.getElementById('profile-edit-add-contact')?.addEventListener('click', () => addProfileContactRow());
+        document.getElementById('profile-edit-contacts')?.addEventListener('click', event => {
+            const remove = event.target.closest('[data-remove-profile-contact]');
+            if (remove) remove.closest('.dealer-profile-contact-row')?.remove();
+        });
+        document.getElementById('profile-edit-responsible')?.addEventListener('change', refreshProfileSectorOptions);
+        document.getElementById('dealer-profile-edit-form')?.addEventListener('submit', saveProfileEdit);
+        return modalEl;
+    }
+
+    function activateProfileEditTab(name) {
+        const modalEl = ensureProfileEditModal();
+        modalEl.querySelectorAll('[data-profile-edit-tab]').forEach(button => {
+            button.classList.toggle('active', button.dataset.profileEditTab === name);
+        });
+        modalEl.querySelectorAll('[data-profile-edit-pane]').forEach(pane => {
+            pane.classList.toggle('active', pane.dataset.profileEditPane === name);
+        });
+    }
+
+    function addProfileContactRow(contact = {}) {
+        ensureProfileEditModal();
+        const container = document.getElementById('profile-edit-contacts');
+        if (!container) return;
+        const row = document.createElement('div');
+        row.className = 'dealer-profile-contact-row';
+        row.innerHTML = `
+            <input class="form-control profile-contact-name" placeholder="Имя" value="${String(contact.name || '').replace(/"/g, '&quot;')}">
+            <input class="form-control profile-contact-position" placeholder="Должность" value="${String(contact.position || '').replace(/"/g, '&quot;')}">
+            <input class="form-control profile-contact-info" placeholder="+7 700 000 00 00" value="${String(contact.contactInfo || '').replace(/"/g, '&quot;')}">
+            <button type="button" data-remove-profile-contact aria-label="Удалить контакт"><i class="bi bi-x-lg"></i></button>`;
+        container.appendChild(row);
+    }
+
+    function collectProfileContacts() {
+        return [...document.querySelectorAll('#profile-edit-contacts .dealer-profile-contact-row')].map(row => ({
+            name: row.querySelector('.profile-contact-name')?.value.trim() || '',
+            position: row.querySelector('.profile-contact-position')?.value.trim() || '',
+            contactInfo: row.querySelector('.profile-contact-info')?.value.trim() || ''
+        })).filter(contact => contact.name || contact.position || contact.contactInfo);
+    }
+
+    function primaryLegalEntity(dealer) {
+        if (Array.isArray(dealer?.legal_entities) && dealer.legal_entities.length) return { ...dealer.legal_entities[0] };
+        return {
+            organizationName: dealer?.requisites?.organizationName || dealer?.organizations?.[0] || dealer?.organization || '',
+            director: dealer?.requisites?.director || '',
+            legalAddress: dealer?.requisites?.legalAddress || '',
+            bin: dealer?.requisites?.bin || '',
+            iik: dealer?.requisites?.iik || '',
+            bank: dealer?.requisites?.bank || '',
+            bik: dealer?.requisites?.bik || '',
+            kbe: dealer?.requisites?.kbe || '',
+            email: dealer?.requisites?.email || ''
+        };
+    }
+
+    async function refreshProfileSectorOptions() {
+        const select = document.getElementById('profile-edit-sector');
+        const responsible = document.getElementById('profile-edit-responsible')?.value || '';
+        if (!select) return;
+        const sectors = Array.isArray(select._crmSectors) ? select._crmSectors : [];
+        const type = responsible === 'regional_astana' ? 'astana' : responsible === 'regional_regions' ? 'region' : '';
+        const current = select.dataset.selected || select.value || '';
+        const filtered = type ? sectors.filter(item => item.type === type) : [];
+        select.innerHTML = '<option value="">Не выбран</option>' + filtered.map(item => `<option value="${String(item.name || '').replace(/"/g,'&quot;')}">${safeText(item.name)}</option>`).join('');
+        if (current && filtered.some(item => item.name === current)) select.value = current;
+        select.disabled = !type;
+    }
+
+    async function fillProfileEditor(section = 'main') {
+        if (!currentDealer) return;
+        const modalEl = ensureProfileEditModal();
+        const subtitle = document.getElementById('dealer-profile-edit-subtitle');
+        if (subtitle) subtitle.textContent = currentDealer.name || 'Карточка дилера';
+
+        const [statusesRes, sectorsRes] = await Promise.all([
+            fetch('/api/statuses', { crmTrackLoading: false }).catch(() => null),
+            fetch('/api/sectors', { crmTrackLoading: false }).catch(() => null)
+        ]);
+        const statuses = statusesRes?.ok ? await statusesRes.json() : [];
+        const sectors = sectorsRes?.ok ? await sectorsRes.json() : [];
+
+        const statusSelect = document.getElementById('profile-edit-status');
+        if (statusSelect) {
+            const fallback = [
+                {value:'standard',label:'Стандарт'}, {value:'active',label:'Активный'},
+                {value:'problem',label:'Проблемный'}, {value:'potential',label:'Потенциальный'}, {value:'archive',label:'Архив'}
+            ];
+            const source = statuses.length ? statuses : fallback;
+            statusSelect.innerHTML = source.map(item => `<option value="${item.value}">${safeText(item.label || item.value)}</option>`).join('');
+            statusSelect.value = currentDealer.status || 'standard';
+        }
+
+        const values = {
+            'profile-edit-dealer-id': currentDealer.dealer_id,
+            'profile-edit-name': currentDealer.name,
+            'profile-edit-city': currentDealer.city,
+            'profile-edit-price-type': currentDealer.price_type,
+            'profile-edit-address': currentDealer.address,
+            'profile-edit-delivery': currentDealer.delivery,
+            'profile-edit-website': currentDealer.website,
+            'profile-edit-instagram': currentDealer.instagram,
+            'profile-edit-bonuses': currentDealer.bonuses,
+            'profile-edit-contract-number': currentDealer.contract?.number,
+            'profile-edit-contract-date': currentDealer.contract?.date
+        };
+        Object.entries(values).forEach(([id, value]) => {
+            const input = document.getElementById(id);
+            if (input) input.value = value || '';
+        });
+        const signed = document.getElementById('profile-edit-contract-signed');
+        if (signed) signed.checked = Boolean(currentDealer.contract?.isSigned);
+
+        const responsible = document.getElementById('profile-edit-responsible');
+        if (responsible) responsible.value = currentDealer.responsible || '';
+
+        const sectorSelect = document.getElementById('profile-edit-sector');
+        if (sectorSelect) {
+            sectorSelect._crmSectors = sectors;
+            sectorSelect.dataset.selected = currentDealer.region_sector || '';
+        }
+        await refreshProfileSectorOptions();
+
+        const contacts = document.getElementById('profile-edit-contacts');
+        if (contacts) contacts.innerHTML = '';
+        (currentDealer.contacts || []).forEach(addProfileContactRow);
+        if (!currentDealer.contacts?.length) addProfileContactRow();
+
+        const legal = primaryLegalEntity(currentDealer);
+        const legalValues = {
+            'profile-edit-org-name': legal.organizationName,
+            'profile-edit-director': legal.director,
+            'profile-edit-legal-address': legal.legalAddress,
+            'profile-edit-bin': legal.bin,
+            'profile-edit-iik': legal.iik,
+            'profile-edit-bank': legal.bank,
+            'profile-edit-bik': legal.bik,
+            'profile-edit-kbe': legal.kbe,
+            'profile-edit-email': legal.email
+        };
+        Object.entries(legalValues).forEach(([id, value]) => {
+            const input = document.getElementById(id);
+            if (input) input.value = value || '';
+        });
+
+        activateProfileEditTab(section);
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+
+    async function saveProfileEdit(event) {
+        event.preventDefault();
+        if (!currentDealer || !window.CRMAuth?.can('can_edit_dealer')) return;
+
+        const saveButton = document.getElementById('dealer-profile-edit-save');
+        const oldHtml = saveButton?.innerHTML || '';
+        if (saveButton) {
+            saveButton.disabled = true;
+            saveButton.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохраняем';
+        }
+
+        const legal = {
+            organizationName: editValue('profile-edit-org-name'),
+            director: editValue('profile-edit-director'),
+            legalAddress: editValue('profile-edit-legal-address'),
+            bin: editValue('profile-edit-bin'),
+            iik: editValue('profile-edit-iik'),
+            bank: editValue('profile-edit-bank'),
+            bik: editValue('profile-edit-bik'),
+            kbe: editValue('profile-edit-kbe'),
+            email: editValue('profile-edit-email')
+        };
+        const legalEntities = Array.isArray(currentDealer.legal_entities) ? currentDealer.legal_entities.map(item => ({...item})) : [];
+        if (legalEntities.length) legalEntities[0] = { ...legalEntities[0], ...legal };
+        else if (Object.values(legal).some(Boolean)) legalEntities.push(legal);
+
+        const payload = {
+            dealer_id: editValue('profile-edit-dealer-id'),
+            name: editValue('profile-edit-name'),
+            status: editValue('profile-edit-status'),
+            city: editValue('profile-edit-city'),
+            price_type: editValue('profile-edit-price-type'),
+            address: editValue('profile-edit-address'),
+            responsible: editValue('profile-edit-responsible'),
+            region_sector: editValue('profile-edit-sector'),
+            delivery: editValue('profile-edit-delivery'),
+            website: editValue('profile-edit-website'),
+            instagram: editValue('profile-edit-instagram'),
+            bonuses: editValue('profile-edit-bonuses'),
+            contacts: collectProfileContacts(),
+            contract: {
+                isSigned: Boolean(document.getElementById('profile-edit-contract-signed')?.checked),
+                date: editValue('profile-edit-contract-date'),
+                number: editValue('profile-edit-contract-number')
+            },
+            requisites: legal,
+            legal_entities: legalEntities,
+            organizations: legalEntities.map(item => item.organizationName).filter(Boolean)
+        };
+
+        try {
+            const response = await fetch(`${API_DEALERS_URL}/${dealerId}`, {
+                method: 'PATCH',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify(payload)
+            });
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || 'Не удалось сохранить изменения');
+            }
+
+            currentDealer = { ...currentDealer, ...payload };
+            cacheDealerProfile(currentDealer);
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('dealer-profile-edit-modal')).hide();
+            window.showToast?.('Изменения сохранены', 'success');
+            await fetchDealerDetails(true);
+        } catch (error) {
+            window.showToast?.(error.message || 'Ошибка сохранения', 'error');
+        } finally {
+            if (saveButton) {
+                saveButton.disabled = false;
+                saveButton.innerHTML = oldHtml;
+            }
+        }
+    }
+
+    function setupDealerReturnNavigation() {
+        const stored = sessionStorage.getItem('crm:dealerReturnTo');
+        const referrer = (() => {
+            try {
+                const url = new URL(document.referrer);
+                return url.origin === location.origin && !url.pathname.endsWith('/dealer.html') ? url.href : '';
+            } catch (_) { return ''; }
+        })();
+        const returnUrl = stored || referrer || '/';
+        document.querySelectorAll('[data-dealer-back]').forEach(link => {
+            link.href = returnUrl;
+            link.addEventListener('click', event => {
+                if (referrer && history.length > 1) {
+                    event.preventDefault();
+                    history.back();
+                }
+            });
+        });
+    }
+
     const docsEditBtn = document.getElementById('dealer-docs-edit-requisites');
     if (docsEditBtn) docsEditBtn.addEventListener('click', () => {
         if (!window.CRMAuth || !CRMAuth.can('can_edit_dealer')) return;
-        localStorage.setItem('pendingEditDealerId', dealerId);
-        window.location.href = '/';
+        fillProfileEditor('requisites');
     });
 
     if(editBtn) editBtn.addEventListener('click', () => {
         if (!window.CRMAuth || !CRMAuth.can('can_edit_dealer')) return;
-        localStorage.setItem('pendingEditDealerId', dealerId);
-        window.location.href = '/';
+        if (!currentDealer) {
+            window.showToast?.('Карточка ещё загружается', 'info');
+            return;
+        }
+        fillProfileEditor('main');
     });
-    if(navigateBtn) navigateBtn.addEventListener('click', () => { if (dealerLat && dealerLng) window.open(`http://googleusercontent.com/maps/google.com/?q=${dealerLat},${dealerLng}`, '_blank'); else alert("Координаты не заданы."); });
+
+    document.querySelector('[data-bs-target="#photos-pane"]')?.addEventListener('shown.bs.tab', () => {
+        ensurePhotosLoaded();
+    });
+    document.querySelector('[data-bs-target="#documents-pane"]')?.addEventListener('shown.bs.tab', () => {
+        ensureCatalogLoaded();
+        ensurePhotosLoaded();
+    });
+
+    if(navigateBtn) navigateBtn.addEventListener('click', () => {
+        if (!currentDealer || !dealerLat || !dealerLng) {
+            window.showToast?.('Координаты не заданы', 'warning');
+            return;
+        }
+        const query = encodeURIComponent([currentDealer.name, currentDealer.address].filter(Boolean).join(' '));
+        window.open(`https://2gis.kz/search/${query}?m=${dealerLng},${dealerLat}/17`, '_blank', 'noopener');
+    });
     if(deleteBtn) deleteBtn.addEventListener('click', async () => {
         if (!window.CRMAuth || !CRMAuth.can('can_delete_dealer')) return;
         if (confirm(`Удалить дилера ${currentDealerName}?`)) {
@@ -588,5 +966,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); document.body.removeChild(a);
     };
 
+    setupDealerReturnNavigation();
     fetchDealerDetails();
 });
