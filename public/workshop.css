@@ -300,3 +300,5 @@ radial-gradient(circle at 90% 0,rgba(185,4,10,.35),transparent 20rem),linear-gra
   .workshop-memo-summary{grid-template-columns:repeat(2,1fr)}
   .workshop-memo-summary>div.wide{grid-column:1/-1}
 }
+
+.ws-memo-need.is-old{background:#f0f0f1;color:#85878c}
