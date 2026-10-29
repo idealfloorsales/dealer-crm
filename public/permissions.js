@@ -1,4 +1,14 @@
 (function () {
+    function ensureMotionStyles() {
+        if (document.getElementById('crm-motion-styles')) return;
+        const link = document.createElement('link');
+        link.id = 'crm-motion-styles';
+        link.rel = 'stylesheet';
+        link.href = '/ui-motion.css?v={{VER}}';
+        document.head.appendChild(link);
+    }
+    ensureMotionStyles();
+
     const PAGE_PERMISSIONS = {
         '/': 'can_view_dealers',
         '/index.html': 'can_view_dealers',
@@ -494,18 +504,267 @@
         if (role) role.textContent = roleNames[user.role] || user.role || 'CRM IDEAL FLOOR';
     }
 
+    let crmPendingRequests = 0;
+    let crmLoaderShowTimer = null;
+    let crmLoaderLongTimer = null;
+    let crmLoaderHideTimer = null;
+    let crmRevealFrame = null;
+
+    function ensureFeedbackShell() {
+        if (!document.body) return;
+
+        if (!document.getElementById('crm-network-progress')) {
+            const progress = document.createElement('div');
+            progress.id = 'crm-network-progress';
+            progress.className = 'crm-network-progress';
+            progress.setAttribute('aria-hidden', 'true');
+            progress.innerHTML = '<div class="crm-network-progress-bar"></div>';
+            document.body.appendChild(progress);
+        }
+
+        if (!document.getElementById('crm-loading-pill')) {
+            const pill = document.createElement('div');
+            pill.id = 'crm-loading-pill';
+            pill.className = 'crm-loading-pill';
+            pill.setAttribute('role', 'status');
+            pill.setAttribute('aria-live', 'polite');
+            pill.innerHTML = '<span class="crm-loading-pill-spinner"></span><span class="crm-loading-pill-text">Загружаем данные…</span>';
+            document.body.appendChild(pill);
+        }
+
+        if (!document.getElementById('crm-toast-stack')) {
+            const existing = document.getElementById('toast-container-custom');
+            const stack = existing || document.createElement('div');
+            stack.id = existing ? existing.id : 'crm-toast-stack';
+            stack.classList.add('crm-toast-stack');
+            stack.setAttribute('aria-live', 'polite');
+            stack.setAttribute('aria-atomic', 'false');
+            if (!existing) document.body.appendChild(stack);
+        }
+    }
+
+    function startNetworkActivity() {
+        crmPendingRequests += 1;
+        if (crmPendingRequests !== 1) return;
+
+        clearTimeout(crmLoaderHideTimer);
+        clearTimeout(crmLoaderShowTimer);
+        clearTimeout(crmLoaderLongTimer);
+
+        crmLoaderShowTimer = setTimeout(() => {
+            ensureFeedbackShell();
+            const progress = document.getElementById('crm-network-progress');
+            if (progress && crmPendingRequests > 0) {
+                progress.classList.remove('is-done');
+                progress.classList.add('is-visible', 'is-loading');
+            }
+        }, 260);
+
+        crmLoaderLongTimer = setTimeout(() => {
+            ensureFeedbackShell();
+            const pill = document.getElementById('crm-loading-pill');
+            if (pill && crmPendingRequests > 0) pill.classList.add('is-visible');
+        }, 900);
+    }
+
+    function stopNetworkActivity() {
+        crmPendingRequests = Math.max(0, crmPendingRequests - 1);
+        if (crmPendingRequests > 0) return;
+
+        clearTimeout(crmLoaderShowTimer);
+        clearTimeout(crmLoaderLongTimer);
+
+        const progress = document.getElementById('crm-network-progress');
+        const pill = document.getElementById('crm-loading-pill');
+        if (pill) pill.classList.remove('is-visible');
+
+        if (progress && progress.classList.contains('is-visible')) {
+            progress.classList.remove('is-loading');
+            progress.classList.add('is-done');
+            crmLoaderHideTimer = setTimeout(() => {
+                progress.classList.remove('is-visible', 'is-done');
+            }, 300);
+        }
+    }
+
+    function normalizeToastType(type) {
+        const value = String(type || 'success').toLowerCase();
+        if (value === 'danger') return 'error';
+        if (['success', 'error', 'warning', 'info'].includes(value)) return value;
+        return 'info';
+    }
+
+    function showToast(message, type = 'success', options = {}) {
+        ensureFeedbackShell();
+        const stack = document.getElementById('crm-toast-stack') || document.getElementById('toast-container-custom');
+        if (!stack) return null;
+
+        const toastType = normalizeToastType(type);
+        const titles = {
+            success: 'Готово',
+            error: 'Не удалось выполнить',
+            warning: 'Обратите внимание',
+            info: 'Информация'
+        };
+        const icons = {
+            success: 'check-lg',
+            error: 'exclamation-triangle',
+            warning: 'exclamation-circle',
+            info: 'info-lg'
+        };
+
+        const duration = Math.max(1800, Number(options.duration) || (toastType === 'error' ? 5200 : 3600));
+        const toast = document.createElement('div');
+        toast.className = `crm-toast crm-toast-${toastType}`;
+        toast.style.setProperty('--toast-duration', duration + 'ms');
+        toast.setAttribute('role', toastType === 'error' ? 'alert' : 'status');
+
+        const icon = document.createElement('span');
+        icon.className = 'crm-toast-icon';
+        icon.innerHTML = `<i class="bi bi-${icons[toastType]}"></i>`;
+
+        const copy = document.createElement('span');
+        copy.className = 'crm-toast-copy';
+
+        const title = document.createElement('span');
+        title.className = 'crm-toast-title';
+        title.textContent = options.title || titles[toastType];
+
+        const body = document.createElement('span');
+        body.className = 'crm-toast-message';
+        body.textContent = String(message || '');
+
+        const close = document.createElement('button');
+        close.type = 'button';
+        close.className = 'crm-toast-close';
+        close.setAttribute('aria-label', 'Закрыть');
+        close.innerHTML = '<i class="bi bi-x-lg"></i>';
+
+        const progress = document.createElement('span');
+        progress.className = 'crm-toast-progress';
+
+        copy.append(title, body);
+        toast.append(icon, copy, close, progress);
+        stack.prepend(toast);
+
+        // Не даём уведомлениям бесконечно накапливаться.
+        Array.from(stack.querySelectorAll('.crm-toast')).slice(4).forEach(old => old.remove());
+
+        let removeTimer = null;
+        const dismiss = () => {
+            if (!toast.isConnected || toast.classList.contains('is-out')) return;
+            clearTimeout(removeTimer);
+            toast.classList.remove('is-in');
+            toast.classList.add('is-out');
+            setTimeout(() => toast.remove(), 220);
+        };
+
+        close.addEventListener('click', dismiss);
+        toast.addEventListener('mouseenter', () => {
+            progress.style.animationPlayState = 'paused';
+            clearTimeout(removeTimer);
+        });
+        toast.addEventListener('mouseleave', () => {
+            progress.style.animationPlayState = 'running';
+            removeTimer = setTimeout(dismiss, Math.min(1800, duration));
+        });
+
+        requestAnimationFrame(() => toast.classList.add('is-in'));
+        removeTimer = setTimeout(dismiss, duration);
+        return toast;
+    }
+
+    function setButtonLoading(button, loading = true, label = '') {
+        if (!button) return;
+        if (loading) {
+            if (!button.dataset.crmOriginalHtml) button.dataset.crmOriginalHtml = button.innerHTML;
+            button.classList.add('crm-btn-busy');
+            button.disabled = true;
+            if (label) button.textContent = label;
+        } else {
+            button.classList.remove('crm-btn-busy');
+            button.disabled = false;
+            if (button.dataset.crmOriginalHtml) {
+                button.innerHTML = button.dataset.crmOriginalHtml;
+                delete button.dataset.crmOriginalHtml;
+            }
+        }
+    }
+
+    function revealMotionElements(root = document) {
+        const selector = [
+            '.cc-kpi-card',
+            '.dealer-v3-card',
+            '.attention-item',
+            '.cc-event-item',
+            '.task-item-modern',
+            '.sales-summary-group',
+            '.reclamation-card',
+            '.product-card',
+            '.app-panel',
+            '.card'
+        ].join(',');
+
+        const elements = [];
+        if (root.nodeType === 1 && root.matches?.(selector)) elements.push(root);
+        root.querySelectorAll?.(selector).forEach(el => elements.push(el));
+
+        elements.slice(0, 40).forEach((el, index) => {
+            if (el.dataset.crmMotionReady === '1') return;
+            el.dataset.crmMotionReady = '1';
+            el.classList.add('crm-reveal');
+            el.style.transitionDelay = Math.min(index, 8) * 18 + 'ms';
+            requestAnimationFrame(() => {
+                el.classList.add('crm-reveal-in');
+                setTimeout(() => {
+                    el.classList.remove('crm-reveal', 'crm-reveal-in');
+                    el.style.transitionDelay = '';
+                }, 520);
+            });
+        });
+    }
+
+    function scheduleReveal(root = document) {
+        cancelAnimationFrame(crmRevealFrame);
+        crmRevealFrame = requestAnimationFrame(() => revealMotionElements(root));
+    }
+
+    function initInteractionLayer() {
+        if (!document.body || document.body.dataset.crmUiReady === '1') return;
+        document.body.dataset.crmUiReady = '1';
+        document.body.classList.add('crm-ui-enhanced');
+        ensureFeedbackShell();
+        scheduleReveal(document);
+
+        const observer = new MutationObserver(mutations => {
+            const added = mutations.flatMap(mutation => Array.from(mutation.addedNodes || []))
+                .find(node => node && node.nodeType === 1);
+            if (added) scheduleReveal(document);
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+
+        document.addEventListener('shown.bs.modal', event => scheduleReveal(event.target));
+    }
+
     async function apiFetch(url, options) {
         options = options || {};
         options.headers = options.headers || {};
         const token = getToken();
         if (token) options.headers.Authorization = 'Bearer ' + token;
 
-        const response = await window.__crmOriginalFetch(url, options);
-        if (response.status === 401) {
-            logout();
-            throw new Error('Сессия завершена');
+        const trackLoading = options.crmTrackLoading !== false;
+        if (trackLoading) startNetworkActivity();
+
+        try {
+            const response = await window.__crmOriginalFetch(url, options);
+            if (response.status === 401) {
+                logout();
+                throw new Error('Сессия завершена');
+            }
+            return response;
+        } finally {
+            if (trackLoading) stopNetworkActivity();
         }
-        return response;
     }
 
     function can(permission) {
@@ -611,6 +870,21 @@
         renderMobileNavigation,
         init
     };
+
+    window.showToast = showToast;
+    window.CRMUI = {
+        showToast,
+        setButtonLoading,
+        startLoading: startNetworkActivity,
+        stopLoading: stopNetworkActivity,
+        reveal: scheduleReveal
+    };
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initInteractionLayer, { once: true });
+    } else {
+        initInteractionLayer();
+    }
 
     window.CRMAuth.ready = init().catch(err => {
         console.error('CRM auth init error:', err);
