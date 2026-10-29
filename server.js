@@ -333,6 +333,8 @@ const workshopMaterialSchema = new mongoose.Schema({
     name: { type: String, required: true },
     category: { type: String, default: 'consumable' },
     unit: { type: String, default: 'шт' },
+    purchaseUnit: String,
+    purchaseUnitSize: { type: Number, default: 1 },
     stockQty: { type: Number, default: 0 },
     minQty: { type: Number, default: 0 },
     active: { type: Boolean, default: true },
@@ -342,7 +344,8 @@ const WorkshopMaterial = mongoose.model('WorkshopMaterial', workshopMaterialSche
 
 const workshopRecipeMaterialSchema = new mongoose.Schema({
     material: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkshopMaterial' },
-    qty: { type: Number, default: 0 }
+    qty: { type: Number, default: 0 },
+    mode: { type: String, enum: ['strict', 'estimate'], default: 'strict' }
 }, { _id: false });
 
 const workshopRecipeComponentSchema = new mongoose.Schema({
@@ -411,6 +414,9 @@ const workshopProductionSchema = new mongoose.Schema({
     packQty: { type: Number, default: 0 },
     totalAcceptedPlanks: { type: Number, default: 0 },
     outputQty: { type: Number, default: 0 },
+    standardPlanksPerUnit: { type: Number, default: 0 },
+    actualPlanksPerUnit: { type: Number, default: 0 },
+    customNormReason: String,
     consumedPlanks: { type: Number, default: 0 },
     scrapPlanks: { type: Number, default: 0 },
     operations: [workshopOperationSchema],
@@ -631,21 +637,30 @@ async function connectToDB() {
 
 async function seedWorkshopMaterials() {
     const defaults = [
-        { code: 'BACK-600', name: 'Задняя стенка 600 мм', category: 'stand_component', unit: 'шт' },
-        { code: 'BACK-800', name: 'Задняя стенка 800 мм', category: 'stand_component', unit: 'шт' },
-        { code: 'ACRYLIC-SIGN', name: 'Оргстекло для табличек', category: 'stand_component', unit: 'шт' },
-        { code: 'STICKER-600', name: 'Наклейка 600 мм', category: 'consumable', unit: 'шт' },
-        { code: 'STICKER-800', name: 'Наклейка 800 мм', category: 'consumable', unit: 'шт' },
-        { code: 'FILM', name: 'Плёнка для стендов', category: 'consumable', unit: 'м' },
-        { code: 'EDGE', name: 'Кромка для стенок', category: 'consumable', unit: 'м' },
-        { code: 'EDGE-GLUE', name: 'Клей для кромки', category: 'consumable', unit: 'шт' },
-        { code: 'CUTTER', name: 'Фреза', category: 'tool', unit: 'шт' },
-        { code: 'COMB', name: 'Расческа / заготовка', category: 'stand_component', unit: 'шт' }
+        { code: 'PLYWOOD-SHEET', name: 'Фанера для расчесок', category: 'raw_sheet', unit: 'лист', purchaseUnit: 'лист', purchaseUnitSize: 1, note: '1 лист = 2 расчески из фанеры' },
+        { code: 'LDSP-SHEET', name: 'ЛДСП для задних стенок', category: 'raw_sheet', unit: 'лист', purchaseUnit: 'лист', purchaseUnitSize: 1, note: 'Норма раскроя: 600 мм — 4 стенки/лист; 800 мм — 3 стенки/лист' },
+        { code: 'ACRYLIC-SIGN', name: 'Табличка из оргстекла (полиграфия)', category: 'stand_component', unit: 'шт', purchaseUnit: 'шт', purchaseUnitSize: 1 },
+        { code: 'STICKER-600', name: 'Наклейка 600 мм', category: 'stand_component', unit: 'шт', purchaseUnit: 'шт', purchaseUnitSize: 1 },
+        { code: 'STICKER-800', name: 'Наклейка 800 мм', category: 'stand_component', unit: 'шт', purchaseUnit: 'шт', purchaseUnitSize: 1 },
+        { code: 'FILM', name: 'Плёнка для стендов', category: 'consumable', unit: 'м', purchaseUnit: 'рулон', purchaseUnitSize: 1 },
+        { code: 'EDGE', name: 'Кромка для стенок', category: 'consumable', unit: 'м', purchaseUnit: 'бухта', purchaseUnitSize: 200, note: '1 бухта = 200 м. Расход учитывать ориентировочно: возможен брак.' },
+        { code: 'EDGE-GLUE', name: 'Клей для кромки', category: 'consumable', unit: 'мешок', purchaseUnit: 'мешок', purchaseUnitSize: 1 },
+        { code: 'CUTTER', name: 'Фреза', category: 'tool', unit: 'шт', purchaseUnit: 'шт', purchaseUnitSize: 1 }
     ];
     for (const item of defaults) {
         await WorkshopMaterial.updateOne(
             { code: item.code },
-            { $setOnInsert: { ...item, stockQty: 0, minQty: 0, active: true } },
+            {
+                $set: {
+                    name: item.name,
+                    category: item.category,
+                    unit: item.unit,
+                    purchaseUnit: item.purchaseUnit || item.unit,
+                    purchaseUnitSize: item.purchaseUnitSize || 1,
+                    note: item.note || ''
+                },
+                $setOnInsert: { stockQty: 0, minQty: 0, active: true }
+            },
             { upsert: true }
         );
     }
@@ -672,6 +687,96 @@ async function seedWorkshopRecipes() {
                 note: 'Норма: 24 планки на двухсторонний планшет. 4 упаковки по 30 планок = 5 планшетов без отхода.'
             });
         }
+    }
+
+    const materialList = await WorkshopMaterial.find({
+        code: { $in: ['PLYWOOD-SHEET','LDSP-SHEET','ACRYLIC-SIGN','STICKER-600','STICKER-800','EDGE'] }
+    }).lean();
+    const materialByCode = new Map(materialList.map(item => [item.code, item]));
+
+    const fixedRecipes = [
+        {
+            sku: 'POS-COMB-PLY',
+            name: 'Расческа из фанеры',
+            outputType: 'other',
+            matrixPosName: 'РФ-2 - Расческа из фанеры',
+            materials: [{ code:'PLYWOOD-SHEET', qty:0.5, mode:'strict' }],
+            note: '1 лист фанеры = 2 расчески'
+        },
+        {
+            sku: 'POS-ACRYLIC',
+            name: 'Табличка из оргстекла',
+            outputType: 'sign',
+            matrixPosName: 'Табличка - Табличка орг.стекло',
+            materials: [{ code:'ACRYLIC-SIGN', qty:1, mode:'strict' }],
+            note: 'Оргстекло заказывается готовыми штуками в полиграфии'
+        },
+        {
+            sku: 'POS-BACK-600',
+            name: 'Стенка 600 мм',
+            outputType: 'other',
+            matrixPosName: 'С600 - 600мм задняя стенка',
+            materials: [
+                { code:'LDSP-SHEET', qty:0.25, mode:'strict' },
+                { code:'EDGE', qty:0, mode:'estimate' }
+            ],
+            note: '1 лист ЛДСП = 4 стенки 600 мм. Кромка — ориентировочный расход.'
+        },
+        {
+            sku: 'POS-BACK-800',
+            name: 'Стенка 800 мм',
+            outputType: 'other',
+            matrixPosName: 'С800 - 800мм задняя стенка',
+            materials: [
+                { code:'LDSP-SHEET', qty:1/3, mode:'strict' },
+                { code:'EDGE', qty:0, mode:'estimate' }
+            ],
+            note: '1 лист ЛДСП = 3 стенки 800 мм. Кромка — ориентировочный расход.'
+        },
+        {
+            sku: 'POS-STICKER-600',
+            name: 'Наклейка 600 мм',
+            outputType: 'other',
+            matrixPosName: 'Н600 - 600мм наклейка',
+            materials: [{ code:'STICKER-600', qty:1, mode:'strict' }]
+        },
+        {
+            sku: 'POS-STICKER-800',
+            name: 'Наклейка 800 мм',
+            outputType: 'other',
+            matrixPosName: 'Н800 - 800мм наклейка',
+            materials: [{ code:'STICKER-800', qty:1, mode:'strict' }]
+        }
+    ];
+
+    for (const def of fixedRecipes) {
+        const materials = def.materials
+            .map(line => {
+                const material = materialByCode.get(line.code);
+                return material ? { material: material._id, qty: line.qty, mode: line.mode } : null;
+            })
+            .filter(Boolean);
+
+        await WorkshopRecipe.updateOne(
+            { sku: def.sku },
+            {
+                $set: {
+                    name: def.name,
+                    outputType: def.outputType,
+                    matrixPosName: def.matrixPosName,
+                    materials,
+                    note: def.note || '',
+                    active: true
+                },
+                $setOnInsert: {
+                    stockQty: 0,
+                    minStockQty: 0,
+                    planksPerUnit: 0,
+                    packQtyOverride: 0
+                }
+            },
+            { upsert: true }
+        );
     }
 }
 
@@ -1277,7 +1382,7 @@ app.get('/api/workshop/bootstrap', requirePermission('can_view_workshop'), async
             WorkshopMaterial.find({ active: { $ne: false } }).sort({ category: 1, name: 1 }).lean(),
             WorkshopRecipe.find({ active: { $ne: false } })
                 .populate('product', 'sku name is_liquid characteristics.package_qty')
-                .populate('materials.material', 'code name unit stockQty')
+                .populate('materials.material', 'code name unit purchaseUnit purchaseUnitSize stockQty')
                 .populate('components.recipe', 'name outputType stockQty')
                 .sort({ outputType: 1, name: 1 }).lean(),
             WorkshopLaminateStock.find().populate('product', 'sku name is_liquid characteristics.package_qty').lean(),
@@ -1364,6 +1469,8 @@ app.post('/api/workshop/materials', requirePermission('can_manage_workshop'), as
             name: String(req.body.name || '').trim(),
             category: req.body.category || 'consumable',
             unit: req.body.unit || 'шт',
+            purchaseUnit: String(req.body.purchaseUnit || req.body.unit || 'шт').trim(),
+            purchaseUnitSize: Math.max(0.0001, workshopNumber(req.body.purchaseUnitSize) || 1),
             stockQty: Math.max(0, workshopNumber(req.body.stockQty)),
             minQty: Math.max(0, workshopNumber(req.body.minQty)),
             active: req.body.active !== false,
@@ -1384,6 +1491,8 @@ app.put('/api/workshop/materials/:id', requirePermission('can_manage_workshop'),
             name: String(req.body.name || '').trim(),
             category: req.body.category || 'consumable',
             unit: req.body.unit || 'шт',
+            purchaseUnit: String(req.body.purchaseUnit || req.body.unit || 'шт').trim(),
+            purchaseUnitSize: Math.max(0.0001, workshopNumber(req.body.purchaseUnitSize) || 1),
             minQty: Math.max(0, workshopNumber(req.body.minQty)),
             active: req.body.active !== false,
             note: String(req.body.note || '').trim()
@@ -1438,8 +1547,9 @@ app.post('/api/workshop/recipes', requirePermission('can_manage_workshop'), asyn
             minStockQty: Math.max(0, workshopNumber(req.body.minStockQty)),
             materials: Array.isArray(req.body.materials) ? req.body.materials.map(item => ({
                 material: item.materialId,
-                qty: Math.max(0, workshopNumber(item.qty))
-            })).filter(item => item.material && item.qty > 0) : [],
+                qty: Math.max(0, workshopNumber(item.qty)),
+                mode: item.mode === 'estimate' ? 'estimate' : 'strict'
+            })).filter(item => item.material && item.qty >= 0) : [],
             components: Array.isArray(req.body.components) ? req.body.components.map(item => ({
                 recipe: item.recipeId,
                 qty: Math.max(0, workshopNumber(item.qty))
@@ -1470,8 +1580,9 @@ app.put('/api/workshop/recipes/:id', requirePermission('can_manage_workshop'), a
             minStockQty: Math.max(0, workshopNumber(req.body.minStockQty)),
             materials: Array.isArray(req.body.materials) ? req.body.materials.map(item => ({
                 material: item.materialId,
-                qty: Math.max(0, workshopNumber(item.qty))
-            })).filter(item => item.material && item.qty > 0) : [],
+                qty: Math.max(0, workshopNumber(item.qty)),
+                mode: item.mode === 'estimate' ? 'estimate' : 'strict'
+            })).filter(item => item.material && item.qty >= 0) : [],
             components: Array.isArray(req.body.components) ? req.body.components.map(item => ({
                 recipe: item.recipeId,
                 qty: Math.max(0, workshopNumber(item.qty))
@@ -1739,7 +1850,14 @@ app.post('/api/workshop/production', requirePermission('can_manage_workshop'), a
         if (outputQty <= 0) return res.status(400).json({ error: 'Укажите количество изготовленных изделий' });
 
         const packQty = workshopPackQty(recipe.product, recipe.packQtyOverride);
-        const usedForOutput = Math.max(0, workshopNumber(recipe.planksPerUnit)) * outputQty;
+        const standardPlanksPerUnit = Math.max(0, workshopNumber(recipe.planksPerUnit));
+        const requestedActualNorm = Math.max(0, workshopNumber(req.body.actualPlanksPerUnit));
+        const actualPlanksPerUnit = requestedActualNorm > 0 ? requestedActualNorm : standardPlanksPerUnit;
+        const customNormReason = String(req.body.customNormReason || '').trim();
+        if (requestedActualNorm > 0 && Math.abs(requestedActualNorm - standardPlanksPerUnit) > 0.0001 && !customNormReason) {
+            return res.status(400).json({ error: 'При изменении стандартной нормы укажите причину (например, индивидуальный образец)' });
+        }
+        const usedForOutput = actualPlanksPerUnit * outputQty;
         const consumedPlanks = usedForOutput + scrapPlanks;
         const acceptedTotal = acceptedPacks * packQty + acceptedLoosePlanks;
 
@@ -1752,6 +1870,7 @@ app.post('/api/workshop/production', requirePermission('can_manage_workshop'), a
         }
 
         for (const line of recipe.materials || []) {
+            if (line.mode === 'estimate') continue;
             const need = (Number(line.qty) || 0) * outputQty;
             if (need > 0 && (Number(line.material?.stockQty) || 0) < need) {
                 return res.status(400).json({ error: `Недостаточно материала «${line.material?.name || 'материал'}»` });
@@ -1772,12 +1891,24 @@ app.post('/api/workshop/production', requirePermission('can_manage_workshop'), a
                 entityType: 'laminate', product: recipe.product._id, direction: 'out',
                 qty: consumedPlanks, unit: 'планка', note: String(req.body.note || '').trim(),
                 serviceMemoNumber: sourceMemo?.number || '',
-                meta: { recipeId: recipe._id, outputQty, scrapPlanks, memoId: sourceMemo?._id || null, memoLineId: sourceMemoLine?._id || null }, createdBy: workshopUser(req)
+                meta: { recipeId: recipe._id, outputQty, scrapPlanks, standardPlanksPerUnit, actualPlanksPerUnit, customNormReason, memoId: sourceMemo?._id || null, memoLineId: sourceMemoLine?._id || null }, createdBy: workshopUser(req)
             });
         }
 
         for (const line of recipe.materials || []) {
             const need = (Number(line.qty) || 0) * outputQty;
+            if (line.mode === 'estimate') {
+                if (need > 0) {
+                    await WorkshopMovement.create({
+                        date: req.body.date || new Date(), type: 'production_material_estimate',
+                        entityType: 'material', material: line.material._id, direction: 'neutral',
+                        qty: need, unit: line.material.unit || 'шт',
+                        note: 'Расчетный расход; фактический остаток автоматически не уменьшается',
+                        meta: { recipeId: recipe._id, outputQty, estimate: true }, createdBy: workshopUser(req)
+                    });
+                }
+                continue;
+            }
             if (need <= 0) continue;
             await workshopChangeMaterial(line.material._id, -need);
             await WorkshopMovement.create({
@@ -1822,6 +1953,9 @@ app.post('/api/workshop/production', requirePermission('can_manage_workshop'), a
             packQty,
             totalAcceptedPlanks: acceptedTotal,
             outputQty,
+            standardPlanksPerUnit,
+            actualPlanksPerUnit,
+            customNormReason,
             consumedPlanks,
             scrapPlanks,
             operations: Array.isArray(req.body.operations)
