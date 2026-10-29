@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     
-    const API_DEALERS_URL = '/api/dealers';
+    const API_DEALERS_URL = '/api/dealers?view=map';
     const API_STATUSES_URL = '/api/statuses'; // Новый API
     const DEFAULT_LAT = 51.1605; 
     const DEFAULT_LNG = 71.4704;
@@ -77,11 +77,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- LOAD DATA ---
     async function init() {
         try {
-            // 1. Грузим статусы
-            await loadStatuses();
-            
-            // 2. Грузим дилеров
-            await loadDealers();
+            if (window.CRMAuth && CRMAuth.ready) await CRMAuth.ready;
+            if (window.CRMAuth && !CRMAuth.can('can_view_map')) return;
+
+            await Promise.all([
+                loadStatuses(),
+                loadDealers()
+            ]);
             
         } catch (e) { 
             console.error(e); 
