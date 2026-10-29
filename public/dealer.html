@@ -178,6 +178,7 @@
                 <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#competitors-pane">Конкуренты</button></li>
                 <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#photos-pane">Фото</button></li>
                 <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#products-pane">Матрица</button></li>
+                <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#documents-pane"><i class="bi bi-file-earmark-text me-1"></i>Документы</button></li>
             </ul>
         </div>
 
@@ -280,6 +281,63 @@
                 </div>
             </div>
 
+            <div class="tab-pane fade" id="documents-pane">
+                <div class="content-card dealer-documents-panel">
+                    <div class="dealer-documents-head">
+                        <div>
+                            <span class="dealer-documents-eyebrow">АВТОМАТИЧЕСКИЕ ДОКУМЕНТЫ</span>
+                            <h5 class="card-heading mb-1">Документы дилера</h5>
+                            <p class="mb-0 text-muted">Данные берутся из карточки дилера, реквизитов и текущей выставленности.</p>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-light border" id="dealer-docs-edit-requisites">
+                            <i class="bi bi-pencil me-1"></i>Реквизиты
+                        </button>
+                    </div>
+                    <div id="dealer-docs-missing" class="dealer-documents-alert d-none"></div>
+                    <div class="dealer-document-grid">
+                        <article class="dealer-document-card">
+                            <div class="dealer-document-icon"><i class="bi bi-file-earmark-text"></i></div>
+                            <div class="dealer-document-copy">
+                                <span class="dealer-document-kicker">ДОГОВОР</span>
+                                <h6>Договор поставки</h6>
+                                <p>Шаблон договора поставки IDEAL FLOOR с автоматической подстановкой покупателя и реквизитов.</p>
+                                <div class="dealer-document-status" id="doc-status-supply">Проверка данных...</div>
+                            </div>
+                            <div class="dealer-document-actions">
+                                <button type="button" class="btn btn-sm btn-light border" onclick="DealerDocuments.preview('supply')"><i class="bi bi-eye"></i> Предпросмотр</button>
+                                <button type="button" class="btn btn-sm btn-dark" onclick="DealerDocuments.download('supply')"><i class="bi bi-download"></i> Скачать DOC</button>
+                            </div>
+                        </article>
+                        <article class="dealer-document-card">
+                            <div class="dealer-document-icon"><i class="bi bi-box-seam"></i></div>
+                            <div class="dealer-document-copy">
+                                <span class="dealer-document-kicker">ДОГОВОР + ПРИЛОЖЕНИЕ</span>
+                                <h6>Ответственное хранение</h6>
+                                <p>Реквизиты подставляются из карточки, а приложение заполняется стендами и POS из выставленности.</p>
+                                <div class="dealer-document-status" id="doc-status-storage">Проверка данных...</div>
+                            </div>
+                            <div class="dealer-document-actions">
+                                <button type="button" class="btn btn-sm btn-light border" onclick="DealerDocuments.preview('storage')"><i class="bi bi-eye"></i> Предпросмотр</button>
+                                <button type="button" class="btn btn-sm btn-dark" onclick="DealerDocuments.download('storage')"><i class="bi bi-download"></i> Скачать DOC</button>
+                            </div>
+                        </article>
+                        <article class="dealer-document-card">
+                            <div class="dealer-document-icon"><i class="bi bi-clipboard2-data"></i></div>
+                            <div class="dealer-document-copy">
+                                <span class="dealer-document-kicker">ПАСПОРТ ОБЪЕКТА</span>
+                                <h6>Паспорт салона</h6>
+                                <p>Карточка дилера, контакты, конкуренты, ассортимент, POS, фото и цифровые ссылки в одном A4-документе.</p>
+                                <div class="dealer-document-status" id="doc-status-passport">Проверка данных...</div>
+                            </div>
+                            <div class="dealer-document-actions">
+                                <button type="button" class="btn btn-sm btn-light border" onclick="DealerDocuments.preview('passport')"><i class="bi bi-eye"></i> Предпросмотр</button>
+                                <button type="button" class="btn btn-sm btn-dark" onclick="DealerDocuments.download('passport')"><i class="bi bi-download"></i> Скачать DOC</button>
+                            </div>
+                        </article>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 
@@ -288,6 +346,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="permissions.js?v={{VER}}"></script>
     <script src="dealer-score.js?v={{VER}}"></script>
+    <script src="dealer-documents.js?v={{VER}}"></script>
     <script src="dealer.js?v={{VER}}"></script>
 </body>
 </html>
