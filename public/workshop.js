@@ -238,7 +238,10 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     function movementName(item) {
-        return item.recipe?.name || item.product ? (item.product?.sku ? item.product.sku+' '+(item.product.name||'') : item.product?.name) : item.material?.name || '—';
+        if (item.recipe?.name) return item.recipe.name;
+        if (item.product) return item.product.sku ? item.product.sku + ' ' + (item.product.name || '') : (item.product.name || '—');
+        if (item.material?.name) return item.material.name;
+        return '—';
     }
 
     function renderHistory() {
