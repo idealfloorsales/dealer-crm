@@ -449,30 +449,10 @@
                                     <section class="dealer-form-section h-100">
                                         <div class="dealer-section-title">
                                             <span class="dealer-section-icon"><i class="bi bi-building"></i></span>
-                                            <div><strong>Организации</strong><small>Юридические лица дилера</small></div>
+                                            <div><strong>Юридические лица</strong><small>ТОО, ИП или частное лицо — реквизиты хранятся отдельно</small></div>
                                         </div>
-                                        <div id="add-org-list" class="d-flex flex-column gap-2"></div>
-                                        <button type="button" class="dealer-add-wide mt-2" id="btn-add-org-add"><i class="bi bi-plus-lg"></i> Добавить организацию</button>
-                                    </section>
-                                </div>
-
-                                <div class="col-12">
-                                    <section class="dealer-form-section">
-                                        <div class="dealer-section-title">
-                                            <span class="dealer-section-icon"><i class="bi bi-file-earmark-text"></i></span>
-                                            <div><strong>Реквизиты для документов</strong><small>Используются для договоров и паспорта объекта</small></div>
-                                        </div>
-                                        <div class="row g-3">
-                                            <div class="col-md-6"><label class="dealer-field-label">Юридическое лицо</label><input type="text" id="add_req_org" class="form-control" placeholder="ТОО «...»"></div>
-                                            <div class="col-md-6"><label class="dealer-field-label">Директор / руководитель</label><input type="text" id="add_req_director" class="form-control" placeholder="ФИО полностью"></div>
-                                            <div class="col-md-8"><label class="dealer-field-label">Юридический адрес</label><input type="text" id="add_req_address" class="form-control"></div>
-                                            <div class="col-md-4"><label class="dealer-field-label">БИН / ИИН</label><input type="text" id="add_req_bin" class="form-control"></div>
-                                            <div class="col-md-6"><label class="dealer-field-label">ИИК</label><input type="text" id="add_req_iik" class="form-control"></div>
-                                            <div class="col-md-6"><label class="dealer-field-label">Банк</label><input type="text" id="add_req_bank" class="form-control"></div>
-                                            <div class="col-md-4"><label class="dealer-field-label">БИК</label><input type="text" id="add_req_bik" class="form-control"></div>
-                                            <div class="col-md-4"><label class="dealer-field-label">КБе</label><input type="text" id="add_req_kbe" class="form-control"></div>
-                                            <div class="col-md-4"><label class="dealer-field-label">E-mail</label><input type="email" id="add_req_email" class="form-control"></div>
-                                        </div>
+                                        <div id="add-legal-entity-list" class="dealer-legal-entity-list"></div>
+                                        <button type="button" class="dealer-add-wide mt-2" id="btn-add-legal-entity-add"><i class="bi bi-plus-lg"></i> Добавить юрлицо</button>
                                     </section>
                                 </div>
 
@@ -771,30 +751,10 @@
                                         <section class="dealer-form-section h-100">
                                             <div class="dealer-section-title">
                                                 <span class="dealer-section-icon"><i class="bi bi-building"></i></span>
-                                                <div><strong>Организации</strong><small>Юридические лица</small></div>
+                                                <div><strong>Юридические лица</strong><small>Для каждого договора можно выбрать нужное ТОО / ИП / частное лицо</small></div>
                                             </div>
-                                            <div id="edit-org-list" class="d-flex flex-column gap-2"></div>
-                                            <button type="button" class="dealer-add-wide mt-2" id="btn-edit-org-add"><i class="bi bi-plus-lg"></i> Добавить организацию</button>
-                                        </section>
-                                    </div>
-
-                                    <div class="col-12">
-                                        <section class="dealer-form-section">
-                                            <div class="dealer-section-title">
-                                                <span class="dealer-section-icon"><i class="bi bi-file-earmark-text"></i></span>
-                                                <div><strong>Реквизиты для документов</strong><small>Автоматически подставляются в договоры и паспорт объекта</small></div>
-                                            </div>
-                                            <div class="row g-3">
-                                                <div class="col-md-6"><label class="dealer-field-label">Юридическое лицо</label><input type="text" id="edit_req_org" class="form-control"></div>
-                                                <div class="col-md-6"><label class="dealer-field-label">Директор / руководитель</label><input type="text" id="edit_req_director" class="form-control"></div>
-                                                <div class="col-md-8"><label class="dealer-field-label">Юридический адрес</label><input type="text" id="edit_req_address" class="form-control"></div>
-                                                <div class="col-md-4"><label class="dealer-field-label">БИН / ИИН</label><input type="text" id="edit_req_bin" class="form-control"></div>
-                                                <div class="col-md-6"><label class="dealer-field-label">ИИК</label><input type="text" id="edit_req_iik" class="form-control"></div>
-                                                <div class="col-md-6"><label class="dealer-field-label">Банк</label><input type="text" id="edit_req_bank" class="form-control"></div>
-                                                <div class="col-md-4"><label class="dealer-field-label">БИК</label><input type="text" id="edit_req_bik" class="form-control"></div>
-                                                <div class="col-md-4"><label class="dealer-field-label">КБе</label><input type="text" id="edit_req_kbe" class="form-control"></div>
-                                                <div class="col-md-4"><label class="dealer-field-label">E-mail</label><input type="email" id="edit_req_email" class="form-control"></div>
-                                            </div>
+                                            <div id="edit-legal-entity-list" class="dealer-legal-entity-list"></div>
+                                            <button type="button" class="dealer-add-wide mt-2" id="btn-add-legal-entity-edit"><i class="bi bi-plus-lg"></i> Добавить юрлицо</button>
                                         </section>
                                     </div>
 
