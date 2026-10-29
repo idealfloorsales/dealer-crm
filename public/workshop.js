@@ -1107,21 +1107,30 @@ document.addEventListener('DOMContentLoaded', () => {
     $('ws-add-bom-material')?.addEventListener('click',()=>addBomMaterial());
     $('ws-add-bom-component')?.addEventListener('click',()=>addBomComponent());
     function addBomMaterial(item={}){
-        const row=document.createElement('div');row.className='ws-bom-row';row.innerHTML=`<select class="form-select ws-bom-material-id">${materialOptions()}</select><input type="number" min="0" step="0.001" class="form-control ws-bom-qty" placeholder="кол-во" value="${esc(item.qty||'')}"><button type="button"><i class="bi bi-x"></i></button>`;
-        $('ws-bom-materials').appendChild(row);row.querySelector('select').value=idOf(item.material||item.materialId);row.querySelector('button').onclick=()=>row.remove();
+        const row=document.createElement('div');
+        row.className='ws-bom-row ws-bom-material-row';
+        row.innerHTML=`<select class="form-select ws-bom-material-id">${materialOptions()}</select><input type="number" min="0" step="0.001" class="form-control ws-bom-qty" placeholder="кол-во" value="${esc(item.qty ?? '')}"><select class="form-select ws-bom-mode"><option value="strict">точно</option><option value="estimate">расчётно</option></select><button type="button"><i class="bi bi-x"></i></button>`;
+        $('ws-bom-materials').appendChild(row);
+        row.querySelector('.ws-bom-material-id').value=idOf(item.material||item.materialId);
+        row.querySelector('.ws-bom-mode').value=item.mode==='estimate'?'estimate':'strict';
+        row.querySelector('button').onclick=()=>row.remove();
     }
     function addBomComponent(item={}){
         const row=document.createElement('div');row.className='ws-bom-row';row.innerHTML=`<select class="form-select ws-bom-component-id">${recipeOptions()}</select><input type="number" min="0" step="0.001" class="form-control ws-bom-qty" placeholder="кол-во" value="${esc(item.qty||'')}"><button type="button"><i class="bi bi-x"></i></button>`;
         $('ws-bom-components').appendChild(row);row.querySelector('select').value=idOf(item.recipe||item.recipeId);row.querySelector('button').onclick=()=>row.remove();
     }
     function collectBom(selector,idSelector){
-        return [...document.querySelectorAll(selector)].map(row=>({id:row.querySelector(idSelector)?.value,qty:n(row.querySelector('.ws-bom-qty')?.value)})).filter(x=>x.id&&x.qty>0);
+        return [...document.querySelectorAll(selector)].map(row=>({
+            id:row.querySelector(idSelector)?.value,
+            qty:n(row.querySelector('.ws-bom-qty')?.value),
+            mode:row.querySelector('.ws-bom-mode')?.value || 'strict'
+        })).filter(x=>x.id&&x.qty>=0);
     }
     function openRecipeEdit(id){
         const item=recipeById(id);if(!item)return;resetRecipe();$('ws-recipe-id').value=id;$('ws-recipe-name').value=item.name||'';$('ws-recipe-type').value=item.outputType||'sample';$('ws-recipe-sku').value=item.sku||'';$('ws-recipe-product').value=idOf(item.product);$('ws-recipe-planks').value=n(item.planksPerUnit);$('ws-recipe-min-stock').value=n(item.minStockQty);$('ws-recipe-pack-override').value=n(item.packQtyOverride);$('ws-recipe-side-a').value=item.sideA||'';$('ws-recipe-side-b').value=item.sideB||'';$('ws-recipe-matrix-pos').value=item.matrixPosName||'';$('ws-recipe-note').value=item.note||'';(item.materials||[]).forEach(addBomMaterial);(item.components||[]).forEach(addBomComponent);updateRecipeCalc();bootstrap.Modal.getOrCreateInstance($('ws-recipe-modal')).show();
     }
     $('ws-recipe-form')?.addEventListener('submit',async event=>{
-        event.preventDefault();const id=$('ws-recipe-id').value;const materials=collectBom('#ws-bom-materials .ws-bom-row','.ws-bom-material-id').map(x=>({materialId:x.id,qty:x.qty}));const components=collectBom('#ws-bom-components .ws-bom-row','.ws-bom-component-id').map(x=>({recipeId:x.id,qty:x.qty}));
+        event.preventDefault();const id=$('ws-recipe-id').value;const materials=collectBom('#ws-bom-materials .ws-bom-row','.ws-bom-material-id').map(x=>({materialId:x.id,qty:x.qty,mode:x.mode}));const components=collectBom('#ws-bom-components .ws-bom-row','.ws-bom-component-id').map(x=>({recipeId:x.id,qty:x.qty}));
         const payload={name:$('ws-recipe-name').value,outputType:$('ws-recipe-type').value,sku:$('ws-recipe-sku').value,productId:$('ws-recipe-product').value||null,planksPerUnit:n($('ws-recipe-planks').value),minStockQty:n($('ws-recipe-min-stock').value),packQtyOverride:n($('ws-recipe-pack-override').value),sideA:$('ws-recipe-side-a').value,sideB:$('ws-recipe-side-b').value,matrixPosName:$('ws-recipe-matrix-pos').value,note:$('ws-recipe-note').value,materials,components};
         await send(id?API+'/recipes/'+id:API+'/recipes',id?'PUT':'POST',payload,'Рецептура сохранена','recipe');
     });
