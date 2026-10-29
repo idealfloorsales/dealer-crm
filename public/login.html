@@ -89,9 +89,11 @@
         const errorMsg = document.getElementById('error-msg');
         const loginBtn = document.getElementById('login-btn');
 
-        // Если у нас уже есть токен, сразу кидаем на главную
+        // Если токен уже есть — возвращаем сотрудника в его основной раздел.
         if (localStorage.getItem('crm_token')) {
-            window.location.href = '/';
+            let cachedUser = null;
+            try { cachedUser = JSON.parse(localStorage.getItem('crm_user') || 'null'); } catch (_) {}
+            window.location.href = cachedUser?.role === 'workshop' ? '/workshop.html' : '/';
         }
 
         form.addEventListener('submit', async (e) => {
@@ -126,8 +128,8 @@
                 // 2. Сохраняем данные пользователя (права, имя)
                 localStorage.setItem('crm_user', JSON.stringify(data.user));
 
-                // 3. Переходим на главную
-                window.location.href = '/';
+                // 3. Сотрудников цеха сразу отправляем в их рабочий раздел.
+                window.location.href = data.user?.role === 'workshop' ? '/workshop.html' : '/';
 
             } catch (err) {
                 errorMsg.textContent = err.message;
