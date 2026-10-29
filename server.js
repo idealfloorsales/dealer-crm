@@ -424,6 +424,7 @@ const workshopMemoLineSchema = new mongoose.Schema({
     recipe: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkshopRecipe' },
     requestedPacks: { type: Number, default: 0 },
     plannedOutputQty: { type: Number, default: 0 },
+    plannedRemainderPlanks: { type: Number, default: 0 },
     packQty: { type: Number, default: 0 },
     planksPerUnit: { type: Number, default: 0 },
     actualProduct: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
@@ -1498,25 +1499,54 @@ app.post('/api/workshop/memos', requirePermission('can_manage_workshop'), async 
             const requestedPacks = Math.max(0, Math.floor(workshopNumber(input.requestedPacks)));
             if (!input.productId || requestedPacks <= 0) continue;
 
-            const [product, recipe] = await Promise.all([
-                Product.findById(input.productId).lean(),
-                input.recipeId ? WorkshopRecipe.findById(input.recipeId).lean() : null
-            ]);
+            const product = await Product.findById(input.productId).lean();
             if (!product) continue;
 
-            const packQty = workshopPackQty(product, recipe?.packQtyOverride);
+            let recipe = null;
+            if (input.recipeId) {
+                recipe = await WorkshopRecipe.findOne({
+                    _id: input.recipeId,
+                    product: product._id,
+                    active: { $ne: false }
+                }).lean();
+                if (!recipe) {
+                    return res.status(400).json({ error: `Выбранная рецептура не подходит для «${product.sku || product.name}»` });
+                }
+            } else {
+                const recipes = await WorkshopRecipe.find({
+                    product: product._id,
+                    active: { $ne: false },
+                    planksPerUnit: { $gt: 0 }
+                }).lean();
+                recipe = recipes.find(item => item.outputType === 'sample')
+                    || recipes.find(item => item.outputType === 'stand')
+                    || recipes[0]
+                    || null;
+            }
+
+            if (!recipe) {
+                return res.status(400).json({ error: `Для «${product.sku || product.name}» не настроена рецептура производства` });
+            }
+
+            const packQty = workshopPackQty(product, recipe.packQtyOverride);
             if (packQty <= 0) {
                 return res.status(400).json({ error: `У «${product.sku || product.name}» не заполнено количество планок в упаковке` });
             }
-            const planksPerUnit = Math.max(0, workshopNumber(recipe?.planksPerUnit));
-            const autoOutput = planksPerUnit > 0 ? Math.floor((requestedPacks * packQty) / planksPerUnit) : 0;
-            const plannedOutputQty = Math.max(0, Math.floor(workshopNumber(input.plannedOutputQty) || autoOutput));
+            const planksPerUnit = Math.max(0, workshopNumber(recipe.planksPerUnit));
+            if (planksPerUnit <= 0) {
+                return res.status(400).json({ error: `В рецептуре «${recipe.name}» не заполнена норма планок на изделие` });
+            }
+
+            const totalPlanks = requestedPacks * packQty;
+            const plannedOutputQty = Math.floor(totalPlanks / planksPerUnit);
+            const plannedRemainderPlanks = totalPlanks - plannedOutputQty * planksPerUnit;
 
             lines.push({
                 product: product._id,
-                recipe: recipe?._id || null,
+                recipe: recipe._id,
                 requestedPacks,
                 plannedOutputQty,
+                plannedRemainderPlanks,
                 packQty,
                 planksPerUnit,
                 actualProduct: product._id,
