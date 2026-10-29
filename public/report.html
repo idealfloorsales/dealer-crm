@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="style.css?v=220"> <link rel="icon" href="favicon.gif" type="image/gif">
 </head>
-<body>   
+<body class="app-workspace-page report-page">   
     <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-4">
         <div class="container-fluid">
             <a class="navbar-brand" href="/"><img src="logo.png" alt="Logo" height="40"></a>
@@ -32,13 +32,19 @@
         </div>
     </nav>
           
-    <div class="container-fluid px-4"> 
-        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-            <h1 class="mb-0 border-0 pt-0 mt-0">Отчет по выставленности</h1>
-            <button id="export-csv-btn" class="btn btn-primary shadow-sm px-4"><i class="bi bi-download me-2"></i>Скачать CSV</button>
-        </div>
+    <main class="container-fluid app-page-shell">
+        <section class="app-page-hero">
+            <div class="app-page-hero-copy">
+                <div class="app-page-eyebrow">IDEAL FLOOR CRM · КОНТРОЛЬ СЕТИ</div>
+                <h1>Выставленность</h1>
+                <p>Контроль матрицы товаров и POS-материалов у дилеров.</p>
+            </div>
+            <div class="app-page-actions">
+                <button id="export-csv-btn" class="app-hero-primary"><i class="bi bi-download"></i><span>Скачать CSV</span></button>
+            </div>
+        </section>
 
-        <div class="bg-white p-3 rounded-4 shadow-sm mb-4 border border-light sticky-filters">
+        <div class="app-toolbar-card sticky-filters">
             <div class="row g-3 align-items-end">
                 
                 <div class="col-xl-2 col-md-4">
@@ -90,7 +96,7 @@
 
         <p id="loading-msg" class="alert alert-light text-center border shadow-sm"><span class="spinner-border spinner-border-sm me-2"></span>Загрузка данных...</p>
         
-        <div id="matrix-container" class="bg-white rounded-4 shadow-sm border border-light overflow-hidden" style="display: none;">
+        <div id="matrix-container" class="app-panel app-table-panel overflow-hidden" style="display: none;">
           <div class="table-responsive" style="max-height: 75vh;">
                 <table id="matrix-table" class="table table-hover mb-0 align-middle">
                     <thead id="matrix-header"></thead>
@@ -99,7 +105,7 @@
                 </table>
             </div>
         </div>
-    </div>
+    </main>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="report.js?v=220"></script>     <script src="permissions.js?v={{VER}}"></script>
