@@ -6,7 +6,8 @@
         dealer: null,
         user: null,
         templates: {},
-        qrPromise: null
+        qrPromise: null,
+        catalog: []
     };
 
     const templatePaths = {
@@ -132,7 +133,52 @@
         return `<div class="passport-check ${checked ? 'is-checked' : ''}"><span class="passport-box">${checked ? '✓' : ''}</span><b>${escapeHtml(code)}</b> ${escapeHtml(name)}</div>`;
     }
 
+    function inferProductGroup(product) {
+        const raw = String(product?.sku || '') + ' ' + String(product?.name || '');
+        const normalized = normalizeCode(raw);
+        if (normalized.includes('eh')) return 'ENGLAND HERRINGBONE';
+        if (normalized.includes('hp')) return 'HERRINGBONE PARQUET';
+        if (normalized.includes('fp')) return 'FRENCH PARQUET';
+        if (normalized.includes('mc')) return 'MAGIC COLLECTION';
+        if (normalized.includes('ic')) return 'IDEAL CLASSIC';
+        if (normalized.includes('rwn') || normalized.includes('rwz') || /real\s*wood/i.test(raw)) return 'REAL WOOD';
+        return 'ДРУГИЕ КОЛЛЕКЦИИ';
+    }
+
+    function checkboxProduct(dealer, product) {
+        const code = product?.sku || '—';
+        const name = product?.name || 'Без названия';
+        const checked = productIsPresent(dealer, code);
+        return `<div class="passport-check ${checked ? 'is-checked' : ''}"><span class="passport-box">${checked ? '✓' : ''}</span><b>${escapeHtml(code)}</b> ${escapeHtml(name)}</div>`;
+    }
+
     function buildPassportMatrix(dealer) {
+        const catalog = Array.isArray(state.catalog) ? state.catalog.filter(p => p && (p.sku || p.name)) : [];
+
+        if (catalog.length) {
+            const groups = new Map();
+            catalog.forEach(product => {
+                const group = inferProductGroup(product);
+                if (!groups.has(group)) groups.set(group, []);
+                groups.get(group).push(product);
+            });
+
+            const englandProducts = groups.get('ENGLAND HERRINGBONE') || [];
+            groups.delete('ENGLAND HERRINGBONE');
+
+            const left = englandProducts.length
+                ? englandProducts.map(p => checkboxProduct(dealer, p)).join('')
+                : '<span class="passport-muted">Нет позиций в каталоге</span>';
+
+            const preferredOrder = ['HERRINGBONE PARQUET','FRENCH PARQUET','MAGIC COLLECTION','IDEAL CLASSIC','REAL WOOD','ДРУГИЕ КОЛЛЕКЦИИ'];
+            const middle = preferredOrder
+                .filter(group => groups.has(group))
+                .map(group => `<div class="passport-group-title">${escapeHtml(group)}</div>` + groups.get(group).map(p => checkboxProduct(dealer, p)).join(''))
+                .join('') || '<span class="passport-muted">Нет позиций в каталоге</span>';
+
+            return `<table class="passport-matrix"><thead><tr><th>ENGLAND HERRINGBONE</th><th>PARQUET / MAGIC / CLASSIC / ДРУГИЕ</th><th>ОБОРУДОВАНИЕ И POSM</th></tr></thead><tbody><tr><td>${left}</td><td>${middle}</td><td>${buildPassportEquipment(dealer)}</td></tr></tbody></table>`;
+        }
+
         const england = [
             ['EH-702','Дуб Арабика'],['EH-703','Дуб Мокко'],['EH-704','Дуб Капучино'],
             ['EH-705','Дуб Голд'],['EH-706','Орех Кедровый'],['EH-707','Дуб Натур'],
@@ -147,20 +193,10 @@
         ];
 
         const otherGroups = [
-            ['HERRINGBONE PARQUET', [
-                ['HP-31','Дуб Лоредо'],['HP-32','Дуб Родос'],['HP-91','Дуб Браун'],
-                ['HP-92','Дуб Латте'],['HP-94','Дуб Аланда'],['HP-95','Дуб Сантана'],
-                ['HP-96','Дуб Алор'],['HP-97','Дуб Айленд']
-            ]],
-            ['FRENCH PARQUET', [
-                ['FP-43','Paris Натур'],['FP-44','Paris Рустик'],['FP-45','Версаль Светлый'],['FP-46','Версаль Капучино']
-            ]],
-            ['MAGIC COLLECTION', [
-                ['MC-101','Орех Испанский'],['MC-102','Орех Венгерский'],['MC-103','Дуб Австрийский']
-            ]],
-            ['IDEAL CLASSIC', [
-                ['IC-01','Дуб Натуральный'],['IC-02','Дуб Светлый'],['IC-03','Камешки'],['IC-04','Аллюминий']
-            ]]
+            ['HERRINGBONE PARQUET', [['HP-31','Дуб Лоредо'],['HP-32','Дуб Родос'],['HP-91','Дуб Браун'],['HP-92','Дуб Латте'],['HP-94','Дуб Аланда'],['HP-95','Дуб Сантана'],['HP-96','Дуб Алор'],['HP-97','Дуб Айленд']]],
+            ['FRENCH PARQUET', [['FP-43','Paris Натур'],['FP-44','Paris Рустик'],['FP-45','Версаль Светлый'],['FP-46','Версаль Капучино']]],
+            ['MAGIC COLLECTION', [['MC-101','Орех Испанский'],['MC-102','Орех Венгерский'],['MC-103','Дуб Австрийский']]],
+            ['IDEAL CLASSIC', [['IC-01','Дуб Натуральный'],['IC-02','Дуб Светлый'],['IC-03','Камешки'],['IC-04','Аллюминий']]]
         ];
 
         const left = england.map(([code,name]) => checkboxLine(dealer, code, name)).join('');
@@ -482,8 +518,14 @@
         render();
     }
 
+    function setCatalog(products) {
+        state.catalog = Array.isArray(products) ? products : [];
+        if (state.dealer) render();
+    }
+
     window.DealerDocuments = {
         setDealer,
+        setCatalog,
         render,
         preview,
         download,
