@@ -618,7 +618,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         if (dealerRouteClear) dealerRouteClear.onclick = clearDealerRouteSelection;
         if (dealerRouteClearModal) dealerRouteClearModal.onclick = clearDealerRouteSelection;
-        if (dealerRouteOpen) dealerRouteOpen.onclick = openDealerRouteInYandex;
+        if (dealerRouteOpen) dealerRouteOpen.onclick = openDealerRouteIn2Gis;
 
         if (dealerQuickFilters) {
             dealerQuickFilters.onclick = (e) => {
@@ -1652,11 +1652,47 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
         if (dealerRouteOpen) {
             const coordsCount = selected.filter(d => Number.isFinite(Number(d.latitude)) && Number.isFinite(Number(d.longitude))).length;
             dealerRouteOpen.disabled = coordsCount === 0;
-            dealerRouteOpen.innerHTML = `<i class="bi bi-signpost-2"></i> Открыть маршрут · ${coordsCount}`;
+            dealerRouteOpen.innerHTML = `<i class="bi bi-box-arrow-up-right"></i> Открыть в 2ГИС · ${coordsCount}`;
         }
     }
 
-    function openDealerRouteInYandex() {
+    function get2GisCitySlug(city) {
+        const key = String(city || '').toLowerCase().replace(/ё/g, 'е').trim();
+        const cityMap = {
+            'астана': 'astana', 'нур-султан': 'astana',
+            'алматы': 'almaty',
+            'шымкент': 'shymkent',
+            'караганда': 'karaganda', 'қарағанды': 'karaganda',
+            'костанай': 'kostanay', 'қостанай': 'kostanay',
+            'павлодар': 'pavlodar',
+            'усть-каменогорск': 'ust-kamenogorsk', 'оскемен': 'ust-kamenogorsk', 'өскемен': 'ust-kamenogorsk',
+            'семей': 'semey',
+            'актобе': 'aktobe', 'ақтөбе': 'aktobe',
+            'атырау': 'atyrau',
+            'актау': 'aktau', 'ақтау': 'aktau',
+            'тараз': 'taraz',
+            'кызылорда': 'kyzylorda', 'қызылорда': 'kyzylorda',
+            'уральск': 'uralsk', 'орал': 'uralsk',
+            'петропавловск': 'petropavlovsk', 'петропавл': 'petropavlovsk',
+            'кокшетау': 'kokshetau', 'көкшетау': 'kokshetau',
+            'туркестан': 'turkestan', 'түркістан': 'turkestan',
+            'талдыкорган': 'taldykorgan', 'талдықорған': 'taldykorgan',
+            'экибастуз': 'ekibastuz'
+        };
+        return cityMap[key] || '';
+    }
+
+    function build2GisDealerUrl(dealer) {
+        const slug = get2GisCitySlug(dealer?.city);
+        const query = [dealer?.name, dealer?.address].filter(Boolean).join(' ') || dealer?.city || 'IDEAL FLOOR';
+        const base = slug ? `https://2gis.kz/${slug}` : 'https://2gis.kz';
+        const lat = Number(dealer?.latitude);
+        const lng = Number(dealer?.longitude);
+        const mapParam = Number.isFinite(lat) && Number.isFinite(lng) ? `?m=${lng},${lat}/17` : '';
+        return `${base}/search/${encodeURIComponent(query)}${mapParam}`;
+    }
+
+    function openDealerRouteIn2Gis() {
         const selected = selectedRouteDealers();
         const withCoords = selected.filter(d => Number.isFinite(Number(d.latitude)) && Number.isFinite(Number(d.longitude)));
         const missing = selected.length - withCoords.length;
@@ -1668,11 +1704,11 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
 
         let url = '';
         if (withCoords.length === 1) {
-            const d = withCoords[0];
-            url = `https://yandex.kz/maps/?pt=${encodeURIComponent(d.longitude)},${encodeURIComponent(d.latitude)}&z=17&l=map`;
+            url = build2GisDealerUrl(withCoords[0]);
         } else {
-            const rtext = withCoords.map(d => `${Number(d.latitude)},${Number(d.longitude)}`).join('~');
-            url = `https://yandex.kz/maps/?rtext=${encodeURIComponent(rtext)}&rtt=auto`;
+            const slug = get2GisCitySlug(withCoords[0]?.city) || 'astana';
+            const points = withCoords.map(d => `|${Number(d.longitude)},${Number(d.latitude)}`).join(';');
+            url = `https://2gis.kz/${slug}/directions/points/${encodeURIComponent(points)}`;
         }
 
         if (missing > 0) window.showToast(`${missing} дилер(а) без координат не добавлены в навигацию`, 'info');
@@ -1905,7 +1941,7 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
             }
 
             if (d.latitude && d.longitude) {
-                secondaryActions.push(`<a class="dealer-v3-menu-item" href="https://yandex.kz/maps/?pt=${encodeURIComponent(d.longitude)},${encodeURIComponent(d.latitude)}&z=17&l=map" target="_blank" rel="noopener"><i class="bi bi-geo-alt"></i><span>Открыть на карте</span></a>`);
+                secondaryActions.push(`<a class="dealer-v3-menu-item" href="${safeAttr(build2GisDealerUrl(d))}" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right"></i><span>Открыть в 2ГИС</span></a>`);
             }
 
             if (d.instagram) {
