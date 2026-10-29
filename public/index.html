@@ -459,6 +459,26 @@
                                 <div class="col-12">
                                     <section class="dealer-form-section">
                                         <div class="dealer-section-title">
+                                            <span class="dealer-section-icon"><i class="bi bi-file-earmark-text"></i></span>
+                                            <div><strong>Реквизиты для документов</strong><small>Используются для договоров и паспорта объекта</small></div>
+                                        </div>
+                                        <div class="row g-3">
+                                            <div class="col-md-6"><label class="dealer-field-label">Юридическое лицо</label><input type="text" id="add_req_org" class="form-control" placeholder="ТОО «...»"></div>
+                                            <div class="col-md-6"><label class="dealer-field-label">Директор / руководитель</label><input type="text" id="add_req_director" class="form-control" placeholder="ФИО полностью"></div>
+                                            <div class="col-md-8"><label class="dealer-field-label">Юридический адрес</label><input type="text" id="add_req_address" class="form-control"></div>
+                                            <div class="col-md-4"><label class="dealer-field-label">БИН / ИИН</label><input type="text" id="add_req_bin" class="form-control"></div>
+                                            <div class="col-md-6"><label class="dealer-field-label">ИИК</label><input type="text" id="add_req_iik" class="form-control"></div>
+                                            <div class="col-md-6"><label class="dealer-field-label">Банк</label><input type="text" id="add_req_bank" class="form-control"></div>
+                                            <div class="col-md-4"><label class="dealer-field-label">БИК</label><input type="text" id="add_req_bik" class="form-control"></div>
+                                            <div class="col-md-4"><label class="dealer-field-label">КБе</label><input type="text" id="add_req_kbe" class="form-control"></div>
+                                            <div class="col-md-4"><label class="dealer-field-label">E-mail</label><input type="email" id="add_req_email" class="form-control"></div>
+                                        </div>
+                                    </section>
+                                </div>
+
+                                <div class="col-12">
+                                    <section class="dealer-form-section">
+                                        <div class="dealer-section-title">
                                             <span class="dealer-section-icon"><i class="bi bi-receipt"></i></span>
                                             <div><strong>Условия работы</strong><small>Тип цен, договор, сайт и доставка</small></div>
                                         </div>
@@ -470,6 +490,10 @@
                                             <div class="col-md-4">
                                                 <label class="dealer-field-label">Доставка</label>
                                                 <input type="text" id="delivery" class="form-control" placeholder="Условия доставки">
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="dealer-field-label">Номер договора</label>
+                                                <input type="text" id="add_contract_number" class="form-control" placeholder="IF000">
                                             </div>
                                             <div class="col-md-4">
                                                 <label class="dealer-field-label">Дата договора</label>
@@ -757,6 +781,26 @@
                                     <div class="col-12">
                                         <section class="dealer-form-section">
                                             <div class="dealer-section-title">
+                                                <span class="dealer-section-icon"><i class="bi bi-file-earmark-text"></i></span>
+                                                <div><strong>Реквизиты для документов</strong><small>Автоматически подставляются в договоры и паспорт объекта</small></div>
+                                            </div>
+                                            <div class="row g-3">
+                                                <div class="col-md-6"><label class="dealer-field-label">Юридическое лицо</label><input type="text" id="edit_req_org" class="form-control"></div>
+                                                <div class="col-md-6"><label class="dealer-field-label">Директор / руководитель</label><input type="text" id="edit_req_director" class="form-control"></div>
+                                                <div class="col-md-8"><label class="dealer-field-label">Юридический адрес</label><input type="text" id="edit_req_address" class="form-control"></div>
+                                                <div class="col-md-4"><label class="dealer-field-label">БИН / ИИН</label><input type="text" id="edit_req_bin" class="form-control"></div>
+                                                <div class="col-md-6"><label class="dealer-field-label">ИИК</label><input type="text" id="edit_req_iik" class="form-control"></div>
+                                                <div class="col-md-6"><label class="dealer-field-label">Банк</label><input type="text" id="edit_req_bank" class="form-control"></div>
+                                                <div class="col-md-4"><label class="dealer-field-label">БИК</label><input type="text" id="edit_req_bik" class="form-control"></div>
+                                                <div class="col-md-4"><label class="dealer-field-label">КБе</label><input type="text" id="edit_req_kbe" class="form-control"></div>
+                                                <div class="col-md-4"><label class="dealer-field-label">E-mail</label><input type="email" id="edit_req_email" class="form-control"></div>
+                                            </div>
+                                        </section>
+                                    </div>
+
+                                    <div class="col-12">
+                                        <section class="dealer-form-section">
+                                            <div class="dealer-section-title">
                                                 <span class="dealer-section-icon"><i class="bi bi-receipt"></i></span>
                                                 <div><strong>Условия работы</strong><small>Коммерческие и договорные данные</small></div>
                                             </div>
@@ -768,6 +812,10 @@
                                                 <div class="col-md-4">
                                                     <label class="dealer-field-label">Доставка</label>
                                                     <input type="text" id="edit_delivery" class="form-control">
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="dealer-field-label">Номер договора</label>
+                                                    <input type="text" id="edit_contract_number" class="form-control" placeholder="IF000">
                                                 </div>
                                                 <div class="col-md-4">
                                                     <label class="dealer-field-label">Дата договора</label>
