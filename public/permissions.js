@@ -750,7 +750,7 @@
         if (!dealerId || crmPrefetchedDealers.has(dealerId)) return;
         crmPrefetchedDealers.add(dealerId);
 
-        window.fetch(`/api/dealers/${encodeURIComponent(dealerId)}?view=profile`, { crmTrackLoading: false })
+        window.fetch(`/api/dealers/${encodeURIComponent(dealerId)}?view=profile`, { crmTrackLoading: false, keepalive: true })
             .then(response => response.ok ? response.json() : null)
             .then(data => {
                 if (!data) return;
@@ -1061,8 +1061,15 @@
     window.__crmOriginalFetch = window.fetch.bind(window);
     window.fetch = apiFetch;
 
+    let crmCachedUser = null;
+    try {
+        crmCachedUser = JSON.parse(localStorage.getItem('crm_user') || 'null');
+    } catch (_) {
+        crmCachedUser = null;
+    }
+
     window.CRMAuth = {
-        user: null,
+        user: crmCachedUser,
         ready: null,
         can,
         logout,
