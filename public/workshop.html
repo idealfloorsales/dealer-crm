@@ -59,7 +59,7 @@
             <button type="button" data-open-workshop="production"><i class="bi bi-tools"></i><span><strong>Записать производство</strong><small>Склейка, распил, кромление</small></span></button>
             <button type="button" data-open-workshop="dealer"><i class="bi bi-truck"></i><span><strong>Дилеру</strong><small>Выдача, возврат, замена</small></span></button>
             <button type="button" data-open-workshop="material"><i class="bi bi-bucket"></i><span><strong>Материалы</strong><small>Приход и расход расходников</small></span></button>
-            <button type="button" data-open-workshop="writeoff"><i class="bi bi-file-earmark-minus"></i><span><strong>Списание</strong><small>Только по служебной записке</small></span></button>
+            <button type="button" data-open-workshop="writeoff"><i class="bi bi-file-earmark-minus"></i><span><strong>Брак / списание</strong><small>Внутренний расход после приёмки</small></span></button>
         </section>
 
         <section class="workshop-tabs-shell">
@@ -271,7 +271,7 @@
     <!-- Writeoff -->
     <div class="modal fade" id="ws-writeoff-modal" tabindex="-1" data-bs-backdrop="static">
         <div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content workshop-modal">
-            <div class="modal-header"><div><small>СПИСАНИЕ</small><h5>Служебная записка</h5></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header"><div><small>ВНУТРЕННЕЕ СПИСАНИЕ</small><h5>Брак / расход цеха</h5></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <form id="ws-writeoff-form"><div class="modal-body"><div class="workshop-form-grid">
                 <label><span>Что списываем</span><select id="ws-writeoff-type" class="form-select"><option value="laminate">Ламинат</option><option value="material">Материал</option><option value="finished">Готовое изделие</option></select></label>
                 <label class="wide"><span>Позиция</span><select id="ws-writeoff-item" class="form-select" required></select></label>
