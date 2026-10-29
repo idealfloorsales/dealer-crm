@@ -19,6 +19,7 @@
         '/competitors.html': 'can_view_competitors',
         '/knowledge.html': 'can_view_knowledge',
         '/reclamations.html': 'can_view_reclamations',
+        '/workshop.html': 'can_view_workshop',
         '/dealer.html': 'can_view_dealers',
         '/users.html': 'can_manage_users'
     };
@@ -32,6 +33,7 @@
         '/competitors.html': 'can_view_competitors',
         '/knowledge.html': 'can_view_knowledge',
         '/reclamations.html': 'can_view_reclamations',
+        '/workshop.html': 'can_view_workshop',
         '/users.html': 'can_manage_users'
     };
 
@@ -44,6 +46,7 @@
         { path: '/competitors.html', label: 'Конкуренты', permission: 'can_view_competitors', icon: 'globe2' },
         { path: '/knowledge.html', label: 'Статьи', permission: 'can_view_knowledge', icon: 'journal-text' },
         { path: '/reclamations.html', label: 'Рекламации', permission: 'can_view_reclamations', icon: 'shield-exclamation' },
+        { path: '/workshop.html', label: 'Цех', permission: 'can_view_workshop', icon: 'tools' },
         { path: '/users.html', label: 'Сотрудники', permission: 'can_manage_users', icon: 'people' }
     ];
 
@@ -995,7 +998,7 @@
         const badge = document.getElementById('user-role-badge');
         if (!badge || !window.CRMAuth.user) return;
         const user = window.CRMAuth.user;
-        const names = { manager: 'Менеджер', marketing: 'Маркетинг', guest: 'Гость' };
+        const names = { manager: 'Менеджер', marketing: 'Маркетинг', workshop: 'Цех', guest: 'Гость' };
         badge.textContent = names[user.role] || user.role || 'Пользователь';
     }
 
@@ -1029,6 +1032,7 @@
                 ['/report.html', 'can_view_report'],
                 ['/knowledge.html', 'can_view_knowledge'],
                 ['/reclamations.html', 'can_view_reclamations'],
+                ['/workshop.html', 'can_view_workshop'],
                 ['/map.html', 'can_view_map'],
                 ['/users.html', 'can_manage_users']
             ];
