@@ -1,12 +1,3 @@
-    options.headers = options.headers || {}; 
-    const token = localStorage.getItem('crm_token');
-    if (token) options.headers['Authorization'] = 'Bearer ' + token;
-    const response = await originalFetch(url, options);
-    if (response.status === 401) window.location.href = '/login.html';
-    return response;
-};
-// -------------------------------------------
-
 document.addEventListener('DOMContentLoaded', () => {
     
     const API_MATRIX_URL = '/api/matrix';
