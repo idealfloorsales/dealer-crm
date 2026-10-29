@@ -149,7 +149,10 @@
         entities.forEach((entity, index) => {
             const type = inferEntityType(entity.type, entity.organizationName);
             const name = entity.organizationName || `Организация ${index + 1}`;
-            const option = new Option(`${type} · ${name}`, String(index));
+            const label = new RegExp('^' + type.replace(/[.*+?^${}()|[\]\\]/g, '\\            const option = new Option(`${type} · ${name}`, String(index));'), 'i').test(name)
+                ? name
+                : `${type} · ${name}`;
+            const option = new Option(label, String(index));
             select.add(option);
         });
 
@@ -407,7 +410,7 @@
             return photo
                 ? `<div class="passport-photo"><img src="${escapeHtml(photo)}" alt="Фото ${i + 1}"></div>`
                 : `<div class="passport-photo empty">Фото ${i + 1}</div>`;
-        }).join('');
+        });
     }
 
     function exhibitedCount(dealer) {
@@ -499,7 +502,9 @@
             STORAGE_POS_COUNT: escapeHtml(storageItems.pos),
             PASSPORT_COMPETITORS: buildCompetitorChips(dealer),
             PASSPORT_MATRIX: buildPassportMatrix(dealer),
-            PASSPORT_PHOTOS: buildPassportPhotos(dealer),
+            PASSPORT_PHOTO_1: buildPassportPhotos(dealer)[0],
+            PASSPORT_PHOTO_2: buildPassportPhotos(dealer)[1],
+            PASSPORT_PHOTO_3: buildPassportPhotos(dealer)[2],
             PASSPORT_EXHIBITED_COUNT: escapeHtml(exhibitedCount(dealer)),
             PASSPORT_POS_TOTAL: escapeHtml(passportPosTotal(dealer))
         };
