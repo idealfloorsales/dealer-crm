@@ -764,7 +764,49 @@
         });
         observer.observe(document.body, { childList: true, subtree: true });
 
-        document.addEventListener('shown.bs.modal', event => scheduleReveal(event.target));
+        function closeTransientOverlays() {
+            document.querySelectorAll('.dropdown-menu.show').forEach(menu => {
+                const toggle = menu.parentElement?.querySelector('[data-bs-toggle="dropdown"]');
+                try {
+                    if (toggle && window.bootstrap?.Dropdown) {
+                        const instance = bootstrap.Dropdown.getInstance(toggle) || bootstrap.Dropdown.getOrCreateInstance(toggle);
+                        instance.hide();
+                    }
+                } catch (_) {}
+                menu.classList.remove('show');
+            });
+            document.querySelectorAll('[data-bs-toggle="dropdown"].show').forEach(toggle => {
+                toggle.classList.remove('show');
+                toggle.setAttribute('aria-expanded', 'false');
+            });
+
+            const sheetBackdrop = document.querySelector('.crm-mobile-sheet-backdrop.open');
+            if (sheetBackdrop) sheetBackdrop.classList.remove('open');
+            document.body.classList.remove('crm-mobile-sheet-open');
+        }
+
+        document.addEventListener('click', event => {
+            if (event.target.closest('.dropdown-menu a, .dropdown-menu button')) {
+                closeTransientOverlays();
+            }
+        }, true);
+
+        document.addEventListener('show.bs.modal', event => {
+            closeTransientOverlays();
+            document.body.classList.add('crm-modal-transitioning');
+            scheduleReveal(event.target);
+        });
+
+        document.addEventListener('shown.bs.modal', event => {
+            document.body.classList.remove('crm-modal-transitioning');
+            scheduleReveal(event.target);
+        });
+
+        document.addEventListener('hidden.bs.modal', () => {
+            if (!document.querySelector('.modal.show')) {
+                document.body.classList.remove('crm-modal-transitioning');
+            }
+        });
     }
 
     async function apiFetch(url, options) {
