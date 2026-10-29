@@ -360,6 +360,7 @@ const workshopRecipeSchema = new mongoose.Schema({
     planksPerUnit: { type: Number, default: 0 },
     packQtyOverride: { type: Number, default: 0 },
     stockQty: { type: Number, default: 0 },
+    minStockQty: { type: Number, default: 0 },
     matrixPosName: String,
     materials: [workshopRecipeMaterialSchema],
     components: [workshopRecipeComponentSchema],
@@ -401,6 +402,9 @@ const workshopOperationSchema = new mongoose.Schema({
 const workshopProductionSchema = new mongoose.Schema({
     date: { type: Date, default: Date.now },
     recipe: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkshopRecipe' },
+    memo: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkshopMemo' },
+    memoLineId: String,
+    serviceMemoNumber: String,
     product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
     acceptedPacks: { type: Number, default: 0 },
     acceptedLoosePlanks: { type: Number, default: 0 },
@@ -1297,6 +1301,18 @@ app.get('/api/workshop/bootstrap', requirePermission('can_view_workshop'), async
                 .sort({ date: -1, createdAt: -1 }).limit(80).lean()
         ]);
 
+        const memoIds = memos.map(item => item._id);
+        const producedByMemoLine = memoIds.length ? await WorkshopProduction.aggregate([
+            { $match: { memo: { $in: memoIds }, memoLineId: { $nin: [null, ''] } } },
+            { $group: { _id: '$memoLineId', qty: { $sum: '$outputQty' } } }
+        ]) : [];
+        const producedMap = new Map(producedByMemoLine.map(item => [String(item._id), Number(item.qty) || 0]));
+        memos.forEach(memo => {
+            (memo.lines || []).forEach(line => {
+                line.producedQty = producedMap.get(String(line._id)) || 0;
+            });
+        });
+
         const today = new Date();
         today.setHours(0,0,0,0);
         const todayRows = await WorkshopProduction.find({ date: { $gte: today } }).select('outputQty').lean();
@@ -1418,6 +1434,7 @@ app.post('/api/workshop/recipes', requirePermission('can_manage_workshop'), asyn
             planksPerUnit: Math.max(0, workshopNumber(req.body.planksPerUnit)),
             packQtyOverride: Math.max(0, workshopNumber(req.body.packQtyOverride)),
             matrixPosName: String(req.body.matrixPosName || '').trim(),
+            minStockQty: Math.max(0, workshopNumber(req.body.minStockQty)),
             materials: Array.isArray(req.body.materials) ? req.body.materials.map(item => ({
                 material: item.materialId,
                 qty: Math.max(0, workshopNumber(item.qty))
@@ -1449,6 +1466,7 @@ app.put('/api/workshop/recipes/:id', requirePermission('can_manage_workshop'), a
             planksPerUnit: Math.max(0, workshopNumber(req.body.planksPerUnit)),
             packQtyOverride: Math.max(0, workshopNumber(req.body.packQtyOverride)),
             matrixPosName: String(req.body.matrixPosName || '').trim(),
+            minStockQty: Math.max(0, workshopNumber(req.body.minStockQty)),
             materials: Array.isArray(req.body.materials) ? req.body.materials.map(item => ({
                 material: item.materialId,
                 qty: Math.max(0, workshopNumber(item.qty))
@@ -1704,6 +1722,20 @@ app.post('/api/workshop/production', requirePermission('can_manage_workshop'), a
             .populate('components.recipe');
         if (!recipe) return res.status(404).json({ error: 'Рецептура не найдена' });
 
+        let sourceMemo = null;
+        let sourceMemoLine = null;
+        if (req.body.memoId) {
+            sourceMemo = await WorkshopMemo.findById(req.body.memoId).lean();
+            if (!sourceMemo || sourceMemo.status !== 'accepted') {
+                return res.status(400).json({ error: 'Можно привязать производство только к принятой служебной записке' });
+            }
+            sourceMemoLine = (sourceMemo.lines || []).find(line => String(line._id) === String(req.body.memoLineId || ''));
+            if (!sourceMemoLine) return res.status(400).json({ error: 'Строка служебной записки не найдена' });
+            if (recipe.product && String(sourceMemoLine.product) !== String(recipe.product._id)) {
+                return res.status(400).json({ error: 'Ламинат рецептуры не совпадает с выбранной строкой служебки' });
+            }
+        }
+
         const outputQty = Math.max(0, workshopNumber(req.body.outputQty));
         const scrapPlanks = Math.max(0, workshopNumber(req.body.scrapPlanks));
         const acceptedPacks = Math.max(0, workshopNumber(req.body.acceptedPacks));
@@ -1743,7 +1775,8 @@ app.post('/api/workshop/production', requirePermission('can_manage_workshop'), a
                 date: req.body.date || new Date(), type: 'production_laminate',
                 entityType: 'laminate', product: recipe.product._id, direction: 'out',
                 qty: consumedPlanks, unit: 'планка', note: String(req.body.note || '').trim(),
-                meta: { recipeId: recipe._id, outputQty, scrapPlanks }, createdBy: workshopUser(req)
+                serviceMemoNumber: sourceMemo?.number || '',
+                meta: { recipeId: recipe._id, outputQty, scrapPlanks, memoId: sourceMemo?._id || null, memoLineId: sourceMemoLine?._id || null }, createdBy: workshopUser(req)
             });
         }
 
@@ -1776,7 +1809,8 @@ app.post('/api/workshop/production', requirePermission('can_manage_workshop'), a
             date: req.body.date || new Date(), type: 'production_output',
             entityType: 'finished', recipe: recipe._id, direction: 'in',
             qty: outputQty, unit: 'шт', note: String(req.body.note || '').trim(),
-            meta: { acceptedPacks, acceptedLoosePlanks, acceptedTotal, packQty, consumedPlanks, scrapPlanks },
+            serviceMemoNumber: sourceMemo?.number || '',
+            meta: { acceptedPacks, acceptedLoosePlanks, acceptedTotal, packQty, consumedPlanks, scrapPlanks, memoId: sourceMemo?._id || null, memoLineId: sourceMemoLine?._id || null },
             createdBy: workshopUser(req)
         });
 
@@ -1784,6 +1818,9 @@ app.post('/api/workshop/production', requirePermission('can_manage_workshop'), a
             date: req.body.date || new Date(),
             recipe: recipe._id,
             product: recipe.product?._id || null,
+            memo: sourceMemo?._id || null,
+            memoLineId: sourceMemoLine?._id ? String(sourceMemoLine._id) : '',
+            serviceMemoNumber: sourceMemo?.number || '',
             acceptedPacks,
             acceptedLoosePlanks,
             packQty,
