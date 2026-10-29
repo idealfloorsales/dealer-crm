@@ -14,7 +14,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#b9040a">
 </head>
-<body>
+<body class="app-workspace-page knowledge-page">
     <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-4">
         <div class="container-fluid">
             <a class="navbar-brand" href="/"><img src="logo.png" alt="Logo" height="40"></a>
@@ -32,15 +32,21 @@
             </div>
         </div>
     </nav>
-    <div class="container mt-4">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h1>Статьи</h1>
-            <button id="open-add-article-btn" class="btn btn-primary btn-lg"><i class="bi bi-plus-circle me-2"></i>Добавить статью</button>
-        </div>
-        <div class="toolbar bg-white p-3 rounded shadow-sm border mb-4"><input type="text" id="search-bar" class="form-control form-control-lg" placeholder="Поиск..."></div>
+    <main class="container-fluid app-page-shell">
+        <section class="app-page-hero">
+            <div class="app-page-hero-copy">
+                <div class="app-page-eyebrow">IDEAL FLOOR CRM · БАЗА ЗНАНИЙ</div>
+                <h1>Статьи</h1>
+                <p>Инструкции, памятки и рабочие материалы команды.</p>
+            </div>
+            <div class="app-page-actions">
+                <button id="open-add-article-btn" class="app-hero-primary"><i class="bi bi-plus-lg"></i><span>Добавить статью</span></button>
+            </div>
+        </section>
+        <div class="app-toolbar-card"><div class="app-search-field"><i class="bi bi-search"></i><input type="text" id="search-bar" class="form-control" placeholder="Поиск по базе знаний..."></div></div>
         <div class="accordion" id="article-list"></div>
         <p id="no-data-msg" class="alert alert-info mt-3" style="display: none;"></p>
-    </div>
+    </main>
     
     <div class="modal fade" id="article-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog modal-lg modal-dialog-centered">
