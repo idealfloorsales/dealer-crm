@@ -242,7 +242,9 @@ app.post('/api/admin/users', requireAdmin, async (req, res) => {
         if (exists) return res.status(400).json({ error: 'Логин уже занят' });
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
-        const newUser = new User({ username: normalizedUsername, password: hashedPassword, fullName, role: role || 'manager', scope, permissions });
+        const normalizedRole = role || 'manager';
+        const normalizedScope = normalizedRole === 'marketing' ? 'all' : scope;
+        const newUser = new User({ username: normalizedUsername, password: hashedPassword, fullName, role: normalizedRole, scope: normalizedScope, permissions });
         await newUser.save();
         res.json({ status: 'ok' });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -251,7 +253,9 @@ app.post('/api/admin/users', requireAdmin, async (req, res) => {
 app.put('/api/admin/users/:id', requireAdmin, async (req, res) => {
     try {
         const { username, fullName, role, scope, permissions, isBlocked, password } = req.body;
-        const updateData = { fullName, role: role || 'manager', scope, permissions, isBlocked };
+        const normalizedRole = role || 'manager';
+        const normalizedScope = normalizedRole === 'marketing' ? 'all' : scope;
+        const updateData = { fullName, role: normalizedRole, scope: normalizedScope, permissions, isBlocked };
 
         if (username && String(username).trim()) {
             const normalizedUsername = String(username).trim().toLowerCase();
