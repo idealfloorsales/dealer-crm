@@ -28,8 +28,8 @@
                 <button type="button" class="workshop-primary-action" data-open-workshop="production">
                     <i class="bi bi-hammer"></i><span>Производство</span>
                 </button>
-                <button type="button" class="workshop-secondary-action" data-open-workshop="receipt">
-                    <i class="bi bi-box-arrow-in-down"></i><span>Приход</span>
+                <button type="button" class="workshop-secondary-action" data-open-workshop="memo">
+                    <i class="bi bi-file-earmark-text"></i><span>Служебка</span>
                 </button>
             </div>
         </section>
@@ -54,7 +54,8 @@
         </section>
 
         <section class="workshop-quick-actions" data-permission="can_manage_workshop">
-            <button type="button" data-open-workshop="receipt"><i class="bi bi-box-arrow-in-down"></i><span><strong>Принять ламинат</strong><small>Поступило / принято / не та позиция</small></span></button>
+            <button type="button" data-open-workshop="memo"><i class="bi bi-file-earmark-plus"></i><span><strong>Создать служебку</strong><small>Несколько SKU и упаковок одним документом</small></span></button>
+            <button type="button" data-open-workshop="receipt"><i class="bi bi-check2-square"></i><span><strong>Сверить приход</strong><small>По служебке, построчно галочками</small></span></button>
             <button type="button" data-open-workshop="production"><i class="bi bi-tools"></i><span><strong>Записать производство</strong><small>Склейка, распил, кромление</small></span></button>
             <button type="button" data-open-workshop="dealer"><i class="bi bi-truck"></i><span><strong>Дилеру</strong><small>Выдача, возврат, замена</small></span></button>
             <button type="button" data-open-workshop="material"><i class="bi bi-bucket"></i><span><strong>Материалы</strong><small>Приход и расход расходников</small></span></button>
@@ -71,7 +72,14 @@
             </div>
 
             <div class="workshop-tab-pane active" data-ws-pane="overview">
-                <div class="workshop-grid-2">
+                <section class="workshop-panel workshop-memo-panel">
+                    <div class="workshop-panel-head">
+                        <div><span>СКЛАД → ЦЕХ</span><h2>Служебные записки и приём</h2><p>Сначала оформляем списание со склада, затем построчно сверяем фактическую доставку.</p></div>
+                        <button type="button" class="workshop-link-btn" data-open-workshop="memo" data-permission="can_manage_workshop"><i class="bi bi-plus-lg"></i> Служебка</button>
+                    </div>
+                    <div id="ws-memo-list" class="workshop-memo-list"></div>
+                </section>
+                <div class="workshop-grid-2 mt-3">
                     <section class="workshop-panel">
                         <div class="workshop-panel-head">
                             <div><span>СЕГОДНЯ / ПОСЛЕДНИЕ ОПЕРАЦИИ</span><h2>Производство</h2></div>
@@ -157,24 +165,47 @@
         </section>
     </main>
 
-    <!-- Receipt modal -->
+    <!-- Service memo modal -->
+    <div class="modal fade" id="ws-memo-modal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered"><div class="modal-content workshop-modal">
+            <div class="modal-header"><div><small>СПИСАНИЕ СО СКЛАДА</small><h5>Новая служебная записка</h5></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <form id="ws-memo-form"><div class="modal-body">
+                <div class="workshop-form-grid">
+                    <label><span>№ служебной записки</span><input id="ws-memo-number" class="form-control" placeholder="Например: ЦЕХ-102" required></label>
+                    <label><span>Дата</span><input id="ws-memo-date" type="date" class="form-control"></label>
+                    <label class="wide"><span>Подпись / ФИО</span><input id="ws-memo-signed" class="form-control" placeholder="Ответственный сотрудник"></label>
+                </div>
+                <div class="workshop-document-note">
+                    <i class="bi bi-info-circle"></i>
+                    <span>Добавьте все позиции одной служебкой. Приход со склада допускается только целыми упаковками.</span>
+                </div>
+                <div class="workshop-memo-editor-head">
+                    <div><strong>Позиции</strong><small>SKU · упаковки · ожидаемый выход образцов</small></div>
+                    <button type="button" id="ws-memo-add-line" class="workshop-link-btn"><i class="bi bi-plus-lg"></i> Позиция</button>
+                </div>
+                <div id="ws-memo-lines" class="workshop-memo-lines"></div>
+                <label class="workshop-note-label"><span>Комментарий</span><textarea id="ws-memo-note" class="form-control" rows="2"></textarea></label>
+            </div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button><button class="btn btn-dark" type="submit"><i class="bi bi-file-earmark-check me-1"></i>Создать служебку</button></div></form>
+        </div></div>
+    </div>
+
+    <!-- Receipt reconciliation modal -->
     <div class="modal fade" id="ws-receipt-modal" tabindex="-1" data-bs-backdrop="static">
-        <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered"><div class="modal-content workshop-modal">
-            <div class="modal-header"><div><small>ПРИХОД ЛАМИНАТА</small><h5>Принять в цех</h5></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered"><div class="modal-content workshop-modal">
+            <div class="modal-header"><div><small>СКЛАД → ЦЕХ</small><h5>Сверка прихода по служебке</h5></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <form id="ws-receipt-form"><div class="modal-body">
                 <div class="workshop-form-grid">
-                    <label class="wide"><span>Что должны были привезти</span><select id="ws-receipt-expected" class="form-select" required></select></label>
-                    <label class="wide"><span>Что фактически привезли</span><select id="ws-receipt-actual" class="form-select" required></select></label>
-                    <label><span>Привезли, упаковок</span><input id="ws-receipt-delivered" type="number" min="0" step="1" class="form-control" required></label>
-                    <label><span>Приняли, упаковок</span><input id="ws-receipt-accepted" type="number" min="0" step="1" class="form-control" required></label>
-                    <label><span>Отдельных планок</span><input id="ws-receipt-loose" type="number" min="0" step="1" class="form-control" value="0"></label>
-                    <label><span>Дата</span><input id="ws-receipt-date" type="date" class="form-control"></label>
-                    <label><span>№ служебной записки</span><input id="ws-receipt-memo" class="form-control" placeholder="На списание со склада"></label>
-                    <label class="wide"><span>Причина расхождения / не та позиция</span><input id="ws-receipt-reason" class="form-control" placeholder="Например: вместо EH-702 привезли EH-703"></label>
-                    <label class="wide"><span>Комментарий</span><textarea id="ws-receipt-note" class="form-control" rows="2"></textarea></label>
+                    <label class="wide"><span>Служебная записка</span><select id="ws-receipt-memo" class="form-select" required></select></label>
+                    <label><span>Дата приёмки</span><input id="ws-receipt-date" type="date" class="form-control"></label>
+                    <label class="wide"><span>Комментарий</span><input id="ws-receipt-note" class="form-control" placeholder="Например: обмен 1 уп. 702 на 1 уп. 703"></label>
                 </div>
+                <div class="workshop-document-note is-warning">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <span>Если хотя бы одна строка не совпадает, документ получает статус «На обмен», и ламинат не приходуется в остаток цеха. После обмена откройте эту же служебку и сверьте повторно.</span>
+                </div>
+                <div id="ws-receipt-lines" class="workshop-receipt-lines"></div>
                 <div id="ws-receipt-calc" class="workshop-calc-box"></div>
-            </div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button><button class="btn btn-dark" type="submit">Принять</button></div></form>
+            </div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button><button class="btn btn-dark" type="submit"><i class="bi bi-check2-square me-1"></i>Зафиксировать сверку</button></div></form>
         </div></div>
     </div>
 
@@ -185,8 +216,6 @@
             <form id="ws-production-form"><div class="modal-body">
                 <div class="workshop-form-grid">
                     <label class="wide"><span>Что изготавливаем</span><select id="ws-production-recipe" class="form-select" required></select></label>
-                    <label><span>Приняли в работу, упаковок</span><input id="ws-production-packs" type="number" min="0" step="1" class="form-control" value="0"></label>
-                    <label><span>+ отдельных планок</span><input id="ws-production-loose" type="number" min="0" step="1" class="form-control" value="0"></label>
                     <label><span>Изготовлено, шт</span><input id="ws-production-output" type="number" min="1" step="1" class="form-control" value="1" required></label>
                     <label><span>Отход / брак, планок</span><input id="ws-production-scrap" type="number" min="0" step="1" class="form-control" value="0"></label>
                     <label><span>Дата</span><input id="ws-production-date" type="date" class="form-control"></label>
