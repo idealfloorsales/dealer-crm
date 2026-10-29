@@ -282,6 +282,7 @@ app.get('/sw.js', (req, res) => {
         if (err) return res.status(500).send('Error');
         const js = data.replace(/{{VER}}/g, APP_VERSION);
         res.set('Content-Type', 'application/javascript');
+        res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.send(js);
     });
 });
@@ -293,6 +294,7 @@ app.get('/competitors.html', (req, res) => servePage(res, 'competitors.html'));
 app.get('/products.html', (req, res) => servePage(res, 'products.html'));
 app.get('/report.html', (req, res) => servePage(res, 'report.html'));
 app.get('/knowledge.html', (req, res) => servePage(res, 'knowledge.html'));
+app.get('/reclamations.html', (req, res) => servePage(res, 'reclamations.html'));
 app.get('/dealer.html', (req, res) => servePage(res, 'dealer.html'));
 app.get('/users.html', (req, res) => servePage(res, 'users.html'));
 app.use(express.static('public'));
