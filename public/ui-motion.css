@@ -335,3 +335,141 @@ body.crm-ui-enhanced .modal-backdrop.show {
         scroll-behavior: auto !important;
     }
 }
+
+
+/* =========================================================
+   GLOBAL OVERLAY / MOBILE SAFE-AREA FIXES
+   ========================================================= */
+
+/* Bootstrap modal must always be above local page navigation and custom menus. */
+.modal { z-index: 1300 !important; }
+.modal-backdrop { z-index: 1290 !important; }
+.crm-toast-stack,
+.toast-container-custom,
+.crm-network-progress,
+.crm-loading-pill { z-index: 1400 !important; }
+
+/* Once a modal is active there must be only one interaction layer. */
+body.modal-open .crm-mobile-nav,
+body.modal-open .bottom-nav,
+body.modal-open .dealer-route-bar,
+body.modal-open .floating-action-button,
+body.modal-open .fab-add {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    transform: translateY(16px) !important;
+}
+
+body.modal-open .dropdown-menu.show {
+    display: none !important;
+}
+
+/* Keep modal content inside the visible viewport on every page. */
+.modal-dialog:not(.modal-fullscreen) {
+    max-height: calc(100dvh - 24px);
+}
+.modal-dialog:not(.modal-fullscreen) .modal-content {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100dvh - 24px);
+    overflow: hidden;
+}
+.modal-dialog:not(.modal-fullscreen) .modal-header,
+.modal-dialog:not(.modal-fullscreen) .modal-footer {
+    flex: 0 0 auto;
+}
+.modal-dialog:not(.modal-fullscreen) .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* The dealer card that launched a modal should never visually compete with it. */
+body.modal-open .dealer-v3-card,
+body.modal-open .dealer-item,
+body.modal-open .app-panel,
+body.modal-open .card {
+    transform: none !important;
+}
+body.modal-open .dealer-v3-more,
+body.modal-open .dealer-v3-menu {
+    z-index: auto !important;
+}
+
+@media (max-width: 991.98px) {
+    body.modal-open {
+        padding-bottom: 0 !important;
+    }
+
+    .modal {
+        padding: 0 !important;
+    }
+
+    .modal-dialog:not(.modal-fullscreen) {
+        width: auto;
+        margin: 8px;
+        max-height: calc(100dvh - 16px);
+    }
+
+    .modal-dialog:not(.modal-fullscreen) .modal-content {
+        max-height: calc(100dvh - 16px);
+        border-radius: 18px !important;
+    }
+
+    .modal-dialog:not(.modal-fullscreen) .modal-footer,
+    .dealer-modal-footer {
+        position: relative !important;
+        bottom: auto !important;
+        z-index: 2;
+        padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
+        background: rgba(255,255,255,.985) !important;
+    }
+
+    .modal-dialog:not(.modal-fullscreen) .modal-footer {
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .modal-dialog:not(.modal-fullscreen) .modal-footer .btn {
+        min-height: 42px;
+    }
+
+    .dealer-form-modal .modal-dialog {
+        height: auto !important;
+        max-height: calc(100dvh - 16px) !important;
+        margin: 8px !important;
+    }
+
+    .dealer-form-modal .dealer-form-content {
+        max-height: calc(100dvh - 16px) !important;
+    }
+
+    .dealer-modal-footer .ms-auto {
+        width: 100%;
+        flex: 1 1 100% !important;
+        justify-content: stretch !important;
+    }
+
+    .dealer-modal-footer .ms-auto > .btn,
+    .dealer-modal-footer .ms-auto > button {
+        flex: 1 1 0;
+    }
+}
+
+@supports not (height: 100dvh) {
+    .modal-dialog:not(.modal-fullscreen),
+    .modal-dialog:not(.modal-fullscreen) .modal-content {
+        max-height: calc(100vh - 24px);
+    }
+    @media (max-width: 991.98px) {
+        .modal-dialog:not(.modal-fullscreen),
+        .modal-dialog:not(.modal-fullscreen) .modal-content,
+        .dealer-form-modal .modal-dialog,
+        .dealer-form-modal .dealer-form-content {
+            max-height: calc(100vh - 16px) !important;
+        }
+    }
+}
