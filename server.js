@@ -32,6 +32,7 @@ const servePage = (res, fileName) => {
     fs.readFile(filePath, 'utf8', (err, data) => {
         if (err) { console.error(err); return res.status(500).send('Server Error'); }
         const html = data.replace(/{{VER}}/g, APP_VERSION);
+        res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.send(html);
     });
 };
@@ -287,6 +288,7 @@ app.get('/sw.js', (req, res) => {
     });
 });
 app.get('/', (req, res) => servePage(res, 'index.html'));
+app.get('/index.html', (req, res) => servePage(res, 'index.html'));
 app.get('/login.html', (req, res) => servePage(res, 'login.html'));
 app.get('/map.html', (req, res) => servePage(res, 'map.html'));
 app.get('/sales.html', (req, res) => servePage(res, 'sales.html'));
