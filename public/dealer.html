@@ -178,6 +178,7 @@
                 <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#competitors-pane">Конкуренты</button></li>
                 <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#photos-pane">Фото</button></li>
                 <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#products-pane">Матрица</button></li>
+                <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#workshop-pane"><i class="bi bi-tools me-1"></i>Образцы</button></li>
                 <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#documents-pane"><i class="bi bi-file-earmark-text me-1"></i>Документы</button></li>
             </ul>
         </div>
@@ -277,6 +278,21 @@
                         
                         <h6 class="fw-bold text-muted mb-2">Товары (Ламинат)</h6>
                         <div id="dealer-products-list"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="workshop-pane">
+                <div class="content-card">
+                    <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                        <div>
+                            <h5 class="card-heading mb-1"><i class="bi bi-tools me-2"></i>Образцы и стенды у дилера</h5>
+                            <p class="text-muted small mb-0">Точное количество по движениям цеха: выдача, возврат и замена.</p>
+                        </div>
+                        <a href="/workshop.html" class="btn btn-sm btn-light border" data-permission="can_view_workshop"><i class="bi bi-arrow-up-right-square me-1"></i>Цех</a>
+                    </div>
+                    <div id="dealer-workshop-assets">
+                        <div class="dealer-lazy-state"><span class="spinner-border spinner-border-sm"></span><span>Загружаем учет цеха…</span></div>
                     </div>
                 </div>
             </div>
