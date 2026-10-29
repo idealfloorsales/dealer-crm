@@ -1457,6 +1457,7 @@ app.post('/api/workshop/laminate-receipt', requirePermission('can_manage_worksho
             direction: 'in',
             qty: planksQty,
             unit: 'планка',
+            serviceMemoNumber: String(req.body.serviceMemoNumber || '').trim(),
             note: String(req.body.note || '').trim(),
             meta: {
                 expectedProductId,
