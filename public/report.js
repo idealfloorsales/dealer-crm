@@ -105,16 +105,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 const cell = row.dealers[index];
                 
                 // Считаем сумму
-                if (cell.value > 0) {
-                    rowPresenceCount++; 
-                    if (!isPos) dealerTotals[i]++; // +1 к итогу дилера
+                const sampleQty = Number(cell.sample_qty) || 0;
+                if (cell.value > 0 || sampleQty > 0) {
+                    rowPresenceCount++;
+                    if (!isPos) dealerTotals[i]++;
                 }
 
                 if (cell.is_pos) {
                     return cell.value > 0 ? `<td class="text-center"><span class="pos-value">${cell.value}</span></td>` : '<td></td>';
                 } else {
-                    if (cell.value === 1) {
-                        return '<td class="text-center"><i class="bi bi-check-circle-fill matrix-check text-success"></i></td>';
+                    const sampleQty = Number(cell.sample_qty) || 0;
+                    if (cell.value === 1 || sampleQty > 0) {
+                        const icon = cell.value === 1
+                            ? '<i class="bi bi-check-circle-fill matrix-check text-success"></i>'
+                            : '<i class="bi bi-exclamation-circle matrix-check text-warning" title="Есть по учету цеха, но нет галочки в матрице"></i>';
+                        const qty = sampleQty > 0
+                            ? `<span class="matrix-sample-qty" title="Количество образцов по учету цеха">×${sampleQty}</span>`
+                            : '';
+                        return `<td class="text-center"><span class="matrix-cell-with-samples">${icon}${qty}</span></td>`;
                     } else {
                         return '<td class="text-center"><span class="matrix-empty text-muted opacity-25">&bull;</span></td>';
                     }
