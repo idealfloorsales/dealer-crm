@@ -187,7 +187,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const cached = readCachedDealerProfile();
             if (cached) return cached;
         }
-        const response = await fetch(`${API_DEALERS_URL}/${dealerId}?view=profile`);
+        const url = `${API_DEALERS_URL}/${dealerId}?view=profile${force ? `&fresh=${Date.now()}` : ''}`;
+        const response = await fetch(url, force ? { cache: 'no-store' } : undefined);
         if (!response.ok) throw new Error('Дилер не найден.');
         const dealer = await response.json();
         cacheDealerProfile(dealer);
