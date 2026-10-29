@@ -216,6 +216,7 @@
             <form id="ws-production-form"><div class="modal-body">
                 <div class="workshop-form-grid">
                     <label class="wide"><span>Что изготавливаем</span><select id="ws-production-recipe" class="form-select" required></select></label>
+                    <label class="wide"><span>По какой служебной записке</span><select id="ws-production-memo-line" class="form-select"><option value="">Без привязки / из текущего остатка</option></select></label>
                     <label><span>Изготовлено, шт</span><input id="ws-production-output" type="number" min="1" step="1" class="form-control" value="1" required></label>
                     <label><span>Отход / брак, планок</span><input id="ws-production-scrap" type="number" min="0" step="1" class="form-control" value="0"></label>
                     <label><span>Дата</span><input id="ws-production-date" type="date" class="form-control"></label>
@@ -311,6 +312,7 @@
                     <label><span>Код</span><input id="ws-recipe-sku" class="form-control"></label>
                     <label class="wide"><span>Ламинат</span><select id="ws-recipe-product" class="form-select"></select></label>
                     <label><span>Планок на 1 изделие</span><input id="ws-recipe-planks" type="number" min="0" step="1" class="form-control" value="0"></label>
+                    <label><span>Минимальный остаток готовых, шт</span><input id="ws-recipe-min-stock" type="number" min="0" step="1" class="form-control" value="0"></label>
                     <label><span>Планок в упаковке (если нужно переопределить)</span><input id="ws-recipe-pack-override" type="number" min="0" step="1" class="form-control" value="0"></label>
                     <label><span>Сторона А</span><input id="ws-recipe-side-a" class="form-control" placeholder="Палубная укладка"></label>
                     <label><span>Сторона Б</span><input id="ws-recipe-side-b" class="form-control" placeholder="Ёлочка"></label>
