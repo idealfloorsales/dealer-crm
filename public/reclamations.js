@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentViewId = null;
     let canManageReclamations = false;
     const reclamationDetailCache = new Map();
+    let referenceDataPromise = null;
 
     const listEl = document.getElementById('reclamations-list');
     const searchInput = document.getElementById('search-input');
@@ -27,11 +28,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (mediaInput && !canManageReclamations) mediaInput.disabled = true;
 
         document.getElementById('r_date').value = new Date().toISOString().slice(0, 10);
-        await Promise.all([
+
+        referenceDataPromise = Promise.allSettled([
             fetchDealers(),
-            fetchProducts(),
-            fetchReclamations()
+            fetchProducts()
         ]);
+
+        await fetchReclamations();
         renderList();
         setupPhotoUpload();
     }
@@ -145,8 +148,9 @@ document.addEventListener('DOMContentLoaded', () => {
         container.insertAdjacentHTML('beforeend', `<input type="text" class="form-control form-control-sm batch-input mt-1" placeholder="Номер партии">`);
     };
 
-    window.openAddModal = () => {
+    window.openAddModal = async () => {
         if (!canManageReclamations) return;
+        if (referenceDataPromise) await referenceDataPromise;
         form.reset();
         document.getElementById('r_id').value = ''; 
         document.getElementById('add-modal-title').textContent = 'Оформление рекламации';
@@ -157,8 +161,9 @@ document.addEventListener('DOMContentLoaded', () => {
         addModal.show();
     };
 
-    window.openEditModal = () => {
+    window.openEditModal = async () => {
         if (!canManageReclamations) return;
+        if (referenceDataPromise) await referenceDataPromise;
         if(!currentViewId) return;
         const r = allReclamations.find(x => x.id === currentViewId);
         if(!r) return;
