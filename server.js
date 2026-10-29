@@ -1129,6 +1129,574 @@ const reclamationSchema = new mongoose.Schema({
 }, { timestamps: true });
 const Reclamation = mongoose.model('Reclamation', reclamationSchema);
 
+
+// ==========================================
+// ЦЕХ API
+// ==========================================
+async function syncWorkshopPosToDealer(dealerId, recipeId) {
+    const recipe = await WorkshopRecipe.findById(recipeId).select('matrixPosName').lean();
+    const posName = String(recipe?.matrixPosName || '').trim();
+    if (!posName) return;
+
+    const recipes = await WorkshopRecipe.find({ matrixPosName: posName }).select('_id').lean();
+    const recipeIds = recipes.map(item => item._id);
+    const assets = await WorkshopDealerAsset.find({ dealer: dealerId, recipe: { $in: recipeIds } }).lean();
+    const qty = assets.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+
+    const dealer = await Dealer.findById(dealerId);
+    if (!dealer) return;
+    dealer.pos_materials = Array.isArray(dealer.pos_materials) ? dealer.pos_materials : [];
+    const index = dealer.pos_materials.findIndex(item => item.name === posName);
+    if (qty > 0) {
+        if (index >= 0) dealer.pos_materials[index].quantity = qty;
+        else dealer.pos_materials.push({ name: posName, quantity: qty });
+    } else if (index >= 0) {
+        dealer.pos_materials.splice(index, 1);
+    }
+    await dealer.save();
+}
+
+app.get('/api/workshop/bootstrap', requirePermission('can_view_workshop'), async (req, res) => {
+    try {
+        const [products, dealers, materials, recipes, laminateStocks, assets, productions, movements] = await Promise.all([
+            Product.find().select('sku name is_liquid characteristics.package_qty characteristics.size characteristics.class characteristics.thickness').sort({ sku: 1 }).lean(),
+            Dealer.find(getDealerFilter(req)).select('_id dealer_id name city status').sort({ name: 1 }).lean(),
+            WorkshopMaterial.find({ active: { $ne: false } }).sort({ category: 1, name: 1 }).lean(),
+            WorkshopRecipe.find({ active: { $ne: false } })
+                .populate('product', 'sku name is_liquid characteristics.package_qty')
+                .populate('materials.material', 'code name unit stockQty')
+                .populate('components.recipe', 'name outputType stockQty')
+                .sort({ outputType: 1, name: 1 }).lean(),
+            WorkshopLaminateStock.find().populate('product', 'sku name is_liquid characteristics.package_qty').lean(),
+            WorkshopDealerAsset.find({ qty: { $gt: 0 } })
+                .populate('dealer', 'dealer_id name city')
+                .populate({ path: 'recipe', populate: { path: 'product', select: 'sku name is_liquid' } })
+                .sort({ updatedAt: -1 }).lean(),
+            WorkshopProduction.find()
+                .populate('recipe', 'name outputType')
+                .populate('product', 'sku name')
+                .sort({ date: -1, createdAt: -1 }).limit(30).lean(),
+            WorkshopMovement.find()
+                .populate('product', 'sku name')
+                .populate('material', 'code name unit')
+                .populate('recipe', 'name outputType')
+                .populate('dealer', 'dealer_id name city')
+                .sort({ date: -1, createdAt: -1 }).limit(60).lean()
+        ]);
+
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const todayProduction = productions.filter(item => new Date(item.date) >= today)
+            .reduce((sum, item) => sum + (Number(item.outputQty) || 0), 0);
+        const finishedStock = recipes.reduce((sum, item) => sum + (Number(item.stockQty) || 0), 0);
+        const lowMaterials = materials.filter(item => Number(item.minQty) > 0 && Number(item.stockQty) <= Number(item.minQty)).length;
+        const laminatePlanks = laminateStocks.reduce((sum, item) => sum + (Number(item.planksQty) || 0), 0);
+
+        res.json({
+            products: products.map(convertToClient),
+            dealers: dealers.map(convertToClient),
+            materials: materials.map(convertToClient),
+            recipes: recipes.map(convertToClient),
+            laminateStocks: laminateStocks.map(convertToClient),
+            dealerAssets: assets.map(convertToClient),
+            productions: productions.map(convertToClient),
+            movements: movements.map(convertToClient),
+            stats: { todayProduction, finishedStock, lowMaterials, laminatePlanks }
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/workshop/movements', requirePermission('can_view_workshop'), async (req, res) => {
+    try {
+        const limit = Math.max(1, Math.min(500, Number(req.query.limit) || 150));
+        const filter = {};
+        if (req.query.type) filter.type = req.query.type;
+        const list = await WorkshopMovement.find(filter)
+            .populate('product', 'sku name')
+            .populate('material', 'code name unit')
+            .populate('recipe', 'name outputType')
+            .populate('dealer', 'dealer_id name city')
+            .sort({ date: -1, createdAt: -1 }).limit(limit).lean();
+        res.json(list.map(convertToClient));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/materials', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const item = new WorkshopMaterial({
+            code: String(req.body.code || '').trim(),
+            name: String(req.body.name || '').trim(),
+            category: req.body.category || 'consumable',
+            unit: req.body.unit || 'шт',
+            stockQty: Math.max(0, workshopNumber(req.body.stockQty)),
+            minQty: Math.max(0, workshopNumber(req.body.minQty)),
+            active: req.body.active !== false,
+            note: String(req.body.note || '').trim()
+        });
+        if (!item.name) return res.status(400).json({ error: 'Укажите название материала' });
+        await item.save();
+        res.status(201).json(convertToClient(item));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.put('/api/workshop/materials/:id', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const payload = {
+            code: String(req.body.code || '').trim(),
+            name: String(req.body.name || '').trim(),
+            category: req.body.category || 'consumable',
+            unit: req.body.unit || 'шт',
+            minQty: Math.max(0, workshopNumber(req.body.minQty)),
+            active: req.body.active !== false,
+            note: String(req.body.note || '').trim()
+        };
+        const item = await WorkshopMaterial.findByIdAndUpdate(req.params.id, payload, { new: true });
+        if (!item) return res.status(404).json({ error: 'Материал не найден' });
+        res.json(convertToClient(item));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/material-movement', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const materialId = req.body.materialId;
+        const qty = Math.abs(workshopNumber(req.body.qty));
+        const direction = req.body.direction === 'out' ? 'out' : 'in';
+        if (!materialId || qty <= 0) return res.status(400).json({ error: 'Укажите материал и количество' });
+
+        const delta = direction === 'out' ? -qty : qty;
+        const material = await workshopChangeMaterial(materialId, delta);
+        const movement = await WorkshopMovement.create({
+            date: req.body.date || new Date(),
+            type: req.body.type || (direction === 'out' ? 'material_issue' : 'material_receipt'),
+            entityType: 'material',
+            material: materialId,
+            direction,
+            qty,
+            unit: material.unit || 'шт',
+            serviceMemoNumber: String(req.body.serviceMemoNumber || '').trim(),
+            note: String(req.body.note || '').trim(),
+            createdBy: workshopUser(req)
+        });
+        res.status(201).json({ material: convertToClient(material), movement: convertToClient(movement) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/recipes', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const recipe = new WorkshopRecipe({
+            name: String(req.body.name || '').trim(),
+            outputType: req.body.outputType || 'sample',
+            sku: String(req.body.sku || '').trim(),
+            product: req.body.productId || null,
+            sideA: String(req.body.sideA || '').trim(),
+            sideB: String(req.body.sideB || '').trim(),
+            planksPerUnit: Math.max(0, workshopNumber(req.body.planksPerUnit)),
+            packQtyOverride: Math.max(0, workshopNumber(req.body.packQtyOverride)),
+            matrixPosName: String(req.body.matrixPosName || '').trim(),
+            materials: Array.isArray(req.body.materials) ? req.body.materials.map(item => ({
+                material: item.materialId,
+                qty: Math.max(0, workshopNumber(item.qty))
+            })).filter(item => item.material && item.qty > 0) : [],
+            components: Array.isArray(req.body.components) ? req.body.components.map(item => ({
+                recipe: item.recipeId,
+                qty: Math.max(0, workshopNumber(item.qty))
+            })).filter(item => item.recipe && item.qty > 0) : [],
+            active: req.body.active !== false,
+            note: String(req.body.note || '').trim()
+        });
+        if (!recipe.name) return res.status(400).json({ error: 'Укажите название изделия' });
+        await recipe.save();
+        res.status(201).json(convertToClient(recipe));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.put('/api/workshop/recipes/:id', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const payload = {
+            name: String(req.body.name || '').trim(),
+            outputType: req.body.outputType || 'sample',
+            sku: String(req.body.sku || '').trim(),
+            product: req.body.productId || null,
+            sideA: String(req.body.sideA || '').trim(),
+            sideB: String(req.body.sideB || '').trim(),
+            planksPerUnit: Math.max(0, workshopNumber(req.body.planksPerUnit)),
+            packQtyOverride: Math.max(0, workshopNumber(req.body.packQtyOverride)),
+            matrixPosName: String(req.body.matrixPosName || '').trim(),
+            materials: Array.isArray(req.body.materials) ? req.body.materials.map(item => ({
+                material: item.materialId,
+                qty: Math.max(0, workshopNumber(item.qty))
+            })).filter(item => item.material && item.qty > 0) : [],
+            components: Array.isArray(req.body.components) ? req.body.components.map(item => ({
+                recipe: item.recipeId,
+                qty: Math.max(0, workshopNumber(item.qty))
+            })).filter(item => item.recipe && item.qty > 0) : [],
+            active: req.body.active !== false,
+            note: String(req.body.note || '').trim()
+        };
+        const recipe = await WorkshopRecipe.findByIdAndUpdate(req.params.id, payload, { new: true });
+        if (!recipe) return res.status(404).json({ error: 'Рецептура не найдена' });
+        res.json(convertToClient(recipe));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/laminate-receipt', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const expectedProductId = req.body.expectedProductId || null;
+        const actualProductId = req.body.actualProductId || expectedProductId;
+        const deliveredPacks = Math.max(0, workshopNumber(req.body.deliveredPacks));
+        const acceptedPacks = Math.max(0, workshopNumber(req.body.acceptedPacks));
+        const acceptedLoosePlanks = Math.max(0, workshopNumber(req.body.acceptedLoosePlanks));
+        const product = await Product.findById(actualProductId).lean();
+        if (!product) return res.status(404).json({ error: 'Фактически принятая позиция не найдена' });
+        const packQty = workshopPackQty(product);
+        if (packQty <= 0) return res.status(400).json({ error: 'В карточке товара не заполнено количество планок в упаковке' });
+
+        const planksQty = acceptedPacks * packQty + acceptedLoosePlanks;
+        if (planksQty <= 0) return res.status(400).json({ error: 'Принятое количество должно быть больше нуля' });
+
+        const stock = await workshopChangeLaminate(actualProductId, planksQty);
+        const mismatch = String(expectedProductId || '') !== String(actualProductId || '') || acceptedPacks !== deliveredPacks;
+        const movement = await WorkshopMovement.create({
+            date: req.body.date || new Date(),
+            type: 'laminate_receipt',
+            entityType: 'laminate',
+            product: actualProductId,
+            direction: 'in',
+            qty: planksQty,
+            unit: 'планка',
+            note: String(req.body.note || '').trim(),
+            meta: {
+                expectedProductId,
+                actualProductId,
+                deliveredPacks,
+                acceptedPacks,
+                acceptedLoosePlanks,
+                packQty,
+                mismatch,
+                discrepancyReason: String(req.body.discrepancyReason || '').trim()
+            },
+            createdBy: workshopUser(req)
+        });
+
+        res.status(201).json({ stock: convertToClient(stock), movement: convertToClient(movement), mismatch });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/production', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const recipe = await WorkshopRecipe.findById(req.body.recipeId)
+            .populate('product')
+            .populate('materials.material')
+            .populate('components.recipe');
+        if (!recipe) return res.status(404).json({ error: 'Рецептура не найдена' });
+
+        const outputQty = Math.max(0, workshopNumber(req.body.outputQty));
+        const scrapPlanks = Math.max(0, workshopNumber(req.body.scrapPlanks));
+        const acceptedPacks = Math.max(0, workshopNumber(req.body.acceptedPacks));
+        const acceptedLoosePlanks = Math.max(0, workshopNumber(req.body.acceptedLoosePlanks));
+        if (outputQty <= 0) return res.status(400).json({ error: 'Укажите количество изготовленных изделий' });
+
+        const packQty = workshopPackQty(recipe.product, recipe.packQtyOverride);
+        const usedForOutput = Math.max(0, workshopNumber(recipe.planksPerUnit)) * outputQty;
+        const consumedPlanks = usedForOutput + scrapPlanks;
+        const acceptedTotal = acceptedPacks * packQty + acceptedLoosePlanks;
+
+        if (consumedPlanks > 0) {
+            if (!recipe.product) return res.status(400).json({ error: 'Для этой рецептуры не выбран ламинат' });
+            const stock = await WorkshopLaminateStock.findOne({ product: recipe.product._id }).lean();
+            if ((Number(stock?.planksQty) || 0) < consumedPlanks) {
+                return res.status(400).json({ error: 'Недостаточно планок ламината в остатках цеха' });
+            }
+        }
+
+        for (const line of recipe.materials || []) {
+            const need = (Number(line.qty) || 0) * outputQty;
+            if (need > 0 && (Number(line.material?.stockQty) || 0) < need) {
+                return res.status(400).json({ error: `Недостаточно материала «${line.material?.name || 'материал'}»` });
+            }
+        }
+
+        for (const line of recipe.components || []) {
+            const need = (Number(line.qty) || 0) * outputQty;
+            if (need > 0 && (Number(line.recipe?.stockQty) || 0) < need) {
+                return res.status(400).json({ error: `Недостаточно готовых компонентов «${line.recipe?.name || 'компонент'}»` });
+            }
+        }
+
+        if (consumedPlanks > 0) {
+            await workshopChangeLaminate(recipe.product._id, -consumedPlanks);
+            await WorkshopMovement.create({
+                date: req.body.date || new Date(), type: 'production_laminate',
+                entityType: 'laminate', product: recipe.product._id, direction: 'out',
+                qty: consumedPlanks, unit: 'планка', note: String(req.body.note || '').trim(),
+                meta: { recipeId: recipe._id, outputQty, scrapPlanks }, createdBy: workshopUser(req)
+            });
+        }
+
+        for (const line of recipe.materials || []) {
+            const need = (Number(line.qty) || 0) * outputQty;
+            if (need <= 0) continue;
+            await workshopChangeMaterial(line.material._id, -need);
+            await WorkshopMovement.create({
+                date: req.body.date || new Date(), type: 'production_material',
+                entityType: 'material', material: line.material._id, direction: 'out',
+                qty: need, unit: line.material.unit || 'шт',
+                meta: { recipeId: recipe._id, outputQty }, createdBy: workshopUser(req)
+            });
+        }
+
+        for (const line of recipe.components || []) {
+            const need = (Number(line.qty) || 0) * outputQty;
+            if (need <= 0) continue;
+            await workshopChangeRecipe(line.recipe._id, -need);
+            await WorkshopMovement.create({
+                date: req.body.date || new Date(), type: 'production_component',
+                entityType: 'finished', recipe: line.recipe._id, direction: 'out',
+                qty: need, unit: 'шт', meta: { recipeId: recipe._id, outputQty },
+                createdBy: workshopUser(req)
+            });
+        }
+
+        const resultStock = await workshopChangeRecipe(recipe._id, outputQty);
+        await WorkshopMovement.create({
+            date: req.body.date || new Date(), type: 'production_output',
+            entityType: 'finished', recipe: recipe._id, direction: 'in',
+            qty: outputQty, unit: 'шт', note: String(req.body.note || '').trim(),
+            meta: { acceptedPacks, acceptedLoosePlanks, acceptedTotal, packQty, consumedPlanks, scrapPlanks },
+            createdBy: workshopUser(req)
+        });
+
+        const production = await WorkshopProduction.create({
+            date: req.body.date || new Date(),
+            recipe: recipe._id,
+            product: recipe.product?._id || null,
+            acceptedPacks,
+            acceptedLoosePlanks,
+            packQty,
+            totalAcceptedPlanks: acceptedTotal,
+            outputQty,
+            consumedPlanks,
+            scrapPlanks,
+            operations: Array.isArray(req.body.operations)
+                ? req.body.operations.map(item => ({
+                    type: String(item.type || '').trim(),
+                    qty: Math.max(0, workshopNumber(item.qty)),
+                    note: String(item.note || '').trim()
+                })).filter(item => item.type)
+                : [],
+            note: String(req.body.note || '').trim(),
+            createdBy: workshopUser(req)
+        });
+
+        res.status(201).json({ production: convertToClient(production), stock: convertToClient(resultStock) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/writeoff', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const entityType = req.body.entityType;
+        const qty = Math.abs(workshopNumber(req.body.qty));
+        const serviceMemoNumber = String(req.body.serviceMemoNumber || '').trim();
+        if (qty <= 0) return res.status(400).json({ error: 'Укажите количество списания' });
+        if (!serviceMemoNumber) return res.status(400).json({ error: 'Для списания укажите номер служебной записки' });
+
+        let movementData = {
+            date: req.body.date || new Date(), type: 'writeoff', entityType,
+            direction: 'out', qty, serviceMemoNumber,
+            note: String(req.body.note || '').trim(), createdBy: workshopUser(req)
+        };
+
+        if (entityType === 'laminate') {
+            await workshopChangeLaminate(req.body.productId, -qty);
+            movementData.product = req.body.productId;
+            movementData.unit = 'планка';
+        } else if (entityType === 'material') {
+            const material = await workshopChangeMaterial(req.body.materialId, -qty);
+            movementData.material = req.body.materialId;
+            movementData.unit = material.unit || 'шт';
+        } else if (entityType === 'finished') {
+            await workshopChangeRecipe(req.body.recipeId, -qty);
+            movementData.recipe = req.body.recipeId;
+            movementData.unit = 'шт';
+        } else {
+            return res.status(400).json({ error: 'Неизвестный тип списания' });
+        }
+
+        const movement = await WorkshopMovement.create(movementData);
+        res.status(201).json(convertToClient(movement));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/dealer-movement', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const dealerId = req.body.dealerId;
+        const recipeId = req.body.recipeId;
+        const action = req.body.action || 'issue';
+        const qty = Math.abs(workshopNumber(req.body.qty));
+        if (!dealerId || !recipeId || qty <= 0) return res.status(400).json({ error: 'Выберите дилера, изделие и количество' });
+
+        const [dealer, recipe] = await Promise.all([
+            Dealer.findById(dealerId).select('_id name'),
+            WorkshopRecipe.findById(recipeId)
+        ]);
+        if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
+        if (!recipe) return res.status(404).json({ error: 'Изделие не найдено' });
+
+        let asset = await WorkshopDealerAsset.findOne({ dealer: dealerId, recipe: recipeId });
+        if (!asset) asset = new WorkshopDealerAsset({ dealer: dealerId, recipe: recipeId, qty: 0 });
+
+        const condition = req.body.returnCondition || 'defect';
+        let issued = 0;
+        let returned = 0;
+
+        if (action === 'issue') {
+            if (Number(recipe.stockQty) < qty) return res.status(400).json({ error: 'Недостаточно готовых изделий в цехе' });
+            await workshopChangeRecipe(recipeId, -qty);
+            asset.qty += qty;
+            issued = qty;
+        } else if (action === 'return') {
+            if (Number(asset.qty) < qty) return res.status(400).json({ error: 'У дилера числится меньше изделий' });
+            asset.qty -= qty;
+            returned = qty;
+            if (condition === 'reusable') await workshopChangeRecipe(recipeId, qty);
+        } else if (action === 'replacement') {
+            const returnQty = Math.abs(workshopNumber(req.body.returnQty || qty));
+            const issueQty = Math.abs(workshopNumber(req.body.issueQty || qty));
+            if (Number(asset.qty) < returnQty) return res.status(400).json({ error: 'У дилера числится меньше изделий для возврата' });
+            if (Number(recipe.stockQty) < issueQty) return res.status(400).json({ error: 'Недостаточно изделий для замены' });
+            asset.qty = Number(asset.qty) - returnQty + issueQty;
+            await workshopChangeRecipe(recipeId, -issueQty);
+            if (condition === 'reusable') await workshopChangeRecipe(recipeId, returnQty);
+            returned = returnQty;
+            issued = issueQty;
+        } else {
+            return res.status(400).json({ error: 'Неизвестная операция с дилером' });
+        }
+
+        asset.qty = Math.max(0, Number(asset.qty) || 0);
+        await asset.save();
+
+        const movement = await WorkshopMovement.create({
+            date: req.body.date || new Date(),
+            type: `dealer_${action}`,
+            entityType: 'finished',
+            recipe: recipeId,
+            dealer: dealerId,
+            direction: action === 'return' ? 'in' : action === 'issue' ? 'out' : 'neutral',
+            qty,
+            unit: 'шт',
+            note: String(req.body.note || '').trim(),
+            meta: { issued, returned, returnCondition: condition, reason: String(req.body.reason || '').trim() },
+            createdBy: workshopUser(req)
+        });
+
+        await syncWorkshopPosToDealer(dealerId, recipeId);
+        res.status(201).json({ asset: convertToClient(asset), movement: convertToClient(movement) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.get('/api/workshop/dealers/:dealerId/assets', requireAnyPermission('can_view_workshop', 'can_view_dealers'), async (req, res) => {
+    try {
+        const assets = await WorkshopDealerAsset.find({ dealer: req.params.dealerId, qty: { $gt: 0 } })
+            .populate({ path: 'recipe', populate: { path: 'product', select: 'sku name is_liquid' } })
+            .sort({ updatedAt: -1 }).lean();
+        res.json(assets.map(convertToClient));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/stocktake', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
+        if (!inputLines.length) return res.status(400).json({ error: 'Добавьте позиции инвентаризации' });
+        const savedLines = [];
+
+        for (const line of inputLines) {
+            const actualQty = Math.max(0, workshopNumber(line.actualQty));
+            let systemQty = 0;
+            let delta = 0;
+            let movement = null;
+
+            if (line.entityType === 'laminate' && line.productId) {
+                const current = await WorkshopLaminateStock.findOne({ product: line.productId }).lean();
+                systemQty = Number(current?.planksQty) || 0;
+                delta = actualQty - systemQty;
+                if (Math.abs(delta) > 0.0001) {
+                    await workshopChangeLaminate(line.productId, delta);
+                    movement = { entityType:'laminate', product:line.productId, unit:'планка' };
+                }
+                savedLines.push({ entityType:'laminate', product:line.productId, systemQty, actualQty, delta, note:line.note || '' });
+            } else if (line.entityType === 'material' && line.materialId) {
+                const current = await WorkshopMaterial.findById(line.materialId).lean();
+                if (!current) continue;
+                systemQty = Number(current.stockQty) || 0;
+                delta = actualQty - systemQty;
+                if (Math.abs(delta) > 0.0001) {
+                    await workshopChangeMaterial(line.materialId, delta);
+                    movement = { entityType:'material', material:line.materialId, unit:current.unit || 'шт' };
+                }
+                savedLines.push({ entityType:'material', material:line.materialId, systemQty, actualQty, delta, note:line.note || '' });
+            } else if (line.entityType === 'finished' && line.recipeId) {
+                const current = await WorkshopRecipe.findById(line.recipeId).lean();
+                if (!current) continue;
+                systemQty = Number(current.stockQty) || 0;
+                delta = actualQty - systemQty;
+                if (Math.abs(delta) > 0.0001) {
+                    await workshopChangeRecipe(line.recipeId, delta);
+                    movement = { entityType:'finished', recipe:line.recipeId, unit:'шт' };
+                }
+                savedLines.push({ entityType:'finished', recipe:line.recipeId, systemQty, actualQty, delta, note:line.note || '' });
+            }
+
+            if (movement && Math.abs(delta) > 0.0001) {
+                await WorkshopMovement.create({
+                    date: req.body.date || new Date(),
+                    type: 'stocktake_adjustment',
+                    ...movement,
+                    direction: delta > 0 ? 'in' : 'out',
+                    qty: Math.abs(delta),
+                    note: line.note || '',
+                    meta: { systemQty, actualQty, delta },
+                    createdBy: workshopUser(req)
+                });
+            }
+        }
+
+        const stocktake = await WorkshopStocktake.create({
+            date: req.body.date || new Date(),
+            lines: savedLines,
+            note: String(req.body.note || '').trim(),
+            createdBy: workshopUser(req)
+        });
+        res.status(201).json(convertToClient(stocktake));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
 app.get('/api/reclamations/dashboard', requirePermission('can_view_reclamations'), async (req, res) => {
     try {
         const dealerIds = await getScopedDealerIds(req);
