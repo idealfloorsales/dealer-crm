@@ -318,7 +318,10 @@ body.crm-ui-enhanced .modal-backdrop.show {
         width: auto;
     }
     .crm-toast { border-radius: 15px; }
-    .crm-loading-pill { top: 12px; }
+    .crm-loading-pill {
+        top: auto;
+        bottom: calc(92px + env(safe-area-inset-bottom));
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
