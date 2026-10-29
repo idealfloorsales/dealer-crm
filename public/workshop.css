@@ -200,3 +200,103 @@ radial-gradient(circle at 90% 0,rgba(185,4,10,.35),transparent 20rem),linear-gra
 @media(max-width:767.98px){
   .workshop-quick-actions button:last-child{grid-column:auto!important}
 }
+
+
+/* =========================================================
+   SERVICE MEMO PRODUCT PICKER
+   ========================================================= */
+.workshop-memo-picker-tools{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;margin:12px 0 8px
+}
+.workshop-memo-picker-tools .workshop-search{flex:1 1 360px;min-width:0}
+.workshop-memo-filters{display:flex;gap:5px;flex:0 0 auto}
+.workshop-memo-filters button{
+  min-height:34px;padding:0 10px;border:1px solid #e4dfda;border-radius:9px;background:#fff;color:#7b7d82;font-size:.54rem;font-weight:800
+}
+.workshop-memo-filters button.active{background:#252529;border-color:#252529;color:#fff}
+
+.workshop-memo-table-head{
+  display:grid;grid-template-columns:38px minmax(220px,1.35fr) 145px 110px minmax(210px,1fr);gap:8px;
+  align-items:center;padding:0 10px 6px;color:#9a9ca1;font-size:.49rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em
+}
+.workshop-memo-product-list{
+  display:flex;flex-direction:column;gap:5px;max-height:min(48vh,520px);overflow:auto;padding-right:2px;
+  overscroll-behavior:contain;-webkit-overflow-scrolling:touch
+}
+.workshop-memo-product-row{
+  display:grid;grid-template-columns:38px minmax(220px,1.35fr) 145px 110px minmax(210px,1fr);gap:8px;
+  align-items:center;padding:8px 10px;border:1px solid #ebe7e3;border-radius:11px;background:#fff;transition:.16s ease
+}
+.workshop-memo-product-row:hover{border-color:#dcd5cf;box-shadow:0 4px 14px rgba(30,30,32,.035)}
+.workshop-memo-product-row.is-selected{border-color:#c8d8cc;background:#fbfefc;box-shadow:0 5px 16px rgba(45,100,64,.05)}
+.workshop-memo-product-row.is-low:not(.is-selected){background:#fffcf5;border-color:#eee1bc}
+.ws-memo-select-cell{display:grid;place-items:center}
+.ws-memo-select-cell .form-check-input{width:18px;height:18px;margin:0;cursor:pointer}
+.ws-memo-product-cell strong{display:block;color:#393a3f;font-size:.6rem;font-weight:800}
+.ws-memo-product-cell small{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:2px;color:#97999e;font-size:.49rem}
+.ws-memo-need{display:inline-flex;align-items:center;gap:3px;padding:2px 5px;border-radius:999px;background:#fff0d9;color:#9a6c13;font-size:.45rem;font-weight:800}
+.ws-memo-stock-cell strong{display:block;color:#44464b;font-size:.58rem}
+.ws-memo-stock-cell small{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:2px;color:#999ba0;font-size:.48rem}
+.ws-memo-suggest{
+  padding:2px 5px;border:0;border-radius:6px;background:#f1ece8;color:#8b5557;font-size:.45rem;font-weight:800
+}
+.ws-memo-packs-cell .form-control{
+  min-height:36px;padding:.35rem .45rem;border:1px solid #ded9d5;border-radius:9px;text-align:center;font-size:.62rem;font-weight:800;box-shadow:none!important
+}
+.ws-memo-packs-cell .form-control:disabled{background:#f5f3f1;color:#aaa}
+.ws-memo-result-cell{min-width:0}
+.ws-memo-result-cell .form-select{min-height:34px;padding-top:.3rem;padding-bottom:.3rem;border:1px solid #ded9d5;border-radius:8px;font-size:.51rem;box-shadow:none!important}
+.ws-memo-recipe-static{display:block}
+.ws-memo-recipe-static strong{display:block;color:#55575c;font-size:.52rem}
+.ws-memo-recipe-static small{display:block;margin-top:1px;color:#9a9ca1;font-size:.46rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ws-memo-no-recipe{display:inline-flex;align-items:center;gap:4px;color:#b22a31;font-size:.5rem;font-weight:800}
+.ws-memo-output-preview{margin-top:3px}
+.ws-memo-output-preview strong{display:block;color:#343539;font-size:.58rem}
+.ws-memo-output-preview small{display:block;color:#96989d;font-size:.47rem}
+
+.workshop-memo-summary{
+  position:sticky;bottom:-1px;z-index:4;display:grid;grid-template-columns:repeat(4,minmax(90px,.65fr)) minmax(230px,1.6fr);
+  gap:6px;margin-top:8px;padding:8px;border:1px solid #ded8d2;border-radius:12px;background:rgba(255,255,255,.96);
+  box-shadow:0 -6px 20px rgba(25,25,28,.06);backdrop-filter:blur(10px)
+}
+.workshop-memo-summary>div{padding:6px 8px;border-radius:9px;background:#f8f6f3}
+.workshop-memo-summary small{display:block;color:#999ba0;font-size:.46rem}
+.workshop-memo-summary strong{display:block;margin-top:1px;color:#343539;font-size:.68rem}
+.workshop-memo-summary #ws-memo-validation{font-size:.56rem}
+.workshop-memo-summary #ws-memo-validation.is-ok{color:#347b52}
+.workshop-memo-summary #ws-memo-validation.is-error{color:#b22930}
+
+@media(max-width:900px){
+  .workshop-memo-picker-tools{align-items:stretch;flex-direction:column}
+  .workshop-memo-picker-tools .workshop-search{flex-basis:auto;width:100%}
+  .workshop-memo-filters{overflow:auto;padding-bottom:1px;scrollbar-width:none}
+  .workshop-memo-filters::-webkit-scrollbar{display:none}
+  .workshop-memo-filters button{flex:0 0 auto}
+  .workshop-memo-table-head{display:none}
+  .workshop-memo-product-list{max-height:none;overflow:visible}
+  .workshop-memo-product-row{
+    grid-template-columns:30px minmax(0,1fr) 92px;gap:7px;padding:9px
+  }
+  .ws-memo-select-cell{grid-column:1;grid-row:1/3;align-self:start;padding-top:3px}
+  .ws-memo-product-cell{grid-column:2;grid-row:1}
+  .ws-memo-stock-cell{grid-column:3;grid-row:1;text-align:right}
+  .ws-memo-packs-cell{grid-column:2;grid-row:2}
+  .ws-memo-result-cell{grid-column:3;grid-row:2}
+  .ws-memo-packs-cell:before{content:'Упаковок';display:block;margin-bottom:3px;color:#9a9ca1;font-size:.45rem;font-weight:800}
+  .ws-memo-result-cell:before{content:'Результат';display:block;margin-bottom:3px;color:#9a9ca1;font-size:.45rem;font-weight:800}
+  .ws-memo-product-cell strong{font-size:.58rem}
+  .workshop-memo-summary{
+    grid-template-columns:repeat(4,1fr);bottom:0;padding:6px
+  }
+  .workshop-memo-summary>div{padding:5px 6px;text-align:center}
+  .workshop-memo-summary>div.wide{grid-column:1/-1;text-align:left}
+  .workshop-memo-summary strong{font-size:.62rem}
+}
+@media(max-width:480px){
+  .workshop-memo-product-row{grid-template-columns:26px minmax(0,1fr) 82px}
+  .ws-memo-stock-cell strong{font-size:.53rem}
+  .ws-memo-stock-cell small{justify-content:flex-end}
+  .ws-memo-suggest{font-size:.42rem}
+  .workshop-memo-summary{grid-template-columns:repeat(2,1fr)}
+  .workshop-memo-summary>div.wide{grid-column:1/-1}
+}
