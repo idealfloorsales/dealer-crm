@@ -72,8 +72,10 @@
         const nav = document.querySelector('nav.navbar');
         if (!nav || window.location.pathname === '/login.html') return;
 
-        nav.classList.add('desktop-nav');
+        nav.classList.add('desktop-nav', 'crm-topbar');
         const currentPath = getCurrentNavPath();
+        const currentItem = NAV_ITEMS.find(item => item.path === currentPath);
+        const pageLabel = currentItem?.label || 'CRM';
 
         const itemsHtml = NAV_ITEMS.map(item => {
             const active = item.path === currentPath;
@@ -84,23 +86,31 @@
         }).join('');
 
         nav.innerHTML = `
-            <div class="container-fluid">
-                <a class="navbar-brand" href="/">
+            <div class="container-fluid crm-topbar-inner">
+                <a class="navbar-brand crm-topbar-brand" href="/" aria-label="IDEAL FLOOR CRM">
                     <img src="logo.png" alt="IDEAL FLOOR CRM" height="40">
                 </a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Открыть меню">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="collapse navbar-collapse" id="navbarNav">
+
+                <div class="crm-topbar-mobile-context" aria-label="Текущий раздел">
+                    <span class="crm-topbar-mobile-kicker">IDEAL FLOOR CRM</span>
+                    <strong>${pageLabel}</strong>
+                </div>
+
+                <div class="crm-topbar-desktop-content">
                     <ul class="navbar-nav me-auto">
                         ${itemsHtml}
                     </ul>
-                    <div class="d-flex align-items-center gap-3">
-                        <span id="user-role-badge" class="badge bg-light text-dark border">...</span>
-                        <button id="logout-btn" class="btn btn-sm btn-outline-danger" type="button">
-                            <i class="bi bi-box-arrow-right me-1"></i>Выход
+                    <div class="crm-topbar-account">
+                        <span id="user-role-badge" class="crm-role-badge">...</span>
+                        <button id="logout-btn" class="crm-topbar-logout" type="button" title="Выйти">
+                            <i class="bi bi-box-arrow-right"></i><span>Выход</span>
                         </button>
                     </div>
+                </div>
+
+                <div class="crm-topbar-mobile-status" aria-hidden="true">
+                    <span class="crm-topbar-live-dot"></span>
+                    <span id="user-role-badge-mobile">CRM</span>
                 </div>
             </div>`;
 
@@ -437,7 +447,7 @@
         }).join('') + `
             <button type="button" class="crm-mobile-nav-more${primaryPaths.includes(currentPath) ? '' : ' active'}" id="crm-mobile-more">
                 <i class="bi bi-grid"></i>
-                <span>Ещё</span>
+                <span>Меню</span>
             </button>`;
 
         const backdrop = document.createElement('div');
@@ -998,11 +1008,14 @@
     }
 
     function applyRoleBadge() {
-        const badge = document.getElementById('user-role-badge');
-        if (!badge || !window.CRMAuth.user) return;
+        if (!window.CRMAuth.user) return;
         const user = window.CRMAuth.user;
         const names = { manager: 'Менеджер', marketing: 'Маркетинг', workshop: 'Цех', guest: 'Гость' };
-        badge.textContent = names[user.role] || user.role || 'Пользователь';
+        const label = names[user.role] || user.role || 'Пользователь';
+        const badge = document.getElementById('user-role-badge');
+        const mobileBadge = document.getElementById('user-role-badge-mobile');
+        if (badge) badge.textContent = label;
+        if (mobileBadge) mobileBadge.textContent = label;
     }
 
     async function init() {
