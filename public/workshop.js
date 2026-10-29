@@ -140,9 +140,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const productMismatch = line.actualProduct && idOf(line.actualProduct) !== idOf(line.product);
                 const lineState = memo.status === 'accepted' ? 'ok' : (line.isMatch ? 'ok' : (memo.status === 'mismatch' ? 'bad' : 'wait'));
                 const actualText = productMismatch ? ` → ${esc(line.actualProduct?.sku || line.actualProduct?.name || 'другая позиция')}` : '';
+                const produced = Number(line.producedQty || 0);
+                const planText = `план ${Number(line.plannedOutputQty || 0)} шт · готово ${produced} шт`;
                 const deliveryText = memo.status === 'created'
-                    ? `${requested} уп. → ${Number(line.plannedOutputQty || 0)} шт`
-                    : `${requested} уп. / привезли ${delivered} уп.${diff ? ` (${diff > 0 ? '+' : ''}${diff})` : ''}`;
+                    ? `${requested} уп. → ${planText}`
+                    : `${requested} уп. / привезли ${delivered} уп.${diff ? ` (${diff > 0 ? '+' : ''}${diff})` : ''} · ${planText}`;
                 return `<div class="workshop-memo-line-summary is-${lineState}">
                     <span class="workshop-memo-check"><i class="bi bi-${lineState === 'ok' ? 'check2' : lineState === 'bad' ? 'exclamation-lg' : 'dash'}"></i></span>
                     <div><strong>${esc(line.product?.sku || '—')} · ${esc(line.product?.name || '')}${actualText}</strong><small>${deliveryText}</small></div>
@@ -198,8 +200,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         state.recipes.forEach(item => {
-            if (n(item.stockQty) <= 0) {
-                items.push({ type:'danger', icon:'box', title:item.name, text:'Готовых изделий нет в остатке' });
+            const minimum = Math.max(0, n(item.minStockQty));
+            const stock = n(item.stockQty);
+            if ((minimum > 0 && stock <= minimum) || (minimum === 0 && stock <= 0)) {
+                items.push({
+                    type: stock <= 0 ? 'danger' : 'warning',
+                    icon:'box',
+                    title:item.name,
+                    text: minimum > 0 ? `Остаток ${fmt(stock)} шт · минимум ${fmt(minimum)} шт` : 'Готовых изделий нет в остатке'
+                });
             }
         });
         state.laminateStocks.forEach(stock => {
@@ -232,9 +241,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('')}</tbody></table>` : '<div class="workshop-empty"><i class="bi bi-layers"></i>Ламинат в цех ещё не принимали</div>';
 
         const finished = state.recipes.filter(item => !term || `${item.name} ${item.sku || ''} ${item.product?.name || ''}`.toLowerCase().includes(term));
-        $('ws-finished-stock').innerHTML = finished.length ? finished.map(item => `<div class="workshop-stock-card">
-            <div><strong>${esc(item.name)}</strong><small>${esc(item.outputType === 'sample' ? 'образец / планшет' : item.outputType === 'stand' ? 'стенд' : item.outputType)}${item.product ? ' · '+esc(item.product.sku || '') : ''}</small></div><b>${fmt(item.stockQty)} шт</b>
-        </div>`).join('') : '<div class="workshop-empty">Нет рецептур</div>';
+        $('ws-finished-stock').innerHTML = finished.length ? finished.map(item => {
+            const minimum = Math.max(0, n(item.minStockQty));
+            const low = minimum > 0 && n(item.stockQty) <= minimum;
+            return `<div class="workshop-stock-card ${low ? 'is-low' : ''}">
+                <div><strong>${esc(item.name)}</strong><small>${esc(item.outputType === 'sample' ? 'образец / планшет' : item.outputType === 'stand' ? 'стенд' : item.outputType)}${item.product ? ' · '+esc(item.product.sku || '') : ''}${minimum > 0 ? ' · минимум '+fmt(minimum) : ''}</small></div><b>${fmt(item.stockQty)} шт</b>
+            </div>`;
+        }).join('') : '<div class="workshop-empty">Нет рецептур</div>';
 
         const materials = state.materials.filter(item => !term || `${item.code || ''} ${item.name}`.toLowerCase().includes(term));
         $('ws-material-stock').innerHTML = materials.length ? materials.map(item => {
@@ -276,7 +289,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const materialCount = (item.materials || []).length + (item.components || []).length;
             return `<article class="workshop-recipe-card" data-recipe-edit="${idOf(item)}">
                 <div class="top"><div><strong>${esc(item.name)}</strong><small>${esc(item.sku || '')}${item.product ? ' · '+esc(item.product.sku || '') : ''}</small></div><span class="ws-liquid ${item.product?.is_liquid === false?'is-old':''}">${item.outputType === 'sample'?'образец':item.outputType === 'stand'?'стенд':esc(item.outputType)}</span></div>
-                <div class="numbers"><span>Планок / шт<b>${fmt(item.planksPerUnit)}</b></span><span>На складе<b>${fmt(item.stockQty)} шт</b></span><span>Компонентов<b>${materialCount}</b></span></div>
+                <div class="numbers"><span>Планок / шт<b>${fmt(item.planksPerUnit)}</b></span><span>На складе<b>${fmt(item.stockQty)} шт</b></span><span>Минимум<b>${fmt(item.minStockQty || 0)} шт</b></span><span>Компонентов<b>${materialCount}</b></span></div>
                 <small class="mt-2">${batch ? `Безотходно: ${batch.packs} уп. → ${batch.output} шт` : 'Норма ламината не задана'}${item.sideA || item.sideB ? ' · '+esc([item.sideA,item.sideB].filter(Boolean).join(' / ')):''}</small>
             </article>`;
         }).join('') : '<div class="workshop-empty"><i class="bi bi-diagram-3"></i>Создайте первую рецептуру</div>';
@@ -470,7 +483,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const expectedId = idOf(line.product);
             const actualId = idOf(line.actualProduct) || expectedId;
             const delivered = memo.status === 'mismatch' ? Number(line.deliveredPacks || 0) : Number(line.requestedPacks || 0);
-            const checked = memo.status === 'mismatch' ? Boolean(line.checked) : true;
+            const checked = memo.status === 'mismatch' ? Boolean(line.checked) : false;
             return `<div class="workshop-receipt-line" data-line-id="${lineId}" data-expected-id="${expectedId}" data-requested="${Number(line.requestedPacks || 0)}">
                 <label class="workshop-check-cell"><input type="checkbox" class="form-check-input ws-receipt-checked" ${checked ? 'checked' : ''}><span>Проверено</span></label>
                 <div class="workshop-receipt-expected"><span>По служебке</span><strong>${esc(line.product?.sku || '—')} · ${esc(line.product?.name || '')}</strong><small>${Number(line.requestedPacks || 0)} уп. → ${Number(line.plannedOutputQty || 0)} изделий</small></div>
@@ -563,11 +576,37 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    function updateProductionMemoOptions() {
+        const select = $('ws-production-memo-line');
+        if (!select) return;
+        const recipe = productionRecipe();
+        const recipeId = idOf(recipe);
+        const productId = idOf(recipe?.product);
+        const options = [];
+        state.memos.filter(memo => memo.status === 'accepted').forEach(memo => {
+            (memo.lines || []).forEach(line => {
+                const lineRecipeId = idOf(line.recipe);
+                const lineProductId = idOf(line.product);
+                if (recipeId && lineRecipeId && lineRecipeId !== recipeId) return;
+                if (productId && lineProductId !== productId) return;
+                const planned = Number(line.plannedOutputQty || 0);
+                const produced = Number(line.producedQty || 0);
+                const remaining = Math.max(0, planned - produced);
+                options.push({
+                    value: `${idOf(memo)}::${idOf(line)}`,
+                    label: `№${memo.number} · ${line.product?.sku || line.product?.name || 'позиция'} · план ${planned} / готово ${produced} / осталось ${remaining}`
+                });
+            });
+        });
+        select.innerHTML = option('', 'Без привязки / из текущего остатка') + options.map(item => option(item.value, item.label)).join('');
+    }
+
     function resetProduction() {
         $('ws-production-form')?.reset();
         $('ws-production-date').value = todayValue();
         $('ws-production-output').value = 1;
         populateFormSelects();
+        updateProductionMemoOptions();
         updateProductionCalc();
     }
     function productionRecipe() { return recipeById($('ws-production-recipe')?.value); }
@@ -591,7 +630,11 @@ document.addEventListener('DOMContentLoaded', () => {
         На указанное производство будет списано: <strong class="${need>available?'text-danger':''}">${fmt(need)} планок</strong>.
         ${batch ? `Безотходная партия: <strong>${batch.packs} уп. → ${batch.output} шт</strong>.` : ''}`;
     }
-    ['ws-production-recipe','ws-production-output','ws-production-scrap'].forEach(id => $(id)?.addEventListener('input',updateProductionCalc));
+    $('ws-production-recipe')?.addEventListener('change', () => {
+        updateProductionMemoOptions();
+        updateProductionCalc();
+    });
+    ['ws-production-output','ws-production-scrap'].forEach(id => $(id)?.addEventListener('input',updateProductionCalc));
 
     $('ws-production-form')?.addEventListener('submit', async event => {
         event.preventDefault();
@@ -600,8 +643,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const qty = label.querySelector('.ws-operation-qty');
             return cb?.checked ? { type:cb.value, qty:n(qty?.value) } : null;
         }).filter(Boolean);
+        const source = String($('ws-production-memo-line')?.value || '').split('::');
         await post(API+'/production', {
             recipeId:$('ws-production-recipe').value,
+            memoId:source[0] || null,
+            memoLineId:source[1] || null,
             outputQty:n($('ws-production-output').value),
             scrapPlanks:n($('ws-production-scrap').value),
             date:$('ws-production-date').value,
@@ -676,7 +722,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function resetRecipe(){
-        $('ws-recipe-form')?.reset(); $('ws-recipe-id').value=''; $('ws-recipe-planks').value=0; $('ws-recipe-pack-override').value=0;
+        $('ws-recipe-form')?.reset(); $('ws-recipe-id').value=''; $('ws-recipe-planks').value=0; $('ws-recipe-min-stock').value=0; $('ws-recipe-pack-override').value=0;
         $('ws-bom-materials').innerHTML=''; $('ws-bom-components').innerHTML=''; populateFormSelects(); updateRecipeCalc();
     }
     function updateRecipeCalc(){
@@ -698,11 +744,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return [...document.querySelectorAll(selector)].map(row=>({id:row.querySelector(idSelector)?.value,qty:n(row.querySelector('.ws-bom-qty')?.value)})).filter(x=>x.id&&x.qty>0);
     }
     function openRecipeEdit(id){
-        const item=recipeById(id);if(!item)return;resetRecipe();$('ws-recipe-id').value=id;$('ws-recipe-name').value=item.name||'';$('ws-recipe-type').value=item.outputType||'sample';$('ws-recipe-sku').value=item.sku||'';$('ws-recipe-product').value=idOf(item.product);$('ws-recipe-planks').value=n(item.planksPerUnit);$('ws-recipe-pack-override').value=n(item.packQtyOverride);$('ws-recipe-side-a').value=item.sideA||'';$('ws-recipe-side-b').value=item.sideB||'';$('ws-recipe-matrix-pos').value=item.matrixPosName||'';$('ws-recipe-note').value=item.note||'';(item.materials||[]).forEach(addBomMaterial);(item.components||[]).forEach(addBomComponent);updateRecipeCalc();bootstrap.Modal.getOrCreateInstance($('ws-recipe-modal')).show();
+        const item=recipeById(id);if(!item)return;resetRecipe();$('ws-recipe-id').value=id;$('ws-recipe-name').value=item.name||'';$('ws-recipe-type').value=item.outputType||'sample';$('ws-recipe-sku').value=item.sku||'';$('ws-recipe-product').value=idOf(item.product);$('ws-recipe-planks').value=n(item.planksPerUnit);$('ws-recipe-min-stock').value=n(item.minStockQty);$('ws-recipe-pack-override').value=n(item.packQtyOverride);$('ws-recipe-side-a').value=item.sideA||'';$('ws-recipe-side-b').value=item.sideB||'';$('ws-recipe-matrix-pos').value=item.matrixPosName||'';$('ws-recipe-note').value=item.note||'';(item.materials||[]).forEach(addBomMaterial);(item.components||[]).forEach(addBomComponent);updateRecipeCalc();bootstrap.Modal.getOrCreateInstance($('ws-recipe-modal')).show();
     }
     $('ws-recipe-form')?.addEventListener('submit',async event=>{
         event.preventDefault();const id=$('ws-recipe-id').value;const materials=collectBom('#ws-bom-materials .ws-bom-row','.ws-bom-material-id').map(x=>({materialId:x.id,qty:x.qty}));const components=collectBom('#ws-bom-components .ws-bom-row','.ws-bom-component-id').map(x=>({recipeId:x.id,qty:x.qty}));
-        const payload={name:$('ws-recipe-name').value,outputType:$('ws-recipe-type').value,sku:$('ws-recipe-sku').value,productId:$('ws-recipe-product').value||null,planksPerUnit:n($('ws-recipe-planks').value),packQtyOverride:n($('ws-recipe-pack-override').value),sideA:$('ws-recipe-side-a').value,sideB:$('ws-recipe-side-b').value,matrixPosName:$('ws-recipe-matrix-pos').value,note:$('ws-recipe-note').value,materials,components};
+        const payload={name:$('ws-recipe-name').value,outputType:$('ws-recipe-type').value,sku:$('ws-recipe-sku').value,productId:$('ws-recipe-product').value||null,planksPerUnit:n($('ws-recipe-planks').value),minStockQty:n($('ws-recipe-min-stock').value),packQtyOverride:n($('ws-recipe-pack-override').value),sideA:$('ws-recipe-side-a').value,sideB:$('ws-recipe-side-b').value,matrixPosName:$('ws-recipe-matrix-pos').value,note:$('ws-recipe-note').value,materials,components};
         await send(id?API+'/recipes/'+id:API+'/recipes',id?'PUT':'POST',payload,'Рецептура сохранена','recipe');
     });
 
