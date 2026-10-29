@@ -417,13 +417,16 @@
         document.querySelectorAll('.crm-mobile-nav, .crm-mobile-sheet-backdrop').forEach(el => el.remove());
 
         const currentPath = getCurrentNavPath();
-        const primaryItems = MOBILE_PRIMARY_PATHS
+        const userRole = window.CRMAuth?.user?.role;
+        const primaryPaths = userRole === 'workshop' ? ['/workshop.html'] : MOBILE_PRIMARY_PATHS;
+        const primaryItems = primaryPaths
             .map(path => NAV_ITEMS.find(item => item.path === path))
             .filter(Boolean);
 
         const nav = document.createElement('nav');
         nav.className = 'crm-mobile-nav';
         nav.setAttribute('aria-label', 'Мобильная навигация');
+        nav.style.gridTemplateColumns = `repeat(${Math.max(2, primaryItems.length + 1)}, minmax(0,1fr))`;
 
         nav.innerHTML = primaryItems.map(item => {
             const active = item.path === currentPath;
@@ -432,7 +435,7 @@
                 <span>${item.label}</span>
             </a>`;
         }).join('') + `
-            <button type="button" class="crm-mobile-nav-more${MOBILE_PRIMARY_PATHS.includes(currentPath) ? '' : ' active'}" id="crm-mobile-more">
+            <button type="button" class="crm-mobile-nav-more${primaryPaths.includes(currentPath) ? '' : ' active'}" id="crm-mobile-more">
                 <i class="bi bi-grid"></i>
                 <span>Ещё</span>
             </button>`;
@@ -502,7 +505,7 @@
         if (!user) return;
         const name = document.getElementById('crm-mobile-user-name');
         const role = document.getElementById('crm-mobile-user-role');
-        const roleNames = { manager: 'Менеджер', marketing: 'Маркетинг', guest: 'Гость' };
+        const roleNames = { manager: 'Менеджер', marketing: 'Маркетинг', workshop: 'Цех', guest: 'Гость' };
         if (name) name.textContent = user.name || user.username || user.email || 'Пользователь';
         if (role) role.textContent = roleNames[user.role] || user.role || 'CRM IDEAL FLOOR';
     }
