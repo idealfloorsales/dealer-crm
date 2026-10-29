@@ -235,7 +235,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function createLegalEntityHTML(entity={}) {
         const type = inferLegalEntityType(entity.type, entity.organizationName);
-        const options = ['ТОО','ИП','Частное лицо'].map(value => `<option value="${value}" ${value === type ? 'selected' : ''}>${value}</option>`).join('');
+        const options = [
+            ['ТОО','ТОО'],
+            ['ИП','ИП'],
+            ['Частное лицо','Частное лицо / ЧС']
+        ].map(([value,label]) => `<option value="${value}" ${value === type ? 'selected' : ''}>${label}</option>`).join('');
         return `
             <div class="legal-entity-entry">
                 <div class="legal-entity-entry-head">
