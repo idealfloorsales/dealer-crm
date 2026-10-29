@@ -254,7 +254,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const materials = state.materials.filter(item => !term || `${item.code || ''} ${item.name}`.toLowerCase().includes(term));
         $('ws-material-stock').innerHTML = materials.length ? materials.map(item => {
             const low = n(item.minQty) > 0 && n(item.stockQty) <= n(item.minQty);
-            return `<div class="workshop-stock-card ${low?'is-low':''}"><div><strong>${esc(item.name)}</strong><small>${esc(item.code || item.category || '')}${low ? ' · минимум '+fmt(item.minQty,2):''}</small></div><b>${fmt(item.stockQty,2)} ${esc(item.unit || 'шт')}</b></div>`;
+            const purchase = item.purchaseUnit && item.purchaseUnitSize
+                ? ` · закупка: ${esc(item.purchaseUnit)}${n(item.purchaseUnitSize)!==1 ? ' = '+fmt(item.purchaseUnitSize,2)+' '+esc(item.unit||'') : ''}`
+                : '';
+            return `<div class="workshop-stock-card ${low?'is-low':''}"><div><strong>${esc(item.name)}</strong><small>${esc(item.code || item.category || '')}${purchase}${low ? ' · минимум '+fmt(item.minQty,2):''}</small></div><b>${fmt(item.stockQty,2)} ${esc(item.unit || 'шт')}</b></div>`;
         }).join('') : '<div class="workshop-empty">Материалы не найдены</div>';
     }
 
@@ -878,6 +881,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if ($('ws-production-custom-fields')) $('ws-production-custom-fields').hidden = true;
         if ($('ws-production-actual-planks')) $('ws-production-actual-planks').value = '';
         if ($('ws-production-custom-reason')) $('ws-production-custom-reason').value = '';
+        if ($('ws-production-custom-order')) $('ws-production-custom-order').value = '';
+        if ($('ws-production-custom-dimensions')) $('ws-production-custom-dimensions').value = '';
         populateFormSelects();
         updateProductionMemoOptions();
         updateProductionCalc();
@@ -985,6 +990,8 @@ document.addEventListener('DOMContentLoaded', () => {
             outputQty:n($('ws-production-output').value),
             actualPlanksPerUnit:$('ws-production-custom-toggle')?.checked ? n($('ws-production-actual-planks').value) : 0,
             customNormReason:$('ws-production-custom-toggle')?.checked ? $('ws-production-custom-reason').value : '',
+            customOrderName:$('ws-production-custom-toggle')?.checked ? $('ws-production-custom-order').value : '',
+            customDimensions:$('ws-production-custom-toggle')?.checked ? $('ws-production-custom-dimensions').value : '',
             scrapPlanks:n($('ws-production-scrap').value),
             date:$('ws-production-date').value,
             operations,
