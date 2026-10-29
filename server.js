@@ -666,6 +666,11 @@ app.get('/api/sales', requirePermission('can_view_sales'), async (req, res) => {
             const dealerIds = dealers.map(d => String(d._id));
             const personalPlanIds = dealerIds.map(id => `PLAN_vip_${id}`);
             const managerPlanId = `PLAN_manager_${req.user.id}`;
+            const zonePlanId = scope === 'astana'
+                ? 'PLAN_astana_all'
+                : scope === 'regions'
+                    ? 'PLAN_regions_all'
+                    : 'PLAN_total_all';
 
             filter = {
                 $and: [
@@ -674,7 +679,7 @@ app.get('/api/sales', requirePermission('can_view_sales'), async (req, res) => {
                         $or: [
                             { isCustom: { $ne: true }, dealerId: { $in: dealerIds } },
                             { isCustom: { $ne: true }, dealerId: { $in: personalPlanIds } },
-                            { isCustom: { $ne: true }, dealerId: managerPlanId },
+                            { isCustom: { $ne: true }, dealerId: { $in: [managerPlanId, zonePlanId] } },
                             { isCustom: true, ownerUserId: String(req.user.id) }
                         ]
                     }
