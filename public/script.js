@@ -537,11 +537,8 @@ document.addEventListener('DOMContentLoaded', () => {
             renderDealerList();
             setupEventListeners();
 
-            const pendingId = localStorage.getItem('pendingEditDealerId');
-            if (pendingId) {
-                localStorage.removeItem('pendingEditDealerId');
-                if (window.CRMAuth && CRMAuth.can('can_edit_dealer')) openEditModal(pendingId);
-            }
+            // Legacy redirect-based dealer editing is no longer used.
+            localStorage.removeItem('pendingEditDealerId');
 
             // 4. Non-critical data must never delay the first screen.
             const backgroundLoads = [];
