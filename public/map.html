@@ -52,7 +52,7 @@
         }
     </style>
 </head>
-<body>
+<body class="app-workspace-page map-page">
     <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm desktop-nav" style="flex-shrink: 0; z-index: 2000;">
         <div class="container-fluid">
             <a class="navbar-brand" href="/"><img src="logo.png" alt="Logo" height="30"></a>
@@ -74,8 +74,10 @@
     <div class="map-wrapper" id="map-container-fullscreen">
         
         <div class="map-sidebar shadow-lg" id="map-sidebar">
-            <div class="sidebar-header p-3 bg-white border-bottom">
-                <div class="input-group shadow-sm mb-2">
+            <div class="sidebar-header map-workspace-header">
+                <div class="map-workspace-eyebrow">IDEAL FLOOR CRM</div>
+                <div class="map-workspace-title">Карта дилеров</div>
+                <div class="input-group map-search-box mb-2">
                     <span class="input-group-text bg-white border-0 ps-3"><i class="bi bi-search text-muted"></i></span>
                     <input type="text" id="map-search" class="form-control border-0" placeholder="Поиск..." style="height: 44px;">
                 </div>
