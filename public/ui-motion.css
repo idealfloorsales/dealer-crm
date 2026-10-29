@@ -837,7 +837,26 @@ body.crm-ui-enhanced.crm-page-leaving button {
         padding: 8px;
         padding-bottom: 18px;
     }
-    .dealer-profile-edit-section { padding: 12px; }
+    .dealer-profile-edit-section { padding: 11px; }
+    .dealer-profile-edit-section .row {
+        --bs-gutter-x: .65rem;
+        --bs-gutter-y: .65rem;
+    }
+    .dealer-profile-edit-section label {
+        margin-bottom: 4px;
+        font-size: .54rem;
+    }
+    .dealer-profile-edit-section .form-control,
+    .dealer-profile-edit-section .form-select {
+        min-height: 38px;
+        padding-top: .42rem;
+        padding-bottom: .42rem;
+        border-radius: 9px;
+        font-size: .65rem;
+    }
+    .dealer-profile-edit-section textarea.form-control {
+        min-height: 72px;
+    }
     .dealer-profile-contact-row {
         grid-template-columns: 1fr 32px;
     }
