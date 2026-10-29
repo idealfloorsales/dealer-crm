@@ -871,11 +871,23 @@ document.addEventListener('DOMContentLoaded', () => {
             </svg>`;
     }
 
+    function isDealerStatusVisible(dealer) {
+        const statusValue = dealer?.status || 'standard';
+        const statusObj = statusList.find(s => s.value === statusValue);
+        return !(statusObj && (statusObj.isVisible === false || String(statusObj.isVisible) === 'false'));
+    }
+
     function buildAttentionItems() {
         const items = [];
         const today = new Date(); today.setHours(0,0,0,0);
 
-        allDealers.filter(d => d.status !== 'archive').forEach(dealer => {
+        // "Требуют внимания" — только рабочие дилеры.
+        // Если у статуса выключен глазик в управлении статусами,
+        // дилер полностью исключается из этого блока.
+        const attentionDealers = allDealers.filter(d => d.status !== 'archive' && isDealerStatusVisible(d));
+        const visibleDealerIds = new Set(attentionDealers.map(d => String(d.id || d._id || '')));
+
+        attentionDealers.forEach(dealer => {
             const health = getDealerHealth(dealer);
             if (dealer.status === 'problem') {
                 items.push({ priority: 100, type:'risk', icon:'exclamation-diamond', title:dealer.name, meta:'Статус дилера: проблемный', dealerId:dealer.id, health });
@@ -885,6 +897,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         (allTasksData || []).forEach(d => {
+            if (!visibleDealerIds.has(String(d.id || d._id || ''))) return;
             (d.visits || []).forEach((v,index) => {
                 if (v.isCompleted || !v.date) return;
                 const date = new Date(v.date); date.setHours(0,0,0,0);
@@ -895,9 +908,12 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
-        reclamationsData.filter(r => !r.resolution).slice(0,10).forEach(r => {
-            items.push({ priority:88, type:'risk', icon:'shield-exclamation', title:r.dealerName || 'Рекламация', meta:'Рекламация без решения', dealerId:r.dealerId });
-        });
+        reclamationsData
+            .filter(r => !r.resolution && visibleDealerIds.has(String(r.dealerId || '')))
+            .slice(0,10)
+            .forEach(r => {
+                items.push({ priority:88, type:'risk', icon:'shield-exclamation', title:r.dealerName || 'Рекламация', meta:'Рекламация без решения', dealerId:r.dealerId });
+            });
 
         return items.sort((a,b) => b.priority-a.priority).slice(0,7);
     }
@@ -1057,7 +1073,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const network = allDealers.filter(d => d.status !== 'archive');
         const activeIds = new Set((currentMonthSales || []).filter(s => Number(s.fact)>0).map(s => String(s.dealerId)));
         const activeCount = network.filter(d => activeIds.has(String(d.id))).length;
-        const problemCount = network.filter(d => d.status === 'problem' || getDealerHealth(d).score < 60).length;
+        const attentionNetwork = network.filter(isDealerStatusVisible);
+        const problemCount = attentionNetwork.filter(d => d.status === 'problem' || getDealerHealth(d).score < 60).length;
         const userScope = getEffectiveDashboardScope();
         const currentTotals = getDashboardMonthTotals(currentMonthSales, userScope);
         const currentFact = currentTotals.fact;
