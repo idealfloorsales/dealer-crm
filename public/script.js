@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const API_TASKS_URL = '/api/tasks';
     const API_SALES_URL = '/api/sales';
     const API_SECTORS_URL = '/api/sectors'; // <--- НОВЫЙ API
+    const API_MANAGERS_URL = '/api/managers';
 
     let fullProductCatalog = [];
     let competitorsRef = []; 
@@ -22,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let salesHistory = [];
     let reclamationsData = [];
     let allSectors = []; // <--- ХРАНИЛИЩЕ СЕКТОРОВ
+    let managerUsers = [];
     
     let currentSort = { column: 'dealer_id', direction: 'asc' };
     let dealerQuickFilter = 'all';
@@ -120,7 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }},
         { id: 'responsible', label: 'Ответственный', isChecked: true, getValue: d => {
             const map = { 'regional_astana': 'Региональный Астана', 'regional_regions': 'Региональный Регионы', 'office': 'Офис' };
-            return map[d.responsible] || d.responsible;
+            return d.responsibleUserId ? managerDisplayName(d.responsibleUserId) : (map[d.responsible] || d.responsible);
         }},
         { id: 'sector', label: 'Сектор', isChecked: true, getValue: d => d.region_sector || '' }, // <--- ДОБАВЛЕНО В ЭКСПОРТ
         { id: 'price_type', label: 'Тип цен', isChecked: true, getValue: d => d.price_type },
@@ -282,6 +284,90 @@ document.addEventListener('DOMContentLoaded', () => {
     window.updateCollections = function(select) { const brandName = select.value; const row = select.closest('.competitor-entry'); const collSelect = row.querySelector('.competitor-collection'); let html = `<option value="">-- Коллекция --</option>`; const ref = competitorsRef.find(r => r.name === brandName); if (ref && ref.collections) { const sortedCols = [...ref.collections].sort((a, b) => { const typeA = (typeof a === 'object') ? a.type : 'std'; const typeB = (typeof b === 'object') ? b.type : 'std'; if (typeA === 'std' && typeB !== 'std') return 1; if (typeA !== 'std' && typeB === 'std') return -1; return 0; }); html += sortedCols.map(col => { const colName = (typeof col === 'string') ? col : col.name; const colType = (typeof col === 'object') ? col.type : 'std'; let label = ''; if(colType.includes('eng')) label = ' (Елка)'; else if(colType.includes('french')) label = ' (Фр. Елка)'; else if(colType.includes('art')) label = ' (Арт)'; return `<option value="${colName}">${colName}${label}</option>`; }).join(''); } collSelect.innerHTML = html; };
     window.showToast = function(message, type = 'success') { let container = document.getElementById('toast-container-custom'); if (!container) { container = document.createElement('div'); container.id = 'toast-container-custom'; container.className = 'toast-container-custom'; document.body.appendChild(container); } const toast = document.createElement('div'); toast.className = `toast-modern toast-${type}`; const icon = type === 'success' ? 'check-circle-fill' : (type === 'error' ? 'exclamation-triangle-fill' : 'info-circle-fill'); toast.innerHTML = `<i class="bi bi-${icon} fs-5"></i><span class="fw-bold text-dark">${message}</span>`; container.appendChild(toast); setTimeout(() => { toast.style.animation = 'toastFadeOut 0.5s forwards'; setTimeout(() => toast.remove(), 500); }, 3000); };
     
+    function isGlobalCurrentUser() {
+        const user = window.CRMAuth?.user;
+        return Boolean(user && (user.role === 'marketing' || user.permissions?.is_admin));
+    }
+
+    function managerById(id) {
+        return managerUsers.find(manager => String(manager.id) === String(id));
+    }
+
+    function managerScope(id) {
+        const manager = managerById(id);
+        return manager?.scope || '';
+    }
+
+    function legacyResponsibleForManager(id) {
+        const scope = managerScope(id);
+        if (scope === 'astana') return 'regional_astana';
+        if (scope === 'regions') return 'regional_regions';
+        return scope === 'all' ? 'office' : '';
+    }
+
+    function managerDisplayName(id, fallback = '') {
+        const manager = managerById(id);
+        return manager?.fullName || manager?.username || fallback || 'Не назначен';
+    }
+
+    function populateManagerSelects(selectedAdd = '', selectedEdit = '') {
+        const currentUser = window.CRMAuth?.user;
+        const currentManagerId = currentUser?.role === 'manager' && !currentUser?.permissions?.is_admin
+            ? String(currentUser.id || '')
+            : '';
+
+        const selectConfigs = [
+            { el: document.getElementById('responsible'), selected: selectedAdd || currentManagerId },
+            { el: document.getElementById('edit_responsible'), selected: selectedEdit },
+            { el: filterResponsible, selected: filterResponsible?.value || '' }
+        ];
+
+        selectConfigs.forEach(({ el, selected }) => {
+            if (!el) return;
+            const firstLabel = el === filterResponsible ? 'Все ответственные' : 'Не выбран';
+            el.innerHTML = '<option value="">' + firstLabel + '</option>' +
+                managerUsers.map(manager => {
+                    const scopeLabel = manager.scope === 'astana'
+                        ? 'Астана'
+                        : manager.scope === 'regions'
+                            ? 'Регионы'
+                            : 'Все';
+                    return '<option value="' + safeAttr(manager.id) + '">' +
+                        safeText(manager.fullName || manager.username) + ' · ' + scopeLabel +
+                    '</option>';
+                }).join('');
+
+            if (selected && managerUsers.some(manager => String(manager.id) === String(selected))) {
+                el.value = String(selected);
+            }
+
+            if (el !== filterResponsible && currentManagerId) {
+                el.value = currentManagerId;
+                el.disabled = true;
+            } else if (el !== filterResponsible) {
+                el.disabled = false;
+            }
+        });
+
+        if (document.getElementById('responsible')) {
+            toggleSectorSelect('add', document.getElementById('responsible').value);
+        }
+    }
+
+    async function fetchManagers() {
+        try {
+            const res = await fetch(API_MANAGERS_URL);
+            if (!res.ok) return;
+            managerUsers = await res.json();
+            populateManagerSelects(
+                document.getElementById('responsible')?.value || '',
+                document.getElementById('edit_responsible')?.value || ''
+            );
+        } catch (e) {
+            console.warn('Не удалось загрузить ответственных менеджеров', e);
+        }
+    }
+
     // --- НОВЫЕ ФУНКЦИИ СЕКТОРОВ (SECTORS LOGIC) ---
     async function fetchSectors() {
         try {
@@ -298,8 +384,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!wrapper || !select) return;
 
         let type = '';
-        if (responsibleValue === 'regional_astana') type = 'astana';
-        else if (responsibleValue === 'regional_regions') type = 'region';
+        const selectedScope = managerScope(responsibleValue);
+        if (selectedScope === 'astana' || responsibleValue === 'regional_astana') type = 'astana';
+        else if (selectedScope === 'regions' || responsibleValue === 'regional_regions') type = 'region';
 
         if (type) {
             wrapper.style.display = 'flex';
@@ -323,10 +410,11 @@ document.addEventListener('DOMContentLoaded', () => {
     window.openSectorManagerFromModal = (prefix) => {
         const responsibleSelect = document.getElementById(prefix === 'add' ? 'responsible' : 'edit_responsible');
         const val = responsibleSelect.value;
-        
-        if (val === 'regional_astana') currentSectorTypeMode = 'astana';
-        else if (val === 'regional_regions') currentSectorTypeMode = 'region';
-        else return alert("Сначала выберите ответственного!");
+        const selectedScope = managerScope(val);
+
+        if (selectedScope === 'astana' || val === 'regional_astana') currentSectorTypeMode = 'astana';
+        else if (selectedScope === 'regions' || val === 'regional_regions') currentSectorTypeMode = 'region';
+        else return alert("У выбранного менеджера не задана зона Астана/Регионы");
 
         document.getElementById('sec-man-type-label').textContent = (currentSectorTypeMode === 'astana' ? 'Астана' : 'Регионы');
         renderSectorManagerList();
@@ -1125,17 +1213,19 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('edit_bonuses').value=d.bonuses; populateStatusSelects(d.status); 
             
             // --- ЛОГИКА ОТКРЫТИЯ (СЕКТОР) ---
-            if(document.getElementById('edit_responsible')) { 
-                document.getElementById('edit_responsible').value = d.responsible || ''; 
-                
-                // 1. Ставим атрибут data-selected (чтобы функция toggle знала, что выбрать)
+            if(document.getElementById('edit_responsible')) {
+                populateManagerSelects(
+                    document.getElementById('responsible')?.value || '',
+                    d.responsibleUserId || ''
+                );
+                const editResponsible = document.getElementById('edit_responsible');
+                if (d.responsibleUserId && managerById(d.responsibleUserId)) {
+                    editResponsible.value = String(d.responsibleUserId);
+                }
+
                 const secSelect = document.getElementById('edit_region_sector');
                 if(secSelect) secSelect.setAttribute('data-selected', d.region_sector || '');
-                
-                // 2. Запускаем функцию обновления списка (она наполнит select нужными опциями)
-                toggleSectorSelect('edit', d.responsible); 
-                
-                // 3. На всякий случай дублируем явное присвоение
+                toggleSectorSelect('edit', editResponsible.value || d.responsible || '');
                 if(secSelect) secSelect.value = d.region_sector || '';
             }
 
@@ -1423,7 +1513,8 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
         };
     }
 
-    function responsibleLabel(value) {
+    function responsibleLabel(value, responsibleUserId = '') {
+        if (responsibleUserId) return managerDisplayName(responsibleUserId);
         const labels = {
             regional_astana: 'Региональный Астана',
             regional_regions: 'Региональный Регионы',
@@ -1716,7 +1807,7 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
             return isVisible &&
                 (!city || normalizedCity === city) &&
                 (!type || normalizedType === type) &&
-                (!responsible || d.responsible === responsible) &&
+                (!responsible || String(d.responsibleUserId || '') === String(responsible)) &&
                 (!sector || normalizedSector === sector) &&
                 (!search || searchable.includes(search));
         });
@@ -2014,7 +2105,8 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
         document.getElementById('add_contract_signed').checked = false; document.getElementById('add_contract_date').value = ''; document.getElementById('add_contract_number').value = '';
         const personalPlanAdd = document.getElementById('add_has_personal_plan');
         if (personalPlanAdd) personalPlanAdd.checked = false;
-        toggleSectorSelect('add', '');
+        populateManagerSelects();
+        toggleSectorSelect('add', document.getElementById('responsible')?.value || '');
         currentStep = 1;
         showStep(1);
         addModal.show(); 
@@ -2085,13 +2177,13 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
     if(addForm) addForm.addEventListener('submit', async (e) => { e.preventDefault(); if (!window.CRMAuth || !CRMAuth.can('can_create_dealer')) { window.showToast("Нет права создавать дилеров", "error"); return; } if (isSaving) return; isSaving = true; const btn = document.getElementById('btn-finish-step'); const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; 
         const legalEntities = collectLegalEntities(addLegalEntityList);
         const primaryEntity = legalEntities[0] || {};
-        const data = { dealer_id: getVal('dealer_id'), name: getVal('name'), organizations: legalEntities.map(entity => entity.organizationName).filter(Boolean), legal_entities: legalEntities, price_type: getVal('price_type'), city: getVal('city'), address: getVal('address'), delivery: getVal('delivery'), website: getVal('website'), instagram: getVal('instagram'), latitude: getVal('add_latitude'), longitude: getVal('add_longitude'), bonuses: getVal('bonuses'), status: getVal('status'), responsible: document.getElementById('responsible').value, region_sector: document.getElementById('add_region_sector').value, hasPersonalPlan: document.getElementById('add_has_personal_plan')?.checked || false, requisites: { organizationName: primaryEntity.organizationName || '', director: primaryEntity.director || '', legalAddress: primaryEntity.legalAddress || '', bin: primaryEntity.bin || '', iik: primaryEntity.iik || '', bank: primaryEntity.bank || '', bik: primaryEntity.bik || '', kbe: primaryEntity.kbe || '', email: primaryEntity.email || '' }, contract: { isSigned: document.getElementById('add_contract_signed').checked, date: getVal('add_contract_date'), number: getVal('add_contract_number') }, contacts: collectData(addContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]), additional_addresses: collectData(addAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]), pos_materials: collectData(addPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]), visits: collectData(addVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'}]), photos: addPhotosData, avatarUrl: newAvatarBase64, competitors: collectData(addCompetitorList, '.competitor-entry', [{key:'brand',class:'.competitor-brand'},{key:'collection',class:'.competitor-collection'},{key:'price_opt',class:'.competitor-price-opt'},{key:'price_retail',class:'.competitor-price-retail'}]) }; 
+        const data = { dealer_id: getVal('dealer_id'), name: getVal('name'), organizations: legalEntities.map(entity => entity.organizationName).filter(Boolean), legal_entities: legalEntities, price_type: getVal('price_type'), city: getVal('city'), address: getVal('address'), delivery: getVal('delivery'), website: getVal('website'), instagram: getVal('instagram'), latitude: getVal('add_latitude'), longitude: getVal('add_longitude'), bonuses: getVal('bonuses'), status: getVal('status'), responsibleUserId: document.getElementById('responsible').value, responsible: legacyResponsibleForManager(document.getElementById('responsible').value), region_sector: document.getElementById('add_region_sector').value, hasPersonalPlan: document.getElementById('add_has_personal_plan')?.checked || false, requisites: { organizationName: primaryEntity.organizationName || '', director: primaryEntity.director || '', legalAddress: primaryEntity.legalAddress || '', bin: primaryEntity.bin || '', iik: primaryEntity.iik || '', bank: primaryEntity.bank || '', bik: primaryEntity.bik || '', kbe: primaryEntity.kbe || '', email: primaryEntity.email || '' }, contract: { isSigned: document.getElementById('add_contract_signed').checked, date: getVal('add_contract_date'), number: getVal('add_contract_number') }, contacts: collectData(addContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]), additional_addresses: collectData(addAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]), pos_materials: collectData(addPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]), visits: collectData(addVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'}]), photos: addPhotosData, avatarUrl: newAvatarBase64, competitors: collectData(addCompetitorList, '.competitor-entry', [{key:'brand',class:'.competitor-brand'},{key:'collection',class:'.competitor-collection'},{key:'price_opt',class:'.competitor-price-opt'},{key:'price_retail',class:'.competitor-price-retail'}]) }; 
         try { const res = await fetch(API_DEALERS_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); if (!res.ok) throw new Error(await res.text()); const newD = await res.json(); const pIds = getSelectedProductIds('add-product-checklist'); if(window.CRMAuth && CRMAuth.can('can_edit_matrix') && pIds.length) await saveProducts(newD.id, pIds); addModal.hide(); window.showToast("Дилер добавлен!"); initApp(); } catch (e) { window.showToast("Ошибка сохранения", "error"); } finally { isSaving = false; btn.disabled = false; btn.innerHTML = oldText; } });
     if(editForm) editForm.addEventListener('submit', async (e) => { e.preventDefault(); if (!window.CRMAuth || !CRMAuth.can('can_edit_dealer')) { window.showToast("Нет права редактировать дилеров", "error"); return; } if (isSaving) return; isSaving = true; const btn = document.querySelector('button[form="edit-dealer-form"]'); const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; const id = document.getElementById('edit_db_id').value; let avatarToSend = getVal('edit-current-avatar-url'); if (newAvatarBase64) avatarToSend = newAvatarBase64; 
         const legalEntities = collectLegalEntities(editLegalEntityList);
         const primaryEntity = legalEntities[0] || {};
         const data = { 
-            dealer_id: getVal('edit_dealer_id'), name: getVal('edit_name'), organizations: legalEntities.map(entity => entity.organizationName).filter(Boolean), legal_entities: legalEntities, price_type: getVal('edit_price_type'), city: getVal('edit_city'), address: getVal('edit_address'), delivery: getVal('edit_delivery'), website: getVal('edit_website'), instagram: getVal('edit_instagram'), latitude: getVal('edit_latitude'), longitude: getVal('edit_longitude'), bonuses: getVal('edit_bonuses'), status: getVal('edit_status'), responsible: document.getElementById('edit_responsible').value, region_sector: document.getElementById('edit_region_sector').value, 
+            dealer_id: getVal('edit_dealer_id'), name: getVal('edit_name'), organizations: legalEntities.map(entity => entity.organizationName).filter(Boolean), legal_entities: legalEntities, price_type: getVal('edit_price_type'), city: getVal('edit_city'), address: getVal('edit_address'), delivery: getVal('edit_delivery'), website: getVal('edit_website'), instagram: getVal('edit_instagram'), latitude: getVal('edit_latitude'), longitude: getVal('edit_longitude'), bonuses: getVal('edit_bonuses'), status: getVal('edit_status'), responsibleUserId: document.getElementById('edit_responsible').value, responsible: legacyResponsibleForManager(document.getElementById('edit_responsible').value), region_sector: document.getElementById('edit_region_sector').value, 
             hasPersonalPlan: document.getElementById('edit_has_personal_plan').checked,
             requisites: { organizationName: primaryEntity.organizationName || '', director: primaryEntity.director || '', legalAddress: primaryEntity.legalAddress || '', bin: primaryEntity.bin || '', iik: primaryEntity.iik || '', bank: primaryEntity.bank || '', bik: primaryEntity.bik || '', kbe: primaryEntity.kbe || '', email: primaryEntity.email || '' }, contract: { isSigned: document.getElementById('edit_contract_signed').checked, date: getVal('edit_contract_date'), number: getVal('edit_contract_number') }, avatarUrl: avatarToSend, contacts: collectData(editContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]), additional_addresses: collectData(editAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]), pos_materials: collectData(editPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]), visits: collectData(editVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'},{key:'isCompleted',class:'.visit-completed'}]), photos: editPhotosData, competitors: collectData(editCompetitorList, '.competitor-entry', [{key:'brand',class:'.competitor-brand'},{key:'collection',class:'.competitor-collection'},{key:'price_opt',class:'.competitor-price-opt'},{key:'price_retail',class:'.competitor-price-retail'}]) 
         }; 
