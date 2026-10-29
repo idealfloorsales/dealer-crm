@@ -9498,3 +9498,28 @@ body.bg-light {
     .dealer-documents-head .btn { width:100%; }
     .dealer-document-actions { display:grid; grid-template-columns:1fr 1fr; }
 }
+
+
+/* Dealer profile tabs mobile scroll */
+@media (max-width: 767.98px) {
+    .dealer-profile-page .profile-nav-wrapper {
+        overflow-x:auto;
+        -webkit-overflow-scrolling:touch;
+        scrollbar-width:none;
+    }
+    .dealer-profile-page .profile-nav-wrapper::-webkit-scrollbar { display:none; }
+    .dealer-profile-page .profile-tabs {
+        display:flex;
+        flex-wrap:nowrap;
+        min-width:max-content;
+        gap:4px;
+        padding-bottom:2px;
+    }
+    .dealer-profile-page .profile-tabs .nav-item { flex:0 0 auto; }
+    .dealer-profile-page .profile-tabs .nav-link {
+        white-space:nowrap;
+        min-width:auto;
+        padding:8px 11px;
+        font-size:.68rem;
+    }
+}
