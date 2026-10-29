@@ -359,10 +359,14 @@ body.modal-open {
 }
 
 body.modal-open .crm-mobile-nav,
+body.modal-open .crm-mobile-sheet-backdrop,
 body.modal-open .bottom-nav,
 body.modal-open .dealer-route-bar,
 body.modal-open .floating-action-button,
-body.modal-open .fab-add {
+body.modal-open .fab-add,
+body.modal-open .elevator-capsule,
+body.modal-open .mobile-list-toggle,
+body.modal-open .map-actions-right {
     opacity: 0 !important;
     visibility: hidden !important;
     pointer-events: none !important;
