@@ -729,10 +729,108 @@
         crmRevealFrame = requestAnimationFrame(() => revealMotionElements(root));
     }
 
+    const crmPrefetchedPages = new Set();
+    const crmPrefetchedDealers = new Set();
+
+    function crmInternalUrl(anchor) {
+        if (!anchor || anchor.target === '_blank' || anchor.hasAttribute('download')) return null;
+        const href = anchor.getAttribute('href');
+        if (!href || href.startsWith('#') || href.startsWith('javascript:') || href.startsWith('mailto:') || href.startsWith('tel:')) return null;
+        try {
+            const url = new URL(anchor.href, window.location.href);
+            return url.origin === window.location.origin ? url : null;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function prefetchDealerProfile(url) {
+        if (url.pathname !== '/dealer.html') return;
+        const dealerId = url.searchParams.get('id');
+        if (!dealerId || crmPrefetchedDealers.has(dealerId)) return;
+        crmPrefetchedDealers.add(dealerId);
+
+        window.fetch(`/api/dealers/${encodeURIComponent(dealerId)}?view=profile`, { crmTrackLoading: false })
+            .then(response => response.ok ? response.json() : null)
+            .then(data => {
+                if (!data) return;
+                try {
+                    sessionStorage.setItem(`crm:dealer-profile:${dealerId}`, JSON.stringify({
+                        savedAt: Date.now(),
+                        data
+                    }));
+                } catch (_) {}
+            })
+            .catch(() => {});
+    }
+
+    function prefetchInternalPage(anchor) {
+        const url = crmInternalUrl(anchor);
+        if (!url) return;
+
+        prefetchDealerProfile(url);
+
+        const key = url.pathname + url.search;
+        if (crmPrefetchedPages.has(key) || key === window.location.pathname + window.location.search) return;
+        crmPrefetchedPages.add(key);
+
+        const link = document.createElement('link');
+        link.rel = 'prefetch';
+        link.href = url.href;
+        link.as = 'document';
+        document.head.appendChild(link);
+    }
+
+    function beginSeamlessNavigation(anchor, event) {
+        if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        const url = crmInternalUrl(anchor);
+        if (!url) return;
+        if (url.pathname === window.location.pathname && url.search === window.location.search) return;
+
+        if (url.pathname === '/dealer.html' && window.location.pathname !== '/dealer.html') {
+            try { sessionStorage.setItem('crm:dealerReturnTo', window.location.href); } catch (_) {}
+        }
+
+        ensureFeedbackShell();
+        document.body.classList.add('crm-page-leaving');
+        const progress = document.getElementById('crm-network-progress');
+        if (progress) {
+            progress.classList.remove('is-done');
+            progress.classList.add('is-visible', 'is-loading');
+        }
+    }
+
+    function initSeamlessNavigation() {
+        if (document.documentElement.dataset.crmNavigationReady === '1') return;
+        document.documentElement.dataset.crmNavigationReady = '1';
+
+        document.addEventListener('pointerover', event => {
+            const anchor = event.target.closest?.('a[href]');
+            if (anchor) prefetchInternalPage(anchor);
+        }, { passive: true });
+
+        document.addEventListener('touchstart', event => {
+            const anchor = event.target.closest?.('a[href]');
+            if (anchor) prefetchInternalPage(anchor);
+        }, { passive: true });
+
+        document.addEventListener('click', event => {
+            const anchor = event.target.closest?.('a[href]');
+            if (anchor) beginSeamlessNavigation(anchor, event);
+        }, true);
+
+        window.addEventListener('pageshow', () => {
+            document.body?.classList.remove('crm-page-leaving');
+            const progress = document.getElementById('crm-network-progress');
+            if (progress) progress.classList.remove('is-visible', 'is-loading', 'is-done');
+        });
+    }
+
     function initInteractionLayer() {
         if (!document.body || document.body.dataset.crmUiReady === '1') return;
         document.body.dataset.crmUiReady = '1';
         document.body.classList.add('crm-ui-enhanced');
+        initSeamlessNavigation();
         ensureFeedbackShell();
         scheduleReveal(document);
 
