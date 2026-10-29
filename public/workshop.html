@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Цех — IDEAL FLOOR CRM</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="style.css?v={{VER}}">
+    <link rel="stylesheet" href="workshop.css?v={{VER}}">
+    <link rel="icon" href="favicon.gif" type="image/gif">
+    <meta name="theme-color" content="#b9040a">
+</head>
+<body class="app-workspace-page workshop-page">
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm"></nav>
+
+    <main class="workshop-shell">
+        <section class="workshop-hero">
+            <div>
+                <span class="workshop-eyebrow">ПРОИЗВОДСТВО И ОБРАЗЦЫ</span>
+                <h1>Цех</h1>
+                <p>Ламинат, расходники, производство, стенды и точный учёт выдачи дилерам.</p>
+            </div>
+            <div class="workshop-hero-actions" data-permission="can_manage_workshop">
+                <button type="button" class="workshop-primary-action" data-open-workshop="production">
+                    <i class="bi bi-hammer"></i><span>Производство</span>
+                </button>
+                <button type="button" class="workshop-secondary-action" data-open-workshop="receipt">
+                    <i class="bi bi-box-arrow-in-down"></i><span>Приход</span>
+                </button>
+            </div>
+        </section>
+
+        <section class="workshop-kpi-grid">
+            <article class="workshop-kpi">
+                <span class="workshop-kpi-icon"><i class="bi bi-calendar-check"></i></span>
+                <div><small>Изготовлено сегодня</small><strong id="ws-kpi-today">—</strong><em>изделий</em></div>
+            </article>
+            <article class="workshop-kpi">
+                <span class="workshop-kpi-icon"><i class="bi bi-boxes"></i></span>
+                <div><small>Готовые образцы / стенды</small><strong id="ws-kpi-finished">—</strong><em>шт</em></div>
+            </article>
+            <article class="workshop-kpi">
+                <span class="workshop-kpi-icon"><i class="bi bi-layers"></i></span>
+                <div><small>Ламинат в цехе</small><strong id="ws-kpi-laminate">—</strong><em>планок</em></div>
+            </article>
+            <article class="workshop-kpi is-warning">
+                <span class="workshop-kpi-icon"><i class="bi bi-exclamation-triangle"></i></span>
+                <div><small>Расходники на минимуме</small><strong id="ws-kpi-low">—</strong><em>позиций</em></div>
+            </article>
+        </section>
+
+        <section class="workshop-quick-actions" data-permission="can_manage_workshop">
+            <button type="button" data-open-workshop="receipt"><i class="bi bi-box-arrow-in-down"></i><span><strong>Принять ламинат</strong><small>Поступило / принято / не та позиция</small></span></button>
+            <button type="button" data-open-workshop="production"><i class="bi bi-tools"></i><span><strong>Записать производство</strong><small>Склейка, распил, кромление</small></span></button>
+            <button type="button" data-open-workshop="dealer"><i class="bi bi-truck"></i><span><strong>Дилеру</strong><small>Выдача, возврат, замена</small></span></button>
+            <button type="button" data-open-workshop="material"><i class="bi bi-bucket"></i><span><strong>Материалы</strong><small>Приход и расход расходников</small></span></button>
+            <button type="button" data-open-workshop="writeoff"><i class="bi bi-file-earmark-minus"></i><span><strong>Списание</strong><small>Только по служебной записке</small></span></button>
+        </section>
+
+        <section class="workshop-tabs-shell">
+            <div class="workshop-tabs" role="tablist">
+                <button class="active" data-ws-tab="overview"><i class="bi bi-speedometer2"></i><span>Обзор</span></button>
+                <button data-ws-tab="stock"><i class="bi bi-box-seam"></i><span>Остатки</span></button>
+                <button data-ws-tab="dealers"><i class="bi bi-shop"></i><span>Дилеры</span></button>
+                <button data-ws-tab="recipes"><i class="bi bi-diagram-3"></i><span>Рецептуры</span></button>
+                <button data-ws-tab="history"><i class="bi bi-clock-history"></i><span>История</span></button>
+            </div>
+
+            <div class="workshop-tab-pane active" data-ws-pane="overview">
+                <div class="workshop-grid-2">
+                    <section class="workshop-panel">
+                        <div class="workshop-panel-head">
+                            <div><span>СЕГОДНЯ / ПОСЛЕДНИЕ ОПЕРАЦИИ</span><h2>Производство</h2></div>
+                            <button type="button" class="workshop-link-btn" data-open-workshop="production" data-permission="can_manage_workshop"><i class="bi bi-plus-lg"></i> Записать</button>
+                        </div>
+                        <div id="ws-production-list" class="workshop-feed"></div>
+                    </section>
+                    <section class="workshop-panel">
+                        <div class="workshop-panel-head">
+                            <div><span>КОНТРОЛЬ</span><h2>Требуют внимания</h2></div>
+                        </div>
+                        <div id="ws-attention-list" class="workshop-attention"></div>
+                    </section>
+                </div>
+            </div>
+
+            <div class="workshop-tab-pane" data-ws-pane="stock">
+                <div class="workshop-stock-toolbar">
+                    <div class="workshop-search"><i class="bi bi-search"></i><input id="ws-stock-search" type="search" placeholder="Поиск по SKU, изделию или материалу"></div>
+                    <button type="button" class="workshop-link-btn" data-open-workshop="stocktake" data-permission="can_manage_workshop"><i class="bi bi-clipboard-check"></i> Инвентаризация</button>
+                </div>
+                <section class="workshop-panel">
+                    <div class="workshop-panel-head"><div><span>СЫРЬЁ</span><h2>Ламинат в цехе</h2></div></div>
+                    <div id="ws-laminate-stock" class="workshop-table-wrap"></div>
+                </section>
+                <div class="workshop-grid-2 mt-3">
+                    <section class="workshop-panel">
+                        <div class="workshop-panel-head"><div><span>ГОТОВАЯ ПРОДУКЦИЯ</span><h2>Образцы и стенды</h2></div></div>
+                        <div id="ws-finished-stock" class="workshop-stock-cards"></div>
+                    </section>
+                    <section class="workshop-panel">
+                        <div class="workshop-panel-head">
+                            <div><span>РАСХОДНИКИ</span><h2>Материалы</h2></div>
+                            <button type="button" class="workshop-link-btn" data-open-workshop="new-material" data-permission="can_manage_workshop"><i class="bi bi-plus-lg"></i> Материал</button>
+                        </div>
+                        <div id="ws-material-stock" class="workshop-stock-cards"></div>
+                    </section>
+                </div>
+            </div>
+
+            <div class="workshop-tab-pane" data-ws-pane="dealers">
+                <section class="workshop-panel">
+                    <div class="workshop-panel-head">
+                        <div><span>ТОЧНЫЙ УЧЁТ</span><h2>Что находится у дилеров</h2></div>
+                        <button type="button" class="workshop-link-btn" data-open-workshop="dealer" data-permission="can_manage_workshop"><i class="bi bi-arrow-left-right"></i> Движение</button>
+                    </div>
+                    <div class="workshop-filter-row">
+                        <div class="workshop-search"><i class="bi bi-search"></i><input id="ws-dealer-search" type="search" placeholder="Дилер, город, образец или стенд"></div>
+                    </div>
+                    <div id="ws-dealer-assets" class="workshop-dealer-assets"></div>
+                </section>
+            </div>
+
+            <div class="workshop-tab-pane" data-ws-pane="recipes">
+                <section class="workshop-panel">
+                    <div class="workshop-panel-head">
+                        <div><span>НОРМЫ ПРОИЗВОДСТВА</span><h2>Рецептуры</h2><p>Сколько планок и материалов требуется на одно готовое изделие.</p></div>
+                        <button type="button" class="workshop-link-btn" data-open-workshop="recipe" data-permission="can_manage_workshop"><i class="bi bi-plus-lg"></i> Рецептура</button>
+                    </div>
+                    <div id="ws-recipes" class="workshop-recipe-grid"></div>
+                </section>
+            </div>
+
+            <div class="workshop-tab-pane" data-ws-pane="history">
+                <section class="workshop-panel">
+                    <div class="workshop-panel-head"><div><span>АУДИТ</span><h2>История движений</h2></div></div>
+                    <div class="workshop-filter-row">
+                        <div class="workshop-search"><i class="bi bi-search"></i><input id="ws-history-search" type="search" placeholder="Поиск по операции, позиции, дилеру, служебке"></div>
+                        <select id="ws-history-type" class="form-select">
+                            <option value="">Все операции</option>
+                            <option value="laminate_receipt">Приход ламината</option>
+                            <option value="production_output">Производство</option>
+                            <option value="dealer_issue">Выдача дилеру</option>
+                            <option value="dealer_return">Возврат</option>
+                            <option value="dealer_replacement">Замена</option>
+                            <option value="writeoff">Списание</option>
+                            <option value="stocktake_adjustment">Инвентаризация</option>
+                        </select>
+                    </div>
+                    <div id="ws-history" class="workshop-table-wrap"></div>
+                </section>
+            </div>
+        </section>
+    </main>
+
+    <!-- Receipt modal -->
+    <div class="modal fade" id="ws-receipt-modal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered"><div class="modal-content workshop-modal">
+            <div class="modal-header"><div><small>ПРИХОД ЛАМИНАТА</small><h5>Принять в цех</h5></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <form id="ws-receipt-form"><div class="modal-body">
+                <div class="workshop-form-grid">
+                    <label class="wide"><span>Что должны были привезти</span><select id="ws-receipt-expected" class="form-select" required></select></label>
+                    <label class="wide"><span>Что фактически привезли</span><select id="ws-receipt-actual" class="form-select" required></select></label>
+                    <label><span>Привезли, упаковок</span><input id="ws-receipt-delivered" type="number" min="0" step="1" class="form-control" required></label>
+                    <label><span>Приняли, упаковок</span><input id="ws-receipt-accepted" type="number" min="0" step="1" class="form-control" required></label>
+                    <label><span>Отдельных планок</span><input id="ws-receipt-loose" type="number" min="0" step="1" class="form-control" value="0"></label>
+                    <label><span>Дата</span><input id="ws-receipt-date" type="date" class="form-control"></label>
+                    <label class="wide"><span>Причина расхождения / не та позиция</span><input id="ws-receipt-reason" class="form-control" placeholder="Например: вместо EH-702 привезли EH-703"></label>
+                    <label class="wide"><span>Комментарий</span><textarea id="ws-receipt-note" class="form-control" rows="2"></textarea></label>
+                </div>
+                <div id="ws-receipt-calc" class="workshop-calc-box"></div>
+            </div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button><button class="btn btn-dark" type="submit">Принять</button></div></form>
+        </div></div>
+    </div>
+
+    <!-- Production modal -->
+    <div class="modal fade" id="ws-production-modal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered"><div class="modal-content workshop-modal">
+            <div class="modal-header"><div><small>ЕЖЕДНЕВНОЕ ПРОИЗВОДСТВО</small><h5>Записать изготовление</h5></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <form id="ws-production-form"><div class="modal-body">
+                <div class="workshop-form-grid">
+                    <label class="wide"><span>Что изготавливаем</span><select id="ws-production-recipe" class="form-select" required></select></label>
+                    <label><span>Приняли в работу, упаковок</span><input id="ws-production-packs" type="number" min="0" step="1" class="form-control" value="0"></label>
+                    <label><span>+ отдельных планок</span><input id="ws-production-loose" type="number" min="0" step="1" class="form-control" value="0"></label>
+                    <label><span>Изготовлено, шт</span><input id="ws-production-output" type="number" min="1" step="1" class="form-control" value="1" required></label>
+                    <label><span>Отход / брак, планок</span><input id="ws-production-scrap" type="number" min="0" step="1" class="form-control" value="0"></label>
+                    <label><span>Дата</span><input id="ws-production-date" type="date" class="form-control"></label>
+                </div>
+                <div id="ws-production-calc" class="workshop-calc-box"></div>
+                <div class="workshop-operation-box">
+                    <strong>Выполненные работы</strong>
+                    <div class="workshop-operation-grid">
+                        <label><input type="checkbox" value="Склейка" class="ws-operation-check"> <span>Склейка</span><input type="number" min="0" class="ws-operation-qty form-control" placeholder="шт"></label>
+                        <label><input type="checkbox" value="Распил" class="ws-operation-check"> <span>Распил</span><input type="number" min="0" class="ws-operation-qty form-control" placeholder="шт"></label>
+                        <label><input type="checkbox" value="Кромление" class="ws-operation-check"> <span>Кромление</span><input type="number" min="0" class="ws-operation-qty form-control" placeholder="шт"></label>
+                        <label><input type="checkbox" value="Сборка стенда" class="ws-operation-check"> <span>Сборка стенда</span><input type="number" min="0" class="ws-operation-qty form-control" placeholder="шт"></label>
+                    </div>
+                </div>
+                <label class="workshop-note-label"><span>Комментарий</span><textarea id="ws-production-note" class="form-control" rows="2"></textarea></label>
+            </div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button><button class="btn btn-dark" type="submit">Записать производство</button></div></form>
+        </div></div>
+    </div>
+
+    <!-- Dealer movement -->
+    <div class="modal fade" id="ws-dealer-modal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered"><div class="modal-content workshop-modal">
+            <div class="modal-header"><div><small>ДИЛЕРЫ</small><h5>Выдача / возврат / замена</h5></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <form id="ws-dealer-form"><div class="modal-body"><div class="workshop-form-grid">
+                <label class="wide"><span>Дилер</span><select id="ws-dealer-id" class="form-select" required></select></label>
+                <label class="wide"><span>Образец / стенд</span><select id="ws-dealer-recipe" class="form-select" required></select></label>
+                <label><span>Операция</span><select id="ws-dealer-action" class="form-select"><option value="issue">Выдать</option><option value="return">Вернуть</option><option value="replacement">Заменить</option></select></label>
+                <label><span>Количество</span><input id="ws-dealer-qty" type="number" min="1" step="1" value="1" class="form-control"></label>
+                <label><span>Состояние возврата</span><select id="ws-dealer-condition" class="form-select"><option value="defect">Брак / не возвращать в остаток</option><option value="reusable">Можно использовать повторно</option></select></label>
+                <label><span>Дата</span><input id="ws-dealer-date" type="date" class="form-control"></label>
+                <label class="wide"><span>Причина</span><input id="ws-dealer-reason" class="form-control" placeholder="Выдача нового стенда, замена бракованного образца..."></label>
+                <label class="wide"><span>Комментарий</span><textarea id="ws-dealer-note" class="form-control" rows="2"></textarea></label>
+            </div><div id="ws-dealer-current" class="workshop-calc-box"></div></div>
+            <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button><button class="btn btn-dark" type="submit">Провести</button></div></form>
+        </div></div>
+    </div>
+
+    <!-- Material movement -->
+    <div class="modal fade" id="ws-material-modal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content workshop-modal">
+            <div class="modal-header"><div><small>РАСХОДНИКИ</small><h5>Движение материала</h5></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <form id="ws-material-form"><div class="modal-body"><div class="workshop-form-grid">
+                <label class="wide"><span>Материал</span><select id="ws-material-id" class="form-select" required></select></label>
+                <label><span>Операция</span><select id="ws-material-direction" class="form-select"><option value="in">Приход</option><option value="out">Расход</option></select></label>
+                <label><span>Количество</span><input id="ws-material-qty" type="number" min="0.001" step="0.001" class="form-control" required></label>
+                <label><span>Дата</span><input id="ws-material-date" type="date" class="form-control"></label>
+                <label class="wide"><span>Комментарий</span><textarea id="ws-material-note" class="form-control" rows="2"></textarea></label>
+            </div></div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button><button class="btn btn-dark" type="submit">Провести</button></div></form>
+        </div></div>
+    </div>
+
+    <!-- Writeoff -->
+    <div class="modal fade" id="ws-writeoff-modal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content workshop-modal">
+            <div class="modal-header"><div><small>СПИСАНИЕ</small><h5>Служебная записка</h5></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <form id="ws-writeoff-form"><div class="modal-body"><div class="workshop-form-grid">
+                <label><span>Что списываем</span><select id="ws-writeoff-type" class="form-select"><option value="laminate">Ламинат</option><option value="material">Материал</option><option value="finished">Готовое изделие</option></select></label>
+                <label class="wide"><span>Позиция</span><select id="ws-writeoff-item" class="form-select" required></select></label>
+                <label><span>Количество</span><input id="ws-writeoff-qty" type="number" min="0.001" step="0.001" class="form-control" required></label>
+                <label><span>№ служебной записки</span><input id="ws-writeoff-memo" class="form-control" required></label>
+                <label><span>Дата</span><input id="ws-writeoff-date" type="date" class="form-control"></label>
+                <label class="wide"><span>Причина</span><textarea id="ws-writeoff-note" class="form-control" rows="2"></textarea></label>
+            </div><div id="ws-writeoff-hint" class="workshop-calc-box"></div></div>
+            <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button><button class="btn btn-danger" type="submit">Списать</button></div></form>
+        </div></div>
+    </div>
+
+    <!-- Material create -->
+    <div class="modal fade" id="ws-new-material-modal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content workshop-modal">
+            <div class="modal-header"><div><small>СПРАВОЧНИК</small><h5>Новый материал</h5></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <form id="ws-new-material-form"><div class="modal-body"><div class="workshop-form-grid">
+                <label><span>Код</span><input id="ws-new-material-code" class="form-control"></label>
+                <label class="wide"><span>Название</span><input id="ws-new-material-name" class="form-control" required></label>
+                <label><span>Категория</span><select id="ws-new-material-category" class="form-select"><option value="consumable">Расходник</option><option value="stand_component">Деталь стенда</option><option value="tool">Инструмент</option><option value="other">Другое</option></select></label>
+                <label><span>Единица</span><input id="ws-new-material-unit" class="form-control" value="шт"></label>
+                <label><span>Начальный остаток</span><input id="ws-new-material-stock" type="number" min="0" step="0.001" class="form-control" value="0"></label>
+                <label><span>Минимальный остаток</span><input id="ws-new-material-min" type="number" min="0" step="0.001" class="form-control" value="0"></label>
+                <label class="wide"><span>Комментарий</span><input id="ws-new-material-note" class="form-control"></label>
+            </div></div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button><button class="btn btn-dark" type="submit">Добавить</button></div></form>
+        </div></div>
+    </div>
+
+    <!-- Recipe -->
+    <div class="modal fade" id="ws-recipe-modal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered"><div class="modal-content workshop-modal">
+            <div class="modal-header"><div><small>НОРМА ПРОИЗВОДСТВА</small><h5>Рецептура изделия</h5></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <form id="ws-recipe-form"><div class="modal-body">
+                <input type="hidden" id="ws-recipe-id">
+                <div class="workshop-form-grid">
+                    <label class="wide"><span>Название изделия</span><input id="ws-recipe-name" class="form-control" placeholder="Планшет EH-702 Дуб Арабика" required></label>
+                    <label><span>Тип</span><select id="ws-recipe-type" class="form-select"><option value="sample">Планшет / образец</option><option value="stand">Стенд</option><option value="sign">Табличка</option><option value="other">Другое</option></select></label>
+                    <label><span>Код</span><input id="ws-recipe-sku" class="form-control"></label>
+                    <label class="wide"><span>Ламинат</span><select id="ws-recipe-product" class="form-select"></select></label>
+                    <label><span>Планок на 1 изделие</span><input id="ws-recipe-planks" type="number" min="0" step="1" class="form-control" value="0"></label>
+                    <label><span>Планок в упаковке (если нужно переопределить)</span><input id="ws-recipe-pack-override" type="number" min="0" step="1" class="form-control" value="0"></label>
+                    <label><span>Сторона А</span><input id="ws-recipe-side-a" class="form-control" placeholder="Палубная укладка"></label>
+                    <label><span>Сторона Б</span><input id="ws-recipe-side-b" class="form-control" placeholder="Ёлочка"></label>
+                    <label class="wide"><span>Связать с POS в Матрице</span><select id="ws-recipe-matrix-pos" class="form-select"><option value="">Не связывать</option><option>С600 - 600мм задняя стенка</option><option>С800 - 800мм задняя стенка</option><option>РФ-2 - Расческа из фанеры</option><option>РФС-1 - Расческа из фанеры СТАРАЯ</option><option>Н600 - 600мм наклейка</option><option>Н800 - 800мм наклейка</option><option>Табличка - Табличка орг.стекло</option></select></label>
+                    <label class="wide"><span>Комментарий</span><textarea id="ws-recipe-note" class="form-control" rows="2"></textarea></label>
+                </div>
+                <div id="ws-recipe-calc" class="workshop-calc-box"></div>
+                <div class="workshop-bom-grid">
+                    <section class="workshop-bom">
+                        <div><strong>Расходные материалы на 1 изделие</strong><button type="button" id="ws-add-bom-material"><i class="bi bi-plus"></i></button></div>
+                        <div id="ws-bom-materials"></div>
+                    </section>
+                    <section class="workshop-bom">
+                        <div><strong>Готовые компоненты на 1 изделие</strong><button type="button" id="ws-add-bom-component"><i class="bi bi-plus"></i></button></div>
+                        <div id="ws-bom-components"></div>
+                    </section>
+                </div>
+            </div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button><button class="btn btn-dark" type="submit">Сохранить рецептуру</button></div></form>
+        </div></div>
+    </div>
+
+    <!-- Stocktake -->
+    <div class="modal fade" id="ws-stocktake-modal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered"><div class="modal-content workshop-modal">
+            <div class="modal-header"><div><small>ИНВЕНТАРИЗАЦИЯ</small><h5>Фактические остатки</h5></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <form id="ws-stocktake-form"><div class="modal-body">
+                <div class="workshop-stocktake-note"><i class="bi bi-info-circle"></i><span>Заполните только позиции, где фактический остаток отличается. Для ламината фактическое количество вводится в планках.</span></div>
+                <div id="ws-stocktake-lines" class="workshop-stocktake-lines"></div>
+                <label class="workshop-note-label mt-3"><span>Комментарий к инвентаризации</span><textarea id="ws-stocktake-note" class="form-control" rows="2"></textarea></label>
+            </div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button><button class="btn btn-dark" type="submit">Зафиксировать остатки</button></div></form>
+        </div></div>
+    </div>
+
+    <script defer src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script defer src="permissions.js?v={{VER}}"></script>
+    <script defer src="workshop.js?v={{VER}}"></script>
+</body>
+</html>
