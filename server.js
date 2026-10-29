@@ -514,7 +514,31 @@ app.get('/api/dealers/:id/avatar', requirePermission('can_view_dealers'), async 
         res.json({ avatarUrl: d.avatarUrl || '' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
-app.get('/api/dealers/:id', requirePermission('can_view_dealers'), async (req, res) => { try { const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).populate('products'); res.json(convertToClient(d)); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.get('/api/dealers/:id', requirePermission('can_view_dealers'), async (req, res) => {
+    try {
+        let query = Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) });
+        if (req.query.view === 'profile') {
+            query = query.select('-photos').populate('products', 'sku name');
+        } else {
+            query = query.populate('products');
+        }
+        const d = await query.lean();
+        if (!d) return res.status(404).json({ error: 'Дилер не найден' });
+        res.json(convertToClient(d));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.get('/api/dealers/:id/photos', requirePermission('can_view_dealers'), async (req, res) => {
+    try {
+        const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).select('photos').lean();
+        if (!d) return res.status(404).json({ error: 'Дилер не найден' });
+        res.set('Cache-Control', 'private, max-age=60');
+        res.json(Array.isArray(d.photos) ? d.photos : []);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
 app.post('/api/dealers', requirePermission('can_create_dealer'), async (req, res) => { try {
     const scope = getUserScope(req);
     if (req.user.role === 'manager' && !isGlobalViewer(req)) {
@@ -592,9 +616,39 @@ app.put('/api/dealers/:id', requirePermission('can_edit_dealer'), async (req, re
         res.status(500).json({ error: e.message });
     }
 });
+app.patch('/api/dealers/:id', requirePermission('can_edit_dealer'), async (req, res) => {
+    try {
+        const payload = { ...req.body };
+        if (req.user.role === 'manager' && !isGlobalViewer(req)) {
+            payload.responsibleUserId = '';
+            payload.responsibleAssignmentSource = '';
+            if (req.user.scope === 'astana') payload.responsible = 'regional_astana';
+            if (req.user.scope === 'regions') payload.responsible = 'regional_regions';
+        }
+
+        const updated = await Dealer.findOneAndUpdate(
+            { _id: req.params.id, ...getDealerFilter(req) },
+            { $set: payload },
+            { new: true }
+        ).lean();
+
+        if (!updated) return res.status(404).json({ error: 'Дилер не найден' });
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
 app.delete('/api/dealers/:id', requirePermission('can_delete_dealer'), async (req, res) => { try { await Dealer.findOneAndDelete({ _id: req.params.id, ...getDealerFilter(req) }); res.json({status:'deleted'}); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.get('/api/dealers/:id/products', requireAnyPermission('can_view_dealers', 'can_view_products'), async (req, res) => { const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).populate('products'); if (!d) return res.status(404).json({ error: 'Дилер не найден' }); res.json(d.products.map(convertToClient)); });
 app.put('/api/dealers/:id/products', requirePermission('can_edit_matrix'), async (req, res) => { const d = await Dealer.findOneAndUpdate({ _id: req.params.id, ...getDealerFilter(req) }, { products: req.body.productIds }); if (!d) return res.status(404).json({ error: 'Дилер не найден' }); res.json({status:'ok'}); });
+app.get('/api/products/count', requireAnyPermission('can_view_products', 'can_view_report', 'can_view_reclamations', 'can_view_dealers'), async (req, res) => {
+    try {
+        const count = await Product.countDocuments({});
+        res.json({ count });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
 app.get('/api/products', requireAnyPermission('can_view_products', 'can_view_report', 'can_view_reclamations', 'can_view_dealers'), async (req, res) => { const s = new RegExp(req.query.search||'', 'i'); const p = await Product.find({$or:[{sku:s},{name:s}]}).sort({sku:1}).lean(); res.json(p.map(x=>{x.id=x._id;return x;})); });
 app.post('/api/products', requirePermission('can_manage_products'), async (req, res) => { const p = new Product(req.body); await p.save(); res.json(convertToClient(p)); });
 app.put('/api/products/:id', requirePermission('can_manage_products'), async (req, res) => { const p = await Product.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(p)); });
@@ -604,7 +658,7 @@ app.get('/api/matrix', requireAnyPermission('can_view_products', 'can_view_repor
 
 app.get('/api/sales', requirePermission('can_view_sales'), async (req, res) => {
     try {
-        const { month, months } = req.query;
+        const { month, months, dealerId } = req.query;
         let filter = month ? { month } : {};
         if (!month && months) {
             const count = Math.max(1, Math.min(24, Number(months) || 6));
@@ -666,6 +720,17 @@ app.get('/api/sales', requirePermission('can_view_sales'), async (req, res) => {
                             { isCustom: true, group: { $in: groupKeys } }
                         ]
                     }
+                ]
+            };
+        }
+
+        if (dealerId) {
+            const requestedDealerId = String(dealerId);
+            const requestedPlanId = `PLAN_vip_${requestedDealerId}`;
+            filter = {
+                $and: [
+                    filter,
+                    { dealerId: { $in: [requestedDealerId, requestedPlanId] } }
                 ]
             };
         }
