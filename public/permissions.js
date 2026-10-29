@@ -779,6 +779,14 @@
                 toggle.classList.remove('show');
                 toggle.setAttribute('aria-expanded', 'false');
             });
+            document.querySelectorAll('.dropdown.show').forEach(dropdown => dropdown.classList.remove('show'));
+            document.querySelectorAll('.multi-select-menu.show').forEach(menu => menu.classList.remove('show'));
+
+            const globalSearch = document.querySelector('.global-search-overlay.open');
+            if (globalSearch) {
+                globalSearch.classList.remove('open');
+                globalSearch.setAttribute('aria-hidden', 'true');
+            }
 
             const sheetBackdrop = document.querySelector('.crm-mobile-sheet-backdrop.open');
             if (sheetBackdrop) sheetBackdrop.classList.remove('open');
