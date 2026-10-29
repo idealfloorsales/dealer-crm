@@ -186,8 +186,8 @@
                         <input id="ws-memo-search" type="search" placeholder="Поиск по артикулу или названию">
                     </div>
                     <div class="workshop-memo-filters">
-                        <button type="button" class="active" data-memo-filter="need">Нужно пополнить</button>
-                        <button type="button" data-memo-filter="all">Все позиции</button>
+                        <button type="button" class="active" data-memo-filter="all">Все позиции</button>
+                        <button type="button" data-memo-filter="need">Нужно пополнить</button>
                         <button type="button" data-memo-filter="selected">Выбранные</button>
                     </div>
                 </div>
@@ -242,6 +242,16 @@
                     <label><span>Отход / брак, планок</span><input id="ws-production-scrap" type="number" min="0" step="1" class="form-control" value="0"></label>
                     <label><span>Дата</span><input id="ws-production-date" type="date" class="form-control"></label>
                 </div>
+                <div class="workshop-custom-norm">
+                    <label class="workshop-custom-toggle">
+                        <input class="form-check-input" type="checkbox" id="ws-production-custom-toggle">
+                        <span><strong>Индивидуальная партия</strong><small>Использовать фактическую норму только для этой партии</small></span>
+                    </label>
+                    <div id="ws-production-custom-fields" class="workshop-custom-fields" hidden>
+                        <label><span>Фактически планок на 1 изделие</span><input id="ws-production-actual-planks" type="number" min="0.001" step="0.001" class="form-control"></label>
+                        <label><span>Причина отклонения</span><input id="ws-production-custom-reason" class="form-control" placeholder="Например: индивидуальный образец для Мегастроя"></label>
+                    </div>
+                </div>
                 <div id="ws-production-calc" class="workshop-calc-box"></div>
                 <div class="workshop-operation-box">
                     <strong>Выполненные работы</strong>
@@ -275,6 +285,24 @@
         </div></div>
     </div>
 
+    <!-- Quick product norm -->
+    <div class="modal fade" id="ws-quick-norm-modal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content workshop-modal">
+            <div class="modal-header"><div><small>НОРМА ДЛЯ ОБРАЗЦА</small><h5 id="ws-quick-norm-title">Настроить позицию</h5></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <form id="ws-quick-norm-form"><div class="modal-body">
+                <input type="hidden" id="ws-quick-norm-product">
+                <div class="workshop-form-grid">
+                    <label><span>Планок в упаковке</span><input id="ws-quick-norm-pack" type="number" min="1" step="1" class="form-control" required></label>
+                    <label><span>Планок на 1 планшет / образец</span><input id="ws-quick-norm-planks" type="number" min="1" step="1" class="form-control" required></label>
+                    <label><span>Минимальный остаток готовых, шт</span><input id="ws-quick-norm-min" type="number" min="0" step="1" class="form-control" value="0"></label>
+                    <label><span>Название изделия</span><input id="ws-quick-norm-name" class="form-control" required></label>
+                    <label class="wide"><span>Комментарий</span><input id="ws-quick-norm-note" class="form-control" placeholder="Например: стандартный двухсторонний планшет"></label>
+                </div>
+                <div class="workshop-document-note"><i class="bi bi-info-circle"></i><span>Норма сохранится для этого SKU и дальше будет применяться автоматически. Для разовых индивидуальных заказов стандартную норму менять не нужно — отклонение указывается в конкретной производственной партии.</span></div>
+            </div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button><button class="btn btn-dark" type="submit">Сохранить норму</button></div></form>
+        </div></div>
+    </div>
+
     <!-- Material movement -->
     <div class="modal fade" id="ws-material-modal" tabindex="-1" data-bs-backdrop="static">
         <div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content workshop-modal">
@@ -282,8 +310,9 @@
             <form id="ws-material-form"><div class="modal-body"><div class="workshop-form-grid">
                 <label class="wide"><span>Материал</span><select id="ws-material-id" class="form-select" required></select></label>
                 <label><span>Операция</span><select id="ws-material-direction" class="form-select"><option value="in">Приход</option><option value="out">Расход</option></select></label>
-                <label><span>Количество</span><input id="ws-material-qty" type="number" min="0.001" step="0.001" class="form-control" required></label>
+                <label><span id="ws-material-qty-label">Количество</span><input id="ws-material-qty" type="number" min="0.001" step="0.001" class="form-control" required></label>
                 <label><span>Дата</span><input id="ws-material-date" type="date" class="form-control"></label>
+                <div class="wide workshop-material-conversion" id="ws-material-conversion"></div>
                 <label class="wide"><span>Комментарий</span><textarea id="ws-material-note" class="form-control" rows="2"></textarea></label>
             </div></div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button><button class="btn btn-dark" type="submit">Провести</button></div></form>
         </div></div>
@@ -313,7 +342,9 @@
                 <label><span>Код</span><input id="ws-new-material-code" class="form-control"></label>
                 <label class="wide"><span>Название</span><input id="ws-new-material-name" class="form-control" required></label>
                 <label><span>Категория</span><select id="ws-new-material-category" class="form-select"><option value="consumable">Расходник</option><option value="stand_component">Деталь стенда</option><option value="tool">Инструмент</option><option value="other">Другое</option></select></label>
-                <label><span>Единица</span><input id="ws-new-material-unit" class="form-control" value="шт"></label>
+                <label><span>Базовая единица учёта</span><input id="ws-new-material-unit" class="form-control" value="шт"></label>
+                <label><span>Как закупается</span><input id="ws-new-material-purchase-unit" class="form-control" value="шт" placeholder="лист / бухта / мешок / шт"></label>
+                <label><span>Сколько базовых единиц в закупочной</span><input id="ws-new-material-purchase-size" type="number" min="0.001" step="0.001" class="form-control" value="1"></label>
                 <label><span>Начальный остаток</span><input id="ws-new-material-stock" type="number" min="0" step="0.001" class="form-control" value="0"></label>
                 <label><span>Минимальный остаток</span><input id="ws-new-material-min" type="number" min="0" step="0.001" class="form-control" value="0"></label>
                 <label class="wide"><span>Комментарий</span><input id="ws-new-material-note" class="form-control"></label>
@@ -337,7 +368,7 @@
                     <label><span>Планок в упаковке (если нужно переопределить)</span><input id="ws-recipe-pack-override" type="number" min="0" step="1" class="form-control" value="0"></label>
                     <label><span>Сторона А</span><input id="ws-recipe-side-a" class="form-control" placeholder="Палубная укладка"></label>
                     <label><span>Сторона Б</span><input id="ws-recipe-side-b" class="form-control" placeholder="Ёлочка"></label>
-                    <label class="wide"><span>Связать с POS в Матрице</span><select id="ws-recipe-matrix-pos" class="form-select"><option value="">Не связывать</option><option>С600 - 600мм задняя стенка</option><option>С800 - 800мм задняя стенка</option><option>РФ-2 - Расческа из фанеры</option><option>РФС-1 - Расческа из фанеры СТАРАЯ</option><option>Н600 - 600мм наклейка</option><option>Н800 - 800мм наклейка</option><option>Табличка - Табличка орг.стекло</option></select></label>
+                    <label class="wide"><span>Связать с POS в Матрице</span><select id="ws-recipe-matrix-pos" class="form-select"><option value="">Не связывать</option><option>С600 - 600мм задняя стенка</option><option>С800 - 800мм задняя стенка</option><option>РФ-2 - Расческа из фанеры</option><option>Н600 - 600мм наклейка</option><option>Н800 - 800мм наклейка</option><option>Табличка - Табличка орг.стекло</option></select></label>
                     <label class="wide"><span>Комментарий</span><textarea id="ws-recipe-note" class="form-control" rows="2"></textarea></label>
                 </div>
                 <div id="ws-recipe-calc" class="workshop-calc-box"></div>
