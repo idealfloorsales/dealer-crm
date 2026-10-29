@@ -70,7 +70,7 @@
         }
     </style>
 </head>
-<body class="bg-light">
+<body class="bg-light app-workspace-page reclamations-page">
 
     <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-4 desktop-nav">
         <div class="container-fluid">
@@ -91,20 +91,20 @@
         </div>
     </nav>
 
-    <div class="container">
-        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-            <h1 class="h3 fw-bold mb-0">Реестр рекламаций</h1>
-            <div class="d-flex gap-2">
-                <button class="btn btn-light border text-secondary shadow-sm" onclick="printBlankForm()" title="Распечатать пустой акт для заполнения от руки">
-                    <i class="bi bi-printer me-2"></i>Печать бланка
-                </button>
-                <button class="btn btn-primary shadow-sm d-none d-lg-block" data-permission="can_manage_reclamations" onclick="openAddModal()">
-                    <i class="bi bi-plus-lg me-2"></i>Новая рекламация
-                </button>
+    <main class="container-fluid app-page-shell">
+        <section class="app-page-hero">
+            <div class="app-page-hero-copy">
+                <div class="app-page-eyebrow">IDEAL FLOOR CRM · СЕРВИС</div>
+                <h1>Рекламации</h1>
+                <p>Реестр обращений, проверка обстоятельств и решения по претензиям.</p>
             </div>
-        </div>
+            <div class="app-page-actions">
+                <button class="app-hero-secondary" onclick="printBlankForm()" title="Распечатать пустой акт"><i class="bi bi-printer"></i><span>Бланк</span></button>
+                <button class="app-hero-primary d-none d-lg-inline-flex" data-permission="can_manage_reclamations" onclick="openAddModal()"><i class="bi bi-plus-lg"></i><span>Новая рекламация</span></button>
+            </div>
+        </section>
 
-        <div class="bg-white p-3 rounded-4 shadow-sm mb-4 border border-light">
+        <div class="app-toolbar-card">
             <div class="row g-2">
                 <div class="col-md-8">
                     <div class="input-group">
@@ -126,7 +126,7 @@
         <div id="reclamations-list" class="d-flex flex-column gap-3 mt-3">
             <p class="text-center text-muted mt-5"><span class="spinner-border spinner-border-sm"></span> Загрузка...</p>
         </div>
-    </div>
+    </main>
 
     <div class="modal fade" id="add-modal" tabindex="-1" data-bs-backdrop="static">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
