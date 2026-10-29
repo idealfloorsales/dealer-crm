@@ -177,13 +177,34 @@
                 </div>
                 <div class="workshop-document-note">
                     <i class="bi bi-info-circle"></i>
-                    <span>Добавьте все позиции одной служебкой. Приход со склада допускается только целыми упаковками.</span>
+                    <span>Отметьте нужные позиции галочками и укажите только количество упаковок. Количество готовых изделий CRM рассчитает автоматически по каталогу и рецептуре.</span>
                 </div>
-                <div class="workshop-memo-editor-head">
-                    <div><strong>Позиции</strong><small>SKU · упаковки · ожидаемый выход образцов</small></div>
-                    <button type="button" id="ws-memo-add-line" class="workshop-link-btn"><i class="bi bi-plus-lg"></i> Позиция</button>
+
+                <div class="workshop-memo-picker-tools">
+                    <div class="workshop-search">
+                        <i class="bi bi-search"></i>
+                        <input id="ws-memo-search" type="search" placeholder="Поиск по артикулу или названию">
+                    </div>
+                    <div class="workshop-memo-filters">
+                        <button type="button" class="active" data-memo-filter="need">Нужно пополнить</button>
+                        <button type="button" data-memo-filter="all">Все позиции</button>
+                        <button type="button" data-memo-filter="selected">Выбранные</button>
+                    </div>
                 </div>
-                <div id="ws-memo-lines" class="workshop-memo-lines"></div>
+
+                <div class="workshop-memo-table-head">
+                    <span></span><span>Артикул / название</span><span>Остаток</span><span>Упаковок</span><span>Результат</span>
+                </div>
+                <div id="ws-memo-product-list" class="workshop-memo-product-list"></div>
+
+                <div class="workshop-memo-summary" id="ws-memo-summary">
+                    <div><small>Позиций</small><strong id="ws-memo-total-lines">0</strong></div>
+                    <div><small>Упаковок</small><strong id="ws-memo-total-packs">0</strong></div>
+                    <div><small>Планок</small><strong id="ws-memo-total-planks">0</strong></div>
+                    <div><small>Изделий</small><strong id="ws-memo-total-output">0</strong></div>
+                    <div class="wide"><small>Проверка</small><strong id="ws-memo-validation">Выберите позиции</strong></div>
+                </div>
+
                 <label class="workshop-note-label"><span>Комментарий</span><textarea id="ws-memo-note" class="form-control" rows="2"></textarea></label>
             </div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button><button class="btn btn-dark" type="submit"><i class="bi bi-file-earmark-check me-1"></i>Создать служебку</button></div></form>
         </div></div>
