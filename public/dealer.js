@@ -189,6 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const productsRes = await fetch(API_PRODUCTS_URL);
             const allProducts = await productsRes.json();
+            if (window.DealerDocuments) window.DealerDocuments.setCatalog(allProducts);
             const totalProductsCount = allProducts.length;
             const dealerProductsCount = dealer.products ? dealer.products.length : 0;
             const percent = totalProductsCount > 0 ? Math.round((dealerProductsCount / totalProductsCount) * 100) : 0;
