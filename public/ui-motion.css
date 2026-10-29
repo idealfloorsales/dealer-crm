@@ -341,15 +341,23 @@ body.crm-ui-enhanced .modal-backdrop.show {
    GLOBAL OVERLAY / MOBILE SAFE-AREA FIXES
    ========================================================= */
 
-/* Bootstrap modal must always be above local page navigation and custom menus. */
-.modal { z-index: 1300 !important; }
-.modal-backdrop { z-index: 1290 !important; }
+/* Bootstrap modal must always be above every page-local navigation, dropdown and custom overlay. */
+.modal { z-index: 30010 !important; }
+.modal-backdrop { z-index: 30000 !important; }
+.modal-backdrop.show {
+    display: block !important;
+    opacity: .5 !important;
+}
 .crm-toast-stack,
 .toast-container-custom,
 .crm-network-progress,
-.crm-loading-pill { z-index: 1400 !important; }
+.crm-loading-pill { z-index: 30100 !important; }
 
 /* Once a modal is active there must be only one interaction layer. */
+body.modal-open {
+    overflow: hidden !important;
+}
+
 body.modal-open .crm-mobile-nav,
 body.modal-open .bottom-nav,
 body.modal-open .dealer-route-bar,
@@ -361,8 +369,17 @@ body.modal-open .fab-add {
     transform: translateY(16px) !important;
 }
 
-body.modal-open .dropdown-menu.show {
+body.modal-open .dropdown-menu.show,
+body.modal-open .multi-select-menu.show,
+body.modal-open .global-search-overlay.open {
     display: none !important;
+    pointer-events: none !important;
+}
+
+body.modal-open .dealer-list-v6-card,
+body.modal-open .dealer-list-v6-card:has(.dealer-v3-menu.show) {
+    z-index: 1 !important;
+    transform: none !important;
 }
 
 /* Keep modal content inside the visible viewport on every page. */
