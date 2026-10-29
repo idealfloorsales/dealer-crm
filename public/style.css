@@ -9423,3 +9423,28 @@ body.bg-light {
     .login-shell { padding:12px; }
     .app-login-card { padding:22px 18px !important; border-radius:20px !important; }
 }
+
+
+/* Map final mobile/desktop geometry cleanup */
+.map-page .map-actions-right {
+    bottom: 24px;
+    right: 18px;
+}
+@media (max-width: 991.98px) {
+    .map-page {
+        height: 100dvh !important;
+        box-sizing: border-box;
+        padding-bottom: calc(84px + env(safe-area-inset-bottom)) !important;
+    }
+    .map-page .map-wrapper {
+        min-height: 0;
+        height: auto;
+    }
+    .map-page .map-actions-right,
+    .map-page .mobile-list-toggle {
+        bottom: 96px;
+    }
+    .map-page .map-counter-pill {
+        top: 14px;
+    }
+}
