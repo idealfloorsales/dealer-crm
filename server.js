@@ -485,6 +485,29 @@ async function migrateLegacyDealerOwnership() {
             { $and: [missingOwner, getLegacyScopeFilter(scope)] },
             { $set: { responsibleUserId: managerId } }
         );
+
+        // Для старых месяцев, где в зоне был только один менеджер,
+        // переносим зональный план в его персональный план один раз.
+        const legacyPlanId = scope === 'astana' ? 'PLAN_astana_all' : 'PLAN_regions_all';
+        const managerPlanId = `PLAN_manager_${managerId}`;
+        const legacyPlans = await Sales.find({ dealerId: legacyPlanId }).lean();
+        for (const legacy of legacyPlans) {
+            await Sales.updateOne(
+                { month: legacy.month, dealerId: managerPlanId },
+                {
+                    $setOnInsert: {
+                        month: legacy.month,
+                        group: 'PLAN',
+                        dealerId: managerPlanId,
+                        dealerName: `Plan manager ${managerId}`,
+                        isCustom: false,
+                        plan: Number(legacy.plan) || 0,
+                        fact: 0
+                    }
+                },
+                { upsert: true }
+            );
+        }
     }
 }
 
