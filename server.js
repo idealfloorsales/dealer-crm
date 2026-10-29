@@ -1,6 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const compression = require('compression');
 const fs = require('fs'); 
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -13,6 +14,7 @@ if (!process.env.JWT_SECRET) console.warn('JWT_SECRET is not configured: session
 
 app.use(express.json({ limit: '50mb' })); 
 app.use(cors());
+app.use(compression());
 
 // --- АВТО-ВЕРСИЯ КЭША ---
 const APP_VERSION = Date.now(); 
