@@ -7,7 +7,8 @@
         user: null,
         templates: {},
         qrPromise: null,
-        catalog: []
+        catalog: [],
+        selectedEntityIndex: 0
     };
 
     const templatePaths = {
@@ -41,21 +42,130 @@
         return state.dealer;
     }
 
-    function getRequisites(dealer) {
+    function inferEntityType(type, name='') {
+        const explicit = String(type || '').trim();
+        if (explicit) return explicit;
+        const value = String(name || '').trim();
+        if (/^ИП\b/i.test(value)) return 'ИП';
+        if (/^(ЧС|ФЛ|Физ|частн)/i.test(value)) return 'Частное лицо';
+        return 'ТОО';
+    }
+
+    function getLegalEntities(dealer) {
+        if (Array.isArray(dealer.legal_entities) && dealer.legal_entities.length) {
+            return dealer.legal_entities.filter(entity => entity && (entity.organizationName || entity.bin || entity.iik));
+        }
+
         const r = dealer.requisites || {};
+        const orgs = Array.isArray(dealer.organizations) ? dealer.organizations.filter(Boolean) : [];
         const contacts = Array.isArray(dealer.contacts) ? dealer.contacts : [];
         const leader = contacts.find(c => /директор|руководител|владел/i.test(String(c?.position || ''))) || contacts[0] || {};
+        const primaryName = r.organizationName || orgs[0] || dealer.organization || dealer.name || '';
+        const entities = [];
+
+        if (primaryName || Object.values(r).some(Boolean)) {
+            entities.push({
+                type: inferEntityType('', primaryName),
+                organizationName: primaryName,
+                director: r.director || leader.name || '',
+                legalAddress: r.legalAddress || dealer.address || '',
+                bin: r.bin || '',
+                iik: r.iik || '',
+                bank: r.bank || '',
+                bik: r.bik || '',
+                kbe: r.kbe || '',
+                email: r.email || ''
+            });
+        }
+
+        orgs.slice(1).forEach(name => entities.push({
+            type: inferEntityType('', name),
+            organizationName: name,
+            director: '',
+            legalAddress: dealer.address || '',
+            bin: '',
+            iik: '',
+            bank: '',
+            bik: '',
+            kbe: '',
+            email: ''
+        }));
+
+        return entities;
+    }
+
+    function getRequisites(dealer) {
+        const entities = getLegalEntities(dealer);
+        const index = Math.max(0, Math.min(state.selectedEntityIndex, Math.max(0, entities.length - 1)));
+        const selected = entities[index] || {};
         return {
-            organizationName: r.organizationName || dealer.organizations?.[0] || dealer.organization || dealer.name || '',
-            director: r.director || leader.name || '',
-            legalAddress: r.legalAddress || dealer.address || '',
-            bin: r.bin || '',
-            iik: r.iik || '',
-            bank: r.bank || '',
-            bik: r.bik || '',
-            kbe: r.kbe || '',
-            email: r.email || ''
+            type: inferEntityType(selected.type, selected.organizationName),
+            organizationName: selected.organizationName || dealer.name || '',
+            director: selected.director || '',
+            legalAddress: selected.legalAddress || dealer.address || '',
+            bin: selected.bin || '',
+            iik: selected.iik || '',
+            bank: selected.bank || '',
+            bik: selected.bik || '',
+            kbe: selected.kbe || '',
+            email: selected.email || ''
         };
+    }
+
+    function legalEntityStorageKey(dealer) {
+        return `dealer_doc_entity_${dealer?.id || dealer?._id || dealer?.dealer_id || 'current'}`;
+    }
+
+    function updateEntityPickerSummary() {
+        if (!state.dealer) return;
+        const req = getRequisites(state.dealer);
+        const currentEl = document.getElementById('dealer-doc-entity-current');
+        const metaEl = document.getElementById('dealer-doc-entity-meta');
+        if (currentEl) currentEl.textContent = req.organizationName || 'Организация не заполнена';
+        if (metaEl) {
+            const details = [req.type, req.bin ? `БИН/ИИН ${req.bin}` : '', req.bank || ''].filter(Boolean);
+            metaEl.textContent = details.length
+                ? details.join(' · ')
+                : 'Заполните реквизиты организации, чтобы документы формировались полностью.';
+        }
+    }
+
+    function populateEntitySelector() {
+        const select = document.getElementById('dealer-doc-entity-select');
+        if (!select || !state.dealer) return;
+
+        const entities = getLegalEntities(state.dealer);
+        select.innerHTML = '';
+
+        if (!entities.length) {
+            select.innerHTML = '<option value="0">Организация не заполнена</option>';
+            select.disabled = true;
+            state.selectedEntityIndex = 0;
+            updateEntityPickerSummary();
+            return;
+        }
+
+        select.disabled = false;
+        entities.forEach((entity, index) => {
+            const type = inferEntityType(entity.type, entity.organizationName);
+            const name = entity.organizationName || `Организация ${index + 1}`;
+            const option = new Option(`${type} · ${name}`, String(index));
+            select.add(option);
+        });
+
+        const saved = Number(localStorage.getItem(legalEntityStorageKey(state.dealer)));
+        if (Number.isInteger(saved) && saved >= 0 && saved < entities.length) state.selectedEntityIndex = saved;
+        if (state.selectedEntityIndex >= entities.length) state.selectedEntityIndex = 0;
+        select.value = String(state.selectedEntityIndex);
+
+        select.onchange = () => {
+            state.selectedEntityIndex = Number(select.value) || 0;
+            localStorage.setItem(legalEntityStorageKey(state.dealer), String(state.selectedEntityIndex));
+            updateEntityPickerSummary();
+            render();
+        };
+
+        updateEntityPickerSummary();
     }
 
     function getContact(dealer) {
@@ -214,29 +324,69 @@
     }
 
     function buildPassportEquipment(dealer) {
-        const rows = [
-            ['Стенд 600мм задняя стенка', n => n.includes('600') && n.includes('задн')],
-            ['Стенд 800мм задняя стенка', n => n.includes('800') && n.includes('задн')],
-            ['Расческа Фанера', n => n.includes('расчес')],
-            ['Стенд 800мм Стандарт', n => n.includes('800') && n.includes('стандарт')],
-            ['Орг. Стекло Табличка', n => n.includes('таблич') || n.includes('орг.стек') || n.includes('орг стек')],
-            ['Наклейка 800мм', n => n.includes('800') && n.includes('наклей')],
-            ['Наклейка 600мм', n => n.includes('600') && n.includes('наклей')]
-        ];
-        return rows.map(([label, matcher]) => {
-            const qty = sumPos(dealer, matcher);
-            return `<div class="passport-eq-row"><span>${escapeHtml(label)}</span><b>${qty || '—'}</b></div>`;
+        const items = Array.isArray(dealer.pos_materials)
+            ? dealer.pos_materials.filter(item => item && (item.name || Number(item.quantity) > 0))
+            : [];
+
+        if (!items.length) {
+            return '<div class="passport-eq-empty">Стенды и POS не указаны</div>';
+        }
+
+        return items.map(item => {
+            const qty = Number(item.quantity) || 0;
+            return `<div class="passport-eq-row"><span>${escapeHtml(item.name || 'Оборудование')}</span><b>${qty} шт.</b></div>`;
         }).join('');
     }
 
-    function buildStorageEquipment(dealer) {
-        const items = (dealer.pos_materials || []).filter(x => Number(x?.quantity) > 0 || x?.name);
-        if (!items.length) {
-            return `<tr><td class="num">1</td><td>Торговое оборудование по данным выставленности не указано</td><td class="qty">—</td></tr>`;
+    function passportPosTotal(dealer) {
+        return (dealer.pos_materials || []).reduce((sum, item) => sum + (Number(item?.quantity) || 0), 0);
+    }
+
+    function formatMoney(value) {
+        const number = Number(value) || 0;
+        return number.toLocaleString('ru-RU').replace(/\u00a0/g, ' ');
+    }
+
+    function storagePosUnitPrice(name) {
+        const n = String(name || '').toLowerCase().replace(/ё/g, 'е');
+        if (n.includes('расчес')) return 5600;
+        if (n.includes('таблич') || n.includes('орг.стек') || n.includes('орг стек')) return 800;
+        if ((n.includes('стенк') || n.includes('задн')) && (n.includes('600') || n.includes('800'))) return 8000;
+        if (n.includes('наклей') && (n.includes('600') || n.includes('800'))) return 2000;
+        return 0;
+    }
+
+    function buildStorageItems(dealer) {
+        const rows = [];
+        let total = 0;
+
+        const products = Array.isArray(dealer.products) ? dealer.products.filter(Boolean) : [];
+        products.forEach((product, index) => {
+            const price = Number(product.sample_price) || 4500;
+            total += price;
+            rows.push(`<tr class="storage-product-row"><td class="num">${index + 1}</td><td class="sku">${escapeHtml(product.sku || '—')}</td><td>${escapeHtml(product.name || 'Без названия')}</td><td class="qty">1 планшет</td><td class="price">${formatMoney(price)}</td></tr>`);
+        });
+
+        const posItems = Array.isArray(dealer.pos_materials)
+            ? dealer.pos_materials.filter(item => item && (item.name || Number(item.quantity) > 0))
+            : [];
+
+        if (posItems.length) {
+            rows.push('<tr class="storage-section-row"><td colspan="5">ТОРГОВОЕ ОБОРУДОВАНИЕ И POSM</td></tr>');
+            posItems.forEach((item, index) => {
+                const quantity = Number(item.quantity) || 0;
+                const unitPrice = storagePosUnitPrice(item.name);
+                const lineTotal = unitPrice * quantity;
+                total += lineTotal;
+                rows.push(`<tr class="storage-pos-row"><td class="num">${index + 1}</td><td class="sku">—</td><td>${escapeHtml(item.name || 'Оборудование')}</td><td class="qty">${quantity} шт.</td><td class="price">${unitPrice ? formatMoney(lineTotal) : '—'}</td></tr>`);
+            });
         }
-        return items.map((item, index) =>
-            `<tr><td class="num">${index + 1}</td><td>${escapeHtml(item.name || 'Оборудование')}</td><td class="qty">${Number(item.quantity) || 0}</td></tr>`
-        ).join('');
+
+        if (!rows.length) {
+            rows.push('<tr><td class="num">1</td><td class="sku">—</td><td>Выставленный ассортимент и оборудование не указаны</td><td class="qty">—</td><td class="price">—</td></tr>');
+        }
+
+        return { rows: rows.join(''), total, products: products.length, pos: posItems.length };
     }
 
     function buildCompetitorChips(dealer) {
@@ -306,6 +456,7 @@
         const date = dateInfo(dealer);
         const number = contractNumber(dealer);
         const location = yandexLocation(dealer);
+        const storageItems = buildStorageItems(dealer);
 
         let instagramUrl = String(dealer.instagram || '').trim();
         if (instagramUrl && !/^https?:\/\//i.test(instagramUrl)) {
@@ -342,12 +493,15 @@
             LOCATION_URL: valueOrLine(location),
             AUDITOR: valueOrLine(state.user?.fullName || state.user?.username || ''),
             NOTES: escapeHtml(dealer.bonuses || '').replace(/\n/g, '<br>') || '—',
-            STORAGE_EQUIPMENT_ROWS: buildStorageEquipment(dealer),
-            STORAGE_EQUIPMENT_COUNT: escapeHtml((dealer.pos_materials || []).filter(x => Number(x?.quantity) > 0).length),
+            STORAGE_ITEMS_ROWS: storageItems.rows,
+            STORAGE_TOTAL: formatMoney(storageItems.total),
+            STORAGE_PRODUCT_COUNT: escapeHtml(storageItems.products),
+            STORAGE_POS_COUNT: escapeHtml(storageItems.pos),
             PASSPORT_COMPETITORS: buildCompetitorChips(dealer),
             PASSPORT_MATRIX: buildPassportMatrix(dealer),
             PASSPORT_PHOTOS: buildPassportPhotos(dealer),
-            PASSPORT_EXHIBITED_COUNT: escapeHtml(exhibitedCount(dealer))
+            PASSPORT_EXHIBITED_COUNT: escapeHtml(exhibitedCount(dealer)),
+            PASSPORT_POS_TOTAL: escapeHtml(passportPosTotal(dealer))
         };
 
         if (type === 'passport') {
@@ -515,6 +669,8 @@
     function setDealer(dealer, user) {
         state.dealer = dealer || null;
         state.user = user || null;
+        state.selectedEntityIndex = 0;
+        populateEntitySelector();
         render();
     }
 
