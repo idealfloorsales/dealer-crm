@@ -415,6 +415,35 @@ const workshopProductionSchema = new mongoose.Schema({
 }, { timestamps: true });
 const WorkshopProduction = mongoose.model('WorkshopProduction', workshopProductionSchema);
 
+const workshopMemoLineSchema = new mongoose.Schema({
+    product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
+    recipe: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkshopRecipe' },
+    requestedPacks: { type: Number, default: 0 },
+    plannedOutputQty: { type: Number, default: 0 },
+    packQty: { type: Number, default: 0 },
+    planksPerUnit: { type: Number, default: 0 },
+    actualProduct: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
+    deliveredPacks: { type: Number, default: 0 },
+    checked: { type: Boolean, default: false },
+    isMatch: { type: Boolean, default: false },
+    discrepancyReason: String
+});
+
+const workshopMemoSchema = new mongoose.Schema({
+    number: { type: String, required: true, unique: true, trim: true },
+    date: { type: Date, default: Date.now },
+    status: { type: String, enum: ['created', 'mismatch', 'accepted', 'cancelled'], default: 'created' },
+    lines: [workshopMemoLineSchema],
+    note: String,
+    signedBy: String,
+    createdBy: { id: String, name: String },
+    acceptedAt: Date,
+    acceptedBy: { id: String, name: String },
+    postedAt: Date,
+    receiptAttempts: [mongoose.Schema.Types.Mixed]
+}, { timestamps: true });
+const WorkshopMemo = mongoose.model('WorkshopMemo', workshopMemoSchema);
+
 const workshopDealerAssetSchema = new mongoose.Schema({
     dealer: { type: mongoose.Schema.Types.ObjectId, ref: 'Dealer', index: true },
     recipe: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkshopRecipe', index: true },
@@ -1237,7 +1266,7 @@ async function syncWorkshopPosToDealer(dealerId, recipeId) {
 
 app.get('/api/workshop/bootstrap', requirePermission('can_view_workshop'), async (req, res) => {
     try {
-        const [products, dealers, materials, recipes, laminateStocks, assets, productions, movements] = await Promise.all([
+        const [products, dealers, materials, recipes, laminateStocks, assets, productions, movements, memos] = await Promise.all([
             Product.find().select('sku name is_liquid characteristics.package_qty characteristics.size characteristics.class characteristics.thickness').sort({ sku: 1 }).lean(),
             Dealer.find(getDealerFilter(req)).select('_id dealer_id name city status').sort({ name: 1 }).lean(),
             WorkshopMaterial.find({ active: { $ne: false } }).sort({ category: 1, name: 1 }).lean(),
@@ -1260,7 +1289,12 @@ app.get('/api/workshop/bootstrap', requirePermission('can_view_workshop'), async
                 .populate('material', 'code name unit')
                 .populate('recipe', 'name outputType')
                 .populate('dealer', 'dealer_id name city')
-                .sort({ date: -1, createdAt: -1 }).limit(60).lean()
+                .sort({ date: -1, createdAt: -1 }).limit(60).lean(),
+            WorkshopMemo.find()
+                .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+                .populate('lines.actualProduct', 'sku name is_liquid characteristics.package_qty')
+                .populate('lines.recipe', 'name outputType planksPerUnit')
+                .sort({ date: -1, createdAt: -1 }).limit(80).lean()
         ]);
 
         const today = new Date();
@@ -1270,6 +1304,7 @@ app.get('/api/workshop/bootstrap', requirePermission('can_view_workshop'), async
         const finishedStock = recipes.reduce((sum, item) => sum + (Number(item.stockQty) || 0), 0);
         const lowMaterials = materials.filter(item => Number(item.minQty) > 0 && Number(item.stockQty) <= Number(item.minQty)).length;
         const laminatePlanks = laminateStocks.reduce((sum, item) => sum + (Number(item.planksQty) || 0), 0);
+        const openMemos = memos.filter(item => item.status === 'created' || item.status === 'mismatch').length;
 
         res.json({
             products: products.map(convertToClient),
@@ -1280,7 +1315,8 @@ app.get('/api/workshop/bootstrap', requirePermission('can_view_workshop'), async
             dealerAssets: assets.map(convertToClient),
             productions: productions.map(convertToClient),
             movements: movements.map(convertToClient),
-            stats: { todayProduction, finishedStock, lowMaterials, laminatePlanks }
+            memos: memos.map(convertToClient),
+            stats: { todayProduction, finishedStock, lowMaterials, laminatePlanks, openMemos }
         });
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -1429,6 +1465,188 @@ app.put('/api/workshop/recipes/:id', requirePermission('can_manage_workshop'), a
         res.json(convertToClient(recipe));
     } catch (e) {
         res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/memos', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const number = String(req.body.number || '').trim();
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
+        if (!number) return res.status(400).json({ error: 'Укажите номер служебной записки' });
+        if (!inputLines.length) return res.status(400).json({ error: 'Добавьте хотя бы одну позицию' });
+
+        const lines = [];
+        for (const input of inputLines) {
+            const requestedPacks = Math.max(0, Math.floor(workshopNumber(input.requestedPacks)));
+            if (!input.productId || requestedPacks <= 0) continue;
+
+            const [product, recipe] = await Promise.all([
+                Product.findById(input.productId).lean(),
+                input.recipeId ? WorkshopRecipe.findById(input.recipeId).lean() : null
+            ]);
+            if (!product) continue;
+
+            const packQty = workshopPackQty(product, recipe?.packQtyOverride);
+            if (packQty <= 0) {
+                return res.status(400).json({ error: `У «${product.sku || product.name}» не заполнено количество планок в упаковке` });
+            }
+            const planksPerUnit = Math.max(0, workshopNumber(recipe?.planksPerUnit));
+            const autoOutput = planksPerUnit > 0 ? Math.floor((requestedPacks * packQty) / planksPerUnit) : 0;
+            const plannedOutputQty = Math.max(0, Math.floor(workshopNumber(input.plannedOutputQty) || autoOutput));
+
+            lines.push({
+                product: product._id,
+                recipe: recipe?._id || null,
+                requestedPacks,
+                plannedOutputQty,
+                packQty,
+                planksPerUnit,
+                actualProduct: product._id,
+                deliveredPacks: 0,
+                checked: false,
+                isMatch: false,
+                discrepancyReason: ''
+            });
+        }
+
+        if (!lines.length) return res.status(400).json({ error: 'Нет корректных позиций для служебной записки' });
+
+        const memo = await WorkshopMemo.create({
+            number,
+            date: req.body.date || new Date(),
+            lines,
+            note: String(req.body.note || '').trim(),
+            signedBy: String(req.body.signedBy || req.user?.fullName || req.user?.username || '').trim(),
+            createdBy: workshopUser(req)
+        });
+
+        const populated = await WorkshopMemo.findById(memo._id)
+            .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+            .populate('lines.recipe', 'name outputType planksPerUnit')
+            .lean();
+        res.status(201).json(convertToClient(populated));
+    } catch (e) {
+        if (e && e.code === 11000) return res.status(400).json({ error: 'Служебная записка с таким номером уже существует' });
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/memos/:id/receive', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const memo = await WorkshopMemo.findById(req.params.id);
+        if (!memo) return res.status(404).json({ error: 'Служебная записка не найдена' });
+        if (memo.status === 'accepted' && memo.postedAt) {
+            return res.status(400).json({ error: 'Эта служебная записка уже принята и оприходована' });
+        }
+
+        const submitted = Array.isArray(req.body.lines) ? req.body.lines : [];
+        if (!submitted.length) return res.status(400).json({ error: 'Нет строк для сверки' });
+
+        const attemptLines = [];
+        let allMatch = true;
+
+        for (const line of memo.lines) {
+            const row = submitted.find(item => String(item.lineId || '') === String(line._id));
+            const actualProductId = row?.actualProductId || line.product;
+            const deliveredPacks = Math.max(0, Math.floor(workshopNumber(row?.deliveredPacks)));
+            const checked = Boolean(row?.checked);
+            const sameProduct = String(actualProductId || '') === String(line.product || '');
+            const sameQty = deliveredPacks === Number(line.requestedPacks || 0);
+            const isMatch = checked && sameProduct && sameQty;
+
+            line.actualProduct = actualProductId || line.product;
+            line.deliveredPacks = deliveredPacks;
+            line.checked = checked;
+            line.isMatch = isMatch;
+            line.discrepancyReason = String(row?.discrepancyReason || '').trim();
+
+            if (!isMatch) allMatch = false;
+            attemptLines.push({
+                lineId: String(line._id),
+                expectedProductId: String(line.product || ''),
+                actualProductId: String(line.actualProduct || ''),
+                requestedPacks: Number(line.requestedPacks || 0),
+                deliveredPacks,
+                checked,
+                isMatch,
+                discrepancyReason: line.discrepancyReason
+            });
+        }
+
+        memo.receiptAttempts.push({
+            date: req.body.date || new Date(),
+            status: allMatch ? 'accepted' : 'mismatch',
+            lines: attemptLines,
+            note: String(req.body.note || '').trim(),
+            createdBy: workshopUser(req)
+        });
+
+        if (!allMatch) {
+            memo.status = 'mismatch';
+            await memo.save();
+            const populated = await WorkshopMemo.findById(memo._id)
+                .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+                .populate('lines.actualProduct', 'sku name is_liquid characteristics.package_qty')
+                .populate('lines.recipe', 'name outputType planksPerUnit')
+                .lean();
+            return res.status(200).json({
+                accepted: false,
+                status: 'mismatch',
+                message: 'Есть расхождения. Упаковки пока не оприходованы — требуется обмен/повторная сверка.',
+                memo: convertToClient(populated)
+            });
+        }
+
+        if (!memo.postedAt) {
+            for (const line of memo.lines) {
+                const product = await Product.findById(line.product).lean();
+                if (!product) throw new Error('Одна из позиций служебки больше не найдена в каталоге');
+                const packQty = Number(line.packQty) > 0 ? Number(line.packQty) : workshopPackQty(product);
+                const planksQty = Number(line.requestedPacks || 0) * packQty;
+                await workshopChangeLaminate(line.product, planksQty);
+                await WorkshopMovement.create({
+                    date: req.body.date || new Date(),
+                    type: 'laminate_receipt',
+                    entityType: 'laminate',
+                    product: line.product,
+                    direction: 'in',
+                    qty: planksQty,
+                    unit: 'планка',
+                    serviceMemoNumber: memo.number,
+                    note: String(req.body.note || '').trim(),
+                    meta: {
+                        memoId: String(memo._id),
+                        memoLineId: String(line._id),
+                        requestedPacks: Number(line.requestedPacks || 0),
+                        deliveredPacks: Number(line.deliveredPacks || 0),
+                        packQty,
+                        plannedOutputQty: Number(line.plannedOutputQty || 0)
+                    },
+                    createdBy: workshopUser(req)
+                });
+            }
+            memo.postedAt = new Date();
+        }
+
+        memo.status = 'accepted';
+        memo.acceptedAt = new Date();
+        memo.acceptedBy = workshopUser(req);
+        await memo.save();
+
+        const populated = await WorkshopMemo.findById(memo._id)
+            .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+            .populate('lines.actualProduct', 'sku name is_liquid characteristics.package_qty')
+            .populate('lines.recipe', 'name outputType planksPerUnit')
+            .lean();
+
+        res.json({
+            accepted: true,
+            status: 'accepted',
+            message: 'Все позиции совпали. Упаковки оприходованы в цех.',
+            memo: convertToClient(populated)
+        });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
     }
 });
 
