@@ -9559,7 +9559,7 @@ body.bg-light {
 }
 .legal-entity-grid {
     display:grid;
-    grid-template-columns:repeat(3,minmax(0,1fr));
+    grid-template-columns:repeat(2,minmax(0,1fr));
     gap:8px;
 }
 .legal-entity-grid label {
@@ -9575,8 +9575,8 @@ body.bg-light {
     text-transform:uppercase;
     letter-spacing:.035em;
 }
-.legal-entity-grid .span-2 { grid-column:span 2; }
-.legal-entity-grid .span-3 { grid-column:span 3; }
+.legal-entity-grid .span-2 { grid-column:1 / -1; }
+.legal-entity-grid .span-3 { grid-column:1 / -1; }
 .legal-entity-grid .form-control,
 .legal-entity-grid .form-select {
     min-height:34px;
