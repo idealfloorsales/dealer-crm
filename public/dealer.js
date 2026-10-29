@@ -257,7 +257,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchDealerDetails(force = false) {
         try {
             try {
-                if (window.CRMAuth && CRMAuth.ready) await CRMAuth.ready;
+                if (window.CRMAuth && !CRMAuth.user && CRMAuth.ready) await CRMAuth.ready;
                 const user = window.CRMAuth ? CRMAuth.user : null;
                 currentUserRole = user ? user.role : 'guest';
 
@@ -275,7 +275,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const dealerPromise = loadDealerProfile(force);
             const productCountPromise = loadProductCount();
+            const previousPhotos = photosLoaded && Array.isArray(currentDealer?.photos) ? currentDealer.photos : null;
             const dealer = await dealerPromise;
+            if (previousPhotos) dealer.photos = previousPhotos;
             currentDealer = dealer;
             currentDealerName = dealer.name;
             if (window.DealerDocuments) {
