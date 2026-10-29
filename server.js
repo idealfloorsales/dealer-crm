@@ -693,6 +693,7 @@ app.get('/api/reclamations', requirePermission('can_view_reclamations'), async (
                 dealerName: 1,
                 date: 1,
                 productName: 1,
+                purchasedVolume: 1,
                 description: 1,
                 clientDemand: 1,
                 resolution: 1,
