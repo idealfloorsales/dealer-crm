@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const competitorsListContainer = document.getElementById('dealer-competitors-list'); 
     const productsStatsContainer = document.getElementById('dealer-products-stats');
     const salesHistoryContainer = document.getElementById('dealer-sales-history');
+    const workshopAssetsContainer = document.getElementById('dealer-workshop-assets');
     
     const dealerNameEl = document.getElementById('dealer-name');
     const dealerIdEl = document.getElementById('dealer-id-subtitle');
@@ -369,7 +370,8 @@ document.addEventListener('DOMContentLoaded', () => {
             renderDealerLinks(dealer.website, dealer.instagram); 
             renderDealerVisits(dealer.visits || []);
             renderDealerContacts(dealer.contacts || []);
-            renderDealerCompetitors(dealer.competitors || []); 
+            renderDealerCompetitors(dealer.competitors || []);
+            loadDealerWorkshopAssets();
             if (!photosLoaded && photoGalleryContainer) {
                 photoGalleryContainer.innerHTML = '<div class="dealer-lazy-state"><i class="bi bi-images"></i><span>Фото загрузятся при открытии вкладки</span></div>';
             }
@@ -527,6 +529,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.openLightbox = function(index) { const modalEl = document.getElementById('imageModal'); const carouselEl = document.querySelector('#photoCarousel'); if (modalEl && carouselEl && carouselInner) { carouselInner.innerHTML = galleryCarouselContent; const myModal = new bootstrap.Modal(modalEl); const carousel = new bootstrap.Carousel(carouselEl); carousel.to(index); myModal.show(); } }
     function openAvatarModal(url) { const modalEl = document.getElementById('imageModal'); if (modalEl && carouselInner) { carouselInner.innerHTML = `<div class="carousel-item active" style="height: 100%;"><div class="d-flex justify-content-center align-items-center h-100"><img src="${url}" style="max-height: 100%; max-width: 100%; object-fit: contain;"></div></div>`; const myModal = new bootstrap.Modal(modalEl); myModal.show(); } }
+
+    async function loadDealerWorkshopAssets() {
+        if (!workshopAssetsContainer) return;
+        try {
+            const response = await fetch(`/api/workshop/dealers/${dealerId}/assets`, { crmTrackLoading: false });
+            if (!response.ok) throw new Error('workshop');
+            const assets = await response.json();
+            if (!Array.isArray(assets) || !assets.length) {
+                workshopAssetsContainer.innerHTML = '<div class="dealer-workshop-empty"><i class="bi bi-box"></i><strong>Ничего не числится</strong><span>По учету цеха образцы и стенды этому дилеру пока не выдавались.</span></div>';
+                return;
+            }
+            workshopAssetsContainer.innerHTML = '<div class="dealer-workshop-grid">' + assets.map(asset => {
+                const recipe = asset.recipe || {};
+                const product = recipe.product || {};
+                const isOld = product.is_liquid === false;
+                return `<article class="dealer-workshop-item">
+                    <div class="dealer-workshop-item-main">
+                        <span class="dealer-workshop-icon"><i class="bi bi-${recipe.outputType === 'stand' ? 'easel2' : 'grid-3x3-gap'}"></i></span>
+                        <div>
+                            <strong>${safeText(recipe.name || 'Изделие')}</strong>
+                            <small>${safeText(product.sku || '')}${product.name ? ' · '+safeText(product.name) : ''}</small>
+                            ${isOld ? '<em><i class="bi bi-clock-history"></i> Неактуальная позиция</em>' : ''}
+                        </div>
+                    </div>
+                    <b>${Number(asset.qty || 0).toLocaleString('ru-RU')} шт</b>
+                </article>`;
+            }).join('') + '</div>';
+        } catch (e) {
+            workshopAssetsContainer.innerHTML = '<div class="dealer-workshop-empty"><i class="bi bi-exclamation-circle"></i><strong>Не удалось загрузить учет цеха</strong></div>';
+        }
+    }
 
     function renderDealerPos(posItems) {
         if (!posListContainer) return;
