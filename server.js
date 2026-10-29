@@ -386,7 +386,7 @@ const compRefSchema = new mongoose.Schema({
 });
 const CompRef = mongoose.model('CompRef', compRefSchema);
 
-const dealerSchema = new mongoose.Schema({ dealer_id: String, name: String, price_type: String, city: String, address: String, contacts: [contactSchema], bonuses: String, photos: [photoSchema], organizations: [String], requisites: dealerRequisitesSchema, legal_entities: [dealerLegalEntitySchema], contract: { isSigned: Boolean, date: String, number: String }, region_sector: String, hasPersonalPlan: { type: Boolean, default: false }, delivery: String, website: String, instagram: String, additional_addresses: [additionalAddressSchema], pos_materials: [posMaterialSchema], visits: [visitSchema], products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }], latitude: Number, longitude: Number, status: { type: String, default: 'standard' }, avatarUrl: String, competitors: [competitorSchema], responsible: String, responsibleUserId: String });
+const dealerSchema = new mongoose.Schema({ dealer_id: String, name: String, price_type: String, city: String, address: String, contacts: [contactSchema], bonuses: String, photos: [photoSchema], organizations: [String], requisites: dealerRequisitesSchema, legal_entities: [dealerLegalEntitySchema], contract: { isSigned: Boolean, date: String, number: String }, region_sector: String, hasPersonalPlan: { type: Boolean, default: false }, delivery: String, website: String, instagram: String, additional_addresses: [additionalAddressSchema], pos_materials: [posMaterialSchema], visits: [visitSchema], products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }], latitude: Number, longitude: Number, status: { type: String, default: 'standard' }, avatarUrl: String, competitors: [competitorSchema], responsible: String, responsibleUserId: String, responsibleAssignmentSource: String });
 const Dealer = mongoose.model('Dealer', dealerSchema);
 
 const salesSchema = new mongoose.Schema({ month: String, group: String, dealerId: String, dealerName: String, plan: Number, fact: Number, isCustom: { type: Boolean, default: false }, ownerUserId: String 
@@ -403,7 +403,7 @@ async function connectToDB() {
         await seedStatuses(); 
         await seedUsers(); 
         await seedSectors();
-        await migrateLegacyDealerOwnership(); 
+        await cleanupAmbiguousLegacyOwnership(); 
     } catch (e) { console.error(e); }
 }
 
@@ -462,56 +462,30 @@ function getDealerFilter(req) {
     return { _id: null };
 }
 
-async function migrateLegacyDealerOwnership() {
-    const missingOwner = {
+async function cleanupAmbiguousLegacyOwnership() {
+    // Старые версии CRM автоматически назначали единственному менеджеру
+    // всех дилеров Астаны/регионов. Такое назначение нельзя считать ответственным.
+    // Оставляем только назначения, которые были явно подтверждены пользователем.
+    const ambiguousFilter = {
+        responsibleUserId: { $nin: [null, ''] },
+        responsible: { $in: ['regional_astana', 'regional_regions'] },
         $or: [
-            { responsibleUserId: { $exists: false } },
-            { responsibleUserId: null },
-            { responsibleUserId: '' }
+            { responsibleAssignmentSource: { $exists: false } },
+            { responsibleAssignmentSource: null },
+            { responsibleAssignmentSource: '' }
         ]
     };
 
-    for (const scope of ['astana', 'regions']) {
-        const managers = await User.find({
-            role: 'manager',
-            scope,
-            isBlocked: { $ne: true },
-            'permissions.is_admin': { $ne: true }
-        }).select('_id fullName username').lean();
-
-        // Автоматически переносим старых дилеров только когда в зоне ровно один менеджер.
-        // Если менеджеров несколько, дилеры остаются неназначенными и видны админу/маркетингу
-        // до ручного выбора конкретного ответственного в карточке.
-        if (managers.length !== 1) continue;
-
-        const managerId = String(managers[0]._id);
-        await Dealer.updateMany(
-            { $and: [missingOwner, getLegacyScopeFilter(scope)] },
-            { $set: { responsibleUserId: managerId } }
-        );
-
-        // Для старых месяцев, где в зоне был только один менеджер,
-        // переносим зональный план в его персональный план один раз.
-        const legacyPlanId = scope === 'astana' ? 'PLAN_astana_all' : 'PLAN_regions_all';
-        const managerPlanId = `PLAN_manager_${managerId}`;
-        const legacyPlans = await Sales.find({ dealerId: legacyPlanId }).lean();
-        for (const legacy of legacyPlans) {
-            await Sales.updateOne(
-                { month: legacy.month, dealerId: managerPlanId },
-                {
-                    $setOnInsert: {
-                        month: legacy.month,
-                        group: 'PLAN',
-                        dealerId: managerPlanId,
-                        dealerName: `Plan manager ${managerId}`,
-                        isCustom: false,
-                        plan: Number(legacy.plan) || 0,
-                        fact: 0
-                    }
-                },
-                { upsert: true }
-            );
+    const result = await Dealer.updateMany(
+        ambiguousFilter,
+        {
+            $unset: { responsibleUserId: '' },
+            $set: { responsibleAssignmentSource: 'needs_review' }
         }
+    );
+
+    if (result.modifiedCount) {
+        console.log(`Dealer ownership cleanup: ${result.modifiedCount} ambiguous assignments reset`);
     }
 }
 
@@ -565,6 +539,7 @@ app.post('/api/dealers', requirePermission('can_create_dealer'), async (req, res
     const scope = getUserScope(req);
     if (req.user.role === 'manager' && !isGlobalViewer(req)) {
         req.body.responsibleUserId = String(req.user.id);
+        req.body.responsibleAssignmentSource = 'self';
         if (scope === 'astana') req.body.responsible = 'regional_astana';
         if (scope === 'regions') req.body.responsible = 'regional_regions';
     }
@@ -621,6 +596,7 @@ app.put('/api/dealers/:id', requirePermission('can_edit_dealer'), async (req, re
     try {
         if (req.user.role === 'manager' && !isGlobalViewer(req)) {
             req.body.responsibleUserId = String(req.user.id);
+            req.body.responsibleAssignmentSource = 'self';
             if (req.user.scope === 'astana') req.body.responsible = 'regional_astana';
             if (req.user.scope === 'regions') req.body.responsible = 'regional_regions';
         }
@@ -664,8 +640,6 @@ app.get('/api/sales', requirePermission('can_view_sales'), async (req, res) => {
         if (!companySalesView && !isGlobalViewer(req) && req.user.role === 'manager') {
             const dealers = await Dealer.find(getDealerFilter(req)).select('_id').lean();
             const dealerIds = dealers.map(d => String(d._id));
-            const personalPlanIds = dealerIds.map(id => `PLAN_vip_${id}`);
-            const managerPlanId = `PLAN_manager_${req.user.id}`;
             const zonePlanId = scope === 'astana'
                 ? 'PLAN_astana_all'
                 : scope === 'regions'
@@ -677,10 +651,11 @@ app.get('/api/sales', requirePermission('can_view_sales'), async (req, res) => {
                     filter,
                     {
                         $or: [
+                            // Факт менеджера считается исключительно по дилерам,
+                            // где он выбран ответственным.
                             { isCustom: { $ne: true }, dealerId: { $in: dealerIds } },
-                            { isCustom: { $ne: true }, dealerId: { $in: personalPlanIds } },
-                            { isCustom: { $ne: true }, dealerId: { $in: [managerPlanId, zonePlanId] } },
-                            { isCustom: true, ownerUserId: String(req.user.id) }
+                            // План берём из сводки его зоны на странице Продажи.
+                            { isCustom: { $ne: true }, dealerId: zonePlanId }
                         ]
                     }
                 ]
