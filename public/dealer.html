@@ -293,6 +293,14 @@
                             <i class="bi bi-pencil me-1"></i>Реквизиты
                         </button>
                     </div>
+                    <div class="dealer-document-entity-picker">
+                        <div>
+                            <span class="dealer-document-picker-label">Организация для документов</span>
+                            <strong id="dealer-doc-entity-current">Выберите юрлицо</strong>
+                            <small id="dealer-doc-entity-meta">Договоры и паспорт будут сформированы на выбранную организацию.</small>
+                        </div>
+                        <select id="dealer-doc-entity-select" class="form-select"></select>
+                    </div>
                     <div id="dealer-docs-missing" class="dealer-documents-alert d-none"></div>
                     <div class="dealer-document-grid">
                         <article class="dealer-document-card">
@@ -313,7 +321,7 @@
                             <div class="dealer-document-copy">
                                 <span class="dealer-document-kicker">ДОГОВОР + ПРИЛОЖЕНИЕ</span>
                                 <h6>Ответственное хранение</h6>
-                                <p>Реквизиты подставляются из карточки, а приложение заполняется стендами и POS из выставленности.</p>
+                                <p>Приложение №1 формируется с новой страницы: весь выставленный ассортимент IDEAL FLOOR, стенды/POS, количество, цены и итог.</p>
                                 <div class="dealer-document-status" id="doc-status-storage">Проверка данных...</div>
                             </div>
                             <div class="dealer-document-actions">
