@@ -927,26 +927,92 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderActivityFeed() {
         const container = document.getElementById('activity-feed');
         if (!container) return;
+
         const events = [];
 
+        const objectIdDate = (id) => {
+            const value = String(id || '');
+            if (!/^[a-f0-9]{24}$/i.test(value)) return null;
+            const seconds = parseInt(value.slice(0, 8), 16);
+            const date = new Date(seconds * 1000);
+            return Number.isNaN(date.getTime()) ? null : date;
+        };
+
         allDealers.forEach(d => {
-            if (d.createdAt) events.push({ date:new Date(d.createdAt), icon:'shop-window', title:`Добавлен дилер ${d.name}`, meta:d.city || d.dealer_id, href:`dealer.html?id=${d.id}` });
+            const createdDate = d.createdAt ? new Date(d.createdAt) : objectIdDate(d.id || d._id);
+            if (createdDate && !Number.isNaN(createdDate.getTime())) {
+                events.push({
+                    type: 'dealer',
+                    date: createdDate,
+                    icon: 'shop-window',
+                    title: `Добавлен дилер ${d.name}`,
+                    meta: d.city || d.dealer_id || 'Новый дилер',
+                    href: `dealer.html?id=${d.id}`
+                });
+            }
         });
 
         allTasksData.forEach(d => (d.visits || []).forEach(v => {
-            if (v.isCompleted && v.date) events.push({ date:new Date(v.date), icon:'geo-alt', title:`Визит · ${d.name}`, meta:v.comment || 'Визит завершён', href:`dealer.html?id=${d.id}` });
+            if (v.isCompleted && v.date) {
+                const date = new Date(v.date);
+                if (!Number.isNaN(date.getTime())) {
+                    events.push({
+                        type: 'visit',
+                        date,
+                        icon: 'geo-alt',
+                        title: `Визит · ${d.name}`,
+                        meta: v.comment || 'Визит завершён',
+                        href: `dealer.html?id=${d.id}`
+                    });
+                }
+            }
         }));
 
         reclamationsData.forEach(r => {
-            if (r.createdAt) events.push({ date:new Date(r.createdAt), icon:'shield-exclamation', title:`Рекламация · ${r.dealerName || 'Дилер'}`, meta:r.productName || 'Новая рекламация', href:'/reclamations.html' });
+            if (!r.createdAt) return;
+            const date = new Date(r.createdAt);
+            if (Number.isNaN(date.getTime())) return;
+            events.push({
+                type: 'reclamation',
+                date,
+                icon: 'shield-exclamation',
+                title: `Рекламация · ${r.dealerName || 'Дилер'}`,
+                meta: r.productName || 'Новая рекламация',
+                href: '/reclamations.html'
+            });
         });
 
-        salesHistory.filter(s => s.updatedAt && Number(s.fact) > 0).forEach(s => {
-            events.push({ date:new Date(s.updatedAt), icon:'graph-up-arrow', title:`Продажи · ${s.dealerName || 'Дилер'}`, meta:`${Number(s.fact).toLocaleString('ru-RU')} м²`, href:'/sales.html' });
-        });
+        // Автосохранение обновляет много строк продаж одновременно.
+        // Поэтому берём максимум 3 последних уникальных дилера, чтобы продажи
+        // не вытесняли добавления дилеров, визиты и рекламации.
+        const recentSales = salesHistory
+            .filter(s => s.updatedAt && Number(s.fact) > 0 && !String(s.dealerId || '').startsWith('PLAN_'))
+            .sort((a,b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+
+        const seenSalesDealers = new Set();
+        for (const s of recentSales) {
+            const key = String(s.dealerId || s.dealerName || '');
+            if (!key || seenSalesDealers.has(key)) continue;
+            seenSalesDealers.add(key);
+
+            const date = new Date(s.updatedAt);
+            if (Number.isNaN(date.getTime())) continue;
+
+            events.push({
+                type: 'sale',
+                date,
+                icon: 'graph-up-arrow',
+                title: `Продажи · ${s.dealerName || 'Дилер'}`,
+                meta: `${Number(s.fact).toLocaleString('ru-RU')} м²`,
+                href: '/sales.html'
+            });
+
+            if (seenSalesDealers.size >= 3) break;
+        }
 
         events.sort((a,b) => b.date-a.date);
         const top = events.slice(0,8);
+
         container.innerHTML = top.length ? top.map(e => `
             <a class="cc-event-item" href="${e.href}">
                 <span class="cc-event-icon"><i class="bi bi-${e.icon}"></i></span>
