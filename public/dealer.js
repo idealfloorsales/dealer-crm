@@ -45,6 +45,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentDealerName = '';
     let currentUserRole = 'guest';
     let currentDealerSales = [];
+    let currentDealer = null;
+    let photosLoaded = false;
+    let catalogLoaded = false;
+    let catalogPromise = null;
+    let photoPromise = null;
+    const profileCacheKey = `crm:dealer-profile:${dealerId}`;
 
     if (!dealerId) { 
         if(dealerNameEl) dealerNameEl.textContent = 'Ошибка: ID не указан'; 
@@ -81,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadDealerSales(dealer) {
         if (!can('can_view_sales')) return [];
         try {
-            const res = await fetch(API_SALES_URL);
+            const res = await fetch(`${API_SALES_URL}?dealerId=${encodeURIComponent(dealerId)}`);
             if (!res.ok) return [];
             const rows = await res.json();
             const dealerKey = String(dealerId);
@@ -158,8 +164,97 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function readCachedDealerProfile() {
+        try {
+            const raw = sessionStorage.getItem(profileCacheKey);
+            if (!raw) return null;
+            const cached = JSON.parse(raw);
+            if (!cached || !cached.data || Date.now() - Number(cached.savedAt || 0) > 120000) return null;
+            return cached.data;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function cacheDealerProfile(dealer) {
+        try {
+            sessionStorage.setItem(profileCacheKey, JSON.stringify({ savedAt: Date.now(), data: dealer }));
+        } catch (_) {}
+    }
+
+    async function loadDealerProfile(force = false) {
+        if (!force) {
+            const cached = readCachedDealerProfile();
+            if (cached) return cached;
+        }
+        const response = await fetch(`${API_DEALERS_URL}/${dealerId}?view=profile`);
+        if (!response.ok) throw new Error('Дилер не найден.');
+        const dealer = await response.json();
+        cacheDealerProfile(dealer);
+        return dealer;
+    }
+
+    async function loadProductCount() {
+        try {
+            const response = await fetch(`${API_PRODUCTS_URL}/count`, { crmTrackLoading: false });
+            if (!response.ok) return 0;
+            const data = await response.json();
+            return Number(data.count) || 0;
+        } catch (_) {
+            return 0;
+        }
+    }
+
+    async function ensurePhotosLoaded() {
+        if (photosLoaded) return currentDealer?.photos || [];
+        if (photoPromise) return photoPromise;
+        photoPromise = (async () => {
+            const container = photoGalleryContainer;
+            if (container) container.innerHTML = '<div class="dealer-lazy-state"><span class="spinner-border spinner-border-sm"></span><span>Загружаем фото…</span></div>';
+            try {
+                const response = await fetch(`${API_DEALERS_URL}/${dealerId}/photos`);
+                if (!response.ok) throw new Error('Не удалось загрузить фото');
+                const photos = await response.json();
+                photosLoaded = true;
+                if (currentDealer) currentDealer.photos = photos;
+                renderDealerPhotos(photos);
+                if (window.DealerDocuments && currentDealer) {
+                    window.DealerDocuments.setDealer(currentDealer, window.CRMAuth ? CRMAuth.user : null);
+                }
+                return photos;
+            } catch (error) {
+                if (container) container.innerHTML = '<div class="dealer-lazy-state is-error"><i class="bi bi-exclamation-circle"></i><span>Фото не загрузились</span></div>';
+                return [];
+            } finally {
+                photoPromise = null;
+            }
+        })();
+        return photoPromise;
+    }
+
+    async function ensureCatalogLoaded() {
+        if (catalogLoaded) return true;
+        if (catalogPromise) return catalogPromise;
+        catalogPromise = (async () => {
+            try {
+                const response = await fetch(API_PRODUCTS_URL);
+                if (!response.ok) throw new Error('catalog');
+                const allProducts = await response.json();
+                catalogLoaded = true;
+                if (window.DealerDocuments) window.DealerDocuments.setCatalog(allProducts);
+                return true;
+            } catch (error) {
+                console.warn('Не удалось загрузить каталог для документов', error);
+                return false;
+            } finally {
+                catalogPromise = null;
+            }
+        })();
+        return catalogPromise;
+    }
+
     // --- MAIN FETCH ---
-    async function fetchDealerDetails() {
+    async function fetchDealerDetails(force = false) {
         try {
             try {
                 if (window.CRMAuth && CRMAuth.ready) await CRMAuth.ready;
@@ -178,19 +273,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } catch(e) { console.warn('Auth check skipped'); }
 
-            const dealerRes = await fetch(`${API_DEALERS_URL}/${dealerId}`);
-            if (!dealerRes.ok) throw new Error(`Дилер не найден.`);
-            const dealer = await dealerRes.json();
+            const dealerPromise = loadDealerProfile(force);
+            const productCountPromise = loadProductCount();
+            const dealer = await dealerPromise;
+            currentDealer = dealer;
             currentDealerName = dealer.name;
             if (window.DealerDocuments) {
                 window.DealerDocuments.setDealer(dealer, window.CRMAuth ? CRMAuth.user : null);
             }
-            currentDealerSales = await loadDealerSales(dealer);
 
-            const productsRes = await fetch(API_PRODUCTS_URL);
-            const allProducts = await productsRes.json();
-            if (window.DealerDocuments) window.DealerDocuments.setCatalog(allProducts);
-            const totalProductsCount = allProducts.length;
+            const [salesRows, totalProductsCount] = await Promise.all([
+                loadDealerSales(dealer),
+                productCountPromise
+            ]);
+            currentDealerSales = salesRows;
+
             const dealerProductsCount = dealer.products ? dealer.products.length : 0;
             const percent = totalProductsCount > 0 ? Math.round((dealerProductsCount / totalProductsCount) * 100) : 0;
 
@@ -266,7 +363,9 @@ document.addEventListener('DOMContentLoaded', () => {
             renderDealerVisits(dealer.visits || []);
             renderDealerContacts(dealer.contacts || []);
             renderDealerCompetitors(dealer.competitors || []); 
-            renderDealerPhotos(dealer.photos || []); 
+            if (!photosLoaded && photoGalleryContainer) {
+                photoGalleryContainer.innerHTML = '<div class="dealer-lazy-state"><i class="bi bi-images"></i><span>Фото загрузятся при открытии вкладки</span></div>';
+            }
             fetchDealerProducts(dealer.products);
             renderDealerOverview(dealer, currentDealerSales);
             renderDealerSales(currentDealerSales); 
