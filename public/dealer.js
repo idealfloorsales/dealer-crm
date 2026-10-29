@@ -182,6 +182,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!dealerRes.ok) throw new Error(`Дилер не найден.`);
             const dealer = await dealerRes.json();
             currentDealerName = dealer.name;
+            if (window.DealerDocuments) {
+                window.DealerDocuments.setDealer(dealer, window.CRMAuth ? CRMAuth.user : null);
+            }
             currentDealerSales = await loadDealerSales(dealer);
 
             const productsRes = await fetch(API_PRODUCTS_URL);
@@ -432,6 +435,13 @@ document.addEventListener('DOMContentLoaded', () => {
         competitors.forEach(c => { html += `<tr><td class="fw-bold">${safeText(c.brand)}</td><td>${safeText(c.collection)}</td><td>${safeText(c.price_opt)}</td><td>${safeText(c.price_retail)}</td></tr>`; });
         competitorsListContainer.innerHTML = html + '</tbody></table></div>';
     }
+
+    const docsEditBtn = document.getElementById('dealer-docs-edit-requisites');
+    if (docsEditBtn) docsEditBtn.addEventListener('click', () => {
+        if (!window.CRMAuth || !CRMAuth.can('can_edit_dealer')) return;
+        localStorage.setItem('pendingEditDealerId', dealerId);
+        window.location.href = '/';
+    });
 
     if(editBtn) editBtn.addEventListener('click', () => {
         if (!window.CRMAuth || !CRMAuth.can('can_edit_dealer')) return;
