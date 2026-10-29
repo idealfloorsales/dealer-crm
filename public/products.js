@@ -53,6 +53,26 @@ document.addEventListener('DOMContentLoaded', () => {
     let sortMode = 'sku'; 
     let filterMode = 'all';
     let canManageProducts = false; 
+    let xlsxLoadPromise = null;
+
+    function ensureXlsxLoaded() {
+        if (window.XLSX) return Promise.resolve(window.XLSX);
+        if (xlsxLoadPromise) return xlsxLoadPromise;
+
+        xlsxLoadPromise = new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js';
+            script.async = true;
+            script.onload = () => window.XLSX ? resolve(window.XLSX) : reject(new Error('Excel-библиотека не загрузилась'));
+            script.onerror = () => reject(new Error('Не удалось загрузить Excel-библиотеку'));
+            document.head.appendChild(script);
+        }).catch(err => {
+            xlsxLoadPromise = null;
+            throw err;
+        });
+
+        return xlsxLoadPromise;
+    }
     
     // Текущий товар в калькуляторе
     let calcCurrentProduct = null;
@@ -399,9 +419,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if(btnImport) btnImport.onclick = () => { if(canManageProducts && fileInput) fileInput.click(); };
-    if(fileInput) fileInput.onchange = (e) => {
+    if(fileInput) fileInput.onchange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
+        try {
+            await ensureXlsxLoaded();
+        } catch (err) {
+            alert(err.message);
+            fileInput.value = '';
+            return;
+        }
         const reader = new FileReader();
         reader.onload = (evt) => {
             try {
