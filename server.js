@@ -47,7 +47,7 @@ const userSchema = new mongoose.Schema({
     password: { type: String, required: true },
     fullName: String,
     isBlocked: { type: Boolean, default: false },
-    role: { type: String, enum: ['manager', 'guest', 'marketing'], default: 'manager' },
+    role: { type: String, enum: ['manager', 'guest', 'marketing', 'workshop'], default: 'manager' },
     scope: { type: String, enum: ['all', 'astana', 'regions'], default: 'all' },
     permissions: {
         can_view_dealers: { type: Boolean, default: true },
@@ -59,6 +59,7 @@ const userSchema = new mongoose.Schema({
         can_view_knowledge: { type: Boolean, default: true },
         can_view_dashboard: { type: Boolean, default: true },
         can_view_reclamations: { type: Boolean, default: true },
+        can_view_workshop: { type: Boolean, default: false },
         can_create_dealer: { type: Boolean, default: false },
         can_edit_dealer: { type: Boolean, default: false },
         can_delete_dealer: { type: Boolean, default: false },
@@ -70,6 +71,7 @@ const userSchema = new mongoose.Schema({
         can_manage_competitors: { type: Boolean, default: false },
         can_manage_knowledge: { type: Boolean, default: false },
         can_manage_reclamations: { type: Boolean, default: false },
+        can_manage_workshop: { type: Boolean, default: false },
         can_export_base: { type: Boolean, default: false },
         can_export_prices: { type: Boolean, default: false },
         can_manage_users: { type: Boolean, default: false },
@@ -93,6 +95,7 @@ async function seedUsers() {
         can_view_knowledge: true,
         can_view_dashboard: true,
         can_view_reclamations: true,
+        can_view_workshop: true,
         can_create_dealer: true,
         can_edit_dealer: true,
         can_delete_dealer: true,
@@ -104,6 +107,7 @@ async function seedUsers() {
         can_manage_competitors: true,
         can_manage_knowledge: true,
         can_manage_reclamations: true,
+        can_manage_workshop: true,
         can_export_base: true,
         can_export_prices: true
     };
@@ -305,6 +309,7 @@ app.get('/knowledge.html', (req, res) => servePage(res, 'knowledge.html'));
 app.get('/reclamations.html', (req, res) => servePage(res, 'reclamations.html'));
 app.get('/dealer.html', (req, res) => servePage(res, 'dealer.html'));
 app.get('/users.html', (req, res) => servePage(res, 'users.html'));
+app.get('/workshop.html', (req, res) => servePage(res, 'workshop.html'));
 app.use(express.static('public'));
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
@@ -317,7 +322,189 @@ const productSchema = new mongoose.Schema({
     sku: String, name: String, is_liquid: { type: Boolean, default: true }, excel_alias: String, stock_qty: Number,
     characteristics: { class: String, thickness: String, bevel: String, size: String, package_area: String, package_qty: String, weight: String }
 });
+
 const Product = mongoose.model('Product', productSchema);
+
+// ==========================================
+// ЦЕХ: материалы, рецептуры, производство и движения
+// ==========================================
+const workshopMaterialSchema = new mongoose.Schema({
+    code: String,
+    name: { type: String, required: true },
+    category: { type: String, default: 'consumable' },
+    unit: { type: String, default: 'шт' },
+    stockQty: { type: Number, default: 0 },
+    minQty: { type: Number, default: 0 },
+    active: { type: Boolean, default: true },
+    note: String
+}, { timestamps: true });
+const WorkshopMaterial = mongoose.model('WorkshopMaterial', workshopMaterialSchema);
+
+const workshopRecipeMaterialSchema = new mongoose.Schema({
+    material: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkshopMaterial' },
+    qty: { type: Number, default: 0 }
+}, { _id: false });
+
+const workshopRecipeComponentSchema = new mongoose.Schema({
+    recipe: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkshopRecipe' },
+    qty: { type: Number, default: 0 }
+}, { _id: false });
+
+const workshopRecipeSchema = new mongoose.Schema({
+    name: { type: String, required: true },
+    outputType: { type: String, enum: ['sample', 'stand', 'sign', 'other'], default: 'sample' },
+    sku: String,
+    product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
+    sideA: String,
+    sideB: String,
+    planksPerUnit: { type: Number, default: 0 },
+    packQtyOverride: { type: Number, default: 0 },
+    stockQty: { type: Number, default: 0 },
+    matrixPosName: String,
+    materials: [workshopRecipeMaterialSchema],
+    components: [workshopRecipeComponentSchema],
+    active: { type: Boolean, default: true },
+    note: String
+}, { timestamps: true });
+const WorkshopRecipe = mongoose.model('WorkshopRecipe', workshopRecipeSchema);
+
+const workshopLaminateStockSchema = new mongoose.Schema({
+    product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', unique: true, index: true },
+    planksQty: { type: Number, default: 0 }
+}, { timestamps: true });
+const WorkshopLaminateStock = mongoose.model('WorkshopLaminateStock', workshopLaminateStockSchema);
+
+const workshopMovementSchema = new mongoose.Schema({
+    date: { type: Date, default: Date.now },
+    type: { type: String, required: true },
+    entityType: { type: String, enum: ['laminate', 'material', 'finished'], required: true },
+    product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
+    material: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkshopMaterial' },
+    recipe: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkshopRecipe' },
+    dealer: { type: mongoose.Schema.Types.ObjectId, ref: 'Dealer' },
+    direction: { type: String, enum: ['in', 'out', 'neutral'], default: 'neutral' },
+    qty: { type: Number, default: 0 },
+    unit: String,
+    serviceMemoNumber: String,
+    note: String,
+    meta: mongoose.Schema.Types.Mixed,
+    createdBy: { id: String, name: String }
+}, { timestamps: true });
+const WorkshopMovement = mongoose.model('WorkshopMovement', workshopMovementSchema);
+
+const workshopOperationSchema = new mongoose.Schema({
+    type: String,
+    qty: Number,
+    note: String
+}, { _id: false });
+
+const workshopProductionSchema = new mongoose.Schema({
+    date: { type: Date, default: Date.now },
+    recipe: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkshopRecipe' },
+    product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
+    acceptedPacks: { type: Number, default: 0 },
+    acceptedLoosePlanks: { type: Number, default: 0 },
+    packQty: { type: Number, default: 0 },
+    totalAcceptedPlanks: { type: Number, default: 0 },
+    outputQty: { type: Number, default: 0 },
+    consumedPlanks: { type: Number, default: 0 },
+    scrapPlanks: { type: Number, default: 0 },
+    operations: [workshopOperationSchema],
+    note: String,
+    createdBy: { id: String, name: String }
+}, { timestamps: true });
+const WorkshopProduction = mongoose.model('WorkshopProduction', workshopProductionSchema);
+
+const workshopDealerAssetSchema = new mongoose.Schema({
+    dealer: { type: mongoose.Schema.Types.ObjectId, ref: 'Dealer', index: true },
+    recipe: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkshopRecipe', index: true },
+    qty: { type: Number, default: 0 }
+}, { timestamps: true });
+workshopDealerAssetSchema.index({ dealer: 1, recipe: 1 }, { unique: true });
+const WorkshopDealerAsset = mongoose.model('WorkshopDealerAsset', workshopDealerAssetSchema);
+
+const workshopStocktakeLineSchema = new mongoose.Schema({
+    entityType: String,
+    product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
+    material: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkshopMaterial' },
+    recipe: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkshopRecipe' },
+    systemQty: Number,
+    actualQty: Number,
+    delta: Number,
+    note: String
+}, { _id: false });
+
+const workshopStocktakeSchema = new mongoose.Schema({
+    date: { type: Date, default: Date.now },
+    lines: [workshopStocktakeLineSchema],
+    note: String,
+    createdBy: { id: String, name: String }
+}, { timestamps: true });
+const WorkshopStocktake = mongoose.model('WorkshopStocktake', workshopStocktakeSchema);
+
+function workshopNumber(value) {
+    const n = Number(String(value ?? '').replace(',', '.').match(/-?\d+(?:\.\d+)?/)?.[0]);
+    return Number.isFinite(n) ? n : 0;
+}
+
+function workshopPackQty(product, override = 0) {
+    const direct = workshopNumber(override);
+    if (direct > 0) return direct;
+    return Math.max(0, Math.round(workshopNumber(product?.characteristics?.package_qty)));
+}
+
+function workshopUser(req) {
+    return {
+        id: req.user?.id || '',
+        name: req.user?.fullName || req.user?.username || 'Сотрудник'
+    };
+}
+
+async function workshopChangeLaminate(productId, delta) {
+    const stock = await WorkshopLaminateStock.findOneAndUpdate(
+        { product: productId },
+        { $inc: { planksQty: delta } },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    if (stock.planksQty < -0.0001) {
+        await WorkshopLaminateStock.updateOne({ _id: stock._id }, { $inc: { planksQty: -delta } });
+        throw new Error('Недостаточно ламината в остатках цеха');
+    }
+    if (stock.planksQty < 0) {
+        stock.planksQty = 0;
+        await stock.save();
+    }
+    return stock;
+}
+
+async function workshopChangeMaterial(materialId, delta) {
+    const item = await WorkshopMaterial.findByIdAndUpdate(materialId, { $inc: { stockQty: delta } }, { new: true });
+    if (!item) throw new Error('Материал не найден');
+    if (item.stockQty < -0.0001) {
+        await WorkshopMaterial.updateOne({ _id: item._id }, { $inc: { stockQty: -delta } });
+        throw new Error(`Недостаточно материала «${item.name}»`);
+    }
+    if (item.stockQty < 0) {
+        item.stockQty = 0;
+        await item.save();
+    }
+    return item;
+}
+
+async function workshopChangeRecipe(recipeId, delta) {
+    const item = await WorkshopRecipe.findByIdAndUpdate(recipeId, { $inc: { stockQty: delta } }, { new: true });
+    if (!item) throw new Error('Изделие не найдено');
+    if (item.stockQty < -0.0001) {
+        await WorkshopRecipe.updateOne({ _id: item._id }, { $inc: { stockQty: -delta } });
+        throw new Error(`Недостаточно готовых изделий «${item.name}»`);
+    }
+    if (item.stockQty < 0) {
+        item.stockQty = 0;
+        await item.save();
+    }
+    return item;
+}
+
 
 // --- НОВАЯ СХЕМА СЕКТОРОВ (КАСТОМНЫЕ) ---
 const sectorSchema = new mongoose.Schema({ 
@@ -402,8 +589,31 @@ async function connectToDB() {
         console.log('MongoDB Connected'); 
         await seedStatuses(); 
         await seedUsers(); 
-        await seedSectors(); 
+        await seedSectors();
+        await seedWorkshopMaterials(); 
     } catch (e) { console.error(e); }
+}
+
+async function seedWorkshopMaterials() {
+    const defaults = [
+        { code: 'BACK-600', name: 'Задняя стенка 600 мм', category: 'stand_component', unit: 'шт' },
+        { code: 'BACK-800', name: 'Задняя стенка 800 мм', category: 'stand_component', unit: 'шт' },
+        { code: 'ACRYLIC-SIGN', name: 'Оргстекло для табличек', category: 'stand_component', unit: 'шт' },
+        { code: 'STICKER-600', name: 'Наклейка 600 мм', category: 'consumable', unit: 'шт' },
+        { code: 'STICKER-800', name: 'Наклейка 800 мм', category: 'consumable', unit: 'шт' },
+        { code: 'FILM', name: 'Плёнка для стендов', category: 'consumable', unit: 'м' },
+        { code: 'EDGE', name: 'Кромка для стенок', category: 'consumable', unit: 'м' },
+        { code: 'EDGE-GLUE', name: 'Клей для кромки', category: 'consumable', unit: 'шт' },
+        { code: 'CUTTER', name: 'Фреза', category: 'tool', unit: 'шт' },
+        { code: 'COMB', name: 'Расческа / заготовка', category: 'stand_component', unit: 'шт' }
+    ];
+    for (const item of defaults) {
+        await WorkshopMaterial.updateOne(
+            { code: item.code },
+            { $setOnInsert: { ...item, stockQty: 0, minQty: 0, active: true } },
+            { upsert: true }
+        );
+    }
 }
 
 async function seedStatuses() { const count = await Status.countDocuments(); if (count === 0) { await Status.insertMany([{ value: 'active', label: 'Активный', color: '#198754', isVisible: true, sortOrder: 1 }, { value: 'standard', label: 'Стандарт', color: '#ffc107', isVisible: true, sortOrder: 2 }, { value: 'problem', label: 'Проблемный', color: '#dc3545', isVisible: true, sortOrder: 3 }, { value: 'potential', label: 'Потенциальный', color: '#0d6efd', isVisible: true, sortOrder: 4 }, { value: 'archive', label: 'Архив', color: '#6c757d', isVisible: false, sortOrder: 5 }]); } }
