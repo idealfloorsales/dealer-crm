@@ -357,6 +357,18 @@ const dealerRequisitesSchema = new mongoose.Schema({
     kbe: String,
     email: String
 }, { _id: false });
+const dealerLegalEntitySchema = new mongoose.Schema({
+    type: { type: String, default: 'ТОО' },
+    organizationName: String,
+    director: String,
+    legalAddress: String,
+    bin: String,
+    iik: String,
+    bank: String,
+    bik: String,
+    kbe: String,
+    email: String
+}, { _id: false });
 const competitorSchema = new mongoose.Schema({ brand: String, collection: String, price_opt: String, price_retail: String }, { _id: false });
 const collectionItemSchema = new mongoose.Schema({ name: String, type: { type: String, default: 'standard' } }, { _id: false });
 const compContactSchema = new mongoose.Schema({ name: String, position: String, phone: String }, { _id: false });
@@ -370,7 +382,7 @@ const compRefSchema = new mongoose.Schema({
 });
 const CompRef = mongoose.model('CompRef', compRefSchema);
 
-const dealerSchema = new mongoose.Schema({ dealer_id: String, name: String, price_type: String, city: String, address: String, contacts: [contactSchema], bonuses: String, photos: [photoSchema], organizations: [String], requisites: dealerRequisitesSchema, contract: { isSigned: Boolean, date: String, number: String }, region_sector: String, hasPersonalPlan: { type: Boolean, default: false }, delivery: String, website: String, instagram: String, additional_addresses: [additionalAddressSchema], pos_materials: [posMaterialSchema], visits: [visitSchema], products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }], latitude: Number, longitude: Number, status: { type: String, default: 'standard' }, avatarUrl: String, competitors: [competitorSchema], responsible: String });
+const dealerSchema = new mongoose.Schema({ dealer_id: String, name: String, price_type: String, city: String, address: String, contacts: [contactSchema], bonuses: String, photos: [photoSchema], organizations: [String], requisites: dealerRequisitesSchema, legal_entities: [dealerLegalEntitySchema], contract: { isSigned: Boolean, date: String, number: String }, region_sector: String, hasPersonalPlan: { type: Boolean, default: false }, delivery: String, website: String, instagram: String, additional_addresses: [additionalAddressSchema], pos_materials: [posMaterialSchema], visits: [visitSchema], products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }], latitude: Number, longitude: Number, status: { type: String, default: 'standard' }, avatarUrl: String, competitors: [competitorSchema], responsible: String });
 const Dealer = mongoose.model('Dealer', dealerSchema);
 
 const salesSchema = new mongoose.Schema({ month: String, group: String, dealerId: String, dealerName: String, plan: Number, fact: Number, isCustom: { type: Boolean, default: false } 
@@ -391,7 +403,7 @@ async function connectToDB() {
 }
 
 async function seedStatuses() { const count = await Status.countDocuments(); if (count === 0) { await Status.insertMany([{ value: 'active', label: 'Активный', color: '#198754', isVisible: true, sortOrder: 1 }, { value: 'standard', label: 'Стандарт', color: '#ffc107', isVisible: true, sortOrder: 2 }, { value: 'problem', label: 'Проблемный', color: '#dc3545', isVisible: true, sortOrder: 3 }, { value: 'potential', label: 'Потенциальный', color: '#0d6efd', isVisible: true, sortOrder: 4 }, { value: 'archive', label: 'Архив', color: '#6c757d', isVisible: false, sortOrder: 5 }]); } }
-function convertToClient(doc) { if(!doc) return null; const obj = doc.toObject ? doc.toObject() : doc; obj.id = obj._id; delete obj._id; delete obj.__v; delete obj.password; if(obj.products) obj.products = obj.products.map(p => { if(p){p.id=p._id; delete p._id;} return p;}); if (obj.organization && (!obj.organizations || obj.organizations.length === 0)) { obj.organizations = [obj.organization]; } return obj; }
+function convertToClient(doc) { if(!doc) return null; const obj = doc.toObject ? doc.toObject() : doc; obj.id = obj._id; delete obj._id; delete obj.__v; delete obj.password; if(obj.products) obj.products = obj.products.map(p => { if(p){p.id=p._id; delete p._id;} return p;}); if (obj.organization && (!obj.organizations || obj.organizations.length === 0)) { obj.organizations = [obj.organization]; } if (!Array.isArray(obj.legal_entities) || obj.legal_entities.length === 0) { const req = obj.requisites || {}; const orgs = Array.isArray(obj.organizations) ? obj.organizations.filter(Boolean) : []; const primaryName = req.organizationName || orgs[0] || obj.organization || ''; if (primaryName || Object.values(req).some(Boolean)) { obj.legal_entities = [{ type: /^ИП\b/i.test(primaryName) ? 'ИП' : (/^(ЧС|ФЛ|Физ)/i.test(primaryName) ? 'Частное лицо' : 'ТОО'), organizationName: primaryName, director: req.director || '', legalAddress: req.legalAddress || obj.address || '', bin: req.bin || '', iik: req.iik || '', bank: req.bank || '', bik: req.bik || '', kbe: req.kbe || '', email: req.email || '' }, ...orgs.slice(1).map(name => ({ type: /^ИП\b/i.test(name) ? 'ИП' : (/^(ЧС|ФЛ|Физ)/i.test(name) ? 'Частное лицо' : 'ТОО'), organizationName: name }))]; } else { obj.legal_entities = []; } } return obj; }
 
 function getUserRole(req) { return req.user ? req.user.role : 'guest'; }
 function getUserScope(req) { return req.user ? req.user.scope : 'none'; }
