@@ -221,13 +221,35 @@
         return `IF${raw}`;
     }
 
-    function yandexLocation(dealer) {
+    function twoGisLocation(dealer) {
+        const cityKey = String(dealer.city || '').toLowerCase().replace(/ё/g, 'е').trim();
+        const cityMap = {
+            'астана': 'astana', 'нур-султан': 'astana',
+            'алматы': 'almaty', 'шымкент': 'shymkent',
+            'караганда': 'karaganda', 'қарағанды': 'karaganda',
+            'костанай': 'kostanay', 'қостанай': 'kostanay',
+            'павлодар': 'pavlodar',
+            'усть-каменогорск': 'ust-kamenogorsk', 'оскемен': 'ust-kamenogorsk', 'өскемен': 'ust-kamenogorsk',
+            'семей': 'semey',
+            'актобе': 'aktobe', 'ақтөбе': 'aktobe',
+            'атырау': 'atyrau',
+            'актау': 'aktau', 'ақтау': 'aktau',
+            'тараз': 'taraz',
+            'кызылорда': 'kyzylorda', 'қызылорда': 'kyzylorda',
+            'уральск': 'uralsk', 'орал': 'uralsk',
+            'петропавловск': 'petropavlovsk', 'петропавл': 'petropavlovsk',
+            'кокшетау': 'kokshetau', 'көкшетау': 'kokshetau',
+            'туркестан': 'turkestan', 'түркістан': 'turkestan',
+            'талдыкорган': 'taldykorgan', 'талдықорған': 'taldykorgan',
+            'экибастуз': 'ekibastuz'
+        };
+        const slug = cityMap[cityKey] || '';
+        const query = [dealer.name, dealer.address].filter(Boolean).join(' ') || dealer.city || 'IDEAL FLOOR';
+        const base = slug ? `https://2gis.kz/${slug}` : 'https://2gis.kz';
         const lat = Number(dealer.latitude);
         const lng = Number(dealer.longitude);
-        if (Number.isFinite(lat) && Number.isFinite(lng)) {
-            return `https://yandex.kz/maps/?pt=${lng},${lat}&z=17&l=map`;
-        }
-        return dealer.website || '';
+        const mapParam = Number.isFinite(lat) && Number.isFinite(lng) ? `?m=${lng},${lat}/17` : '';
+        return `${base}/search/${encodeURIComponent(query)}${mapParam}`;
     }
 
     function normalizeCode(value) {
@@ -467,7 +489,7 @@
         const contact = getContact(dealer);
         const date = dateInfo(dealer);
         const number = contractNumber(dealer);
-        const location = yandexLocation(dealer);
+        const location = twoGisLocation(dealer);
         const storageItems = buildStorageItems(dealer);
 
         let instagramUrl = String(dealer.instagram || '').trim();
