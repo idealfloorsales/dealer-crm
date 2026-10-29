@@ -2,123 +2,164 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Карта покрытия</title>
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Карта дилеров — IDEAL FLOOR CRM</title>
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
 
-    <link rel="stylesheet" href="style.css?v={{VER}}"> <link rel="icon" href="favicon.gif" type="image/gif">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css">
+
+    <link rel="stylesheet" href="style.css?v={{VER}}">
+    <link rel="icon" href="favicon.gif" type="image/gif">
     <link rel="manifest" href="manifest.json">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#b9040a">
-    
-    <style>
-        body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; } /* Место под меню */
-        .map-wrapper { flex: 1; position: relative; width: 100%; height: 100%; display: flex; }
-        #main-map { flex-grow: 1; height: 100%; z-index: 1; }
 
-        /* Нижнее меню */
-        .bottom-nav {
-            position: fixed; bottom: 0; left: 0; right: 0;
-            background: rgba(255, 255, 255, 0.98);
-            backdrop-filter: blur(10px);
-            border-top: 1px solid #eee;
-            z-index: 2000;
-            height: 60px;
-            display: flex; justify-content: space-around;
-            padding-bottom: env(safe-area-inset-bottom);
-        }
-        .bottom-nav-item {
-            text-align: center; color: #adb5bd; padding: 10px 0;
-            text-decoration: none; flex: 1; transition: color 0.2s;
-        }
-        .bottom-nav-item.active { color: #B9040A; }
-        .bottom-nav-item i { font-size: 1.4rem; display: block; margin-bottom: 2px; }
-        .bottom-nav-item span { font-size: 0.65rem; font-weight: 600; }
-        
-        .desktop-nav { display: flex; }
-        @media (max-width: 991px) {
-            .desktop-nav { display: none !important; }
+    <style>
+        html, body { height: 100%; }
+        body { display:flex; flex-direction:column; min-height:100dvh; overflow:hidden; }
+        .map-wrapper { flex:1; min-height:0; position:relative; width:100%; display:flex; }
+        #main-map { flex:1; min-width:0; height:100%; z-index:1; }
+        .desktop-nav { display:flex; flex:0 0 auto; }
+        @media (max-width: 991.98px) {
+            .desktop-nav { display:none !important; }
         }
     </style>
 </head>
 <body class="app-workspace-page map-page">
-    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm desktop-nav" style="flex-shrink: 0; z-index: 2000;">
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm desktop-nav">
         <div class="container-fluid">
-            <a class="navbar-brand" href="/"><img src="logo.png" alt="Logo" height="30"></a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"><span class="navbar-toggler-icon"></span></button>
-            <div class="collapse navbar-collapse" id="navbarNav">
+            <a class="navbar-brand" href="/"><img src="logo.png" alt="IDEAL FLOOR CRM" height="30"></a>
+            <div class="collapse navbar-collapse show">
                 <ul class="navbar-nav">
                     <li class="nav-item"><a class="nav-link" href="/">Дилеры</a></li>
                     <li class="nav-item"><a class="nav-link active" href="/map.html">Карта</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/products.html">Матрица</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/report.html">Выставленность</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/sales.html">Продажи</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/competitors.html">Конкуренты</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/knowledge.html">Статьи</a></li>
                 </ul>
             </div>
         </div>
     </nav>
-    
-    <div class="map-wrapper" id="map-container-fullscreen">
-        
-        <div class="map-sidebar shadow-lg" id="map-sidebar">
-            <div class="sidebar-header map-workspace-header">
-                <div class="map-workspace-eyebrow">IDEAL FLOOR CRM</div>
-                <div class="map-workspace-title">Карта дилеров</div>
-                <div class="input-group map-search-box mb-2">
-                    <span class="input-group-text bg-white border-0 ps-3"><i class="bi bi-search text-muted"></i></span>
-                    <input type="text" id="map-search" class="form-control border-0" placeholder="Поиск..." style="height: 44px;">
-                </div>
-                <div id="map-search-suggestions" class="address-suggestions shadow-sm rounded-3 mt-1"></div>
 
-                <div class="d-flex gap-2">
-                    <select id="map-filter-city" class="form-select form-select-sm border-0 bg-light"><option value="">Все города</option></select>
-                    <select id="map-filter-status" class="form-select form-select-sm border-0 bg-light">
-                        <option value="">Все статусы</option>
-                        <option value="active">🟢 Активный</option>
-                        <option value="standard">🟡 Стандарт</option>
-                        <option value="problem">🔴 Проблемный</option>
-                        <option value="potential">🔵 Потенциальный</option>
-                        <option value="archive">⚫ Архив</option>
-                    </select>
+    <main class="map-wrapper map-v2" id="map-container-fullscreen">
+        <aside class="map-sidebar" id="map-sidebar" aria-label="Список дилеров">
+            <div class="map-mobile-handle d-md-none" aria-hidden="true"></div>
+
+            <header class="map-workspace-header">
+                <div class="map-workspace-topline">
+                    <div>
+                        <div class="map-workspace-eyebrow">IDEAL FLOOR CRM</div>
+                        <h1 class="map-workspace-title">Карта дилеров</h1>
+                        <p class="map-workspace-subtitle">Вся дилерская сеть на одной карте</p>
+                    </div>
+                    <button type="button" class="map-sheet-close d-md-none" id="btn-close-map-list" aria-label="Закрыть список">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
                 </div>
+
+                <div class="map-summary-grid">
+                    <div class="map-summary-card">
+                        <span>В сети</span>
+                        <strong id="map-summary-total">—</strong>
+                    </div>
+                    <div class="map-summary-card">
+                        <span>На карте</span>
+                        <strong id="map-summary-visible">—</strong>
+                    </div>
+                    <div class="map-summary-card">
+                        <span>Без координат</span>
+                        <strong id="map-summary-missing">—</strong>
+                    </div>
+                </div>
+
+                <div class="map-search-shell">
+                    <i class="bi bi-search"></i>
+                    <input type="search" id="map-search" autocomplete="off" placeholder="Дилер, город или адрес">
+                    <button type="button" id="map-search-clear" aria-label="Очистить поиск" hidden><i class="bi bi-x"></i></button>
+                </div>
+                <div id="map-search-suggestions" class="map-search-suggestions"></div>
+
+                <div class="map-filter-grid">
+                    <label>
+                        <span>Город</span>
+                        <select id="map-filter-city" class="form-select">
+                            <option value="">Все города</option>
+                        </select>
+                    </label>
+                    <label>
+                        <span>Статус</span>
+                        <select id="map-filter-status" class="form-select">
+                            <option value="">Все статусы</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div class="map-header-actions">
+                    <button type="button" id="map-reset-filters" class="map-soft-action">
+                        <i class="bi bi-arrow-counterclockwise"></i><span>Сбросить</span>
+                    </button>
+                    <button type="button" id="map-fit-visible" class="map-soft-action">
+                        <i class="bi bi-bounding-box-circles"></i><span>Показать все</span>
+                    </button>
+                </div>
+            </header>
+
+            <div class="map-list-head">
+                <div>
+                    <strong>Дилеры</strong>
+                    <small id="map-list-caption">Загрузка...</small>
+                </div>
+                <span class="map-list-2gis-note"><i class="bi bi-box-arrow-up-right"></i> 2ГИС</span>
             </div>
 
             <div class="sidebar-content" id="dealer-list-container">
-                <p class="text-center text-muted mt-4 small">Загрузка списка...</p>
+                <div class="map-list-loading">
+                    <span class="spinner-border spinner-border-sm"></span>
+                    <span>Загрузка дилеров...</span>
+                </div>
             </div>
-            
-            <button id="btn-toggle-sidebar" class="btn btn-primary w-100 rounded-0 d-md-none py-3">Показать карту</button>
-        </div>
+        </aside>
 
-        <div class="map-actions-right">
-             <button id="btn-toggle-heat" class="btn-circle-map shadow mb-2" title="Тепловая карта"><i class="bi bi-layers-fill"></i></button>
-             <button id="btn-fullscreen" class="btn-circle-map shadow mb-2" title="На весь экран"><i class="bi bi-arrows-fullscreen"></i></button>
-             <button id="btn-my-location" class="btn-circle-map shadow" title="Сортировать по расстоянию"><i class="bi bi-geo-alt-fill"></i></button>
-        </div>
+        <section class="map-canvas" aria-label="Карта дилеров">
+            <div id="main-map"></div>
 
-        <div id="map-visible-count" class="map-counter-pill shadow-sm">
-            Загрузка...
-        </div>
+            <div id="map-visible-count" class="map-counter-pill">
+                Загрузка...
+            </div>
 
-        <button id="btn-show-list-mobile" class="btn btn-primary rounded-pill shadow px-4 py-2 mobile-list-toggle d-md-none">
-            <i class="bi bi-list-ul me-2"></i>Список
-        </button>
-        
-        <div id="main-map"></div>
-    </div>
+            <div class="map-provider-note">
+                <i class="bi bi-map"></i>
+                <span>Карта OSM · карточки открываются в 2ГИС</span>
+            </div>
+
+            <div class="map-actions-right" aria-label="Инструменты карты">
+                <button id="btn-fit-map" class="btn-circle-map" title="Показать все точки" aria-label="Показать все точки">
+                    <i class="bi bi-bounding-box"></i>
+                </button>
+                <button id="btn-toggle-heat" class="btn-circle-map" title="Тепловая карта" aria-label="Тепловая карта">
+                    <i class="bi bi-layers"></i>
+                </button>
+                <button id="btn-my-location" class="btn-circle-map" title="Моё местоположение" aria-label="Моё местоположение">
+                    <i class="bi bi-crosshair"></i>
+                </button>
+                <button id="btn-fullscreen" class="btn-circle-map" title="На весь экран" aria-label="На весь экран">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+            </div>
+
+            <button id="btn-show-list-mobile" class="map-mobile-list-btn d-md-none" type="button">
+                <i class="bi bi-list-ul"></i>
+                <span>Список дилеров</span>
+                <b id="map-mobile-count">0</b>
+            </button>
+        </section>
+    </main>
 
     <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script defer src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
