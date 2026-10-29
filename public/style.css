@@ -9448,3 +9448,53 @@ body.bg-light {
         top: 14px;
     }
 }
+
+
+/* Dealer automatic documents */
+.dealer-documents-panel { padding: 22px; }
+.dealer-documents-head {
+    display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:16px;
+}
+.dealer-documents-eyebrow {
+    display:block; margin-bottom:4px; color:var(--if-red); font-size:.62rem; font-weight:800; letter-spacing:.13em;
+}
+.dealer-documents-head p { font-size:.76rem; }
+.dealer-documents-alert {
+    margin-bottom:14px; padding:11px 13px; border:1px solid #efd9b8; border-radius:12px;
+    background:#fff8e9; color:#76541b; font-size:.72rem;
+}
+.dealer-document-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.dealer-document-card {
+    min-width:0; display:flex; flex-direction:column; min-height:255px; padding:17px;
+    border:1px solid var(--if-line); border-radius:17px; background:#fff;
+    box-shadow:0 7px 22px rgba(26,22,22,.035);
+}
+.dealer-document-card:hover { border-color:rgba(185,4,10,.17); box-shadow:0 12px 28px rgba(26,22,22,.06); }
+.dealer-document-icon {
+    width:42px; height:42px; display:grid; place-items:center; margin-bottom:13px;
+    border-radius:12px; background:#f5efec; color:var(--if-red); font-size:1.05rem;
+}
+.dealer-document-copy { flex:1; }
+.dealer-document-kicker {
+    display:block; margin-bottom:4px; color:#9b9da2; font-size:.55rem; font-weight:800; letter-spacing:.1em;
+}
+.dealer-document-copy h6 { margin:0 0 7px; color:#292a2e; font-size:.94rem; font-weight:760; }
+.dealer-document-copy p { margin:0 0 12px; color:#777a80; font-size:.7rem; line-height:1.45; }
+.dealer-document-status {
+    display:inline-flex; align-items:center; min-height:25px; padding:0 9px; border-radius:999px;
+    background:#f0f2f4; color:#676a70; font-size:.61rem; font-weight:720;
+}
+.dealer-document-status.is-ready { background:#eaf7ef; color:#287848; }
+.dealer-document-status.is-warning { background:#fff3df; color:#996311; }
+.dealer-document-actions { display:flex; gap:7px; margin-top:14px; }
+.dealer-document-actions .btn { flex:1; min-height:35px; border-radius:10px; font-size:.66rem; font-weight:700; }
+@media (max-width: 991.98px) {
+    .dealer-document-grid { grid-template-columns:1fr; }
+    .dealer-document-card { min-height:0; }
+}
+@media (max-width: 575.98px) {
+    .dealer-documents-panel { padding:15px; }
+    .dealer-documents-head { flex-direction:column; }
+    .dealer-documents-head .btn { width:100%; }
+    .dealer-document-actions { display:grid; grid-template-columns:1fr 1fr; }
+}
