@@ -470,7 +470,7 @@ app.post('/api/products', requirePermission('can_manage_products'), async (req, 
 app.put('/api/products/:id', requirePermission('can_manage_products'), async (req, res) => { const p = await Product.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(p)); });
 app.delete('/api/products/:id', requirePermission('can_manage_products'), async (req, res) => { await Product.findByIdAndDelete(req.params.id); res.json({}); });
 app.post('/api/admin/import-catalog', requirePermission('can_manage_products'), async (req, res) => { res.json({status: 'ok'}); });
-app.get('/api/matrix', requireAnyPermission('can_view_products', 'can_view_report'), async (req, res) => { try { const prods = await Product.find().sort({sku:1}).lean(); const dealers = await Dealer.find(getDealerFilter(req)).lean(); const map = new Map(); dealers.forEach(d => map.set(d._id.toString(), new Set(d.products.map(String)))); const posList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"]; const matrix = prods.map(p => ({ sku: p.sku, name: p.name, type: 'product', dealers: dealers.map(d => ({ value: map.get(d._id.toString()).has(p._id.toString()) ? 1 : 0, is_pos: false })) })); posList.forEach(pn => { matrix.push({ sku: "POS", name: pn, type: 'pos', dealers: dealers.map(d => ({ value: (d.pos_materials||[]).find(m=>m.name===pn)?.quantity||0, is_pos: true })) }); }); res.json({ headers: dealers.map(d=>({id:d._id, name:d.name, city:d.city, responsible:d.responsible})), matrix }); } catch (e) { res.status(500).json({error:e.message}); } });
+app.get('/api/matrix', requireAnyPermission('can_view_products', 'can_view_report'), async (req, res) => { try { const [prods, dealers] = await Promise.all([ Product.find().select('sku name').sort({sku:1}).lean(), Dealer.find(getDealerFilter(req)).select('_id name city responsible products pos_materials').lean() ]); const map = new Map(); dealers.forEach(d => map.set(d._id.toString(), new Set((d.products||[]).map(String)))); const posList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"]; const matrix = prods.map(p => ({ sku: p.sku, name: p.name, type: 'product', dealers: dealers.map(d => ({ value: map.get(d._id.toString()).has(p._id.toString()) ? 1 : 0, is_pos: false })) })); posList.forEach(pn => { matrix.push({ sku: "POS", name: pn, type: 'pos', dealers: dealers.map(d => ({ value: (d.pos_materials||[]).find(m=>m.name===pn)?.quantity||0, is_pos: true })) }); }); res.json({ headers: dealers.map(d=>({id:d._id, name:d.name, city:d.city, responsible:d.responsible})), matrix }); } catch (e) { res.status(500).json({error:e.message}); } });
 
 app.get('/api/sales', requirePermission('can_view_sales'), async (req, res) => {
     try {
@@ -685,9 +685,30 @@ app.get('/api/reclamations/dashboard', requirePermission('can_view_reclamations'
 });
 
 app.get('/api/reclamations', requirePermission('can_view_reclamations'), async (req, res) => {
-    try { 
-        const list = await Reclamation.find().sort({createdAt: -1}); 
-        res.json(list.map(convertToClient)); 
+    try {
+        const list = await Reclamation.aggregate([
+            { $sort: { createdAt: -1 } },
+            { $project: {
+                dealerId: 1,
+                dealerName: 1,
+                date: 1,
+                productName: 1,
+                description: 1,
+                clientDemand: 1,
+                resolution: 1,
+                createdAt: 1,
+                updatedAt: 1,
+                photoCount: { $size: { $ifNull: ['$photos', []] } }
+            } }
+        ]);
+        res.json(list.map(item => ({ ...item, id: String(item._id), _id: undefined })));
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+app.get('/api/reclamations/:id', requirePermission('can_view_reclamations'), async (req, res) => {
+    try {
+        const item = await Reclamation.findById(req.params.id).lean();
+        if (!item) return res.status(404).json({ error: 'Рекламация не найдена' });
+        res.json(convertToClient(item));
     } catch(e) { res.status(500).json({error: e.message}); }
 });
 
