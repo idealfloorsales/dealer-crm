@@ -9523,3 +9523,120 @@ body.bg-light {
         font-size:.68rem;
     }
 }
+
+
+/* Dealer legal entities editor */
+.dealer-legal-entity-list {
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+}
+.legal-entity-entry {
+    border:1px solid var(--if-line);
+    border-radius:14px;
+    background:#fbfaf9;
+    padding:12px;
+}
+.legal-entity-entry-head {
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom:10px;
+}
+.legal-entity-entry-head strong {
+    display:block;
+    color:#2a292d;
+    font-size:.76rem;
+    font-weight:780;
+}
+.legal-entity-entry-head small {
+    display:block;
+    margin-top:2px;
+    color:#939096;
+    font-size:.61rem;
+    line-height:1.35;
+}
+.legal-entity-grid {
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:8px;
+}
+.legal-entity-grid label {
+    min-width:0;
+    margin:0;
+}
+.legal-entity-grid label > span {
+    display:block;
+    margin:0 0 4px 2px;
+    color:#7d7b80;
+    font-size:.56rem;
+    font-weight:760;
+    text-transform:uppercase;
+    letter-spacing:.035em;
+}
+.legal-entity-grid .span-2 { grid-column:span 2; }
+.legal-entity-grid .span-3 { grid-column:span 3; }
+.legal-entity-grid .form-control,
+.legal-entity-grid .form-select {
+    min-height:34px;
+    border-radius:9px;
+    font-size:.68rem;
+}
+@media (max-width: 767.98px) {
+    .legal-entity-grid { grid-template-columns:1fr; }
+    .legal-entity-grid .span-2,
+    .legal-entity-grid .span-3 { grid-column:span 1; }
+}
+
+/* Dealer documents legal entity picker */
+.dealer-document-entity-picker {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    margin:0 0 14px;
+    padding:12px 14px;
+    border:1px solid rgba(185,4,10,.11);
+    border-radius:14px;
+    background:linear-gradient(135deg,#fff 0%,#fbf5f3 100%);
+}
+.dealer-document-entity-picker > div { min-width:0; flex:1; }
+.dealer-document-picker-label {
+    display:block;
+    margin-bottom:3px;
+    color:var(--if-red);
+    font-size:.56rem;
+    font-weight:800;
+    letter-spacing:.09em;
+    text-transform:uppercase;
+}
+.dealer-document-entity-picker strong {
+    display:block;
+    overflow:hidden;
+    color:#292a2e;
+    font-size:.8rem;
+    font-weight:780;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+.dealer-document-entity-picker small {
+    display:block;
+    margin-top:2px;
+    color:#85868b;
+    font-size:.61rem;
+    line-height:1.35;
+}
+.dealer-document-entity-picker .form-select {
+    width:min(390px,42%);
+    min-height:38px;
+    border-radius:10px;
+    border-color:rgba(185,4,10,.14);
+    background-color:#fff;
+    font-size:.68rem;
+    font-weight:700;
+}
+@media (max-width: 767.98px) {
+    .dealer-document-entity-picker { flex-direction:column; align-items:stretch; }
+    .dealer-document-entity-picker .form-select { width:100%; }
+}
