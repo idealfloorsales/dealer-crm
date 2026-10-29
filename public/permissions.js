@@ -736,6 +736,27 @@
         ensureFeedbackShell();
         scheduleReveal(document);
 
+        if (!window.__crmOriginalAlert) {
+            window.__crmOriginalAlert = window.alert.bind(window);
+            window.alert = message => {
+                const text = String(message || '');
+                const lower = text.toLowerCase();
+                const type = /ошиб|не удалось|невозмож|слишком больш|нет доступа/.test(lower)
+                    ? 'error'
+                    : /вниман|предупреж|не заполн|не задан/.test(lower)
+                        ? 'warning'
+                        : 'info';
+                showToast(text, type);
+            };
+        }
+
+        document.addEventListener('submit', event => {
+            const submitter = event.submitter;
+            if (!submitter || submitter.disabled) return;
+            submitter.classList.add('crm-saving-pulse');
+            setTimeout(() => submitter.classList.remove('crm-saving-pulse'), 900);
+        }, true);
+
         const observer = new MutationObserver(mutations => {
             const added = mutations.flatMap(mutation => Array.from(mutation.addedNodes || []))
                 .find(node => node && node.nodeType === 1);
