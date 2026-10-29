@@ -796,10 +796,10 @@ app.post('/api/sales', async (req, res) => {
     let groupFilter = {};
     if (managerRestricted) {
         groupFilter = { ownerUserId: String(req.user.id) };
-    } else if (scope === 'astana') {
+    } else if (!companySalesView && scope === 'astana') {
         const sectors = await Sector.find({ type: 'astana' });
         groupFilter = { group: { $in: sectors.map(s => s.name) } };
-    } else if (scope === 'regions') {
+    } else if (!companySalesView && scope === 'regions') {
         const sectors = await Sector.find({ type: 'region' });
         groupFilter = { group: { $in: sectors.map(s => s.name) } };
     }
