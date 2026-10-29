@@ -1669,49 +1669,9 @@ app.post('/api/workshop/memos/:id/receive', requirePermission('can_manage_worksh
 });
 
 app.post('/api/workshop/laminate-receipt', requirePermission('can_manage_workshop'), async (req, res) => {
-    try {
-        const expectedProductId = req.body.expectedProductId || null;
-        const actualProductId = req.body.actualProductId || expectedProductId;
-        const deliveredPacks = Math.max(0, workshopNumber(req.body.deliveredPacks));
-        const acceptedPacks = Math.max(0, workshopNumber(req.body.acceptedPacks));
-        const acceptedLoosePlanks = Math.max(0, workshopNumber(req.body.acceptedLoosePlanks));
-        const product = await Product.findById(actualProductId).lean();
-        if (!product) return res.status(404).json({ error: 'Фактически принятая позиция не найдена' });
-        const packQty = workshopPackQty(product);
-        if (packQty <= 0) return res.status(400).json({ error: 'В карточке товара не заполнено количество планок в упаковке' });
-
-        const planksQty = acceptedPacks * packQty + acceptedLoosePlanks;
-        if (planksQty <= 0) return res.status(400).json({ error: 'Принятое количество должно быть больше нуля' });
-
-        const stock = await workshopChangeLaminate(actualProductId, planksQty);
-        const mismatch = String(expectedProductId || '') !== String(actualProductId || '') || acceptedPacks !== deliveredPacks;
-        const movement = await WorkshopMovement.create({
-            date: req.body.date || new Date(),
-            type: 'laminate_receipt',
-            entityType: 'laminate',
-            product: actualProductId,
-            direction: 'in',
-            qty: planksQty,
-            unit: 'планка',
-            serviceMemoNumber: String(req.body.serviceMemoNumber || '').trim(),
-            note: String(req.body.note || '').trim(),
-            meta: {
-                expectedProductId,
-                actualProductId,
-                deliveredPacks,
-                acceptedPacks,
-                acceptedLoosePlanks,
-                packQty,
-                mismatch,
-                discrepancyReason: String(req.body.discrepancyReason || '').trim()
-            },
-            createdBy: workshopUser(req)
-        });
-
-        res.status(201).json({ stock: convertToClient(stock), movement: convertToClient(movement), mismatch });
-    } catch (e) {
-        res.status(400).json({ error: e.message });
-    }
+    return res.status(400).json({
+        error: 'Одиночный приход отключен. Ламинат принимается только целыми упаковками по многострочной служебной записке.'
+    });
 });
 
 app.post('/api/workshop/production', requirePermission('can_manage_workshop'), async (req, res) => {
