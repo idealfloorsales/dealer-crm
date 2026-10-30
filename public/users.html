@@ -186,6 +186,7 @@
                                         <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_view_knowledge"><label class="form-check-label" for="p_can_view_knowledge">База знаний</label></div>
                                         <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_view_reclamations"><label class="form-check-label" for="p_can_view_reclamations">Рекламации</label></div>
                                         <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_view_workshop"><label class="form-check-label fw-bold text-danger" for="p_can_view_workshop"><i class="bi bi-tools me-1"></i>Цех</label></div>
+                                        <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_view_pricing"><label class="form-check-label fw-bold" for="p_can_view_pricing"><i class="bi bi-percent me-1"></i>Ценовые условия</label></div>
                                         <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_view_dashboard"><label class="form-check-label" for="p_can_view_dashboard">Дашборд (Статистика)</label></div>
                                     </div>
                                 </div>
@@ -202,6 +203,7 @@
                                         <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_edit_matrix"><label class="form-check-label" for="p_can_edit_matrix">Редактировать матрицу дилера</label></div>
                                         <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_edit_sales_fact"><label class="form-check-label" for="p_can_edit_sales_fact">Вносить Факт продаж</label></div>
                                         <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_manage_workshop"><label class="form-check-label fw-bold text-danger" for="p_can_manage_workshop">Вносить операции цеха</label></div>
+                                        <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_manage_pricing"><label class="form-check-label fw-bold" for="p_can_manage_pricing">Управлять ценовыми условиями</label></div>
                                         
                                         <div class="perm-group-header text-success mt-3">Справочники</div>
                                         <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_manage_products"><label class="form-check-label" for="p_can_manage_products">Управлять товарами (SKU)</label></div>
@@ -399,7 +401,7 @@
             document.querySelectorAll('.perm-check').forEach(cb => cb.checked = false);
             
             // Базовые права по умолчанию
-            ['p_can_view_map', 'p_can_view_dealers', 'p_can_view_products', 'p_can_view_sales', 'p_can_view_knowledge', 'p_can_view_reclamations', 'p_can_view_dashboard'].forEach(id => {
+            ['p_can_view_map', 'p_can_view_dealers', 'p_can_view_products', 'p_can_view_sales', 'p_can_view_knowledge', 'p_can_view_reclamations', 'p_can_view_dashboard', 'p_can_view_pricing'].forEach(id => {
                 const el = document.getElementById(id); if(el) el.checked = true;
             });
             modal.show();
