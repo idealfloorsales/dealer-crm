@@ -192,3 +192,13 @@ html,body.pricing-page{max-width:100%;overflow-x:hidden}
   .pricing-modal .modal-footer{padding-bottom:max(10px,env(safe-area-inset-bottom))}
   .pricing-modal .modal-footer .btn{flex:1 1 0;min-height:42px;font-size:.6rem}
 }
+.pricing-presets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-bottom:8px}
+.pricing-presets button{
+  min-height:48px;display:flex;align-items:center;gap:8px;padding:8px 9px;border:1px solid #e5e0dc;border-radius:10px;background:#fff;color:#55575c;text-align:left
+}
+.pricing-presets button:hover{border-color:#d7c8c4;background:#fffafa}
+.pricing-presets i{display:grid;place-items:center;width:28px;height:28px;flex:0 0 28px;border-radius:8px;background:#f3efec;color:#9a3d41}
+.pricing-presets strong{display:block;font-size:.54rem}
+.pricing-presets small{display:block;margin-top:1px;color:#999ba0;font-size:.43rem}
+.pricing-badge.is-conflict{background:#fff1db;color:#986812}
+@media(max-width:600px){.pricing-presets{grid-template-columns:1fr}}
