@@ -14,6 +14,7 @@ const LOCAL_ASSETS = [
     '/users.html',
     '/dealer.html',
     '/workshop.html',
+    '/pricing.html',
     '/login.html',
     '/manifest.json',
     '/style.css?v={{VER}}',
@@ -31,6 +32,8 @@ const LOCAL_ASSETS = [
     '/map.js?v={{VER}}',
     '/workshop.js?v={{VER}}',
     '/workshop.css?v={{VER}}',
+    '/pricing.js?v={{VER}}',
+    '/pricing.css?v={{VER}}',
     '/logo.png',
     '/favicon.gif'
 ];
