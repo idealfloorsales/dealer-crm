@@ -147,6 +147,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 badges.push(`<span class="pricing-badge is-discount">−${fmt(condition.discountPercent,2)}% · ${esc(condition.name)}</span>`);
             });
             if (row.pendingRequirements) badges.push(`<span class="pricing-badge is-warning"><i class="bi bi-exclamation-circle"></i>${row.pendingRequirements} обязательств</span>`);
+            if (row.priceListConflicts) badges.push(`<span class="pricing-badge is-conflict"><i class="bi bi-exclamation-triangle"></i>${row.priceListConflicts + 1} базовых прайса</span>`);
+            if (Array.isArray(row.ignoredDiscounts) && row.ignoredDiscounts.length) badges.push(`<span class="pricing-badge is-conflict"><i class="bi bi-slash-circle"></i>${row.ignoredDiscounts.length} скидок не применено</span>`);
             if (!badges.length) badges.push('<span class="pricing-badge">Стандартные условия</span>');
 
             const baseNote = row.priceListCondition
@@ -281,7 +283,45 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function resetForm() {
+    function applyPreset(name) {
+        if (!manage) return;
+        if (name === 'social5') {
+            document.querySelector('input[name="pricing-kind"][value="discount"]').checked = true;
+            $('pricing-name').value = '−5% за публикации в соцсетях';
+            $('pricing-code').value = 'SOCIAL-5';
+            $('pricing-percent').value = 5;
+            $('pricing-stackable').value = 'true';
+            $('pricing-reason-type').value = 'social_posts';
+            $('pricing-requirement-target').value = 8;
+            $('pricing-requirement-current').value = 0;
+            $('pricing-requirement-unit').value = 'публикаций';
+            $('pricing-requirement-verified').checked = false;
+        } else if (name === 'support10') {
+            document.querySelector('input[name="pricing-kind"][value="discount"]').checked = true;
+            $('pricing-name').value = '−10% акция для поддержки продаж';
+            $('pricing-code').value = 'SUPPORT-10';
+            $('pricing-percent').value = 10;
+            $('pricing-stackable').value = 'true';
+            $('pricing-reason-type').value = 'support_promo';
+            $('pricing-requirement-target').value = 0;
+            $('pricing-requirement-current').value = 0;
+            $('pricing-requirement-verified').checked = false;
+        } else if (name === 'regional') {
+            document.querySelector('input[name="pricing-kind"][value="price_list"]').checked = true;
+            $('pricing-name').value = 'Региональный базовый прайс';
+            $('pricing-code').value = 'REGIONAL-PRICE';
+            $('pricing-price-list').value = '';
+            $('pricing-reason-type').value = 'regional_price';
+            $('pricing-requirement-target').value = 0;
+            $('pricing-requirement-current').value = 0;
+            $('pricing-requirement-verified').checked = false;
+            if ($('pricing-scope-type').value === 'dealer') $('pricing-scope-type').value = 'sector';
+        }
+        syncScopeFields();
+        syncKindFields();
+    }
+
+        function resetForm() {
         $('pricing-condition-form').reset();
         $('pricing-condition-id').value = '';
         $('pricing-modal-title').textContent = 'Новое условие';
@@ -422,6 +462,9 @@ document.addEventListener('DOMContentLoaded', () => {
     $('pricing-scope-type')?.addEventListener('change',syncScopeFields);
     document.querySelectorAll('input[name="pricing-kind"]').forEach(input=>input.addEventListener('change',syncKindFields));
     $('pricing-reason-type')?.addEventListener('change',()=>syncReasonDefaults(true));
+    document.querySelectorAll('[data-pricing-preset]').forEach(button => {
+        button.addEventListener('click', () => applyPreset(button.dataset.pricingPreset));
+    });
     $('pricing-condition-form')?.addEventListener('submit',saveCondition);
 
     load();
