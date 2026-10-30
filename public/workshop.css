@@ -364,3 +364,40 @@ html,body.workshop-page{max-width:100%;overflow-x:hidden}
   .ws-bom-material-row .ws-bom-mode{grid-column:1/2}
   .ws-bom-material-row button{grid-column:2;grid-row:2}
 }
+
+
+/* Workshop edit / delete controls */
+.workshop-card-actions,
+.workshop-feed-actions,
+.workshop-stock-actions,
+.workshop-recipe-actions{
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap
+}
+.workshop-icon-action{
+  width:31px;height:31px;display:inline-grid;place-items:center;flex:0 0 31px;
+  border:1px solid #e4dfda;border-radius:9px;background:#fff;color:#696b70;font-size:.72rem;
+  transition:.14s ease
+}
+.workshop-icon-action:hover{background:#f4f1ee;color:#303136;border-color:#d8d1cb}
+.workshop-icon-action.is-danger{border-color:#f0d2d3;background:#fff7f7;color:#b0272e}
+.workshop-icon-action.is-danger:hover{background:#fff0f0;border-color:#e7b8bb}
+.workshop-feed-actions{justify-content:flex-end}
+.workshop-feed-actions>b{margin-right:2px}
+.workshop-stock-actions{justify-content:flex-end}
+.workshop-stock-actions>b{margin-right:2px;white-space:nowrap}
+.workshop-recipe-actions{
+  justify-content:flex-end;margin-top:10px;padding-top:9px;border-top:1px solid #ece8e4
+}
+.workshop-recipe-actions .workshop-link-btn{margin-right:auto}
+.workshop-memo-card-foot .workshop-card-actions{justify-content:flex-end}
+
+@media(max-width:767.98px){
+  .workshop-memo-card-foot{align-items:flex-start;flex-direction:column}
+  .workshop-memo-card-foot .workshop-card-actions{width:100%;justify-content:flex-start}
+  .workshop-memo-card-foot .workshop-card-actions .workshop-link-btn{margin-left:auto}
+  .workshop-feed-item{grid-template-columns:auto minmax(0,1fr)}
+  .workshop-feed-actions{grid-column:2;justify-content:flex-start;margin-top:2px}
+  .workshop-stock-card{grid-template-columns:minmax(0,1fr)}
+  .workshop-stock-actions{justify-content:flex-start}
+  .workshop-stock-actions b{margin-right:auto}
+}
