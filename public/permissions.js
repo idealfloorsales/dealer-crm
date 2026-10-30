@@ -101,6 +101,9 @@
                         ${itemsHtml}
                     </ul>
                     <div class="crm-topbar-account">
+                        <button type="button" class="crm-connection-chip" data-crm-network-status title="Состояние соединения">
+                            <span class="crm-topbar-live-dot"></span><span data-crm-network-label>Связь</span>
+                        </button>
                         <span id="user-role-badge" class="crm-role-badge">...</span>
                         <button id="logout-btn" class="crm-topbar-logout" type="button" title="Выйти">
                             <i class="bi bi-box-arrow-right"></i><span>Выход</span>
@@ -108,16 +111,89 @@
                     </div>
                 </div>
 
-                <div class="crm-topbar-mobile-status" aria-hidden="true">
+                <button type="button" class="crm-topbar-mobile-status" data-crm-network-status aria-label="Состояние соединения">
                     <span class="crm-topbar-live-dot"></span>
-                    <span>Онлайн</span>
-                </div>
+                    <span data-crm-network-label>Связь</span>
+                </button>
             </div>`;
 
         const logoutButton = document.getElementById('logout-btn');
         if (logoutButton) logoutButton.addEventListener('click', logout);
     }
 
+
+    const crmNetwork = {
+        state: 'checking',
+        lastSuccessAt: 0,
+        lastFailureAt: 0,
+        lastLatency: null
+    };
+
+    function networkMeta(state) {
+        const states = {
+            checking: { label: 'Связь…', title: 'Проверяем соединение' },
+            online: { label: 'Онлайн', title: 'Связь с CRM работает' },
+            slow: { label: 'Медленно', title: 'Связь есть, но сервер отвечает медленно' },
+            unstable: { label: 'Нестабильно', title: 'Соединение нестабильно. Данные могут загружаться дольше обычного' },
+            offline: { label: 'Нет сети', title: 'Нет соединения. Доступны только уже закэшированные экраны' },
+            server: { label: 'Сервер', title: 'Интернет доступен, но CRM-сервер временно не отвечает' }
+        };
+        return states[state] || states.checking;
+    }
+
+    function setNetworkState(state, latency) {
+        crmNetwork.state = state;
+        if (Number.isFinite(latency)) crmNetwork.lastLatency = latency;
+        const meta = networkMeta(state);
+        document.documentElement.dataset.crmNetwork = state;
+        document.querySelectorAll('[data-crm-network-status]').forEach(chip => {
+            chip.dataset.state = state;
+            chip.title = meta.title;
+            chip.setAttribute('aria-label', meta.title);
+            const label = chip.querySelector('[data-crm-network-label]');
+            if (label) label.textContent = meta.label;
+        });
+    }
+
+    function markNetworkSuccess(latency) {
+        crmNetwork.lastSuccessAt = Date.now();
+        setNetworkState(Number.isFinite(latency) && latency > 3500 ? 'slow' : 'online', latency);
+    }
+
+    function markNetworkFailure(kind = 'unstable') {
+        crmNetwork.lastFailureAt = Date.now();
+        const state = navigator.onLine === false ? 'offline' : kind;
+        setNetworkState(state);
+    }
+
+    function showNetworkDetails() {
+        const meta = networkMeta(crmNetwork.state);
+        let detail = meta.title;
+        if (Number.isFinite(crmNetwork.lastLatency) && crmNetwork.state !== 'offline') {
+            detail += ` · ${Math.max(1, Math.round(crmNetwork.lastLatency))} мс`;
+        }
+        showToast(detail, crmNetwork.state === 'online' ? 'success' : crmNetwork.state === 'slow' ? 'warning' : 'info', {
+            title: 'Соединение'
+        });
+    }
+
+    function initConnectivityLayer() {
+        setNetworkState(navigator.onLine === false ? 'offline' : 'checking');
+        window.addEventListener('offline', () => setNetworkState('offline'));
+        window.addEventListener('online', () => setNetworkState('checking'));
+        document.addEventListener('click', event => {
+            if (event.target.closest?.('[data-crm-network-status]')) showNetworkDetails();
+        });
+    }
+
+    function registerServiceWorker() {
+        if (!('serviceWorker' in navigator) || window.location.protocol !== 'https:') return;
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(error => {
+                console.warn('CRM service worker registration failed:', error);
+            });
+        }, { once: true });
+    }
 
     function ensureMobileNavStyles() {
         if (document.getElementById('crm-mobile-nav-styles')) return;
@@ -848,6 +924,7 @@
         document.body.classList.add('crm-ui-enhanced');
         initSeamlessNavigation();
         ensureFeedbackShell();
+        initConnectivityLayer();
         scheduleReveal(document);
 
         if (!window.__crmOriginalAlert) {
@@ -970,15 +1047,27 @@
         if (token) options.headers.Authorization = 'Bearer ' + token;
 
         const trackLoading = options.crmTrackLoading !== false;
+        const startedAt = performance.now();
         if (trackLoading) startNetworkActivity();
 
         try {
             const response = await window.__crmOriginalFetch(url, options);
+            const latency = performance.now() - startedAt;
+
+            if (response.status >= 500) {
+                markNetworkFailure('server');
+            } else {
+                markNetworkSuccess(latency);
+            }
+
             if (response.status === 401) {
                 logout();
                 throw new Error('Сессия завершена');
             }
             return response;
+        } catch (error) {
+            markNetworkFailure(navigator.onLine === false ? 'offline' : 'unstable');
+            throw error;
         } finally {
             if (trackLoading) stopNetworkActivity();
         }
@@ -1075,6 +1164,7 @@
     // Меню строится синхронно до DOMContentLoaded, чтобы все страницы
     // получили один и тот же набор пунктов и порядок.
     renderTopNavigation();
+    registerServiceWorker();
 
     window.__crmOriginalFetch = window.fetch.bind(window);
     window.fetch = apiFetch;
