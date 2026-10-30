@@ -13,7 +13,9 @@ const LOCAL_ASSETS = [
     '/reclamations.html',
     '/users.html',
     '/dealer.html',
+    '/workshop.html',
     '/login.html',
+    '/manifest.json',
     '/style.css?v={{VER}}',
     '/ui-motion.css?v={{VER}}',
     '/script.js?v={{VER}}',
@@ -27,6 +29,8 @@ const LOCAL_ASSETS = [
     '/dealer-score.js?v={{VER}}',
     '/dealer.js?v={{VER}}',
     '/map.js?v={{VER}}',
+    '/workshop.js?v={{VER}}',
+    '/workshop.css?v={{VER}}',
     '/logo.png',
     '/favicon.gif'
 ];
