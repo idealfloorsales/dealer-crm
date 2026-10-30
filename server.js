@@ -1309,7 +1309,7 @@ app.get('/api/pricing/overview', requirePermission('can_view_pricing'), async (r
     }
 });
 
-app.get('/api/pricing/dealers/:id', requireAnyPermission('can_view_pricing', 'can_view_dealers'), async (req, res) => {
+app.get('/api/pricing/dealers/:id', requirePermission('can_view_pricing'), async (req, res) => {
     try {
         const dealer = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) })
             .select('_id dealer_id name city region_sector price_type responsible')
