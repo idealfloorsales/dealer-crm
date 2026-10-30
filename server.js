@@ -228,6 +228,12 @@ const requireAnyPermission = (...permissions) => (req, res, next) => {
 };
 
 const requireAdmin = requirePermission('can_manage_users');
+const requireIsAdmin = (req, res, next) => {
+    if (!req.user?.permissions?.is_admin) {
+        return res.status(403).json({ error: 'Удаление доступно только администратору' });
+    }
+    next();
+};
 
 app.get('/api/admin/users', requireAdmin, async (req, res) => {
     try {
@@ -423,6 +429,9 @@ const workshopProductionSchema = new mongoose.Schema({
     scrapPlanks: { type: Number, default: 0 },
     operations: [workshopOperationSchema],
     note: String,
+    cancelledAt: Date,
+    cancelledBy: { id: String, name: String },
+    cancelReason: String,
     createdBy: { id: String, name: String }
 }, { timestamps: true });
 const WorkshopProduction = mongoose.model('WorkshopProduction', workshopProductionSchema);
@@ -1392,7 +1401,7 @@ app.get('/api/workshop/bootstrap', requirePermission('can_view_workshop'), async
                 .populate('dealer', 'dealer_id name city')
                 .populate({ path: 'recipe', populate: { path: 'product', select: 'sku name is_liquid' } })
                 .sort({ updatedAt: -1 }).lean(),
-            WorkshopProduction.find()
+            WorkshopProduction.find({ cancelledAt: { $exists: false } })
                 .populate('recipe', 'name outputType')
                 .populate('product', 'sku name')
                 .sort({ date: -1, createdAt: -1 }).limit(30).lean(),
@@ -1411,7 +1420,7 @@ app.get('/api/workshop/bootstrap', requirePermission('can_view_workshop'), async
 
         const memoIds = memos.map(item => item._id);
         const producedByMemoLine = memoIds.length ? await WorkshopProduction.aggregate([
-            { $match: { memo: { $in: memoIds }, memoLineId: { $nin: [null, ''] } } },
+            { $match: { memo: { $in: memoIds }, memoLineId: { $nin: [null, ''] }, cancelledAt: { $exists: false } } },
             { $group: { _id: '$memoLineId', qty: { $sum: '$outputQty' } } }
         ]) : [];
         const producedMap = new Map(producedByMemoLine.map(item => [String(item._id), Number(item.qty) || 0]));
@@ -1423,7 +1432,7 @@ app.get('/api/workshop/bootstrap', requirePermission('can_view_workshop'), async
 
         const today = new Date();
         today.setHours(0,0,0,0);
-        const todayRows = await WorkshopProduction.find({ date: { $gte: today } }).select('outputQty').lean();
+        const todayRows = await WorkshopProduction.find({ date: { $gte: today }, cancelledAt: { $exists: false } }).select('outputQty').lean();
         const todayProduction = todayRows.reduce((sum, item) => sum + (Number(item.outputQty) || 0), 0);
         const finishedStock = recipes.reduce((sum, item) => sum + (Number(item.stockQty) || 0), 0);
         const lowMaterials = materials.filter(item => Number(item.minQty) > 0 && Number(item.stockQty) <= Number(item.minQty)).length;
@@ -1504,6 +1513,25 @@ app.put('/api/workshop/materials/:id', requirePermission('can_manage_workshop'),
         res.json(convertToClient(item));
     } catch (e) {
         res.status(500).json({ error: e.message });
+    }
+});
+
+app.delete('/api/workshop/materials/:id', requireIsAdmin, async (req, res) => {
+    try {
+        const item = await WorkshopMaterial.findById(req.params.id);
+        if (!item) return res.status(404).json({ error: 'Материал не найден' });
+
+        const [movementUsed, recipeUsed] = await Promise.all([
+            WorkshopMovement.exists({ material: item._id }),
+            WorkshopRecipe.exists({ 'materials.material': item._id })
+        ]);
+        if (movementUsed || recipeUsed) {
+            return res.status(400).json({ error: 'Материал уже используется в истории или рецептурах. Его можно отредактировать/деактивировать, но не удалить.' });
+        }
+        await WorkshopMaterial.deleteOne({ _id: item._id });
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
     }
 });
 
@@ -1597,6 +1625,28 @@ app.put('/api/workshop/recipes/:id', requirePermission('can_manage_workshop'), a
         res.json(convertToClient(recipe));
     } catch (e) {
         res.status(500).json({ error: e.message });
+    }
+});
+
+app.delete('/api/workshop/recipes/:id', requireIsAdmin, async (req, res) => {
+    try {
+        const recipe = await WorkshopRecipe.findById(req.params.id);
+        if (!recipe) return res.status(404).json({ error: 'Рецептура не найдена' });
+
+        const [productionUsed, movementUsed, dealerUsed, componentUsed, memoUsed] = await Promise.all([
+            WorkshopProduction.exists({ recipe: recipe._id }),
+            WorkshopMovement.exists({ recipe: recipe._id }),
+            WorkshopDealerAsset.exists({ recipe: recipe._id, qty: { $gt: 0 } }),
+            WorkshopRecipe.exists({ 'components.recipe': recipe._id }),
+            WorkshopMemo.exists({ 'lines.recipe': recipe._id })
+        ]);
+        if (productionUsed || movementUsed || dealerUsed || componentUsed || memoUsed || Math.abs(Number(recipe.stockQty) || 0) > 0.0001) {
+            return res.status(400).json({ error: 'Рецептура уже участвует в учёте. Её можно редактировать или деактивировать, но нельзя удалить без нарушения истории.' });
+        }
+        await WorkshopRecipe.deleteOne({ _id: recipe._id });
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
     }
 });
 
@@ -1694,6 +1744,108 @@ app.post('/api/workshop/memos', requirePermission('can_manage_workshop'), async 
         res.status(201).json(convertToClient(populated));
     } catch (e) {
         if (e && e.code === 11000) return res.status(400).json({ error: 'Служебная записка с таким номером уже существует' });
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.put('/api/workshop/memos/:id', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const memo = await WorkshopMemo.findById(req.params.id);
+        if (!memo) return res.status(404).json({ error: 'Служебная записка не найдена' });
+        if (memo.postedAt || memo.status === 'accepted') {
+            return res.status(400).json({ error: 'Принятую служебную записку нельзя редактировать. Используйте корректировку/отмену.' });
+        }
+
+        const number = String(req.body.number || memo.number || '').trim();
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
+        if (!number) return res.status(400).json({ error: 'Укажите номер служебной записки' });
+        if (!inputLines.length) return res.status(400).json({ error: 'Добавьте хотя бы одну позицию' });
+
+        const duplicateNumber = await WorkshopMemo.exists({ number, _id: { $ne: memo._id } });
+        if (duplicateNumber) return res.status(400).json({ error: 'Служебная записка с таким номером уже существует' });
+
+        const seenProducts = new Set();
+        const lines = [];
+        for (const input of inputLines) {
+            const requestedPacks = Math.max(0, Math.floor(workshopNumber(input.requestedPacks)));
+            if (!input.productId || requestedPacks <= 0) continue;
+
+            const product = await Product.findById(input.productId).lean();
+            if (!product) continue;
+            const productKey = String(product._id);
+            if (seenProducts.has(productKey)) {
+                return res.status(400).json({ error: `Позиция «${product.sku || product.name}» добавлена в служебку дважды` });
+            }
+            seenProducts.add(productKey);
+
+            let recipe = null;
+            if (input.recipeId) {
+                recipe = await WorkshopRecipe.findOne({ _id: input.recipeId, product: product._id, active: { $ne: false } }).lean();
+            }
+            if (!recipe) {
+                const recipes = await WorkshopRecipe.find({ product: product._id, active: { $ne: false }, planksPerUnit: { $gt: 0 } }).lean();
+                recipe = recipes.find(item => item.outputType === 'sample') || recipes.find(item => item.outputType === 'stand') || recipes[0] || null;
+            }
+            if (!recipe) return res.status(400).json({ error: `Для «${product.sku || product.name}» не настроена рецептура` });
+
+            const packQty = workshopPackQty(product, recipe.packQtyOverride);
+            const planksPerUnit = Math.max(0, workshopNumber(recipe.planksPerUnit));
+            if (packQty <= 0 || planksPerUnit <= 0) {
+                return res.status(400).json({ error: `Проверьте нормы для «${product.sku || product.name}»` });
+            }
+
+            const totalPlanks = requestedPacks * packQty;
+            const plannedOutputQty = Math.floor(totalPlanks / planksPerUnit);
+            const plannedRemainderPlanks = totalPlanks - plannedOutputQty * planksPerUnit;
+            lines.push({
+                product: product._id,
+                recipe: recipe._id,
+                requestedPacks,
+                plannedOutputQty,
+                plannedRemainderPlanks,
+                packQty,
+                planksPerUnit,
+                actualProduct: product._id,
+                deliveredPacks: 0,
+                checked: false,
+                isMatch: false,
+                discrepancyReason: ''
+            });
+        }
+
+        if (!lines.length) return res.status(400).json({ error: 'Нет корректных позиций' });
+
+        memo.number = number;
+        memo.date = req.body.date || memo.date || new Date();
+        memo.lines = lines;
+        memo.note = String(req.body.note || '').trim();
+        memo.signedBy = String(req.body.signedBy || '').trim();
+        memo.status = 'created';
+        memo.receiptAttempts = [];
+        await memo.save();
+
+        const populated = await WorkshopMemo.findById(memo._id)
+            .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+            .populate('lines.recipe', 'name outputType planksPerUnit minStockQty stockQty')
+            .lean();
+        res.json(convertToClient(populated));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.delete('/api/workshop/memos/:id', requireIsAdmin, async (req, res) => {
+    try {
+        const memo = await WorkshopMemo.findById(req.params.id);
+        if (!memo) return res.status(404).json({ error: 'Служебная записка не найдена' });
+        if (memo.postedAt || memo.status === 'accepted') {
+            return res.status(400).json({ error: 'Проведённую служебную записку нельзя удалить напрямую: она уже изменила остатки.' });
+        }
+        const linkedProduction = await WorkshopProduction.exists({ memo: memo._id });
+        if (linkedProduction) return res.status(400).json({ error: 'По этой служебке уже есть производство. Сначала отмените связанные операции.' });
+        await WorkshopMemo.deleteOne({ _id: memo._id });
+        res.json({ status: 'ok' });
+    } catch (e) {
         res.status(400).json({ error: e.message });
     }
 });
@@ -1976,6 +2128,72 @@ app.post('/api/workshop/production', requirePermission('can_manage_workshop'), a
         });
 
         res.status(201).json({ production: convertToClient(production), stock: convertToClient(resultStock) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.delete('/api/workshop/productions/:id', requireIsAdmin, async (req, res) => {
+    try {
+        const production = await WorkshopProduction.findById(req.params.id)
+            .populate({
+                path: 'recipe',
+                populate: [
+                    { path: 'materials.material' },
+                    { path: 'components.recipe' }
+                ]
+            })
+            .populate('product');
+        if (!production) return res.status(404).json({ error: 'Запись производства не найдена' });
+        if (production.cancelledAt) return res.status(400).json({ error: 'Эта запись уже отменена' });
+
+        const recipe = production.recipe;
+        if (!recipe) return res.status(400).json({ error: 'Рецептура производства не найдена' });
+        const outputQty = Number(production.outputQty) || 0;
+
+        if ((Number(recipe.stockQty) || 0) + 1e-9 < outputQty) {
+            return res.status(400).json({ error: 'Нельзя отменить производство: часть изготовленных изделий уже выдана или использована.' });
+        }
+
+        if (outputQty > 0) await workshopChangeRecipe(recipe._id, -outputQty);
+        if (production.product && Number(production.consumedPlanks) > 0) {
+            await workshopChangeLaminate(production.product._id, Number(production.consumedPlanks));
+        }
+
+        for (const line of recipe.materials || []) {
+            if (line.mode === 'estimate') continue;
+            const qty = (Number(line.qty) || 0) * outputQty;
+            if (qty > 0 && line.material?._id) await workshopChangeMaterial(line.material._id, qty);
+        }
+        for (const line of recipe.components || []) {
+            const qty = (Number(line.qty) || 0) * outputQty;
+            if (qty > 0 && line.recipe?._id) await workshopChangeRecipe(line.recipe._id, qty);
+        }
+
+        await WorkshopMovement.create({
+            date: new Date(),
+            type: 'production_cancelled',
+            entityType: 'finished',
+            recipe: recipe._id,
+            direction: 'out',
+            qty: outputQty,
+            unit: 'шт',
+            serviceMemoNumber: production.serviceMemoNumber || '',
+            note: String(req.body?.reason || 'Отмена записи производства администратором'),
+            meta: {
+                productionId: String(production._id),
+                restoredPlanks: Number(production.consumedPlanks) || 0,
+                cancellation: true
+            },
+            createdBy: workshopUser(req)
+        });
+
+        production.cancelledAt = new Date();
+        production.cancelledBy = workshopUser(req);
+        production.cancelReason = String(req.body?.reason || '').trim();
+        await production.save();
+
+        res.json({ status: 'ok' });
     } catch (e) {
         res.status(400).json({ error: e.message });
     }
