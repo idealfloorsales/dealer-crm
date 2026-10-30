@@ -60,6 +60,7 @@ const userSchema = new mongoose.Schema({
         can_view_dashboard: { type: Boolean, default: true },
         can_view_reclamations: { type: Boolean, default: true },
         can_view_workshop: { type: Boolean, default: false },
+        can_view_pricing: { type: Boolean, default: false },
         can_create_dealer: { type: Boolean, default: false },
         can_edit_dealer: { type: Boolean, default: false },
         can_delete_dealer: { type: Boolean, default: false },
@@ -72,6 +73,7 @@ const userSchema = new mongoose.Schema({
         can_manage_knowledge: { type: Boolean, default: false },
         can_manage_reclamations: { type: Boolean, default: false },
         can_manage_workshop: { type: Boolean, default: false },
+        can_manage_pricing: { type: Boolean, default: false },
         can_export_base: { type: Boolean, default: false },
         can_export_prices: { type: Boolean, default: false },
         can_manage_users: { type: Boolean, default: false },
@@ -96,6 +98,7 @@ async function seedUsers() {
         can_view_dashboard: true,
         can_view_reclamations: true,
         can_view_workshop: true,
+        can_view_pricing: true,
         can_create_dealer: true,
         can_edit_dealer: true,
         can_delete_dealer: true,
@@ -108,6 +111,7 @@ async function seedUsers() {
         can_manage_knowledge: true,
         can_manage_reclamations: true,
         can_manage_workshop: true,
+        can_manage_pricing: true,
         can_export_base: true,
         can_export_prices: true
     };
@@ -316,6 +320,7 @@ app.get('/reclamations.html', (req, res) => servePage(res, 'reclamations.html'))
 app.get('/dealer.html', (req, res) => servePage(res, 'dealer.html'));
 app.get('/users.html', (req, res) => servePage(res, 'users.html'));
 app.get('/workshop.html', (req, res) => servePage(res, 'workshop.html'));
+app.get('/pricing.html', (req, res) => servePage(res, 'pricing.html'));
 app.use(express.static('public'));
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
@@ -627,6 +632,55 @@ const CompRef = mongoose.model('CompRef', compRefSchema);
 const dealerSchema = new mongoose.Schema({ dealer_id: String, name: String, price_type: String, city: String, address: String, contacts: [contactSchema], bonuses: String, photos: [photoSchema], organizations: [String], requisites: dealerRequisitesSchema, legal_entities: [dealerLegalEntitySchema], contract: { isSigned: Boolean, date: String, number: String }, region_sector: String, hasPersonalPlan: { type: Boolean, default: false }, delivery: String, website: String, instagram: String, additional_addresses: [additionalAddressSchema], pos_materials: [posMaterialSchema], visits: [visitSchema], products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }], latitude: Number, longitude: Number, status: { type: String, default: 'standard' }, avatarUrl: String, competitors: [competitorSchema], responsible: String, responsibleUserId: String, responsibleAssignmentSource: String }, { timestamps: true });
 const Dealer = mongoose.model('Dealer', dealerSchema);
 
+const pricingAuditSchema = new mongoose.Schema({
+    at: { type: Date, default: Date.now },
+    action: String,
+    userId: String,
+    userName: String,
+    note: String
+}, { _id: false });
+
+const pricingConditionSchema = new mongoose.Schema({
+    name: { type: String, required: true, trim: true },
+    code: { type: String, trim: true },
+    kind: { type: String, enum: ['discount', 'price_list'], required: true },
+    scopeType: { type: String, enum: ['dealer', 'sector', 'city', 'all'], default: 'dealer' },
+    dealer: { type: mongoose.Schema.Types.ObjectId, ref: 'Dealer' },
+    scopeValue: String,
+
+    discountPercent: { type: Number, default: 0 },
+    priceListName: String,
+    stackable: { type: Boolean, default: true },
+    priority: { type: Number, default: 0 },
+
+    startDate: { type: String, default: '' },
+    endDate: { type: String, default: '' },
+    paused: { type: Boolean, default: false },
+    cancelledAt: Date,
+
+    reasonType: {
+        type: String,
+        enum: ['social_posts', 'support_promo', 'regional_price', 'individual', 'other'],
+        default: 'other'
+    },
+    requirementTarget: { type: Number, default: 0 },
+    requirementCurrent: { type: Number, default: 0 },
+    requirementUnit: { type: String, default: 'публикаций' },
+    requirementDueDate: String,
+    requirementVerified: { type: Boolean, default: false },
+    proofNote: String,
+    note: String,
+
+    createdBy: { id: String, name: String },
+    updatedBy: { id: String, name: String },
+    audit: [pricingAuditSchema]
+}, { timestamps: true });
+
+pricingConditionSchema.index({ dealer: 1, startDate: 1, endDate: 1 });
+pricingConditionSchema.index({ scopeType: 1, scopeValue: 1 });
+pricingConditionSchema.index({ cancelledAt: 1 });
+const PricingCondition = mongoose.model('PricingCondition', pricingConditionSchema);
+
 const salesSchema = new mongoose.Schema({ month: String, group: String, dealerId: String, dealerName: String, plan: Number, fact: Number, isCustom: { type: Boolean, default: false }, ownerUserId: String 
 }, { timestamps: true }); 
 const Sales = mongoose.model('Sales', salesSchema);
@@ -825,6 +879,172 @@ function getDealerFilter(req) {
     }
 
     return { _id: null };
+}
+
+function pricingTodayKey() {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Almaty',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).formatToParts(new Date());
+    const map = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    return `${map.year}-${map.month}-${map.day}`;
+}
+
+function normalizePricingText(value) {
+    return String(value || '').trim().toLowerCase();
+}
+
+function pricingConditionStatus(condition, today = pricingTodayKey()) {
+    if (condition.cancelledAt) return 'cancelled';
+    if (condition.paused) return 'paused';
+    if (condition.startDate && condition.startDate > today) return 'planned';
+    if (condition.endDate && condition.endDate < today) return 'expired';
+    return 'active';
+}
+
+function pricingScopeSpecificity(condition) {
+    if (condition.scopeType === 'dealer') return 4;
+    if (condition.scopeType === 'sector') return 3;
+    if (condition.scopeType === 'city') return 2;
+    return 1;
+}
+
+function pricingConditionMatchesDealer(condition, dealer) {
+    if (!condition || !dealer) return false;
+    if (condition.scopeType === 'all') return true;
+    if (condition.scopeType === 'dealer') {
+        const target = condition.dealer?._id || condition.dealer;
+        return String(target || '') === String(dealer._id || dealer.id || '');
+    }
+    if (condition.scopeType === 'sector') {
+        return normalizePricingText(condition.scopeValue) === normalizePricingText(dealer.region_sector);
+    }
+    if (condition.scopeType === 'city') {
+        return normalizePricingText(condition.scopeValue) === normalizePricingText(dealer.city);
+    }
+    return false;
+}
+
+function buildDealerPricingSummary(dealer, allConditions, today = pricingTodayKey()) {
+    const matched = (allConditions || [])
+        .filter(condition => pricingConditionMatchesDealer(condition, dealer))
+        .map(condition => ({ ...condition, computedStatus: pricingConditionStatus(condition, today) }));
+
+    const active = matched.filter(condition => condition.computedStatus === 'active');
+
+    const priceLists = active
+        .filter(condition => condition.kind === 'price_list')
+        .sort((a, b) =>
+            (Number(b.priority) || 0) - (Number(a.priority) || 0) ||
+            pricingScopeSpecificity(b) - pricingScopeSpecificity(a) ||
+            String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''))
+        );
+
+    const selectedPriceList = priceLists[0] || null;
+    const activeDiscounts = active.filter(condition => condition.kind === 'discount');
+
+    const exclusive = activeDiscounts
+        .filter(condition => condition.stackable === false)
+        .sort((a, b) =>
+            (Number(b.priority) || 0) - (Number(a.priority) || 0) ||
+            (Number(b.discountPercent) || 0) - (Number(a.discountPercent) || 0)
+        );
+
+    const appliedDiscounts = exclusive.length
+        ? [exclusive[0]]
+        : activeDiscounts.filter(condition => condition.stackable !== false);
+
+    const totalDiscountPercent = appliedDiscounts.reduce(
+        (sum, condition) => sum + Math.max(0, Number(condition.discountPercent) || 0),
+        0
+    );
+
+    const activeEndDates = active.map(condition => condition.endDate).filter(Boolean).sort();
+    const pendingRequirements = active.filter(condition =>
+        Number(condition.requirementTarget) > 0 &&
+        (
+            Number(condition.requirementCurrent) < Number(condition.requirementTarget) ||
+            condition.requirementVerified !== true
+        )
+    );
+
+    return {
+        dealerId: String(dealer._id || dealer.id || ''),
+        dealerName: dealer.name || '',
+        city: dealer.city || '',
+        sector: dealer.region_sector || '',
+        responsible: dealer.responsible || '',
+        defaultPriceType: dealer.price_type || '',
+        effectivePriceList: selectedPriceList?.priceListName || selectedPriceList?.name || dealer.price_type || 'Оптовая цена',
+        priceListCondition: selectedPriceList,
+        activeDiscounts: appliedDiscounts,
+        totalDiscountPercent,
+        has5: appliedDiscounts.some(condition => Math.abs((Number(condition.discountPercent) || 0) - 5) < 0.001),
+        has10: appliedDiscounts.some(condition => Math.abs((Number(condition.discountPercent) || 0) - 10) < 0.001),
+        nearestEndDate: activeEndDates[0] || '',
+        pendingRequirements: pendingRequirements.length,
+        matchedConditions: matched
+    };
+}
+
+function pricingUserMeta(req) {
+    return {
+        id: String(req.user?._id || req.user?.id || ''),
+        name: req.user?.fullName || req.user?.username || ''
+    };
+}
+
+function cleanPricingPayload(body = {}) {
+    const kind = body.kind === 'price_list' ? 'price_list' : 'discount';
+    const scopeType = ['dealer', 'sector', 'city', 'all'].includes(body.scopeType) ? body.scopeType : 'dealer';
+    const reasonTypes = ['social_posts', 'support_promo', 'regional_price', 'individual', 'other'];
+    const reasonType = reasonTypes.includes(body.reasonType) ? body.reasonType : 'other';
+    const targetDefault = reasonType === 'social_posts' ? 8 : 0;
+
+    return {
+        name: String(body.name || '').trim(),
+        code: String(body.code || '').trim(),
+        kind,
+        scopeType,
+        dealer: scopeType === 'dealer' && body.dealerId ? body.dealerId : null,
+        scopeValue: scopeType === 'sector' || scopeType === 'city' ? String(body.scopeValue || '').trim() : '',
+        discountPercent: kind === 'discount' ? Math.max(0, Number(body.discountPercent) || 0) : 0,
+        priceListName: kind === 'price_list' ? String(body.priceListName || '').trim() : '',
+        stackable: kind === 'discount' ? body.stackable !== false : false,
+        priority: Number(body.priority) || 0,
+        startDate: String(body.startDate || '').trim(),
+        endDate: String(body.endDate || '').trim(),
+        paused: Boolean(body.paused),
+        reasonType,
+        requirementTarget: Math.max(0, Number(body.requirementTarget ?? targetDefault) || 0),
+        requirementCurrent: Math.max(0, Number(body.requirementCurrent) || 0),
+        requirementUnit: String(body.requirementUnit || 'публикаций').trim() || 'публикаций',
+        requirementDueDate: String(body.requirementDueDate || '').trim(),
+        requirementVerified: Boolean(body.requirementVerified),
+        proofNote: String(body.proofNote || '').trim(),
+        note: String(body.note || '').trim()
+    };
+}
+
+function validatePricingPayload(payload) {
+    if (!payload.name) return 'Укажите название условия';
+    if (payload.kind === 'discount' && (payload.discountPercent <= 0 || payload.discountPercent > 100)) {
+        return 'Скидка должна быть больше 0% и не больше 100%';
+    }
+    if (payload.kind === 'price_list' && !payload.priceListName) return 'Укажите название базового прайса';
+    if (payload.scopeType === 'dealer' && !payload.dealer) return 'Выберите дилера';
+    if ((payload.scopeType === 'sector' || payload.scopeType === 'city') && !payload.scopeValue) {
+        return 'Укажите сектор / город';
+    }
+    const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+    if (payload.startDate && !dateRe.test(payload.startDate)) return 'Некорректная дата начала';
+    if (payload.endDate && !dateRe.test(payload.endDate)) return 'Некорректная дата окончания';
+    if (payload.startDate && payload.endDate && payload.endDate < payload.startDate) {
+        return 'Дата окончания не может быть раньше даты начала';
+    }
+    return '';
 }
 
 async function cleanupAmbiguousLegacyOwnership() {
@@ -1027,6 +1247,165 @@ app.patch('/api/dealers/:id', requirePermission('can_edit_dealer'), async (req, 
 app.delete('/api/dealers/:id', requirePermission('can_delete_dealer'), async (req, res) => { try { await Dealer.findOneAndDelete({ _id: req.params.id, ...getDealerFilter(req) }); res.json({status:'deleted'}); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.get('/api/dealers/:id/products', requireAnyPermission('can_view_dealers', 'can_view_products'), async (req, res) => { const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).populate('products'); if (!d) return res.status(404).json({ error: 'Дилер не найден' }); res.json(d.products.map(convertToClient)); });
 app.put('/api/dealers/:id/products', requirePermission('can_edit_matrix'), async (req, res) => { const d = await Dealer.findOneAndUpdate({ _id: req.params.id, ...getDealerFilter(req) }, { products: req.body.productIds }); if (!d) return res.status(404).json({ error: 'Дилер не найден' }); res.json({status:'ok'}); });
+// ==========================================
+// ЦЕНОВЫЕ УСЛОВИЯ ДИЛЕРОВ
+// ==========================================
+app.get('/api/pricing/overview', requirePermission('can_view_pricing'), async (req, res) => {
+    try {
+        const dealers = await Dealer.find(getDealerFilter(req))
+            .select('_id dealer_id name city region_sector price_type responsible')
+            .sort({ name: 1 })
+            .lean();
+        const conditions = await PricingCondition.find({})
+            .populate('dealer', '_id dealer_id name city region_sector price_type responsible')
+            .sort({ createdAt: -1 })
+            .lean();
+
+        const rows = dealers.map(dealer => buildDealerPricingSummary(dealer, conditions));
+        const today = pricingTodayKey();
+        const inSeven = new Date(today + 'T00:00:00Z');
+        inSeven.setUTCDate(inSeven.getUTCDate() + 7);
+        const sevenKey = inSeven.toISOString().slice(0, 10);
+
+        const activeConditionIds = new Set();
+        rows.forEach(row => row.matchedConditions.forEach(condition => {
+            if (condition.computedStatus === 'active') activeConditionIds.add(String(condition._id));
+        }));
+
+        const visibleConditions = conditions
+            .filter(condition => rows.some(row => pricingConditionMatchesDealer(condition, {
+                _id: row.dealerId,
+                name: row.dealerName,
+                city: row.city,
+                region_sector: row.sector,
+                price_type: row.defaultPriceType,
+                responsible: row.responsible
+            })))
+            .map(condition => ({
+                ...condition,
+                computedStatus: pricingConditionStatus(condition, today)
+            }));
+
+        res.json({
+            today,
+            rows,
+            conditions: visibleConditions,
+            stats: {
+                dealersWith5: rows.filter(row => row.has5 && !row.has10).length,
+                dealersWith10: rows.filter(row => row.has10 && !row.has5).length,
+                dealersWithBoth: rows.filter(row => row.has5 && row.has10).length,
+                activePriceOverrides: rows.filter(row => row.priceListCondition).length,
+                expiringSoon: visibleConditions.filter(condition =>
+                    condition.computedStatus === 'active' &&
+                    condition.endDate &&
+                    condition.endDate >= today &&
+                    condition.endDate <= sevenKey
+                ).length,
+                pendingRequirements: rows.reduce((sum, row) => sum + row.pendingRequirements, 0)
+            }
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/pricing/dealers/:id', requireAnyPermission('can_view_pricing', 'can_view_dealers'), async (req, res) => {
+    try {
+        const dealer = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) })
+            .select('_id dealer_id name city region_sector price_type responsible')
+            .lean();
+        if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
+
+        const conditions = await PricingCondition.find({})
+            .populate('dealer', '_id dealer_id name city region_sector price_type responsible')
+            .sort({ createdAt: -1 })
+            .lean();
+        res.json(buildDealerPricingSummary(dealer, conditions));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/pricing/conditions', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const payload = cleanPricingPayload(req.body);
+        const validation = validatePricingPayload(payload);
+        if (validation) return res.status(400).json({ error: validation });
+
+        if (!isGlobalViewer(req) && payload.scopeType !== 'dealer') {
+            return res.status(403).json({ error: 'Региональные и общие ценовые условия может создавать только пользователь с доступом ко всей компании' });
+        }
+        if (payload.scopeType === 'dealer') {
+            const dealer = await Dealer.findOne({ _id: payload.dealer, ...getDealerFilter(req) }).select('_id').lean();
+            if (!dealer) return res.status(404).json({ error: 'Дилер недоступен' });
+        }
+
+        const user = pricingUserMeta(req);
+        const condition = await PricingCondition.create({
+            ...payload,
+            createdBy: user,
+            updatedBy: user,
+            audit: [{ action: 'created', userId: user.id, userName: user.name, note: 'Условие создано' }]
+        });
+        const populated = await PricingCondition.findById(condition._id).populate('dealer', '_id dealer_id name city region_sector price_type responsible').lean();
+        res.status(201).json({ ...populated, computedStatus: pricingConditionStatus(populated) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.put('/api/pricing/conditions/:id', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const existing = await PricingCondition.findById(req.params.id);
+        if (!existing) return res.status(404).json({ error: 'Ценовое условие не найдено' });
+        if (existing.cancelledAt) return res.status(400).json({ error: 'Отменённое условие нельзя редактировать' });
+
+        const payload = cleanPricingPayload(req.body);
+        const validation = validatePricingPayload(payload);
+        if (validation) return res.status(400).json({ error: validation });
+
+        if (!isGlobalViewer(req) && payload.scopeType !== 'dealer') {
+            return res.status(403).json({ error: 'Региональные и общие ценовые условия может менять только пользователь с доступом ко всей компании' });
+        }
+        if (payload.scopeType === 'dealer') {
+            const dealer = await Dealer.findOne({ _id: payload.dealer, ...getDealerFilter(req) }).select('_id').lean();
+            if (!dealer) return res.status(404).json({ error: 'Дилер недоступен' });
+        }
+
+        const user = pricingUserMeta(req);
+        Object.assign(existing, payload, { updatedBy: user });
+        existing.audit.push({ action: 'updated', userId: user.id, userName: user.name, note: String(req.body.auditNote || 'Условие изменено').trim() });
+        await existing.save();
+
+        const populated = await PricingCondition.findById(existing._id).populate('dealer', '_id dealer_id name city region_sector price_type responsible').lean();
+        res.json({ ...populated, computedStatus: pricingConditionStatus(populated) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.delete('/api/pricing/conditions/:id', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const condition = await PricingCondition.findById(req.params.id);
+        if (!condition) return res.status(404).json({ error: 'Ценовое условие не найдено' });
+        if (condition.cancelledAt) return res.status(400).json({ error: 'Условие уже отменено' });
+
+        const user = pricingUserMeta(req);
+        condition.cancelledAt = new Date();
+        condition.updatedBy = user;
+        condition.audit.push({
+            action: 'cancelled',
+            userId: user.id,
+            userName: user.name,
+            note: String(req.body?.reason || 'Условие отменено').trim()
+        });
+        await condition.save();
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
 app.get('/api/products/count', requireAnyPermission('can_view_products', 'can_view_report', 'can_view_reclamations', 'can_view_dealers'), async (req, res) => {
     try {
         const count = await Product.countDocuments({});
