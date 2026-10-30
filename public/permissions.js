@@ -36,6 +36,7 @@
         '/knowledge.html': 'can_view_knowledge',
         '/reclamations.html': 'can_view_reclamations',
         '/workshop.html': 'can_view_workshop',
+        '/pricing.html': 'can_view_pricing',
         '/dealer.html': 'can_view_dealers',
         '/users.html': 'can_manage_users'
     };
@@ -50,6 +51,7 @@
         '/knowledge.html': 'can_view_knowledge',
         '/reclamations.html': 'can_view_reclamations',
         '/workshop.html': 'can_view_workshop',
+        '/pricing.html': 'can_view_pricing',
         '/users.html': 'can_manage_users'
     };
 
@@ -63,6 +65,7 @@
         { path: '/knowledge.html', label: 'Статьи', permission: 'can_view_knowledge', icon: 'journal-text' },
         { path: '/reclamations.html', label: 'Рекламации', permission: 'can_view_reclamations', icon: 'shield-exclamation' },
         { path: '/workshop.html', label: 'Цех', permission: 'can_view_workshop', icon: 'tools' },
+        { path: '/pricing.html', label: 'Цены', permission: 'can_view_pricing', icon: 'percent' },
         { path: '/users.html', label: 'Сотрудники', permission: 'can_manage_users', icon: 'people' }
     ];
 
