@@ -28,6 +28,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('ru-RU', { day:'2-digit', month:'2-digit', year:'2-digit' });
     };
     const todayValue = () => new Date().toISOString().slice(0,10);
+    const dateInputValue = value => {
+        const d = value ? new Date(value) : null;
+        return d && !Number.isNaN(d.getTime()) ? d.toISOString().slice(0,10) : todayValue();
+    };
     const toast = (message, type = 'success') => window.showToast ? window.showToast(message, type) : alert(message);
 
     function idOf(value) {
@@ -411,7 +415,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function resetMemo() {
+        editingMemoId = '';
         $('ws-memo-form')?.reset();
+        if ($('ws-memo-title')) $('ws-memo-title').textContent = 'Новая служебная записка';
         $('ws-memo-date').value = todayValue();
         const currentUser = window.CRMAuth?.user || {};
         $('ws-memo-signed').value = currentUser.fullName || currentUser.name || currentUser.username || '';
@@ -695,7 +701,43 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    $('ws-memo-form')?.addEventListener('submit', async event => {
+    function openMemoEdit(memoId) {
+        if (!canManageWorkshop()) return;
+        const memo = memoById(memoId);
+        if (!memo || memo.status === 'accepted' || memo.postedAt) {
+            return toast('Эту служебную записку уже нельзя редактировать', 'warning');
+        }
+        resetMemo();
+        editingMemoId = memoId;
+        if ($('ws-memo-title')) $('ws-memo-title').textContent = `Редактирование служебной №${memo.number}`;
+        $('ws-memo-number').value = memo.number || '';
+        $('ws-memo-date').value = dateInputValue(memo.date);
+        $('ws-memo-signed').value = memo.signedBy || memo.createdBy?.name || '';
+        $('ws-memo-note').value = memo.note || '';
+        memoDraft.clear();
+        (memo.lines || []).forEach(line => {
+            memoDraft.set(idOf(line.product), {
+                recipeId: idOf(line.recipe),
+                packs: Math.max(1, Math.floor(n(line.requestedPacks)))
+            });
+        });
+        memoFilter = 'selected';
+        document.querySelectorAll('[data-memo-filter]').forEach(button => {
+            button.classList.toggle('active', button.dataset.memoFilter === memoFilter);
+        });
+        renderMemoProductPicker();
+        bootstrap.Modal.getOrCreateInstance($('ws-memo-modal')).show();
+    }
+
+    async function deleteWorkshopMemo(memoId) {
+        if (!isWorkshopAdmin()) return;
+        const memo = memoById(memoId);
+        if (!memo) return;
+        if (!window.confirm(`Удалить служебную №${memo.number}? Это доступно только администратору.`)) return;
+        await send(API + '/memos/' + encodeURIComponent(memoId), 'DELETE', {}, 'Служебная записка удалена');
+    }
+
+        $('ws-memo-form')?.addEventListener('submit', async event => {
         event.preventDefault();
         const lines = [];
         let invalid = false;
@@ -717,13 +759,20 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!lines.length) return toast('Отметьте хотя бы одну позицию', 'warning');
         if (invalid) return toast('Проверьте выбранные позиции и количество упаковок', 'warning');
 
-        await post(API + '/memos', {
+        const payload = {
             number: $('ws-memo-number').value,
             date: $('ws-memo-date').value,
             signedBy: $('ws-memo-signed').value,
             note: $('ws-memo-note').value,
             lines
-        }, 'Служебная записка создана', 'memo');
+        };
+        await send(
+            editingMemoId ? API + '/memos/' + encodeURIComponent(editingMemoId) : API + '/memos',
+            editingMemoId ? 'PUT' : 'POST',
+            payload,
+            editingMemoId ? 'Служебная записка обновлена' : 'Служебная записка создана',
+            'memo'
+        );
     });
 
     function openQuickNorm(productId) {
@@ -1114,16 +1163,63 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 'Движение материала проведено', 'material');
     });
 
-    $('ws-new-material-form')?.addEventListener('submit', async event => {
+    function resetNewMaterial() {
+        $('ws-new-material-form')?.reset();
+        $('ws-new-material-id').value = '';
+        if ($('ws-new-material-title')) $('ws-new-material-title').textContent = 'Новый материал';
+        if ($('ws-new-material-save')) $('ws-new-material-save').textContent = 'Добавить';
+        $('ws-new-material-unit').value = 'шт';
+        $('ws-new-material-purchase-unit').value = 'шт';
+        $('ws-new-material-purchase-size').value = 1;
+        $('ws-new-material-stock').value = 0;
+        $('ws-new-material-stock').disabled = false;
+        $('ws-new-material-min').value = 0;
+    }
+
+    function openMaterialEdit(materialId) {
+        if (!canManageWorkshop()) return;
+        const item = materialById(materialId);
+        if (!item) return;
+        resetNewMaterial();
+        $('ws-new-material-id').value = materialId;
+        if ($('ws-new-material-title')) $('ws-new-material-title').textContent = 'Редактирование материала';
+        if ($('ws-new-material-save')) $('ws-new-material-save').textContent = 'Сохранить';
+        $('ws-new-material-code').value = item.code || '';
+        $('ws-new-material-name').value = item.name || '';
+        $('ws-new-material-category').value = item.category || 'consumable';
+        $('ws-new-material-unit').value = item.unit || 'шт';
+        $('ws-new-material-purchase-unit').value = item.purchaseUnit || item.unit || 'шт';
+        $('ws-new-material-purchase-size').value = n(item.purchaseUnitSize) || 1;
+        $('ws-new-material-stock').value = n(item.stockQty);
+        $('ws-new-material-stock').disabled = true;
+        $('ws-new-material-min').value = n(item.minQty);
+        $('ws-new-material-note').value = item.note || '';
+        bootstrap.Modal.getOrCreateInstance($('ws-new-material-modal')).show();
+    }
+
+    async function deleteWorkshopMaterial(materialId) {
+        if (!isWorkshopAdmin()) return;
+        const item = materialById(materialId);
+        if (!item) return;
+        if (!window.confirm(`Удалить материал «${item.name}»? Если он уже использовался, система не даст удалить его.`)) return;
+        await send(API + '/materials/' + encodeURIComponent(materialId), 'DELETE', {}, 'Материал удалён');
+    }
+
+        $('ws-new-material-form')?.addEventListener('submit', async event => {
         event.preventDefault();
-        await post(API+'/materials', {
-            code:$('ws-new-material-code').value, name:$('ws-new-material-name').value, category:$('ws-new-material-category').value,
+        const id = $('ws-new-material-id').value;
+        const payload = {
+            code:$('ws-new-material-code').value,
+            name:$('ws-new-material-name').value,
+            category:$('ws-new-material-category').value,
             unit:$('ws-new-material-unit').value,
             purchaseUnit:$('ws-new-material-purchase-unit').value,
             purchaseUnitSize:n($('ws-new-material-purchase-size').value),
-            stockQty:n($('ws-new-material-stock').value), minQty:n($('ws-new-material-min').value),
+            minQty:n($('ws-new-material-min').value),
             note:$('ws-new-material-note').value
-        }, 'Материал добавлен', 'new-material');
+        };
+        if (!id) payload.stockQty = n($('ws-new-material-stock').value);
+        await send(id ? API+'/materials/'+encodeURIComponent(id) : API+'/materials', id ? 'PUT' : 'POST', payload, id ? 'Материал обновлён' : 'Материал добавлен', 'new-material');
     });
 
     function resetWriteoff(){ $('ws-writeoff-form')?.reset(); $('ws-writeoff-date').value=todayValue(); updateWriteoffItems(); }
@@ -1186,13 +1282,72 @@ document.addEventListener('DOMContentLoaded', () => {
     function openRecipeEdit(id){
         const item=recipeById(id);if(!item)return;resetRecipe();$('ws-recipe-id').value=id;$('ws-recipe-name').value=item.name||'';$('ws-recipe-type').value=item.outputType||'sample';$('ws-recipe-sku').value=item.sku||'';$('ws-recipe-product').value=idOf(item.product);$('ws-recipe-planks').value=n(item.planksPerUnit);$('ws-recipe-min-stock').value=n(item.minStockQty);$('ws-recipe-pack-override').value=n(item.packQtyOverride);$('ws-recipe-side-a').value=item.sideA||'';$('ws-recipe-side-b').value=item.sideB||'';$('ws-recipe-matrix-pos').value=item.matrixPosName||'';$('ws-recipe-note').value=item.note||'';(item.materials||[]).forEach(addBomMaterial);(item.components||[]).forEach(addBomComponent);updateRecipeCalc();bootstrap.Modal.getOrCreateInstance($('ws-recipe-modal')).show();
     }
-    $('ws-recipe-form')?.addEventListener('submit',async event=>{
+    async function deleteWorkshopRecipe(recipeId) {
+        if (!isWorkshopAdmin()) return;
+        const recipe = recipeById(recipeId);
+        if (!recipe) return;
+        if (!window.confirm(`Удалить рецептуру «${recipe.name}»? Если она уже участвовала в учёте, система сохранит её и покажет причину.`)) return;
+        await send(API + '/recipes/' + encodeURIComponent(recipeId), 'DELETE', {}, 'Рецептура удалена');
+    }
+
+        $('ws-recipe-form')?.addEventListener('submit',async event=>{
         event.preventDefault();const id=$('ws-recipe-id').value;const materials=collectBom('#ws-bom-materials .ws-bom-row','.ws-bom-material-id').map(x=>({materialId:x.id,qty:x.qty,mode:x.mode}));const components=collectBom('#ws-bom-components .ws-bom-row','.ws-bom-component-id').map(x=>({recipeId:x.id,qty:x.qty}));
         const payload={name:$('ws-recipe-name').value,outputType:$('ws-recipe-type').value,sku:$('ws-recipe-sku').value,productId:$('ws-recipe-product').value||null,planksPerUnit:n($('ws-recipe-planks').value),minStockQty:n($('ws-recipe-min-stock').value),packQtyOverride:n($('ws-recipe-pack-override').value),sideA:$('ws-recipe-side-a').value,sideB:$('ws-recipe-side-b').value,matrixPosName:$('ws-recipe-matrix-pos').value,note:$('ws-recipe-note').value,materials,components};
         await send(id?API+'/recipes/'+id:API+'/recipes',id?'PUT':'POST',payload,'Рецептура сохранена','recipe');
     });
 
-    function buildStocktake(){
+    function openProductionEdit(productionId) {
+        if (!canManageWorkshop()) return;
+        const item = state.productions.find(row => idOf(row) === String(productionId));
+        if (!item) return;
+        $('ws-production-edit-id').value = productionId;
+        $('ws-production-edit-title').textContent = item.recipe?.name || 'Производство';
+        $('ws-production-edit-date').value = dateInputValue(item.date);
+        $('ws-production-edit-order').value = item.customOrderName || '';
+        $('ws-production-edit-dimensions').value = item.customDimensions || '';
+        $('ws-production-edit-reason').value = item.customNormReason || '';
+        $('ws-production-edit-note').value = item.note || '';
+
+        const opMap = new Map((item.operations || []).map(op => [op.type, op]));
+        document.querySelectorAll('#ws-production-edit-operations label').forEach(label => {
+            const check = label.querySelector('.ws-production-edit-op');
+            const qty = label.querySelector('.ws-production-edit-op-qty');
+            const current = opMap.get(check?.value);
+            if (check) check.checked = Boolean(current);
+            if (qty) qty.value = current?.qty || '';
+        });
+        bootstrap.Modal.getOrCreateInstance($('ws-production-edit-modal')).show();
+    }
+
+    $('ws-production-edit-form')?.addEventListener('submit', async event => {
+        event.preventDefault();
+        const id = $('ws-production-edit-id').value;
+        const operations = [...document.querySelectorAll('#ws-production-edit-operations label')].map(label => {
+            const check = label.querySelector('.ws-production-edit-op');
+            const qty = label.querySelector('.ws-production-edit-op-qty');
+            return check?.checked ? { type: check.value, qty: n(qty?.value) } : null;
+        }).filter(Boolean);
+        await send(API + '/productions/' + encodeURIComponent(id), 'PUT', {
+            date: $('ws-production-edit-date').value,
+            customOrderName: $('ws-production-edit-order').value,
+            customDimensions: $('ws-production-edit-dimensions').value,
+            customNormReason: $('ws-production-edit-reason').value,
+            note: $('ws-production-edit-note').value,
+            operations
+        }, 'Запись производства обновлена', 'production-edit');
+    });
+
+    async function cancelProduction(productionId) {
+        if (!isWorkshopAdmin()) return;
+        const item = state.productions.find(row => idOf(row) === String(productionId));
+        if (!item) return;
+        if (!window.confirm(`Отменить запись «${item.recipe?.name || 'Производство'}» на ${fmt(item.outputQty)} шт? Остатки будут пересчитаны обратно.`)) return;
+        await send(API + '/productions/' + encodeURIComponent(productionId), 'DELETE', {
+            reason: 'Отмена записи администратором'
+        }, 'Производство отменено, остатки восстановлены');
+    }
+
+        function buildStocktake(){
         const host=$('ws-stocktake-lines');host.innerHTML='';
         state.laminateStocks.forEach(stock=>addStocktakeRow(host,'laminate',idOf(stock.product),`${stock.product?.sku||'—'} · ${stock.product?.name||''}`,n(stock.planksQty),'планок'));
         state.materials.forEach(item=>addStocktakeRow(host,'material',idOf(item),item.name,n(item.stockQty),item.unit||'шт'));
