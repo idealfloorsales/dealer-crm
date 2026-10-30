@@ -168,7 +168,7 @@
     <!-- Service memo modal -->
     <div class="modal fade" id="ws-memo-modal" tabindex="-1" data-bs-backdrop="static">
         <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered"><div class="modal-content workshop-modal">
-            <div class="modal-header"><div><small>СПИСАНИЕ СО СКЛАДА</small><h5>Новая служебная записка</h5></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header"><div><small>СПИСАНИЕ СО СКЛАДА</small><h5 id="ws-memo-title">Новая служебная записка</h5></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <form id="ws-memo-form"><div class="modal-body">
                 <div class="workshop-form-grid">
                     <label><span>№ служебной записки</span><input id="ws-memo-number" class="form-control" placeholder="Например: ЦЕХ-102" required></label>
@@ -269,6 +269,36 @@
         </div></div>
     </div>
 
+    <!-- Production details edit -->
+    <div class="modal fade" id="ws-production-edit-modal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered"><div class="modal-content workshop-modal">
+            <div class="modal-header"><div><small>КОРРЕКТИРОВКА ЗАПИСИ</small><h5 id="ws-production-edit-title">Производство</h5></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <form id="ws-production-edit-form">
+                <input type="hidden" id="ws-production-edit-id">
+                <div class="modal-body">
+                    <div class="workshop-document-note"><i class="bi bi-shield-check"></i><span>Можно менять дату, описание и выполненные работы. Количество изготовленных изделий и списание сырья не редактируются напрямую — администратор может отменить запись и создать её заново.</span></div>
+                    <div class="workshop-form-grid mt-3">
+                        <label><span>Дата</span><input id="ws-production-edit-date" type="date" class="form-control"></label>
+                        <label><span>Для кого / проект</span><input id="ws-production-edit-order" class="form-control"></label>
+                        <label><span>Размер / описание</span><input id="ws-production-edit-dimensions" class="form-control"></label>
+                        <label><span>Причина отклонения</span><input id="ws-production-edit-reason" class="form-control"></label>
+                    </div>
+                    <div class="workshop-operation-box">
+                        <strong>Выполненные работы</strong>
+                        <div class="workshop-operation-grid" id="ws-production-edit-operations">
+                            <label><input type="checkbox" value="Склейка" class="ws-production-edit-op"> <span>Склейка</span><input type="number" min="0" class="ws-production-edit-op-qty form-control" placeholder="шт"></label>
+                            <label><input type="checkbox" value="Распил" class="ws-production-edit-op"> <span>Распил</span><input type="number" min="0" class="ws-production-edit-op-qty form-control" placeholder="шт"></label>
+                            <label><input type="checkbox" value="Кромление" class="ws-production-edit-op"> <span>Кромление</span><input type="number" min="0" class="ws-production-edit-op-qty form-control" placeholder="шт"></label>
+                            <label><input type="checkbox" value="Сборка стенда" class="ws-production-edit-op"> <span>Сборка стенда</span><input type="number" min="0" class="ws-production-edit-op-qty form-control" placeholder="шт"></label>
+                        </div>
+                    </div>
+                    <label class="workshop-note-label"><span>Комментарий</span><textarea id="ws-production-edit-note" class="form-control" rows="3"></textarea></label>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button><button class="btn btn-dark" type="submit">Сохранить изменения</button></div>
+            </form>
+        </div></div>
+    </div>
+
     <!-- Dealer movement -->
     <div class="modal fade" id="ws-dealer-modal" tabindex="-1" data-bs-backdrop="static">
         <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered"><div class="modal-content workshop-modal">
@@ -339,8 +369,8 @@
     <!-- Material create -->
     <div class="modal fade" id="ws-new-material-modal" tabindex="-1" data-bs-backdrop="static">
         <div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content workshop-modal">
-            <div class="modal-header"><div><small>СПРАВОЧНИК</small><h5>Новый материал</h5></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-            <form id="ws-new-material-form"><div class="modal-body"><div class="workshop-form-grid">
+            <div class="modal-header"><div><small>СПРАВОЧНИК</small><h5 id="ws-new-material-title">Новый материал</h5></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <form id="ws-new-material-form"><input type="hidden" id="ws-new-material-id"><div class="modal-body"><div class="workshop-form-grid">
                 <label><span>Код</span><input id="ws-new-material-code" class="form-control"></label>
                 <label class="wide"><span>Название</span><input id="ws-new-material-name" class="form-control" required></label>
                 <label><span>Категория</span><select id="ws-new-material-category" class="form-select"><option value="consumable">Расходник</option><option value="stand_component">Деталь стенда</option><option value="tool">Инструмент</option><option value="other">Другое</option></select></label>
@@ -350,7 +380,7 @@
                 <label><span>Начальный остаток</span><input id="ws-new-material-stock" type="number" min="0" step="0.001" class="form-control" value="0"></label>
                 <label><span>Минимальный остаток</span><input id="ws-new-material-min" type="number" min="0" step="0.001" class="form-control" value="0"></label>
                 <label class="wide"><span>Комментарий</span><input id="ws-new-material-note" class="form-control"></label>
-            </div></div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button><button class="btn btn-dark" type="submit">Добавить</button></div></form>
+            </div></div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button><button class="btn btn-dark" id="ws-new-material-save" type="submit">Добавить</button></div></form>
         </div></div>
     </div>
 
