@@ -13,6 +13,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const productsStatsContainer = document.getElementById('dealer-products-stats');
     const salesHistoryContainer = document.getElementById('dealer-sales-history');
     const workshopAssetsContainer = document.getElementById('dealer-workshop-assets');
+    const dealerPricingSummary = document.getElementById('dealer-pricing-summary');
+    const dealerPricingManageLink = document.getElementById('dealer-pricing-manage-link');
     
     const dealerNameEl = document.getElementById('dealer-name');
     const dealerIdEl = document.getElementById('dealer-id-subtitle');
@@ -276,6 +278,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     const salesTab = document.querySelector('[data-bs-target="#sales-pane"]');
                     if (salesTab) salesTab.closest('.nav-item')?.remove();
                 }
+                if (!can('can_view_pricing')) {
+                    const pricingTab = document.querySelector('[data-bs-target="#pricing-pane"]');
+                    if (pricingTab) pricingTab.closest('.nav-item')?.remove();
+                    document.getElementById('pricing-pane')?.remove();
+                } else if (dealerPricingManageLink) {
+                    dealerPricingManageLink.href = `/pricing.html?dealer=${encodeURIComponent(dealerId)}`;
+                    if (!can('can_manage_pricing')) dealerPricingManageLink.style.display = 'none';
+                }
             } catch(e) { console.warn('Auth check skipped'); }
 
             const dealerPromise = loadDealerProfile(force);
@@ -372,6 +382,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderDealerContacts(dealer.contacts || []);
             renderDealerCompetitors(dealer.competitors || []);
             loadDealerWorkshopAssets();
+            loadDealerPricing();
             if (!photosLoaded && photoGalleryContainer) {
                 photoGalleryContainer.innerHTML = '<div class="dealer-lazy-state"><i class="bi bi-images"></i><span>Фото загрузятся при открытии вкладки</span></div>';
             }
@@ -530,7 +541,66 @@ document.addEventListener('DOMContentLoaded', () => {
     window.openLightbox = function(index) { const modalEl = document.getElementById('imageModal'); const carouselEl = document.querySelector('#photoCarousel'); if (modalEl && carouselEl && carouselInner) { carouselInner.innerHTML = galleryCarouselContent; const myModal = new bootstrap.Modal(modalEl); const carousel = new bootstrap.Carousel(carouselEl); carousel.to(index); myModal.show(); } }
     function openAvatarModal(url) { const modalEl = document.getElementById('imageModal'); if (modalEl && carouselInner) { carouselInner.innerHTML = `<div class="carousel-item active" style="height: 100%;"><div class="d-flex justify-content-center align-items-center h-100"><img src="${url}" style="max-height: 100%; max-width: 100%; object-fit: contain;"></div></div>`; const myModal = new bootstrap.Modal(modalEl); myModal.show(); } }
 
-    async function loadDealerWorkshopAssets() {
+    async function loadDealerPricing() {
+        if (!dealerPricingSummary || !can('can_view_pricing')) return;
+        try {
+            const response = await fetch(`/api/pricing/dealers/${dealerId}`, { crmTrackLoading: false });
+            if (!response.ok) throw new Error('pricing');
+            const pricing = await response.json();
+            const discounts = Array.isArray(pricing.activeDiscounts) ? pricing.activeDiscounts : [];
+            const matched = Array.isArray(pricing.matchedConditions) ? pricing.matchedConditions : [];
+            const active = matched.filter(item => item.computedStatus === 'active');
+            const pending = active.filter(item => Number(item.requirementTarget) > 0 && (Number(item.requirementCurrent) < Number(item.requirementTarget) || item.requirementVerified !== true));
+
+            const discountBadges = discounts.length
+                ? discounts.map(item => `<span class="dealer-price-chip is-discount">−${Number(item.discountPercent || 0).toLocaleString('ru-RU',{maximumFractionDigits:2})}% · ${safeText(item.name)}</span>`).join('')
+                : '<span class="dealer-price-chip">Дополнительных скидок нет</span>';
+
+            const conditionsHtml = active.length
+                ? active.map(item => {
+                    const isDiscount = item.kind === 'discount';
+                    const title = isDiscount
+                        ? `−${Number(item.discountPercent || 0).toLocaleString('ru-RU',{maximumFractionDigits:2})}% · ${safeText(item.name)}`
+                        : safeText(item.priceListName || item.name);
+                    const dates = `${item.startDate ? new Date(item.startDate+'T00:00:00').toLocaleDateString('ru-RU') : 'сразу'} — ${item.endDate ? new Date(item.endDate+'T00:00:00').toLocaleDateString('ru-RU') : 'без срока'}`;
+                    const req = Number(item.requirementTarget) > 0
+                        ? `<small class="dealer-price-requirement ${Number(item.requirementCurrent)>=Number(item.requirementTarget) && item.requirementVerified ? 'is-ok':''}">
+                            <i class="bi bi-instagram"></i> ${Number(item.requirementCurrent)||0}/${Number(item.requirementTarget)||0} ${safeText(item.requirementUnit || 'публикаций')}${item.requirementVerified ? ' · подтверждено' : ''}
+                          </small>`
+                        : '';
+                    return `<article class="dealer-price-condition">
+                        <div><strong>${title}</strong><small>${dates}</small>${req}</div>
+                        <span class="dealer-price-kind">${isDiscount ? 'скидка' : 'прайс'}</span>
+                    </article>`;
+                }).join('')
+                : '<div class="dealer-price-empty"><i class="bi bi-check2-circle"></i><span>Активных специальных условий нет</span></div>';
+
+            dealerPricingSummary.innerHTML = `
+                <div class="dealer-price-overview">
+                    <div class="dealer-price-metric">
+                        <small>Базовый прайс</small>
+                        <strong>${safeText(pricing.effectivePriceList || pricing.defaultPriceType || 'Оптовая цена')}</strong>
+                        <span>${pricing.priceListCondition ? 'специальный / региональный' : 'из карточки дилера'}</span>
+                    </div>
+                    <div class="dealer-price-metric is-accent">
+                        <small>Итоговая скидка</small>
+                        <strong>${pricing.totalDiscountPercent ? '−'+Number(pricing.totalDiscountPercent).toLocaleString('ru-RU',{maximumFractionDigits:2})+'%' : '0%'}</strong>
+                        <span>${discounts.length ? 'сумма активных условий' : 'без дополнительной скидки'}</span>
+                    </div>
+                    <div class="dealer-price-metric">
+                        <small>Ближайший срок</small>
+                        <strong>${pricing.nearestEndDate ? new Date(pricing.nearestEndDate+'T00:00:00').toLocaleDateString('ru-RU') : 'Без срока'}</strong>
+                        <span>${pending.length ? 'есть незакрытые обязательства' : 'обязательства в порядке'}</span>
+                    </div>
+                </div>
+                <div class="dealer-price-chips">${discountBadges}</div>
+                <div class="dealer-price-conditions">${conditionsHtml}</div>`;
+        } catch (e) {
+            dealerPricingSummary.innerHTML = '<div class="dealer-price-empty is-error"><i class="bi bi-exclamation-circle"></i><span>Не удалось загрузить ценовые условия</span></div>';
+        }
+    }
+
+        async function loadDealerWorkshopAssets() {
         if (!workshopAssetsContainer) return;
         try {
             const response = await fetch(`/api/workshop/dealers/${dealerId}/assets`, { crmTrackLoading: false });
