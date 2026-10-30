@@ -2133,6 +2133,31 @@ app.post('/api/workshop/production', requirePermission('can_manage_workshop'), a
     }
 });
 
+app.put('/api/workshop/productions/:id', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const production = await WorkshopProduction.findById(req.params.id);
+        if (!production) return res.status(404).json({ error: 'Запись производства не найдена' });
+        if (production.cancelledAt) return res.status(400).json({ error: 'Отменённую запись нельзя редактировать' });
+
+        production.date = req.body.date || production.date;
+        production.note = String(req.body.note ?? production.note ?? '').trim();
+        production.customOrderName = String(req.body.customOrderName ?? production.customOrderName ?? '').trim();
+        production.customDimensions = String(req.body.customDimensions ?? production.customDimensions ?? '').trim();
+        production.customNormReason = String(req.body.customNormReason ?? production.customNormReason ?? '').trim();
+        if (Array.isArray(req.body.operations)) {
+            production.operations = req.body.operations.map(item => ({
+                type: String(item.type || '').trim(),
+                qty: Math.max(0, workshopNumber(item.qty)),
+                note: String(item.note || '').trim()
+            })).filter(item => item.type);
+        }
+        await production.save();
+        res.json(convertToClient(production));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
 app.delete('/api/workshop/productions/:id', requireIsAdmin, async (req, res) => {
     try {
         const production = await WorkshopProduction.findById(req.params.id)
