@@ -6,6 +6,14 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     const memoDraft = new Map();
     let memoFilter = 'all';
+    let editingMemoId = '';
+
+    function canManageWorkshop() {
+        return Boolean(window.CRMAuth?.can?.('can_manage_workshop'));
+    }
+    function isWorkshopAdmin() {
+        return Boolean(window.CRMAuth?.user?.permissions?.is_admin);
+    }
 
     const $ = id => document.getElementById(id);
     const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[ch]));
@@ -56,7 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalIds = {
         memo:'ws-memo-modal', receipt:'ws-receipt-modal', production:'ws-production-modal', dealer:'ws-dealer-modal',
         material:'ws-material-modal', writeoff:'ws-writeoff-modal', recipe:'ws-recipe-modal',
-        stocktake:'ws-stocktake-modal', 'new-material':'ws-new-material-modal'
+        stocktake:'ws-stocktake-modal', 'new-material':'ws-new-material-modal', 'production-edit':'ws-production-edit-modal'
     };
     function showModal(name) {
         const el = $(modalIds[name]);
@@ -69,7 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (name === 'writeoff') resetWriteoff();
         if (name === 'recipe') resetRecipe();
         if (name === 'stocktake') buildStocktake();
-        if (name === 'new-material') $('ws-new-material-form')?.reset();
+        if (name === 'new-material') resetNewMaterial();
         bootstrap.Modal.getOrCreateInstance(el).show();
     }
     function hideModal(name) {
@@ -161,13 +169,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="workshop-memo-card-lines">${lines}</div>
                 <div class="workshop-memo-card-foot">
                     <small>${(memo.lines || []).length} поз. · ${(memo.lines || []).reduce((sum,line)=>sum+n(line.requestedPacks),0)} уп. · ${(memo.lines || []).reduce((sum,line)=>sum+n(line.plannedOutputQty),0)} изделий</small>
-                    ${actionable ? `<button type="button" class="workshop-link-btn" data-receive-memo="${idOf(memo)}"><i class="bi bi-check2-square"></i>${memo.status === 'mismatch' ? 'Повторно сверить' : 'Сверить приход'}</button>` : '<span class="text-success small fw-bold"><i class="bi bi-check-circle me-1"></i>Оприходовано</span>'}
+                    <div class="workshop-card-actions">
+                        ${actionable && canManageWorkshop() ? `<button type="button" class="workshop-icon-action" data-edit-memo="${idOf(memo)}" title="Редактировать"><i class="bi bi-pencil"></i></button>` : ''}
+                        ${actionable && isWorkshopAdmin() ? `<button type="button" class="workshop-icon-action is-danger" data-delete-memo="${idOf(memo)}" title="Удалить"><i class="bi bi-trash3"></i></button>` : ''}
+                        ${actionable ? `<button type="button" class="workshop-link-btn" data-receive-memo="${idOf(memo)}"><i class="bi bi-check2-square"></i>${memo.status === 'mismatch' ? 'Повторно сверить' : 'Сверить приход'}</button>` : '<span class="text-success small fw-bold"><i class="bi bi-check-circle me-1"></i>Оприходовано</span>'}
+                    </div>
                 </div>
             </article>`;
         }).join('');
 
         host.querySelectorAll('[data-receive-memo]').forEach(button => {
             button.addEventListener('click', () => openReceiptForMemo(button.dataset.receiveMemo));
+        });
+        host.querySelectorAll('[data-edit-memo]').forEach(button => {
+            button.addEventListener('click', () => openMemoEdit(button.dataset.editMemo));
+        });
+        host.querySelectorAll('[data-delete-memo]').forEach(button => {
+            button.addEventListener('click', () => deleteWorkshopMemo(button.dataset.deleteMemo));
         });
     }
 
@@ -182,10 +200,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const ops = (item.operations || []).map(op => op.type).filter(Boolean).join(', ');
             return `<div class="workshop-feed-item">
                 <span class="icon"><i class="bi bi-tools"></i></span>
-                <div><strong>${esc(item.recipe?.name || 'Изделие')}</strong><small>${dateText(item.date)}${ops ? ' · '+esc(ops) : ''}${item.scrapPlanks ? ' · отход '+fmt(item.scrapPlanks)+' пл.' : ''}</small></div>
-                <b>+${fmt(item.outputQty)} шт</b>
+                <div><strong>${esc(item.recipe?.name || 'Изделие')}</strong><small>${dateText(item.date)}${ops ? ' · '+esc(ops) : ''}${item.scrapPlanks ? ' · отход '+fmt(item.scrapPlanks)+' пл.' : ''}${item.customOrderName ? ' · '+esc(item.customOrderName) : ''}</small></div>
+                <div class="workshop-feed-actions"><b>+${fmt(item.outputQty)} шт</b>
+                    ${canManageWorkshop() ? `<button type="button" class="workshop-icon-action" data-edit-production="${idOf(item)}" title="Редактировать детали"><i class="bi bi-pencil"></i></button>` : ''}
+                    ${isWorkshopAdmin() ? `<button type="button" class="workshop-icon-action is-danger" data-delete-production="${idOf(item)}" title="Отменить запись"><i class="bi bi-trash3"></i></button>` : ''}
+                </div>
             </div>`;
         }).join('');
+        host.querySelectorAll('[data-edit-production]').forEach(button => {
+            button.addEventListener('click', () => openProductionEdit(button.dataset.editProduction));
+        });
+        host.querySelectorAll('[data-delete-production]').forEach(button => {
+            button.addEventListener('click', () => cancelProduction(button.dataset.deleteProduction));
+        });
     }
 
     function renderAttention() {
@@ -257,8 +284,20 @@ document.addEventListener('DOMContentLoaded', () => {
             const purchase = item.purchaseUnit && item.purchaseUnitSize
                 ? ` · закупка: ${esc(item.purchaseUnit)}${n(item.purchaseUnitSize)!==1 ? ' = '+fmt(item.purchaseUnitSize,2)+' '+esc(item.unit||'') : ''}`
                 : '';
-            return `<div class="workshop-stock-card ${low?'is-low':''}"><div><strong>${esc(item.name)}</strong><small>${esc(item.code || item.category || '')}${purchase}${low ? ' · минимум '+fmt(item.minQty,2):''}</small></div><b>${fmt(item.stockQty,2)} ${esc(item.unit || 'шт')}</b></div>`;
+            return `<div class="workshop-stock-card ${low?'is-low':''}">
+                <div><strong>${esc(item.name)}</strong><small>${esc(item.code || item.category || '')}${purchase}${low ? ' · минимум '+fmt(item.minQty,2):''}</small></div>
+                <div class="workshop-stock-actions"><b>${fmt(item.stockQty,2)} ${esc(item.unit || 'шт')}</b>
+                    ${canManageWorkshop() ? `<button type="button" class="workshop-icon-action" data-edit-material="${idOf(item)}" title="Редактировать"><i class="bi bi-pencil"></i></button>` : ''}
+                    ${isWorkshopAdmin() ? `<button type="button" class="workshop-icon-action is-danger" data-delete-material="${idOf(item)}" title="Удалить"><i class="bi bi-trash3"></i></button>` : ''}
+                </div>
+            </div>`;
         }).join('') : '<div class="workshop-empty">Материалы не найдены</div>';
+        $('ws-material-stock')?.querySelectorAll('[data-edit-material]').forEach(button => {
+            button.addEventListener('click', () => openMaterialEdit(button.dataset.editMaterial));
+        });
+        $('ws-material-stock')?.querySelectorAll('[data-delete-material]').forEach(button => {
+            button.addEventListener('click', () => deleteWorkshopMaterial(button.dataset.deleteMaterial));
+        });
     }
 
     function renderDealerAssets() {
@@ -292,13 +331,24 @@ document.addEventListener('DOMContentLoaded', () => {
             const pq = recipePack(item);
             const batch = noWasteBatch(pq, item.planksPerUnit);
             const materialCount = (item.materials || []).length + (item.components || []).length;
-            return `<article class="workshop-recipe-card" data-recipe-edit="${idOf(item)}">
+            return `<article class="workshop-recipe-card">
                 <div class="top"><div><strong>${esc(item.name)}</strong><small>${esc(item.sku || '')}${item.product ? ' · '+esc(item.product.sku || '') : ''}</small></div><span class="ws-liquid ${item.product?.is_liquid === false?'is-old':''}">${item.outputType === 'sample'?'образец':item.outputType === 'stand'?'стенд':esc(item.outputType)}</span></div>
                 <div class="numbers"><span>Планок / шт<b>${fmt(item.planksPerUnit)}</b></span><span>На складе<b>${fmt(item.stockQty)} шт</b></span><span>Минимум<b>${fmt(item.minStockQty || 0)} шт</b></span><span>Компонентов<b>${materialCount}</b></span></div>
                 <small class="mt-2">${batch ? `Безотходно: ${batch.packs} уп. → ${batch.output} шт` : 'Норма ламината не задана'}${item.sideA || item.sideB ? ' · '+esc([item.sideA,item.sideB].filter(Boolean).join(' / ')):''}</small>
+                <div class="workshop-recipe-actions">
+                    ${canManageWorkshop() ? `<button type="button" class="workshop-link-btn" data-recipe-edit="${idOf(item)}"><i class="bi bi-pencil"></i> Изменить</button>` : ''}
+                    ${isWorkshopAdmin() ? `<button type="button" class="workshop-icon-action is-danger" data-delete-recipe="${idOf(item)}" title="Удалить"><i class="bi bi-trash3"></i></button>` : ''}
+                </div>
             </article>`;
         }).join('') : '<div class="workshop-empty"><i class="bi bi-diagram-3"></i>Создайте первую рецептуру</div>';
-        host.querySelectorAll('[data-recipe-edit]').forEach(card => card.addEventListener('click', () => openRecipeEdit(card.dataset.recipeEdit)));
+        host.querySelectorAll('[data-recipe-edit]').forEach(button => button.addEventListener('click', event => {
+            event.stopPropagation();
+            openRecipeEdit(button.dataset.recipeEdit);
+        }));
+        host.querySelectorAll('[data-delete-recipe]').forEach(button => button.addEventListener('click', event => {
+            event.stopPropagation();
+            deleteWorkshopRecipe(button.dataset.deleteRecipe);
+        }));
     }
 
     const movementLabels = {
