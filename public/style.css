@@ -105,6 +105,57 @@ nav a.nav-link.active { background: var(--primary-color) !important; color: whit
     gap: 8px;
     margin-left: auto;
 }
+.crm-connection-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 32px;
+    padding: 0 10px;
+    border: 1px solid rgba(23,24,27,.08);
+    border-radius: 10px;
+    background: #f8f6f3;
+    color: #6c6e74;
+    font: inherit;
+    font-size: .59rem;
+    font-weight: 750;
+    cursor: pointer;
+    transition: background .16s ease,border-color .16s ease,color .16s ease;
+}
+.crm-connection-chip:hover { background:#f3f0ed; }
+.crm-connection-chip[data-state="slow"],
+.crm-topbar-mobile-status[data-state="slow"] {
+    border-color: rgba(184,126,18,.18);
+    background: #fff8e8;
+    color: #8b681d;
+}
+.crm-connection-chip[data-state="unstable"],
+.crm-topbar-mobile-status[data-state="unstable"] {
+    border-color: rgba(194,91,19,.18);
+    background: #fff4e9;
+    color: #98521f;
+}
+.crm-connection-chip[data-state="offline"],
+.crm-topbar-mobile-status[data-state="offline"],
+.crm-connection-chip[data-state="server"],
+.crm-topbar-mobile-status[data-state="server"] {
+    border-color: rgba(185,4,10,.16);
+    background: #fff1f1;
+    color: #a20a10;
+}
+.crm-connection-chip[data-state="checking"],
+.crm-topbar-mobile-status[data-state="checking"] { color:#898b90; }
+.crm-connection-chip[data-state="slow"] .crm-topbar-live-dot,
+.crm-topbar-mobile-status[data-state="slow"] .crm-topbar-live-dot { background:#d29a24; box-shadow:0 0 0 3px rgba(210,154,36,.11); }
+.crm-connection-chip[data-state="unstable"] .crm-topbar-live-dot,
+.crm-topbar-mobile-status[data-state="unstable"] .crm-topbar-live-dot { background:#cf6a21; box-shadow:0 0 0 3px rgba(207,106,33,.11); }
+.crm-connection-chip[data-state="offline"] .crm-topbar-live-dot,
+.crm-topbar-mobile-status[data-state="offline"] .crm-topbar-live-dot,
+.crm-connection-chip[data-state="server"] .crm-topbar-live-dot,
+.crm-topbar-mobile-status[data-state="server"] .crm-topbar-live-dot { background:#b9040a; box-shadow:0 0 0 3px rgba(185,4,10,.10); }
+.crm-connection-chip[data-state="checking"] .crm-topbar-live-dot,
+.crm-topbar-mobile-status[data-state="checking"] .crm-topbar-live-dot { background:#9b9da2; box-shadow:0 0 0 3px rgba(155,157,162,.10); }
+
 .crm-role-badge {
     display: inline-flex;
     align-items: center;
