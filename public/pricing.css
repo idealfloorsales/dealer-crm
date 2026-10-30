@@ -1,0 +1,194 @@
+:root{
+  --pricing-red:#b9040a;
+  --pricing-ink:#292a2e;
+  --pricing-muted:#8d8f95;
+  --pricing-line:#e8e3df;
+  --pricing-soft:#f7f5f2;
+  --pricing-green:#347852;
+  --pricing-amber:#9a6b16;
+}
+html,body.pricing-page{max-width:100%;overflow-x:hidden}
+.pricing-page{font-family:Onest,Inter,sans-serif;background:#f1efec;color:var(--pricing-ink)}
+.pricing-page *{box-sizing:border-box}
+.pricing-shell{width:min(100%,1560px);margin:0 auto;padding:24px 24px 90px}
+.pricing-hero{
+  display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin:6px 0 18px;
+  padding:22px 24px;border:1px solid rgba(30,30,32,.07);border-radius:22px;background:#fff;
+  box-shadow:0 12px 30px rgba(34,31,29,.045)
+}
+.pricing-eyebrow{display:block;margin-bottom:5px;color:var(--pricing-red);font-size:.58rem;font-weight:800;letter-spacing:.12em}
+.pricing-hero h1{margin:0;font-size:2rem;font-weight:800;letter-spacing:-.04em}
+.pricing-hero p{max-width:780px;margin:7px 0 0;color:var(--pricing-muted);font-size:.68rem;line-height:1.55}
+.pricing-primary-action{
+  min-height:42px;padding:0 15px;display:inline-flex;align-items:center;gap:7px;border:0;border-radius:12px;
+  background:linear-gradient(135deg,#242529,#34353a);color:#fff;font-size:.61rem;font-weight:800;
+  box-shadow:0 8px 18px rgba(30,30,33,.12)
+}
+.pricing-kpi-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.pricing-kpi{
+  min-width:0;display:flex;align-items:center;gap:10px;padding:13px 14px;border:1px solid rgba(30,30,32,.07);
+  border-radius:16px;background:#fff;box-shadow:0 7px 20px rgba(35,32,30,.035)
+}
+.pricing-kpi-icon{display:grid;place-items:center;width:38px;height:38px;flex:0 0 38px;border-radius:11px;background:#f3efec;color:#9b3438}
+.pricing-kpi small{display:block;color:#94969b;font-size:.49rem;font-weight:700}
+.pricing-kpi strong{display:inline-block;margin-top:1px;color:#333438;font-size:1rem;font-weight:800}
+.pricing-kpi em{margin-left:4px;color:#a0a2a6;font-size:.45rem;font-style:normal}
+.pricing-kpi.is-accent{border-color:#ead5d6;background:#fffafa}
+.pricing-kpi.is-warning{border-color:#eddfbd;background:#fffcf5}
+.pricing-panel{
+  margin-top:14px;padding:16px;border:1px solid rgba(30,30,32,.07);border-radius:18px;background:#fff;
+  box-shadow:0 8px 24px rgba(35,32,30,.035)
+}
+.pricing-panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:12px}
+.pricing-panel-head>div>span{display:block;color:#999ba0;font-size:.48rem;font-weight:800;letter-spacing:.08em}
+.pricing-panel-head h2{margin:2px 0 0;font-size:.94rem;font-weight:800}
+.pricing-panel-head p{margin:3px 0 0;color:#9a9ca1;font-size:.53rem}
+.pricing-today{padding:6px 9px;border-radius:9px;background:#f5f2ef;color:#77797e;font-size:.52rem;font-weight:700}
+.pricing-status-filter{width:180px;min-height:34px;border-radius:9px;font-size:.55rem}
+.pricing-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.pricing-search{position:relative;flex:1 1 auto;min-width:0}
+.pricing-search i{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:#aaa;font-size:.72rem}
+.pricing-search input{
+  width:100%;height:38px;padding:0 12px 0 34px;border:1px solid #e4dfda;border-radius:10px;background:#faf9f7;
+  color:#3b3c40;font-size:.58rem;outline:0
+}
+.pricing-search input:focus{border-color:#d5c4c0;background:#fff;box-shadow:0 0 0 3px rgba(185,4,10,.045)}
+.pricing-toolbar>.form-select{width:220px;height:38px;border:1px solid #e4dfda;border-radius:10px;font-size:.55rem}
+.pricing-dealer-list{display:flex;flex-direction:column;gap:6px}
+.pricing-dealer-row{
+  display:grid;grid-template-columns:minmax(230px,1.3fr) minmax(160px,.85fr) minmax(170px,.9fr) minmax(240px,1.35fr) 105px 135px 30px;
+  gap:9px;align-items:center;padding:9px 10px;border:1px solid #ebe7e3;border-radius:12px;background:#fff
+}
+.pricing-dealer-row:hover{border-color:#ddd7d1;background:#fdfcfb}
+.pricing-dealer-main strong{display:block;color:#3c3d41;font-size:.61rem}
+.pricing-dealer-main small,.pricing-dealer-meta small{display:block;margin-top:2px;color:#97999e;font-size:.48rem}
+.pricing-dealer-meta strong{display:block;color:#606267;font-size:.54rem;font-weight:700}
+.pricing-price-base strong{display:block;color:#3e4044;font-size:.56rem}
+.pricing-price-base small{display:block;margin-top:2px;color:#999ba0;font-size:.47rem}
+.pricing-badges{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.pricing-badge{
+  display:inline-flex;align-items:center;gap:3px;min-height:23px;padding:0 7px;border-radius:999px;background:#f2eeeb;
+  color:#6c6e73;font-size:.47rem;font-weight:800
+}
+.pricing-badge.is-discount{background:#fff0f0;color:#a82329}
+.pricing-badge.is-base{background:#eeeaf7;color:#67528c}
+.pricing-badge.is-warning{background:#fff5dc;color:#936713}
+.pricing-total{text-align:center}
+.pricing-total strong{display:block;color:#a42026;font-size:.72rem;font-weight:800}
+.pricing-total small{display:block;color:#9a9ca1;font-size:.44rem}
+.pricing-end strong{display:block;color:#585a5f;font-size:.52rem}
+.pricing-end small{display:block;margin-top:2px;color:#999ba0;font-size:.44rem}
+.pricing-dealer-open{
+  width:30px;height:30px;display:grid;place-items:center;border:1px solid #e4dfda;border-radius:9px;background:#fff;color:#77797e
+}
+.pricing-empty{padding:28px 12px;text-align:center;color:#9b9da2;font-size:.58rem}
+.pricing-condition-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.pricing-condition-card{
+  display:flex;flex-direction:column;gap:9px;padding:11px;border:1px solid #e8e3df;border-radius:13px;background:#fbfaf8
+}
+.pricing-condition-card.is-cancelled,.pricing-condition-card.is-expired{opacity:.68}
+.pricing-condition-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.pricing-condition-top strong{display:block;color:#3d3e42;font-size:.61rem}
+.pricing-condition-top small{display:block;margin-top:2px;color:#96989d;font-size:.48rem}
+.pricing-status{
+  display:inline-flex;align-items:center;min-height:23px;padding:0 7px;border-radius:999px;background:#eeeae7;color:#75777c;
+  font-size:.45rem;font-weight:800;white-space:nowrap
+}
+.pricing-status.is-active{background:#eaf6ee;color:#377954}
+.pricing-status.is-planned{background:#edf3fb;color:#426a92}
+.pricing-status.is-expired{background:#f0f0f1;color:#7f8186}
+.pricing-status.is-paused{background:#fff5dd;color:#946815}
+.pricing-status.is-cancelled{background:#fff0f0;color:#aa2a30}
+.pricing-condition-details{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.pricing-condition-details>div{padding:7px;border-radius:8px;background:#fff}
+.pricing-condition-details small{display:block;color:#999ba0;font-size:.44rem}
+.pricing-condition-details strong{display:block;margin-top:1px;color:#4a4c51;font-size:.53rem}
+.pricing-requirement{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 8px;border-radius:9px;background:#fff8e8;color:#805f1b;font-size:.49rem
+}
+.pricing-requirement.is-ok{background:#edf7f0;color:#397652}
+.pricing-condition-actions{display:flex;align-items:center;justify-content:flex-end;gap:5px}
+.pricing-icon-btn{
+  width:31px;height:31px;display:grid;place-items:center;border:1px solid #e4dfda;border-radius:9px;background:#fff;color:#67696e
+}
+.pricing-icon-btn.is-danger{border-color:#efd0d2;background:#fff7f7;color:#ae292f}
+.pricing-modal{display:flex;min-height:0;flex-direction:column;border:0!important;border-radius:20px!important;overflow:hidden}
+.pricing-modal>.modal-header{flex:0 0 auto;padding:15px 18px;border-bottom:1px solid #eee9e5}
+.pricing-modal>.modal-header small{display:block;color:#a0a2a6;font-size:.47rem;font-weight:800;letter-spacing:.08em}
+.pricing-modal>.modal-header h5{margin:2px 0 0;font-size:.84rem;font-weight:800}
+.pricing-modal>form{display:flex;flex:1 1 auto;min-height:0;flex-direction:column;overflow:hidden}
+.pricing-modal .modal-body{flex:1 1 auto;min-height:0;overflow:auto;padding:14px}
+.pricing-modal .modal-footer{flex:0 0 auto;background:#fff;border-top:1px solid #eee9e5}
+.pricing-form-section{margin-bottom:10px;padding:11px;border:1px solid #e9e4e0;border-radius:13px;background:#fbfaf8}
+.pricing-form-section-title{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.pricing-form-section-title>span{display:grid;place-items:center;width:24px;height:24px;border-radius:8px;background:#292a2e;color:#fff;font-size:.5rem;font-weight:800}
+.pricing-form-section-title strong{display:block;color:#45464a;font-size:.59rem}
+.pricing-form-section-title small{display:block;margin-top:1px;color:#9a9ca1;font-size:.46rem}
+.pricing-form-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.pricing-form-grid label{min-width:0}
+.pricing-form-grid label.wide{grid-column:span 2}
+.pricing-form-grid label>span{display:block;margin:0 0 4px 2px;color:#77797e;font-size:.49rem;font-weight:800}
+.pricing-form-grid .form-control,.pricing-form-grid .form-select,.pricing-form-section>textarea{
+  min-height:38px;border:1px solid #ddd8d4;border-radius:9px;background:#fff;font-size:.57rem;box-shadow:none!important
+}
+.pricing-kind-switch{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.pricing-kind-switch label{cursor:pointer}
+.pricing-kind-switch input{position:absolute;opacity:0;pointer-events:none}
+.pricing-kind-switch label>span{
+  min-height:68px;display:grid;grid-template-columns:30px minmax(0,1fr);align-items:center;column-gap:8px;padding:9px;
+  border:1px solid #e4dfda;border-radius:11px;background:#fff
+}
+.pricing-kind-switch i{grid-row:1/3;display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:#f2efec;color:#8d4b4f}
+.pricing-kind-switch strong{font-size:.56rem}
+.pricing-kind-switch small{color:#999ba0;font-size:.45rem}
+.pricing-kind-switch input:checked+span{border-color:#d3b7b9;background:#fffafa;box-shadow:0 0 0 2px rgba(185,4,10,.035)}
+.pricing-rule-note{display:flex;align-items:flex-start;gap:7px;margin-top:9px;padding:8px;border-radius:9px;background:#f1f4f7;color:#667784;font-size:.49rem;line-height:1.45}
+.pricing-checkbox-label{display:flex!important;align-items:center;gap:7px;min-height:38px;padding:0 9px;border:1px solid #ddd8d4;border-radius:9px;background:#fff}
+.pricing-checkbox-label>span{margin:0!important}
+.pricing-checkbox-label strong{display:block;color:#5a5c61;font-size:.5rem}
+.pricing-checkbox-label small{display:block;color:#9a9ca1;font-size:.43rem}
+@media(max-width:1250px){
+  .pricing-kpi-grid{grid-template-columns:repeat(3,1fr)}
+  .pricing-dealer-row{grid-template-columns:minmax(220px,1.4fr) 150px 160px minmax(220px,1.2fr) 95px 120px 30px}
+}
+@media(max-width:900px){
+  .pricing-shell{padding:14px 12px 90px}
+  .pricing-hero{align-items:flex-start;flex-direction:column;padding:16px}
+  .pricing-primary-action{width:100%;justify-content:center}
+  .pricing-kpi-grid{grid-template-columns:repeat(2,1fr)}
+  .pricing-toolbar{align-items:stretch;flex-direction:column}
+  .pricing-toolbar>.form-select{width:100%}
+  .pricing-dealer-row{
+    grid-template-columns:minmax(0,1fr) auto;padding:10px
+  }
+  .pricing-dealer-main{grid-column:1}
+  .pricing-dealer-open{grid-column:2;grid-row:1}
+  .pricing-dealer-meta,.pricing-price-base,.pricing-badges,.pricing-total,.pricing-end{grid-column:1/-1}
+  .pricing-dealer-meta{display:flex;gap:10px;flex-wrap:wrap}
+  .pricing-total{text-align:left;display:flex;align-items:center;gap:5px}
+  .pricing-condition-list{grid-template-columns:1fr}
+  .pricing-form-grid{grid-template-columns:1fr 1fr}
+  .pricing-form-grid label.wide{grid-column:1/-1}
+}
+@media(max-width:600px){
+  .pricing-shell{width:100%;max-width:100vw;overflow:hidden}
+  .pricing-hero h1{font-size:1.55rem}
+  .pricing-kpi-grid{grid-template-columns:1fr 1fr;gap:7px}
+  .pricing-kpi{padding:10px}
+  .pricing-kpi-icon{width:34px;height:34px;flex-basis:34px}
+  .pricing-panel{padding:10px;border-radius:14px}
+  .pricing-panel-head{align-items:stretch;flex-direction:column}
+  .pricing-status-filter{width:100%}
+  .pricing-condition-details{grid-template-columns:1fr 1fr}
+  .pricing-form-grid{grid-template-columns:1fr}
+  .pricing-form-grid label.wide{grid-column:auto}
+  .pricing-kind-switch{grid-template-columns:1fr}
+  .pricing-page .modal{padding:0!important}
+  .pricing-page .modal-dialog{
+    width:calc(100% - 12px)!important;max-width:calc(100vw - 12px)!important;height:calc(100dvh - 12px)!important;
+    max-height:calc(100dvh - 12px)!important;margin:6px auto!important
+  }
+  .pricing-page .modal-content{height:100%!important;max-height:none!important;border-radius:17px!important}
+  .pricing-modal .modal-footer{padding-bottom:max(10px,env(safe-area-inset-bottom))}
+  .pricing-modal .modal-footer .btn{flex:1 1 0;min-height:42px;font-size:.6rem}
+}
