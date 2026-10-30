@@ -961,6 +961,9 @@ function buildDealerPricingSummary(dealer, allConditions, today = pricingTodayKe
         0
     );
 
+    const ignoredDiscounts = activeDiscounts.filter(condition =>
+        !appliedDiscounts.some(applied => String(applied._id) === String(condition._id))
+    );
     const activeEndDates = active.map(condition => condition.endDate).filter(Boolean).sort();
     const pendingRequirements = active.filter(condition =>
         Number(condition.requirementTarget) > 0 &&
@@ -979,7 +982,9 @@ function buildDealerPricingSummary(dealer, allConditions, today = pricingTodayKe
         defaultPriceType: dealer.price_type || '',
         effectivePriceList: selectedPriceList?.priceListName || selectedPriceList?.name || dealer.price_type || 'Оптовая цена',
         priceListCondition: selectedPriceList,
+        priceListConflicts: Math.max(0, priceLists.length - 1),
         activeDiscounts: appliedDiscounts,
+        ignoredDiscounts,
         totalDiscountPercent,
         has5: appliedDiscounts.some(condition => Math.abs((Number(condition.discountPercent) || 0) - 5) < 0.001),
         has10: appliedDiscounts.some(condition => Math.abs((Number(condition.discountPercent) || 0) - 10) < 0.001),
@@ -1045,6 +1050,30 @@ function validatePricingPayload(payload) {
         return 'Дата окончания не может быть раньше даты начала';
     }
     return '';
+}
+
+function pricingPeriodsOverlap(aStart, aEnd, bStart, bEnd) {
+    const startA = aStart || '0000-01-01';
+    const endA = aEnd || '9999-12-31';
+    const startB = bStart || '0000-01-01';
+    const endB = bEnd || '9999-12-31';
+    return startA <= endB && startB <= endA;
+}
+
+async function findPricingDuplicate(payload, excludeId = '') {
+    if (!payload.code) return null;
+    const query = {
+        code: payload.code,
+        kind: payload.kind,
+        scopeType: payload.scopeType,
+        cancelledAt: { $in: [null] }
+    };
+    if (payload.scopeType === 'dealer') query.dealer = payload.dealer;
+    else if (payload.scopeType === 'sector' || payload.scopeType === 'city') query.scopeValue = payload.scopeValue;
+    if (excludeId) query._id = { $ne: excludeId };
+
+    const candidates = await PricingCondition.find(query).lean();
+    return candidates.find(item => pricingPeriodsOverlap(payload.startDate, payload.endDate, item.startDate, item.endDate)) || null;
 }
 
 async function cleanupAmbiguousLegacyOwnership() {
@@ -1331,6 +1360,10 @@ app.post('/api/pricing/conditions', requirePermission('can_manage_pricing'), asy
         const payload = cleanPricingPayload(req.body);
         const validation = validatePricingPayload(payload);
         if (validation) return res.status(400).json({ error: validation });
+        const duplicate = await findPricingDuplicate(payload);
+        if (duplicate) {
+            return res.status(400).json({ error: `Условие с кодом «${payload.code}» уже действует на эту же цель в пересекающийся период` });
+        }
 
         if (!isGlobalViewer(req) && payload.scopeType !== 'dealer') {
             return res.status(403).json({ error: 'Региональные и общие ценовые условия может создавать только пользователь с доступом ко всей компании' });
@@ -1363,6 +1396,10 @@ app.put('/api/pricing/conditions/:id', requirePermission('can_manage_pricing'), 
         const payload = cleanPricingPayload(req.body);
         const validation = validatePricingPayload(payload);
         if (validation) return res.status(400).json({ error: validation });
+        const duplicate = await findPricingDuplicate(payload, existing._id);
+        if (duplicate) {
+            return res.status(400).json({ error: `Условие с кодом «${payload.code}» уже действует на эту же цель в пересекающийся период` });
+        }
 
         if (!isGlobalViewer(req) && payload.scopeType !== 'dealer') {
             return res.status(403).json({ error: 'Региональные и общие ценовые условия может менять только пользователь с доступом ко всей компании' });
