@@ -9,6 +9,22 @@
     }
     ensureMotionStyles();
 
+    function ensureAppHead() {
+        if (!document.querySelector('link[rel="manifest"]')) {
+            const manifest = document.createElement('link');
+            manifest.rel = 'manifest';
+            manifest.href = '/manifest.json';
+            document.head.appendChild(manifest);
+        }
+        if (!document.querySelector('meta[name="theme-color"]')) {
+            const theme = document.createElement('meta');
+            theme.name = 'theme-color';
+            theme.content = '#b9040a';
+            document.head.appendChild(theme);
+        }
+    }
+    ensureAppHead();
+
     const PAGE_PERMISSIONS = {
         '/': 'can_view_dealers',
         '/index.html': 'can_view_dealers',
