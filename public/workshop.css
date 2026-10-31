@@ -401,3 +401,90 @@ html,body.workshop-page{max-width:100%;overflow-x:hidden}
   .workshop-stock-actions{justify-content:flex-start}
   .workshop-stock-actions b{margin-right:auto}
 }
+
+
+/* =========================================================
+   2026-10-31 — WORKSHOP: NORMAL CRM TYPOGRAPHY / SCALE
+   ========================================================= */
+.workshop-page{background:#f4f2ef!important;color:#242528;font-size:16px}
+.workshop-shell{max-width:1520px;padding:24px 22px 110px}
+.workshop-hero{padding:28px 30px;border-radius:24px}
+.workshop-eyebrow{font-size:.7rem;letter-spacing:.15em}
+.workshop-hero h1{font-size:clamp(2rem,3.4vw,3rem)}
+.workshop-hero p{font-size:.92rem}
+.workshop-primary-action,.workshop-secondary-action{min-height:46px;padding:0 17px;border-radius:13px;font-size:.78rem}
+.workshop-kpi-grid{gap:12px;margin-top:14px}
+.workshop-kpi{min-height:98px;padding:17px;border-radius:17px}
+.workshop-kpi-icon{width:43px;height:43px;flex-basis:43px;font-size:1rem}
+.workshop-kpi small{font-size:.69rem!important}
+.workshop-kpi strong{font-size:1.3rem!important}
+.workshop-kpi em{font-size:.62rem!important}
+.workshop-quick-actions{gap:10px;margin:14px 0}
+.workshop-quick-actions>button{min-height:76px;padding:13px 14px;border-radius:15px}
+.workshop-quick-actions>button>i{font-size:1rem}
+.workshop-quick-actions strong{font-size:.76rem!important}
+.workshop-quick-actions small{font-size:.64rem!important}
+.workshop-tabs-shell{border-radius:18px}
+.workshop-tabs{gap:4px;padding:6px}
+.workshop-tabs button{min-height:43px;padding:0 13px;font-size:.74rem!important}
+.workshop-panel{padding:18px;border-radius:18px}
+.workshop-panel-head{margin-bottom:14px}
+.workshop-panel-head>div>span{font-size:.64rem!important;letter-spacing:.1em}
+.workshop-panel-head h2{font-size:1.14rem!important}
+.workshop-panel-head p{font-size:.72rem!important}
+.workshop-link-btn{min-height:36px;padding:0 10px;font-size:.7rem!important}
+.workshop-feed-item,.workshop-attention-item{min-height:60px;padding:10px 11px;border-radius:12px}
+.workshop-feed-item strong,.workshop-attention-item strong{font-size:.75rem!important}
+.workshop-feed-item small,.workshop-attention-item small{font-size:.64rem!important}
+.workshop-feed-item b,.workshop-attention-item b{font-size:.72rem!important}
+.workshop-search input,.workshop-filter-row .form-select,.workshop-stock-toolbar .form-select{min-height:42px;font-size:.73rem!important}
+.workshop-table{font-size:.72rem!important}
+.workshop-table th{font-size:.63rem!important}
+.workshop-table td{padding-top:10px!important;padding-bottom:10px!important}
+.workshop-stock-card,.workshop-dealer-card,.workshop-recipe-card,.workshop-memo-card{border-radius:14px}
+.workshop-stock-card strong,.workshop-dealer-card strong,.workshop-recipe-card strong,.workshop-memo-card strong{font-size:.76rem!important}
+.workshop-stock-card small,.workshop-dealer-card small,.workshop-recipe-card small,.workshop-memo-card small{font-size:.63rem!important}
+.workshop-asset-pill{font-size:.65rem!important}
+.workshop-empty{font-size:.73rem!important}
+.workshop-memo-status{font-size:.61rem!important}
+.workshop-memo-line-summary,.workshop-memo-check,.workshop-receipt-line-status{font-size:.65rem!important}
+.workshop-memo-filters button{min-height:34px;font-size:.66rem!important}
+.workshop-memo-table-head{font-size:.62rem!important}
+.workshop-memo-product-row{font-size:.7rem!important}
+.workshop-memo-product-row strong{font-size:.74rem!important}
+.workshop-memo-product-row small{font-size:.62rem!important}
+.workshop-memo-summary{font-size:.72rem!important}
+.workshop-modal>.modal-header small{font-size:.62rem!important}
+.workshop-modal>.modal-header h5{font-size:.95rem!important}
+.workshop-form-grid label>span,.workshop-note-label>span{font-size:.66rem!important}
+.workshop-form-grid .form-control,.workshop-form-grid .form-select,.workshop-note-label .form-control{min-height:41px;font-size:.73rem!important}
+.workshop-calc-box,.workshop-document-note,.workshop-material-conversion{font-size:.67rem!important}
+.workshop-operation-box>strong,.workshop-bom>strong{font-size:.72rem!important}
+.workshop-operation-grid label,.workshop-bom-row{font-size:.68rem!important}
+.workshop-custom-toggle strong{font-size:.72rem!important}
+.workshop-custom-toggle small{font-size:.61rem!important}
+.workshop-custom-fields label>span{font-size:.64rem!important}
+.workshop-custom-fields .form-control{font-size:.72rem!important}
+.workshop-icon-action{width:34px;height:34px;flex-basis:34px;font-size:.78rem}
+
+@media(max-width:900px){
+  .workshop-shell{padding:14px 12px 100px}
+  .workshop-hero{padding:22px 18px}
+  .workshop-hero p{font-size:.82rem}
+  .workshop-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .workshop-quick-actions{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .workshop-grid-2{grid-template-columns:1fr}
+}
+@media(max-width:600px){
+  .workshop-hero h1{font-size:1.75rem}
+  .workshop-kpi{min-height:86px;padding:13px}
+  .workshop-kpi small{font-size:.64rem!important}
+  .workshop-kpi strong{font-size:1.14rem!important}
+  .workshop-quick-actions>button{min-height:72px}
+  .workshop-tabs button{font-size:.7rem!important}
+  .workshop-panel{padding:12px}
+  .workshop-panel-head h2{font-size:1.05rem!important}
+  .workshop-panel-head p{font-size:.69rem!important}
+  .workshop-table{font-size:.7rem!important}
+  .workshop-modal>.modal-header h5{font-size:.9rem!important}
+}
