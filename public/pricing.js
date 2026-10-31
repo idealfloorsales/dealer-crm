@@ -130,6 +130,94 @@ document.addEventListener('DOMContentLoaded', () => {
         return true;
     }
 
+    function dealerCondition(row, code, kind = 'discount') {
+        const list = Array.isArray(row.matchedConditions) ? row.matchedConditions : [];
+        return list
+            .filter(item =>
+                item.kind === kind &&
+                String(item.code || '').toUpperCase() === String(code || '').toUpperCase() &&
+                item.scopeType === 'dealer' &&
+                idOf(item.dealer) === String(row.dealerId) &&
+                item.computedStatus !== 'cancelled'
+            )
+            .sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')))[0] || null;
+    }
+
+    function inheritedActiveConditions(row) {
+        return (Array.isArray(row.matchedConditions) ? row.matchedConditions : [])
+            .filter(item => item.computedStatus === 'active' && item.scopeType !== 'dealer');
+    }
+
+    function quickEditorHtml(row) {
+        const social = dealerCondition(row, 'SOCIAL-5');
+        const support = dealerCondition(row, 'SUPPORT-10');
+        const base = (Array.isArray(row.matchedConditions) ? row.matchedConditions : [])
+            .filter(item => item.kind === 'price_list' && item.scopeType === 'dealer' && idOf(item.dealer) === String(row.dealerId) && item.computedStatus !== 'cancelled')
+            .sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')))[0] || null;
+        const inherited = inheritedActiveConditions(row);
+        const inheritedHtml = inherited.length
+            ? `<div class="pricing-inline-inherited">
+                <strong><i class="bi bi-diagram-3"></i> Унаследовано</strong>
+                <div>${inherited.map(item => {
+                    const value = item.kind === 'discount'
+                        ? '−'+fmt(item.discountPercent,2)+'%'
+                        : esc(item.priceListName || item.name);
+                    return `<span title="Это условие задано на уровне ${esc(item.scopeType)}">${value} · ${esc(item.name)}</span>`;
+                }).join('')}</div>
+                <small>Эти условия нельзя снять только у одного дилера из этой строки — они заданы для региона/города/сети.</small>
+              </div>`
+            : '';
+
+        return `<div class="pricing-inline-editor" data-inline-editor="${esc(row.dealerId)}" hidden>
+            <div class="pricing-inline-head">
+                <div><strong>Условия для ${esc(row.dealerName)}</strong><small>Изменения сохраняются только для этого дилера.</small></div>
+                <button type="button" class="pricing-inline-close" data-close-inline="${esc(row.dealerId)}"><i class="bi bi-x-lg"></i></button>
+            </div>
+            ${inheritedHtml}
+            <div class="pricing-inline-rules">
+                <section class="pricing-inline-rule" data-inline-rule="social">
+                    <label class="pricing-rule-toggle">
+                        <input type="checkbox" class="form-check-input" data-inline-social-enabled ${social && ['active','planned','paused'].includes(social.computedStatus) ? 'checked':''}>
+                        <span><strong>−5% · соцсети</strong><small>8 публикаций, суммируется с −10%</small></span>
+                    </label>
+                    <div class="pricing-inline-fields">
+                        <label><span>С</span><input type="date" class="form-control" data-inline-social-start value="${esc(social?.startDate || state.today || todayValue())}"></label>
+                        <label><span>По</span><input type="date" class="form-control" data-inline-social-end value="${esc(social?.endDate || '')}"></label>
+                        <label><span>Публикации</span><div class="pricing-inline-progress"><input type="number" min="0" max="99" class="form-control" data-inline-social-current value="${fmt(social?.requirementCurrent || 0)}"><b>/ 8</b></div></label>
+                        <label class="pricing-inline-check"><input type="checkbox" class="form-check-input" data-inline-social-verified ${social?.requirementVerified ? 'checked':''}><span>Проверено</span></label>
+                    </div>
+                </section>
+
+                <section class="pricing-inline-rule" data-inline-rule="support">
+                    <label class="pricing-rule-toggle">
+                        <input type="checkbox" class="form-check-input" data-inline-support-enabled ${support && ['active','planned','paused'].includes(support.computedStatus) ? 'checked':''}>
+                        <span><strong>−10% · поддержка продаж</strong><small>Суммируется с −5%</small></span>
+                    </label>
+                    <div class="pricing-inline-fields is-short">
+                        <label><span>С</span><input type="date" class="form-control" data-inline-support-start value="${esc(support?.startDate || state.today || todayValue())}"></label>
+                        <label><span>По</span><input type="date" class="form-control" data-inline-support-end value="${esc(support?.endDate || '')}"></label>
+                    </div>
+                </section>
+
+                <section class="pricing-inline-rule" data-inline-rule="base">
+                    <label class="pricing-rule-toggle">
+                        <input type="checkbox" class="form-check-input" data-inline-base-enabled ${base && ['active','planned','paused'].includes(base.computedStatus) ? 'checked':''}>
+                        <span><strong>Индивидуальный базовый прайс</strong><small>Используется до применения процентных скидок</small></span>
+                    </label>
+                    <div class="pricing-inline-fields is-base">
+                        <label class="is-name"><span>Название прайса</span><input class="form-control" data-inline-base-name value="${esc(base?.priceListName || '')}" placeholder="Например: Индивидуальный прайс"></label>
+                        <label><span>С</span><input type="date" class="form-control" data-inline-base-start value="${esc(base?.startDate || state.today || todayValue())}"></label>
+                        <label><span>По</span><input type="date" class="form-control" data-inline-base-end value="${esc(base?.endDate || '')}"></label>
+                    </div>
+                </section>
+            </div>
+            <div class="pricing-inline-footer">
+                <small><i class="bi bi-info-circle"></i> −5% и −10% складываются арифметически. Региональные условия остаются активными отдельно.</small>
+                <button type="button" class="pricing-inline-save" data-save-inline="${esc(row.dealerId)}"><i class="bi bi-check2"></i> Сохранить</button>
+            </div>
+        </div>`;
+    }
+
     function renderDealers() {
         const host = $('pricing-dealer-list');
         if (!host) return;
@@ -144,7 +232,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const badges = [];
             if (row.priceListCondition) badges.push(`<span class="pricing-badge is-base"><i class="bi bi-receipt"></i>${esc(row.effectivePriceList)}</span>`);
             (row.activeDiscounts || []).forEach(condition => {
-                badges.push(`<span class="pricing-badge is-discount">−${fmt(condition.discountPercent,2)}% · ${esc(condition.name)}</span>`);
+                const inherited = condition.scopeType !== 'dealer';
+                badges.push(`<span class="pricing-badge is-discount ${inherited?'is-inherited':''}">−${fmt(condition.discountPercent,2)}% · ${esc(condition.name)}${inherited?' · '+esc(condition.scopeType):''}</span>`);
             });
             if (row.pendingRequirements) badges.push(`<span class="pricing-badge is-warning"><i class="bi bi-exclamation-circle"></i>${row.pendingRequirements} обязательств</span>`);
             if (row.priceListConflicts) badges.push(`<span class="pricing-badge is-conflict"><i class="bi bi-exclamation-triangle"></i>${row.priceListConflicts + 1} базовых прайса</span>`);
@@ -158,28 +247,165 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? `<strong>${dateText(row.nearestEndDate)}</strong><small>${isExpiring(row) ? 'скоро заканчивается' : 'ближайший срок'}</small>`
                 : '<strong>Без срока</strong><small>активные условия</small>';
 
-            return `<article class="pricing-dealer-row">
-                <div class="pricing-dealer-main">
-                    <strong>${esc(row.dealerName)}</strong>
-                    <small>${esc(row.city || 'Город не указан')}${row.sector ? ' · '+esc(row.sector):''}</small>
-                </div>
-                <div class="pricing-dealer-meta">
-                    <strong>${esc(row.responsible || 'Ответственный не указан')}</strong>
-                    <small>ответственный</small>
-                </div>
-                <div class="pricing-price-base">
-                    <strong>${esc(row.effectivePriceList)}</strong>
-                    <small>${baseNote}</small>
-                </div>
-                <div class="pricing-badges">${badges.join('')}</div>
-                <div class="pricing-total">
-                    <strong>${row.totalDiscountPercent ? '−'+fmt(row.totalDiscountPercent,2)+'%' : '0%'}</strong>
-                    <small>итоговая скидка</small>
-                </div>
-                <div class="pricing-end">${end}</div>
-                <a class="pricing-dealer-open" href="/dealer.html?id=${encodeURIComponent(row.dealerId)}" title="Открыть дилера"><i class="bi bi-chevron-right"></i></a>
-            </article>`;
+            return `<div class="pricing-dealer-block">
+                <article class="pricing-dealer-row">
+                    <div class="pricing-dealer-main">
+                        <strong>${esc(row.dealerName)}</strong>
+                        <small>${esc(row.city || 'Город не указан')}${row.sector ? ' · '+esc(row.sector):''}</small>
+                    </div>
+                    <div class="pricing-dealer-meta">
+                        <strong>${esc(row.responsible || 'Ответственный не указан')}</strong>
+                        <small>ответственный</small>
+                    </div>
+                    <div class="pricing-price-base">
+                        <strong>${esc(row.effectivePriceList)}</strong>
+                        <small>${baseNote}</small>
+                    </div>
+                    <div class="pricing-badges">${badges.join('')}</div>
+                    <div class="pricing-total">
+                        <strong>${row.totalDiscountPercent ? '−'+fmt(row.totalDiscountPercent,2)+'%' : '0%'}</strong>
+                        <small>итоговая скидка</small>
+                    </div>
+                    <div class="pricing-end">${end}</div>
+                    <div class="pricing-row-actions">
+                        ${manage ? `<button type="button" class="pricing-quick-btn ${row.has5?'is-active':''}" data-quick-open="${esc(row.dealerId)}" data-focus-rule="social" title="Настроить −5%">−5%</button>
+                        <button type="button" class="pricing-quick-btn ${row.has10?'is-active':''}" data-quick-open="${esc(row.dealerId)}" data-focus-rule="support" title="Настроить −10%">−10%</button>
+                        <button type="button" class="pricing-settings-btn" data-quick-open="${esc(row.dealerId)}" title="Все условия дилера"><i class="bi bi-sliders2"></i></button>` : ''}
+                    </div>
+                </article>
+                ${manage ? quickEditorHtml(row) : ''}
+            </div>`;
         }).join('');
+
+        host.querySelectorAll('[data-quick-open]').forEach(button => {
+            button.addEventListener('click', () => openInlineEditor(button.dataset.quickOpen, button.dataset.focusRule || ''));
+        });
+        host.querySelectorAll('[data-close-inline]').forEach(button => {
+            button.addEventListener('click', () => closeInlineEditor(button.dataset.closeInline));
+        });
+        host.querySelectorAll('[data-save-inline]').forEach(button => {
+            button.addEventListener('click', () => saveInlineDealerPricing(button.dataset.saveInline));
+        });
+    }
+
+    function openInlineEditor(dealerId, focusRule = '') {
+        const editor = document.querySelector(`[data-inline-editor="${CSS.escape(String(dealerId))}"]`);
+        if (!editor) return;
+        document.querySelectorAll('.pricing-inline-editor:not([hidden])').forEach(other => {
+            if (other !== editor) other.hidden = true;
+        });
+        editor.hidden = false;
+        editor.closest('.pricing-dealer-block')?.classList.add('is-open');
+        if (focusRule) {
+            requestAnimationFrame(() => {
+                const rule = editor.querySelector(`[data-inline-rule="${focusRule}"]`);
+                rule?.scrollIntoView({block:'nearest',behavior:'smooth'});
+                rule?.classList.add('is-focus');
+                setTimeout(()=>rule?.classList.remove('is-focus'),900);
+            });
+        }
+    }
+
+    function closeInlineEditor(dealerId) {
+        const editor = document.querySelector(`[data-inline-editor="${CSS.escape(String(dealerId))}"]`);
+        if (!editor) return;
+        editor.hidden = true;
+        editor.closest('.pricing-dealer-block')?.classList.remove('is-open');
+    }
+
+    function dealerQuickPayload(dealerId, code, editor) {
+        if (code === 'SOCIAL-5') {
+            return {
+                scopeType:'dealer', dealerId, kind:'discount',
+                name:'−5% за публикации в соцсетях', code:'SOCIAL-5',
+                discountPercent:5, stackable:true, priority:0,
+                startDate:editor.querySelector('[data-inline-social-start]')?.value || state.today,
+                endDate:editor.querySelector('[data-inline-social-end]')?.value || '',
+                paused:false, reasonType:'social_posts',
+                requirementTarget:8,
+                requirementCurrent:n(editor.querySelector('[data-inline-social-current]')?.value),
+                requirementUnit:'публикаций',
+                requirementDueDate:editor.querySelector('[data-inline-social-end]')?.value || '',
+                requirementVerified:Boolean(editor.querySelector('[data-inline-social-verified]')?.checked),
+                proofNote:'', note:''
+            };
+        }
+        if (code === 'SUPPORT-10') {
+            return {
+                scopeType:'dealer', dealerId, kind:'discount',
+                name:'−10% акция для поддержки продаж', code:'SUPPORT-10',
+                discountPercent:10, stackable:true, priority:0,
+                startDate:editor.querySelector('[data-inline-support-start]')?.value || state.today,
+                endDate:editor.querySelector('[data-inline-support-end]')?.value || '',
+                paused:false, reasonType:'support_promo',
+                requirementTarget:0, requirementCurrent:0, requirementUnit:'публикаций',
+                requirementDueDate:'', requirementVerified:false, proofNote:'', note:''
+            };
+        }
+        return {
+            scopeType:'dealer', dealerId, kind:'price_list',
+            name:'Индивидуальный базовый прайс', code:'DEALER-PRICE',
+            discountPercent:0,
+            priceListName:editor.querySelector('[data-inline-base-name]')?.value?.trim() || '',
+            stackable:false, priority:100,
+            startDate:editor.querySelector('[data-inline-base-start]')?.value || state.today,
+            endDate:editor.querySelector('[data-inline-base-end]')?.value || '',
+            paused:false, reasonType:'individual',
+            requirementTarget:0, requirementCurrent:0, requirementUnit:'публикаций',
+            requirementDueDate:'', requirementVerified:false, proofNote:'', note:''
+        };
+    }
+
+    async function syncInlineCondition(row, editor, code, enabled, existing) {
+        if (enabled) {
+            const payload = dealerQuickPayload(row.dealerId, code, editor);
+            if (code === 'DEALER-PRICE' && !payload.priceListName) {
+                throw new Error('Укажите название индивидуального базового прайса');
+            }
+            if (existing) {
+                return send(API + '/conditions/' + encodeURIComponent(idOf(existing)), 'PUT', payload);
+            }
+            return send(API + '/conditions', 'POST', payload);
+        }
+
+        if (existing && ['active','planned','paused'].includes(existing.computedStatus)) {
+            return send(API + '/conditions/' + encodeURIComponent(idOf(existing)), 'DELETE', { reason:'Отключено из строки дилера' });
+        }
+        return null;
+    }
+
+    async function saveInlineDealerPricing(dealerId) {
+        const row = state.rows.find(item => String(item.dealerId) === String(dealerId));
+        const editor = document.querySelector(`[data-inline-editor="${CSS.escape(String(dealerId))}"]`);
+        if (!row || !editor || !manage) return;
+        const save = editor.querySelector('[data-save-inline]');
+        try {
+            if (save) {
+                save.disabled = true;
+                save.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохраняем…';
+            }
+
+            const social = dealerCondition(row, 'SOCIAL-5');
+            const support = dealerCondition(row, 'SUPPORT-10');
+            const base = (Array.isArray(row.matchedConditions) ? row.matchedConditions : [])
+                .filter(item => item.kind === 'price_list' && item.scopeType === 'dealer' && idOf(item.dealer) === String(row.dealerId) && item.computedStatus !== 'cancelled')
+                .sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')))[0] || null;
+
+            await syncInlineCondition(row, editor, 'SOCIAL-5', Boolean(editor.querySelector('[data-inline-social-enabled]')?.checked), social);
+            await syncInlineCondition(row, editor, 'SUPPORT-10', Boolean(editor.querySelector('[data-inline-support-enabled]')?.checked), support);
+            await syncInlineCondition(row, editor, 'DEALER-PRICE', Boolean(editor.querySelector('[data-inline-base-enabled]')?.checked), base);
+
+            toast('Ценовые условия дилера сохранены');
+            await load();
+            requestAnimationFrame(() => openInlineEditor(dealerId));
+        } catch (error) {
+            toast(error.message || 'Не удалось сохранить условия', 'error');
+        } finally {
+            if (save && document.body.contains(save)) {
+                save.disabled = false;
+                save.innerHTML = '<i class="bi bi-check2"></i> Сохранить';
+            }
+        }
     }
 
     function renderConditions() {
