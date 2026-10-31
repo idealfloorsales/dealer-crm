@@ -10771,3 +10771,15 @@ body.bg-light {
     .dealer-price-overview{grid-template-columns:1fr}
     .dealer-price-condition{align-items:flex-start}
 }
+
+
+/* Global safeguard: headings inside dark CRM hero surfaces must stay readable */
+.cc-hero h1,
+.app-page-hero h1,
+.sales-hero h1,
+.dealer-profile-hero .profile-title,
+.map-workspace-title,
+.workshop-hero h1,
+.pricing-hero h1 {
+    color:#fff !important;
+}
