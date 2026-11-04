@@ -2,54 +2,27 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>База Конкурентов</title>
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Конкуренты — IDEAL FLOOR CRM</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-
+    <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="style.css?v={{VER}}"> <link rel="icon" href="favicon.gif" type="image/gif">
-    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="style.css?v={{VER}}">
+    <link rel="stylesheet" href="competitors.css?v={{VER}}">
+    <link rel="icon" href="favicon.gif" type="image/gif">
     <meta name="theme-color" content="#b9040a">
-    <style>
-        /* СТИЛИ ДЛЯ НИЖНЕГО МЕНЮ */
-        body { }
-        .bottom-nav {
-            position: fixed; bottom: 0; left: 0; right: 0;
-            background: rgba(255, 255, 255, 0.98);
-            backdrop-filter: blur(10px);
-            border-top: 1px solid #eee;
-            z-index: 1050;
-            padding-bottom: env(safe-area-inset-bottom);
-            box-shadow: 0 -5px 20px rgba(0,0,0,0.05);
-        }
-        .bottom-nav-item {
-            text-align: center; color: #adb5bd; padding: 10px 0;
-            text-decoration: none; flex: 1; transition: color 0.2s;
-        }
-        .bottom-nav-item.active { color: #B9040A; }
-        .bottom-nav-item i { font-size: 1.4rem; display: block; margin-bottom: 2px; }
-        .bottom-nav-item span { font-size: 0.65rem; font-weight: 600; }
-        
-        .desktop-nav { display: flex; }
-        @media (max-width: 991px) {
-            .desktop-nav { display: none !important; }
-        }
-        .cb-custom { background-color: #e0cffc; color: #5b21b6; border: 1px solid #d8b4fe; }
-    </style>
 </head>
 <body class="app-workspace-page competitors-page">
     <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-4 desktop-nav"></nav>
-    
-    <main class="container-fluid app-page-shell">
-        <section class="app-page-hero">
+
+    <main class="container-fluid app-page-shell competitors-shell">
+        <section class="app-page-hero competitors-hero">
             <div class="app-page-hero-copy">
                 <div class="app-page-eyebrow">IDEAL FLOOR CRM · РЫНОК</div>
                 <h1>Конкуренты</h1>
-                <p>Бренды, коллекции, поставщики и ценовой мониторинг.</p>
+                <p>База конкурентной разведки: бренды, ассортимент, цены, дилерское присутствие и регулярный мониторинг.</p>
             </div>
             <div class="app-page-actions">
                 <button id="export-comp-btn" class="app-hero-secondary"><i class="bi bi-file-earmark-excel"></i><span>Excel</span></button>
@@ -57,142 +30,221 @@
             </div>
         </section>
 
-        <div id="comp-dashboard" class="row g-3 app-kpi-row">
-            <p class="text-muted">Загрузка статистики...</p>
-        </div>
+        <section id="comp-dashboard" class="competitors-kpis">
+            <div class="competitors-loading">Загрузка статистики…</div>
+        </section>
 
-        <div class="app-toolbar-card sticky-filters">
-            <div class="row g-2 align-items-center">
-                <div class="col-md-8">
-                    <div class="input-group">
-                        <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-search"></i></span>
-                        <input type="text" id="search-input" class="form-control border-start-0 ps-0" placeholder="Поиск по бренду, стране или поставщику...">
-                    </div>
+        <section class="competitors-toolbar">
+            <div class="competitors-toolbar-top">
+                <div class="competitors-search">
+                    <i class="bi bi-search"></i>
+                    <input id="search-input" type="search" placeholder="Бренд, поставщик, страна, склад, коллекция, тег…">
                 </div>
-                <div class="col-md-4">
-                    <div class="input-group">
-                        <select id="filter-type" class="form-select border-0 bg-light text-truncate">
-                            <option value="all">Все типы коллекций</option>
-                        </select>
-                        <button class="btn btn-light border-0 text-secondary" id="btn-manage-types" title="Управление типами"><i class="bi bi-gear-fill"></i></button>
-                    </div>
+                <button type="button" id="filters-toggle" class="competitors-filter-toggle">
+                    <i class="bi bi-sliders"></i><span>Фильтры</span><b id="active-filter-count">0</b>
+                </button>
+                <div class="competitors-view-switch" role="group" aria-label="Вид">
+                    <button type="button" data-view="cards" class="active" title="Карточки"><i class="bi bi-grid"></i></button>
+                    <button type="button" data-view="list" title="Список"><i class="bi bi-list-ul"></i></button>
                 </div>
             </div>
-        </div>
 
-        <div id="competitors-grid" class="row g-3">
-            <p class="text-center text-muted p-5">Загрузка базы...</p>
-        </div>
+            <div id="competitors-filters" class="competitors-filters">
+                <label><span>Тип коллекции</span><select id="filter-type" class="form-select"><option value="all">Все типы</option></select></label>
+                <label><span>Страна</span><select id="filter-country" class="form-select"><option value="all">Все страны</option></select></label>
+                <label><span>Сегмент</span><select id="filter-segment" class="form-select"><option value="all">Все сегменты</option></select></label>
+                <label><span>Приоритет</span>
+                    <select id="filter-priority" class="form-select">
+                        <option value="all">Любой</option>
+                        <option value="critical">Критический</option>
+                        <option value="high">Высокий</option>
+                        <option value="medium">Средний</option>
+                        <option value="low">Низкий</option>
+                    </select>
+                </label>
+                <label><span>Статус</span>
+                    <select id="filter-status" class="form-select">
+                        <option value="all">Любой</option>
+                        <option value="active">Активный</option>
+                        <option value="watch">Наблюдение</option>
+                        <option value="inactive">Неактивный</option>
+                    </select>
+                </label>
+                <label><span>У дилеров</span>
+                    <select id="filter-presence" class="form-select">
+                        <option value="all">Неважно</option>
+                        <option value="yes">Есть у дилеров</option>
+                        <option value="no">Нет у дилеров</option>
+                    </select>
+                </label>
+                <label><span>Мониторинг</span>
+                    <select id="filter-monitoring" class="form-select">
+                        <option value="all">Любой</option>
+                        <option value="overdue">Просрочен</option>
+                        <option value="due7">В ближайшие 7 дней</option>
+                        <option value="no-date">Дата не задана</option>
+                    </select>
+                </label>
+                <label><span>Цены</span>
+                    <select id="filter-prices" class="form-select">
+                        <option value="all">Неважно</option>
+                        <option value="yes">Есть цены</option>
+                        <option value="no">Цен нет</option>
+                    </select>
+                </label>
+                <label><span>Сортировка</span>
+                    <select id="sort-by" class="form-select">
+                        <option value="priority">По важности</option>
+                        <option value="name">По названию</option>
+                        <option value="dealers">По дилерам</option>
+                        <option value="collections">По коллекциям</option>
+                        <option value="monitoring">По мониторингу</option>
+                        <option value="updated">Недавно обновлённые</option>
+                    </select>
+                </label>
+                <div class="competitors-filter-actions">
+                    <button type="button" id="btn-manage-types" class="competitors-secondary-btn"><i class="bi bi-tags"></i>Типы коллекций</button>
+                    <button type="button" id="reset-filters" class="competitors-secondary-btn"><i class="bi bi-arrow-counterclockwise"></i>Сбросить</button>
+                </div>
+            </div>
+
+            <div class="competitors-toolbar-bottom">
+                <div id="quick-filters" class="competitors-quick-filters">
+                    <button type="button" class="active" data-quick="all">Все</button>
+                    <button type="button" data-quick="important"><i class="bi bi-exclamation-diamond"></i>Важные</button>
+                    <button type="button" data-quick="overdue"><i class="bi bi-clock-history"></i>Просрочен мониторинг</button>
+                    <button type="button" data-quick="dealers"><i class="bi bi-shop"></i>Есть у дилеров</button>
+                    <button type="button" data-quick="no-prices"><i class="bi bi-currency-dollar"></i>Нет цен</button>
+                </div>
+                <div class="competitors-result-meta">
+                    <strong id="result-count">0</strong><span>брендов</span>
+                </div>
+            </div>
+        </section>
+
+        <section id="competitors-grid" class="competitors-grid">
+            <div class="competitors-empty">Загрузка базы…</div>
+        </section>
     </main>
 
-    <div class="modal fade" id="comp-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-        <div class="modal-dialog modal-lg modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header border-0 pb-0">
-                    <h5 class="modal-title fw-bold" id="comp-modal-title">Бренд</h5>
+    <div class="modal fade" id="comp-modal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
+            <div class="modal-content competitor-modal">
+                <div class="modal-header">
+                    <div><small>КОНКУРЕНТНАЯ БАЗА</small><h5 id="comp-modal-title">Бренд</h5></div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
-                    <form id="comp-form">
-                        <input type="hidden" id="comp_id">
+                <form id="comp-form">
+                    <input type="hidden" id="comp_id">
+                    <div class="modal-body">
+                        <section class="competitor-form-section competitor-identity-section">
+                            <div class="competitor-logo-editor">
+                                <div class="competitor-logo-preview-wrap">
+                                    <img id="comp_logo_preview" src="" alt="" hidden>
+                                    <div id="comp_logo_placeholder"><i class="bi bi-image"></i><span>Логотип</span></div>
+                                </div>
+                                <button type="button" id="comp-logo-btn"><i class="bi bi-camera"></i>Заменить</button>
+                                <input type="file" id="comp_logo_input" hidden accept="image/*">
+                            </div>
 
-<div class="text-center mb-4">
-    <div class="position-relative d-inline-block">
-        <img id="comp_logo_preview" src="" class="rounded-3 shadow-sm border bg-white d-none" style="width: 100px; height: 100px; object-fit: contain;">
-        <div id="comp_logo_placeholder" class="rounded-3 border border-2 border-dashed bg-light d-flex align-items-center justify-content-center text-muted" style="width: 100px; height: 100px;">
-            <div class="text-center small"><i class="bi bi-image fs-4"></i><br>Лого</div>
-        </div>
-        <button type="button" class="btn btn-sm btn-dark position-absolute top-100 start-50 translate-middle rounded-pill px-3 shadow-sm" style="margin-top: -15px;" onclick="document.getElementById('comp_logo_input').click()">
-            <i class="bi bi-camera me-1"></i>Фото
-        </button>
-    </div>
-    <input type="file" id="comp_logo_input" hidden accept="image/*">
-</div>
+                            <div class="competitor-form-main">
+                                <div class="competitor-form-section-head">
+                                    <div><span>ОСНОВНОЕ</span><strong>Профиль бренда</strong></div>
+                                </div>
+                                <div class="competitor-form-grid">
+                                    <label class="span-2"><span>Название бренда *</span><input type="text" id="comp_name" class="form-control" required></label>
+                                    <label><span>Страна</span><input type="text" id="comp_country" class="form-control" placeholder="Россия, Китай…"></label>
+                                    <label><span>Статус</span>
+                                        <select id="comp_status" class="form-select">
+                                            <option value="active">Активный</option>
+                                            <option value="watch">Наблюдение</option>
+                                            <option value="inactive">Неактивный</option>
+                                        </select>
+                                    </label>
+                                    <label><span>Приоритет мониторинга</span>
+                                        <select id="comp_priority" class="form-select">
+                                            <option value="critical">Критический</option>
+                                            <option value="high">Высокий</option>
+                                            <option value="medium" selected>Средний</option>
+                                            <option value="low">Низкий</option>
+                                        </select>
+                                    </label>
+                                    <label><span>Ценовой сегмент</span><input type="text" id="comp_segment" class="form-control" placeholder="Эконом / средний / премиум / свой"></label>
+                                    <label class="span-2"><span>Теги</span><input type="text" id="comp_tags" class="form-control" placeholder="ёлочка, Китай, агрессивная цена, Астана"></label>
+                                </div>
+                            </div>
+                        </section>
 
-<div class="row g-3 mb-3">
-    <div class="col-md-8">
-        <label class="form-label text-secondary small fw-bold">Название Бренда *</label>
-        <input type="text" class="form-control fw-bold" id="comp_name" required>
-    </div>
-    <div class="col-md-4">
-        <label class="form-label text-secondary small fw-bold">Страна</label>
-        <input type="text" class="form-control" id="comp_country" placeholder="Напр. Россия">
-    </div>
-</div>
+                        <section class="competitor-form-section">
+                            <div class="competitor-form-section-head">
+                                <div><span>ПОСТАВКИ И ПРИСУТСТВИЕ</span><strong>Поставщик, склад и каналы</strong></div>
+                            </div>
+                            <div class="competitor-form-grid">
+                                <label><span>Поставщик</span><input type="text" id="comp_supplier" class="form-control"></label>
+                                <label><span>Склад / город</span><input type="text" id="comp_warehouse" class="form-control"></label>
+                                <label><span>Веб-сайт</span><input type="text" id="comp_website" class="form-control" placeholder="https://…"></label>
+                                <label><span>Instagram</span><input type="text" id="comp_instagram" class="form-control" placeholder="@username"></label>
+                                <label><span>Срок хранения</span><input type="text" id="comp_storage" class="form-control"></label>
+                                <label><span>Остатки</span><input type="text" id="comp_stock" class="form-control"></label>
+                                <label><span>Резерв</span><input type="text" id="comp_reserve" class="form-control"></label>
+                                <label><span>Позиционирование цены</span><input type="text" id="comp_price_positioning" class="form-control" placeholder="Ниже рынка / на уровне / выше"></label>
+                            </div>
 
-<div class="mb-4">
-    <div class="d-flex justify-content-between align-items-center mb-2">
-        <label class="form-label fw-bold mb-0 text-primary"><i class="bi bi-geo-alt me-1"></i>Адреса</label>
-        <button type="button" class="btn btn-sm btn-light border" id="btn-add-address">+ Добавить</button>
-    </div>
-    <div id="comp-addresses-list" class="list-container"></div>
-</div>
+                            <div class="competitor-subsection">
+                                <div class="competitor-subsection-head"><strong>Адреса</strong><button type="button" id="btn-add-address"><i class="bi bi-plus-lg"></i>Добавить</button></div>
+                                <div id="comp-addresses-list" class="competitor-entry-list"></div>
+                            </div>
+                            <div class="competitor-subsection">
+                                <div class="competitor-subsection-head"><strong>Контакты</strong><button type="button" id="btn-add-contact"><i class="bi bi-plus-lg"></i>Добавить</button></div>
+                                <div id="comp-contacts-list" class="competitor-entry-list"></div>
+                            </div>
+                        </section>
 
-<div class="row g-3 mb-4">
-    <div class="col-md-6"><label class="form-label text-secondary small fw-bold">Поставщик</label><input type="text" class="form-control" id="comp_supplier"></div>
-    <div class="col-md-6"><label class="form-label text-secondary small fw-bold">Склад (Город)</label><input type="text" class="form-control" id="comp_warehouse"></div>
-</div>
+                        <section class="competitor-form-section">
+                            <div class="competitor-form-section-head">
+                                <div><span>МОНИТОРИНГ</span><strong>Когда и кто проверяет</strong></div>
+                            </div>
+                            <div class="competitor-form-grid">
+                                <label><span>Последняя проверка</span><input type="date" id="comp_last_monitoring" class="form-control"></label>
+                                <label><span>Следующая проверка</span><input type="date" id="comp_next_monitoring" class="form-control"></label>
+                                <label class="span-2"><span>Ответственный</span><input type="text" id="comp_monitoring_owner" class="form-control" placeholder="Менеджер / маркетинг"></label>
+                                <label class="span-2"><span>Сильные стороны</span><textarea id="comp_strengths" class="form-control" rows="3" placeholder="Что у конкурента действительно хорошо"></textarea></label>
+                                <label class="span-2"><span>Слабые стороны</span><textarea id="comp_weaknesses" class="form-control" rows="3" placeholder="Где мы видим слабость / возможность"></textarea></label>
+                            </div>
+                        </section>
 
-<div class="row g-3 mb-4">
-    <div class="col-md-6">
-        <label class="form-label text-secondary small fw-bold"><i class="bi bi-globe me-1"></i>Веб-сайт</label>
-        <input type="text" class="form-control" id="comp_website" placeholder="https://...">
-    </div>
-    <div class="col-md-6">
-        <label class="form-label text-secondary small fw-bold"><i class="bi bi-instagram me-1"></i>Instagram</label>
-        <input type="text" class="form-control" id="comp_instagram" placeholder="@username">
-    </div>
-</div>
+                        <section class="competitor-form-section">
+                            <div class="competitor-form-section-head">
+                                <div><span>АССОРТИМЕНТ И ЦЕНЫ</span><strong>Коллекции</strong><small>Можно хранить характеристики и цены по каждой коллекции.</small></div>
+                                <button type="button" id="add-coll-row-btn" class="competitor-section-action"><i class="bi bi-plus-lg"></i>Коллекция</button>
+                            </div>
+                            <div id="collections-container" class="competitor-collections-editor"></div>
+                        </section>
 
-<div class="row g-3 mb-4 p-3 bg-light rounded-3 border mx-0">
-    <div class="col-md-4"><label class="form-label small fw-bold">Срок хранения</label><input type="text" class="form-control form-control-sm" id="comp_storage"></div>
-    <div class="col-md-4"><label class="form-label small fw-bold">Остатки</label><input type="text" class="form-control form-control-sm" id="comp_stock"></div>
-    <div class="col-md-4"><label class="form-label small fw-bold">Резерв (дни)</label><input type="text" class="form-control form-control-sm" id="comp_reserve"></div>
-</div>
-
-<div class="mb-4">
-    <div class="d-flex justify-content-between align-items-center mb-2">
-        <label class="form-label fw-bold mb-0 text-primary">Контакты</label>
-        <button type="button" class="btn btn-sm btn-light border" id="btn-add-contact">+ Добавить</button>
-    </div>
-    <div id="comp-contacts-list" class="list-container"></div>
-</div>
-
-<div class="mb-4">
-    <div class="d-flex justify-content-between align-items-center mb-2">
-        <label class="form-label fw-bold mb-0 text-primary">Коллекции</label>
-        <button type="button" class="btn btn-sm btn-light border" id="add-coll-row-btn">+ Добавить</button>
-    </div>
-    <div id="collections-container" class="list-container"></div>
-</div>
-
-<div class="mb-3">
-    <label class="form-label text-secondary small fw-bold">Доп. заметки</label>
-    <textarea class="form-control" id="comp_info" rows="2"></textarea>
-</div>
-                    </form>
-                </div>
-                <div class="modal-footer justify-content-between border-0 pt-0">
-                    <button type="button" class="btn btn-light text-danger" id="btn-delete-comp" style="display:none;"><i class="bi bi-trash me-2"></i>Удалить</button>
-                    <div>
-                        <button type="button" class="btn btn-light me-2" data-bs-dismiss="modal">Отмена</button>
-                        <button type="button" id="btn-save-comp" class="btn btn-primary px-4 rounded-pill">Сохранить</button>
+                        <section class="competitor-form-section mb-0">
+                            <div class="competitor-form-section-head">
+                                <div><span>ЗАМЕТКИ</span><strong>Дополнительная информация</strong></div>
+                            </div>
+                            <textarea id="comp_info" class="form-control" rows="4" placeholder="Наблюдения, договорённости, источники информации…"></textarea>
+                        </section>
                     </div>
-                </div>
+                    <div class="modal-footer">
+                        <button type="button" id="btn-delete-comp" class="btn btn-outline-danger me-auto" hidden><i class="bi bi-trash3 me-1"></i>Удалить</button>
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" id="btn-save-comp" class="btn btn-dark"><i class="bi bi-check2 me-1"></i>Сохранить</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
 
     <div class="modal fade" id="types-manager-modal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header border-0 pb-0">
-                    <h5 class="modal-title fw-bold">Управление типами</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
+            <div class="modal-content competitor-small-modal">
+                <div class="modal-header"><div><small>СПРАВОЧНИК</small><h5>Типы коллекций</h5></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body">
-                    <p class="text-muted small mb-3">Здесь можно переименовать или удалить созданные вами типы коллекций.</p>
-                    <div class="list-group list-group-flush" id="types-manager-list"></div>
+                    <p class="text-muted small">Пользовательские типы появляются после использования в коллекциях. Здесь их можно переименовать или заменить на «Стандарт».</p>
+                    <div id="types-manager-list" class="competitor-types-list"></div>
                 </div>
             </div>
         </div>
@@ -200,34 +252,15 @@
 
     <div class="modal fade" id="dealers-list-modal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header border-0 pb-0">
-                    <h5 class="modal-title fw-bold">Дилеры с брендом <span id="dl-brand-name" class="text-primary"></span></h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div id="dealers-list-container" class="list-group list-group-flush"></div>
-                </div>
+            <div class="modal-content competitor-small-modal">
+                <div class="modal-header"><div><small>ПРИСУТСТВИЕ</small><h5>Дилеры с брендом <span id="dl-brand-name"></span></h5></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body"><div id="dealers-list-container" class="competitor-dealers-list"></div></div>
             </div>
         </div>
     </div>
 
-    <div id="elevator-controls" class="elevator-capsule">
-    <button class="elevator-btn" onclick="scrollToTop()" title="В начало">
-        <i class="bi bi-arrow-up"></i>
-    </button>
-    
-    <button class="elevator-btn" onclick="toggleViewMode()" title="Сменить вид">
-        <i class="bi bi-list-ul" id="view-mode-icon" style="font-size: 1.2rem;"></i>
-    </button>
-    
-    <button class="elevator-btn" onclick="scrollToBottom()" title="В конец">
-        <i class="bi bi-arrow-down"></i>
-    </button>
-</div>
-    
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="permissions.js?v={{VER}}"></script>
-    <script src="competitors.js?v={{VER}}"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script defer src="permissions.js?v={{VER}}"></script>
+    <script defer src="competitors.js?v={{VER}}"></script>
 </body>
 </html>
