@@ -24,6 +24,7 @@ const LOCAL_ASSETS = [
     '/report.js?v={{VER}}',
     '/products.js?v={{VER}}',
     '/competitors.js?v={{VER}}',
+    '/competitors.css?v={{VER}}',
     '/knowledge.js?v={{VER}}',
     '/reclamations.js?v={{VER}}',
     '/permissions.js?v={{VER}}',
