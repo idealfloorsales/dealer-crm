@@ -319,3 +319,10 @@ html,body.competitors-page{max-width:100%;overflow-x:hidden}
   .competitor-collection-edit-details{grid-template-columns:1fr 1fr}
   .competitor-collection-edit-details .wide{grid-column:1/-1}
 }
+
+/* Keep mobile actions clear while competitor editor is open */
+.competitors-page.modal-open .crm-mobile-nav{
+  opacity:0!important;
+  transform:translateY(120%)!important;
+  pointer-events:none!important
+}
