@@ -617,16 +617,47 @@ const dealerLegalEntitySchema = new mongoose.Schema({
     email: String
 }, { _id: false });
 const competitorSchema = new mongoose.Schema({ brand: String, collection: String, price_opt: String, price_retail: String }, { _id: false });
-const collectionItemSchema = new mongoose.Schema({ name: String, type: { type: String, default: 'standard' } }, { _id: false });
+const collectionItemSchema = new mongoose.Schema({
+    name: String,
+    type: { type: String, default: 'std' },
+    class: String,
+    thickness: String,
+    format: String,
+    price_opt: String,
+    price_retail: String,
+    currency: { type: String, default: 'KZT' },
+    note: String
+}, { _id: false });
 const compContactSchema = new mongoose.Schema({ name: String, position: String, phone: String }, { _id: false });
 
-const compRefSchema = new mongoose.Schema({ 
-    name: String, country: String, supplier: String, warehouse: String, 
-    addresses: [additionalAddressSchema], logoUrl: String, 
-    website: String, instagram: String, info: String, 
-    storage_days: String, stock_info: String, reserve_days: String, 
-    contacts: [compContactSchema], collections: [collectionItemSchema] 
-});
+const compRefSchema = new mongoose.Schema({
+    name: String,
+    country: String,
+    supplier: String,
+    warehouse: String,
+    addresses: [additionalAddressSchema],
+    logoUrl: String,
+    website: String,
+    instagram: String,
+    info: String,
+
+    status: { type: String, enum: ['active', 'watch', 'inactive'], default: 'active' },
+    priority: { type: String, enum: ['low', 'medium', 'high', 'critical'], default: 'medium' },
+    segment: String,
+    tags: [String],
+    strengths: String,
+    weaknesses: String,
+    price_positioning: String,
+    last_monitoring_date: String,
+    next_monitoring_date: String,
+    monitoring_owner: String,
+
+    storage_days: String,
+    stock_info: String,
+    reserve_days: String,
+    contacts: [compContactSchema],
+    collections: [collectionItemSchema]
+}, { timestamps: true });
 const CompRef = mongoose.model('CompRef', compRefSchema);
 
 const dealerSchema = new mongoose.Schema({ dealer_id: String, name: String, price_type: String, city: String, address: String, contacts: [contactSchema], bonuses: String, photos: [photoSchema], organizations: [String], requisites: dealerRequisitesSchema, legal_entities: [dealerLegalEntitySchema], contract: { isSigned: Boolean, date: String, number: String }, region_sector: String, hasPersonalPlan: { type: Boolean, default: false }, delivery: String, website: String, instagram: String, additional_addresses: [additionalAddressSchema], pos_materials: [posMaterialSchema], visits: [visitSchema], products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }], latitude: Number, longitude: Number, status: { type: String, default: 'standard' }, avatarUrl: String, competitors: [competitorSchema], responsible: String, responsibleUserId: String, responsibleAssignmentSource: String }, { timestamps: true });
