@@ -326,3 +326,113 @@ html,body.competitors-page{max-width:100%;overflow-x:hidden}
   transform:translateY(120%)!important;
   pointer-events:none!important
 }
+
+
+/* =========================================================
+   2026-11-04 — UNIFIED CRM SCALE / COMPETITORS READABILITY
+   ========================================================= */
+.competitors-shell{
+  width:min(1480px,calc(100% - 32px))!important;
+  max-width:none!important;
+  margin:0 auto!important;
+  padding:24px 0 110px!important
+}
+.competitors-kpis{gap:12px;margin:14px 0 16px}
+.competitor-kpi{min-height:96px;padding:16px 17px;border-radius:17px}
+.competitor-kpi-icon{width:44px;height:44px;flex-basis:44px;font-size:1.05rem}
+.competitor-kpi small{font-size:.72rem}
+.competitor-kpi strong{font-size:1.38rem}
+.competitor-kpi em{font-size:.64rem}
+
+.competitors-toolbar{padding:14px;border-radius:18px}
+.competitors-search input{height:46px;font-size:.82rem}
+.competitors-filter-toggle,.competitors-view-switch button{height:46px}
+.competitors-filter-toggle{font-size:.77rem}
+.competitors-filters{gap:10px}
+.competitors-filters label>span{font-size:.69rem}
+.competitors-filters .form-select{min-height:42px;font-size:.76rem}
+.competitors-secondary-btn{min-height:42px;font-size:.72rem}
+.competitors-quick-filters button{min-height:34px;padding:0 11px;font-size:.7rem}
+.competitors-result-meta strong{font-size:1rem}
+.competitors-result-meta span{font-size:.7rem}
+
+.competitors-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.competitor-card{border-radius:19px}
+.competitor-card-head{gap:14px;padding:17px 17px 13px}
+.competitor-card-logo{width:64px;height:64px;flex-basis:64px;border-radius:14px}
+.competitor-card-logo span{font-size:1.24rem}
+.competitor-card-title h3{font-size:1.08rem}
+.competitor-card-title p{font-size:.76rem}
+.comp-status,.comp-priority{min-height:25px;padding:0 8px;font-size:.65rem}
+.comp-icon-btn{width:36px;height:36px;font-size:.78rem}
+
+.competitor-card-metrics{gap:8px;padding:0 17px 13px}
+.competitor-card-metric{padding:10px 11px}
+.competitor-card-metric small{font-size:.67rem}
+.competitor-card-metric strong{font-size:.9rem}
+
+.competitor-card-info{gap:8px;padding:0 17px 13px}
+.competitor-info-row{grid-template-columns:20px minmax(0,1fr);gap:8px}
+.competitor-info-row i{font-size:.83rem}
+.competitor-info-row strong{font-size:.77rem}
+.competitor-info-row small{font-size:.69rem}
+
+.competitor-badge-row{gap:6px;padding:0 17px 12px}
+.competitor-type-badge,.competitor-tag{min-height:27px;padding:0 9px;font-size:.65rem}
+.competitor-type-badge i{font-size:.53rem}
+
+.competitor-monitoring{margin:0 17px 13px;padding:11px 12px}
+.competitor-monitoring-top strong{font-size:.76rem}
+.competitor-monitoring-top span{font-size:.68rem}
+.competitor-monitoring small{font-size:.68rem}
+
+.competitor-collections-preview{padding:0 17px 14px}
+.competitor-collections-preview-head strong{font-size:.78rem}
+.competitor-collections-preview-head button{font-size:.7rem}
+.competitor-collection-line{padding:9px 0}
+.competitor-collection-line strong{font-size:.76rem}
+.competitor-collection-line small{font-size:.67rem}
+.competitor-price{font-size:.72rem}
+
+.competitor-card-more{padding:0 17px 15px}
+.competitor-analysis-box{padding:11px}
+.competitor-analysis-box strong{font-size:.72rem}
+.competitor-analysis-box p,.competitor-note{font-size:.69rem}
+.competitor-card-footer{padding:11px 17px}
+.competitor-card-footer button,.competitor-card-footer a{min-height:38px;padding:0 11px;font-size:.7rem}
+.competitors-empty{font-size:.82rem}
+
+/* List stays dense, but not tiny */
+.competitors-grid.is-list .competitor-card-title h3{font-size:.9rem}
+.competitors-grid.is-list .competitor-card-title p{font-size:.69rem}
+.competitors-grid.is-list .competitor-card-logo{width:48px;height:48px;flex-basis:48px}
+
+/* Editor uses the same readable scale */
+.competitor-modal>.modal-header small,.competitor-small-modal>.modal-header small{font-size:.66rem}
+.competitor-modal>.modal-header h5,.competitor-small-modal>.modal-header h5{font-size:1.02rem}
+.competitor-form-section-head span{font-size:.66rem}
+.competitor-form-section-head strong{font-size:.88rem}
+.competitor-form-section-head small{font-size:.68rem}
+.competitor-form-grid label>span{font-size:.7rem}
+.competitor-form-grid .form-control,.competitor-form-grid .form-select,.competitor-form-section>textarea{min-height:43px;font-size:.8rem}
+.competitor-subsection-head strong{font-size:.8rem}
+.competitor-subsection-head button,.competitor-section-action{min-height:36px;font-size:.7rem}
+.competitor-entry .form-control,.competitor-entry .form-select,
+.competitor-collection-edit .form-control,.competitor-collection-edit .form-select{min-height:39px;font-size:.76rem}
+.competitor-collection-edit label>span{font-size:.66rem}
+.competitor-dealer-row strong{font-size:.78rem}
+.competitor-dealer-row small{font-size:.69rem}
+
+@media(max-width:900px){
+  .competitors-shell{width:min(100% - 24px,1480px)!important;padding-top:16px!important}
+  .competitors-grid{grid-template-columns:1fr}
+}
+@media(max-width:600px){
+  .competitors-shell{width:calc(100% - 20px)!important;padding-left:0!important;padding-right:0!important}
+  .competitor-card-title h3{font-size:1rem}
+  .competitor-card-title p{font-size:.73rem}
+  .competitor-card-metric small{font-size:.65rem}
+  .competitor-card-metric strong{font-size:.85rem}
+  .competitor-info-row strong{font-size:.74rem}
+  .competitor-info-row small{font-size:.67rem}
+}
