@@ -488,3 +488,39 @@ html,body.workshop-page{max-width:100%;overflow-x:hidden}
   .workshop-table{font-size:.7rem!important}
   .workshop-modal>.modal-header h5{font-size:.9rem!important}
 }
+
+
+/* =========================================================
+   2026-11-04 — SHARED CRM PAGE WIDTH / HERO
+   ========================================================= */
+.workshop-shell{
+  width:min(1480px,calc(100% - 32px))!important;
+  max-width:none!important;
+  margin:0 auto!important;
+  padding:24px 0 110px!important
+}
+.workshop-hero{
+  min-height:150px!important;
+  margin:0 0 14px!important;
+  padding:25px 28px!important;
+  border:1px solid rgba(255,255,255,.55)!important;
+  border-radius:26px!important;
+  background:
+    radial-gradient(circle at 91% -12%,rgba(185,4,10,.48),transparent 22rem),
+    linear-gradient(120deg,#171719 0%,#292628 100%)!important;
+  box-shadow:0 20px 50px rgba(29,20,20,.11)!important
+}
+.workshop-eyebrow{font-size:.68rem!important;letter-spacing:.16em!important;color:rgba(255,255,255,.48)!important}
+.workshop-hero h1{
+  font-size:clamp(2rem,4vw,3.2rem)!important;
+  font-weight:700!important;
+  letter-spacing:-.055em!important;
+  line-height:1.02!important
+}
+.workshop-hero p{max-width:690px!important;margin-top:9px!important;font-size:.82rem!important;color:rgba(255,255,255,.6)!important}
+@media(max-width:900px){
+  .workshop-shell{width:min(100% - 24px,1480px)!important;padding:16px 0 100px!important}
+}
+@media(max-width:600px){
+  .workshop-shell{width:calc(100% - 20px)!important}
+}
