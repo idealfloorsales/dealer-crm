@@ -118,9 +118,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function priorityLabel(value) {
         return ({critical:'Критический',high:'Высокий',medium:'Средний',low:'Низкий'})[value] || 'Средний';
     }
+    const normalizeType = value => {
+        const type = String(value || 'std').trim();
+        return type === 'standard' ? 'std' : (type || 'std');
+    };
     function getAllTypes() { return [...defaultTypes, ...dynamicTypes]; }
     function typeInfo(type) {
-        return getAllTypes().find(item => item.val === (type || 'std')) || { val:type || 'std', label:type || 'Стандарт', color:'#8b5cf6' };
+        const normalized = normalizeType(type);
+        return getAllTypes().find(item => item.val === normalized) || { val:normalized, label:normalized || 'Стандарт', color:'#8b5cf6' };
     }
 
     function dealerCount(competitor) {
@@ -174,7 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function refreshDynamicTypes() {
         const found = new Set();
         competitors.forEach(item => (item.collections || []).forEach(col => {
-            const type = typeof col === 'string' ? 'std' : (col.type || 'std');
+            const type = typeof col === 'string' ? 'std' : normalizeType(col.type);
             if (!defaultTypes.some(x => x.val === type)) found.add(type);
         }));
         dynamicTypes = [...found].sort((a,b)=>a.localeCompare(b,'ru')).map((value,index)=>({
@@ -248,7 +253,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (search && !searchBlob(c).includes(search)) return false;
 
         const type = filters['filter-type']?.value || 'all';
-        if (type !== 'all' && !(c.collections||[]).some(col => (typeof col==='string'?'std':(col.type||'std'))===type)) return false;
+        if (type !== 'all' && !(c.collections||[]).some(col => (typeof col==='string'?'std':normalizeType(col.type))===type)) return false;
 
         const country = filters['filter-country']?.value || 'all';
         if (country !== 'all' && String(c.country||'') !== country) return false;
@@ -324,7 +329,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function cardHtml(c) {
-        const types = [...new Set((c.collections||[]).map(col=>typeof col==='string'?'std':(col.type||'std')))];
+        const types = [...new Set((c.collections||[]).map(col=>typeof col==='string'?'std':normalizeType(col.type)))];
         const tags = Array.isArray(c.tags) ? c.tags.filter(Boolean) : [];
         const dealers = dealerCount(c);
         const priced = pricedCollectionCount(c);
@@ -517,7 +522,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 let changed=false;
                 const collections=(c.collections||[]).map(col=>{
                     const obj=typeof col==='string'?{name:col,type:'std'}:{...col};
-                    if((obj.type||'std')===from){obj.type=to;changed=true;}
+                    if(normalizeType(obj.type)===from){obj.type=to;changed=true;}
                     return obj;
                 });
                 if(!changed) return null;
