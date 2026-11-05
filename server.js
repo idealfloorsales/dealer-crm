@@ -377,7 +377,7 @@ async function auditMutationMiddleware(req,res,next) {
                 await AuditLog.create({
                     actor:{id:String(req.user?.id||''),username:String(req.user?.username||''),name:String(req.user?.fullName||req.user?.username||'Пользователь'),role:String(req.user?.role||'')},
                     module:route.module,action:route.action,method:req.method,path:req.originalUrl||req.path,
-                    entityType:descriptor?.entityType||route.entityType,entityId:String(descriptor?.id||responseBody?.id||responseBody?._id||req.params?.id||''),entityLabel:label,
+                    entityType:descriptor?.entityType||route.entityType,entityId:String(descriptor?.id||after?._id||after?.id||responseBody?.id||responseBody?._id||req.params?.id||''),entityLabel:label,
                     summary:auditSummary(req,route,label),success,statusCode:res.statusCode,requestData,before,after,
                     changes:before&&after?auditDiff(before,after):[],
                     meta:{ip:String(req.headers['x-forwarded-for']||req.ip||'').split(',')[0].trim(),userAgent:auditSanitize(String(req.headers['user-agent']||''),'userAgent')}
@@ -523,8 +523,8 @@ app.get('/api/audit', requireAdmin, async (req, res) => {
         if (req.query.success==='false') filter.success=false;
         if (req.query.from || req.query.to) {
             filter.createdAt={};
-            if (req.query.from) filter.createdAt.$gte=new Date(String(req.query.from)+'T00:00:00.000Z');
-            if (req.query.to) { const end=new Date(String(req.query.to)+'T00:00:00.000Z'); end.setUTCDate(end.getUTCDate()+1); filter.createdAt.$lt=end; }
+            if (req.query.from) filter.createdAt.$gte=new Date(String(req.query.from)+'T00:00:00+05:00');
+            if (req.query.to) filter.createdAt.$lte=new Date(String(req.query.to)+'T23:59:59.999+05:00');
         }
         const q=String(req.query.q||'').trim();
         if (q) {
