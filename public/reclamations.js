@@ -7,11 +7,21 @@ document.addEventListener('DOMContentLoaded', () => {
     let canManageReclamations = false;
     const reclamationDetailCache = new Map();
     let referenceDataPromise = null;
+    let dateFilterMode = 'all';
 
     const listEl = document.getElementById('reclamations-list');
     const searchInput = document.getElementById('search-input');
-    const sortSelect = document.getElementById('sort-select'); // Сортировка
-    const addModal = new bootstrap.Modal(document.getElementById('add-modal'));
+    const searchClear = document.getElementById('rec-search-clear');
+    const sortSelect = document.getElementById('sort-select');
+    const statusFilter = document.getElementById('status-filter');
+    const mediaFilter = document.getElementById('media-filter');
+    const dealerFilter = document.getElementById('dealer-filter');
+    const resetFiltersBtn = document.getElementById('rec-reset-filters');
+    const kpiHost = document.getElementById('reclamation-kpis');
+    const filterSummary = document.getElementById('rec-filter-summary');
+    const visibleSummary = document.getElementById('rec-visible-summary');
+    const addModalEl = document.getElementById('add-modal');
+    const addModal = new bootstrap.Modal(addModalEl);
     const viewModal = new bootstrap.Modal(document.getElementById('view-modal'));
     const fullscreenModal = new bootstrap.Modal(document.getElementById('fullscreen-modal'));
     const form = document.getElementById('reclamation-form');
@@ -24,8 +34,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const saveBtn = document.getElementById('btn-save');
         const mediaInput = document.getElementById('r_photos');
+        const cameraInput = document.getElementById('r_camera');
         if (saveBtn && !canManageReclamations) saveBtn.style.display = 'none';
         if (mediaInput && !canManageReclamations) mediaInput.disabled = true;
+        if (cameraInput && !canManageReclamations) cameraInput.disabled = true;
 
         document.getElementById('r_date').value = new Date().toISOString().slice(0, 10);
 
@@ -37,6 +49,8 @@ document.addEventListener('DOMContentLoaded', () => {
         await fetchReclamations();
         renderList();
         setupPhotoUpload();
+        setupFieldShortcuts();
+        setupFormProgress();
     }
 
     async function fetchReclamations() {
@@ -49,15 +63,47 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) { console.error(e); }
     }
 
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g,'&amp;')
+            .replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;')
+            .replace(/"/g,'&quot;')
+            .replace(/'/g,'&#039;');
+    }
+
+    function normalize(value) {
+        return String(value ?? '').trim().toLowerCase().replace(/\s+/g,' ');
+    }
+
+    function isResolved(item) {
+        return Boolean(String(item?.resolution || '').trim());
+    }
+
+    function mediaCount(item) {
+        return Number(item?.photoCount ?? item?.photos?.length ?? 0) || 0;
+    }
+
+    function daysSince(value) {
+        const date = new Date(value || 0);
+        if (Number.isNaN(date.getTime())) return 0;
+        return Math.max(0, Math.floor((Date.now() - date.getTime()) / 86400000));
+    }
+
     async function fetchDealers() {
         try {
             const res = await fetch('/api/dealers?scope=all');
             if (res.ok) {
-                allDealers = await res.json();
-                allDealers.sort((a,b) => a.name.localeCompare(b.name));
+                allDealers = (await res.json())
+                    .filter(d => !['potential','archive'].includes(String(d.status || '').toLowerCase()));
+                allDealers.sort((a,b) => String(a.name || '').localeCompare(String(b.name || ''),'ru'));
                 const select = document.getElementById('r_dealer');
                 select.innerHTML = '<option value="">-- Выберите дилера --</option>' + 
-                    allDealers.map(d => `<option value="${d.id}">${d.name} (${d.city})</option>`).join('');
+                    allDealers.map(d => `<option value="${escapeHtml(d.id)}">${escapeHtml(d.name)}${d.city ? ' ('+escapeHtml(d.city)+')' : ''}</option>`).join('');
+                if (dealerFilter) {
+                    dealerFilter.innerHTML = '<option value="">Все дилеры</option>' +
+                        allDealers.map(d => `<option value="${escapeHtml(d.id)}">${escapeHtml(d.name)}</option>`).join('');
+                }
             }
         } catch (e) {}
     }
@@ -73,75 +119,211 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(e) {}
     }
 
-    // --- ОБНОВЛЕННЫЙ РЕНДЕР С СОРТИРОВКОЙ И НУМЕРАЦИЕЙ ---
-    function renderList() {
-        const query = searchInput.value.toLowerCase();
-        const sortMode = sortSelect.value;
+    // --- РЕЕСТР: КАРТОЧКИ, KPI И ФИЛЬТРЫ ---
+    function getFilteredReclamations() {
+        const query = normalize(searchInput?.value);
+        const sortMode = sortSelect?.value || 'newest';
+        const status = statusFilter?.value || 'all';
+        const media = mediaFilter?.value || 'all';
+        const dealerId = dealerFilter?.value || '';
 
-        // Фильтрация
-        let filtered = allReclamations.filter(r => 
-            (r.dealerName || '').toLowerCase().includes(query) || 
-            (r.productName || '').toLowerCase().includes(query)
-        );
-
-        // Сортировка
-        filtered.sort((a, b) => {
-            if (sortMode === 'newest') return new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date);
-            if (sortMode === 'oldest') return new Date(a.createdAt || a.date) - new Date(b.createdAt || b.date);
-            if (sortMode === 'dealer_asc') return (a.dealerName || '').localeCompare(b.dealerName || '');
-            if (sortMode === 'dealer_desc') return (b.dealerName || '').localeCompare(a.dealerName || '');
-            return 0;
+        let filtered = allReclamations.filter(r => {
+            const blob = normalize([
+                r.dealerName, r.productName, r.invoiceNumber,
+                r.clientName, r.description, r.clientDemand
+            ].filter(Boolean).join(' '));
+            if (query && !blob.includes(query)) return false;
+            if (status === 'open' && isResolved(r)) return false;
+            if (status === 'resolved' && !isResolved(r)) return false;
+            const photos = mediaCount(r);
+            if (media === 'with' && photos <= 0) return false;
+            if (media === 'without' && photos > 0) return false;
+            if (dealerId && String(r.dealerId || '') !== dealerId) return false;
+            if (dateFilterMode === 'recent' && daysSince(r.createdAt || r.date) > 30) return false;
+            return true;
         });
 
-        if (filtered.length === 0) {
-            listEl.innerHTML = '<div class="text-center text-muted p-5"><i class="bi bi-inbox display-4 d-block mb-3"></i>Ничего не найдено</div>';
+        filtered.sort((a,b) => {
+            if (sortMode === 'oldest') return new Date(a.createdAt || a.date) - new Date(b.createdAt || b.date);
+            if (sortMode === 'dealer_asc') return String(a.dealerName || '').localeCompare(String(b.dealerName || ''),'ru');
+            if (sortMode === 'dealer_desc') return String(b.dealerName || '').localeCompare(String(a.dealerName || ''),'ru');
+            return new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date);
+        });
+        return filtered;
+    }
+
+    function renderKpis() {
+        if (!kpiHost) return;
+        const total = allReclamations.length;
+        const open = allReclamations.filter(r => !isResolved(r)).length;
+        const resolved = total - open;
+        const withoutMedia = allReclamations.filter(r => mediaCount(r) === 0).length;
+        const recent = allReclamations.filter(r => daysSince(r.createdAt || r.date) <= 30).length;
+
+        const cleanSearch = !normalize(searchInput?.value) && !dealerFilter?.value;
+        const cards = [
+            {key:'all',icon:'bi-collection',label:'Всего',value:total,foot:'в реестре',tone:'',active:cleanSearch && statusFilter?.value==='all' && mediaFilter?.value==='all' && dateFilterMode==='all'},
+            {key:'open',icon:'bi-hourglass-split',label:'В работе',value:open,foot:'без решения',tone:open?'warn':'',active:statusFilter?.value==='open' && dateFilterMode==='all'},
+            {key:'resolved',icon:'bi-check2-circle',label:'Решено',value:resolved,foot:'закрытые обращения',tone:'good',active:statusFilter?.value==='resolved' && dateFilterMode==='all'},
+            {key:'without-media',icon:'bi-camera',label:'Без фото',value:withoutMedia,foot:'нужно проверить',tone:withoutMedia?'risk':'',active:mediaFilter?.value==='without' && dateFilterMode==='all'},
+            {key:'recent',icon:'bi-calendar3',label:'За 30 дней',value:recent,foot:'новые обращения',tone:'',active:dateFilterMode==='recent'}
+        ];
+
+        kpiHost.innerHTML = cards.map(card => `
+            <button type="button" class="rec-kpi ${card.tone?'is-'+card.tone:''} ${card.active?'active':''}" data-rec-kpi="${card.key}">
+                <span class="rec-kpi-icon"><i class="bi ${card.icon}"></i></span>
+                <span class="rec-kpi-copy"><small>${escapeHtml(card.label)}</small><strong>${escapeHtml(card.value)}</strong><em>${escapeHtml(card.foot)}</em></span>
+            </button>
+        `).join('');
+
+        kpiHost.querySelectorAll('[data-rec-kpi]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const key = btn.dataset.recKpi;
+                if (searchInput) searchInput.value = '';
+                if (dealerFilter) dealerFilter.value = '';
+                if (statusFilter) statusFilter.value = key === 'open' ? 'open' : key === 'resolved' ? 'resolved' : 'all';
+                if (mediaFilter) mediaFilter.value = key === 'without-media' ? 'without' : 'all';
+                dateFilterMode = key === 'recent' ? 'recent' : 'all';
+                renderList();
+            });
+        });
+    }
+
+    function renderFilterMeta(filtered) {
+        const parts = [];
+        const status = statusFilter?.value || 'all';
+        const media = mediaFilter?.value || 'all';
+        if (status === 'open') parts.push('В работе');
+        else if (status === 'resolved') parts.push('Решено');
+        else parts.push('Все рекламации');
+        if (media === 'with') parts.push('с медиа');
+        if (media === 'without') parts.push('без медиа');
+        if (dealerFilter?.value) parts.push(dealerFilter.selectedOptions?.[0]?.textContent || 'дилер');
+        if (dateFilterMode === 'recent') parts.push('за 30 дней');
+        if (normalize(searchInput?.value)) parts.push(`поиск: «${searchInput.value.trim()}»`);
+
+        if (filterSummary) filterSummary.textContent = parts.join(' · ');
+        const openVisible = filtered.filter(r => !isResolved(r)).length;
+        if (visibleSummary) visibleSummary.textContent = `${filtered.length} показано · ${openVisible} в работе`;
+    }
+
+    function renderList() {
+        if (searchClear) searchClear.hidden = !normalize(searchInput?.value);
+        const filtered = getFilteredReclamations();
+        renderKpis();
+        renderFilterMeta(filtered);
+
+        if (!filtered.length) {
+            listEl.innerHTML = '<div class="rec-empty"><i class="bi bi-inbox"></i><span>По текущим фильтрам ничего не найдено</span></div>';
             return;
         }
 
-        listEl.innerHTML = filtered.map((r, index) => {
-            const dateStr = new Date(r.createdAt || r.date).toLocaleDateString('ru-RU');
-            const imgBadge = Number(r.photoCount) > 0 ? `<i class="bi bi-image text-brand ms-2"></i> ${r.photoCount}` : '';
-            
-            // Внешний вид статуса
-            const statusBadge = r.resolution 
-                ? `<span class="badge bg-success rounded-pill px-2 py-1"><i class="bi bi-check2-all"></i> Решено</span>` 
-                : `<span class="badge bg-warning text-dark rounded-pill px-2 py-1"><i class="bi bi-hourglass-split"></i> В работе</span>`;
+        const chronological = [...allReclamations].sort((a,b) => new Date(a.createdAt || a.date) - new Date(b.createdAt || b.date));
+        const sequenceMap = new Map(chronological.map((r,index) => [String(r.id), index + 1]));
 
-            const shortDesc = r.description ? (r.description.length > 60 ? r.description.substring(0, 60) + '...' : r.description) : 'Нет описания';
-            const demandTag = r.clientDemand ? `<span class="badge bg-light text-dark border">${r.clientDemand}</span>` : '';
-
-            // НУМЕРАЦИЯ (index + 1)
+        listEl.innerHTML = filtered.map(r => {
+            const dateObj = new Date(r.createdAt || r.date);
+            const dateStr = Number.isNaN(dateObj.getTime()) ? '—' : dateObj.toLocaleDateString('ru-RU');
+            const photos = mediaCount(r);
+            const resolved = isResolved(r);
+            const seq = sequenceMap.get(String(r.id)) || 0;
+            const age = daysSince(r.createdAt || r.date);
+            const ageText = !resolved && age > 0 ? `${age} дн. в работе` : dateStr;
+            const product = r.productName || 'Товар не указан';
+            const description = r.description || 'Описание не заполнено';
+            const purchased = r.purchasedVolume || '—';
+            const defect = r.defectVolume || '—';
             return `
-            <div class="card border-0 shadow-sm rounded-4 mb-3 reclamation-card" onclick="viewReclamation('${r.id}')">
-                <div class="rec-index">${index + 1}</div>
-                <div class="card-body p-3 ps-4">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <h6 class="fw-bold text-dark mb-0 text-truncate" style="max-width: 65%;">
-                            ${r.dealerName || 'Неизвестный дилер'}
-                        </h6>
-                        <div>${statusBadge}</div>
+                <article class="reclamation-card" data-reclamation-id="${escapeHtml(r.id)}">
+                    <div class="rec-card">
+                        <div class="rec-card-head">
+                            <span class="rec-number">№${String(seq).padStart(3,'0')}</span>
+                            <div class="rec-card-title">
+                                <strong>${escapeHtml(r.dealerName || 'Дилер не указан')}</strong>
+                                <small>${escapeHtml(dateStr)}${r.invoiceNumber ? ' · Накл. '+escapeHtml(r.invoiceNumber) : ''}</small>
+                            </div>
+                        </div>
+                        <span class="rec-status ${resolved?'is-resolved':''}"><i class="bi ${resolved?'bi-check2-circle':'bi-hourglass-split'}"></i>${resolved?'Решено':'В работе'}</span>
+                        <div class="rec-card-product">
+                            <strong>${escapeHtml(product)}</strong>
+                            <small><span>Куплено: <b>${escapeHtml(purchased)}</b></span><span>Брак: <b>${escapeHtml(defect)}</b></span></small>
+                        </div>
+                        <div class="rec-card-problem">${escapeHtml(description)}</div>
+                        <div class="rec-card-foot">
+                            <span class="rec-card-demand">${escapeHtml(r.clientDemand || 'Требование не указано')}</span>
+                            <span class="rec-card-meta">
+                                <span><i class="bi bi-camera"></i> ${photos}</span>
+                                <span>${escapeHtml(ageText)}</span>
+                            </span>
+                        </div>
                     </div>
-                    
-                    <div class="mb-2">
-                        <div class="small text-secondary mb-1"><i class="bi bi-box-seam me-1"></i> <span class="fw-bold text-dark">${r.productName}</span></div>
-                        <div class="small text-brand fw-bold"><i class="bi bi-cart-check me-1"></i> Куплено: ${r.purchasedVolume || '-'}</div>
-                    </div>
-
-                    <div class="small text-muted mb-2 fst-italic border-start border-2 border-danger ps-2" style="font-size: 0.8rem; line-height: 1.3;">
-                        "${shortDesc}"
-                    </div>
-
-                    <div class="d-flex justify-content-between align-items-end mt-2 pt-2 border-top">
-                        <div>${demandTag}</div>
-                        <div class="small text-muted">${dateStr} ${imgBadge}</div>
-                    </div>
-                </div>
-            </div>`;
+                </article>`;
         }).join('');
+
+        listEl.querySelectorAll('[data-reclamation-id]').forEach(card => {
+            card.addEventListener('click', () => viewReclamation(card.dataset.reclamationId));
+        });
     }
 
-    searchInput.addEventListener('input', renderList);
-    sortSelect.addEventListener('change', renderList);
+    searchInput?.addEventListener('input', () => { dateFilterMode='all'; renderList(); });
+    searchClear?.addEventListener('click', () => {
+        searchInput.value='';
+        dateFilterMode='all';
+        renderList();
+        searchInput.focus();
+    });
+    sortSelect?.addEventListener('change', renderList);
+    statusFilter?.addEventListener('change', () => { dateFilterMode='all'; renderList(); });
+    mediaFilter?.addEventListener('change', () => { dateFilterMode='all'; renderList(); });
+    dealerFilter?.addEventListener('change', () => { dateFilterMode='all'; renderList(); });
+    resetFiltersBtn?.addEventListener('click', () => {
+        if (searchInput) searchInput.value='';
+        if (sortSelect) sortSelect.value='newest';
+        if (statusFilter) statusFilter.value='all';
+        if (mediaFilter) mediaFilter.value='all';
+        if (dealerFilter) dealerFilter.value='';
+        dateFilterMode='all';
+        renderList();
+    });
+
+    function setupFieldShortcuts() {
+        document.querySelectorAll('[data-rec-target]').forEach(button => {
+            button.addEventListener('click', () => {
+                document.querySelectorAll('[data-rec-target]').forEach(item => item.classList.toggle('active', item === button));
+                const target = document.querySelector(button.dataset.recTarget);
+                if (!target) return;
+                target.scrollIntoView({behavior:'smooth', block:'start'});
+                if (target.matches('input,textarea,select')) setTimeout(() => target.focus({preventScroll:true}), 180);
+            });
+        });
+    }
+
+    function updateFormProgress() {
+        const requiredIds = ['r_dealer','r_date','r_product','r_purchased_volume','r_defect_volume','r_description'];
+        const completed = requiredIds.filter(id => String(document.getElementById(id)?.value || '').trim()).length;
+        const percent = Math.round((completed / requiredIds.length) * 100);
+        const bar = document.getElementById('rec-form-progress-bar');
+        const textEl = document.getElementById('rec-form-progress-text');
+        if (bar) bar.style.width = percent + '%';
+        if (textEl) textEl.textContent = completed === requiredIds.length
+            ? 'Обязательные поля заполнены'
+            : `Обязательные поля: ${completed} из ${requiredIds.length}`;
+    }
+
+    function setupFormProgress() {
+        form?.addEventListener('input', updateFormProgress);
+        form?.addEventListener('change', updateFormProgress);
+        updateFormProgress();
+    }
+
+    function resetFieldShortcutState() {
+        document.querySelectorAll('[data-rec-target]').forEach((button,index) => button.classList.toggle('active', index === 0));
+        updateFormProgress();
+        setTimeout(() => {
+            const body = addModalEl?.querySelector('.rec-modal-body');
+            if (body) body.scrollTop = 0;
+        }, 50);
+    }
 
     window.addBatchInput = function() {
         const container = document.getElementById('batch-list');
@@ -158,6 +340,7 @@ document.addEventListener('DOMContentLoaded', () => {
         uploadedPhotos = [];
         renderPhotoPreviews();
         document.getElementById('batch-list').innerHTML = `<input type="text" class="form-control form-control-sm batch-input" placeholder="Номер партии">`;
+        resetFieldShortcutState();
         addModal.show();
     };
 
@@ -221,6 +404,7 @@ document.addEventListener('DOMContentLoaded', () => {
             isVideo: p.photo_url.startsWith('data:video')
         }));
         renderPhotoPreviews();
+        resetFieldShortcutState();
         addModal.show();
     };
 
@@ -248,15 +432,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function setupPhotoUpload() {
-        const input = document.getElementById('r_photos');
-        input.addEventListener('change', async (e) => {
-            for (let file of e.target.files) {
+        const mediaInput = document.getElementById('r_photos');
+        const cameraInput = document.getElementById('r_camera');
+
+        async function handleFiles(input) {
+            const files = [...(input?.files || [])];
+            for (const file of files) {
                 if (file.type.startsWith('image/')) {
-                    const base64 = await compressImage(file, 800, 0.7);
+                    const base64 = await compressImage(file, 1000, 0.72);
                     uploadedPhotos.push({ photo_url: base64, isVideo: false });
-                } 
-                else if (file.type.startsWith('video/')) {
-                    // Ограничение видео в 8 МБ
+                } else if (file.type.startsWith('video/')) {
                     if (file.size > 8 * 1024 * 1024) {
                         alert(`Видео "${file.name}" слишком большое. Максимальный размер 8 МБ.`);
                         continue;
@@ -266,8 +451,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             renderPhotoPreviews();
-            input.value = '';
-        });
+            if (input) input.value = '';
+        }
+
+        mediaInput?.addEventListener('change', () => handleFiles(mediaInput));
+        cameraInput?.addEventListener('change', () => handleFiles(cameraInput));
     }
 
     function renderPhotoPreviews() {
@@ -354,7 +542,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 addModal.hide();
             } else { alert("Ошибка сохранения. Возможно размер видео слишком большой."); }
         } catch(err) { alert(err.message); }
-        finally { btn.disabled = false; btn.innerHTML = '<i class="bi bi-send me-2"></i>Сохранить'; }
+        finally { btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg"></i><span>Сохранить рекламацию</span>'; }
     });
 
     // --- ПРОСМОТР НА ВЕСЬ ЭКРАН ---
