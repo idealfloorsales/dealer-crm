@@ -157,8 +157,12 @@
                 <p>Продажи, выполнение плана, визиты и важные сигналы — в одном списке.</p>
             </div>
             <div class="dealer-directory-actions">
-                <button id="export-competitors-prices-btn" class="cc-secondary-btn d-none d-md-inline-flex" title="Цены"><i class="bi bi-tags"></i> Цены</button>
-                <button id="export-dealers-btn" class="cc-secondary-btn d-none d-md-inline-flex"><i class="bi bi-download"></i> База</button>
+                <button id="export-dealers-btn" class="cc-secondary-btn dealer-export-trigger" title="Выгрузить базу дилеров в Excel">
+                    <i class="bi bi-file-earmark-spreadsheet"></i><span>База дилеров</span>
+                </button>
+                <button id="export-competitors-prices-btn" class="cc-secondary-btn dealer-export-trigger" title="Выгрузить цены конкурентов в Excel">
+                    <i class="bi bi-tags"></i><span>Цены конкурентов</span>
+                </button>
             </div>
         </section>
 
@@ -260,22 +264,103 @@
         <i class="bi bi-plus-lg"></i>
     </button>
 
-    <div class="modal fade" id="export-settings-modal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header border-0 pb-0">
-                    <h5 class="modal-title fw-bold">Настройка выгрузки</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <p class="text-muted small mb-3">Выберите колонки для Excel/CSV файла:</p>
-                    <div id="export-columns-list" class="d-flex flex-column gap-2" style="max-height: 400px; overflow-y: auto;">
+    <div class="modal fade export-builder-modal" id="export-settings-modal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
+            <div class="modal-content export-builder-content">
+                <div class="export-builder-header">
+                    <div class="export-builder-heading">
+                        <span class="export-builder-icon" id="export-builder-icon"><i class="bi bi-file-earmark-spreadsheet"></i></span>
+                        <div>
+                            <small>ЭКСПОРТ ИЗ CRM</small>
+                            <h5 id="export-builder-title">База дилеров</h5>
+                            <p id="export-builder-description">Выберите, каких дилеров и какие данные включить в Excel.</p>
                         </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-footer border-0 pt-0">
-                    <button type="button" class="btn btn-success w-100 rounded-pill" onclick="generateAndDownloadCSV()">
-                        <i class="bi bi-download me-2"></i>Скачать
-                    </button>
+
+                <div class="export-builder-body">
+                    <section class="export-builder-section">
+                        <div class="export-builder-section-head">
+                            <div>
+                                <strong>1. Кого выгружаем</strong>
+                                <small>Можно выгрузить текущую выборку или всю доступную базу.</small>
+                            </div>
+                            <span class="export-builder-count" id="export-builder-row-count">0 строк</span>
+                        </div>
+                        <div class="export-scope-grid">
+                            <label class="export-scope-card">
+                                <input type="radio" name="export-scope" value="current" checked>
+                                <span class="export-scope-icon"><i class="bi bi-funnel"></i></span>
+                                <span><strong>Текущая выборка</strong><small>Учитывает поиск, фильтры и быстрый фильтр на главной.</small></span>
+                                <i class="bi bi-check-circle-fill export-scope-check"></i>
+                            </label>
+                            <label class="export-scope-card">
+                                <input type="radio" name="export-scope" value="working">
+                                <span class="export-scope-icon"><i class="bi bi-shop"></i></span>
+                                <span><strong>Все рабочие дилеры</strong><small>Без потенциальных и архивных.</small></span>
+                                <i class="bi bi-check-circle-fill export-scope-check"></i>
+                            </label>
+                            <label class="export-scope-card">
+                                <input type="radio" name="export-scope" value="all">
+                                <span class="export-scope-icon"><i class="bi bi-database"></i></span>
+                                <span><strong>Вся доступная база</strong><small>Включая потенциальных и архивных дилеров.</small></span>
+                                <i class="bi bi-check-circle-fill export-scope-check"></i>
+                            </label>
+                        </div>
+                    </section>
+
+                    <section class="export-builder-section">
+                        <div class="export-builder-section-head">
+                            <div>
+                                <strong>2. Быстрый набор</strong>
+                                <small>Выберите готовый вариант или настройте колонки вручную.</small>
+                            </div>
+                            <button type="button" id="export-builder-select-all" class="export-builder-link">Выбрать всё</button>
+                        </div>
+                        <div id="export-builder-presets" class="export-builder-presets"></div>
+                    </section>
+
+                    <section class="export-builder-section">
+                        <div class="export-builder-section-head">
+                            <div>
+                                <strong>3. Колонки Excel</strong>
+                                <small id="export-builder-columns-help">Отметьте только те данные, которые нужны в файле.</small>
+                            </div>
+                            <span class="export-builder-selected" id="export-builder-selected-count">0 выбрано</span>
+                        </div>
+                        <div id="export-columns-list" class="export-builder-columns"></div>
+                    </section>
+
+                    <section class="export-builder-section export-price-options" id="export-price-options" hidden>
+                        <label class="export-builder-switch">
+                            <span>
+                                <strong>Только строки с заполненной ценой</strong>
+                                <small>Если выключить — в файл попадут и позиции конкурентов без цены, чтобы видеть пробелы в мониторинге.</small>
+                            </span>
+                            <span class="form-check form-switch m-0">
+                                <input class="form-check-input" type="checkbox" id="export-prices-filled-only" checked>
+                            </span>
+                        </label>
+                    </section>
+
+                    <div class="export-builder-note">
+                        <i class="bi bi-info-circle"></i>
+                        <span>Файл будет создан в формате <b>.xlsx</b> с закреплённой шапкой, автофильтром и удобной шириной колонок. Сам факт выгрузки попадёт в журнал действий.</span>
+                    </div>
+                </div>
+
+                <div class="export-builder-footer">
+                    <div>
+                        <strong id="export-builder-summary">Готовим выгрузку</strong>
+                        <small id="export-builder-summary-detail">Выберите нужные данные.</small>
+                    </div>
+                    <div class="export-builder-footer-actions">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button>
+                        <button type="button" class="btn btn-dark" id="export-builder-download">
+                            <i class="bi bi-file-earmark-arrow-down"></i><span>Скачать .xlsx</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
