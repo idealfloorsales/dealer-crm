@@ -2216,26 +2216,19 @@ app.post('/api/workshop/memos', requirePermission('can_manage_workshop'), async 
                     || null;
             }
 
-            if (!recipe) {
-                return res.status(400).json({ error: `Для «${product.sku || product.name}» не настроена рецептура производства` });
-            }
-
-            const packQty = workshopPackQty(product, recipe.packQtyOverride);
+            const packQty = workshopPackQty(product, recipe?.packQtyOverride || 0);
             if (packQty <= 0) {
                 return res.status(400).json({ error: `У «${product.sku || product.name}» не заполнено количество планок в упаковке` });
             }
-            const planksPerUnit = Math.max(0, workshopNumber(recipe.planksPerUnit));
-            if (planksPerUnit <= 0) {
-                return res.status(400).json({ error: `В рецептуре «${recipe.name}» не заполнена норма планок на изделие` });
-            }
+            const planksPerUnit = recipe ? Math.max(0, workshopNumber(recipe.planksPerUnit)) : 0;
 
             const totalPlanks = requestedPacks * packQty;
-            const plannedOutputQty = Math.floor(totalPlanks / planksPerUnit);
-            const plannedRemainderPlanks = totalPlanks - plannedOutputQty * planksPerUnit;
+            const plannedOutputQty = planksPerUnit > 0 ? Math.floor(totalPlanks / planksPerUnit) : 0;
+            const plannedRemainderPlanks = planksPerUnit > 0 ? totalPlanks - plannedOutputQty * planksPerUnit : totalPlanks;
 
             lines.push({
                 product: product._id,
-                recipe: recipe._id,
+                recipe: recipe?._id || null,
                 requestedPacks,
                 plannedOutputQty,
                 plannedRemainderPlanks,
@@ -2309,20 +2302,18 @@ app.put('/api/workshop/memos/:id', requirePermission('can_manage_workshop'), asy
                 const recipes = await WorkshopRecipe.find({ product: product._id, active: { $ne: false }, planksPerUnit: { $gt: 0 } }).lean();
                 recipe = recipes.find(item => item.outputType === 'sample') || recipes.find(item => item.outputType === 'stand') || recipes[0] || null;
             }
-            if (!recipe) return res.status(400).json({ error: `Для «${product.sku || product.name}» не настроена рецептура` });
-
-            const packQty = workshopPackQty(product, recipe.packQtyOverride);
-            const planksPerUnit = Math.max(0, workshopNumber(recipe.planksPerUnit));
-            if (packQty <= 0 || planksPerUnit <= 0) {
-                return res.status(400).json({ error: `Проверьте нормы для «${product.sku || product.name}»` });
+            const packQty = workshopPackQty(product, recipe?.packQtyOverride || 0);
+            const planksPerUnit = recipe ? Math.max(0, workshopNumber(recipe.planksPerUnit)) : 0;
+            if (packQty <= 0) {
+                return res.status(400).json({ error: `У «${product.sku || product.name}» не заполнено количество планок в упаковке` });
             }
 
             const totalPlanks = requestedPacks * packQty;
-            const plannedOutputQty = Math.floor(totalPlanks / planksPerUnit);
-            const plannedRemainderPlanks = totalPlanks - plannedOutputQty * planksPerUnit;
+            const plannedOutputQty = planksPerUnit > 0 ? Math.floor(totalPlanks / planksPerUnit) : 0;
+            const plannedRemainderPlanks = planksPerUnit > 0 ? totalPlanks - plannedOutputQty * planksPerUnit : totalPlanks;
             lines.push({
                 product: product._id,
-                recipe: recipe._id,
+                recipe: recipe?._id || null,
                 requestedPacks,
                 plannedOutputQty,
                 plannedRemainderPlanks,
