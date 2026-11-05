@@ -1099,7 +1099,8 @@ async function connectToDB() {
         await seedUsers(); 
         await seedSectors();
         await seedWorkshopMaterials();
-        await seedWorkshopRecipes(); 
+        await seedWorkshopRecipes();
+        await normalizeWorkshopPosRecipes(); 
     } catch (e) { console.error(e); }
 }
 
@@ -1132,6 +1133,122 @@ async function seedWorkshopMaterials() {
             { upsert: true }
         );
     }
+}
+
+function workshopPosDefinition(source = {}) {
+    const recipe = source.recipe || source;
+    const product = source.product || recipe?.product || {};
+    const raw = [
+        recipe?.sku, recipe?.name, recipe?.matrixPosName,
+        product?.sku, product?.name
+    ].filter(Boolean).join(' ');
+    const text = raw.toUpperCase().replace(/Ё/g,'Е').replace(/\s+/g,' ').trim();
+
+    const defs = [
+        { match: /(^|[^A-ZА-Я0-9])(С|C)600([^0-9]|$)|600\s*ММ.*ЗАДН/i, recipeSku:'POS-BACK-600', name:'Задняя стенка 600 мм', outputType:'other', matrixPosName:'С600 - 600мм задняя стенка' },
+        { match: /(^|[^A-ZА-Я0-9])(С|C)800([^0-9]|$)|800\s*ММ.*ЗАДН/i, recipeSku:'POS-BACK-800', name:'Задняя стенка 800 мм', outputType:'other', matrixPosName:'С800 - 800мм задняя стенка' },
+        { match: /РФ-?2|RF-?2|РАСЧЕСК.*ФАНЕР/i, recipeSku:'POS-COMB-PLY', name:'Расческа из фанеры', outputType:'other', matrixPosName:'РФ-2 - Расческа из фанеры' },
+        { match: /(^|[^A-ZА-Я0-9])(Н|H)600([^0-9]|$)|НАКЛЕЙК.*600/i, recipeSku:'POS-STICKER-600', name:'Наклейка 600 мм', outputType:'other', matrixPosName:'Н600 - 600мм наклейка' },
+        { match: /(^|[^A-ZА-Я0-9])(Н|H)800([^0-9]|$)|НАКЛЕЙК.*800/i, recipeSku:'POS-STICKER-800', name:'Наклейка 800 мм', outputType:'other', matrixPosName:'Н800 - 800мм наклейка' },
+        { match: /ТАБЛИЧК|ОРГ.?СТЕКЛ/i, recipeSku:'POS-ACRYLIC', name:'Табличка из оргстекла', outputType:'sign', matrixPosName:'Табличка - Табличка орг.стекло' }
+    ];
+
+    const known = defs.find(def => def.match.test(text));
+    if (known) return known;
+
+    const explicitPos = Boolean(
+        recipe?.matrixPosName ||
+        /^POS-/i.test(String(recipe?.sku || '')) ||
+        recipe?.outputType === 'stand' ||
+        recipe?.outputType === 'sign' ||
+        /СТЕНД|ТОРГОВ.*ОБОРУД/i.test(text)
+    );
+    if (!explicitPos) return null;
+
+    return {
+        recipeSku: '',
+        name: String(recipe?.name || product?.name || 'Торговое оборудование')
+            .replace(/^\s*(ПЛАНШЕТ|ОБРАЗЕЦ)\s+/i,'')
+            .trim(),
+        outputType: recipe?.outputType === 'sample' ? 'other' : (recipe?.outputType || 'other'),
+        matrixPosName: String(recipe?.matrixPosName || '').trim()
+    };
+}
+
+async function normalizeWorkshopPosRecipes() {
+    const recipes = await WorkshopRecipe.find({}).populate('product','sku name').lean();
+    const affectedDealers = new Set();
+    let normalized = 0;
+
+    for (const recipe of recipes) {
+        const def = workshopPosDefinition({ recipe, product: recipe.product || {} });
+        if (!def) continue;
+
+        const currentName = String(recipe.name || '').trim();
+        const cleanName = def.name || currentName.replace(/^\s*(Планшет|Образец)\s+/i,'').trim();
+        const isCanonical = def.recipeSku && String(recipe.sku || '') === def.recipeSku;
+
+        if (def.recipeSku && !isCanonical) {
+            const canonical = await WorkshopRecipe.findOne({ sku:def.recipeSku });
+            if (canonical && String(canonical._id) !== String(recipe._id)) {
+                const wrongStock = Math.max(0, Number(recipe.stockQty) || 0);
+                const wrongMin = Math.max(0, Number(recipe.minStockQty) || 0);
+                canonical.stockQty = Math.max(Number(canonical.stockQty) || 0, wrongStock);
+                canonical.minStockQty = Math.max(Number(canonical.minStockQty) || 0, wrongMin);
+                canonical.name = def.name;
+                canonical.outputType = def.outputType;
+                canonical.matrixPosName = def.matrixPosName;
+                canonical.active = true;
+                await canonical.save();
+
+                const wrongAssets = await WorkshopDealerAsset.find({ recipe:recipe._id }).lean();
+                for (const asset of wrongAssets) {
+                    const existing = await WorkshopDealerAsset.findOne({ dealer:asset.dealer, recipe:canonical._id });
+                    const qty = Math.max(0, Number(asset.qty) || 0);
+                    if (existing) {
+                        existing.qty = Math.max(Number(existing.qty) || 0, qty);
+                        await existing.save();
+                    } else if (qty > 0) {
+                        await WorkshopDealerAsset.create({ dealer:asset.dealer, recipe:canonical._id, qty });
+                    }
+                    affectedDealers.add(String(asset.dealer));
+                }
+                await WorkshopDealerAsset.deleteMany({ recipe:recipe._id });
+
+                await WorkshopRecipe.updateOne(
+                    { _id:recipe._id },
+                    { $set:{
+                        name:cleanName || def.name,
+                        outputType:def.outputType,
+                        matrixPosName:def.matrixPosName,
+                        stockQty:0,
+                        active:false,
+                        note:[String(recipe.note || '').trim(),'Автоматически объединено с торговым оборудованием '+def.recipeSku].filter(Boolean).join(' · ')
+                    } }
+                );
+                normalized++;
+                continue;
+            }
+        }
+
+        const updates = {};
+        if (currentName !== cleanName) updates.name = cleanName;
+        if (recipe.outputType === 'sample') updates.outputType = def.outputType || 'other';
+        if (def.matrixPosName && recipe.matrixPosName !== def.matrixPosName) updates.matrixPosName = def.matrixPosName;
+        if (Object.keys(updates).length) {
+            await WorkshopRecipe.updateOne({ _id:recipe._id }, { $set:updates });
+            normalized++;
+        }
+    }
+
+    for (const dealerId of affectedDealers) {
+        const assets = await WorkshopDealerAsset.find({ dealer:dealerId, qty:{ $gt:0 } }).select('recipe').lean();
+        for (const asset of assets) {
+            await syncWorkshopPosToDealer(dealerId, asset.recipe);
+        }
+    }
+
+    if (normalized) console.log(`Workshop POS normalization: ${normalized} recipes normalized`);
 }
 
 async function seedWorkshopRecipes() {
@@ -3327,24 +3444,30 @@ app.post('/api/workshop/opening-balance', requirePermission('can_manage_workshop
             } else if (line.productId) {
                 const product = await Product.findById(line.productId).lean();
                 if (!product) continue;
-                recipe = await WorkshopRecipe.findOne({
-                    product: product._id,
-                    outputType: 'sample',
-                    active: { $ne: false }
-                });
-                if (!recipe) {
-                    recipe = await WorkshopRecipe.create({
-                        name: `Планшет ${product.sku || ''} ${product.name || ''}`.trim(),
-                        outputType: 'sample',
-                        sku: `SAMPLE-${product.sku || String(product._id).slice(-6)}`,
+
+                const posDef = workshopPosDefinition({ product });
+                if (posDef?.recipeSku) {
+                    recipe = await WorkshopRecipe.findOne({ sku:posDef.recipeSku, active:{ $ne:false } });
+                } else {
+                    recipe = await WorkshopRecipe.findOne({
                         product: product._id,
-                        planksPerUnit: 0,
-                        packQtyOverride: 0,
-                        stockQty: 0,
-                        minStockQty: 0,
-                        active: true,
-                        note: 'Создано автоматически при вводе стартовых остатков. Норму производства можно заполнить позже.'
+                        outputType: 'sample',
+                        active: { $ne: false }
                     });
+                    if (!recipe) {
+                        recipe = await WorkshopRecipe.create({
+                            name: `Планшет ${product.sku || ''} ${product.name || ''}`.trim(),
+                            outputType: 'sample',
+                            sku: `SAMPLE-${product.sku || String(product._id).slice(-6)}`,
+                            product: product._id,
+                            planksPerUnit: 0,
+                            packQtyOverride: 0,
+                            stockQty: 0,
+                            minStockQty: 0,
+                            active: true,
+                            note: 'Создано автоматически при вводе стартовых остатков. Норму производства можно заполнить позже.'
+                        });
+                    }
                 }
             }
             if (!recipe) continue;
