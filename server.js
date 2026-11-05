@@ -1633,8 +1633,8 @@ app.post('/api/dealers', requirePermission('can_create_dealer'), async (req, res
     const scope = getUserScope(req);
     const payload = canonicalDealerPayload(req.body);
     if (req.user.role === 'manager' && !isGlobalViewer(req)) {
-        payload.responsibleUserId = '';
-        payload.responsibleAssignmentSource = '';
+        payload.responsibleUserId = String(req.user.id || '');
+        payload.responsibleAssignmentSource = 'self_create';
         if (scope === 'astana') payload.responsible = 'regional_astana';
         if (scope === 'regions') payload.responsible = 'regional_regions';
     }
@@ -1691,8 +1691,8 @@ app.put('/api/dealers/:id', requirePermission('can_edit_dealer'), async (req, re
     try {
         const payload = canonicalDealerPayload(req.body);
         if (req.user.role === 'manager' && !isGlobalViewer(req)) {
-            payload.responsibleUserId = '';
-            payload.responsibleAssignmentSource = '';
+            delete payload.responsibleUserId;
+            delete payload.responsibleAssignmentSource;
             if (req.user.scope === 'astana') payload.responsible = 'regional_astana';
             if (req.user.scope === 'regions') payload.responsible = 'regional_regions';
         }
@@ -1712,8 +1712,8 @@ app.patch('/api/dealers/:id', requirePermission('can_edit_dealer'), async (req, 
     try {
         const payload = canonicalDealerPayload(req.body);
         if (req.user.role === 'manager' && !isGlobalViewer(req)) {
-            payload.responsibleUserId = '';
-            payload.responsibleAssignmentSource = '';
+            delete payload.responsibleUserId;
+            delete payload.responsibleAssignmentSource;
             if (req.user.scope === 'astana') payload.responsible = 'regional_astana';
             if (req.user.scope === 'regions') payload.responsible = 'regional_regions';
         }
