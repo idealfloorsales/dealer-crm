@@ -557,7 +557,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const totalPlanks = packs * meta.pq;
             const output = meta.per > 0 ? Math.floor(totalPlanks / meta.per) : 0;
             const remainder = meta.per > 0 ? totalPlanks - output * meta.per : 0;
-            const disabled = !recipe || !meta.pq || !meta.per;
+            const disabled = !meta.pq;
             const stockClass = meta.needs ? 'is-low' : '';
             const urgency = meta.needs
                 ? `<span class="ws-memo-need"><i class="bi bi-exclamation-circle"></i> нужно пополнить</span>`
@@ -576,17 +576,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     <small>${meta.pq ? meta.pq+' пл./уп.' : 'не указано планок в упаковке'}${urgency}</small>
                 </div>
                 <div class="ws-memo-stock-cell">
-                    <strong>${recipe ? fmt(meta.stock) : '—'} шт</strong>
-                    <small>${recipe ? 'минимум '+fmt(meta.minimum) : 'нет нормы'} ${suggestion}</small>
+                    <strong>${recipe ? fmt(meta.stock) + ' шт' : '—'}</strong>
+                    <small>${recipe ? 'готовых · минимум '+fmt(meta.minimum) : 'норма не нужна для прихода'} ${suggestion}</small>
                 </div>
                 <div class="ws-memo-packs-cell">
                     <input type="number" min="1" step="1" inputmode="numeric" class="form-control ws-memo-grid-packs" value="${selected ? packs : ''}" placeholder="${meta.suggestedPacks || 1}" ${selected ? '' : 'disabled'}>
                 </div>
                 <div class="ws-memo-result-cell">
                     ${memoRecipeSelectHtml(productId, meta.recipes, recipe)}
-                    <div class="ws-memo-output-preview">${recipe && selected
-                        ? `<strong>${output} ${recipeTypeLabel(recipe).toLowerCase()}</strong><small>${totalPlanks} пл.${remainder ? ' · остаток '+remainder+' пл.' : ' · без отхода'}</small>`
-                        : recipe ? '<small>Отметьте позицию</small>' : '<small class="text-danger">Нельзя добавить без нормы</small>'}</div>
+                    <div class="ws-memo-output-preview">${selected
+                        ? (recipe && meta.per > 0
+                            ? `<strong>${output} ${recipeTypeLabel(recipe).toLowerCase()}</strong><small>${totalPlanks} пл.${remainder ? ' · остаток '+remainder+' пл.' : ' · без отхода'}</small>`
+                            : `<strong>${packs} уп.</strong><small>${totalPlanks} пл. · принять можно без нормы</small>`)
+                        : recipe ? '<small>Отметьте позицию</small>' : '<small>Можно принять без нормы</small>'}</div>
                 </div>
             </div>`;
         }).join('');
@@ -601,15 +603,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (check.checked) {
                     const meta = memoProductMeta(productById(productId));
                     const recipe = meta.selectedRecipe;
-                    if (!recipe) {
-                        check.checked = false;
-                        return toast('Сначала настройте рецептуру для этой позиции', 'warning');
-                    }
                     memoDraft.set(productId, {
                         recipeId: idOf(recipe),
-                        packs: meta.suggestedPacks || noWasteBatch(meta.pq, meta.per)?.packs || 1
-                    });
-                } else {
+                        packs: meta.suggestedPacks || (recipe ? noWasteBatch(meta.pq, meta.per)?.packs : 0) || 1
+                    });                } else {
                     memoDraft.delete(productId);
                 }
                 renderMemoProductPicker();
@@ -660,15 +657,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const productId = row?.dataset?.productId;
         const draft = memoDraft.get(productId);
         if (!row || !draft) return;
+        const product = productById(productId);
         const recipe = recipeById(draft.recipeId);
-        const pq = recipePack(recipe);
+        const pq = recipe ? recipePack(recipe) : packQty(product);
         const per = n(recipe?.planksPerUnit);
         const packs = Math.max(0, Math.floor(n(draft.packs)));
         const totalPlanks = packs * pq;
         const output = per > 0 ? Math.floor(totalPlanks / per) : 0;
         const remainder = per > 0 ? totalPlanks - output * per : 0;
         const preview = row.querySelector('.ws-memo-output-preview');
-        if (preview) preview.innerHTML = `<strong>${output} ${recipeTypeLabel(recipe).toLowerCase()}</strong><small>${totalPlanks} пл.${remainder ? ' · остаток '+remainder+' пл.' : ' · без отхода'}</small>`;
+        if (!preview) return;
+        preview.innerHTML = recipe && per > 0
+            ? `<strong>${output} ${recipeTypeLabel(recipe).toLowerCase()}</strong><small>${totalPlanks} пл.${remainder ? ' · остаток '+remainder+' пл.' : ' · без отхода'}</small>`
+            : `<strong>${packs} уп.</strong><small>${totalPlanks} пл. · норму производства можно задать позже</small>`;
     }
 
     function updateMemoSummary() {
@@ -676,22 +677,27 @@ document.addEventListener('DOMContentLoaded', () => {
         let totalPlanks = 0;
         let totalOutput = 0;
         let valid = true;
+        let withoutRecipe = 0;
         const breakdown = {};
 
         memoDraft.forEach((draft, productId) => {
             const recipe = recipeById(draft.recipeId);
             const product = productById(productId);
-            const pq = recipePack(recipe);
+            const pq = recipe ? recipePack(recipe) : packQty(product);
             const per = n(recipe?.planksPerUnit);
             const packs = Math.max(0, Math.floor(n(draft.packs)));
-            if (!product || !recipe || !pq || !per || packs <= 0) valid = false;
+            if (!product || !pq || packs <= 0) valid = false;
             const planks = packs * pq;
             const output = per > 0 ? Math.floor(planks / per) : 0;
             totalPacks += packs;
             totalPlanks += planks;
             totalOutput += output;
-            const label = recipeTypeLabel(recipe);
-            breakdown[label] = (breakdown[label] || 0) + output;
+            if (recipe && per > 0) {
+                const label = recipeTypeLabel(recipe);
+                breakdown[label] = (breakdown[label] || 0) + output;
+            } else {
+                withoutRecipe++;
+            }
         });
 
         if ($('ws-memo-total-lines')) $('ws-memo-total-lines').textContent = memoDraft.size;
@@ -705,16 +711,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 validation.textContent = 'Выберите позиции';
                 validation.className = '';
             } else if (!valid) {
-                validation.textContent = 'Проверьте количество и рецептуры';
+                validation.textContent = 'Проверьте количество упаковок и данные товара';
                 validation.className = 'is-error';
             } else {
                 const parts = Object.entries(breakdown).map(([name,qty]) => `${name}: ${fmt(qty)}`);
-                validation.textContent = `Готово · ${parts.join(' · ')}`;
+                const noNorm = withoutRecipe ? ` · без нормы: ${withoutRecipe} поз.` : '';
+                validation.textContent = `Готово к приходу${parts.length ? ' · '+parts.join(' · ') : ''}${noNorm}`;
                 validation.className = 'is-ok';
             }
         }
     }
-
     $('ws-memo-search')?.addEventListener('input', renderMemoProductPicker);
     document.querySelectorAll('[data-memo-filter]').forEach(button => {
         button.addEventListener('click', () => {
@@ -767,14 +773,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         memoDraft.forEach((draft, productId) => {
             const recipe = recipeById(draft.recipeId);
+            const product = productById(productId);
             const packs = Math.max(0, Math.floor(n(draft.packs)));
-            if (!recipe || packs <= 0) {
+            const pq = recipe ? recipePack(recipe) : packQty(product);
+            if (!product || !pq || packs <= 0) {
                 invalid = true;
                 return;
             }
             lines.push({
                 productId,
-                recipeId: idOf(recipe),
+                recipeId: recipe ? idOf(recipe) : null,
                 requestedPacks: packs
             });
         });
@@ -784,7 +792,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return null;
         }
         if (invalid) {
-            toast('Проверьте выбранные позиции и количество упаковок', 'warning');
+            toast('Проверьте количество упаковок и данные товара', 'warning');
             return null;
         }
         if (!String($('ws-memo-number')?.value || '').trim()) {
@@ -801,7 +809,6 @@ document.addEventListener('DOMContentLoaded', () => {
             lines
         };
     }
-
     $('ws-memo-form')?.addEventListener('submit', async event => {
         event.preventDefault();
         const payload = collectMemoPayload();
