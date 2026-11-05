@@ -7,6 +7,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const memoDraft = new Map();
     let memoFilter = 'all';
     let editingMemoId = '';
+    let openingFilter = 'all';
+    const openingDraft = new Map();
 
     function canManageWorkshop() {
         return Boolean(window.CRMAuth?.can?.('can_manage_workshop'));
@@ -68,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalIds = {
         memo:'ws-memo-modal', receipt:'ws-receipt-modal', production:'ws-production-modal', dealer:'ws-dealer-modal',
         material:'ws-material-modal', writeoff:'ws-writeoff-modal', recipe:'ws-recipe-modal',
-        stocktake:'ws-stocktake-modal', 'new-material':'ws-new-material-modal', 'production-edit':'ws-production-edit-modal'
+        stocktake:'ws-stocktake-modal', opening:'ws-opening-modal', 'new-material':'ws-new-material-modal', 'production-edit':'ws-production-edit-modal'
     };
     function showModal(name) {
         const el = $(modalIds[name]);
@@ -81,6 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (name === 'writeoff') resetWriteoff();
         if (name === 'recipe') resetRecipe();
         if (name === 'stocktake') buildStocktake();
+        if (name === 'opening') resetOpening();
         if (name === 'new-material') resetNewMaterial();
         bootstrap.Modal.getOrCreateInstance(el).show();
     }
@@ -128,10 +131,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderKpis() {
-        $('ws-kpi-today').textContent = fmt(state.stats.todayProduction);
-        $('ws-kpi-finished').textContent = fmt(state.stats.finishedStock);
-        $('ws-kpi-laminate').textContent = fmt(state.stats.laminatePlanks);
-        $('ws-kpi-low').textContent = fmt(state.stats.lowMaterials);
+        if ($('ws-kpi-open')) $('ws-kpi-open').textContent = fmt(state.stats.openMemos);
+        if ($('ws-kpi-today')) $('ws-kpi-today').textContent = fmt(state.stats.todayProduction);
+        if ($('ws-kpi-finished')) $('ws-kpi-finished').textContent = fmt(state.stats.finishedStock);
+        if ($('ws-kpi-dealers')) $('ws-kpi-dealers').textContent = fmt(state.stats.dealerAssetStock);
+
+        const banner = $('ws-opening-banner');
+        if (banner) {
+            const count = Math.max(0, n(state.stats.openingBalanceCount));
+            banner.classList.toggle('is-done', count > 0);
+            const text = $('ws-opening-banner-text');
+            const button = banner.querySelector('button');
+            if (text) text.textContent = count > 0
+                ? `Стартовые остатки уже фиксировались (${fmt(count)} корректировок). Если нашли ещё старые готовые образцы — их можно спокойно добавить здесь.`
+                : 'Внесите готовые образцы, которые уже лежат в цехе или уже стоят у дилеров. Производить их задним числом не нужно.';
+            if (button) button.textContent = count > 0 ? 'Дополнить остатки' : 'Внести остатки';
+        }
     }
 
     function memoStatusLabel(status) {
@@ -141,7 +156,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderMemos() {
         const host = $('ws-memo-list');
         if (!host) return;
-        const list = state.memos.slice(0, 16);
+        const list = [...state.memos]
+            .sort((a,b) => {
+                const rank = status => status === 'mismatch' ? 0 : status === 'created' ? 1 : status === 'accepted' ? 2 : 3;
+                return rank(a.status) - rank(b.status) || new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt);
+            })
+            .slice(0, 12);
         if (!list.length) {
             host.innerHTML = '<div class="workshop-empty"><i class="bi bi-file-earmark-text"></i>Служебных записок пока нет</div>';
             return;
@@ -360,7 +380,8 @@ document.addEventListener('DOMContentLoaded', () => {
         production_material:'Материал в производство', production_component:'Компонент в производство',
         production_output:'Изготовлено', dealer_issue:'Выдано дилеру', dealer_return:'Возврат от дилера',
         dealer_replacement:'Замена у дилера', writeoff:'Списание', material_receipt:'Приход материала',
-        material_issue:'Расход материала', stocktake_adjustment:'Корректировка инвентаризации'
+        material_issue:'Расход материала', stocktake_adjustment:'Корректировка инвентаризации',
+        opening_balance:'Стартовый остаток в цехе', opening_dealer_balance:'Стартовый остаток у дилера'
     };
 
     function movementName(item) {
@@ -411,13 +432,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const open = state.memos.filter(item => item.status === 'created' || item.status === 'mismatch');
             $('ws-receipt-memo').innerHTML = option('', 'Выберите служебную записку') + open.map(item => option(idOf(item), `№${item.number} · ${dateText(item.date)} · ${(item.lines || []).length} поз.`)).join('');
         }
+        if ($('ws-opening-dealer')) $('ws-opening-dealer').innerHTML = dealerOptions();
         updateWriteoffItems();
     }
 
     function resetMemo() {
         editingMemoId = '';
         $('ws-memo-form')?.reset();
-        if ($('ws-memo-title')) $('ws-memo-title').textContent = 'Новая служебная записка';
+        if ($('ws-memo-title')) $('ws-memo-title').textContent = 'Что приняли со склада';
+        if ($('ws-memo-quick-submit')) $('ws-memo-quick-submit').hidden = false;
         $('ws-memo-date').value = todayValue();
         const currentUser = window.CRMAuth?.user || {};
         $('ws-memo-signed').value = currentUser.fullName || currentUser.name || currentUser.username || '';
@@ -710,6 +733,7 @@ document.addEventListener('DOMContentLoaded', () => {
         resetMemo();
         editingMemoId = memoId;
         if ($('ws-memo-title')) $('ws-memo-title').textContent = `Редактирование служебной №${memo.number}`;
+        if ($('ws-memo-quick-submit')) $('ws-memo-quick-submit').hidden = true;
         $('ws-memo-number').value = memo.number || '';
         $('ws-memo-date').value = dateInputValue(memo.date);
         $('ws-memo-signed').value = memo.signedBy || memo.createdBy?.name || '';
@@ -737,8 +761,7 @@ document.addEventListener('DOMContentLoaded', () => {
         await send(API + '/memos/' + encodeURIComponent(memoId), 'DELETE', {}, 'Служебная записка удалена');
     }
 
-        $('ws-memo-form')?.addEventListener('submit', async event => {
-        event.preventDefault();
+    function collectMemoPayload() {
         const lines = [];
         let invalid = false;
 
@@ -756,16 +779,33 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
-        if (!lines.length) return toast('Отметьте хотя бы одну позицию', 'warning');
-        if (invalid) return toast('Проверьте выбранные позиции и количество упаковок', 'warning');
+        if (!lines.length) {
+            toast('Отметьте хотя бы одну позицию', 'warning');
+            return null;
+        }
+        if (invalid) {
+            toast('Проверьте выбранные позиции и количество упаковок', 'warning');
+            return null;
+        }
+        if (!String($('ws-memo-number')?.value || '').trim()) {
+            toast('Укажите номер служебной записки', 'warning');
+            $('ws-memo-number')?.focus();
+            return null;
+        }
 
-        const payload = {
+        return {
             number: $('ws-memo-number').value,
             date: $('ws-memo-date').value,
             signedBy: $('ws-memo-signed').value,
             note: $('ws-memo-note').value,
             lines
         };
+    }
+
+    $('ws-memo-form')?.addEventListener('submit', async event => {
+        event.preventDefault();
+        const payload = collectMemoPayload();
+        if (!payload) return;
         await send(
             editingMemoId ? API + '/memos/' + encodeURIComponent(editingMemoId) : API + '/memos',
             editingMemoId ? 'PUT' : 'POST',
@@ -773,6 +813,58 @@ document.addEventListener('DOMContentLoaded', () => {
             editingMemoId ? 'Служебная записка обновлена' : 'Служебная записка создана',
             'memo'
         );
+    });
+
+    $('ws-memo-quick-submit')?.addEventListener('click', async () => {
+        if (editingMemoId) return;
+        const payload = collectMemoPayload();
+        if (!payload) return;
+
+        const button = $('ws-memo-quick-submit');
+        const oldHtml = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Принимаем…';
+        try {
+            const createResponse = await fetch(API + '/memos', {
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify(payload)
+            });
+            const memo = await createResponse.json().catch(() => ({}));
+            if (!createResponse.ok) throw new Error(memo.error || 'Не удалось создать служебную записку');
+
+            const memoId = idOf(memo);
+            const receiveLines = (memo.lines || []).map(line => ({
+                lineId:idOf(line),
+                actualProductId:idOf(line.product),
+                deliveredPacks:Math.max(0, Math.floor(n(line.requestedPacks))),
+                checked:true,
+                discrepancyReason:''
+            }));
+            const receiveResponse = await fetch(API + '/memos/' + encodeURIComponent(memoId) + '/receive', {
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({
+                    date:payload.date || todayValue(),
+                    note:payload.note || '',
+                    lines:receiveLines
+                })
+            });
+            const received = await receiveResponse.json().catch(() => ({}));
+            if (!receiveResponse.ok || received.accepted === false) {
+                throw new Error(received.error || received.message || 'Служебка создана, но приход требует отдельной сверки');
+            }
+
+            hideModal('memo');
+            toast('Приход принят и оприходован одним действием', 'success');
+            await load();
+        } catch (error) {
+            toast(error.message || 'Ошибка при оформлении прихода', 'error');
+            await load();
+        } finally {
+            button.disabled = false;
+            button.innerHTML = oldHtml;
+        }
     });
 
     function openQuickNorm(productId) {
@@ -974,6 +1066,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function resetProduction() {
         $('ws-production-form')?.reset();
+        const advanced = $('ws-production-form')?.querySelector('.workshop-advanced-fields');
+        if (advanced) advanced.open = false;
         $('ws-production-date').value = todayValue();
         $('ws-production-output').value = 1;
         if ($('ws-production-custom-toggle')) $('ws-production-custom-toggle').checked = false;
@@ -1099,14 +1193,26 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function resetDealerMovement() {
-        $('ws-dealer-form')?.reset(); $('ws-dealer-date').value=todayValue(); $('ws-dealer-qty').value=1;
-        populateFormSelects(); updateDealerCurrent();
+        $('ws-dealer-form')?.reset();
+        $('ws-dealer-date').value=todayValue();
+        $('ws-dealer-qty').value=1;
+        const extra = $('ws-dealer-extra');
+        if (extra) extra.open = false;
+        populateFormSelects();
+        updateDealerCurrent();
     }
     function updateDealerCurrent() {
         const dealerId=$('ws-dealer-id')?.value, recipeId=$('ws-dealer-recipe')?.value;
+        const action=$('ws-dealer-action')?.value || 'issue';
         const asset=state.dealerAssets.find(x=>idOf(x.dealer)===dealerId && idOf(x.recipe)===recipeId);
         const recipe=recipeById(recipeId);
-        $('ws-dealer-current').innerHTML = recipe ? `В цехе готово: <strong>${fmt(recipe.stockQty)} шт</strong> · У выбранного дилера числится: <strong>${fmt(asset?.qty || 0)} шт</strong>.` : 'Выберите дилера и изделие.';
+        const conditionWrap=$('ws-dealer-condition-wrap');
+        if (conditionWrap) conditionWrap.hidden = action === 'issue';
+        const extra=$('ws-dealer-extra');
+        if (extra && action !== 'issue') extra.open = true;
+        $('ws-dealer-current').innerHTML = recipe
+            ? `В цехе: <strong>${fmt(recipe.stockQty)} шт</strong> · У дилера: <strong>${fmt(asset?.qty || 0)} шт</strong>.`
+            : 'Выберите дилера и изделие.';
     }
     ['ws-dealer-id','ws-dealer-recipe','ws-dealer-action'].forEach(id=>$(id)?.addEventListener('change',updateDealerCurrent));
     $('ws-dealer-form')?.addEventListener('submit', async event => {
