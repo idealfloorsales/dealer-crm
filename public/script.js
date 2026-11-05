@@ -1440,7 +1440,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if(editCurrentAvatarUrl) editCurrentAvatarUrl.value = d.avatarUrl || ''; newAvatarBase64 = null;
             renderList(editContactList, d.contacts, createContactEntryHTML); renderList(editAddressList, d.additional_addresses, createAddressEntryHTML); renderList(editPosList, d.pos_materials, createPosEntryHTML); renderList(editVisitsList, d.visits, createVisitEntryHTML); renderList(editCompetitorList, d.competitors, createCompetitorEntryHTML);
             renderProductChecklist(editProductChecklist, (d.products||[]).map(p=>p.id)); editPhotosData = d.photos||[]; renderPhotoPreviews(editPhotoPreviewContainer, editPhotosData);
-            const firstTabEl = document.querySelector('#editTabs button[data-bs-target="#tab-main"]'); if(firstTabEl) { const tab = new bootstrap.Tab(firstTabEl); tab.show(); } editModal.show();
+            const firstTabEl = document.querySelector('#editTabs button[data-bs-target="#tab-main"]'); if(firstTabEl) { const tab = new bootstrap.Tab(firstTabEl); tab.show(); }
+            document.querySelectorAll('[data-field-shortcuts="edit"] button').forEach((item,index) => item.classList.toggle('active', index === 0));
+            editModal.show();
         } catch(e){ window.showToast("Ошибка загрузки данных", "error"); console.error(e); }
     }
     // EXPOSE TO WINDOW
@@ -2357,6 +2359,7 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
         }
         currentStep = 1;
         showStep(1);
+        document.querySelectorAll('[data-field-shortcuts="add"] button').forEach((item,index) => item.classList.toggle('active', index === 0));
         addModal.show(); 
     };
     let currentStep = 1;
