@@ -329,14 +329,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const text = `${stock.product?.sku || ''} ${stock.product?.name || ''}`.toLowerCase();
             return !term || text.includes(term);
         });
-        laminateHost.innerHTML = rows.length ? `<table class="workshop-table"><thead><tr><th>SKU / декор</th><th>Актуальность</th><th>В упаковке</th><th>Остаток</th><th>Эквивалент</th></tr></thead><tbody>${rows.map(stock => {
+        laminateHost.innerHTML = rows.length ? `<table class="workshop-table"><thead><tr><th>SKU / декор</th><th>Актуальность</th><th>В упаковке</th><th>Остаток</th><th>Эквивалент</th><th></th></tr></thead><tbody>${rows.map(stock => {
             const pq = packQty(stock.product);
             const planks = n(stock.planksQty);
             const packs = pq > 0 ? Math.floor(planks / pq) : 0;
             const loose = pq > 0 ? Math.round(planks - packs*pq) : planks;
             return `<tr><td><div class="ws-stock-main"><strong>${esc(stock.product?.sku || '—')} · ${esc(stock.product?.name || '')}</strong><small>${esc(stock.product?.characteristics?.size || '')}</small></div></td>
             <td><span class="ws-liquid ${stock.product?.is_liquid === false ? 'is-old':''}">${stock.product?.is_liquid === false ? 'неактуален':'актуален'}</span></td>
-            <td>${pq ? pq+' пл.' : 'не задано'}</td><td><strong>${fmt(planks)} пл.</strong></td><td>${pq ? `${packs} уп. + ${loose} пл.` : '—'}</td></tr>`;
+            <td>${pq ? pq+' пл.' : 'не задано'}</td><td><strong>${fmt(planks)} пл.</strong></td><td>${pq ? `${packs} уп. + ${loose} пл.` : '—'}</td><td>${canManageWorkshop() ? `<button type="button" class="workshop-icon-action" data-correct-stock="laminate" data-correct-id="${idOf(stock.product)}" title="Исправить фактический остаток"><i class="bi bi-pencil-square"></i></button>` : ''}</td></tr>`;
         }).join('')}</tbody></table>` : '<div class="workshop-empty"><i class="bi bi-layers"></i>Ламинат в цех ещё не принимали</div>';
 
         const finished = state.recipes.filter(item => !term || `${item.name} ${item.sku || ''} ${item.product?.name || ''}`.toLowerCase().includes(term));
@@ -344,7 +344,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const minimum = Math.max(0, n(item.minStockQty));
             const low = minimum > 0 && n(item.stockQty) <= minimum;
             return `<div class="workshop-stock-card ${low ? 'is-low' : ''}">
-                <div><strong>${esc(item.name)}</strong><small>${esc(item.outputType === 'sample' ? 'образец / планшет' : item.outputType === 'stand' ? 'стенд' : item.outputType)}${item.product ? ' · '+esc(item.product.sku || '') : ''}${minimum > 0 ? ' · минимум '+fmt(minimum) : ''}</small></div><b>${fmt(item.stockQty)} шт</b>
+                <div><strong>${esc(item.name)}</strong><small>${esc(item.outputType === 'sample' ? 'образец / планшет' : item.outputType === 'stand' ? 'стенд' : item.outputType)}${item.product ? ' · '+esc(item.product.sku || '') : ''}${minimum > 0 ? ' · минимум '+fmt(minimum) : ''}</small></div>
+                <div class="workshop-stock-actions"><b>${fmt(item.stockQty)} шт</b>${canManageWorkshop() ? `<button type="button" class="workshop-icon-action" data-correct-stock="finished" data-correct-id="${idOf(item)}" title="Исправить фактический остаток"><i class="bi bi-pencil-square"></i></button>` : ''}</div>
             </div>`;
         }).join('') : '<div class="workshop-empty">Нет рецептур</div>';
 
@@ -357,11 +358,17 @@ document.addEventListener('DOMContentLoaded', () => {
             return `<div class="workshop-stock-card ${low?'is-low':''}">
                 <div><strong>${esc(item.name)}</strong><small>${esc(item.code || item.category || '')}${purchase}${low ? ' · минимум '+fmt(item.minQty,2):''}</small></div>
                 <div class="workshop-stock-actions"><b>${fmt(item.stockQty,2)} ${esc(item.unit || 'шт')}</b>
-                    ${canManageWorkshop() ? `<button type="button" class="workshop-icon-action" data-edit-material="${idOf(item)}" title="Редактировать"><i class="bi bi-pencil"></i></button>` : ''}
+                    ${canManageWorkshop() ? `<button type="button" class="workshop-icon-action" data-correct-stock="material" data-correct-id="${idOf(item)}" title="Исправить фактический остаток"><i class="bi bi-pencil-square"></i></button>` : ''}
+                    ${canManageWorkshop() ? `<button type="button" class="workshop-icon-action" data-edit-material="${idOf(item)}" title="Редактировать настройки материала"><i class="bi bi-gear"></i></button>` : ''}
                     ${isWorkshopAdmin() ? `<button type="button" class="workshop-icon-action is-danger" data-delete-material="${idOf(item)}" title="Удалить"><i class="bi bi-trash3"></i></button>` : ''}
                 </div>
             </div>`;
         }).join('') : '<div class="workshop-empty">Материалы не найдены</div>';
+        ['ws-laminate-stock','ws-finished-stock','ws-material-stock'].forEach(hostId => {
+            $(hostId)?.querySelectorAll('[data-correct-stock]').forEach(button => {
+                button.addEventListener('click',() => openStockCorrection(button.dataset.correctStock,button.dataset.correctId,'stock'));
+            });
+        });
         $('ws-material-stock')?.querySelectorAll('[data-edit-material]').forEach(button => {
             button.addEventListener('click', () => openMaterialEdit(button.dataset.editMaterial));
         });
