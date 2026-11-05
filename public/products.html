@@ -11,7 +11,9 @@
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="style.css?v={{VER}}"> <link rel="icon" href="favicon.gif" type="image/gif">
+    <link rel="stylesheet" href="style.css?v={{VER}}">
+    <link rel="stylesheet" href="products.css?v={{VER}}">
+    <link rel="icon" href="favicon.gif" type="image/gif">
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
@@ -38,9 +40,9 @@
     <main class="container-fluid app-page-shell">
         <section class="app-page-hero">
             <div class="app-page-hero-copy">
-                <div class="app-page-eyebrow">IDEAL FLOOR CRM · ТОВАРЫ</div>
-                <h1>Каталог</h1>
-                <p>Товарная матрица, остатки и характеристики коллекций.</p>
+                <div class="app-page-eyebrow">IDEAL FLOOR CRM · ТОВАРНАЯ МАТРИЦА</div>
+                <h1>Матрица</h1>
+                <p>Рабочий каталог ассортимента: актуальность позиций, остатки, упаковка и качество заполнения карточек.</p>
             </div>
             <div class="app-page-actions">
                 <button class="app-hero-secondary" onclick="openGlobalCalc()"><i class="bi bi-calculator"></i><span>Калькулятор</span></button>
@@ -51,18 +53,88 @@
             </div>
         </section>
 
-        <div class="app-toolbar-card sticky-filters">
-            <div class="input-group">
-                <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-search"></i></span>
-                <input type="text" id="product-search" class="form-control border-start-0 ps-0" placeholder="Поиск по артикулу или названию...">
-            </div>
-        </div>
+        <section id="product-kpis" class="product-kpi-grid">
+            <div class="product-kpi-loading">Загрузка товарной матрицы…</div>
+        </section>
 
-        <div id="products-list-container" class="d-flex flex-column gap-2">
-            <p class="text-center text-muted p-5">Загрузка...</p>
-        </div>
+        <section class="app-toolbar-card sticky-filters product-toolbar">
+            <div class="product-search-row">
+                <div class="product-search-box">
+                    <i class="bi bi-search"></i>
+                    <input type="search" id="product-search" class="form-control" placeholder="Артикул, название, размер, класс, фаска…">
+                    <button type="button" id="product-search-clear" title="Очистить поиск" hidden><i class="bi bi-x-lg"></i></button>
+                </div>
+                <button type="button" id="product-reset-filters" class="product-reset-btn"><i class="bi bi-arrow-counterclockwise"></i><span>Сбросить</span></button>
+            </div>
+
+            <div class="product-filter-grid">
+                <label>
+                    <span>Актуальность</span>
+                    <select id="filter-select" class="form-select">
+                        <option value="liquid" selected>Ликвидные</option>
+                        <option value="illiquid">Неликвидные</option>
+                        <option value="all">Все позиции</option>
+                    </select>
+                </label>
+                <label>
+                    <span>Остаток</span>
+                    <select id="stock-filter" class="form-select">
+                        <option value="all">Любой остаток</option>
+                        <option value="positive">Есть на складе</option>
+                        <option value="low">Мало — до 20 м²</option>
+                        <option value="zero">Нет остатка</option>
+                        <option value="unknown">Не загружен</option>
+                    </select>
+                </label>
+                <label>
+                    <span>Класс</span>
+                    <select id="class-filter" class="form-select"><option value="">Все классы</option></select>
+                </label>
+                <label>
+                    <span>Толщина</span>
+                    <select id="thickness-filter" class="form-select"><option value="">Любая</option></select>
+                </label>
+                <label>
+                    <span>Данные карточки</span>
+                    <select id="completeness-filter" class="form-select">
+                        <option value="all">Все</option>
+                        <option value="complete">Заполненные</option>
+                        <option value="incomplete">Требуют заполнения</option>
+                    </select>
+                </label>
+                <label>
+                    <span>Сортировка</span>
+                    <select id="sort-select" class="form-select">
+                        <option value="sku">По артикулу</option>
+                        <option value="name">По названию</option>
+                        <option value="stock_desc">Остаток: больше → меньше</option>
+                        <option value="stock_asc">Остаток: меньше → больше</option>
+                        <option value="incomplete">Сначала неполные</option>
+                    </select>
+                </label>
+            </div>
+
+            <div class="product-toolbar-meta">
+                <div id="active-filter-summary">Рабочая матрица · ликвидные позиции</div>
+                <div id="filtered-summary"></div>
+            </div>
+        </section>
+
+        <section class="product-list-panel">
+            <div class="product-list-head" aria-hidden="true">
+                <span>Позиция</span>
+                <span>Характеристики</span>
+                <span>Упаковка</span>
+                <span>Остаток</span>
+                <span>Статус</span>
+                <span></span>
+            </div>
+            <div id="products-list-container" class="product-list">
+                <div class="product-empty-state"><span class="spinner-border spinner-border-sm"></span>Загрузка…</div>
+            </div>
+        </section>
         
-        <p id="total-count" class="text-center text-muted mt-4 small">Всего товаров: 0</p>
+        <p id="total-count" class="product-total-count">Загрузка…</p>
     </main>
 
     <div class="modal fade" id="product-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
