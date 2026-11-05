@@ -1212,7 +1212,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     dealers:['shop-window','/'], matrix:['grid-3x3-gap','/report.html'], visits:['geo-alt','/'],
                     products:['boxes','/products.html'], sales:['graph-up-arrow','/sales.html'], competitors:['globe2','/competitors.html'],
                     knowledge:['journal-text','/knowledge.html'], reclamations:['shield-exclamation','/reclamations.html'],
-                    workshop:['tools','/workshop.html'], pricing:['percent','/pricing.html'], users:['people','/users.html'],
+                    workshop:['tools','/workshop.html'], pricing:['percent','/pricing.html'], exports:['file-earmark-spreadsheet','/audit.html'], users:['people','/users.html'],
                     settings:['gear','/']
                 };
                 container.innerHTML = renderActivityFeed.auditItems.slice(0,8).map(item => {
