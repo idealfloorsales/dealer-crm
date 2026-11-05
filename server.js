@@ -1956,6 +1956,11 @@ app.get('/api/workshop/bootstrap', requirePermission('can_view_workshop'), async
         const lowMaterials = materials.filter(item => Number(item.minQty) > 0 && Number(item.stockQty) <= Number(item.minQty)).length;
         const laminatePlanks = laminateStocks.reduce((sum, item) => sum + (Number(item.planksQty) || 0), 0);
         const openMemos = memos.filter(item => item.status === 'created' || item.status === 'mismatch').length;
+        const visibleAssets = assets.filter(asset => !isNonWorkingDealerStatus(asset.dealer?.status));
+        const dealerAssetStock = visibleAssets.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+        const openingBalanceCount = await WorkshopMovement.countDocuments({
+            type: { $in: ['opening_balance', 'opening_dealer_balance'] }
+        });
 
         res.json({
             products: products.map(convertToClient),
@@ -1963,11 +1968,11 @@ app.get('/api/workshop/bootstrap', requirePermission('can_view_workshop'), async
             materials: materials.map(convertToClient),
             recipes: recipes.map(convertToClient),
             laminateStocks: laminateStocks.map(convertToClient),
-            dealerAssets: assets.filter(asset => !isNonWorkingDealerStatus(asset.dealer?.status)).map(convertToClient),
+            dealerAssets: visibleAssets.map(convertToClient),
             productions: productions.map(convertToClient),
             movements: movements.map(convertToClient),
             memos: memos.map(convertToClient),
-            stats: { todayProduction, finishedStock, lowMaterials, laminatePlanks, openMemos }
+            stats: { todayProduction, finishedStock, lowMaterials, laminatePlanks, openMemos, dealerAssetStock, openingBalanceCount }
         });
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -2857,6 +2862,93 @@ app.get('/api/workshop/dealers/:dealerId/assets', requireAnyPermission('can_view
         res.json(assets.map(convertToClient));
     } catch (e) {
         res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/opening-balance', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const location = req.body.location === 'dealer' ? 'dealer' : 'workshop';
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
+        const date = req.body.date || new Date();
+        const note = String(req.body.note || '').trim();
+        if (!inputLines.length) return res.status(400).json({ error: 'Укажите хотя бы один фактический остаток' });
+
+        let dealer = null;
+        if (location === 'dealer') {
+            if (!req.body.dealerId) return res.status(400).json({ error: 'Выберите дилера' });
+            dealer = await Dealer.findOne({
+                _id: req.body.dealerId,
+                ...getWorkingDealerFilter(getDealerFilter(req))
+            }).select('_id name');
+            if (!dealer) return res.status(404).json({ error: 'Дилер не найден или недоступен' });
+        }
+
+        const changed = [];
+        for (const line of inputLines) {
+            const recipeId = line.recipeId;
+            if (!recipeId) continue;
+            const recipe = await WorkshopRecipe.findOne({ _id: recipeId, active: { $ne: false } });
+            if (!recipe) continue;
+
+            const actualQty = Math.max(0, workshopNumber(line.actualQty));
+            const lineNote = String(line.note || '').trim();
+
+            if (location === 'workshop') {
+                const previousQty = Number(recipe.stockQty) || 0;
+                const delta = actualQty - previousQty;
+                if (Math.abs(delta) <= 0.0001) continue;
+
+                await workshopChangeRecipe(recipe._id, delta);
+                await WorkshopMovement.create({
+                    date,
+                    type: 'opening_balance',
+                    entityType: 'finished',
+                    recipe: recipe._id,
+                    direction: delta > 0 ? 'in' : 'out',
+                    qty: Math.abs(delta),
+                    unit: 'шт',
+                    note: lineNote || note || 'Стартовый остаток готовых образцов до начала учёта в CRM',
+                    meta: { previousQty, actualQty, delta, source: 'legacy_opening_balance' },
+                    createdBy: workshopUser(req)
+                });
+                changed.push({ recipeId: String(recipe._id), previousQty, actualQty, delta });
+            } else {
+                let asset = await WorkshopDealerAsset.findOne({ dealer: dealer._id, recipe: recipe._id });
+                const previousQty = Number(asset?.qty) || 0;
+                const delta = actualQty - previousQty;
+                if (Math.abs(delta) <= 0.0001) continue;
+
+                if (!asset) asset = new WorkshopDealerAsset({ dealer: dealer._id, recipe: recipe._id, qty: 0 });
+                asset.qty = actualQty;
+                await asset.save();
+
+                await WorkshopMovement.create({
+                    date,
+                    type: 'opening_dealer_balance',
+                    entityType: 'finished',
+                    recipe: recipe._id,
+                    dealer: dealer._id,
+                    direction: 'neutral',
+                    qty: Math.abs(delta),
+                    unit: 'шт',
+                    note: lineNote || note || 'Образцы уже находились у дилера до начала учёта в CRM',
+                    meta: { previousQty, actualQty, delta, source: 'legacy_opening_balance' },
+                    createdBy: workshopUser(req)
+                });
+                await syncWorkshopPosToDealer(dealer._id, recipe._id);
+                changed.push({ recipeId: String(recipe._id), previousQty, actualQty, delta });
+            }
+        }
+
+        if (!changed.length) return res.status(400).json({ error: 'Фактические остатки не отличаются от текущих' });
+        res.status(201).json({
+            status: 'ok',
+            location,
+            dealerId: dealer ? String(dealer._id) : '',
+            changed
+        });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
     }
 });
 
