@@ -275,7 +275,7 @@ function auditRouteMeta(req) {
     else if (path.startsWith('/api/exports')) { module='exports'; entityType='export'; }
     else if (path.startsWith('/api/statuses') || path.startsWith('/api/sectors')) { module='settings'; entityType=path.startsWith('/api/statuses')?'status':'sector'; }
     let action = req.method === 'DELETE' ? 'delete' : ((req.method === 'PUT' || req.method === 'PATCH') ? 'update' : 'create');
-    if (path === '/api/sales' || path.startsWith('/api/exports') || path === '/api/workshop/print-log' || /\/visits(?:\/|$)/.test(path) || /\/receive$/.test(path) || /\/material-movement$/.test(path) || /\/production$/.test(path) || /\/writeoff$/.test(path) || /\/dealer-movement$/.test(path) || /\/opening-balance$/.test(path) || /\/stocktake$/.test(path) || path === '/api/admin/import-catalog') action='execute';
+    if (path === '/api/sales' || path.startsWith('/api/exports') || path === '/api/workshop/print-log' || path === '/api/workshop/correction' || /\/visits(?:\/|$)/.test(path) || /\/receive$/.test(path) || /\/material-movement$/.test(path) || /\/production$/.test(path) || /\/writeoff$/.test(path) || /\/dealer-movement$/.test(path) || /\/opening-balance$/.test(path) || /\/stocktake$/.test(path) || path === '/api/admin/import-catalog') action='execute';
     return { module, entityType, action };
 }
 
@@ -347,6 +347,11 @@ function auditSummary(req, route, label) {
     if (path.endsWith('/dealer-movement')) return 'Провёл выдачу / возврат по дилеру';
     if (path.endsWith('/opening-balance')) return 'Зафиксировал стартовые остатки цеха';
     if (path.endsWith('/stocktake')) return 'Провёл инвентаризацию цеха';
+    if (path === '/api/workshop/correction') {
+        const count=Array.isArray(req.body?.lines)?req.body.lines.length:0;
+        const reason=String(req.body?.reason||'').trim();
+        return 'Исправил остаток цеха' + (count>1?' · '+count+' позиции':'') + (reason?' · '+reason:'');
+    }
     if (path === '/api/workshop/print-log') {
         const title=String(req.body?.title||req.body?.type||'документ').trim();
         return 'Распечатал документ цеха · '+title;
@@ -3400,6 +3405,140 @@ app.post('/api/workshop/opening-balance', requirePermission('can_manage_workshop
             location,
             dealerId: dealer ? String(dealer._id) : '',
             changed
+        });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/correction', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const reason = String(req.body.reason || '').trim();
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines.slice(0, 10) : [];
+        if (reason.length < 3) return res.status(400).json({ error: 'Укажите причину исправления' });
+        if (!inputLines.length) return res.status(400).json({ error: 'Добавьте хотя бы одну позицию' });
+
+        const prepared = [];
+        const seen = new Set();
+
+        for (const line of inputLines) {
+            const entityType = String(line.entityType || '').trim();
+            const id = String(line.id || '').trim();
+            const actualQty = Math.max(0, workshopNumber(line.actualQty));
+            if (!['finished','laminate','material'].includes(entityType) || !id) {
+                return res.status(400).json({ error: 'Некорректная позиция для исправления' });
+            }
+
+            const key = entityType + ':' + id;
+            if (seen.has(key)) return res.status(400).json({ error: 'Одна и та же позиция добавлена дважды' });
+            seen.add(key);
+
+            if (entityType === 'finished') {
+                const item = await WorkshopRecipe.findById(id).lean();
+                if (!item) return res.status(404).json({ error: 'Готовое изделие не найдено' });
+                prepared.push({
+                    entityType, id, actualQty,
+                    previousQty: Math.max(0, Number(item.stockQty) || 0),
+                    unit: 'шт',
+                    name: item.name || 'Готовое изделие',
+                    recipe: id
+                });
+            } else if (entityType === 'material') {
+                const item = await WorkshopMaterial.findById(id).lean();
+                if (!item) return res.status(404).json({ error: 'Материал не найден' });
+                prepared.push({
+                    entityType, id, actualQty,
+                    previousQty: Math.max(0, Number(item.stockQty) || 0),
+                    unit: item.unit || 'шт',
+                    name: item.name || 'Материал',
+                    material: id
+                });
+            } else {
+                const product = await Product.findById(id).select('sku name').lean();
+                if (!product) return res.status(404).json({ error: 'Ламинат не найден' });
+                const stock = await WorkshopLaminateStock.findOne({ product: id }).lean();
+                prepared.push({
+                    entityType, id, actualQty,
+                    previousQty: Math.max(0, Number(stock?.planksQty) || 0),
+                    unit: 'планка',
+                    name: [product.sku, product.name].filter(Boolean).join(' · ') || 'Ламинат',
+                    product: id
+                });
+            }
+        }
+
+        const changed = prepared
+            .map(item => ({ ...item, delta: item.actualQty - item.previousQty }))
+            .filter(item => Math.abs(item.delta) > 0.0001);
+
+        if (!changed.length) return res.status(400).json({ error: 'Новые остатки совпадают с текущими' });
+
+        const savedLines = [];
+        for (const item of changed) {
+            if (item.entityType === 'finished') {
+                await WorkshopRecipe.updateOne({ _id: item.id }, { $set: { stockQty: item.actualQty } });
+            } else if (item.entityType === 'material') {
+                await WorkshopMaterial.updateOne({ _id: item.id }, { $set: { stockQty: item.actualQty } });
+            } else {
+                await WorkshopLaminateStock.findOneAndUpdate(
+                    { product: item.id },
+                    { $set: { planksQty: item.actualQty } },
+                    { upsert: true, new: true, setDefaultsOnInsert: true }
+                );
+            }
+
+            await WorkshopMovement.create({
+                date: req.body.date || new Date(),
+                type: 'manual_correction',
+                entityType: item.entityType,
+                product: item.product || null,
+                material: item.material || null,
+                recipe: item.recipe || null,
+                direction: item.delta > 0 ? 'in' : 'out',
+                qty: Math.abs(item.delta),
+                unit: item.unit,
+                note: reason,
+                meta: {
+                    previousQty: item.previousQty,
+                    actualQty: item.actualQty,
+                    delta: item.delta,
+                    reason,
+                    source: 'manual_correction'
+                },
+                createdBy: workshopUser(req)
+            });
+
+            savedLines.push({
+                entityType: item.entityType,
+                product: item.product || null,
+                material: item.material || null,
+                recipe: item.recipe || null,
+                systemQty: item.previousQty,
+                actualQty: item.actualQty,
+                delta: item.delta,
+                note: reason
+            });
+        }
+
+        await WorkshopStocktake.create({
+            date: req.body.date || new Date(),
+            lines: savedLines,
+            note: 'Корректировка остатка: ' + reason,
+            createdBy: workshopUser(req)
+        });
+
+        res.status(201).json({
+            status: 'ok',
+            reason,
+            changed: changed.map(item => ({
+                entityType: item.entityType,
+                id: item.id,
+                name: item.name,
+                previousQty: item.previousQty,
+                actualQty: item.actualQty,
+                delta: item.delta,
+                unit: item.unit
+            }))
         });
     } catch (e) {
         res.status(400).json({ error: e.message });
