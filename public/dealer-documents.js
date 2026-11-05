@@ -52,46 +52,10 @@
     }
 
     function getLegalEntities(dealer) {
-        if (Array.isArray(dealer.legal_entities) && dealer.legal_entities.length) {
-            return dealer.legal_entities.filter(entity => entity && (entity.organizationName || entity.bin || entity.iik));
-        }
-
-        const r = dealer.requisites || {};
-        const orgs = Array.isArray(dealer.organizations) ? dealer.organizations.filter(Boolean) : [];
-        const contacts = Array.isArray(dealer.contacts) ? dealer.contacts : [];
-        const leader = contacts.find(c => /директор|руководител|владел/i.test(String(c?.position || ''))) || contacts[0] || {};
-        const primaryName = r.organizationName || orgs[0] || dealer.organization || dealer.name || '';
-        const entities = [];
-
-        if (primaryName || Object.values(r).some(Boolean)) {
-            entities.push({
-                type: inferEntityType('', primaryName),
-                organizationName: primaryName,
-                director: r.director || leader.name || '',
-                legalAddress: r.legalAddress || dealer.address || '',
-                bin: r.bin || '',
-                iik: r.iik || '',
-                bank: r.bank || '',
-                bik: r.bik || '',
-                kbe: r.kbe || '',
-                email: r.email || ''
-            });
-        }
-
-        orgs.slice(1).forEach(name => entities.push({
-            type: inferEntityType('', name),
-            organizationName: name,
-            director: '',
-            legalAddress: dealer.address || '',
-            bin: '',
-            iik: '',
-            bank: '',
-            bik: '',
-            kbe: '',
-            email: ''
-        }));
-
-        return entities;
+        if (!Array.isArray(dealer?.legal_entities)) return [];
+        return dealer.legal_entities.filter(entity =>
+            entity && (entity.organizationName || entity.bin || entity.iik || entity.director)
+        );
     }
 
     function getRequisites(dealer) {
