@@ -70,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalIds = {
         memo:'ws-memo-modal', receipt:'ws-receipt-modal', production:'ws-production-modal', dealer:'ws-dealer-modal',
         material:'ws-material-modal', writeoff:'ws-writeoff-modal', recipe:'ws-recipe-modal',
-        stocktake:'ws-stocktake-modal', opening:'ws-opening-modal', print:'ws-print-modal',
+        stocktake:'ws-stocktake-modal', opening:'ws-opening-modal', print:'ws-print-modal', correction:'ws-correction-modal',
         'new-material':'ws-new-material-modal', 'production-edit':'ws-production-edit-modal'
     };
     function showModal(name) {
@@ -370,6 +370,118 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    let correctionReturnMode = '';
+
+    function correctionEntityLabel(type) {
+        return type === 'finished' ? 'Готовая продукция' : type === 'laminate' ? 'Ламинат' : 'Материал';
+    }
+
+    function correctionItems(type) {
+        if (type === 'finished') {
+            return state.recipes.map(item => ({
+                id:idOf(item), name:item.name || 'Изделие', code:item.product?.sku || item.sku || '',
+                current:Math.max(0,n(item.stockQty)), unit:'шт'
+            }));
+        }
+        if (type === 'laminate') {
+            return state.laminateStocks.map(stock => ({
+                id:idOf(stock.product), name:stock.product?.name || 'Ламинат', code:stock.product?.sku || '',
+                current:Math.max(0,n(stock.planksQty)), unit:'планок'
+            }));
+        }
+        return state.materials.map(item => ({
+            id:idOf(item), name:item.name || 'Материал', code:item.code || '',
+            current:Math.max(0,n(item.stockQty)), unit:item.unit || 'шт'
+        }));
+    }
+
+    function correctionItem(type,id) {
+        return correctionItems(type).find(item => String(item.id) === String(id || '')) || null;
+    }
+
+    function correctionOptionRows(type, selectedId='') {
+        return correctionItems(type)
+            .sort((a,b)=>String(a.code||a.name).localeCompare(String(b.code||b.name),'ru',{numeric:true}))
+            .map(item => option(item.id, `${item.code ? item.code+' · ' : ''}${item.name} · сейчас ${fmt(item.current,2)} ${item.unit}`, String(item.id)===String(selectedId)))
+            .join('');
+    }
+
+    function updateCorrectionDelta(which) {
+        const isPrimary = which === 'primary';
+        const type = isPrimary ? $('ws-correction-primary-entity')?.value : $('ws-correction-second-entity')?.value;
+        const id = isPrimary ? $('ws-correction-primary-id')?.value : $('ws-correction-second-id')?.value;
+        const input = isPrimary ? $('ws-correction-primary-actual') : $('ws-correction-second-actual');
+        const currentHost = isPrimary ? $('ws-correction-primary-current') : $('ws-correction-second-current');
+        const deltaHost = isPrimary ? $('ws-correction-primary-delta') : $('ws-correction-second-delta');
+        const item = correctionItem(type,id);
+
+        if (!item) {
+            if (currentHost) currentHost.textContent='—';
+            if (deltaHost) deltaHost.textContent='Выберите позицию';
+            return;
+        }
+        if (currentHost) currentHost.textContent=`${fmt(item.current,2)} ${item.unit}`;
+        if (!input?.value.trim()) {
+            if (deltaHost) {
+                deltaHost.className='workshop-correction-delta';
+                deltaHost.textContent='Укажите правильный остаток';
+            }
+            return;
+        }
+        const actual=Math.max(0,n(input.value));
+        const delta=actual-item.current;
+        if (deltaHost) {
+            deltaHost.className='workshop-correction-delta '+(Math.abs(delta)<0.0001?'is-same':delta>0?'is-plus':'is-minus');
+            deltaHost.textContent=Math.abs(delta)<0.0001
+                ? 'Изменений нет'
+                : `CRM запишет корректировку ${delta>0?'+':''}${fmt(delta,2)} ${item.unit}`;
+        }
+    }
+
+    function refreshSecondCorrectionPicker(selectedId='') {
+        const type=$('ws-correction-second-entity')?.value || 'finished';
+        const select=$('ws-correction-second-id');
+        if (!select) return;
+        select.innerHTML=option('','Выберите позицию')+correctionOptionRows(type,selectedId);
+        if ($('ws-correction-second-actual')) $('ws-correction-second-actual').value='';
+        updateCorrectionDelta('second');
+    }
+
+    function openStockCorrection(type,id,returnMode='') {
+        if (!canManageWorkshop()) return toast('Нет права изменять остатки цеха','warning');
+        const item=correctionItem(type,id);
+        if (!item) return toast('Позиция не найдена','error');
+
+        correctionReturnMode=returnMode || '';
+        $('ws-correction-form')?.reset();
+        $('ws-correction-primary-entity').value=type;
+        $('ws-correction-primary-id').value=id;
+        $('ws-correction-primary-name').textContent=`${item.code ? item.code+' · ' : ''}${item.name}`;
+        $('ws-correction-primary-type').textContent=correctionEntityLabel(type);
+        $('ws-correction-primary-current').textContent=`${fmt(item.current,2)} ${item.unit}`;
+        $('ws-correction-primary-actual').value=String(item.current);
+        $('ws-correction-primary-actual').step = type === 'finished' ? '1' : '0.001';
+        $('ws-correction-primary-delta').className='workshop-correction-delta is-same';
+        $('ws-correction-primary-delta').textContent='Изменений нет';
+        $('ws-correction-reason').value='';
+
+        const second=$('ws-correction-second');
+        if (second) second.hidden=true;
+        if ($('ws-correction-add-second')) $('ws-correction-add-second').hidden=false;
+        if ($('ws-correction-second-entity')) $('ws-correction-second-entity').value=type;
+        refreshSecondCorrectionPicker();
+
+        const sourceModal=$('ws-stock-view-modal');
+        const sourceInstance=sourceModal ? bootstrap.Modal.getInstance(sourceModal) : null;
+        const show=()=>bootstrap.Modal.getOrCreateInstance($('ws-correction-modal')).show();
+        if (sourceInstance && sourceModal.classList.contains('show')) {
+            sourceModal.addEventListener('hidden.bs.modal',show,{once:true});
+            sourceInstance.hide();
+        } else {
+            show();
+        }
+    }
+
     let stockViewMode = 'finished';
 
     function stockViewTitle(mode) {
@@ -427,7 +539,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <small>${esc(currentStockTypeLabel(item))}${item.product?.sku?' · '+esc(item.product.sku):''}${item.product?.name?' · '+esc(item.product.name):''}</small>
                     </div>
                     <div class="workshop-current-min"><small>Минимум</small><span>${minimum>0?fmt(minimum)+' шт':'—'}</span></div>
-                    <div class="workshop-current-qty"><small>Сейчас в цехе</small><strong>${fmt(current)} шт</strong>${shortage>0?`<em>не хватает ${fmt(shortage)}</em>`:''}</div>
+                    <div class="workshop-current-qty"><small>Сейчас в цехе</small><strong>${fmt(current)} шт</strong>${shortage>0?`<em>не хватает ${fmt(shortage)}</em>`:''}${canManageWorkshop()?`<button type="button" class="workshop-current-edit" data-correct-stock="finished" data-correct-id="${idOf(item)}"><i class="bi bi-pencil-square"></i>Исправить</button>`:''}</div>
                 </article>`;
             }).join('') : '<div class="workshop-empty">Готовые изделия не найдены</div>';
         } else if (stockViewMode === 'laminate') {
@@ -445,7 +557,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return `<article class="workshop-current-row">
                     <div class="workshop-current-main"><strong>${esc(item.product?.sku||'—')} · ${esc(item.product?.name||'')}</strong><small>${item.product?.is_liquid===false?'Неликвид / архивная позиция':'Актуальная позиция'}${pq?' · '+pq+' планок в упаковке':''}</small></div>
                     <div class="workshop-current-min"><small>Эквивалент</small><span>${pq?`${packs} уп. + ${loose} пл.`:'—'}</span></div>
-                    <div class="workshop-current-qty"><small>Сейчас в цехе</small><strong>${fmt(planks)} пл.</strong></div>
+                    <div class="workshop-current-qty"><small>Сейчас в цехе</small><strong>${fmt(planks)} пл.</strong>${canManageWorkshop()?`<button type="button" class="workshop-current-edit" data-correct-stock="laminate" data-correct-id="${idOf(item.product)}"><i class="bi bi-pencil-square"></i>Исправить</button>`:''}</div>
                 </article>`;
             }).join('') : '<div class="workshop-empty">Ламинат не найден</div>';
         } else if (stockViewMode === 'materials') {
@@ -459,7 +571,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return `<article class="workshop-current-row ${shortage>0?'is-shortage':''}">
                     <div class="workshop-current-main"><strong>${esc(item.name)}</strong><small>${esc(item.code||item.category||'')}${item.purchaseUnit?' · закупка: '+esc(item.purchaseUnit):''}</small></div>
                     <div class="workshop-current-min"><small>Минимум</small><span>${minimum>0?fmt(minimum,2)+' '+esc(item.unit||'шт'):'—'}</span></div>
-                    <div class="workshop-current-qty"><small>Сейчас в цехе</small><strong>${fmt(current,2)} ${esc(item.unit||'шт')}</strong>${shortage>0?`<em>не хватает ${fmt(shortage,2)}</em>`:''}</div>
+                    <div class="workshop-current-qty"><small>Сейчас в цехе</small><strong>${fmt(current,2)} ${esc(item.unit||'шт')}</strong>${shortage>0?`<em>не хватает ${fmt(shortage,2)}</em>`:''}${canManageWorkshop()?`<button type="button" class="workshop-current-edit" data-correct-stock="material" data-correct-id="${idOf(item)}"><i class="bi bi-pencil-square"></i>Исправить</button>`:''}</div>
                 </article>`;
             }).join(''):'<div class="workshop-empty">Материалы не найдены</div>';
         } else if (stockViewMode === 'dealers') {
@@ -489,13 +601,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 return `<article class="workshop-current-row is-shortage">
                     <div class="workshop-current-main"><strong>${esc(item.name)}</strong><small>${esc(label)}${code?' · '+esc(code):''}</small></div>
                     <div class="workshop-current-min"><small>Нужно минимум</small><span>${fmt(row.minimum,2)} ${esc(unit)}</span><small>есть ${fmt(row.current,2)}</small></div>
-                    <div class="workshop-current-qty"><small>Не хватает</small><strong>${fmt(row.shortage,2)} ${esc(unit)}</strong></div>
+                    <div class="workshop-current-qty"><small>Не хватает</small><strong>${fmt(row.shortage,2)} ${esc(unit)}</strong>${canManageWorkshop()?`<button type="button" class="workshop-current-edit" data-correct-stock="${row.type}" data-correct-id="${idOf(item)}"><i class="bi bi-pencil-square"></i>Исправить</button>`:''}</div>
                 </article>`;
             }).join(''):'<div class="workshop-empty is-success"><i class="bi bi-check-circle"></i>Все позиции с заданным минимумом обеспечены</div>';
         }
 
         summary.innerHTML = summaryHtml;
         host.innerHTML = html;
+        host.querySelectorAll('[data-correct-stock]').forEach(button => {
+            button.addEventListener('click',event => {
+                event.stopPropagation();
+                openStockCorrection(button.dataset.correctStock,button.dataset.correctId,stockViewMode);
+            });
+        });
     }
 
     function openStockView(mode='finished') {
