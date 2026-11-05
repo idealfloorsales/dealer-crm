@@ -260,27 +260,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getDealerLegalEntities(d={}) {
-        if (Array.isArray(d.legal_entities) && d.legal_entities.length) return d.legal_entities;
-        const req = d.requisites || {};
-        const orgs = Array.isArray(d.organizations) ? d.organizations.filter(Boolean) : [];
-        const primaryName = req.organizationName || orgs[0] || d.organization || '';
-        const result = [];
-        if (primaryName || Object.values(req).some(Boolean)) {
-            result.push({
-                type: inferLegalEntityType('', primaryName),
-                organizationName: primaryName,
-                director: req.director || '',
-                legalAddress: req.legalAddress || d.address || '',
-                bin: req.bin || '',
-                iik: req.iik || '',
-                bank: req.bank || '',
-                bik: req.bik || '',
-                kbe: req.kbe || '',
-                email: req.email || ''
-            });
-        }
-        orgs.slice(1).forEach(name => result.push({ type: inferLegalEntityType('', name), organizationName: name }));
-        return result;
+        return Array.isArray(d.legal_entities) ? d.legal_entities.filter(Boolean) : [];
     }
 
     function createLegalEntityHTML(entity={}) {
