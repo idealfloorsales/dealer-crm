@@ -786,7 +786,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return workshopShortages().map(row=>{
             const item=row.item, unit=row.type==='finished'?'шт':(item.unit||'шт');
             return [
-                row.type==='finished'?'Готовое изделие':'Материал',
+                row.type==='finished'?currentStockTypeLabel(item):'Материал',
                 item.name,
                 row.type==='finished'?(item.product?.sku||item.sku||''):(item.code||''),
                 `${fmt(row.current,2)} ${unit}`,
