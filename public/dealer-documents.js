@@ -177,9 +177,7 @@
     }
 
     function contractNumber(dealer) {
-        const raw = String(dealer.dealer_id || '').trim();
-        if (!raw) return 'IF000';
-        return raw.toUpperCase();
+        return String(dealer.dealer_id || '').trim().toUpperCase();
     }
 
     function twoGisLocation(dealer) {
