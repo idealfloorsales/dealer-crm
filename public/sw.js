@@ -35,6 +35,8 @@ const LOCAL_ASSETS = [
     '/map.js?v={{VER}}',
     '/workshop.js?v={{VER}}',
     '/workshop.css?v={{VER}}',
+    '/audit.js?v={{VER}}',
+    '/audit.css?v={{VER}}',
     '/pricing.js?v={{VER}}',
     '/pricing.css?v={{VER}}',
     '/logo.png',
