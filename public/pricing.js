@@ -567,11 +567,22 @@ document.addEventListener('DOMContentLoaded', () => {
         syncKindFields();
     }
 
+    function resetPricingModalViewport() {
+        const body = document.querySelector('#pricing-condition-modal .modal-body');
+        if (body) {
+            body.scrollTop = 0;
+            body.scrollLeft = 0;
+        }
+    }
+
     function openCreate(dealerId='') {
         if (!manage) return;
         resetForm();
         if (dealerId) $('pricing-dealer-id').value = dealerId;
-        bootstrap.Modal.getOrCreateInstance($('pricing-condition-modal')).show();
+        const modalEl = $('pricing-condition-modal');
+        resetPricingModalViewport();
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        requestAnimationFrame(resetPricingModalViewport);
     }
 
     function openEdit(conditionId) {
@@ -607,7 +618,10 @@ document.addEventListener('DOMContentLoaded', () => {
         $('pricing-requirement-verified').checked = condition.requirementVerified === true;
         $('pricing-proof-note').value = condition.proofNote || '';
         $('pricing-note').value = condition.note || '';
-        bootstrap.Modal.getOrCreateInstance($('pricing-condition-modal')).show();
+        const modalEl = $('pricing-condition-modal');
+        resetPricingModalViewport();
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        requestAnimationFrame(resetPricingModalViewport);
     }
 
     function formPayload() {
@@ -692,6 +706,7 @@ document.addEventListener('DOMContentLoaded', () => {
         button.addEventListener('click', () => applyPreset(button.dataset.pricingPreset));
     });
     $('pricing-condition-form')?.addEventListener('submit',saveCondition);
+    $('pricing-condition-modal')?.addEventListener('shown.bs.modal',resetPricingModalViewport);
 
     load();
 });
