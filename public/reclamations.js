@@ -59,6 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (res.ok) {
                 allReclamations = await res.json();
                 reclamationDetailCache.clear();
+                populateReclamationDealerFilter();
             }
         } catch (e) { console.error(e); }
     }
@@ -90,6 +91,21 @@ document.addEventListener('DOMContentLoaded', () => {
         return Math.max(0, Math.floor((Date.now() - date.getTime()) / 86400000));
     }
 
+    function populateReclamationDealerFilter() {
+        if (!dealerFilter) return;
+        const current = dealerFilter.value || '';
+        const map = new Map();
+        allReclamations.forEach(r => {
+            const id = String(r.dealerId || '');
+            const name = String(r.dealerName || '').trim();
+            if (id && name && !map.has(id)) map.set(id,name);
+        });
+        const items = [...map.entries()].sort((a,b)=>a[1].localeCompare(b[1],'ru'));
+        dealerFilter.innerHTML = '<option value="">Все дилеры</option>' +
+            items.map(([id,name]) => `<option value="${escapeHtml(id)}">${escapeHtml(name)}</option>`).join('');
+        if (items.some(([id])=>id===current)) dealerFilter.value=current;
+    }
+
     async function fetchDealers() {
         try {
             const res = await fetch('/api/dealers?scope=all');
@@ -100,10 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const select = document.getElementById('r_dealer');
                 select.innerHTML = '<option value="">-- Выберите дилера --</option>' + 
                     allDealers.map(d => `<option value="${escapeHtml(d.id)}">${escapeHtml(d.name)}${d.city ? ' ('+escapeHtml(d.city)+')' : ''}</option>`).join('');
-                if (dealerFilter) {
-                    dealerFilter.innerHTML = '<option value="">Все дилеры</option>' +
-                        allDealers.map(d => `<option value="${escapeHtml(d.id)}">${escapeHtml(d.name)}</option>`).join('');
-                }
+
             }
         } catch (e) {}
     }
