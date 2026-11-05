@@ -132,11 +132,46 @@ document.addEventListener('DOMContentLoaded', () => {
         populateFormSelects();
     }
 
+    function finishedShortages() {
+        return state.recipes
+            .map(item => {
+                const current = Math.max(0, n(item.stockQty));
+                const minimum = Math.max(0, n(item.minStockQty));
+                return { type:'finished', item, current, minimum, shortage:Math.max(0, minimum-current) };
+            })
+            .filter(row => row.minimum > 0 && row.shortage > 0)
+            .sort((a,b) => b.shortage-a.shortage || String(a.item.name||'').localeCompare(String(b.item.name||''),'ru'));
+    }
+
+    function materialShortages() {
+        return state.materials
+            .map(item => {
+                const current = Math.max(0, n(item.stockQty));
+                const minimum = Math.max(0, n(item.minQty));
+                return { type:'material', item, current, minimum, shortage:Math.max(0, minimum-current) };
+            })
+            .filter(row => row.minimum > 0 && row.shortage > 0)
+            .sort((a,b) => b.shortage-a.shortage || String(a.item.name||'').localeCompare(String(b.item.name||''),'ru'));
+    }
+
+    function workshopShortages() {
+        return [...finishedShortages(), ...materialShortages()];
+    }
+
+    function activateWorkshopTab(name) {
+        const button = document.querySelector(`[data-ws-tab="${name}"]`);
+        if (!button) return;
+        document.querySelectorAll('[data-ws-tab]').forEach(item => item.classList.toggle('active', item === button));
+        document.querySelectorAll('[data-ws-pane]').forEach(pane => pane.classList.toggle('active', pane.dataset.wsPane === name));
+        document.querySelector('.workshop-tabs-shell')?.scrollIntoView({behavior:'smooth',block:'start'});
+    }
+
     function renderKpis() {
         if ($('ws-kpi-open')) $('ws-kpi-open').textContent = fmt(state.stats.openMemos);
         if ($('ws-kpi-today')) $('ws-kpi-today').textContent = fmt(state.stats.todayProduction);
         if ($('ws-kpi-finished')) $('ws-kpi-finished').textContent = fmt(state.stats.finishedStock);
         if ($('ws-kpi-dealers')) $('ws-kpi-dealers').textContent = fmt(state.stats.dealerAssetStock);
+        if ($('ws-kpi-shortage')) $('ws-kpi-shortage').textContent = fmt(workshopShortages().length);
 
         const banner = $('ws-opening-banner');
         if (banner) {
