@@ -156,12 +156,17 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderMemos() {
         const host = $('ws-memo-list');
         if (!host) return;
-        const list = [...state.memos]
+        const actionable = state.memos
+            .filter(item => item.status === 'mismatch' || item.status === 'created')
             .sort((a,b) => {
-                const rank = status => status === 'mismatch' ? 0 : status === 'created' ? 1 : status === 'accepted' ? 2 : 3;
+                const rank = status => status === 'mismatch' ? 0 : 1;
                 return rank(a.status) - rank(b.status) || new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt);
-            })
-            .slice(0, 12);
+            });
+        const recentAccepted = state.memos
+            .filter(item => item.status === 'accepted')
+            .sort((a,b) => new Date(b.acceptedAt || b.date || b.createdAt) - new Date(a.acceptedAt || a.date || a.createdAt))
+            .slice(0, actionable.length ? 2 : 4);
+        const list = [...actionable, ...recentAccepted].slice(0, 12);
         if (!list.length) {
             host.innerHTML = '<div class="workshop-empty"><i class="bi bi-file-earmark-text"></i>Служебных записок пока нет</div>';
             return;
@@ -795,12 +800,6 @@ document.addEventListener('DOMContentLoaded', () => {
             toast('Проверьте количество упаковок и данные товара', 'warning');
             return null;
         }
-        if (!String($('ws-memo-number')?.value || '').trim()) {
-            toast('Укажите номер служебной записки', 'warning');
-            $('ws-memo-number')?.focus();
-            return null;
-        }
-
         return {
             number: $('ws-memo-number').value,
             date: $('ws-memo-date').value,
