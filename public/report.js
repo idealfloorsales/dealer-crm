@@ -7,7 +7,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const matrixFooter = $('matrix-footer');
     const matrixContainer = $('matrix-container');
     const loadingMsg = $('loading-msg');
-    const exportBtn = $('export-csv-btn');
+    const exportBtn = $('export-excel-btn');
+    const excelExportModalEl = $('excel-export-modal');
+    const excelExportModal = excelExportModalEl ? bootstrap.Modal.getOrCreateInstance(excelExportModalEl) : null;
+    const excelExportScope = $('excel-export-scope');
+    const excelExportConfirm = $('excel-export-confirm');
+    const excelSelectAll = $('excel-select-all');
     const kpiHost = $('exhibition-kpis');
     const matrixMeta = $('matrix-current-meta');
 
@@ -566,37 +571,419 @@ document.addEventListener('DOMContentLoaded', () => {
         renderMatrix();
     }
 
-    function exportCsv() {
-        if (!fullData.matrix.length) return;
-        const data=getFilteredData();
-        const indices=visibleOriginalIndices(data.headers);
-        const clean=value=>`"${String(value??'').replace(/"/g,'""')}"`;
-        let csv='\uFEFFАртикул;Название;'+data.headers.map(h=>clean(`${h.name} (${h.city||''})`)).join(';')+';Итого\r\n';
+    function selectedExportSheets() {
+        return {
+            summary:Boolean($('excel-sheet-summary')?.checked),
+            matrix:Boolean($('excel-sheet-matrix')?.checked),
+            dealers:Boolean($('excel-sheet-dealers')?.checked),
+            issues:Boolean($('excel-sheet-issues')?.checked),
+            pos:Boolean($('excel-sheet-pos')?.checked)
+        };
+    }
 
-        data.matrix.forEach(row=>{
-            let present=0;
-            const cells=indices.map(index=>{
-                const cell=row.dealers[index]||{};
-                if(cell.is_pos){
-                    const qty=n(cell.value);
-                    if(qty>0)present++;
-                    return qty>0?String(qty):'';
-                }
-                const state=cellState(cell);
-                if(state!=='missing')present++;
-                const qty=n(cell.sample_qty);
-                if(state==='confirmed')return qty?`Подтверждено ×${qty}`:'Подтверждено';
-                if(state==='manual')return 'Только матрица';
-                if(state==='workshop')return `Только Цех ×${qty}`;
-                return '';
-            });
-            csv+=`${clean(row.sku)};${clean(row.name)};${cells.map(clean).join(';')};${present}\r\n`;
+    function exportScopeText() {
+        const data=getFilteredData();
+        const city=filterCity?.value || 'Все города';
+        const responsible=filterResponsible?.selectedOptions?.[0]?.textContent || 'Все ответственные';
+        const dealerText=selectedDealerIds.size ? `${selectedDealerIds.size} выбрано` : `Все (${data.headers.length})`;
+        const productText=selectedProductSkus.size ? `${selectedProductSkus.size} выбрано` : `Все (${data.matrix.length})`;
+        return {city,responsible,dealerText,productText};
+    }
+
+    function renderExportScope() {
+        if(!excelExportScope) return;
+        const scope=exportScopeText();
+        excelExportScope.innerHTML=`
+            <div><small>Город</small><strong>${safeText(scope.city)}</strong></div>
+            <div><small>Ответственный</small><strong>${safeText(scope.responsible)}</strong></div>
+            <div><small>Дилеры</small><strong>${safeText(scope.dealerText)}</strong></div>
+            <div><small>Позиции</small><strong>${safeText(scope.productText)}</strong></div>
+        `;
+    }
+
+    function openExcelExport() {
+        if (!fullData.matrix.length) return;
+        renderExportScope();
+        excelExportModal?.show();
+    }
+
+    const excelColors = {
+        dark:'FF25262A',
+        red:'FFB9040A',
+        redSoft:'FFFFEEEE',
+        green:'FF397A55',
+        greenSoft:'FFEAF5ED',
+        blue:'FF4C6E91',
+        blueSoft:'FFEDF3F8',
+        amber:'FF956718',
+        amberSoft:'FFFFF4D8',
+        gray:'FF8E9096',
+        graySoft:'FFF4F2EF',
+        line:'FFE6E1DD',
+        white:'FFFFFFFF'
+    };
+
+    function styleTitleRow(row, fill = excelColors.dark) {
+        row.height=28;
+        row.eachCell(cell=>{
+            cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:fill}};
+            cell.font={bold:true,color:{argb:excelColors.white},size:11};
+            cell.alignment={vertical:'middle',horizontal:'left'};
+        });
+    }
+
+    function styleHeaderRow(row) {
+        row.height=25;
+        row.eachCell(cell=>{
+            cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:excelColors.graySoft}};
+            cell.font={bold:true,color:{argb:excelColors.dark},size:10};
+            cell.alignment={vertical:'middle',horizontal:'center',wrapText:true};
+            cell.border={
+                top:{style:'thin',color:{argb:excelColors.line}},
+                left:{style:'thin',color:{argb:excelColors.line}},
+                bottom:{style:'thin',color:{argb:excelColors.line}},
+                right:{style:'thin',color:{argb:excelColors.line}}
+            };
+        });
+    }
+
+    function applyGridBorders(worksheet, fromRow, toRow, fromCol, toCol) {
+        for(let r=fromRow;r<=toRow;r++){
+            for(let col=fromCol;col<=toCol;col++){
+                const cell=worksheet.getCell(r,col);
+                cell.border={
+                    top:{style:'hair',color:{argb:excelColors.line}},
+                    left:{style:'hair',color:{argb:excelColors.line}},
+                    bottom:{style:'hair',color:{argb:excelColors.line}},
+                    right:{style:'hair',color:{argb:excelColors.line}}
+                };
+            }
+        }
+    }
+
+    function setStatusCellStyle(cell,state) {
+        const map={
+            confirmed:{fill:excelColors.greenSoft,font:excelColors.green},
+            manual:{fill:excelColors.blueSoft,font:excelColors.blue},
+            workshop:{fill:excelColors.amberSoft,font:excelColors.amber},
+            missing:{fill:excelColors.graySoft,font:excelColors.gray},
+            'pos-present':{fill:'FFF1EDFA',font:'FF6A5592'},
+            'pos-missing':{fill:excelColors.graySoft,font:excelColors.gray}
+        };
+        const style=map[state]||map.missing;
+        cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:style.fill}};
+        cell.font={bold:true,color:{argb:style.font},size:9};
+        cell.alignment={vertical:'middle',horizontal:'center',wrapText:true};
+    }
+
+    function matrixCellExportValue(cell) {
+        const state=cellState(cell);
+        if(cell?.is_pos){
+            const qty=n(cell.value);
+            return {state,value:qty>0?qty:''};
+        }
+        const qty=n(cell?.sample_qty);
+        if(state==='confirmed') return {state,value:qty?`Подтверждено ×${qty}`:'Подтверждено'};
+        if(state==='manual') return {state,value:'Только матрица'};
+        if(state==='workshop') return {state,value:`Только Цех ×${qty}`};
+        return {state,value:''};
+    }
+
+    function dealerExportStats(dealerId,data) {
+        const index=fullData.headers.findIndex(h=>idOf(h.id)===String(dealerId));
+        const products=data.matrix.filter(row=>row.type!=='pos');
+        const pos=data.matrix.filter(row=>row.type==='pos');
+        let present=0,confirmed=0,manual=0,workshop=0,samples=0,posUnits=0;
+        products.forEach(row=>{
+            const cell=row.dealers[index]||{};
+            const state=cellState(cell);
+            if(state!=='missing')present++;
+            if(state==='confirmed')confirmed++;
+            if(state==='manual')manual++;
+            if(state==='workshop')workshop++;
+            samples+=n(cell.sample_qty);
+        });
+        pos.forEach(row=>{posUnits+=n(row.dealers[index]?.value);});
+        return {
+            total:products.length,
+            present,
+            coverage:products.length?Math.round((present/products.length)*100):0,
+            confirmed,
+            manual,
+            workshop,
+            issues:manual+workshop,
+            missing:Math.max(0,products.length-present),
+            samples,
+            posUnits
+        };
+    }
+
+    function addSummarySheet(workbook,data) {
+        const ws=workbook.addWorksheet('Сводка',{properties:{tabColor:{argb:excelColors.red}}});
+        ws.views=[{state:'frozen',ySplit:4}];
+        ws.columns=[
+            {width:25},{width:24},{width:24},{width:24},{width:24},{width:24}
+        ];
+
+        ws.mergeCells('A1:F2');
+        const title=ws.getCell('A1');
+        title.value='IDEAL FLOOR — ВЫСТАВЛЕННОСТЬ';
+        title.fill={type:'pattern',pattern:'solid',fgColor:{argb:excelColors.dark}};
+        title.font={bold:true,color:{argb:excelColors.white},size:18};
+        title.alignment={vertical:'middle',horizontal:'left'};
+        ws.getRow(1).height=26;ws.getRow(2).height=20;
+
+        const scope=exportScopeText();
+        ws.mergeCells('A3:F3');
+        ws.getCell('A3').value=`Сформировано: ${new Date().toLocaleString('ru-RU')} · Город: ${scope.city} · Ответственный: ${scope.responsible} · Дилеры: ${scope.dealerText} · Позиции: ${scope.productText}`;
+        ws.getCell('A3').font={color:{argb:excelColors.gray},size:9};
+        ws.getCell('A3').alignment={wrapText:true,vertical:'middle'};
+        ws.getRow(3).height=30;
+
+        const stats=calculateStats(data);
+        const kpis=[
+            ['Дилеров',stats.dealers,'в выборке'],
+            ['Выставлено',stats.coverage+'%',`${stats.present} из ${stats.totalCells}`],
+            ['Подтверждено',stats.confirmedPercent+'%',`${stats.confirmed} совпадений`],
+            ['Расхождения',stats.discrepancies,`${stats.manualOnly} матрица / ${stats.workshopOnly} цех`],
+            ['Образцов',stats.samples,'шт по Цеху'],
+            ['POS',stats.posUnits,'шт']
+        ];
+        const header=ws.addRow(['ПОКАЗАТЕЛЬ','ЗНАЧЕНИЕ','КОММЕНТАРИЙ','','','']);
+        styleHeaderRow(header);
+        ws.mergeCells(header.number,3,header.number,6);
+
+        kpis.forEach((item,index)=>{
+            const row=ws.addRow([item[0],item[1],item[2]]);
+            ws.mergeCells(row.number,3,row.number,6);
+            row.getCell(1).font={bold:true,color:{argb:excelColors.dark}};
+            row.getCell(2).font={bold:true,size:13,color:{argb:index===3&&stats.discrepancies?excelColors.amber:excelColors.dark}};
+            row.getCell(3).font={color:{argb:excelColors.gray}};
+            row.height=24;
         });
 
-        const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
-        const a=document.createElement('a');
-        a.href=url;a.download='IDEAL_FLOOR_Exhibition.csv';document.body.appendChild(a);a.click();a.remove();
-        setTimeout(()=>URL.revokeObjectURL(url),500);
+        ws.addRow([]);
+        const legendTitle=ws.addRow(['ЛЕГЕНДА СТАТУСОВ']);
+        ws.mergeCells(legendTitle.number,1,legendTitle.number,6);
+        styleTitleRow(legendTitle,excelColors.red);
+
+        const legend=[
+            ['Подтверждено','Матрица и Цех совпадают','confirmed'],
+            ['Только матрица','Есть ручная отметка, но выдача Цеха не найдена','manual'],
+            ['Только Цех','Есть образец по Цеху, но нет отметки в матрице','workshop'],
+            ['Нет образца','Нет ни ручной отметки, ни выдачи из Цеха','missing']
+        ];
+        legend.forEach(item=>{
+            const row=ws.addRow([item[0],item[1]]);
+            ws.mergeCells(row.number,2,row.number,6);
+            setStatusCellStyle(row.getCell(1),item[2]);
+            row.getCell(2).alignment={wrapText:true,vertical:'middle'};
+            row.getCell(2).font={color:{argb:excelColors.dark},size:9};
+            row.height=25;
+        });
+
+        ws.addRow([]);
+        const filterTitle=ws.addRow(['ТЕКУЩИЕ ФИЛЬТРЫ']);
+        ws.mergeCells(filterTitle.number,1,filterTitle.number,6);
+        styleTitleRow(filterTitle,excelColors.dark);
+        [
+            ['Город',scope.city],
+            ['Ответственный',scope.responsible],
+            ['Дилеры',scope.dealerText],
+            ['Позиции',scope.productText]
+        ].forEach(item=>{
+            const row=ws.addRow(item);
+            row.getCell(1).font={bold:true,color:{argb:excelColors.gray}};
+            row.getCell(2).font={bold:true,color:{argb:excelColors.dark}};
+        });
+        return ws;
+    }
+
+    function addMatrixSheet(workbook,data) {
+        const dealerCount=data.headers.length;
+        const lastCol=dealerCount+3;
+        const ws=workbook.addWorksheet('Матрица',{properties:{tabColor:{argb:excelColors.dark}}});
+        ws.views=[{state:'frozen',xSplit:2,ySplit:4}];
+
+        ws.mergeCells(1,1,1,lastCol);
+        ws.getCell(1,1).value='IDEAL FLOOR — Матрица выставленности';
+        styleTitleRow(ws.getRow(1));
+        ws.mergeCells(2,1,2,lastCol);
+        ws.getCell(2,1).value='Статусы: зелёный — подтверждено, синий — только матрица, жёлтый — только Цех.';
+        ws.getCell(2,1).font={color:{argb:excelColors.gray},italic:true,size:9};
+
+        const headers=['Артикул','Название',...data.headers.map(h=>`${h.name} · ${h.city||'—'}`),'Сводка'];
+        const headerRow=ws.getRow(4);
+        headerRow.values=headers;
+        styleHeaderRow(headerRow);
+
+        ws.getColumn(1).width=16;
+        ws.getColumn(2).width=34;
+        for(let col=3;col<lastCol;col++) ws.getColumn(col).width=18;
+        ws.getColumn(lastCol).width=16;
+
+        const indices=visibleOriginalIndices(data.headers);
+        data.matrix.forEach(row=>{
+            let present=0;
+            const values=[row.type==='pos'?'POS':row.sku,row.name];
+            const states=[];
+            indices.forEach(index=>{
+                const cell=row.dealers[index]||{};
+                const exported=matrixCellExportValue(cell);
+                if(row.type==='pos'){
+                    if(n(cell.value)>0)present++;
+                }else if(exported.state!=='missing'){
+                    present++;
+                }
+                values.push(exported.value);
+                states.push(exported.state);
+            });
+            const total=data.headers.length;
+            values.push(`${present}/${total} · ${total?Math.round((present/total)*100):0}%`);
+            const excelRow=ws.addRow(values);
+            excelRow.height=30;
+            excelRow.getCell(1).font={bold:true,color:{argb:row.type==='pos'?excelColors.amber:excelColors.dark}};
+            excelRow.getCell(2).alignment={wrapText:true,vertical:'middle'};
+            states.forEach((state,index)=>setStatusCellStyle(excelRow.getCell(index+3),state));
+            excelRow.getCell(lastCol).font={bold:true,color:{argb:excelColors.dark}};
+            excelRow.getCell(lastCol).alignment={horizontal:'center'};
+        });
+
+        ws.autoFilter={from:{row:4,column:1},to:{row:4,column:lastCol}};
+        applyGridBorders(ws,4,ws.lastRow.number,1,lastCol);
+        return ws;
+    }
+
+    function addDealersSheet(workbook,data) {
+        const ws=workbook.addWorksheet('Дилеры',{properties:{tabColor:{argb:excelColors.green}}});
+        ws.views=[{state:'frozen',ySplit:2}];
+        const columns=[
+            ['Дилер',28],['Город',16],['Ответственный',20],['Выставлено %',14],['Есть',10],
+            ['Подтверждено',14],['Только матрица',14],['Только Цех',12],['Расхождения',13],['Нет',10],['Образцов',11],['POS, шт',10]
+        ];
+        ws.columns=columns.map(([header,width])=>({header,width}));
+        styleHeaderRow(ws.getRow(1));
+
+        data.headers.forEach(dealer=>{
+            const s=dealerExportStats(idOf(dealer.id),data);
+            const row=ws.addRow([
+                dealer.name,dealer.city||'',dealer.responsible||'',s.coverage,s.present,s.confirmed,s.manual,s.workshop,s.issues,s.missing,s.samples,s.posUnits
+            ]);
+            row.height=24;
+            row.getCell(4).numFmt='0"%"';
+            if(s.issues){
+                row.getCell(9).fill={type:'pattern',pattern:'solid',fgColor:{argb:excelColors.amberSoft}};
+                row.getCell(9).font={bold:true,color:{argb:excelColors.amber}};
+            }
+            if(s.coverage>=70) row.getCell(4).font={bold:true,color:{argb:excelColors.green}};
+            else if(s.coverage>=40) row.getCell(4).font={bold:true,color:{argb:excelColors.amber}};
+            else row.getCell(4).font={bold:true,color:{argb:excelColors.red}};
+        });
+        ws.autoFilter={from:'A1',to:'L1'};
+        applyGridBorders(ws,1,ws.lastRow.number,1,12);
+        return ws;
+    }
+
+    function addIssuesSheet(workbook,data) {
+        const ws=workbook.addWorksheet('Расхождения',{properties:{tabColor:{argb:excelColors.amber}}});
+        ws.views=[{state:'frozen',ySplit:2}];
+        const columns=[
+            ['Дилер',28],['Город',16],['Ответственный',20],['Артикул',16],['Товар',34],['Статус',18],['Образцов по Цеху',16],['Что проверить',34]
+        ];
+        ws.columns=columns.map(([header,width])=>({header,width}));
+        styleHeaderRow(ws.getRow(1));
+
+        const indices=visibleOriginalIndices(data.headers);
+        data.headers.forEach((dealer,visibleIndex)=>{
+            const originalIndex=indices[visibleIndex];
+            data.matrix.filter(row=>row.type!=='pos').forEach(row=>{
+                const cell=row.dealers[originalIndex]||{};
+                const state=cellState(cell);
+                if(!['manual','workshop'].includes(state)) return;
+                const action=state==='manual'
+                    ? 'Проверить, выдавался ли образец из Цеха / актуальна ли ручная отметка'
+                    : 'Добавить отметку в Матрицу или проверить фактическое наличие у дилера';
+                const excelRow=ws.addRow([
+                    dealer.name,dealer.city||'',dealer.responsible||'',row.sku,row.name,stateLabel(state),n(cell.sample_qty),action
+                ]);
+                setStatusCellStyle(excelRow.getCell(6),state);
+                excelRow.getCell(8).alignment={wrapText:true,vertical:'middle'};
+                excelRow.height=32;
+            });
+        });
+        ws.autoFilter={from:'A1',to:'H1'};
+        if(ws.lastRow.number>1) applyGridBorders(ws,1,ws.lastRow.number,1,8);
+        return ws;
+    }
+
+    function addPosSheet(workbook,data) {
+        const ws=workbook.addWorksheet('POS',{properties:{tabColor:{argb:'FF6A5592'}}});
+        ws.views=[{state:'frozen',ySplit:2}];
+        const columns=[
+            ['Дилер',28],['Город',16],['Ответственный',20],['POS-материал',36],['Количество, шт',14]
+        ];
+        ws.columns=columns.map(([header,width])=>({header,width}));
+        styleHeaderRow(ws.getRow(1));
+        const indices=visibleOriginalIndices(data.headers);
+        data.headers.forEach((dealer,visibleIndex)=>{
+            const originalIndex=indices[visibleIndex];
+            data.matrix.filter(row=>row.type==='pos').forEach(row=>{
+                ws.addRow([dealer.name,dealer.city||'',dealer.responsible||'',row.name,n(row.dealers[originalIndex]?.value)]);
+            });
+        });
+        ws.autoFilter={from:'A1',to:'E1'};
+        if(ws.lastRow.number>1) applyGridBorders(ws,1,ws.lastRow.number,1,5);
+        return ws;
+    }
+
+    async function exportExcel() {
+        const sheets=selectedExportSheets();
+        if(!Object.values(sheets).some(Boolean)) return alert('Выберите хотя бы один лист для экспорта');
+        if(!window.ExcelJS) return alert('Модуль Excel не загрузился. Обновите страницу и попробуйте ещё раз.');
+
+        const data=getFilteredData();
+        const oldHtml=excelExportConfirm?.innerHTML;
+        if(excelExportConfirm){
+            excelExportConfirm.disabled=true;
+            excelExportConfirm.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>Формируем Excel…';
+        }
+
+        try{
+            const workbook=new ExcelJS.Workbook();
+            workbook.creator='IDEAL FLOOR CRM';
+            workbook.company='IDEAL FLOOR';
+            workbook.subject='Выставленность дилерской сети';
+            workbook.created=new Date();
+            workbook.modified=new Date();
+
+            if(sheets.summary) addSummarySheet(workbook,data);
+            if(sheets.matrix) addMatrixSheet(workbook,data);
+            if(sheets.dealers) addDealersSheet(workbook,data);
+            if(sheets.issues) addIssuesSheet(workbook,data);
+            if(sheets.pos) addPosSheet(workbook,data);
+
+            const buffer=await workbook.xlsx.writeBuffer();
+            const blob=new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+            const url=URL.createObjectURL(blob);
+            const now=new Date();
+            const stamp=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+            const a=document.createElement('a');
+            a.href=url;
+            a.download=`IDEAL_FLOOR_Выставленность_${stamp}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(()=>URL.revokeObjectURL(url),1000);
+            excelExportModal?.hide();
+        }catch(error){
+            console.error('Excel export error:',error);
+            alert('Не удалось сформировать Excel: '+(error.message||'неизвестная ошибка'));
+        }finally{
+            if(excelExportConfirm){
+                excelExportConfirm.disabled=false;
+                excelExportConfirm.innerHTML=oldHtml;
+            }
+        }
     }
 
     document.addEventListener('click',event=>{
@@ -621,7 +1008,15 @@ document.addEventListener('DOMContentLoaded', () => {
     filterCity?.addEventListener('change',()=>{updateDealerListOptions();renderMatrix();});
     filterResponsible?.addEventListener('change',()=>{updateDealerListOptions();renderMatrix();});
     resetFiltersBtn?.addEventListener('click',resetFilters);
-    exportBtn?.addEventListener('click',exportCsv);
+    exportBtn?.addEventListener('click',openExcelExport);
+    excelExportConfirm?.addEventListener('click',exportExcel);
+    excelSelectAll?.addEventListener('click',()=>{
+        const checkboxes=['excel-sheet-summary','excel-sheet-matrix','excel-sheet-dealers','excel-sheet-issues','excel-sheet-pos']
+            .map(id=>$(id)).filter(Boolean);
+        const allChecked=checkboxes.every(input=>input.checked);
+        checkboxes.forEach(input=>input.checked=!allChecked);
+        excelSelectAll.textContent=allChecked?'Выбрать всё':'Снять всё';
+    });
 
     document.querySelectorAll('[data-report-view]').forEach(button=>{
         button.addEventListener('click',()=>setView(button.dataset.reportView));
