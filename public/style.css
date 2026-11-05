@@ -10783,3 +10783,417 @@ body.bg-light {
 .pricing-hero h1 {
     color:#fff !important;
 }
+
+
+/* =========================================================
+   DEALER FIELD MODE — MOBILE FIRST EDITING
+   ========================================================= */
+.dealer-field-shortcuts{
+    display:none;
+}
+.dealer-product-checklist{
+    max-height:none;
+    overflow:hidden;
+    padding:0;
+    columns:auto;
+    column-gap:0;
+    border:1px solid rgba(23,24,27,.065);
+    background:#fff!important;
+}
+.dealer-field-product-controls{
+    position:sticky;
+    top:0;
+    z-index:3;
+    padding:9px;
+    border-bottom:1px solid rgba(23,24,27,.07);
+    background:rgba(255,255,255,.98);
+    backdrop-filter:blur(10px);
+}
+.dealer-field-product-search{
+    position:relative;
+}
+.dealer-field-product-search>i{
+    position:absolute;
+    left:12px;
+    top:50%;
+    transform:translateY(-50%);
+    z-index:2;
+    color:#96989d;
+    font-size:.78rem;
+}
+.dealer-form-modal .dealer-field-product-search .form-control{
+    min-height:40px;
+    padding-left:36px;
+    padding-right:38px;
+    border-radius:10px;
+}
+.dealer-field-product-clear{
+    position:absolute;
+    right:5px;
+    top:5px;
+    width:30px;
+    height:30px;
+    display:grid;
+    place-items:center;
+    border:0;
+    border-radius:8px;
+    background:transparent;
+    color:#96989d;
+    font-size:.7rem;
+}
+.dealer-field-product-clear:hover{
+    background:#f1efec;
+    color:#4d4f54;
+}
+.dealer-field-product-filterbar{
+    display:flex;
+    gap:5px;
+    margin-top:7px;
+    overflow-x:auto;
+    scrollbar-width:none;
+}
+.dealer-field-product-filterbar::-webkit-scrollbar{display:none}
+.dealer-field-product-filterbar button{
+    flex:0 0 auto;
+    min-height:30px;
+    padding:0 9px;
+    border:1px solid #e1ddd9;
+    border-radius:999px;
+    background:#fff;
+    color:#77797f;
+    font-size:.58rem;
+    font-weight:750;
+}
+.dealer-field-product-filterbar button.active{
+    border-color:#242529;
+    background:#242529;
+    color:#fff;
+}
+.dealer-field-product-filterbar button span{
+    display:inline-grid;
+    place-items:center;
+    min-width:18px;
+    height:18px;
+    margin-left:3px;
+    padding:0 4px;
+    border-radius:999px;
+    background:rgba(255,255,255,.14);
+    font-size:.52rem;
+}
+.dealer-field-product-items{
+    display:flex;
+    flex-direction:column;
+    max-height:330px;
+    overflow:auto;
+    overscroll-behavior:contain;
+}
+.dealer-field-product-item{
+    position:relative;
+    display:grid;
+    grid-template-columns:28px minmax(0,1fr) auto;
+    gap:9px;
+    align-items:center;
+    min-height:54px;
+    margin:0;
+    padding:8px 10px;
+    border-bottom:1px solid #f0ece8;
+    background:#fff;
+    cursor:pointer;
+    transition:.12s ease;
+}
+.dealer-field-product-item:last-child{border-bottom:0}
+.dealer-field-product-item:hover{background:#faf9f7}
+.dealer-field-product-item.is-selected{background:#f4faf6}
+.dealer-field-product-item input{
+    position:absolute;
+    opacity:0;
+    pointer-events:none;
+}
+.dealer-field-product-check{
+    width:27px;
+    height:27px;
+    display:grid;
+    place-items:center;
+    border:1px solid #dcd8d4;
+    border-radius:8px;
+    background:#fff;
+    color:transparent;
+    font-size:.72rem;
+}
+.dealer-field-product-item.is-selected .dealer-field-product-check{
+    border-color:#4e8665;
+    background:#4e8665;
+    color:#fff;
+}
+.dealer-field-product-copy{
+    min-width:0;
+}
+.dealer-field-product-copy>span{
+    display:flex;
+    align-items:baseline;
+    gap:7px;
+    min-width:0;
+}
+.dealer-field-product-copy strong{
+    flex:0 0 auto;
+    color:#6a6c71;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:.59rem;
+}
+.dealer-field-product-copy b{
+    min-width:0;
+    overflow:hidden;
+    color:#3c3e43;
+    font-size:.66rem;
+    font-weight:750;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+.dealer-field-product-copy small{
+    display:block;
+    margin-top:2px;
+    color:#999ba0;
+    font-size:.54rem;
+}
+.dealer-field-product-item>em{
+    padding:3px 6px;
+    border-radius:999px;
+    background:#fff0f0;
+    color:#a33c42;
+    font-size:.48rem;
+    font-style:normal;
+    font-weight:800;
+}
+.dealer-field-product-footer{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    min-height:34px;
+    padding:0 10px;
+    border-top:1px solid #eee9e5;
+    background:#faf9f7;
+    color:#8d8f94;
+    font-size:.53rem;
+}
+.dealer-field-product-footer strong{
+    color:#55575c;
+    font-size:.57rem;
+}
+.dealer-field-product-empty{
+    padding:24px 12px;
+    text-align:center;
+    color:#999ba0;
+    font-size:.64rem;
+}
+
+/* Competitor cards in dealer add/edit */
+.dealer-form-modal .dealer-competitor-entry{
+    position:relative;
+    grid-template-columns:1.2fr 1.2fr .72fr .72fr 32px;
+    padding:9px;
+}
+.dealer-competitor-field{
+    min-width:0;
+    margin:0;
+}
+.dealer-competitor-field>span{
+    display:block;
+    margin:0 0 4px 2px;
+    color:#96989d;
+    font-size:.52rem;
+    font-weight:750;
+}
+.dealer-form-modal .dealer-competitor-field .form-control,
+.dealer-form-modal .dealer-competitor-field .form-select{
+    width:100%;
+    min-height:38px;
+    margin:0;
+    font-size:.66rem;
+}
+.dealer-form-modal .dealer-competitor-entry .btn-remove-entry{
+    align-self:end;
+    height:38px;
+}
+
+/* Mobile field shortcuts and large tap targets */
+@media (max-width:767px){
+    .dealer-field-shortcuts{
+        display:grid;
+        grid-template-columns:repeat(4,minmax(0,1fr));
+        gap:5px;
+        padding:7px 8px;
+        border-bottom:1px solid rgba(23,24,27,.08);
+        background:#fff;
+    }
+    .dealer-field-shortcuts button{
+        min-width:0;
+        min-height:45px;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        flex-direction:column;
+        gap:2px;
+        padding:4px 3px;
+        border:1px solid #e7e2de;
+        border-radius:10px;
+        background:#faf9f7;
+        color:#71737a;
+        font-size:.51rem;
+        font-weight:750;
+        line-height:1.1;
+    }
+    .dealer-field-shortcuts button i{
+        font-size:.82rem;
+    }
+    .dealer-field-shortcuts button span{
+        max-width:100%;
+        overflow:hidden;
+        text-overflow:ellipsis;
+        white-space:nowrap;
+    }
+    .dealer-field-shortcuts button.active{
+        border-color:#26272b;
+        background:#26272b;
+        color:#fff;
+    }
+
+    /* The old navigation stays available, but field shortcuts become the primary mobile navigation. */
+    .dealer-form-modal .dealer-wizard-nav,
+    .dealer-form-modal .dealer-edit-nav-wrap{
+        display:none;
+    }
+
+    .dealer-modal-body{
+        padding:9px 9px 16px;
+    }
+    .dealer-form-section{
+        padding:11px;
+    }
+    .dealer-section-title{
+        align-items:flex-start;
+        margin-bottom:10px;
+    }
+    .dealer-section-title .dealer-add-inline{
+        min-height:34px;
+        margin-left:auto;
+        padding:0 9px;
+    }
+
+    .dealer-product-checklist{
+        border-radius:13px;
+    }
+    .dealer-field-product-controls{
+        padding:8px;
+    }
+    .dealer-form-modal .dealer-field-product-search .form-control{
+        min-height:44px;
+        font-size:.72rem;
+    }
+    .dealer-field-product-filterbar button{
+        min-height:34px;
+        padding:0 11px;
+        font-size:.6rem;
+    }
+    .dealer-field-product-items{
+        max-height:45dvh;
+    }
+    .dealer-field-product-item{
+        grid-template-columns:32px minmax(0,1fr) auto;
+        min-height:61px;
+        padding:9px 8px;
+    }
+    .dealer-field-product-check{
+        width:31px;
+        height:31px;
+        border-radius:9px;
+    }
+    .dealer-field-product-copy strong{font-size:.61rem}
+    .dealer-field-product-copy b{
+        font-size:.69rem;
+        white-space:normal;
+        line-height:1.2;
+    }
+    .dealer-field-product-copy small{
+        font-size:.56rem;
+        line-height:1.3;
+    }
+    .dealer-field-product-footer{
+        min-height:38px;
+        font-size:.55rem;
+    }
+
+    #add-competitor-list,
+    #edit-competitor-list{
+        max-height:none!important;
+        overflow:visible!important;
+        padding:0;
+        border:0;
+        background:transparent;
+    }
+    .dealer-form-modal .dealer-competitor-entry{
+        display:grid;
+        grid-template-columns:1fr 1fr;
+        gap:7px;
+        padding:10px;
+        border-radius:13px;
+        background:#faf9f7;
+    }
+    .dealer-competitor-field.is-brand,
+    .dealer-competitor-field.is-collection{
+        grid-column:1/-1;
+    }
+    .dealer-form-modal .dealer-competitor-field .form-control,
+    .dealer-form-modal .dealer-competitor-field .form-select{
+        min-height:46px;
+        font-size:.72rem;
+    }
+    .dealer-competitor-field>span{
+        margin-bottom:4px;
+        font-size:.55rem;
+    }
+    .dealer-form-modal .dealer-competitor-entry .btn-remove-entry{
+        grid-column:1/-1;
+        width:100%;
+        height:34px;
+        margin-top:1px;
+        color:#a43a40;
+        background:#fff0f0;
+    }
+
+    /* Keep the save action easy to reach above the mobile app navigation. */
+    .dealer-modal-footer{
+        flex:0 0 auto;
+        padding:8px 9px calc(8px + env(safe-area-inset-bottom));
+        background:rgba(255,255,255,.98);
+    }
+    .dealer-modal-footer .ms-auto{
+        width:100%;
+        display:grid!important;
+        grid-template-columns:auto minmax(0,1fr);
+        gap:7px!important;
+    }
+    .dealer-footer-save,
+    .dealer-footer-primary{
+        min-height:44px!important;
+        font-size:.69rem!important;
+    }
+    .dealer-footer-note,
+    .dealer-footer-progress{
+        display:none;
+    }
+}
+
+@media (max-width:420px){
+    .dealer-field-shortcuts button span{
+        font-size:.47rem;
+    }
+    .dealer-field-product-item>em{
+        display:none;
+    }
+    .dealer-field-product-copy>span{
+        align-items:flex-start;
+        flex-direction:column;
+        gap:1px;
+    }
+}
