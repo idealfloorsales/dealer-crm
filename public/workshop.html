@@ -24,31 +24,43 @@
                 <h1>Цех</h1>
                 <p>Три ежедневных действия: приняли ламинат, сделали образцы, передали дилеру. Остальное — в дополнительных операциях.</p>
             </div>
-            <div class="workshop-hero-actions" data-permission="can_manage_workshop">
-                <button type="button" class="workshop-secondary-action" data-open-workshop="opening">
+            <div class="workshop-hero-actions">
+                <button type="button" class="workshop-secondary-action" data-open-workshop="print">
+                    <i class="bi bi-printer"></i><span>Печать / отчёты</span>
+                </button>
+                <button type="button" class="workshop-secondary-action" data-open-workshop="opening" data-permission="can_manage_workshop">
                     <i class="bi bi-box-arrow-in-down"></i><span>Стартовые остатки</span>
                 </button>
             </div>
         </section>
 
         <section class="workshop-kpi-grid">
-            <article class="workshop-kpi is-warning">
+            <article class="workshop-kpi is-warning is-clickable" data-workshop-drilldown="memos" tabindex="0" role="button">
                 <span class="workshop-kpi-icon"><i class="bi bi-inbox"></i></span>
-                <div><small>Ждут приёмки</small><strong id="ws-kpi-open">—</strong><em>служебок</em></div>
+                <div><small>Ждут приёмки</small><strong id="ws-kpi-open">—</strong><em>открыть служебки</em></div>
+                <i class="bi bi-chevron-right workshop-kpi-go"></i>
             </article>
-            <article class="workshop-kpi">
+            <article class="workshop-kpi is-clickable" data-workshop-drilldown="production" tabindex="0" role="button">
                 <span class="workshop-kpi-icon"><i class="bi bi-hammer"></i></span>
-                <div><small>Сделано сегодня</small><strong id="ws-kpi-today">—</strong><em>изделий</em></div>
+                <div><small>Сделано сегодня</small><strong id="ws-kpi-today">—</strong><em>посмотреть производство</em></div>
+                <i class="bi bi-chevron-right workshop-kpi-go"></i>
             </article>
-            <article class="workshop-kpi">
+            <article class="workshop-kpi is-clickable is-primary-stock" data-stock-view="finished" tabindex="0" role="button">
                 <span class="workshop-kpi-icon"><i class="bi bi-boxes"></i></span>
-                <div><small>Готово в цехе</small><strong id="ws-kpi-finished">—</strong><em>образцов / стендов</em></div>
+                <div><small>Готово в цехе</small><strong id="ws-kpi-finished">—</strong><em>открыть текущие остатки</em></div>
+                <i class="bi bi-chevron-right workshop-kpi-go"></i>
             </article>
-            <article class="workshop-kpi">
+            <article class="workshop-kpi is-clickable" data-stock-view="dealers" tabindex="0" role="button">
                 <span class="workshop-kpi-icon"><i class="bi bi-shop"></i></span>
-                <div><small>У дилеров</small><strong id="ws-kpi-dealers">—</strong><em>образцов / стендов</em></div>
+                <div><small>У дилеров</small><strong id="ws-kpi-dealers">—</strong><em>что где находится</em></div>
+                <i class="bi bi-chevron-right workshop-kpi-go"></i>
             </article>
-        </section>
+            <article class="workshop-kpi is-danger-soft is-clickable" data-stock-view="shortage" tabindex="0" role="button">
+                <span class="workshop-kpi-icon"><i class="bi bi-exclamation-triangle"></i></span>
+                <div><small>Не хватает</small><strong id="ws-kpi-shortage">—</strong><em>позиций ниже минимума</em></div>
+                <i class="bi bi-chevron-right workshop-kpi-go"></i>
+            </article>
+        </section>section>
 
         <section id="ws-opening-banner" class="workshop-opening-banner" data-permission="can_manage_workshop">
             <span class="workshop-opening-icon"><i class="bi bi-clock-history"></i></span>
@@ -128,6 +140,8 @@
             <div class="workshop-tab-pane" data-ws-pane="stock">
                 <div class="workshop-stock-toolbar">
                     <div class="workshop-search"><i class="bi bi-search"></i><input id="ws-stock-search" type="search" placeholder="Поиск по SKU, изделию или материалу"></div>
+                    <button type="button" class="workshop-link-btn" data-print-workshop="stock"><i class="bi bi-printer"></i> Печать остатков</button>
+                    <button type="button" class="workshop-link-btn is-alert" data-stock-view="shortage"><i class="bi bi-exclamation-triangle"></i> Чего не хватает</button>
                     <button type="button" class="workshop-link-btn" data-open-workshop="stocktake" data-permission="can_manage_workshop"><i class="bi bi-clipboard-check"></i> Инвентаризация</button>
                 </div>
                 <section class="workshop-panel">
@@ -153,7 +167,10 @@
                 <section class="workshop-panel">
                     <div class="workshop-panel-head">
                         <div><span>ТОЧНЫЙ УЧЁТ</span><h2>Что находится у дилеров</h2></div>
-                        <button type="button" class="workshop-link-btn" data-open-workshop="dealer" data-permission="can_manage_workshop"><i class="bi bi-arrow-left-right"></i> Движение</button>
+                        <div class="workshop-panel-actions">
+                            <button type="button" class="workshop-link-btn" data-print-workshop="dealers"><i class="bi bi-printer"></i> Печать</button>
+                            <button type="button" class="workshop-link-btn" data-open-workshop="dealer" data-permission="can_manage_workshop"><i class="bi bi-arrow-left-right"></i> Движение</button>
+                        </div>
                     </div>
                     <div class="workshop-filter-row">
                         <div class="workshop-search"><i class="bi bi-search"></i><input id="ws-dealer-search" type="search" placeholder="Дилер, город, образец или стенд"></div>
@@ -174,7 +191,7 @@
 
             <div class="workshop-tab-pane" data-ws-pane="history">
                 <section class="workshop-panel">
-                    <div class="workshop-panel-head"><div><span>АУДИТ</span><h2>История движений</h2></div></div>
+                    <div class="workshop-panel-head"><div><span>АУДИТ</span><h2>История движений</h2></div><button type="button" class="workshop-link-btn" data-print-workshop="history"><i class="bi bi-printer"></i> Печать</button></div>
                     <div class="workshop-filter-row">
                         <div class="workshop-search"><i class="bi bi-search"></i><input id="ws-history-search" type="search" placeholder="Поиск по операции, позиции, дилеру, служебке"></div>
                         <select id="ws-history-type" class="form-select">
@@ -513,6 +530,67 @@
                 <div id="ws-stocktake-lines" class="workshop-stocktake-lines"></div>
                 <label class="workshop-note-label mt-3"><span>Комментарий к инвентаризации</span><textarea id="ws-stocktake-note" class="form-control" rows="2"></textarea></label>
             </div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button><button class="btn btn-dark" type="submit">Зафиксировать остатки</button></div></form>
+        </div></div>
+    </div>
+
+    <!-- Current workshop stock drilldown -->
+    <div class="modal fade" id="ws-stock-view-modal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered"><div class="modal-content workshop-modal workshop-stock-view-modal">
+            <div class="modal-header">
+                <div><small>ФАКТИЧЕСКОЕ СОСТОЯНИЕ НА СЕЙЧАС</small><h5 id="ws-stock-view-title">Остатки цеха</h5></div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="workshop-stock-view-top">
+                    <div class="workshop-stock-view-tabs">
+                        <button type="button" data-stock-view-tab="finished" class="active"><i class="bi bi-boxes"></i>Готовое</button>
+                        <button type="button" data-stock-view-tab="laminate"><i class="bi bi-layers"></i>Ламинат</button>
+                        <button type="button" data-stock-view-tab="materials"><i class="bi bi-tools"></i>Материалы</button>
+                        <button type="button" data-stock-view-tab="dealers"><i class="bi bi-shop"></i>У дилеров</button>
+                        <button type="button" data-stock-view-tab="shortage"><i class="bi bi-exclamation-triangle"></i>Не хватает</button>
+                    </div>
+                    <div class="workshop-search"><i class="bi bi-search"></i><input id="ws-stock-view-search" type="search" placeholder="Поиск"></div>
+                </div>
+                <div id="ws-stock-view-summary" class="workshop-stock-view-summary"></div>
+                <div id="ws-stock-view-content" class="workshop-current-stock-list"></div>
+            </div>
+            <div class="modal-footer">
+                <small class="workshop-current-note"><i class="bi bi-info-circle"></i> Здесь показан текущий фактический остаток. + / − используются только в истории движений.</small>
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Закрыть</button>
+                <button type="button" class="btn btn-dark" id="ws-stock-view-print"><i class="bi bi-printer me-1"></i>Печать</button>
+            </div>
+        </div></div>
+    </div>
+
+    <!-- Workshop print center -->
+    <div class="modal fade" id="ws-print-modal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered"><div class="modal-content workshop-modal workshop-print-modal">
+            <div class="modal-header"><div><small>ДОКУМЕНТЫ ЦЕХА</small><h5>Печать и отчёты</h5></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="workshop-document-note"><i class="bi bi-printer"></i><span>Все отчёты формируются по текущим данным CRM. Остатки печатаются как фактическое количество на момент печати.</span></div>
+
+                <section class="workshop-print-section">
+                    <div class="workshop-print-section-head"><strong>Служебная записка</strong><small>Выберите любую сохранённую служебку и распечатайте её отдельно.</small></div>
+                    <div class="workshop-print-memo-row">
+                        <select id="ws-print-memo" class="form-select"></select>
+                        <button type="button" class="workshop-print-action" data-print-workshop="memo"><i class="bi bi-file-earmark-text"></i><span>Печать служебки</span></button>
+                    </div>
+                </section>
+
+                <section class="workshop-print-section">
+                    <div class="workshop-print-section-head"><strong>Оперативные отчёты</strong><small>Что есть, чего не хватает и где находятся готовые образцы.</small></div>
+                    <div class="workshop-print-grid">
+                        <button type="button" data-print-workshop="stock"><i class="bi bi-boxes"></i><span><strong>Все остатки цеха</strong><small>готовое + ламинат + материалы</small></span></button>
+                        <button type="button" data-print-workshop="shortage"><i class="bi bi-exclamation-triangle"></i><span><strong>Чего не хватает</strong><small>позиции ниже минимального остатка</small></span></button>
+                        <button type="button" data-print-workshop="finished"><i class="bi bi-grid"></i><span><strong>Готовая продукция</strong><small>планшеты, стенды, таблички</small></span></button>
+                        <button type="button" data-print-workshop="laminate"><i class="bi bi-layers"></i><span><strong>Ламинат в цехе</strong><small>текущий остаток в планках и упаковках</small></span></button>
+                        <button type="button" data-print-workshop="materials"><i class="bi bi-tools"></i><span><strong>Материалы</strong><small>фанера, ЛДСП, кромка, клей и др.</small></span></button>
+                        <button type="button" data-print-workshop="dealers"><i class="bi bi-shop"></i><span><strong>Что у дилеров</strong><small>образцы и стенды по каждому дилеру</small></span></button>
+                        <button type="button" data-print-workshop="production"><i class="bi bi-hammer"></i><span><strong>Производство</strong><small>последние записи изготовления</small></span></button>
+                        <button type="button" data-print-workshop="history"><i class="bi bi-clock-history"></i><span><strong>История движений</strong><small>приходы, выдачи, возвраты, списания</small></span></button>
+                    </div>
+                </section>
+            </div>
         </div></div>
     </div>
 
