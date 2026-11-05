@@ -22,60 +22,89 @@
             <div>
                 <span class="workshop-eyebrow">ПРОИЗВОДСТВО И ОБРАЗЦЫ</span>
                 <h1>Цех</h1>
-                <p>Ламинат, расходники, производство, стенды и точный учёт выдачи дилерам.</p>
+                <p>Три ежедневных действия: приняли ламинат, сделали образцы, передали дилеру. Остальное — в дополнительных операциях.</p>
             </div>
             <div class="workshop-hero-actions" data-permission="can_manage_workshop">
-                <button type="button" class="workshop-primary-action" data-open-workshop="production">
-                    <i class="bi bi-hammer"></i><span>Производство</span>
-                </button>
-                <button type="button" class="workshop-secondary-action" data-open-workshop="memo">
-                    <i class="bi bi-file-earmark-text"></i><span>Служебка</span>
+                <button type="button" class="workshop-secondary-action" data-open-workshop="opening">
+                    <i class="bi bi-box-arrow-in-down"></i><span>Стартовые остатки</span>
                 </button>
             </div>
         </section>
 
         <section class="workshop-kpi-grid">
+            <article class="workshop-kpi is-warning">
+                <span class="workshop-kpi-icon"><i class="bi bi-inbox"></i></span>
+                <div><small>Ждут приёмки</small><strong id="ws-kpi-open">—</strong><em>служебок</em></div>
+            </article>
             <article class="workshop-kpi">
-                <span class="workshop-kpi-icon"><i class="bi bi-calendar-check"></i></span>
-                <div><small>Изготовлено сегодня</small><strong id="ws-kpi-today">—</strong><em>изделий</em></div>
+                <span class="workshop-kpi-icon"><i class="bi bi-hammer"></i></span>
+                <div><small>Сделано сегодня</small><strong id="ws-kpi-today">—</strong><em>изделий</em></div>
             </article>
             <article class="workshop-kpi">
                 <span class="workshop-kpi-icon"><i class="bi bi-boxes"></i></span>
-                <div><small>Готовые образцы / стенды</small><strong id="ws-kpi-finished">—</strong><em>шт</em></div>
+                <div><small>Готово в цехе</small><strong id="ws-kpi-finished">—</strong><em>образцов / стендов</em></div>
             </article>
             <article class="workshop-kpi">
-                <span class="workshop-kpi-icon"><i class="bi bi-layers"></i></span>
-                <div><small>Ламинат в цехе</small><strong id="ws-kpi-laminate">—</strong><em>планок</em></div>
-            </article>
-            <article class="workshop-kpi is-warning">
-                <span class="workshop-kpi-icon"><i class="bi bi-exclamation-triangle"></i></span>
-                <div><small>Расходники на минимуме</small><strong id="ws-kpi-low">—</strong><em>позиций</em></div>
+                <span class="workshop-kpi-icon"><i class="bi bi-shop"></i></span>
+                <div><small>У дилеров</small><strong id="ws-kpi-dealers">—</strong><em>образцов / стендов</em></div>
             </article>
         </section>
 
-        <section class="workshop-quick-actions" data-permission="can_manage_workshop">
-            <button type="button" data-open-workshop="memo"><i class="bi bi-file-earmark-plus"></i><span><strong>Создать служебку</strong><small>Несколько SKU и упаковок одним документом</small></span></button>
-            <button type="button" data-open-workshop="receipt"><i class="bi bi-check2-square"></i><span><strong>Сверить приход</strong><small>По служебке, построчно галочками</small></span></button>
-            <button type="button" data-open-workshop="production"><i class="bi bi-tools"></i><span><strong>Записать производство</strong><small>Склейка, распил, кромление</small></span></button>
-            <button type="button" data-open-workshop="dealer"><i class="bi bi-truck"></i><span><strong>Дилеру</strong><small>Выдача, возврат, замена</small></span></button>
-            <button type="button" data-open-workshop="material"><i class="bi bi-bucket"></i><span><strong>Материалы</strong><small>Приход и расход расходников</small></span></button>
-            <button type="button" data-open-workshop="writeoff"><i class="bi bi-file-earmark-minus"></i><span><strong>Брак / списание</strong><small>Внутренний расход после приёмки</small></span></button>
+        <section id="ws-opening-banner" class="workshop-opening-banner" data-permission="can_manage_workshop">
+            <span class="workshop-opening-icon"><i class="bi bi-clock-history"></i></span>
+            <div>
+                <strong>Цех работал до запуска CRM?</strong>
+                <small id="ws-opening-banner-text">Внесите готовые образцы, которые уже лежат в цехе или уже стоят у дилеров. Производить их задним числом не нужно.</small>
+            </div>
+            <button type="button" data-open-workshop="opening">Внести остатки</button>
         </section>
+
+        <section class="workshop-flow" data-permission="can_manage_workshop">
+            <button type="button" class="workshop-flow-step" data-open-workshop="memo">
+                <span class="workshop-flow-number">1</span>
+                <span class="workshop-flow-icon"><i class="bi bi-box-arrow-in-down"></i></span>
+                <span><strong>Приняли в цех</strong><small>Служебка + упаковки. Если всё совпало — оформить и принять одной кнопкой.</small></span>
+                <i class="bi bi-chevron-right"></i>
+            </button>
+            <button type="button" class="workshop-flow-step" data-open-workshop="production">
+                <span class="workshop-flow-number">2</span>
+                <span class="workshop-flow-icon"><i class="bi bi-hammer"></i></span>
+                <span><strong>Сделали</strong><small>Выберите изделие и количество. Остальные детали необязательны.</small></span>
+                <i class="bi bi-chevron-right"></i>
+            </button>
+            <button type="button" class="workshop-flow-step" data-open-workshop="dealer">
+                <span class="workshop-flow-number">3</span>
+                <span class="workshop-flow-icon"><i class="bi bi-truck"></i></span>
+                <span><strong>Передали дилеру</strong><small>Выдача, возврат или замена готового образца / стенда.</small></span>
+                <i class="bi bi-chevron-right"></i>
+            </button>
+        </section>
+
+        <details class="workshop-more-actions" data-permission="can_manage_workshop">
+            <summary><i class="bi bi-three-dots"></i><span>Дополнительные операции</span><small>расхождения, материалы, списания, нормы и инвентаризация</small></summary>
+            <div>
+                <button type="button" data-open-workshop="receipt"><i class="bi bi-check2-square"></i><span><strong>Сверить расхождение</strong><small>Если по служебке приехало не то количество или другой SKU</small></span></button>
+                <button type="button" data-open-workshop="material"><i class="bi bi-bucket"></i><span><strong>Материалы</strong><small>Приход / расход расходников</small></span></button>
+                <button type="button" data-open-workshop="writeoff"><i class="bi bi-file-earmark-minus"></i><span><strong>Брак / списание</strong><small>Списать ламинат, материал или изделие</small></span></button>
+                <button type="button" data-open-workshop="stocktake"><i class="bi bi-clipboard-check"></i><span><strong>Инвентаризация</strong><small>Сверить фактические остатки с CRM</small></span></button>
+                <button type="button" data-open-workshop="recipe"><i class="bi bi-diagram-3"></i><span><strong>Новая норма</strong><small>Добавить рецептуру изделия</small></span></button>
+            </div>
+        </details>
 
         <section class="workshop-tabs-shell">
             <div class="workshop-tabs" role="tablist">
-                <button class="active" data-ws-tab="overview"><i class="bi bi-speedometer2"></i><span>Обзор</span></button>
+                <button class="active" data-ws-tab="overview"><i class="bi bi-speedometer2"></i><span>Сегодня</span></button>
                 <button data-ws-tab="stock"><i class="bi bi-box-seam"></i><span>Остатки</span></button>
-                <button data-ws-tab="dealers"><i class="bi bi-shop"></i><span>Дилеры</span></button>
-                <button data-ws-tab="recipes"><i class="bi bi-diagram-3"></i><span>Рецептуры</span></button>
+                <button data-ws-tab="dealers"><i class="bi bi-shop"></i><span>У дилеров</span></button>
+                <button data-ws-tab="recipes"><i class="bi bi-diagram-3"></i><span>Нормы</span></button>
                 <button data-ws-tab="history"><i class="bi bi-clock-history"></i><span>История</span></button>
             </div>
 
             <div class="workshop-tab-pane active" data-ws-pane="overview">
                 <section class="workshop-panel workshop-memo-panel">
                     <div class="workshop-panel-head">
-                        <div><span>СКЛАД → ЦЕХ</span><h2>Служебные записки и приём</h2><p>Сначала оформляем списание со склада, затем построчно сверяем фактическую доставку.</p></div>
-                        <button type="button" class="workshop-link-btn" data-open-workshop="memo" data-permission="can_manage_workshop"><i class="bi bi-plus-lg"></i> Служебка</button>
+                        <div><span>ПРИХОД В ЦЕХ</span><h2>Служебки и приём</h2><p>Открытые и проблемные служебки показываются первыми. Если приход совпал — его можно оформить одним действием.</p></div>
+                        <button type="button" class="workshop-link-btn" data-open-workshop="memo" data-permission="can_manage_workshop"><i class="bi bi-plus-lg"></i> Новый приход</button>
                     </div>
                     <div id="ws-memo-list" class="workshop-memo-list"></div>
                 </section>
