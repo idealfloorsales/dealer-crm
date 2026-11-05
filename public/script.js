@@ -105,51 +105,129 @@ document.addEventListener('DOMContentLoaded', () => {
     let refreshAddMap = null; let refreshEditMap = null;
 
     // --- 4. EXPORT CONFIGURATION ---
-    const exportColumnsConfig = [
-        { id: 'id', label: 'ID дилера', isChecked: true, getValue: d => d.dealer_id },
-        { id: 'name_org', label: 'Название и Организация', isChecked: true, getValue: d => {
-            const orgs = getDealerLegalEntities(d).map(entity => entity.organizationName).filter(Boolean).join(', ');
-            return orgs ? `${d.name} (${orgs})` : d.name;
+    let activeExportType = 'dealers';
+    let excelJsLoadPromise = null;
+
+    function exportLegalValues(dealer, field) {
+        return getDealerLegalEntities(dealer)
+            .map(entity => String(entity?.[field] || '').trim())
+            .filter(Boolean)
+            .filter((value,index,array) => array.indexOf(value) === index)
+            .join('; ');
+    }
+
+    function exportContactValues(dealer) {
+        return (Array.isArray(dealer.contacts) ? dealer.contacts : [])
+            .map(contact => {
+                const parts = [contact?.name, contact?.position].filter(Boolean).join(' · ');
+                const phone = String(contact?.contactInfo || '').trim();
+                return [parts,phone].filter(Boolean).join(' — ');
+            })
+            .filter(Boolean)
+            .join('; ');
+    }
+
+    function exportLastVisit(dealer) {
+        let visits = Array.isArray(dealer.visits) ? dealer.visits : [];
+        if (!visits.length) {
+            const taskData = allTasksData.find(item => String(item.id) === String(dealer.id));
+            visits = Array.isArray(taskData?.visits) ? taskData.visits : [];
+        }
+        const valid = visits
+            .filter(visit => visit?.date && visit.isCompleted !== false)
+            .sort((a,b) => new Date(b.date) - new Date(a.date));
+        return valid[0]?.date ? String(valid[0].date).slice(0,10) : '';
+    }
+
+    function exportMoneyValue(value) {
+        const raw = String(value ?? '').trim();
+        if (!raw) return '';
+        const normalized = raw.replace(/\s/g,'').replace(',','.').replace(/[^0-9.-]/g,'');
+        const num = Number(normalized);
+        return Number.isFinite(num) ? num : raw;
+    }
+
+    function exportPriceNumber(value) {
+        const converted = exportMoneyValue(value);
+        return typeof converted === 'number' ? converted : null;
+    }
+
+    function exportStatusLabel(dealer) {
+        const custom = statusList.find(status => status.value === dealer.status);
+        if (custom) return custom.label || custom.value;
+        const map = {potential:'Потенциальный',active:'Активный',standard:'Стандарт',problem:'Проблемный',archive:'Архив'};
+        return map[dealer.status] || dealer.status || '';
+    }
+
+    const dealerExportColumns = [
+        {id:'dealer_id',group:'Основное',label:'ID дилера',width:14,checked:true,getValue:d=>d.dealer_id||''},
+        {id:'name',group:'Основное',label:'Дилер',width:30,checked:true,getValue:d=>d.name||''},
+        {id:'legal_names',group:'Юр. данные',label:'Юридические лица',width:32,checked:false,getValue:d=>exportLegalValues(d,'organizationName')},
+        {id:'bin',group:'Юр. данные',label:'БИН / ИИН',width:18,checked:false,getValue:d=>exportLegalValues(d,'bin')},
+        {id:'city',group:'Основное',label:'Город',width:18,checked:true,getValue:d=>normalizeDisplayValue(d.city)},
+        {id:'address',group:'Основное',label:'Фактический адрес',width:34,checked:true,getValue:d=>d.address||''},
+        {id:'status',group:'Работа',label:'Статус дилера',width:18,checked:true,getValue:d=>exportStatusLabel(d)},
+        {id:'responsible',group:'Работа',label:'Зона ответственности',width:20,checked:true,getValue:d=>responsibleLabel(d.responsible)},
+        {id:'sector',group:'Работа',label:'Сектор',width:20,checked:true,getValue:d=>d.region_sector||''},
+        {id:'price_type',group:'Коммерция',label:'Тип цен',width:18,checked:true,getValue:d=>d.price_type||''},
+        {id:'contacts',group:'Контакты',label:'Контакты',width:42,checked:true,getValue:d=>exportContactValues(d)},
+        {id:'website',group:'Контакты',label:'Сайт',width:28,checked:false,getValue:d=>d.website||''},
+        {id:'instagram',group:'Контакты',label:'Instagram',width:24,checked:false,getValue:d=>d.instagram||''},
+        {id:'contract_number',group:'Договор',label:'№ договора',width:15,checked:false,getValue:d=>d.dealer_id||''},
+        {id:'contract_signed',group:'Договор',label:'Договор подписан',width:18,checked:false,getValue:d=>d.contract?.isSigned?'Да':'Нет'},
+        {id:'contract_date',group:'Договор',label:'Дата договора',width:16,checked:false,getValue:d=>d.contract?.date||''},
+        {id:'sales_month',group:'Коммерция',label:'Продажи за месяц, м²',width:20,checked:true,getValue:d=>Number(getDealerListMetrics(d).fact||0)},
+        {id:'plan_month',group:'Коммерция',label:'План на месяц, м²',width:19,checked:false,getValue:d=>Number(getDealerListMetrics(d).plan||0)},
+        {id:'plan_percent',group:'Коммерция',label:'Выполнение плана, %',width:20,checked:true,getValue:d=>getDealerListMetrics(d).achievement ?? ''},
+        {id:'health_score',group:'Контроль',label:'Оценка дилера, %',width:18,checked:false,getValue:d=>Number(getDealerListMetrics(d).health?.score||0)},
+        {id:'last_visit',group:'Контроль',label:'Последний визит',width:17,checked:true,getValue:d=>exportLastVisit(d)},
+        {id:'delivery',group:'Работа',label:'Условия доставки',width:30,checked:false,getValue:d=>d.delivery||''},
+        {id:'notes',group:'Работа',label:'Заметки / особые условия',width:40,checked:false,getValue:d=>d.bonuses||''},
+        {id:'latitude',group:'Локация',label:'Широта',width:15,checked:false,getValue:d=>d.latitude??''},
+        {id:'longitude',group:'Локация',label:'Долгота',width:15,checked:false,getValue:d=>d.longitude??''}
+    ];
+
+    const competitorPriceExportColumns = [
+        {id:'dealer_id',group:'Дилер',label:'ID дилера',width:14,checked:true,getValue:r=>r.dealer.dealer_id||''},
+        {id:'dealer',group:'Дилер',label:'Дилер',width:28,checked:true,getValue:r=>r.dealer.name||''},
+        {id:'city',group:'Дилер',label:'Город',width:18,checked:true,getValue:r=>normalizeDisplayValue(r.dealer.city)},
+        {id:'status',group:'Дилер',label:'Статус дилера',width:18,checked:false,getValue:r=>exportStatusLabel(r.dealer)},
+        {id:'responsible',group:'Дилер',label:'Зона ответственности',width:20,checked:false,getValue:r=>responsibleLabel(r.dealer.responsible)},
+        {id:'sector',group:'Дилер',label:'Сектор',width:20,checked:false,getValue:r=>r.dealer.region_sector||''},
+        {id:'brand',group:'Конкурент',label:'Бренд конкурента',width:24,checked:true,getValue:r=>r.competitor.brand||''},
+        {id:'collection',group:'Конкурент',label:'Коллекция',width:28,checked:true,getValue:r=>r.competitor.collection||''},
+        {id:'price_opt',group:'Цена',label:'Оптовая цена',width:17,checked:true,getValue:r=>exportMoneyValue(r.competitor.price_opt)},
+        {id:'price_retail',group:'Цена',label:'Розничная цена',width:17,checked:true,getValue:r=>exportMoneyValue(r.competitor.price_retail)},
+        {id:'difference',group:'Аналитика',label:'Разница розница − опт',width:21,checked:false,getValue:r=>{
+            const opt=exportPriceNumber(r.competitor.price_opt),retail=exportPriceNumber(r.competitor.price_retail);
+            return opt!==null&&retail!==null?retail-opt:'';
         }},
-        { id: 'city', label: 'Город', isChecked: true, getValue: d => d.city },
-        { id: 'address', label: 'Адрес', isChecked: true, getValue: d => d.address },
-        { id: 'status', label: 'Статус', isChecked: true, getValue: d => {
-            const map = { 'potential': 'Потенциальный', 'active': 'Активный', 'standard': 'Стандарт', 'problem': 'Проблемный', 'archive': 'Архив' };
-            const custom = statusList.find(s => s.value === d.status);
-            return custom ? custom.label : (map[d.status] || d.status);
-        }},
-        { id: 'responsible', label: 'Ответственный', isChecked: true, getValue: d => {
-            return responsibleLabel(d.responsible);
-        }},
-        { id: 'sector', label: 'Сектор', isChecked: true, getValue: d => d.region_sector || '' }, // <--- ДОБАВЛЕНО В ЭКСПОРТ
-        { id: 'price_type', label: 'Тип цен', isChecked: true, getValue: d => d.price_type },
-        { id: 'contacts', label: 'Контакты (Телефон)', isChecked: true, getValue: d => {
-            if (!d.contacts || !d.contacts.length) return '';
-            return d.contacts.map(c => `${c.name || 'Без имени'} (${c.contactInfo || '-'})`).join('; ');
-        }},
-        { id: 'contract', label: 'Договор (Подписан/Нет)', isChecked: true, getValue: d => (d.contract && d.contract.isSigned) ? 'Подписан' : 'Нет' },
-        { id: 'contract_date', label: 'Дата договора', isChecked: true, getValue: d => (d.contract && d.contract.date) ? d.contract.date : '' },
-        { id: 'website_insta', label: 'Сайт / Инстаграм', isChecked: false, getValue: d => [d.website, d.instagram].filter(Boolean).join(' / ') },
-        { id: 'bonuses', label: 'Бонусы / Заметки', isChecked: false, getValue: d => d.bonuses },
-        { id: 'total_sales', label: 'Общие продажи (Тек. мес)', isChecked: true, getValue: d => {
-            const sale = currentMonthSales.find(s => String(s.dealerId) === String(d.id));
-            return sale ? sale.fact : '0';
-        }},
-        { id: 'last_visit', label: 'Последний визит', isChecked: true, getValue: d => {
-            let visits = d.visits;
-            if (!visits || !Array.isArray(visits) || visits.length === 0) {
-                const taskData = allTasksData.find(t => String(t.id) === String(d.id));
-                if (taskData && taskData.visits && Array.isArray(taskData.visits)) visits = taskData.visits;
-            }
-            if(!visits || !Array.isArray(visits) || visits.length === 0) return '-';
-            const sorted = [...visits].sort((a,b) => new Date(b.date) - new Date(a.date));
-            const lastDate = sorted[0].date;
-            if(!lastDate) return '-';
-            try { return lastDate.split('T')[0].split('-').reverse().join('.'); } catch(e) { return lastDate; }
+        {id:'markup',group:'Аналитика',label:'Наценка, %',width:15,checked:false,getValue:r=>{
+            const opt=exportPriceNumber(r.competitor.price_opt),retail=exportPriceNumber(r.competitor.price_retail);
+            return opt!==null&&retail!==null&&opt!==0?Math.round(((retail-opt)/opt)*10000)/100:'';
         }}
     ];
 
+    const exportPresets = {
+        dealers: [
+            {id:'work',label:'Рабочая база',icon:'briefcase',columns:['dealer_id','name','city','address','status','responsible','sector','price_type','contacts','sales_month','plan_percent','last_visit']},
+            {id:'contacts',label:'Контакты и договоры',icon:'person-lines-fill',columns:['dealer_id','name','legal_names','bin','city','address','contacts','website','instagram','contract_number','contract_signed','contract_date']},
+            {id:'commercial',label:'Коммерческий контроль',icon:'graph-up-arrow',columns:['dealer_id','name','city','status','responsible','sector','price_type','sales_month','plan_month','plan_percent','health_score','last_visit']},
+            {id:'all',label:'Все поля',icon:'grid-3x3-gap',columns:'all'}
+        ],
+        prices: [
+            {id:'monitoring',label:'Мониторинг цен',icon:'tags',columns:['dealer_id','dealer','city','brand','collection','price_opt','price_retail']},
+            {id:'analysis',label:'Для анализа',icon:'bar-chart',columns:['dealer_id','dealer','city','status','responsible','sector','brand','collection','price_opt','price_retail','difference','markup']},
+            {id:'all',label:'Все поля',icon:'grid-3x3-gap',columns:'all'}
+        ]
+    };
+
+    function getExportColumns() {
+        return activeExportType === 'prices' ? competitorPriceExportColumns : dealerExportColumns;
+    }
+
     // --- 5. HELPERS ---
+
     const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
     const safeText = (text) => (text || '').toString().replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const safeAttr = (text) => (text || '').toString().replace(/"/g, '&quot;');
