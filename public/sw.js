@@ -28,6 +28,7 @@ const LOCAL_ASSETS = [
     '/competitors.css?v={{VER}}',
     '/knowledge.js?v={{VER}}',
     '/reclamations.js?v={{VER}}',
+    '/reclamations.css?v={{VER}}',
     '/permissions.js?v={{VER}}',
     '/dealer-score.js?v={{VER}}',
     '/dealer.js?v={{VER}}',
