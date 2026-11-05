@@ -48,7 +48,7 @@ html,body.report-page{max-width:100%;overflow-x:hidden}
 
 /* Toolbar */
 .exhibition-toolbar{position:sticky;top:76px;z-index:55;margin-bottom:14px;padding:13px!important;border-radius:18px!important}
-.exhibition-toolbar-main{display:grid;grid-template-columns:170px 190px minmax(220px,1fr) minmax(260px,1.15fr) auto;gap:9px;align-items:end}
+.exhibition-toolbar-main{display:grid;grid-template-columns:150px 170px 165px minmax(210px,1fr) minmax(250px,1.15fr) auto;gap:9px;align-items:end}
 .exhibition-toolbar-main>label{min-width:0}
 .exhibition-toolbar-main>label>span{display:block;margin:0 0 4px 2px;color:#85878d;font-size:.65rem;font-weight:750}
 .exhibition-toolbar .form-select,
@@ -208,6 +208,10 @@ thead .matrix-summary-col{z-index:20!important;background:#f8f6f3!important}
 .exhibition-field-product-main>div{display:flex;align-items:baseline;gap:8px;min-width:0}
 .exhibition-field-product-main strong{flex:0 0 auto;color:#414246;font-size:.71rem}
 .exhibition-field-product-main span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#64666b;font-size:.7rem}
+.exhibition-liquidity-tag{display:inline-flex;align-items:center;min-height:19px;padding:0 6px;border-radius:999px;background:#fff0f0;color:#a33b40;font-size:.52rem;font-style:normal;font-weight:800;white-space:nowrap}
+.matrix-liquidity-badge{display:inline-flex;align-items:center;margin-left:6px;padding:2px 5px;border-radius:999px;background:#fff0f0;color:#a33b40;font-size:.5rem;font-weight:800;vertical-align:middle}
+#matrix-table tr.is-illiquid td{background:#fffafa}
+#matrix-table tr.is-illiquid td.matrix-sticky-col{background:#fff8f8}
 .exhibition-field-product-main small{display:block;margin-top:3px;color:#999ba0;font-size:.62rem}
 .exhibition-field-status{
   display:inline-flex;align-items:center;min-height:25px;padding:0 8px;border-radius:999px;background:#f3f1ef;color:#7c7e83;font-size:.57rem;font-weight:800;white-space:nowrap
@@ -219,7 +223,7 @@ thead .matrix-summary-col{z-index:20!important;background:#f8f6f3!important}
 
 @media(max-width:1200px){
   .exhibition-kpi-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
-  .exhibition-toolbar-main{grid-template-columns:150px 170px 1fr 1fr auto}
+  .exhibition-toolbar-main{grid-template-columns:140px 155px 155px 1fr 1fr auto}
   .exhibition-field-layout{grid-template-columns:290px minmax(0,1fr)}
 }
 @media(max-width:900px){
@@ -367,7 +371,7 @@ thead .matrix-summary-col{z-index:20!important;background:#f8f6f3!important}
 }
 .exhibition-export-scope{
   display:grid;
-  grid-template-columns:repeat(4,minmax(0,1fr));
+  grid-template-columns:repeat(5,minmax(0,1fr));
   gap:7px;
   margin-top:10px
 }
