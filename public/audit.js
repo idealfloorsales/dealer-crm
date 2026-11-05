@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const moduleLabels = {
     dealers:'Дилеры',matrix:'Выставленность',visits:'Визиты',products:'Матрица',sales:'Продажи',
     competitors:'Конкуренты',knowledge:'Статьи',reclamations:'Рекламации',workshop:'Цех',
-    pricing:'Цены',users:'Сотрудники',settings:'Настройки',system:'Система'
+    pricing:'Цены',exports:'Экспорт',users:'Сотрудники',settings:'Настройки',system:'Система'
   };
   const actionLabels = {create:'Добавление',update:'Изменение',delete:'Удаление',execute:'Операция'};
   let page=1,pages=1,items=[],metaLoaded=false;
