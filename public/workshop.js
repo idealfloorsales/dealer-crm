@@ -479,8 +479,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const finished=finishedShortages().filter(row => !term || [row.item.name,row.item.sku,row.item.product?.sku,row.item.product?.name].join(' ').toLowerCase().includes(term));
             const materials=materialShortages().filter(row => !term || [row.item.code,row.item.name].join(' ').toLowerCase().includes(term));
             const all=[...finished,...materials];
-            const totalNeed=all.reduce((sum,row)=>sum+row.shortage,0);
-            summaryHtml=`<div class="is-danger"><small>Позиций не хватает</small><strong>${fmt(all.length)}</strong></div><div><small>Готовых изделий</small><strong>${fmt(finished.length)}</strong></div><div><small>Материалов</small><strong>${fmt(materials.length)}</strong></div><div><small>Суммарный дефицит*</small><strong>${fmt(totalNeed,2)}</strong></div>`;
+            const zeroCount=all.filter(row=>row.current<=0).length;
+            summaryHtml=`<div class="is-danger"><small>Позиций не хватает</small><strong>${fmt(all.length)}</strong></div><div><small>Готовых изделий</small><strong>${fmt(finished.length)}</strong></div><div><small>Материалов</small><strong>${fmt(materials.length)}</strong></div><div><small>Совсем нет в наличии</small><strong>${fmt(zeroCount)}</strong></div>`;
             html=all.length?all.map(row=>{
                 const item=row.item;
                 const unit=row.type==='finished'?'шт':(item.unit||'шт');
