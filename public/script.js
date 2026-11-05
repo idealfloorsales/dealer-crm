@@ -1576,12 +1576,322 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchStatuses(rerender = true) { const res = await fetch(API_STATUSES_URL); if(res.ok) { statusList = await res.json(); populateStatusSelects(); renderStatusManagerList(); if(rerender && typeof renderDealerList === 'function') renderDealerList(); } else throw new Error("Ошибка статусов"); }
     
     function populateStatusSelects(selectedStatus = null) { let filterHtml = '<option value="">Рабочие дилеры</option>'; statusList.forEach(s => { filterHtml += `<option value="${s.value}">${s.label}</option>`; }); if(filterStatus) filterStatus.innerHTML = filterHtml; const modalHtml = statusList.map(s => `<option value="${s.value}" ${selectedStatus === s.value ? 'selected' : ''}>${s.label}</option>`).join(''); const addStatusSel = document.getElementById('status'); if(addStatusSel) addStatusSel.innerHTML = modalHtml; const editStatusSel = document.getElementById('edit_status'); if(editStatusSel) editStatusSel.innerHTML = modalHtml; }
-    function renderStatusManagerList() { if(!statusListContainer) return; statusListContainer.innerHTML = statusList.map(s => `<tr><td style="width: 50px;"><div style="width:20px;height:20px;background:${s.color};border-radius:50%;"></div></td><td class="fw-bold">${s.label}</td><td class="text-muted small">${s.value}</td><td class="text-center">${s.isVisible !== false ? '<i class="bi bi-eye-fill text-success"></i>' : '<i class="bi bi-eye-slash-fill text-muted"></i>'}</td><td class="text-end"><button class="btn btn-sm btn-light border me-1" onclick="editStatus('${s.id}')"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-light border text-danger" onclick="deleteStatus('${s.id}')"><i class="bi bi-trash"></i></button></td></tr>`).join(''); }
-function resetStatusForm() { if(!statusForm) return; statusForm.reset(); document.getElementById('st_id').value = ''; document.getElementById('st_value').value = ''; document.getElementById('btn-save-status').textContent = 'Добавить'; document.getElementById('btn-save-status').className = 'btn btn-primary w-100'; document.getElementById('btn-cancel-edit-status').style.display = 'none'; document.getElementById('st_color').value = '#0d6efd'; }
-    window.editStatus = (id) => { const s = statusList.find(i => i.id === id); if(!s) return; document.getElementById('st_id').value = s.id; document.getElementById('st_value').value = s.value; document.getElementById('st_label').value = s.label; document.getElementById('st_color').value = s.color; document.getElementById('st_visible').checked = s.isVisible !== false; const btn = document.getElementById('btn-save-status'); btn.textContent = 'Сохранить'; btn.className = 'btn btn-success w-100'; document.getElementById('btn-cancel-edit-status').style.display = 'inline-block'; };
-    window.deleteStatus = async (id) => { if(!confirm("Удалить этот статус?")) return; try { await fetch(`${API_STATUSES_URL}/${id}`, { method: 'DELETE' }); window.showToast("Удалено"); fetchStatuses(); } catch(e) { window.showToast("Ошибка", "error"); } };
-    if(document.getElementById('btn-cancel-edit-status')) document.getElementById('btn-cancel-edit-status').onclick = resetStatusForm;
-    if(statusForm) { statusForm.addEventListener('submit', async (e) => { e.preventDefault(); const id = document.getElementById('st_id').value; const val = document.getElementById('st_value').value.trim(); const label = document.getElementById('st_label').value; const color = document.getElementById('st_color').value; const isVisible = document.getElementById('st_visible').checked; const body = { value: val, label, color, isVisible }; let url = API_STATUSES_URL; let method = 'POST'; if(id) { url += `/${id}`; method = 'PUT'; } else { body.sortOrder = statusList.length + 10; } try { const res = await fetch(url, { method: method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) }); if(res.ok) { window.showToast(id ? "Обновлено" : "Создано"); resetStatusForm(); fetchStatuses(); } else { throw new Error(); } } catch(e) { window.showToast("Ошибка сохранения", "error"); } }); }
+    function statusDealerCount(value) {
+        return (Array.isArray(allDealers) ? allDealers : []).filter(dealer => String(dealer.status || '') === String(value || '')).length;
+    }
+
+    function statusColor(value) {
+        const color = String(value || '').trim();
+        return /^#[0-9a-f]{6}$/i.test(color) ? color : '#8f9197';
+    }
+
+    function renderStatusManagerStats() {
+        const total = statusList.length;
+        const visible = statusList.filter(item => item.isVisible !== false).length;
+        const hidden = total - visible;
+        const assigned = (Array.isArray(allDealers) ? allDealers : []).filter(dealer =>
+            statusList.some(status => String(status.value) === String(dealer.status || ''))
+        ).length;
+        const set = (id,value) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = Number(value || 0).toLocaleString('ru-RU');
+        };
+        set('status-stat-total',total);
+        set('status-stat-visible',visible);
+        set('status-stat-hidden',hidden);
+        set('status-stat-dealers',assigned);
+    }
+
+    function renderStatusManagerList() {
+        if (!statusListContainer) return;
+        renderStatusManagerStats();
+
+        if (!statusList.length) {
+            statusListContainer.innerHTML = '<div class="status-manager-empty"><i class="bi bi-tag"></i><span>Статусы ещё не созданы</span></div>';
+            return;
+        }
+
+        const editingId = String(document.getElementById('st_id')?.value || '');
+        statusListContainer.innerHTML = statusList.map((status,index) => {
+            const id = String(status.id || status._id || '');
+            const count = statusDealerCount(status.value);
+            const visible = status.isVisible !== false;
+            const color = statusColor(status.color);
+            const deleteTitle = count > 0 ? `Статус используется: ${count} дил.` : 'Удалить статус';
+            return `
+                <article class="status-manager-item ${editingId === id ? 'is-editing' : ''}" data-status-id="${safeAttr(id)}">
+                    <div class="status-manager-item-main">
+                        <span class="status-manager-color" style="background:${safeAttr(color)}"></span>
+                        <div class="status-manager-copy">
+                            <strong>${safeText(status.label || status.value || 'Без названия')}</strong>
+                            <div class="status-manager-meta">
+                                <span class="status-manager-code">${safeText(status.value || '—')}</span>
+                                <span class="status-manager-count"><i class="bi bi-shop"></i>${count} дил.</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="status-manager-actions">
+                        <button type="button" class="status-manager-eye ${visible ? '' : 'is-hidden'}" data-status-action="visibility" title="${visible ? 'Скрыть из рабочего списка' : 'Показывать в рабочем списке'}">
+                            <i class="bi bi-${visible ? 'eye-fill' : 'eye-slash'}"></i>
+                            <span>${visible ? 'Показывается' : 'Скрыт'}</span>
+                        </button>
+                        <span class="status-manager-reorder" title="Изменить порядок">
+                            <button type="button" data-status-action="up" ${index === 0 ? 'disabled' : ''}><i class="bi bi-chevron-up"></i></button>
+                            <button type="button" data-status-action="down" ${index === statusList.length - 1 ? 'disabled' : ''}><i class="bi bi-chevron-down"></i></button>
+                        </span>
+                        <button type="button" class="status-manager-icon-btn" data-status-action="edit" title="Редактировать"><i class="bi bi-pencil"></i></button>
+                        <button type="button" class="status-manager-icon-btn is-danger" data-status-action="delete" title="${safeAttr(deleteTitle)}" ${count > 0 ? 'disabled' : ''}><i class="bi bi-trash"></i></button>
+                    </div>
+                </article>`;
+        }).join('');
+    }
+
+    function updateStatusColorPreview() {
+        const input = document.getElementById('st_color');
+        const dot = document.querySelector('#status-color-preview i');
+        if (input && dot) dot.style.background = statusColor(input.value);
+    }
+
+    function resetStatusForm(options = {}) {
+        if (!statusForm) return;
+        statusForm.reset();
+        const idInput = document.getElementById('st_id');
+        const codeInput = document.getElementById('st_value');
+        const colorInput = document.getElementById('st_color');
+        const visibleInput = document.getElementById('st_visible');
+        const saveBtn = document.getElementById('btn-save-status');
+        const cancelBtn = document.getElementById('btn-cancel-edit-status');
+        const kicker = document.getElementById('status-editor-kicker');
+        const title = document.getElementById('status-editor-title');
+
+        if (idInput) idInput.value = '';
+        if (codeInput) {
+            codeInput.value = '';
+            codeInput.disabled = false;
+            codeInput.title = '';
+            const help = codeInput.closest('.status-editor-field')?.querySelector('small');
+            if (help) help.textContent = 'Системный код на латинице. После использования лучше его не менять.';
+        }
+        if (colorInput) colorInput.value = '#B9040A';
+        if (visibleInput) visibleInput.checked = true;
+        if (saveBtn) saveBtn.innerHTML = '<i class="bi bi-plus-lg"></i><span>Добавить статус</span>';
+        if (cancelBtn) cancelBtn.textContent = 'Очистить';
+        if (kicker) kicker.textContent = 'НОВЫЙ СТАТУС';
+        if (title) title.textContent = 'Добавить статус';
+
+        updateStatusColorPreview();
+        renderStatusManagerList();
+
+        if (options.focus) {
+            document.getElementById('st_label')?.focus();
+            if (window.innerWidth < 768) document.getElementById('status-manager-editor')?.scrollIntoView({behavior:'smooth',block:'start'});
+        }
+    }
+
+    function translitStatusCode(value) {
+        const map = {
+            'а':'a','б':'b','в':'v','г':'g','д':'d','е':'e','ё':'e','ж':'zh','з':'z','и':'i','й':'y',
+            'к':'k','л':'l','м':'m','н':'n','о':'o','п':'p','р':'r','с':'s','т':'t','у':'u','ф':'f',
+            'х':'h','ц':'c','ч':'ch','ш':'sh','щ':'sch','ъ':'','ы':'y','ь':'','э':'e','ю':'yu','я':'ya',
+            'қ':'q','ғ':'g','ң':'n','ө':'o','ұ':'u','ү':'u','һ':'h','і':'i','ә':'a'
+        };
+        return String(value || '').trim().toLowerCase().split('').map(ch => map[ch] ?? ch).join('')
+            .replace(/[^a-z0-9]+/g,'_')
+            .replace(/^_+|_+$/g,'')
+            .replace(/_+/g,'_')
+            .slice(0,48);
+    }
+
+    function editStatus(id) {
+        const status = statusList.find(item => String(item.id || item._id) === String(id));
+        if (!status) return;
+
+        const count = statusDealerCount(status.value);
+        document.getElementById('st_id').value = status.id || status._id || '';
+        document.getElementById('st_label').value = status.label || '';
+        const codeInput = document.getElementById('st_value');
+        codeInput.value = status.value || '';
+        codeInput.disabled = count > 0;
+        codeInput.title = count > 0 ? 'Код заблокирован, потому что статус уже используется дилерами' : '';
+        const help = codeInput.closest('.status-editor-field')?.querySelector('small');
+        if (help) help.textContent = count > 0
+            ? `Код заблокирован: этот статус используют ${count} дил. Название и цвет можно менять безопасно.`
+            : 'Системный код на латинице. После использования лучше его не менять.';
+
+        document.getElementById('st_color').value = statusColor(status.color);
+        document.getElementById('st_visible').checked = status.isVisible !== false;
+        document.getElementById('status-editor-kicker').textContent = 'РЕДАКТИРОВАНИЕ';
+        document.getElementById('status-editor-title').textContent = status.label || status.value || 'Статус';
+        document.getElementById('btn-save-status').innerHTML = '<i class="bi bi-check-lg"></i><span>Сохранить изменения</span>';
+        document.getElementById('btn-cancel-edit-status').textContent = 'Отмена';
+
+        updateStatusColorPreview();
+        renderStatusManagerList();
+        if (window.innerWidth < 768) document.getElementById('status-manager-editor')?.scrollIntoView({behavior:'smooth',block:'start'});
+    }
+
+    async function toggleStatusVisibility(id) {
+        const status = statusList.find(item => String(item.id || item._id) === String(id));
+        if (!status) return;
+        try {
+            const response = await fetch(`${API_STATUSES_URL}/${id}`, {
+                method:'PUT',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({isVisible: status.isVisible === false})
+            });
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || 'Не удалось изменить видимость');
+            }
+            window.showToast(status.isVisible === false ? 'Статус снова показывается' : 'Статус скрыт из рабочего списка');
+            await fetchStatuses();
+        } catch (error) {
+            window.showToast(error.message || 'Ошибка изменения статуса','error');
+        }
+    }
+
+    async function moveStatus(id,direction) {
+        const index = statusList.findIndex(item => String(item.id || item._id) === String(id));
+        const target = index + direction;
+        if (index < 0 || target < 0 || target >= statusList.length) return;
+
+        const current = statusList[index];
+        const other = statusList[target];
+        const currentOrder = Number.isFinite(Number(current.sortOrder)) ? Number(current.sortOrder) : (index + 1) * 10;
+        const otherOrder = Number.isFinite(Number(other.sortOrder)) ? Number(other.sortOrder) : (target + 1) * 10;
+
+        try {
+            const responses = await Promise.all([
+                fetch(`${API_STATUSES_URL}/${current.id || current._id}`, {
+                    method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({sortOrder:otherOrder})
+                }),
+                fetch(`${API_STATUSES_URL}/${other.id || other._id}`, {
+                    method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({sortOrder:currentOrder})
+                })
+            ]);
+            if (responses.some(response => !response.ok)) throw new Error('Не удалось изменить порядок');
+            await fetchStatuses();
+        } catch (error) {
+            window.showToast(error.message || 'Ошибка изменения порядка','error');
+        }
+    }
+
+    async function deleteStatus(id) {
+        const status = statusList.find(item => String(item.id || item._id) === String(id));
+        if (!status) return;
+        const count = statusDealerCount(status.value);
+        if (count > 0) {
+            window.showToast(`Статус используют ${count} дил. Сначала переведите их на другой статус.`,'warning');
+            return;
+        }
+        if (!confirm(`Удалить статус «${status.label || status.value}»? Это действие нельзя отменить.`)) return;
+
+        try {
+            const response = await fetch(`${API_STATUSES_URL}/${id}`,{method:'DELETE'});
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || 'Не удалось удалить статус');
+            }
+            window.showToast('Статус удалён');
+            resetStatusForm();
+            await fetchStatuses();
+        } catch (error) {
+            window.showToast(error.message || 'Ошибка удаления','error');
+        }
+    }
+
+    statusListContainer?.addEventListener('click', event => {
+        const button = event.target.closest('[data-status-action]');
+        const item = event.target.closest('[data-status-id]');
+        if (!button || !item) return;
+        const id = item.dataset.statusId;
+        const action = button.dataset.statusAction;
+        if (action === 'edit') editStatus(id);
+        if (action === 'delete') deleteStatus(id);
+        if (action === 'visibility') toggleStatusVisibility(id);
+        if (action === 'up') moveStatus(id,-1);
+        if (action === 'down') moveStatus(id,1);
+    });
+
+    document.getElementById('btn-new-status')?.addEventListener('click', () => resetStatusForm({focus:true}));
+    document.getElementById('btn-cancel-edit-status')?.addEventListener('click', () => resetStatusForm());
+    document.getElementById('status-generate-code')?.addEventListener('click', () => {
+        const codeInput = document.getElementById('st_value');
+        if (!codeInput || codeInput.disabled) return;
+        codeInput.value = translitStatusCode(document.getElementById('st_label')?.value);
+        codeInput.focus();
+    });
+    document.getElementById('st_label')?.addEventListener('blur', () => {
+        const codeInput = document.getElementById('st_value');
+        if (codeInput && !codeInput.disabled && !codeInput.value.trim()) {
+            codeInput.value = translitStatusCode(document.getElementById('st_label')?.value);
+        }
+    });
+    document.getElementById('st_value')?.addEventListener('input', event => {
+        if (!event.target.disabled) event.target.value = translitStatusCode(event.target.value);
+    });
+    document.getElementById('st_color')?.addEventListener('input', updateStatusColorPreview);
+
+    if (statusForm) {
+        statusForm.addEventListener('submit', async event => {
+            event.preventDefault();
+            const id = String(document.getElementById('st_id')?.value || '');
+            const label = String(document.getElementById('st_label')?.value || '').trim();
+            const codeInput = document.getElementById('st_value');
+            const value = String(codeInput?.value || '').trim();
+            const color = statusColor(document.getElementById('st_color')?.value);
+            const isVisible = Boolean(document.getElementById('st_visible')?.checked);
+
+            if (!label || !value) {
+                window.showToast('Заполните название и код статуса','warning');
+                return;
+            }
+            const duplicate = statusList.find(item =>
+                String(item.value || '').toLowerCase() === value.toLowerCase() &&
+                String(item.id || item._id) !== id
+            );
+            if (duplicate) {
+                window.showToast('Такой системный код уже используется','warning');
+                return;
+            }
+
+            const body = {value,label,color,isVisible};
+            if (!id) {
+                const maxOrder = statusList.reduce((max,item,index) => Math.max(max,Number(item.sortOrder) || (index + 1) * 10),0);
+                body.sortOrder = maxOrder + 10;
+            }
+
+            const button = document.getElementById('btn-save-status');
+            const previous = button?.innerHTML;
+            if (button) {
+                button.disabled = true;
+                button.innerHTML = '<span class="spinner-border spinner-border-sm"></span><span>Сохраняем…</span>';
+            }
+            try {
+                const response = await fetch(id ? `${API_STATUSES_URL}/${id}` : API_STATUSES_URL, {
+                    method:id ? 'PUT' : 'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify(body)
+                });
+                if (!response.ok) {
+                    const data = await response.json().catch(() => ({}));
+                    throw new Error(data.error || 'Не удалось сохранить статус');
+                }
+                window.showToast(id ? 'Статус обновлён' : 'Статус добавлен');
+                resetStatusForm();
+                await fetchStatuses();
+            } catch (error) {
+                window.showToast(error.message || 'Ошибка сохранения','error');
+            } finally {
+                if (button) {
+                    button.disabled = false;
+                    if (previous && document.getElementById('st_id')?.value) button.innerHTML = previous;
+                    else button.innerHTML = '<i class="bi bi-plus-lg"></i><span>Добавить статус</span>';
+                }
+            }
+        });
+    }
+
     // --- STANDARD API ---
     async function fetchProductCatalog() { if (fullProductCatalog.length > 0) return; const response = await fetch(API_PRODUCTS_URL); if (!response.ok) throw new Error("Ошибка каталога"); fullProductCatalog = await response.json(); fullProductCatalog.sort((a, b) => a.sku.localeCompare(b.sku, 'ru', { numeric: true })); }
     async function fetchCompetitorsRef() {
