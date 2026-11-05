@@ -275,7 +275,7 @@ function auditRouteMeta(req) {
     else if (path.startsWith('/api/exports')) { module='exports'; entityType='export'; }
     else if (path.startsWith('/api/statuses') || path.startsWith('/api/sectors')) { module='settings'; entityType=path.startsWith('/api/statuses')?'status':'sector'; }
     let action = req.method === 'DELETE' ? 'delete' : ((req.method === 'PUT' || req.method === 'PATCH') ? 'update' : 'create');
-    if (path === '/api/sales' || path.startsWith('/api/exports') || /\/visits(?:\/|$)/.test(path) || /\/receive$/.test(path) || /\/material-movement$/.test(path) || /\/production$/.test(path) || /\/writeoff$/.test(path) || /\/dealer-movement$/.test(path) || /\/opening-balance$/.test(path) || /\/stocktake$/.test(path) || path === '/api/admin/import-catalog') action='execute';
+    if (path === '/api/sales' || path.startsWith('/api/exports') || path === '/api/workshop/print-log' || /\/visits(?:\/|$)/.test(path) || /\/receive$/.test(path) || /\/material-movement$/.test(path) || /\/production$/.test(path) || /\/writeoff$/.test(path) || /\/dealer-movement$/.test(path) || /\/opening-balance$/.test(path) || /\/stocktake$/.test(path) || path === '/api/admin/import-catalog') action='execute';
     return { module, entityType, action };
 }
 
@@ -347,6 +347,10 @@ function auditSummary(req, route, label) {
     if (path.endsWith('/dealer-movement')) return 'Провёл выдачу / возврат по дилеру';
     if (path.endsWith('/opening-balance')) return 'Зафиксировал стартовые остатки цеха';
     if (path.endsWith('/stocktake')) return 'Провёл инвентаризацию цеха';
+    if (path === '/api/workshop/print-log') {
+        const title=String(req.body?.title||req.body?.type||'документ').trim();
+        return 'Распечатал документ цеха · '+title;
+    }
     if (path === '/api/admin/import-catalog') return 'Импортировал товарную матрицу';
     if (path === '/api/exports/log') {
         const type=String(req.body?.type||'');
@@ -2319,6 +2323,17 @@ async function syncWorkshopPosToDealer(dealerId, recipeId) {
     }
     await dealer.save();
 }
+
+app.post('/api/workshop/print-log', requirePermission('can_view_workshop'), async (req, res) => {
+    try {
+        const type=String(req.body?.type||'report').trim().slice(0,60);
+        const referenceId=String(req.body?.referenceId||'').trim().slice(0,120);
+        const title=String(req.body?.title||'Документ цеха').trim().slice(0,180);
+        res.json({status:'logged',type,referenceId,title});
+    } catch(e) {
+        res.status(500).json({error:e.message});
+    }
+});
 
 app.get('/api/workshop/bootstrap', requirePermission('can_view_workshop'), async (req, res) => {
     try {
