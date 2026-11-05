@@ -501,15 +501,8 @@ app.delete('/api/admin/users/:id', requireAdmin, async (req, res) => {
 });
 
 function auditRegex(value) {
-    return String(value || '').replace(/[.*+?^$()|[\]\\]/g, '\\app.delete('/api/admin/users/:id', requireAdmin, async (req, res) => {
-    try {
-        if (req.params.id === req.user.id) return res.status(400).json({ error: 'Нельзя удалить самого себя' });
-        await User.findByIdAndDelete(req.params.id);
-        res.json({ status: 'deleted' });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});');
+    return String(value || '').replace(/[.*+?^$()|[\]\\]/g, '\\$&');
 }
-
 app.get('/api/audit', requireAdmin, async (req, res) => {
     try {
         const page=Math.max(1,Number(req.query.page)||1);
