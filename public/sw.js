@@ -12,6 +12,7 @@ const LOCAL_ASSETS = [
     '/knowledge.html',
     '/reclamations.html',
     '/users.html',
+    '/audit.html',
     '/dealer.html',
     '/workshop.html',
     '/pricing.html',
