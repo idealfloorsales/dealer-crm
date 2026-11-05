@@ -920,7 +920,7 @@ document.addEventListener('DOMContentLoaded', () => {
         production_material:'Материал в производство', production_component:'Компонент в производство',
         production_output:'Изготовлено', dealer_issue:'Выдано дилеру', dealer_return:'Возврат от дилера',
         dealer_replacement:'Замена у дилера', writeoff:'Списание', material_receipt:'Приход материала',
-        material_issue:'Расход материала', stocktake_adjustment:'Корректировка инвентаризации',
+        material_issue:'Расход материала', stocktake_adjustment:'Корректировка инвентаризации', manual_correction:'Корректировка остатка',
         opening_balance:'Стартовый остаток в цехе', opening_dealer_balance:'Стартовый остаток у дилера'
     };
 
