@@ -322,6 +322,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function stockSearchTerm() { return ($('ws-stock-search')?.value || '').trim().toLowerCase(); }
 
+    function isTradingEquipmentRecipe(item) {
+        if (!item) return false;
+        const text = [
+            item.sku, item.name, item.matrixPosName,
+            item.product?.sku, item.product?.name
+        ].filter(Boolean).join(' ').toUpperCase();
+        return Boolean(
+            item.matrixPosName ||
+            /^POS-/i.test(String(item.sku || '')) ||
+            item.outputType === 'stand' ||
+            item.outputType === 'sign' ||
+            /(^|[^A-ZА-Я0-9])(С|C)600([^0-9]|$)|(^|[^A-ZА-Я0-9])(С|C)800([^0-9]|$)|РФ-?2|RF-?2|(^|[^A-ZА-Я0-9])(Н|H)600([^0-9]|$)|(^|[^A-ZА-Я0-9])(Н|H)800([^0-9]|$)|ТАБЛИЧК|ОРГ.?СТЕКЛ|СТЕНД|ЗАДН.*СТЕНК|РАСЧЕСК.*ФАНЕР|НАКЛЕЙК/i.test(text)
+        );
+    }
+
+    function isTradingEquipmentProduct(product) {
+        if (!product) return false;
+        const text=[product.sku,product.name].filter(Boolean).join(' ').toUpperCase();
+        return /(^|[^A-ZА-Я0-9])(С|C)600([^0-9]|$)|(^|[^A-ZА-Я0-9])(С|C)800([^0-9]|$)|РФ-?2|RF-?2|(^|[^A-ZА-Я0-9])(Н|H)600([^0-9]|$)|(^|[^A-ZА-Я0-9])(Н|H)800([^0-9]|$)|ТАБЛИЧК|ОРГ.?СТЕКЛ|СТЕНД|ЗАДН.*СТЕНК|РАСЧЕСК.*ФАНЕР|НАКЛЕЙК/i.test(text);
+    }
+
+    function workshopRecipeDisplayName(item) {
+        const name=String(item?.name || item?.product?.name || 'Изделие').trim();
+        return isTradingEquipmentRecipe(item)
+            ? name.replace(/^\s*(Планшет|Образец)\s+/i,'').trim()
+            : name;
+    }
+
+    function workshopRecipeTypeLabel(item) {
+        if (isTradingEquipmentRecipe(item)) return 'Торговое оборудование';
+        if (item?.outputType === 'sample') return 'Планшет / образец';
+        return 'Изделие';
+    }
+
     function renderStocks() {
         const term = stockSearchTerm();
         const laminateHost = $('ws-laminate-stock');
@@ -344,7 +378,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const minimum = Math.max(0, n(item.minStockQty));
             const low = minimum > 0 && n(item.stockQty) <= minimum;
             return `<div class="workshop-stock-card ${low ? 'is-low' : ''}">
-                <div><strong>${esc(item.name)}</strong><small>${esc(item.outputType === 'sample' ? 'образец / планшет' : item.outputType === 'stand' ? 'стенд' : item.outputType)}${item.product ? ' · '+esc(item.product.sku || '') : ''}${minimum > 0 ? ' · минимум '+fmt(minimum) : ''}</small></div>
+                <div><strong>${esc(workshopRecipeDisplayName(item))}</strong><small>${esc(workshopRecipeTypeLabel(item))}${item.product ? ' · '+esc(item.product.sku || '') : ''}${minimum > 0 ? ' · минимум '+fmt(minimum) : ''}</small></div>
                 <div class="workshop-stock-actions"><b>${fmt(item.stockQty)} шт</b>${canManageWorkshop() ? `<button type="button" class="workshop-icon-action" data-correct-stock="finished" data-correct-id="${idOf(item)}" title="Исправить фактический остаток"><i class="bi bi-pencil-square"></i></button>` : ''}</div>
             </div>`;
         }).join('') : '<div class="workshop-empty">Нет рецептур</div>';
@@ -386,7 +420,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function correctionItems(type) {
         if (type === 'finished') {
             return state.recipes.map(item => ({
-                id:idOf(item), name:item.name || 'Изделие', code:item.product?.sku || item.sku || '',
+                id:idOf(item), name:workshopRecipeDisplayName(item) || 'Изделие', code:item.product?.sku || item.sku || '',
                 current:Math.max(0,n(item.stockQty)), unit:'шт'
             }));
         }
@@ -499,16 +533,13 @@ document.addEventListener('DOMContentLoaded', () => {
             finished:'Готовая продукция в цехе',
             laminate:'Ламинат в цехе',
             materials:'Материалы и расходники',
-            dealers:'Образцы и стенды у дилеров',
+            dealers:'Образцы и торговое оборудование у дилеров',
             shortage:'Чего не хватает'
         }[mode] || 'Остатки цеха';
     }
 
     function currentStockTypeLabel(item) {
-        if (item?.outputType === 'sample') return 'Планшет / образец';
-        if (item?.outputType === 'stand') return 'Стенд';
-        if (item?.outputType === 'sign') return 'Табличка';
-        return 'Изделие';
+        return workshopRecipeTypeLabel(item);
     }
 
     function renderStockView() {
@@ -545,7 +576,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const shortage=Math.max(0,minimum-current);
                 return `<article class="workshop-current-row ${shortage>0?'is-shortage':''}">
                     <div class="workshop-current-main">
-                        <strong>${esc(item.name)}</strong>
+                        <strong>${esc(workshopRecipeDisplayName(item))}</strong>
                         <small>${esc(currentStockTypeLabel(item))}${item.product?.sku?' · '+esc(item.product.sku):''}${item.product?.name?' · '+esc(item.product.name):''}</small>
                     </div>
                     <div class="workshop-current-min"><small>Минимум</small><span>${minimum>0?fmt(minimum)+' шт':'—'}</span></div>
@@ -594,7 +625,7 @@ document.addEventListener('DOMContentLoaded', () => {
             summaryHtml=`<div><small>У дилеров всего</small><strong>${fmt(total)} шт</strong></div><div><small>Дилеров</small><strong>${fmt(dealers)}</strong></div><div><small>Строк учёта</small><strong>${fmt(rows.length)}</strong></div>`;
             html=rows.length?rows.map(asset=>`<article class="workshop-current-row">
                 <div class="workshop-current-main"><strong>${esc(asset.dealer?.name||'—')}</strong><small>${esc(asset.dealer?.city||'')}${asset.dealer?.dealer_id?' · '+esc(asset.dealer.dealer_id):''}</small></div>
-                <div class="workshop-current-min"><small>Изделие</small><span>${esc(asset.recipe?.name||'—')}${asset.recipe?.product?.sku?' · '+esc(asset.recipe.product.sku):''}</span></div>
+                <div class="workshop-current-min"><small>Изделие</small><span>${esc(workshopRecipeDisplayName(asset.recipe)||'—')}${asset.recipe?.product?.sku?' · '+esc(asset.recipe.product.sku):''}</span></div>
                 <div class="workshop-current-qty"><small>Сейчас у дилера</small><strong>${fmt(asset.qty)} шт</strong></div>
             </article>`).join(''):'<div class="workshop-empty">У дилеров ничего не числится</div>';
         } else {
@@ -609,7 +640,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const label=row.type==='finished'?currentStockTypeLabel(item):'Материал / расходник';
                 const code=row.type==='finished'?(item.product?.sku||item.sku||''):(item.code||'');
                 return `<article class="workshop-current-row is-shortage">
-                    <div class="workshop-current-main"><strong>${esc(item.name)}</strong><small>${esc(label)}${code?' · '+esc(code):''}</small></div>
+                    <div class="workshop-current-main"><strong>${esc(row.type==='finished'?workshopRecipeDisplayName(item):item.name)}</strong><small>${esc(label)}${code?' · '+esc(code):''}</small></div>
                     <div class="workshop-current-min"><small>Нужно минимум</small><span>${fmt(row.minimum,2)} ${esc(unit)}</span><small>есть ${fmt(row.current,2)}</small></div>
                     <div class="workshop-current-qty"><small>Не хватает</small><strong>${fmt(row.shortage,2)} ${esc(unit)}</strong>${canManageWorkshop()?`<button type="button" class="workshop-current-edit" data-correct-stock="${row.type}" data-correct-id="${idOf(item)}"><i class="bi bi-pencil-square"></i>Исправить</button>`:''}</div>
                 </article>`;
@@ -712,7 +743,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return [...state.recipes]
             .sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'ru'))
             .map(item=>[
-                item.name,
+                workshopRecipeDisplayName(item),
                 currentStockTypeLabel(item),
                 item.product?.sku || item.sku || '',
                 `${fmt(Math.max(0,n(item.stockQty)))} шт`,
@@ -747,7 +778,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .sort((a,b)=>String(a.dealer?.name||'').localeCompare(String(b.dealer?.name||''),'ru'))
             .map(item=>[
                 item.dealer?.dealer_id||'',item.dealer?.name||'',item.dealer?.city||'',
-                item.recipe?.name||'',item.recipe?.product?.sku||'',`${fmt(item.qty)} шт`
+                workshopRecipeDisplayName(item.recipe)||'',item.recipe?.product?.sku||'',`${fmt(item.qty)} шт`
             ]);
     }
 
@@ -820,7 +851,7 @@ document.addEventListener('DOMContentLoaded', () => {
             subtitle='Позиции, где текущий остаток ниже установленного минимума';
             body=printTable('Дефицит',['Тип','Позиция','Код / SKU','Сейчас','Минимум','Не хватает'],shortagePrintRows());
         } else if (type === 'dealers') {
-            title='Образцы и стенды у дилеров';
+            title='Образцы и торговое оборудование у дилеров';
             body=printTable('Текущее размещение',['ID','Дилер','Город','Изделие','SKU','Сейчас у дилера'],dealerAssetPrintRows());
             landscape=true;
         } else if (type === 'production') {
@@ -896,7 +927,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const batch = noWasteBatch(pq, item.planksPerUnit);
             const materialCount = (item.materials || []).length + (item.components || []).length;
             return `<article class="workshop-recipe-card">
-                <div class="top"><div><strong>${esc(item.name)}</strong><small>${esc(item.sku || '')}${item.product ? ' · '+esc(item.product.sku || '') : ''}</small></div><span class="ws-liquid ${item.product?.is_liquid === false?'is-old':''}">${item.outputType === 'sample'?'образец':item.outputType === 'stand'?'стенд':esc(item.outputType)}</span></div>
+                <div class="top"><div><strong>${esc(workshopRecipeDisplayName(item))}</strong><small>${esc(item.sku || '')}${item.product ? ' · '+esc(item.product.sku || '') : ''}</small></div><span class="ws-liquid ${item.product?.is_liquid === false?'is-old':''}">${esc(workshopRecipeTypeLabel(item))}</span></div>
                 <div class="numbers"><span>Планок / шт<b>${fmt(item.planksPerUnit)}</b></span><span>На складе<b>${fmt(item.stockQty)} шт</b></span><span>Минимум<b>${fmt(item.minStockQty || 0)} шт</b></span><span>Компонентов<b>${materialCount}</b></span></div>
                 <small class="mt-2">${batch ? `Безотходно: ${batch.packs} уп. → ${batch.output} шт` : 'Норма ламината не задана'}${item.sideA || item.sideB ? ' · '+esc([item.sideA,item.sideB].filter(Boolean).join(' / ')):''}</small>
                 <div class="workshop-recipe-actions">
@@ -1006,10 +1037,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function recipeTypeLabel(recipe) {
         if (!recipe) return 'Нет рецептуры';
-        if (recipe.outputType === 'sample') return 'Планшет';
-        if (recipe.outputType === 'stand') return 'Стенд';
-        if (recipe.outputType === 'sign') return 'Табличка';
-        return 'Изделие';
+        return workshopRecipeTypeLabel(recipe);
     }
 
     function recommendedPacksForRecipe(recipe) {
@@ -2006,14 +2034,14 @@ document.addEventListener('DOMContentLoaded', () => {
             key:`recipe:${idOf(recipe)}`,
             recipe,
             product:recipe.product || null,
-            name:recipe.name || 'Изделие',
+            name:workshopRecipeDisplayName(recipe) || 'Изделие',
             sku:recipe.sku || recipe.product?.sku || '',
             outputType:recipe.outputType || 'other',
             autoRecipe:false
         }));
 
         const productRows = state.products
-            .filter(product => !recipeProductIds.has(idOf(product)))
+            .filter(product => !recipeProductIds.has(idOf(product)) && !isTradingEquipmentProduct(product))
             .map(product => ({
                 key:`product:${idOf(product)}`,
                 recipe:null,
@@ -2043,10 +2071,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function openingTypeLabel(candidate) {
         if (candidate?.autoRecipe) return 'образец · карточка создастся автоматически';
-        if (candidate?.outputType === 'sample') return 'образец / планшет';
-        if (candidate?.outputType === 'stand') return 'стенд';
-        if (candidate?.outputType === 'sign') return 'табличка';
-        return 'изделие';
+        if (candidate?.recipe && isTradingEquipmentRecipe(candidate.recipe)) return 'Торговое оборудование';
+        if (candidate?.outputType === 'sample') return 'Планшет / образец';
+        return 'Изделие';
     }
 
     function resetOpening() {
