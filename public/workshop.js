@@ -236,6 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="workshop-memo-card-foot">
                     <small>${(memo.lines || []).length} поз. · ${(memo.lines || []).reduce((sum,line)=>sum+n(line.requestedPacks),0)} уп. · ${(memo.lines || []).reduce((sum,line)=>sum+n(line.plannedOutputQty),0)} изделий</small>
                     <div class="workshop-card-actions">
+                        <button type="button" class="workshop-icon-action" data-print-memo="${idOf(memo)}" title="Печать служебки"><i class="bi bi-printer"></i></button>
                         ${actionable && canManageWorkshop() ? `<button type="button" class="workshop-icon-action" data-edit-memo="${idOf(memo)}" title="Редактировать"><i class="bi bi-pencil"></i></button>` : ''}
                         ${actionable && isWorkshopAdmin() ? `<button type="button" class="workshop-icon-action is-danger" data-delete-memo="${idOf(memo)}" title="Удалить"><i class="bi bi-trash3"></i></button>` : ''}
                         ${actionable ? `<button type="button" class="workshop-link-btn" data-receive-memo="${idOf(memo)}"><i class="bi bi-check2-square"></i>${memo.status === 'mismatch' ? 'Повторно сверить' : 'Сверить приход'}</button>` : '<span class="text-success small fw-bold"><i class="bi bi-check-circle me-1"></i>Оприходовано</span>'}
@@ -244,6 +245,9 @@ document.addEventListener('DOMContentLoaded', () => {
             </article>`;
         }).join('');
 
+        host.querySelectorAll('[data-print-memo]').forEach(button => {
+            button.addEventListener('click', () => printMemoDocument(memoById(button.dataset.printMemo)));
+        });
         host.querySelectorAll('[data-receive-memo]').forEach(button => {
             button.addEventListener('click', () => openReceiptForMemo(button.dataset.receiveMemo));
         });
@@ -2092,6 +2096,49 @@ document.addEventListener('DOMContentLoaded', () => {
     $('ws-dealer-search')?.addEventListener('input',renderDealerAssets);
     $('ws-history-search')?.addEventListener('input',renderHistory);
     $('ws-history-type')?.addEventListener('change',renderHistory);
+
+    document.querySelectorAll('[data-stock-view]').forEach(button => {
+        const open = () => openStockView(button.dataset.stockView);
+        button.addEventListener('click',open);
+        button.addEventListener('keydown',event => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                open();
+            }
+        });
+    });
+
+    document.querySelectorAll('[data-stock-view-tab]').forEach(button => {
+        button.addEventListener('click',() => {
+            stockViewMode=button.dataset.stockViewTab || 'finished';
+            if ($('ws-stock-view-search')) $('ws-stock-view-search').value='';
+            renderStockView();
+        });
+    });
+    $('ws-stock-view-search')?.addEventListener('input',renderStockView);
+    $('ws-stock-view-print')?.addEventListener('click',() => printWorkshopReport(stockViewMode));
+
+    document.querySelectorAll('[data-workshop-drilldown]').forEach(button => {
+        const open = () => {
+            const type=button.dataset.workshopDrilldown;
+            activateWorkshopTab('overview');
+            setTimeout(() => {
+                const target=type==='memos' ? $('ws-memo-list') : $('ws-production-list');
+                target?.scrollIntoView({behavior:'smooth',block:'center'});
+            },180);
+        };
+        button.addEventListener('click',open);
+        button.addEventListener('keydown',event => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                open();
+            }
+        });
+    });
+
+    document.querySelectorAll('[data-print-workshop]').forEach(button => {
+        button.addEventListener('click',() => printWorkshopReport(button.dataset.printWorkshop));
+    });
 
     load();
 });
