@@ -804,17 +804,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function primaryLegalEntity(dealer) {
-        if (Array.isArray(dealer?.legal_entities) && dealer.legal_entities.length) return { ...dealer.legal_entities[0] };
+        if (Array.isArray(dealer?.legal_entities) && dealer.legal_entities.length) {
+            return { ...dealer.legal_entities[0] };
+        }
         return {
-            organizationName: dealer?.requisites?.organizationName || dealer?.organizations?.[0] || dealer?.organization || '',
-            director: dealer?.requisites?.director || '',
-            legalAddress: dealer?.requisites?.legalAddress || '',
-            bin: dealer?.requisites?.bin || '',
-            iik: dealer?.requisites?.iik || '',
-            bank: dealer?.requisites?.bank || '',
-            bik: dealer?.requisites?.bik || '',
-            kbe: dealer?.requisites?.kbe || '',
-            email: dealer?.requisites?.email || ''
+            organizationName: '',
+            director: '',
+            legalAddress: '',
+            bin: '',
+            iik: '',
+            bank: '',
+            bik: '',
+            kbe: '',
+            email: ''
         };
     }
 
