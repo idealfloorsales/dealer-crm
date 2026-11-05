@@ -912,6 +912,23 @@ function getDealerFilter(req) {
     return { _id: null };
 }
 
+const NON_WORKING_DEALER_STATUSES = ['potential', 'archive'];
+
+function isNonWorkingDealerStatus(status) {
+    return NON_WORKING_DEALER_STATUSES.includes(String(status || '').trim().toLowerCase());
+}
+
+function getWorkingDealerFilter(baseFilter = {}) {
+    const working = { status: { $nin: NON_WORKING_DEALER_STATUSES } };
+    if (!baseFilter || Object.keys(baseFilter).length === 0) return working;
+    return { $and: [baseFilter, working] };
+}
+
+function shouldIncludeNonWorkingDealers(req) {
+    const view = String(req.query?.view || '').trim().toLowerCase();
+    return view === 'main' || view === 'map';
+}
+
 function pricingTodayKey() {
     const parts = new Intl.DateTimeFormat('en-CA', {
         timeZone: 'Asia/Almaty',
@@ -1170,7 +1187,25 @@ app.get('/api/sectors', requireAnyPermission('can_view_dealers', 'can_view_sales
 app.post('/api/sectors', requirePermission('can_edit_dealer'), async (req, res) => { const s = new Sector(req.body); await s.save(); res.json(convertToClient(s)); });
 app.delete('/api/sectors/:id', requirePermission('can_edit_dealer'), async (req, res) => { await Sector.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
 
-app.get('/api/dealers', requireAnyPermission('can_view_dealers', 'can_view_map', 'can_view_sales', 'can_view_competitors', 'can_view_reclamations'), async (req, res) => { try { let filter = getDealerFilter(req); if (req.query.scope === 'all' && req.user.permissions && req.user.permissions.is_admin) { filter = {}; } if (req.query.context === 'sales' && hasPermission(req, 'can_view_sales')) { filter = {}; } let query = Dealer.find(filter); if (req.query.view === 'map') query = query.select('_id name city address contacts latitude longitude status responsible responsibleUserId'); else query = query.select('-photos -visits -products -avatarUrl'); const dealers = await query.lean(); res.json(dealers.map(d => ({ id: d._id, ...d }))); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.get('/api/dealers', requireAnyPermission('can_view_dealers', 'can_view_map', 'can_view_sales', 'can_view_competitors', 'can_view_reclamations'), async (req, res) => {
+    try {
+        let filter = getDealerFilter(req);
+        if (req.query.scope === 'all' && req.user.permissions && req.user.permissions.is_admin) filter = {};
+        if (req.query.context === 'sales' && hasPermission(req, 'can_view_sales')) filter = {};
+        if (!shouldIncludeNonWorkingDealers(req)) filter = getWorkingDealerFilter(filter);
+
+        let query = Dealer.find(filter);
+        if (req.query.view === 'map') {
+            query = query.select('_id name city address contacts latitude longitude status responsible responsibleUserId');
+        } else {
+            query = query.select('-photos -visits -products -avatarUrl');
+        }
+        const dealers = await query.lean();
+        res.json(dealers.map(d => ({ id: d._id, ...d })));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
 app.get('/api/dealers/:id/avatar', requirePermission('can_view_dealers'), async (req, res) => {
     try {
         const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).select('avatarUrl').lean();
@@ -1312,7 +1347,7 @@ app.put('/api/dealers/:id/products', requirePermission('can_edit_matrix'), async
 // ==========================================
 app.get('/api/pricing/overview', requirePermission('can_view_pricing'), async (req, res) => {
     try {
-        const dealers = await Dealer.find(getDealerFilter(req))
+        const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req)))
             .select('_id dealer_id name city region_sector price_type responsible')
             .sort({ name: 1 })
             .lean();
@@ -1371,8 +1406,12 @@ app.get('/api/pricing/overview', requirePermission('can_view_pricing'), async (r
 
 app.get('/api/pricing/dealers/:id', requirePermission('can_view_pricing'), async (req, res) => {
     try {
-        const dealer = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) })
-            .select('_id dealer_id name city region_sector price_type responsible')
+        const dealer = await Dealer.findOne({
+            $and: [
+                { _id: req.params.id },
+                getWorkingDealerFilter(getDealerFilter(req))
+            ]
+        }).select('_id dealer_id name city region_sector price_type responsible')
             .lean();
         if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
 
@@ -1400,7 +1439,12 @@ app.post('/api/pricing/conditions', requirePermission('can_manage_pricing'), asy
             return res.status(403).json({ error: 'Региональные и общие ценовые условия может создавать только пользователь с доступом ко всей компании' });
         }
         if (payload.scopeType === 'dealer') {
-            const dealer = await Dealer.findOne({ _id: payload.dealer, ...getDealerFilter(req) }).select('_id').lean();
+            const dealer = await Dealer.findOne({
+                $and: [
+                    { _id: payload.dealer },
+                    getWorkingDealerFilter(getDealerFilter(req))
+                ]
+            }).select('_id').lean();
             if (!dealer) return res.status(404).json({ error: 'Дилер недоступен' });
         }
 
@@ -1436,7 +1480,12 @@ app.put('/api/pricing/conditions/:id', requirePermission('can_manage_pricing'), 
             return res.status(403).json({ error: 'Региональные и общие ценовые условия может менять только пользователь с доступом ко всей компании' });
         }
         if (payload.scopeType === 'dealer') {
-            const dealer = await Dealer.findOne({ _id: payload.dealer, ...getDealerFilter(req) }).select('_id').lean();
+            const dealer = await Dealer.findOne({
+                $and: [
+                    { _id: payload.dealer },
+                    getWorkingDealerFilter(getDealerFilter(req))
+                ]
+            }).select('_id').lean();
             if (!dealer) return res.status(404).json({ error: 'Дилер недоступен' });
         }
 
@@ -1490,8 +1539,8 @@ app.post('/api/admin/import-catalog', requirePermission('can_manage_products'), 
 app.get('/api/matrix', requireAnyPermission('can_view_products', 'can_view_report'), async (req, res) => {
     try {
         const [prods, dealers] = await Promise.all([
-            Product.find().select('sku name').sort({sku:1}).lean(),
-            Dealer.find(getDealerFilter(req)).select('_id name city responsible products pos_materials').lean()
+            Product.find({ is_liquid: { $ne: false } }).select('sku name is_liquid').sort({sku:1}).lean(),
+            Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id name city responsible products pos_materials status').lean()
         ]);
         const dealerIds = dealers.map(d => d._id);
         const assets = dealerIds.length
@@ -1559,7 +1608,7 @@ app.get('/api/sales', requirePermission('can_view_sales'), async (req, res) => {
         const companySalesView = req.query.context === 'sales' && hasPermission(req, 'can_view_sales');
 
         if (!companySalesView && !isGlobalViewer(req) && req.user.role === 'manager') {
-            const dealers = await Dealer.find(getDealerFilter(req)).select('_id').lean();
+            const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id').lean();
             const dealerIds = dealers.map(d => String(d._id));
             const zonePlanId = scope === 'astana'
                 ? 'PLAN_astana_all'
@@ -1582,7 +1631,7 @@ app.get('/api/sales', requirePermission('can_view_sales'), async (req, res) => {
                 ]
             };
         } else if (!companySalesView && !isGlobalViewer(req) && scope !== 'all') {
-            const dealers = await Dealer.find(getDealerFilter(req)).select('_id').lean();
+            const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id').lean();
             const dealerIds = dealers.map(d => String(d._id));
             const personalPlanIds = dealerIds.map(id => `PLAN_vip_${id}`);
 
@@ -1643,7 +1692,7 @@ app.post('/api/sales', async (req, res) => {
     const managerRestricted = Boolean(req.user && req.user.role === 'manager' && !isGlobalViewer(req) && !companySalesView);
     let managerDealerIds = null;
     if (managerRestricted) {
-        const dealers = await Dealer.find(getDealerFilter(req)).select('_id').lean();
+        const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id').lean();
         managerDealerIds = new Set(dealers.map(d => String(d._id)));
     }
 
@@ -1757,11 +1806,11 @@ app.get('/api/knowledge/:id', requirePermission('can_view_knowledge'), async (re
 app.post('/api/knowledge', requirePermission('can_manage_knowledge'), async (req, res) => { const a = new Knowledge(req.body); await a.save(); res.json(convertToClient(a)); });
 app.put('/api/knowledge/:id', requirePermission('can_manage_knowledge'), async (req, res) => { const a = await Knowledge.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(a)); });
 app.delete('/api/knowledge/:id', requirePermission('can_manage_knowledge'), async (req, res) => { await Knowledge.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
-app.get('/api/tasks', requirePermission('can_view_dashboard'), async (req, res) => { try { const data = await Dealer.find(getDealerFilter(req)).select('name visits status responsible').lean(); res.json(data.map(d => ({ id: d._id, name: d.name, status: d.status, visits: d.visits || [], responsible: d.responsible }))); } catch (e) { res.status(500).json([]); } });
+app.get('/api/tasks', requirePermission('can_view_dashboard'), async (req, res) => { try { const data = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('name visits status responsible').lean(); res.json(data.map(d => ({ id: d._id, name: d.name, status: d.status, visits: d.visits || [], responsible: d.responsible }))); } catch (e) { res.status(500).json([]); } });
 
 async function getScopedDealerIds(req) {
-    if (isGlobalViewer(req)) return null;
-    const dealers = await Dealer.find(getDealerFilter(req)).select('_id').lean();
+    const baseFilter = isGlobalViewer(req) ? {} : getDealerFilter(req);
+    const dealers = await Dealer.find(getWorkingDealerFilter(baseFilter)).select('_id').lean();
     return dealers.map(d => String(d._id));
 }
 
@@ -1836,7 +1885,7 @@ app.get('/api/workshop/bootstrap', requirePermission('can_view_workshop'), async
     try {
         const [products, dealers, materials, recipes, laminateStocks, assets, productions, movements, memos] = await Promise.all([
             Product.find().select('sku name is_liquid characteristics.package_qty characteristics.size characteristics.class characteristics.thickness').sort({ sku: 1 }).lean(),
-            Dealer.find(getDealerFilter(req)).select('_id dealer_id name city status').sort({ name: 1 }).lean(),
+            Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id dealer_id name city status').sort({ name: 1 }).lean(),
             WorkshopMaterial.find({ active: { $ne: false } }).sort({ category: 1, name: 1 }).lean(),
             WorkshopRecipe.find({ active: { $ne: false } })
                 .populate('product', 'sku name is_liquid characteristics.package_qty')
@@ -1845,7 +1894,7 @@ app.get('/api/workshop/bootstrap', requirePermission('can_view_workshop'), async
                 .sort({ outputType: 1, name: 1 }).lean(),
             WorkshopLaminateStock.find().populate('product', 'sku name is_liquid characteristics.package_qty').lean(),
             WorkshopDealerAsset.find({ qty: { $gt: 0 } })
-                .populate('dealer', 'dealer_id name city')
+                .populate('dealer', 'dealer_id name city status')
                 .populate({ path: 'recipe', populate: { path: 'product', select: 'sku name is_liquid' } })
                 .sort({ updatedAt: -1 }).lean(),
             WorkshopProduction.find({ cancelledAt: { $exists: false } })
@@ -1892,7 +1941,7 @@ app.get('/api/workshop/bootstrap', requirePermission('can_view_workshop'), async
             materials: materials.map(convertToClient),
             recipes: recipes.map(convertToClient),
             laminateStocks: laminateStocks.map(convertToClient),
-            dealerAssets: assets.map(convertToClient),
+            dealerAssets: assets.filter(asset => !isNonWorkingDealerStatus(asset.dealer?.status)).map(convertToClient),
             productions: productions.map(convertToClient),
             movements: movements.map(convertToClient),
             memos: memos.map(convertToClient),
