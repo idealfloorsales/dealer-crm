@@ -103,7 +103,7 @@
             hasText(dealer.address),
             hasText(dealer.responsible),
             hasText(dealer.price_type),
-            (Array.isArray(dealer.organizations) && dealer.organizations.length > 0) || hasText(dealer.organization),
+            Array.isArray(dealer.legal_entities) && dealer.legal_entities.some(entity => hasText(entity?.organizationName)),
             Boolean(dealer.contract && (dealer.contract.isSigned || hasText(dealer.contract.date)))
         ];
         const profileFilled = profileChecks.filter(Boolean).length;
