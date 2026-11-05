@@ -213,12 +213,9 @@
     }
 
     function contractNumber(dealer) {
-        const explicit = String(dealer.contract?.number || '').trim();
-        if (explicit) return explicit;
         const raw = String(dealer.dealer_id || '').trim();
         if (!raw) return 'IF000';
-        if (/^IF/i.test(raw)) return raw.toUpperCase();
-        return `IF${raw}`;
+        return raw.toUpperCase();
     }
 
     function twoGisLocation(dealer) {
