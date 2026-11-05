@@ -5,7 +5,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // Элементы
     const listContainer = document.getElementById('products-list-container'); 
     const searchInput = document.getElementById('product-search');
+    const searchClear = document.getElementById('product-search-clear');
     const totalLabel = document.getElementById('total-count');
+    const kpiHost = document.getElementById('product-kpis');
+    const filterSelect = document.getElementById('filter-select');
+    const stockFilter = document.getElementById('stock-filter');
+    const classFilter = document.getElementById('class-filter');
+    const thicknessFilter = document.getElementById('thickness-filter');
+    const completenessFilter = document.getElementById('completeness-filter');
+    const sortSelect = document.getElementById('sort-select');
+    const resetFiltersBtn = document.getElementById('product-reset-filters');
+    const activeFilterSummary = document.getElementById('active-filter-summary');
+    const filteredSummary = document.getElementById('filtered-summary');
     
     // Модалки
     const modalEl = document.getElementById('product-modal');
@@ -51,7 +62,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let allProducts = [];
     let unmappedItems = [];
     let sortMode = 'sku'; 
-    let filterMode = 'all';
+    let filterMode = 'liquid';
+    let stockMode = 'all';
+    let completenessMode = 'all';
     let canManageProducts = false; 
     let xlsxLoadPromise = null;
 
@@ -77,37 +90,129 @@ document.addEventListener('DOMContentLoaded', () => {
     // Текущий товар в калькуляторе
     let calcCurrentProduct = null;
 
-    // --- ВНЕДРЕНИЕ КОНТРОЛОВ ---
-    function injectSimpleControls() {
-        const searchBlock = searchInput.closest('.sticky-filters');
-        if(!searchBlock || document.getElementById('simple-controls')) return;
+    // --- РАБОЧАЯ ЛОГИКА МАТРИЦЫ ---
+    const esc = value => String(value ?? '')
+        .replace(/&/g,'&amp;')
+        .replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;')
+        .replace(/'/g,'&#039;');
 
-        const controls = document.createElement('div');
-        controls.id = 'simple-controls';
-        controls.className = 'mt-2 d-flex gap-2';
-        
-        controls.innerHTML = `
-            <select id="sort-select" class="form-select form-select-sm text-secondary bg-light border-0" style="font-weight: 500;">
-                <option value="sku">Сортировка: Артикул (А-Я)</option>
-                <option value="stock_desc">По остатку (Убывание)</option>
-                <option value="stock_asc">По остатку (Возрастание)</option>
-            </select>
-            <select id="filter-select" class="form-select form-select-sm text-secondary bg-light border-0" style="font-weight: 500;">
-                <option value="all">Все товары</option>
-                <option value="liquid">Только Ликвид</option>
-                <option value="illiquid">Только Неликвид</option>
-            </select>
-        `;
-        searchBlock.appendChild(controls);
+    const normalize = value => String(value ?? '').trim().toLowerCase().replace(/\s+/g,' ');
 
-        document.getElementById('sort-select').onchange = (e) => {
-            sortMode = e.target.value;
-            applyLogic();
-        };
-        document.getElementById('filter-select').onchange = (e) => {
-            filterMode = e.target.value;
-            applyLogic();
-        };
+    function stockValue(product) {
+        const raw = product?.stock_qty;
+        if (raw === undefined || raw === null || raw === '') return null;
+        const value = Number(raw);
+        return Number.isFinite(value) ? value : null;
+    }
+
+    function missingProductFields(product) {
+        const c = product?.characteristics || {};
+        const fields = [
+            ['артикул', product?.sku],
+            ['название', product?.name],
+            ['класс', c.class],
+            ['толщина', c.thickness],
+            ['размер', c.size],
+            ['м²/уп', c.package_area],
+            ['шт/уп', c.package_qty]
+        ];
+        return fields.filter(([,value]) => !String(value ?? '').trim()).map(([label]) => label);
+    }
+
+    function isProductComplete(product) {
+        return missingProductFields(product).length === 0;
+    }
+
+    function populateDynamicFilters() {
+        const selectedClass = classFilter?.value || '';
+        const selectedThickness = thicknessFilter?.value || '';
+
+        const classes = [...new Set(allProducts.map(p => String(p.characteristics?.class || '').trim()).filter(Boolean))]
+            .sort((a,b)=>a.localeCompare(b,'ru',{numeric:true}));
+        const thicknesses = [...new Set(allProducts.map(p => String(p.characteristics?.thickness || '').trim()).filter(Boolean))]
+            .sort((a,b)=>a.localeCompare(b,'ru',{numeric:true}));
+
+        if (classFilter) {
+            classFilter.innerHTML = '<option value="">Все классы</option>' +
+                classes.map(v=>`<option value="${esc(v)}">${esc(v)} класс</option>`).join('');
+            if (classes.includes(selectedClass)) classFilter.value = selectedClass;
+        }
+        if (thicknessFilter) {
+            thicknessFilter.innerHTML = '<option value="">Любая</option>' +
+                thicknesses.map(v=>`<option value="${esc(v)}">${esc(v)} мм</option>`).join('');
+            if (thicknesses.includes(selectedThickness)) thicknessFilter.value = selectedThickness;
+        }
+    }
+
+    function resetWorkingFilters({showAll=false} = {}) {
+        filterMode = showAll ? 'all' : 'liquid';
+        stockMode = 'all';
+        completenessMode = 'all';
+        sortMode = 'sku';
+        if (filterSelect) filterSelect.value = filterMode;
+        if (stockFilter) stockFilter.value = stockMode;
+        if (classFilter) classFilter.value = '';
+        if (thicknessFilter) thicknessFilter.value = '';
+        if (completenessFilter) completenessFilter.value = completenessMode;
+        if (sortSelect) sortSelect.value = sortMode;
+        if (searchInput) searchInput.value = '';
+        if (searchClear) searchClear.hidden = true;
+    }
+
+    function applyQuickFilter(kind) {
+        resetWorkingFilters({showAll:kind==='all'});
+        if (kind === 'liquid') filterMode = 'liquid';
+        if (kind === 'illiquid') filterMode = 'illiquid';
+        if (kind === 'stock') { filterMode = 'liquid'; stockMode = 'positive'; }
+        if (kind === 'zero') { filterMode = 'liquid'; stockMode = 'zero'; }
+        if (kind === 'incomplete') { filterMode = 'liquid'; completenessMode = 'incomplete'; }
+
+        if (filterSelect) filterSelect.value = filterMode;
+        if (stockFilter) stockFilter.value = stockMode;
+        if (completenessFilter) completenessFilter.value = completenessMode;
+        applyLogic();
+    }
+
+    function renderKpis() {
+        if (!kpiHost) return;
+        const liquid = allProducts.filter(p => p.is_liquid !== false);
+        const illiquid = allProducts.filter(p => p.is_liquid === false);
+        const liquidStock = liquid.reduce((sum,p) => sum + Math.max(0, stockValue(p) ?? 0), 0);
+        const zeroStock = liquid.filter(p => {
+            const value = stockValue(p);
+            return value !== null && value <= 0;
+        }).length;
+        const incomplete = liquid.filter(p => !isProductComplete(p)).length;
+
+        const cleanState = !normalize(searchInput?.value) &&
+            !classFilter?.value && !thicknessFilter?.value &&
+            stockMode === 'all' && completenessMode === 'all';
+
+        const cards = [
+            {key:'all',icon:'bi-grid',label:'Всего в базе',value:allProducts.length,foot:`${liquid.length} рабочих позиций`,tone:'',active:cleanState&&filterMode==='all'},
+            {key:'liquid',icon:'bi-check2-circle',label:'Ликвид',value:liquid.length,foot:'рабочая матрица',tone:'good',active:cleanState&&filterMode==='liquid'},
+            {key:'illiquid',icon:'bi-archive',label:'Неликвид',value:illiquid.length,foot:'доступен для контроля',tone:'risk',active:cleanState&&filterMode==='illiquid'},
+            {key:'stock',icon:'bi-box-seam',label:'Остаток ликвида',value:liquidStock.toLocaleString('ru-RU',{maximumFractionDigits:2}),foot:'м² на складе',tone:'good',active:filterMode==='liquid'&&stockMode==='positive'},
+            {key:'zero',icon:'bi-box',label:'Без остатка',value:zeroStock,foot:'ликвидных позиций',tone:zeroStock?'warn':'',active:filterMode==='liquid'&&stockMode==='zero'},
+            {key:'incomplete',icon:'bi-exclamation-diamond',label:'Нужно заполнить',value:incomplete,foot:'неполных карточек',tone:incomplete?'warn':'',active:filterMode==='liquid'&&completenessMode==='incomplete'}
+        ];
+
+        kpiHost.innerHTML = cards.map(card=>`
+            <button type="button" class="product-kpi ${card.tone?'is-'+card.tone:''} ${card.active?'active':''}" data-product-kpi="${card.key}">
+                <span class="product-kpi-icon"><i class="bi ${card.icon}"></i></span>
+                <span class="product-kpi-copy">
+                    <small>${esc(card.label)}</small>
+                    <strong>${esc(card.value)}</strong>
+                    <em>${esc(card.foot)}</em>
+                </span>
+            </button>
+        `).join('');
+
+        kpiHost.querySelectorAll('[data-product-kpi]').forEach(btn=>{
+            btn.addEventListener('click',()=>applyQuickFilter(btn.dataset.productKpi));
+        });
     }
 
     async function loadProducts() {
@@ -116,8 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await fetch(API_URL);
             if (!res.ok) throw new Error('Ошибка');
             allProducts = await res.json();
-            
-            injectSimpleControls();
+            populateDynamicFilters();
             applyLogic();
         } catch (e) {
             listContainer.innerHTML = '<div class="text-center text-danger py-4">Ошибка загрузки данных</div>';
@@ -125,109 +229,163 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function applyLogic() {
-        const term = searchInput.value.toLowerCase();
-        
-        let filtered = allProducts.filter(p => {
-            const matchSearch = (p.name && p.name.toLowerCase().includes(term)) || 
-                                (p.sku && p.sku.toLowerCase().includes(term));
-            if(!matchSearch) return false;
+        const term = normalize(searchInput?.value);
+        if (searchClear) searchClear.hidden = !term;
 
-            if (filterMode === 'liquid' && p.is_liquid === false) return false;
-            if (filterMode === 'illiquid' && p.is_liquid !== false) return false;
+        filterMode = filterSelect?.value || filterMode || 'liquid';
+        stockMode = stockFilter?.value || stockMode || 'all';
+        completenessMode = completenessFilter?.value || completenessMode || 'all';
+        sortMode = sortSelect?.value || sortMode || 'sku';
+        const classValue = classFilter?.value || '';
+        const thicknessValue = thicknessFilter?.value || '';
 
+        let filtered = allProducts.filter(product => {
+            const c = product.characteristics || {};
+            const searchBlob = normalize([
+                product.sku, product.name, product.excel_alias,
+                c.class, c.thickness, c.bevel, c.size, c.package_area, c.package_qty
+            ].filter(Boolean).join(' '));
+
+            if (term && !searchBlob.includes(term)) return false;
+            if (filterMode === 'liquid' && product.is_liquid === false) return false;
+            if (filterMode === 'illiquid' && product.is_liquid !== false) return false;
+            if (classValue && String(c.class || '') !== classValue) return false;
+            if (thicknessValue && String(c.thickness || '') !== thicknessValue) return false;
+
+            const stock = stockValue(product);
+            if (stockMode === 'positive' && !(stock !== null && stock > 0)) return false;
+            if (stockMode === 'low' && !(stock !== null && stock > 0 && stock <= 20)) return false;
+            if (stockMode === 'zero' && !(stock !== null && stock <= 0)) return false;
+            if (stockMode === 'unknown' && stock !== null) return false;
+
+            const complete = isProductComplete(product);
+            if (completenessMode === 'complete' && !complete) return false;
+            if (completenessMode === 'incomplete' && complete) return false;
             return true;
         });
 
-        filtered.sort((a, b) => {
-            if (sortMode === 'sku') {
-                return (a.sku || '').localeCompare(b.sku || '');
-            } else if (sortMode === 'stock_desc') {
-                return (b.stock_qty || 0) - (a.stock_qty || 0);
-            } else if (sortMode === 'stock_asc') {
-                return (a.stock_qty || 0) - (b.stock_qty || 0);
+        filtered.sort((a,b) => {
+            const aStock = stockValue(a);
+            const bStock = stockValue(b);
+            const bySku = () => String(a.sku || '').localeCompare(String(b.sku || ''),'ru',{numeric:true});
+            if (sortMode === 'name') return String(a.name || '').localeCompare(String(b.name || ''),'ru') || bySku();
+            if (sortMode === 'stock_desc') return (bStock ?? -Infinity) - (aStock ?? -Infinity) || bySku();
+            if (sortMode === 'stock_asc') {
+                if (aStock === null && bStock !== null) return 1;
+                if (bStock === null && aStock !== null) return -1;
+                return (aStock ?? 0) - (bStock ?? 0) || bySku();
             }
+            if (sortMode === 'incomplete') {
+                return Number(isProductComplete(a)) - Number(isProductComplete(b)) || bySku();
+            }
+            return bySku();
         });
 
         renderList(filtered);
+        renderKpis();
+        renderFilterMeta(filtered);
     }
 
-   // --- ОТРИСОВКА СПИСКА ---
-    function renderList(products) {
-        // 1. Считаем сумму остатков
-        const totalStock = products.reduce((sum, p) => sum + (parseFloat(p.stock_qty) || 0), 0);
-        
-        // 2. Форматируем число
-        const formattedStock = totalStock.toLocaleString('ru-RU', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        });
+    function renderFilterMeta(products) {
+        const labels = [];
+        labels.push(filterMode === 'liquid' ? 'Ликвидные' : filterMode === 'illiquid' ? 'Неликвидные' : 'Все позиции');
+        if (stockMode !== 'all') {
+            labels.push(({positive:'есть на складе',low:'остаток до 20 м²',zero:'без остатка',unknown:'остаток не загружен'})[stockMode] || stockMode);
+        }
+        if (classFilter?.value) labels.push(`${classFilter.value} класс`);
+        if (thicknessFilter?.value) labels.push(`${thicknessFilter.value} мм`);
+        if (completenessMode === 'complete') labels.push('карточки заполнены');
+        if (completenessMode === 'incomplete') labels.push('нужно заполнить');
+        if (normalize(searchInput?.value)) labels.push(`поиск: «${searchInput.value.trim()}»`);
 
-        // 3. Обновляем верхнюю надпись
-        if (products.length === 0) {
-            totalLabel.innerHTML = '<span class="text-muted">Ничего не найдено</span>';
-            listContainer.innerHTML = '<div class="text-center text-muted py-4">Список пуст</div>';
-            return;
-        } else {
-            totalLabel.innerHTML = `
-                <span class="text-secondary">Позиций:</span> <span class="fw-bold text-dark">${products.length}</span>
-                <span class="mx-2 text-muted opacity-25">|</span>
-                <span class="text-secondary">Общий остаток:</span> <span class="fw-bold text-success">${formattedStock} м²</span>
-            `;
+        const stockTotal = products.reduce((sum,p)=>sum + Math.max(0,stockValue(p) ?? 0),0);
+        const knownStock = products.filter(p=>stockValue(p)!==null).length;
+        if (activeFilterSummary) activeFilterSummary.textContent = labels.join(' · ');
+        if (filteredSummary) filteredSummary.textContent =
+            `${products.length} позиций · ${stockTotal.toLocaleString('ru-RU',{maximumFractionDigits:2})} м² · остаток загружен у ${knownStock}`;
+    }
+
+    function renderList(products) {
+        const totalStock = products.reduce((sum,p)=>sum + Math.max(0,stockValue(p) ?? 0),0);
+
+        if (totalLabel) {
+            totalLabel.textContent = products.length
+                ? `Показано ${products.length} из ${allProducts.length} · ${totalStock.toLocaleString('ru-RU',{maximumFractionDigits:2})} м²`
+                : 'По текущим фильтрам позиций нет';
         }
 
-        // 4. Рисуем список
-        listContainer.innerHTML = products.map(p => {
-            const isLiquid = p.is_liquid !== false; 
-            const bgClass = isLiquid ? 'bg-white' : 'bg-light';
-            const textOpacity = isLiquid ? '' : 'text-muted';
+        if (!products.length) {
+            listContainer.innerHTML = `
+                <div class="product-empty-state">
+                    <i class="bi bi-search"></i>
+                    <span>По текущим фильтрам ничего не найдено</span>
+                </div>`;
+            return;
+        }
 
-            let details = [];
-            if(p.characteristics) {
-                const c = p.characteristics;
-                if(c.class) details.push(`${c.class} кл`);
-                if(c.thickness) details.push(`${c.thickness} мм`);
-                if(c.size) details.push(c.size);
-                if(c.bevel) details.push(c.bevel);
-                
-                let pack = [];
-                if(c.package_area) pack.push(`${c.package_area} м²`);
-                if(c.package_qty) pack.push(`${c.package_qty} шт`);
-                if(pack.length > 0) details.push(`(${pack.join('/')})`);
-                
-                if(c.weight) details.push(`${c.weight} кг`);
-            }
-            const detailsStr = details.join(', ');
+        listContainer.innerHTML = products.map(product => {
+            const c = product.characteristics || {};
+            const isLiquid = product.is_liquid !== false;
+            const missing = missingProductFields(product);
+            const stock = stockValue(product);
+            const stockClass = stock === null ? 'is-unknown' : stock <= 0 ? 'is-zero' : stock <= 20 ? 'is-low' : 'is-good';
+            const stockText = stock === null ? 'Не загружен' : `${stock.toLocaleString('ru-RU',{minimumFractionDigits:0,maximumFractionDigits:2})} м²`;
+            const stockFoot = stock === null ? 'нет данных' : stock <= 0 ? 'нет на складе' : stock <= 20 ? 'низкий остаток' : 'в наличии';
 
-            let stockHtml = '';
-            if (p.stock_qty !== undefined && p.stock_qty !== null) {
-                const qty = parseFloat(p.stock_qty);
-                const colorClass = qty > 20 ? 'text-success' : (qty > 0 ? 'text-warning' : 'text-secondary');
-                stockHtml = `<span class="${colorClass} fw-bold" style="font-size: 0.9rem;">${qty.toFixed(2)} м²</span>`;
-            }
+            const chars = [
+                c.class ? `${esc(c.class)} класс` : '',
+                c.thickness ? `${esc(c.thickness)} мм` : '',
+                c.size ? esc(c.size) : '',
+                c.bevel ? esc(c.bevel) : ''
+            ].filter(Boolean);
+
+            const packageMain = [
+                c.package_area ? `${esc(c.package_area)} м²/уп` : '',
+                c.package_qty ? `${esc(c.package_qty)} шт/уп` : ''
+            ].filter(Boolean).join(' · ');
+            const packageFoot = c.weight ? `Вес упаковки: ${esc(c.weight)} кг` : 'Вес упаковки не указан';
 
             return `
-            <div class="${bgClass} p-3 rounded-4 shadow-sm border border-light mb-2 d-flex align-items-center justify-content-between" ${canManageProducts ? `onclick="openModal('${p.id}')"` : ''} style="cursor:${canManageProducts ? 'pointer' : 'default'}; min-height: 60px;">
-                <div style="overflow: hidden; flex-grow: 1;">
-                    <div class="d-flex align-items-center gap-2 mb-1">
-                        <span class="badge bg-light text-secondary border border-secondary-subtle fw-normal font-monospace">${p.sku || '---'}</span>
-                        <span class="fw-bold text-dark text-truncate ${textOpacity}">${p.name || 'Без названия'}</span>
-                        ${!isLiquid ? '<span class="badge bg-danger bg-opacity-10 text-danger border border-danger-subtle" style="font-size:0.65rem">НЕЛИКВИД</span>' : ''}
+                <article class="product-row ${isLiquid?'':'is-illiquid'}" ${canManageProducts?`data-edit-product="${esc(product.id)}"`:''}>
+                    <div class="product-position">
+                        <div class="product-position-top">
+                            <span class="product-sku">${esc(product.sku || '—')}</span>
+                            <span class="product-name" title="${esc(product.name || 'Без названия')}">${esc(product.name || 'Без названия')}</span>
+                        </div>
+                        ${product.excel_alias ? `<small class="product-alias" title="${esc(product.excel_alias)}">Excel: ${esc(product.excel_alias)}</small>` : ''}
+                        ${missing.length ? `<span class="product-alert"><i class="bi bi-exclamation-circle"></i>Не заполнено: ${esc(missing.slice(0,3).join(', '))}${missing.length>3?'…':''}</span>` : ''}
                     </div>
-                    <div class="text-muted small text-truncate" style="font-size: 0.85rem;">
-                        ${detailsStr || 'Нет характеристик'}
+                    <div class="product-characteristics">
+                        ${chars.length ? chars.map(value=>`<span class="product-tag">${value}</span>`).join('') : '<span class="product-tag is-empty">Характеристики не заполнены</span>'}
                     </div>
-                </div>
-
-                <div class="d-flex align-items-center ps-2">
-                    <div class="d-flex flex-column align-items-end">
-                       ${stockHtml}
+                    <div class="product-package">
+                        <div class="product-package-main">
+                            <strong>${packageMain || 'Упаковка не заполнена'}</strong>
+                            <small>${packageFoot}</small>
+                        </div>
                     </div>
-                    ${canManageProducts ? `<button class="btn btn-sm btn-light border ms-3 text-secondary" title="Редактировать">
-                        <i class="bi bi-pencil"></i>
-                    </button>` : ''}
-                </div>
-            </div>`;
+                    <div class="product-stock ${stockClass}">
+                        <strong>${esc(stockText)}</strong>
+                        <small>${esc(stockFoot)}</small>
+                    </div>
+                    <div>
+                        <span class="product-status ${isLiquid?'':'is-illiquid'}">${isLiquid?'Ликвид':'Неликвид'}</span>
+                    </div>
+                    <div>
+                        ${canManageProducts?'<button type="button" class="product-edit-btn" title="Редактировать"><i class="bi bi-pencil"></i></button>':''}
+                    </div>
+                </article>
+            `;
         }).join('');
+
+        if (canManageProducts) {
+            listContainer.querySelectorAll('[data-edit-product]').forEach(row=>{
+                row.addEventListener('click',event=>{
+                    if (event.target.closest('button')) event.preventDefault();
+                    openModal(row.dataset.editProduct);
+                });
+            });
+        }
     }
 
     // --- ЛОГИКА КАЛЬКУЛЯТОРА ---
@@ -514,7 +672,23 @@ document.addEventListener('DOMContentLoaded', () => {
         alert('Сохранено');
     };
 
-    searchInput.addEventListener('input', applyLogic);
+    searchInput?.addEventListener('input', applyLogic);
+    searchClear?.addEventListener('click',()=>{
+        searchInput.value='';
+        searchClear.hidden=true;
+        applyLogic();
+        searchInput.focus();
+    });
+    filterSelect?.addEventListener('change',applyLogic);
+    stockFilter?.addEventListener('change',applyLogic);
+    classFilter?.addEventListener('change',applyLogic);
+    thicknessFilter?.addEventListener('change',applyLogic);
+    completenessFilter?.addEventListener('change',applyLogic);
+    sortSelect?.addEventListener('change',applyLogic);
+    resetFiltersBtn?.addEventListener('click',()=>{
+        resetWorkingFilters();
+        applyLogic();
+    });
 
     async function initPermissionsAndLoad() {
         if (window.CRMAuth && CRMAuth.ready) await CRMAuth.ready;
