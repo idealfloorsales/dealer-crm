@@ -868,7 +868,16 @@ document.addEventListener('DOMContentLoaded', () => {
             </svg>`;
     }
 
+    function isNonWorkingDealer(dealer) {
+        return ['potential', 'archive'].includes(String(dealer?.status || '').trim().toLowerCase());
+    }
+
+    function isWorkingDealer(dealer) {
+        return !isNonWorkingDealer(dealer);
+    }
+
     function isDealerStatusVisible(dealer) {
+        if (isNonWorkingDealer(dealer)) return false;
         const statusValue = dealer?.status || 'standard';
         const statusObj = statusList.find(s => s.value === statusValue);
         return !(statusObj && (statusObj.isVisible === false || String(statusObj.isVisible) === 'false'));
@@ -881,7 +890,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // "Требуют внимания" — только рабочие дилеры.
         // Если у статуса выключен глазик в управлении статусами,
         // дилер полностью исключается из этого блока.
-        const attentionDealers = allDealers.filter(d => d.status !== 'archive' && isDealerStatusVisible(d));
+        const attentionDealers = allDealers.filter(d => isWorkingDealer(d) && isDealerStatusVisible(d));
         const visibleDealerIds = new Set(attentionDealers.map(d => String(d.id || d._id || '')));
 
         attentionDealers.forEach(dealer => {
@@ -951,7 +960,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return Number.isNaN(date.getTime()) ? null : date;
         };
 
-        allDealers.forEach(d => {
+        allDealers.filter(isWorkingDealer).forEach(d => {
             const createdDate = d.createdAt ? new Date(d.createdAt) : objectIdDate(d.id || d._id);
             if (createdDate && !Number.isNaN(createdDate.getTime())) {
                 events.push({
@@ -1067,7 +1076,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderDashboard() {
         if (!dashboardStats || !allDealers) return;
 
-        const network = allDealers.filter(d => d.status !== 'archive');
+        const network = allDealers.filter(isWorkingDealer);
         const activeIds = new Set((currentMonthSales || []).filter(s => Number(s.fact)>0).map(s => String(s.dealerId)));
         const activeCount = network.filter(d => activeIds.has(String(d.id))).length;
         const attentionNetwork = network.filter(isDealerStatusVisible);
@@ -1182,7 +1191,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let csvContent = "\uFEFF"; 
         csvContent += selectedCols.map(c => cleanCsv(c.label)).join(";") + "\n";
 
-        allDealers.forEach(dealer => {
+        allDealers.filter(isWorkingDealer).forEach(dealer => {
             const row = selectedCols.map(col => {
                 const val = col.getValue(dealer);
                 return cleanCsv(val);
@@ -1194,7 +1203,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(exportModal) exportModal.hide();
     };
 
-    if(btnExportCompetitors) btnExportCompetitors.onclick = () => { if(!allDealers.length) return window.showToast("Нет данных", "error"); let csv = "\uFEFFДилер;Город;Бренд;Коллекция;ОПТ;Розница\n"; let count = 0; allDealers.forEach(d => { if(d.competitors && d.competitors.length > 0) { d.competitors.forEach(c => { csv += `${cleanCsv(d.name)};${cleanCsv(d.city)};${cleanCsv(c.brand)};${cleanCsv(c.collection)};${cleanCsv(c.price_opt)};${cleanCsv(c.price_retail)}\n`; count++; }); } }); if(count === 0) return window.showToast("Нет данных о конкурентах", "warning"); downloadCsv(csv, `competitors_prices_${new Date().toISOString().slice(0,10)}.csv`); };
+    if(btnExportCompetitors) btnExportCompetitors.onclick = () => { if(!allDealers.length) return window.showToast("Нет данных", "error"); let csv = "\uFEFFДилер;Город;Бренд;Коллекция;ОПТ;Розница\n"; let count = 0; allDealers.filter(isWorkingDealer).forEach(d => { if(d.competitors && d.competitors.length > 0) { d.competitors.forEach(c => { csv += `${cleanCsv(d.name)};${cleanCsv(d.city)};${cleanCsv(c.brand)};${cleanCsv(c.collection)};${cleanCsv(c.price_opt)};${cleanCsv(c.price_retail)}\n`; count++; }); } }); if(count === 0) return window.showToast("Нет данных о конкурентах", "warning"); downloadCsv(csv, `competitors_prices_${new Date().toISOString().slice(0,10)}.csv`); };
 
     // --- ОТКРЫТИЕ РЕДАКТИРОВАНИЯ (С УЧЕТОМ СЕКТОРА) ---
     async function openEditModal(id) {
@@ -1311,7 +1320,7 @@ document.addEventListener('DOMContentLoaded', () => {
         qvModal.show();
     };
 
-    async function fetchDealers() { const response = await fetch(API_DEALERS_URL); if (!response.ok) throw new Error("Не удалось загрузить список дилеров"); allDealers = await response.json(); }
+    async function fetchDealers() { const response = await fetch(API_DEALERS_URL + '?view=main'); if (!response.ok) throw new Error("Не удалось загрузить список дилеров"); allDealers = await response.json(); }
     async function fetchTasks() { const response = await fetch(API_TASKS_URL); if(response.ok) allTasksData = await response.json(); else throw new Error("Ошибка задач"); }
     async function fetchCurrentMonthSales() {
         const month = new Date().toISOString().slice(0, 7);
@@ -1540,7 +1549,7 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
 
     function cleanDealerRoute() {
         if (!allDealers.length || !dealerRouteIds.length) return;
-        const validIds = new Set(allDealers.map(d => String(d.id)));
+        const validIds = new Set(allDealers.filter(isWorkingDealer).map(d => String(d.id)));
         const cleaned = dealerRouteIds.filter((id, index, arr) => validIds.has(String(id)) && arr.indexOf(id) === index);
         if (cleaned.length !== dealerRouteIds.length) {
             dealerRouteIds = cleaned;
@@ -1550,7 +1559,7 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
 
     function selectedRouteDealers() {
         return dealerRouteIds
-            .map(id => allDealers.find(d => String(d.id) === String(id)))
+            .map(id => allDealers.find(d => isWorkingDealer(d) && String(d.id) === String(id)))
             .filter(Boolean);
     }
 
@@ -2104,7 +2113,7 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
         window.renderGlobalSearchResults = function(query) {
             const q = (query || '').trim().toLowerCase();
             const matches = allDealers
-                .filter(d => d.status !== 'archive' && (!q || searchableText(d).includes(q)))
+                .filter(d => isWorkingDealer(d) && (!q || searchableText(d).includes(q)))
                 .slice(0,10);
 
             globalSearchIndex = Math.min(globalSearchIndex, Math.max(0,matches.length-1));
