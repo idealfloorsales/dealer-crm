@@ -1453,7 +1453,160 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 'Производство отменено, остатки восстановлены');
     }
 
-        function buildStocktake(){
+        function openingCurrentQty(recipeId) {
+        const location = $('ws-opening-location')?.value || 'workshop';
+        if (location === 'dealer') {
+            const dealerId = $('ws-opening-dealer')?.value || '';
+            const asset = state.dealerAssets.find(item =>
+                idOf(item.dealer) === dealerId && idOf(item.recipe) === String(recipeId || '')
+            );
+            return Math.max(0, n(asset?.qty));
+        }
+        return Math.max(0, n(recipeById(recipeId)?.stockQty));
+    }
+
+    function openingTypeLabel(recipe) {
+        if (recipe?.outputType === 'sample') return 'образец / планшет';
+        if (recipe?.outputType === 'stand') return 'стенд';
+        if (recipe?.outputType === 'sign') return 'табличка';
+        return 'изделие';
+    }
+
+    function resetOpening() {
+        $('ws-opening-form')?.reset();
+        if ($('ws-opening-date')) $('ws-opening-date').value = todayValue();
+        if ($('ws-opening-location')) $('ws-opening-location').value = 'workshop';
+        if ($('ws-opening-search')) $('ws-opening-search').value = '';
+        openingFilter = 'all';
+        openingDraft.clear();
+        populateFormSelects();
+        updateOpeningLocation();
+        document.querySelectorAll('[data-opening-filter]').forEach(button => {
+            button.classList.toggle('active', button.dataset.openingFilter === openingFilter);
+        });
+        renderOpeningLines();
+    }
+
+    function updateOpeningLocation() {
+        const location = $('ws-opening-location')?.value || 'workshop';
+        const dealerWrap = $('ws-opening-dealer-wrap');
+        if (dealerWrap) dealerWrap.hidden = location !== 'dealer';
+        if (location !== 'dealer' && $('ws-opening-dealer')) $('ws-opening-dealer').value = '';
+    }
+
+    function openingRowMatches(recipe) {
+        const term = ($('ws-opening-search')?.value || '').trim().toLowerCase();
+        const text = `${recipe.name || ''} ${recipe.sku || ''} ${recipe.product?.sku || ''} ${recipe.product?.name || ''}`.toLowerCase();
+        if (term && !text.includes(term)) return false;
+        if (openingFilter === 'changed') return openingDraft.has(idOf(recipe));
+        return true;
+    }
+
+    function renderOpeningLines() {
+        const host = $('ws-opening-lines');
+        if (!host) return;
+
+        updateOpeningLocation();
+        const location = $('ws-opening-location')?.value || 'workshop';
+        const dealerId = $('ws-opening-dealer')?.value || '';
+        if (location === 'dealer' && !dealerId) {
+            host.innerHTML = '<div class="workshop-empty"><i class="bi bi-shop"></i>Выберите дилера — затем укажите фактические образцы, которые уже у него находятся</div>';
+            return;
+        }
+
+        const rows = [...state.recipes]
+            .filter(openingRowMatches)
+            .sort((a,b) => {
+                const rank = item => item.outputType === 'sample' ? 0 : item.outputType === 'stand' ? 1 : item.outputType === 'sign' ? 2 : 3;
+                return rank(a) - rank(b) || String(a.name || '').localeCompare(String(b.name || ''),'ru',{numeric:true});
+            });
+
+        if (!rows.length) {
+            host.innerHTML = '<div class="workshop-empty"><i class="bi bi-search"></i>Подходящих изделий нет</div>';
+            return;
+        }
+
+        host.innerHTML = rows.map(recipe => {
+            const recipeId = idOf(recipe);
+            const current = openingCurrentQty(recipeId);
+            const hasDraft = openingDraft.has(recipeId);
+            const draftValue = hasDraft ? openingDraft.get(recipeId) : '';
+            const productMeta = recipe.product?.sku ? ` · ${recipe.product.sku}` : '';
+            return `<div class="workshop-opening-row ${hasDraft ? 'is-changed' : ''}" data-recipe-id="${esc(recipeId)}">
+                <div class="workshop-opening-name">
+                    <strong>${esc(recipe.name)}</strong>
+                    <small>${esc(openingTypeLabel(recipe) + productMeta)}</small>
+                </div>
+                <div class="workshop-opening-current"><strong>${fmt(current)}</strong><small>шт в CRM</small></div>
+                <label class="workshop-opening-actual">
+                    <input type="number" min="0" step="1" inputmode="numeric" class="form-control" value="${hasDraft ? esc(draftValue) : ''}" placeholder="${fmt(current)}">
+                    <small>${hasDraft && n(draftValue) !== current ? (n(draftValue) > current ? '+' : '') + fmt(n(draftValue)-current) + ' к системе' : 'оставьте пустым, если верно'}</small>
+                </label>
+            </div>`;
+        }).join('');
+
+        host.querySelectorAll('.workshop-opening-row').forEach(row => {
+            const input = row.querySelector('input');
+            const recipeId = row.dataset.recipeId;
+            input?.addEventListener('input', () => {
+                const raw = String(input.value || '').trim();
+                if (!raw) openingDraft.delete(recipeId);
+                else openingDraft.set(recipeId, Math.max(0, Math.floor(n(raw))));
+                row.classList.toggle('is-changed', openingDraft.has(recipeId));
+                const hint = row.querySelector('.workshop-opening-actual small');
+                const current = openingCurrentQty(recipeId);
+                if (hint) {
+                    if (!openingDraft.has(recipeId)) hint.textContent = 'оставьте пустым, если верно';
+                    else {
+                        const delta = n(openingDraft.get(recipeId)) - current;
+                        hint.textContent = delta ? `${delta > 0 ? '+' : ''}${fmt(delta)} к системе` : 'совпадает с CRM';
+                    }
+                }
+                if (openingFilter === 'changed' && !openingDraft.has(recipeId)) row.hidden = true;
+            });
+        });
+    }
+
+    $('ws-opening-location')?.addEventListener('change', () => {
+        openingDraft.clear();
+        updateOpeningLocation();
+        renderOpeningLines();
+    });
+    $('ws-opening-dealer')?.addEventListener('change', () => {
+        openingDraft.clear();
+        renderOpeningLines();
+    });
+    $('ws-opening-search')?.addEventListener('input', renderOpeningLines);
+    document.querySelectorAll('[data-opening-filter]').forEach(button => {
+        button.addEventListener('click', () => {
+            openingFilter = button.dataset.openingFilter || 'all';
+            document.querySelectorAll('[data-opening-filter]').forEach(item => item.classList.toggle('active', item === button));
+            renderOpeningLines();
+        });
+    });
+
+    $('ws-opening-form')?.addEventListener('submit', async event => {
+        event.preventDefault();
+        const location = $('ws-opening-location')?.value || 'workshop';
+        const dealerId = $('ws-opening-dealer')?.value || '';
+        if (location === 'dealer' && !dealerId) return toast('Выберите дилера', 'warning');
+
+        const lines = [...openingDraft.entries()].map(([recipeId, actualQty]) => ({
+            recipeId,
+            actualQty:Math.max(0, Math.floor(n(actualQty)))
+        }));
+        if (!lines.length) return toast('Введите фактическое количество хотя бы для одного изделия', 'warning');
+
+        await post(API + '/opening-balance', {
+            location,
+            dealerId: location === 'dealer' ? dealerId : null,
+            date:$('ws-opening-date')?.value || todayValue(),
+            note:$('ws-opening-note')?.value || '',
+            lines
+        }, location === 'dealer' ? 'Стартовые остатки у дилера зафиксированы' : 'Стартовые остатки цеха зафиксированы', 'opening');
+    });
+
+    function buildStocktake(){
         const host=$('ws-stocktake-lines');host.innerHTML='';
         state.laminateStocks.forEach(stock=>addStocktakeRow(host,'laminate',idOf(stock.product),`${stock.product?.sku||'—'} · ${stock.product?.name||''}`,n(stock.planksQty),'планок'));
         state.materials.forEach(item=>addStocktakeRow(host,'material',idOf(item),item.name,n(item.stockQty),item.unit||'шт'));
