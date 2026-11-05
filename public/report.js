@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const filterCity = $('filter-city');
     const filterResponsible = $('filter-responsible');
+    const filterLiquidity = $('filter-liquidity');
     const resetFiltersBtn = $('report-reset-filters');
 
     const dealerBtn = $('dealer-dropdown-btn');
@@ -85,6 +86,15 @@ document.addEventListener('DOMContentLoaded', () => {
         })[state] || state;
     }
 
+    function rowMatchesLiquidity(row) {
+        const mode = filterLiquidity?.value || 'liquid';
+        if (row?.type === 'pos') return mode !== 'illiquid';
+        const isLiquid = row?.is_liquid !== false;
+        if (mode === 'illiquid') return !isLiquid;
+        if (mode === 'all') return true;
+        return isLiquid;
+    }
+
     function getFilteredData() {
         const city = filterCity?.value || '';
         const responsible = filterResponsible?.value || '';
@@ -98,6 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         const matrix = fullData.matrix.filter(row => {
+            if (!rowMatchesLiquidity(row)) return false;
             const key = row.type === 'pos' ? row.name : row.sku;
             return selectedProductSkus.size === 0 || selectedProductSkus.has(String(key));
         });
@@ -247,10 +258,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }).join('');
 
             const percent = totalDealers ? Math.round((rowPresent/totalDealers)*100) : 0;
+            const isIlliquid = !isPos && row.is_liquid === false;
             return `
-                <tr class="${isPos?'matrix-pos-row':''}">
+                <tr class="${isPos?'matrix-pos-row':''} ${isIlliquid?'is-illiquid':''}">
                     <td class="matrix-sticky-col matrix-sku-col">${isPos?'<span class="matrix-pos-label">POS</span>':`<strong>${safeText(row.sku)}</strong>`}</td>
-                    <td class="matrix-sticky-col matrix-name-col" title="${safeText(row.name)}"><span>${safeText(row.name)}</span></td>
+                    <td class="matrix-sticky-col matrix-name-col" title="${safeText(row.name)}"><span>${safeText(row.name)}</span>${isIlliquid?'<span class="matrix-liquidity-badge">Неликвид</span>':''}</td>
                     ${cells}
                     <td class="text-center matrix-summary-col">
                         <strong>${rowPresent}/${totalDealers}</strong>
@@ -367,6 +379,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function populateProductList() {
         const term = String(productSearch?.value || '').trim().toLowerCase();
         const rows = fullData.matrix.filter(row => {
+            if (!rowMatchesLiquidity(row)) return false;
             const blob = `${row.sku||''} ${row.name||''}`.toLowerCase();
             return !term || blob.includes(term);
         });
@@ -376,7 +389,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return `
                 <label class="multi-select-item" for="product-check-${index}">
                     <input class="form-check-input product-checkbox" type="checkbox" value="${safeText(key)}" id="product-check-${index}" ${selectedProductSkus.has(key)?'checked':''}>
-                    <span><strong>${row.type==='pos'?'POS':safeText(row.sku)}</strong><small>${safeText(row.name)}</small></span>
+                    <span><strong>${row.type==='pos'?'POS':safeText(row.sku)}${row.type!=='pos' && row.is_liquid===false?' · НЕЛИКВИД':''}</strong><small>${safeText(row.name)}</small></span>
                 </label>
             `;
         }).join('');
@@ -537,7 +550,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <article class="exhibition-field-product is-${safeText(state)}">
                     <span class="exhibition-field-state"><i class="bi ${icon}"></i></span>
                     <div class="exhibition-field-product-main">
-                        <div><strong>${row.type==='pos'?'POS':safeText(row.sku)}</strong><span>${safeText(row.name)}</span></div>
+                        <div><strong>${row.type==='pos'?'POS':safeText(row.sku)}</strong><span>${safeText(row.name)}</span>${row.type!=='pos' && row.is_liquid===false?'<em class="exhibition-liquidity-tag">Неликвид</em>':''}</div>
                         <small>${safeText(detail)}</small>
                     </div>
                     <span class="exhibition-field-status">${safeText(stateLabel(state))}</span>
@@ -549,6 +562,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function resetFilters() {
         filterCity.value='';
         filterResponsible.value='';
+        if (filterLiquidity) filterLiquidity.value='liquid';
         selectedDealerIds.clear();
         selectedProductSkus.clear();
         dealerSearch.value='';
@@ -585,9 +599,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const data=getFilteredData();
         const city=filterCity?.value || 'Все города';
         const responsible=filterResponsible?.selectedOptions?.[0]?.textContent || 'Все ответственные';
+        const liquidity=filterLiquidity?.selectedOptions?.[0]?.textContent || 'Ликвидные + POS';
         const dealerText=selectedDealerIds.size ? `${selectedDealerIds.size} выбрано` : `Все (${data.headers.length})`;
         const productText=selectedProductSkus.size ? `${selectedProductSkus.size} выбрано` : `Все (${data.matrix.length})`;
-        return {city,responsible,dealerText,productText};
+        return {city,responsible,liquidity,dealerText,productText};
     }
 
     function renderExportScope() {
@@ -596,6 +611,7 @@ document.addEventListener('DOMContentLoaded', () => {
         excelExportScope.innerHTML=`
             <div><small>Город</small><strong>${safeText(scope.city)}</strong></div>
             <div><small>Ответственный</small><strong>${safeText(scope.responsible)}</strong></div>
+            <div><small>Актуальность</small><strong>${safeText(scope.liquidity)}</strong></div>
             <div><small>Дилеры</small><strong>${safeText(scope.dealerText)}</strong></div>
             <div><small>Позиции</small><strong>${safeText(scope.productText)}</strong></div>
         `;
@@ -735,7 +751,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const scope=exportScopeText();
         ws.mergeCells('A3:F3');
-        ws.getCell('A3').value=`Сформировано: ${new Date().toLocaleString('ru-RU')} · Город: ${scope.city} · Ответственный: ${scope.responsible} · Дилеры: ${scope.dealerText} · Позиции: ${scope.productText}`;
+        ws.getCell('A3').value=`Сформировано: ${new Date().toLocaleString('ru-RU')} · Город: ${scope.city} · Ответственный: ${scope.responsible} · Актуальность: ${scope.liquidity} · Дилеры: ${scope.dealerText} · Позиции: ${scope.productText}`;
         ws.getCell('A3').font={color:{argb:excelColors.gray},size:9};
         ws.getCell('A3').alignment={wrapText:true,vertical:'middle'};
         ws.getRow(3).height=30;
@@ -789,6 +805,7 @@ document.addEventListener('DOMContentLoaded', () => {
         [
             ['Город',scope.city],
             ['Ответственный',scope.responsible],
+            ['Актуальность',scope.liquidity],
             ['Дилеры',scope.dealerText],
             ['Позиции',scope.productText]
         ].forEach(item=>{
@@ -825,7 +842,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const indices=visibleOriginalIndices(data.headers);
         data.matrix.forEach(row=>{
             let present=0;
-            const values=[row.type==='pos'?'POS':row.sku,row.name];
+            const values=[row.type==='pos'?'POS':row.sku,row.type!=='pos' && row.is_liquid===false ? `${row.name} [НЕЛИКВИД]` : row.name];
             const states=[];
             indices.forEach(index=>{
                 const cell=row.dealers[index]||{};
@@ -1007,6 +1024,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     filterCity?.addEventListener('change',()=>{updateDealerListOptions();renderMatrix();});
     filterResponsible?.addEventListener('change',()=>{updateDealerListOptions();renderMatrix();});
+    filterLiquidity?.addEventListener('change',()=>{
+        selectedProductSkus.clear();
+        if (productSearch) productSearch.value='';
+        populateProductList();
+        renderMatrix();
+    });
     resetFiltersBtn?.addEventListener('click',resetFilters);
     exportBtn?.addEventListener('click',openExcelExport);
     excelExportConfirm?.addEventListener('click',exportExcel);
