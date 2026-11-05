@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Журнал действий · IDEAL FLOOR CRM</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="style.css?v={{VER}}">
+  <link rel="stylesheet" href="audit.css?v={{VER}}">
+  <link rel="icon" href="favicon.gif" type="image/gif">
+</head>
+<body class="audit-page">
+  <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top"></nav>
+
+  <main class="audit-shell">
+    <section class="audit-hero">
+      <div>
+        <span class="audit-eyebrow">КОНТРОЛЬ И ИСТОРИЯ</span>
+        <h1>Журнал действий</h1>
+        <p>Кто, когда и что изменил в CRM. Для изменений сохраняется история полей, а для удалений — последний снимок записи.</p>
+      </div>
+      <button type="button" id="audit-refresh" class="audit-refresh"><i class="bi bi-arrow-clockwise"></i><span>Обновить</span></button>
+    </section>
+
+    <section class="audit-kpis">
+      <article><span><i class="bi bi-list-check"></i></span><div><small>По фильтру</small><strong id="audit-kpi-total">—</strong><em>действий</em></div></article>
+      <article><span><i class="bi bi-clock-history"></i></span><div><small>За 24 часа</small><strong id="audit-kpi-day">—</strong><em>действий</em></div></article>
+      <article class="is-risk"><span><i class="bi bi-exclamation-triangle"></i></span><div><small>Ошибки за 24 часа</small><strong id="audit-kpi-failed">—</strong><em>операций</em></div></article>
+      <article><span><i class="bi bi-people"></i></span><div><small>Сотрудники</small><strong id="audit-kpi-users">—</strong><em>в журнале</em></div></article>
+    </section>
+
+    <section class="audit-toolbar">
+      <div class="audit-search">
+        <i class="bi bi-search"></i>
+        <input id="audit-search" type="search" placeholder="Дилер, сотрудник, товар, действие…">
+        <button id="audit-search-clear" type="button" hidden><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div class="audit-filters">
+        <label><span>Раздел</span><select id="audit-module" class="form-select"><option value="all">Все разделы</option></select></label>
+        <label><span>Действие</span><select id="audit-action" class="form-select">
+          <option value="all">Все действия</option>
+          <option value="create">Добавление</option>
+          <option value="update">Изменение</option>
+          <option value="delete">Удаление</option>
+          <option value="execute">Операция</option>
+        </select></label>
+        <label><span>Сотрудник</span><select id="audit-actor" class="form-select"><option value="">Все сотрудники</option></select></label>
+        <label><span>Результат</span><select id="audit-success" class="form-select">
+          <option value="">Все</option><option value="true">Успешно</option><option value="false">Ошибка</option>
+        </select></label>
+        <label><span>С даты</span><input id="audit-from" type="date" class="form-control"></label>
+        <label><span>По дату</span><input id="audit-to" type="date" class="form-control"></label>
+      </div>
+      <div class="audit-toolbar-foot">
+        <span id="audit-summary">Загрузка…</span>
+        <button id="audit-reset" type="button"><i class="bi bi-arrow-counterclockwise"></i>Сбросить</button>
+      </div>
+    </section>
+
+    <section class="audit-list-shell">
+      <div class="audit-table-head"><span>Когда</span><span>Сотрудник</span><span>Действие</span><span>Раздел</span><span>Объект / изменения</span><span>Статус</span></div>
+      <div id="audit-list"><div class="audit-empty"><span class="spinner-border spinner-border-sm"></span>Загрузка журнала…</div></div>
+    </section>
+
+    <div class="audit-pagination">
+      <button id="audit-prev" type="button"><i class="bi bi-chevron-left"></i></button>
+      <span id="audit-page-label">1 / 1</span>
+      <button id="audit-next" type="button"><i class="bi bi-chevron-right"></i></button>
+    </div>
+  </main>
+
+  <div class="modal fade" id="audit-detail-modal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
+      <div class="modal-content audit-detail-modal">
+        <div class="modal-header">
+          <div><small>ПОЛНАЯ ИСТОРИЯ ОПЕРАЦИИ</small><h5 id="audit-detail-title">Действие</h5></div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" id="audit-detail-body"></div>
+      </div>
+    </div>
+  </div>
+
+  <script defer src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script defer src="permissions.js?v={{VER}}"></script>
+  <script defer src="audit.js?v={{VER}}"></script>
+</body>
+</html>
