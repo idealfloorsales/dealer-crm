@@ -197,22 +197,30 @@ document.addEventListener('DOMContentLoaded', () => {
             : `https://2gis.kz/search/${encodedQuery}`;
     }
 
+    function isNonWorkingDealer(dealer) {
+        return ['potential', 'archive'].includes(String(dealer?.status || '').trim().toLowerCase());
+    }
+
     function isDealerVisibleByStatus(dealer) {
-        if (!statusList.length) return dealer.status !== 'archive';
+        if (isNonWorkingDealer(dealer)) return false;
+        if (!statusList.length) return true;
         const status = statusList.find(item => item.value === dealer.status);
         return !status || status.isVisible !== false;
     }
 
     function populateStatusFilter() {
         if (!filterStatus) return;
-        const visibleStatuses = statusList.filter(status => status.isVisible !== false);
+        const visibleStatuses = statusList.filter(status =>
+            status.isVisible !== false || ['potential', 'archive'].includes(String(status.value || ''))
+        );
         const options = visibleStatuses.length
             ? visibleStatuses
             : [
                 { value: 'active', label: 'Активный' },
                 { value: 'standard', label: 'Стандарт' },
                 { value: 'problem', label: 'Проблемный' },
-                { value: 'potential', label: 'Потенциальный' }
+                { value: 'potential', label: 'Потенциальный' },
+                { value: 'archive', label: 'Архив' }
             ];
 
         filterStatus.innerHTML = '<option value="">Все статусы</option>' +
@@ -246,9 +254,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateSummary() {
-        const withCoordinates = allDealers.filter(dealer => Number(dealer.latitude) && Number(dealer.longitude));
-        const missingCoordinates = allDealers.length - withCoordinates.length;
-        if (summaryTotal) summaryTotal.textContent = String(allDealers.length);
+        const working = allDealers.filter(dealer => !isNonWorkingDealer(dealer));
+        const withCoordinates = working.filter(dealer => Number(dealer.latitude) && Number(dealer.longitude));
+        const missingCoordinates = working.length - withCoordinates.length;
+        if (summaryTotal) summaryTotal.textContent = String(working.length);
         if (summaryMissing) summaryMissing.textContent = String(missingCoordinates);
     }
 
