@@ -521,6 +521,75 @@
         </div></div>
     </div>
 
+    <!-- Safe stock correction -->
+    <div class="modal fade" id="ws-correction-modal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered"><div class="modal-content workshop-modal workshop-correction-modal">
+            <div class="modal-header">
+                <div><small>ИСПРАВЛЕНИЕ ОШИБКИ УЧЁТА</small><h5>Корректировка остатка</h5></div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="ws-correction-form">
+                <div class="modal-body">
+                    <div class="workshop-correction-warning">
+                        <i class="bi bi-shield-check"></i>
+                        <div><strong>Старую запись не переписываем</strong><small>CRM сохранит исходную историю и добавит отдельную корректировку: кто, когда, что было и на какое количество исправили.</small></div>
+                    </div>
+
+                    <section class="workshop-correction-line is-primary">
+                        <div class="workshop-correction-line-head">
+                            <div><small>ПОЗИЦИЯ 1</small><strong id="ws-correction-primary-name">—</strong></div>
+                            <span id="ws-correction-primary-type">—</span>
+                        </div>
+                        <input type="hidden" id="ws-correction-primary-entity">
+                        <input type="hidden" id="ws-correction-primary-id">
+                        <div class="workshop-correction-values">
+                            <label><span>Сейчас в CRM</span><div class="workshop-correction-current" id="ws-correction-primary-current">—</div></label>
+                            <label><span>Должно быть фактически</span><input id="ws-correction-primary-actual" type="number" min="0" step="0.001" class="form-control" required></label>
+                        </div>
+                        <div id="ws-correction-primary-delta" class="workshop-correction-delta">Укажите правильный остаток</div>
+                    </section>
+
+                    <button type="button" id="ws-correction-add-second" class="workshop-correction-add">
+                        <i class="bi bi-plus-circle"></i>
+                        <span><strong>Ошибка затронула другую позицию?</strong><small>Например, количество внесли не в тот декор или не в ту строку.</small></span>
+                    </button>
+
+                    <section class="workshop-correction-line" id="ws-correction-second" hidden>
+                        <div class="workshop-correction-line-head">
+                            <div><small>ПОЗИЦИЯ 2</small><strong>Исправить вторую позицию</strong></div>
+                            <button type="button" id="ws-correction-remove-second" class="workshop-icon-action" title="Убрать вторую позицию"><i class="bi bi-x-lg"></i></button>
+                        </div>
+                        <div class="workshop-correction-picker">
+                            <label><span>Категория</span>
+                                <select id="ws-correction-second-entity" class="form-select">
+                                    <option value="finished">Готовая продукция</option>
+                                    <option value="laminate">Ламинат</option>
+                                    <option value="material">Материалы</option>
+                                </select>
+                            </label>
+                            <label class="wide"><span>Позиция</span><select id="ws-correction-second-id" class="form-select"></select></label>
+                        </div>
+                        <div class="workshop-correction-values">
+                            <label><span>Сейчас в CRM</span><div class="workshop-correction-current" id="ws-correction-second-current">—</div></label>
+                            <label><span>Должно быть фактически</span><input id="ws-correction-second-actual" type="number" min="0" step="0.001" class="form-control"></label>
+                        </div>
+                        <div id="ws-correction-second-delta" class="workshop-correction-delta">Выберите позицию</div>
+                    </section>
+
+                    <label class="workshop-note-label mt-3">
+                        <span>Причина исправления <b class="text-danger">*</b></span>
+                        <textarea id="ws-correction-reason" class="form-control" rows="3" required placeholder="Например: при вводе стартовых остатков 12 шт ошибочно внесли в 703 вместо 702"></textarea>
+                        <small class="workshop-field-hint">Причина попадёт в историю и журнал действий.</small>
+                    </label>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-dark"><i class="bi bi-check2-circle me-1"></i>Исправить остаток</button>
+                </div>
+            </form>
+        </div></div>
+    </div>
+
     <!-- Stocktake -->
     <div class="modal fade" id="ws-stocktake-modal" tabindex="-1" data-bs-backdrop="static">
         <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered"><div class="modal-content workshop-modal">
