@@ -391,10 +391,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }));
         }
         if (type === 'laminate') {
-            return state.laminateStocks.map(stock => ({
-                id:idOf(stock.product), name:stock.product?.name || 'Ламинат', code:stock.product?.sku || '',
-                current:Math.max(0,n(stock.planksQty)), unit:'планок'
-            }));
+            return state.products.map(product => {
+                const stock=state.laminateStocks.find(row => idOf(row.product) === idOf(product));
+                return {
+                    id:idOf(product), name:product?.name || 'Ламинат', code:product?.sku || '',
+                    current:Math.max(0,n(stock?.planksQty)), unit:'планок'
+                };
+            });
         }
         return state.materials.map(item => ({
             id:idOf(item), name:item.name || 'Материал', code:item.code || '',
@@ -2188,6 +2191,67 @@ document.addEventListener('DOMContentLoaded', () => {
             note:$('ws-opening-note')?.value || '',
             lines
         }, location === 'dealer' ? 'Стартовые остатки у дилера зафиксированы' : 'Стартовые остатки цеха зафиксированы', 'opening');
+    });
+
+    function syncSecondCorrectionItem() {
+        const type=$('ws-correction-second-entity')?.value || 'finished';
+        const id=$('ws-correction-second-id')?.value || '';
+        const item=correctionItem(type,id);
+        const input=$('ws-correction-second-actual');
+        if (input) {
+            input.step=type === 'finished' ? '1' : '0.001';
+            input.value=item ? String(item.current) : '';
+        }
+        updateCorrectionDelta('second');
+    }
+
+    $('ws-correction-primary-actual')?.addEventListener('input',()=>updateCorrectionDelta('primary'));
+    $('ws-correction-add-second')?.addEventListener('click',()=>{
+        const section=$('ws-correction-second');
+        if (section) section.hidden=false;
+        $('ws-correction-add-second').hidden=true;
+        refreshSecondCorrectionPicker();
+    });
+    $('ws-correction-remove-second')?.addEventListener('click',()=>{
+        const section=$('ws-correction-second');
+        if (section) section.hidden=true;
+        $('ws-correction-add-second').hidden=false;
+        if ($('ws-correction-second-id')) $('ws-correction-second-id').value='';
+        if ($('ws-correction-second-actual')) $('ws-correction-second-actual').value='';
+    });
+    $('ws-correction-second-entity')?.addEventListener('change',()=>refreshSecondCorrectionPicker());
+    $('ws-correction-second-id')?.addEventListener('change',syncSecondCorrectionItem);
+    $('ws-correction-second-actual')?.addEventListener('input',()=>updateCorrectionDelta('second'));
+
+    $('ws-correction-form')?.addEventListener('submit',async event=>{
+        event.preventDefault();
+        const reason=String($('ws-correction-reason')?.value || '').trim();
+        if (reason.length < 3) return toast('Укажите причину исправления','warning');
+
+        const primaryType=$('ws-correction-primary-entity')?.value || '';
+        const primaryId=$('ws-correction-primary-id')?.value || '';
+        const primaryActual=Math.max(0,n($('ws-correction-primary-actual')?.value));
+        const lines=[{entityType:primaryType,id:primaryId,actualQty:primaryActual}];
+
+        const secondVisible=!$('ws-correction-second')?.hidden;
+        if (secondVisible) {
+            const secondType=$('ws-correction-second-entity')?.value || '';
+            const secondId=$('ws-correction-second-id')?.value || '';
+            if (!secondId) return toast('Выберите вторую позицию','warning');
+            if (secondType===primaryType && String(secondId)===String(primaryId)) return toast('Вторая позиция должна отличаться от первой','warning');
+            if (!$('ws-correction-second-actual')?.value.trim()) return toast('Укажите правильный остаток второй позиции','warning');
+            lines.push({entityType:secondType,id:secondId,actualQty:Math.max(0,n($('ws-correction-second-actual')?.value))});
+        }
+
+        const returnMode=correctionReturnMode;
+        try {
+            await post(API+'/correction',{date:todayValue(),reason,lines},lines.length>1?'Обе позиции исправлены':'Остаток исправлен','correction');
+            correctionReturnMode='';
+            setTimeout(()=>{
+                if (returnMode === 'stock') activateWorkshopTab('stock');
+                else if (returnMode) openStockView(returnMode);
+            },180);
+        } catch (_) {}
     });
 
     function buildStocktake(){
