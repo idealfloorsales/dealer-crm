@@ -594,6 +594,7 @@ html,body.workshop-page{max-width:100%;overflow-x:hidden}
 .workshop-simple-form .form-control:focus,.workshop-simple-form .form-select:focus{
   border-color:rgba(185,4,10,.38);background:#fff;box-shadow:0 0 0 3px rgba(185,4,10,.05)!important
 }
+.workshop-field-hint{display:block;margin:4px 0 0 2px;color:#9b9da2;font-size:.55rem}
 .workshop-production-main-calc{margin-top:9px}
 
 .workshop-advanced-fields{
