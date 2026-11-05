@@ -366,6 +366,372 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    let stockViewMode = 'finished';
+
+    function stockViewTitle(mode) {
+        return {
+            finished:'Готовая продукция в цехе',
+            laminate:'Ламинат в цехе',
+            materials:'Материалы и расходники',
+            dealers:'Образцы и стенды у дилеров',
+            shortage:'Чего не хватает'
+        }[mode] || 'Остатки цеха';
+    }
+
+    function currentStockTypeLabel(item) {
+        if (item?.outputType === 'sample') return 'Планшет / образец';
+        if (item?.outputType === 'stand') return 'Стенд';
+        if (item?.outputType === 'sign') return 'Табличка';
+        return 'Изделие';
+    }
+
+    function renderStockView() {
+        const host = $('ws-stock-view-content');
+        const summary = $('ws-stock-view-summary');
+        const title = $('ws-stock-view-title');
+        if (!host || !summary) return;
+
+        if (title) title.textContent = stockViewTitle(stockViewMode);
+        document.querySelectorAll('[data-stock-view-tab]').forEach(button => {
+            button.classList.toggle('active', button.dataset.stockViewTab === stockViewMode);
+        });
+
+        const term = ($('ws-stock-view-search')?.value || '').trim().toLowerCase();
+        let html = '';
+        let summaryHtml = '';
+
+        if (stockViewMode === 'finished') {
+            const rows = state.recipes
+                .filter(item => {
+                    const text = [item.name,item.sku,item.product?.sku,item.product?.name,currentStockTypeLabel(item)].join(' ').toLowerCase();
+                    return !term || text.includes(term);
+                })
+                .sort((a,b) => n(b.stockQty)-n(a.stockQty) || String(a.name||'').localeCompare(String(b.name||''),'ru'));
+            const total = rows.reduce((sum,item) => sum + Math.max(0,n(item.stockQty)),0);
+            const inStock = rows.filter(item => n(item.stockQty)>0).length;
+            const zero = rows.filter(item => n(item.stockQty)<=0).length;
+            summaryHtml = `
+                <div><small>Всего готово</small><strong>${fmt(total)} шт</strong></div>
+                <div><small>Позиций с остатком</small><strong>${fmt(inStock)}</strong></div>
+                <div><small>Нулевой остаток</small><strong>${fmt(zero)}</strong></div>`;
+            html = rows.length ? rows.map(item => {
+                const current=Math.max(0,n(item.stockQty)), minimum=Math.max(0,n(item.minStockQty));
+                const shortage=Math.max(0,minimum-current);
+                return `<article class="workshop-current-row ${shortage>0?'is-shortage':''}">
+                    <div class="workshop-current-main">
+                        <strong>${esc(item.name)}</strong>
+                        <small>${esc(currentStockTypeLabel(item))}${item.product?.sku?' · '+esc(item.product.sku):''}${item.product?.name?' · '+esc(item.product.name):''}</small>
+                    </div>
+                    <div class="workshop-current-min"><small>Минимум</small><span>${minimum>0?fmt(minimum)+' шт':'—'}</span></div>
+                    <div class="workshop-current-qty"><small>Сейчас в цехе</small><strong>${fmt(current)} шт</strong>${shortage>0?`<em>не хватает ${fmt(shortage)}</em>`:''}</div>
+                </article>`;
+            }).join('') : '<div class="workshop-empty">Готовые изделия не найдены</div>';
+        } else if (stockViewMode === 'laminate') {
+            const rows = state.laminateStocks
+                .filter(item => {
+                    const text=[item.product?.sku,item.product?.name].join(' ').toLowerCase();
+                    return !term || text.includes(term);
+                })
+                .sort((a,b)=>String(a.product?.sku||'').localeCompare(String(b.product?.sku||''),undefined,{numeric:true}));
+            const totalPlanks=rows.reduce((sum,item)=>sum+Math.max(0,n(item.planksQty)),0);
+            summaryHtml = `<div><small>Позиций</small><strong>${fmt(rows.length)}</strong></div><div><small>Планок всего</small><strong>${fmt(totalPlanks)}</strong></div>`;
+            html = rows.length ? rows.map(item => {
+                const pq=packQty(item.product), planks=Math.max(0,n(item.planksQty));
+                const packs=pq>0?Math.floor(planks/pq):0, loose=pq>0?Math.round(planks-packs*pq):planks;
+                return `<article class="workshop-current-row">
+                    <div class="workshop-current-main"><strong>${esc(item.product?.sku||'—')} · ${esc(item.product?.name||'')}</strong><small>${item.product?.is_liquid===false?'Неликвид / архивная позиция':'Актуальная позиция'}${pq?' · '+pq+' планок в упаковке':''}</small></div>
+                    <div class="workshop-current-min"><small>Эквивалент</small><span>${pq?`${packs} уп. + ${loose} пл.`:'—'}</span></div>
+                    <div class="workshop-current-qty"><small>Сейчас в цехе</small><strong>${fmt(planks)} пл.</strong></div>
+                </article>`;
+            }).join('') : '<div class="workshop-empty">Ламинат не найден</div>';
+        } else if (stockViewMode === 'materials') {
+            const rows=state.materials
+                .filter(item => !term || [item.code,item.name,item.category].join(' ').toLowerCase().includes(term))
+                .sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'ru'));
+            const low=rows.filter(item=>n(item.minQty)>0&&n(item.stockQty)<n(item.minQty)).length;
+            summaryHtml = `<div><small>Материалов</small><strong>${fmt(rows.length)}</strong></div><div><small>Ниже минимума</small><strong>${fmt(low)}</strong></div>`;
+            html=rows.length?rows.map(item=>{
+                const current=Math.max(0,n(item.stockQty)), minimum=Math.max(0,n(item.minQty)), shortage=Math.max(0,minimum-current);
+                return `<article class="workshop-current-row ${shortage>0?'is-shortage':''}">
+                    <div class="workshop-current-main"><strong>${esc(item.name)}</strong><small>${esc(item.code||item.category||'')}${item.purchaseUnit?' · закупка: '+esc(item.purchaseUnit):''}</small></div>
+                    <div class="workshop-current-min"><small>Минимум</small><span>${minimum>0?fmt(minimum,2)+' '+esc(item.unit||'шт'):'—'}</span></div>
+                    <div class="workshop-current-qty"><small>Сейчас в цехе</small><strong>${fmt(current,2)} ${esc(item.unit||'шт')}</strong>${shortage>0?`<em>не хватает ${fmt(shortage,2)}</em>`:''}</div>
+                </article>`;
+            }).join(''):'<div class="workshop-empty">Материалы не найдены</div>';
+        } else if (stockViewMode === 'dealers') {
+            const rows=state.dealerAssets
+                .filter(asset => n(asset.qty)>0)
+                .filter(asset => !term || [asset.dealer?.name,asset.dealer?.city,asset.recipe?.name,asset.recipe?.product?.sku].join(' ').toLowerCase().includes(term))
+                .sort((a,b)=>String(a.dealer?.name||'').localeCompare(String(b.dealer?.name||''),'ru') || String(a.recipe?.name||'').localeCompare(String(b.recipe?.name||''),'ru'));
+            const total=rows.reduce((sum,item)=>sum+Math.max(0,n(item.qty)),0);
+            const dealers=new Set(rows.map(item=>idOf(item.dealer)).filter(Boolean)).size;
+            summaryHtml=`<div><small>У дилеров всего</small><strong>${fmt(total)} шт</strong></div><div><small>Дилеров</small><strong>${fmt(dealers)}</strong></div><div><small>Строк учёта</small><strong>${fmt(rows.length)}</strong></div>`;
+            html=rows.length?rows.map(asset=>`<article class="workshop-current-row">
+                <div class="workshop-current-main"><strong>${esc(asset.dealer?.name||'—')}</strong><small>${esc(asset.dealer?.city||'')}${asset.dealer?.dealer_id?' · '+esc(asset.dealer.dealer_id):''}</small></div>
+                <div class="workshop-current-min"><small>Изделие</small><span>${esc(asset.recipe?.name||'—')}${asset.recipe?.product?.sku?' · '+esc(asset.recipe.product.sku):''}</span></div>
+                <div class="workshop-current-qty"><small>Сейчас у дилера</small><strong>${fmt(asset.qty)} шт</strong></div>
+            </article>`).join(''):'<div class="workshop-empty">У дилеров ничего не числится</div>';
+        } else {
+            const finished=finishedShortages().filter(row => !term || [row.item.name,row.item.sku,row.item.product?.sku,row.item.product?.name].join(' ').toLowerCase().includes(term));
+            const materials=materialShortages().filter(row => !term || [row.item.code,row.item.name].join(' ').toLowerCase().includes(term));
+            const all=[...finished,...materials];
+            const totalNeed=all.reduce((sum,row)=>sum+row.shortage,0);
+            summaryHtml=`<div class="is-danger"><small>Позиций не хватает</small><strong>${fmt(all.length)}</strong></div><div><small>Готовых изделий</small><strong>${fmt(finished.length)}</strong></div><div><small>Материалов</small><strong>${fmt(materials.length)}</strong></div><div><small>Суммарный дефицит*</small><strong>${fmt(totalNeed,2)}</strong></div>`;
+            html=all.length?all.map(row=>{
+                const item=row.item;
+                const unit=row.type==='finished'?'шт':(item.unit||'шт');
+                const label=row.type==='finished'?currentStockTypeLabel(item):'Материал / расходник';
+                const code=row.type==='finished'?(item.product?.sku||item.sku||''):(item.code||'');
+                return `<article class="workshop-current-row is-shortage">
+                    <div class="workshop-current-main"><strong>${esc(item.name)}</strong><small>${esc(label)}${code?' · '+esc(code):''}</small></div>
+                    <div class="workshop-current-min"><small>Нужно минимум</small><span>${fmt(row.minimum,2)} ${esc(unit)}</span><small>есть ${fmt(row.current,2)}</small></div>
+                    <div class="workshop-current-qty"><small>Не хватает</small><strong>${fmt(row.shortage,2)} ${esc(unit)}</strong></div>
+                </article>`;
+            }).join(''):'<div class="workshop-empty is-success"><i class="bi bi-check-circle"></i>Все позиции с заданным минимумом обеспечены</div>';
+        }
+
+        summary.innerHTML = summaryHtml;
+        host.innerHTML = html;
+    }
+
+    function openStockView(mode='finished') {
+        stockViewMode = ['finished','laminate','materials','dealers','shortage'].includes(mode) ? mode : 'finished';
+        if ($('ws-stock-view-search')) $('ws-stock-view-search').value='';
+        renderStockView();
+        bootstrap.Modal.getOrCreateInstance($('ws-stock-view-modal')).show();
+    }
+
+    function preparePrintCenter() {
+        const select=$('ws-print-memo');
+        if (!select) return;
+        const rows=[...state.memos].sort((a,b)=>new Date(b.date||b.createdAt)-new Date(a.date||a.createdAt));
+        select.innerHTML = rows.length
+            ? rows.map(memo=>option(idOf(memo),`№${memo.number} · ${dateText(memo.date)} · ${memoStatusLabel(memo.status)}`)).join('')
+            : option('','Служебок пока нет');
+    }
+
+    function printDateTime() {
+        return new Date().toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    }
+
+    function printCell(value) {
+        return esc(value === null || value === undefined || value === '' ? '—' : value);
+    }
+
+    function printTable(title,headers,rows,note='') {
+        return `<section class="report-section">
+            <h2>${esc(title)}</h2>
+            ${note?`<p class="section-note">${esc(note)}</p>`:''}
+            <table><thead><tr>${headers.map(header=>`<th>${esc(header)}</th>`).join('')}</tr></thead>
+            <tbody>${rows.length?rows.map(row=>`<tr>${row.map(cell=>`<td>${printCell(cell)}</td>`).join('')}</tr>`).join(''):`<tr><td colspan="${headers.length}" class="empty">Нет данных</td></tr>`}</tbody></table>
+        </section>`;
+    }
+
+    function sendWorkshopPrintToPrinter(title,subtitle,bodyHtml,options={}) {
+        const frame=document.createElement('iframe');
+        frame.setAttribute('aria-hidden','true');
+        frame.style.position='fixed';
+        frame.style.right='0';
+        frame.style.bottom='0';
+        frame.style.width='1px';
+        frame.style.height='1px';
+        frame.style.border='0';
+        frame.style.opacity='0';
+        document.body.appendChild(frame);
+
+        const doc=frame.contentWindow.document;
+        const user=window.CRMAuth?.user?.fullName || window.CRMAuth?.user?.name || window.CRMAuth?.user?.username || '';
+        doc.open();
+        doc.write(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>${esc(title)}</title>
+        <style>
+            @page{size:A4 ${options.landscape?'landscape':'portrait'};margin:12mm}
+            *{box-sizing:border-box}body{margin:0;color:#1f2023;font:11px Arial,sans-serif}
+            .report-head{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;padding-bottom:10px;border-bottom:2px solid #1f2023}
+            .brand{font-size:18px;font-weight:800;letter-spacing:.04em}.brand span{color:#b9040a}
+            h1{margin:5px 0 0;font-size:17px} .meta{text-align:right;color:#666;line-height:1.5}
+            .subtitle{margin:8px 0 0;color:#555;font-size:10px}
+            .report-section{margin-top:14px;break-inside:auto}.report-section h2{margin:0 0 6px;font-size:12px}
+            .section-note{margin:-2px 0 6px;color:#777;font-size:9px}
+            table{width:100%;border-collapse:collapse;table-layout:auto}th,td{padding:5px 6px;border:1px solid #cfcfcf;text-align:left;vertical-align:top}
+            th{background:#efefef;font-size:9px;text-transform:uppercase}td{font-size:10px}.empty{text-align:center;color:#888;padding:14px}
+            .memo-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:12px}.memo-meta div{padding:7px;border:1px solid #d5d5d5}
+            .memo-meta small{display:block;color:#777;font-size:8px;text-transform:uppercase}.memo-meta strong{display:block;margin-top:2px}
+            .memo-note{margin-top:10px;padding:8px;border:1px solid #d5d5d5;min-height:38px}.memo-note small{display:block;color:#777}
+            .signatures{display:grid;grid-template-columns:1fr 1fr;gap:35px;margin-top:30px}.signature{border-top:1px solid #222;padding-top:4px;color:#555}
+            .footer{margin-top:16px;padding-top:7px;border-top:1px solid #ddd;color:#888;font-size:8px}
+            @media print{.report-section{break-inside:auto}tr{break-inside:avoid}}
+        </style></head><body>
+        <header class="report-head"><div><div class="brand"><span>IDEAL</span> FLOOR · ЦЕХ</div><h1>${esc(title)}</h1><p class="subtitle">${esc(subtitle||'')}</p></div>
+        <div class="meta">Сформировано: ${esc(printDateTime())}<br>${user?'Сотрудник: '+esc(user):''}</div></header>
+        ${bodyHtml}
+        <div class="footer">IDEAL FLOOR CRM · документ сформирован из текущих данных системы</div>
+        </body></html>`);
+        doc.close();
+
+        const doPrint=()=>{
+            try{frame.contentWindow.focus();frame.contentWindow.print();}
+            finally{setTimeout(()=>frame.remove(),1800);}
+        };
+        if (frame.contentWindow.document.readyState === 'complete') setTimeout(doPrint,120);
+        else frame.onload=()=>setTimeout(doPrint,120);
+    }
+
+    function finishedPrintRows() {
+        return [...state.recipes]
+            .sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'ru'))
+            .map(item=>[
+                item.name,
+                currentStockTypeLabel(item),
+                item.product?.sku || item.sku || '',
+                `${fmt(Math.max(0,n(item.stockQty)))} шт`,
+                n(item.minStockQty)>0?`${fmt(item.minStockQty)} шт`:'—'
+            ]);
+    }
+
+    function laminatePrintRows() {
+        return [...state.laminateStocks]
+            .sort((a,b)=>String(a.product?.sku||'').localeCompare(String(b.product?.sku||''),undefined,{numeric:true}))
+            .map(item=>{
+                const planks=Math.max(0,n(item.planksQty)), pq=packQty(item.product);
+                const packs=pq>0?Math.floor(planks/pq):0, loose=pq>0?Math.round(planks-packs*pq):planks;
+                return [item.product?.sku||'',item.product?.name||'',`${fmt(planks)} пл.`,pq?`${packs} уп. + ${loose} пл.`:'—',item.product?.is_liquid===false?'Неликвид':'Актуален'];
+            });
+    }
+
+    function materialPrintRows() {
+        return [...state.materials]
+            .sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'ru'))
+            .map(item=>[
+                item.code||'',item.name,
+                `${fmt(Math.max(0,n(item.stockQty)),2)} ${item.unit||'шт'}`,
+                n(item.minQty)>0?`${fmt(item.minQty,2)} ${item.unit||'шт'}`:'—',
+                n(item.minQty)>n(item.stockQty)?`${fmt(n(item.minQty)-n(item.stockQty),2)} ${item.unit||'шт'}`:'—'
+            ]);
+    }
+
+    function dealerAssetPrintRows() {
+        return [...state.dealerAssets]
+            .filter(item=>n(item.qty)>0)
+            .sort((a,b)=>String(a.dealer?.name||'').localeCompare(String(b.dealer?.name||''),'ru'))
+            .map(item=>[
+                item.dealer?.dealer_id||'',item.dealer?.name||'',item.dealer?.city||'',
+                item.recipe?.name||'',item.recipe?.product?.sku||'',`${fmt(item.qty)} шт`
+            ]);
+    }
+
+    function shortagePrintRows() {
+        return workshopShortages().map(row=>{
+            const item=row.item, unit=row.type==='finished'?'шт':(item.unit||'шт');
+            return [
+                row.type==='finished'?'Готовое изделие':'Материал',
+                item.name,
+                row.type==='finished'?(item.product?.sku||item.sku||''):(item.code||''),
+                `${fmt(row.current,2)} ${unit}`,
+                `${fmt(row.minimum,2)} ${unit}`,
+                `${fmt(row.shortage,2)} ${unit}`
+            ];
+        });
+    }
+
+    function printMemoDocument(memo) {
+        if (!memo) return toast('Выберите служебную записку','warning');
+        const rows=(memo.lines||[]).map(line=>[
+            line.product?.sku||'',
+            line.product?.name||'',
+            `${fmt(line.requestedPacks)} уп.`,
+            line.packQty?`${fmt(line.packQty)} пл.`:'—',
+            `${fmt(line.plannedOutputQty)} шт`,
+            memo.status==='created'?'—':`${fmt(line.deliveredPacks)} уп.`,
+            line.discrepancyReason||''
+        ]);
+        const body=`
+            <div class="memo-meta">
+                <div><small>№ служебной</small><strong>${esc(memo.number||'—')}</strong></div>
+                <div><small>Дата</small><strong>${esc(dateText(memo.date))}</strong></div>
+                <div><small>Статус</small><strong>${esc(memoStatusLabel(memo.status))}</strong></div>
+            </div>
+            ${printTable('Позиции',['Артикул','Наименование','Упаковок','Планок / уп.','Ожидаемый выпуск','Принято','Расхождение'],rows)}
+            ${memo.note?`<div class="memo-note"><small>Комментарий</small>${esc(memo.note)}</div>`:''}
+            <div class="signatures">
+                <div class="signature">Передал: ${esc(memo.signedBy||memo.createdBy?.name||'')}</div>
+                <div class="signature">Принял: ${esc(memo.acceptedBy?.name||'')}</div>
+            </div>`;
+        sendWorkshopPrintToPrinter(`Служебная записка №${memo.number||''}`,'Приход ламината в цех',body);
+        logWorkshopPrint('memo',idOf(memo),`Служебная №${memo.number||''}`);
+    }
+
+    async function printWorkshopReport(type) {
+        if (type === 'memo') {
+            const memo=memoById($('ws-print-memo')?.value);
+            return printMemoDocument(memo);
+        }
+
+        let body='',title='',subtitle='Фактическое состояние на момент печати',landscape=false;
+        if (type === 'stock') {
+            title='Остатки цеха';
+            body=
+                printTable('Готовая продукция',['Изделие','Тип','SKU','Сейчас','Минимум'],finishedPrintRows())+
+                printTable('Ламинат',['SKU','Декор','Сейчас','Эквивалент','Актуальность'],laminatePrintRows())+
+                printTable('Материалы',['Код','Материал','Сейчас','Минимум','Не хватает'],materialPrintRows());
+            landscape=true;
+        } else if (type === 'finished') {
+            title='Готовая продукция в цехе';
+            body=printTable('Текущие остатки',['Изделие','Тип','SKU','Сейчас','Минимум'],finishedPrintRows());
+        } else if (type === 'laminate') {
+            title='Ламинат в цехе';
+            body=printTable('Текущие остатки',['SKU','Декор','Сейчас','Эквивалент','Актуальность'],laminatePrintRows());
+        } else if (type === 'materials') {
+            title='Материалы цеха';
+            body=printTable('Текущие остатки',['Код','Материал','Сейчас','Минимум','Не хватает'],materialPrintRows());
+        } else if (type === 'shortage') {
+            title='Чего не хватает в цехе';
+            subtitle='Позиции, где текущий остаток ниже установленного минимума';
+            body=printTable('Дефицит',['Тип','Позиция','Код / SKU','Сейчас','Минимум','Не хватает'],shortagePrintRows());
+        } else if (type === 'dealers') {
+            title='Образцы и стенды у дилеров';
+            body=printTable('Текущее размещение',['ID','Дилер','Город','Изделие','SKU','Сейчас у дилера'],dealerAssetPrintRows());
+            landscape=true;
+        } else if (type === 'production') {
+            title='Производство цеха';
+            subtitle='Последние сохранённые записи производства';
+            const rows=state.productions.map(item=>[
+                dateText(item.date),item.recipe?.name||'Изделие',item.product?.sku||'',`${fmt(item.outputQty)} шт`,
+                item.operations?.map(op=>op.type).filter(Boolean).join(', ')||'',item.createdBy?.name||''
+            ]);
+            body=printTable('Производство',['Дата','Изделие','SKU','Изготовлено','Операции','Сотрудник'],rows);
+            landscape=true;
+        } else if (type === 'history') {
+            title='История движений цеха';
+            subtitle='Приходы, производство, выдачи, возвраты, списания и корректировки';
+            let movements=state.movements;
+            try {
+                const response=await fetch(API+'/movements?limit=500');
+                if (response.ok) movements=await response.json();
+            } catch (_) {}
+            const rows=movements.map(item=>[
+                dateText(item.date),movementLabels[item.type]||item.type,movementName(item),
+                `${item.direction==='in'?'+':item.direction==='out'?'−':''}${fmt(item.qty,2)} ${item.unit||''}`,
+                item.dealer?.name||item.serviceMemoNumber||item.note||'',item.createdBy?.name||''
+            ]);
+            body=printTable('Движения',['Дата','Операция','Позиция','Изменение','Дилер / документ','Сотрудник'],rows);
+            landscape=true;
+        } else {
+            return;
+        }
+
+        sendWorkshopPrintToPrinter(title,subtitle,body,{landscape});
+        logWorkshopPrint(type,'',title);
+    }
+
+    function logWorkshopPrint(type,referenceId='',title='') {
+        fetch(API+'/print-log',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({type,referenceId,title}),
+            crmTrackLoading:false
+        }).catch(()=>{});
+    }
+
     function renderDealerAssets() {
         const host = $('ws-dealer-assets');
         const term = ($('ws-dealer-search')?.value || '').trim().toLowerCase();
