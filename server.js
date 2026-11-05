@@ -920,7 +920,7 @@ const compRefSchema = new mongoose.Schema({
 }, { timestamps: true });
 const CompRef = mongoose.model('CompRef', compRefSchema);
 
-const dealerSchema = new mongoose.Schema({ dealer_id: String, name: String, price_type: String, city: String, address: String, contacts: [contactSchema], bonuses: String, photos: [photoSchema], organizations: [String], requisites: dealerRequisitesSchema, legal_entities: [dealerLegalEntitySchema], contract: { isSigned: Boolean, date: String, number: String }, region_sector: String, hasPersonalPlan: { type: Boolean, default: false }, delivery: String, website: String, instagram: String, additional_addresses: [additionalAddressSchema], pos_materials: [posMaterialSchema], visits: [visitSchema], products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }], latitude: Number, longitude: Number, status: { type: String, default: 'standard' }, avatarUrl: String, competitors: [competitorSchema], responsible: String, responsibleUserId: String, responsibleAssignmentSource: String }, { timestamps: true });
+const dealerSchema = new mongoose.Schema({ dealer_id: String, name: String, price_type: String, city: String, address: String, contacts: [contactSchema], bonuses: String, photos: [photoSchema], legal_entities: [dealerLegalEntitySchema], contract: { isSigned: Boolean, date: String }, region_sector: String, hasPersonalPlan: { type: Boolean, default: false }, delivery: String, website: String, instagram: String, additional_addresses: [additionalAddressSchema], pos_materials: [posMaterialSchema], visits: [visitSchema], products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }], latitude: Number, longitude: Number, status: { type: String, default: 'standard' }, avatarUrl: String, competitors: [competitorSchema], responsible: String, responsibleUserId: String, responsibleAssignmentSource: String }, { timestamps: true });
 const Dealer = mongoose.model('Dealer', dealerSchema);
 
 const pricingAuditSchema = new mongoose.Schema({
@@ -978,11 +978,115 @@ const Sales = mongoose.model('Sales', salesSchema);
 
 const Knowledge = mongoose.model('Knowledge', new mongoose.Schema({ title: String, content: String }, { timestamps: true }));
 
+function canonicalDealerPayload(input = {}) {
+    const payload = { ...input };
+
+    delete payload.organization;
+    delete payload.organizations;
+    delete payload.requisites;
+
+    if (Object.prototype.hasOwnProperty.call(payload, 'contract')) {
+        const source = payload.contract && typeof payload.contract === 'object' ? payload.contract : {};
+        const contract = {};
+        if (Object.prototype.hasOwnProperty.call(source, 'isSigned')) contract.isSigned = Boolean(source.isSigned);
+        if (Object.prototype.hasOwnProperty.call(source, 'date')) contract.date = String(source.date || '');
+        payload.contract = contract;
+    }
+
+    if (Array.isArray(payload.legal_entities)) {
+        payload.legal_entities = payload.legal_entities
+            .filter(entity => entity && typeof entity === 'object')
+            .map(entity => ({
+                type: String(entity.type || '').trim(),
+                organizationName: String(entity.organizationName || '').trim(),
+                director: String(entity.director || '').trim(),
+                legalAddress: String(entity.legalAddress || '').trim(),
+                bin: String(entity.bin || '').trim(),
+                iik: String(entity.iik || '').trim(),
+                bank: String(entity.bank || '').trim(),
+                bik: String(entity.bik || '').trim(),
+                kbe: String(entity.kbe || '').trim(),
+                email: String(entity.email || '').trim()
+            }))
+            .filter(entity => Object.values(entity).some(Boolean));
+    }
+
+    return payload;
+}
+
+function legacyEntityType(name) {
+    const value = String(name || '').trim();
+    if (/^ИП\b/i.test(value)) return 'ИП';
+    if (/^(ЧС|ФЛ|Физ)/i.test(value)) return 'Частное лицо';
+    return 'ТОО';
+}
+
+async function migrateDealerCanonicalFields() {
+    const collection = mongoose.connection.collection('dealers');
+    const cursor = collection.find({});
+    let migrated = 0;
+
+    for await (const doc of cursor) {
+        const update = { $unset: {} };
+        let changed = false;
+        let legalEntities = Array.isArray(doc.legal_entities) ? doc.legal_entities.filter(Boolean) : [];
+
+        if (!legalEntities.length) {
+            const req = doc.requisites && typeof doc.requisites === 'object' ? doc.requisites : {};
+            const orgs = Array.isArray(doc.organizations) ? doc.organizations.filter(Boolean) : [];
+            const primaryName = req.organizationName || orgs[0] || doc.organization || '';
+
+            if (primaryName || Object.values(req).some(Boolean)) {
+                legalEntities = [{
+                    type: legacyEntityType(primaryName),
+                    organizationName: primaryName,
+                    director: req.director || '',
+                    legalAddress: req.legalAddress || doc.address || '',
+                    bin: req.bin || '',
+                    iik: req.iik || '',
+                    bank: req.bank || '',
+                    bik: req.bik || '',
+                    kbe: req.kbe || '',
+                    email: req.email || ''
+                }];
+                orgs.slice(1).forEach(name => legalEntities.push({
+                    type: legacyEntityType(name),
+                    organizationName: name
+                }));
+            }
+        }
+
+        const set = {};
+        if (legalEntities.length && (!Array.isArray(doc.legal_entities) || !doc.legal_entities.length)) {
+            set.legal_entities = legalEntities;
+            changed = true;
+        }
+
+        if (Object.prototype.hasOwnProperty.call(doc, 'organization')) { update.$unset.organization = ''; changed = true; }
+        if (Object.prototype.hasOwnProperty.call(doc, 'organizations')) { update.$unset.organizations = ''; changed = true; }
+        if (Object.prototype.hasOwnProperty.call(doc, 'requisites')) { update.$unset.requisites = ''; changed = true; }
+        if (doc.contract && Object.prototype.hasOwnProperty.call(doc.contract, 'number')) {
+            update.$unset['contract.number'] = '';
+            changed = true;
+        }
+
+        if (changed) {
+            if (Object.keys(set).length) update.$set = set;
+            if (!Object.keys(update.$unset).length) delete update.$unset;
+            await collection.updateOne({ _id: doc._id }, update);
+            migrated++;
+        }
+    }
+
+    if (migrated) console.log(`Dealer canonical field migration: ${migrated} records normalized`);
+}
+
 async function connectToDB() {
     if (!DB_CONNECTION_STRING) return console.error("No DB String");
     try { 
         await mongoose.connect(DB_CONNECTION_STRING); 
-        console.log('MongoDB Connected'); 
+        console.log('MongoDB Connected');
+        await migrateDealerCanonicalFields();
         await seedStatuses(); 
         await seedUsers(); 
         await seedSectors();
@@ -1137,7 +1241,43 @@ async function seedWorkshopRecipes() {
 }
 
 async function seedStatuses() { const count = await Status.countDocuments(); if (count === 0) { await Status.insertMany([{ value: 'active', label: 'Активный', color: '#198754', isVisible: true, sortOrder: 1 }, { value: 'standard', label: 'Стандарт', color: '#ffc107', isVisible: true, sortOrder: 2 }, { value: 'problem', label: 'Проблемный', color: '#dc3545', isVisible: true, sortOrder: 3 }, { value: 'potential', label: 'Потенциальный', color: '#0d6efd', isVisible: true, sortOrder: 4 }, { value: 'archive', label: 'Архив', color: '#6c757d', isVisible: false, sortOrder: 5 }]); } }
-function convertToClient(doc) { if(!doc) return null; const obj = doc.toObject ? doc.toObject() : doc; obj.id = obj._id; delete obj._id; delete obj.__v; delete obj.password; if(obj.products) obj.products = obj.products.map(p => { if(p){p.id=p._id; delete p._id;} return p;}); if (obj.organization && (!obj.organizations || obj.organizations.length === 0)) { obj.organizations = [obj.organization]; } if (!Array.isArray(obj.legal_entities) || obj.legal_entities.length === 0) { const req = obj.requisites || {}; const orgs = Array.isArray(obj.organizations) ? obj.organizations.filter(Boolean) : []; const primaryName = req.organizationName || orgs[0] || obj.organization || ''; if (primaryName || Object.values(req).some(Boolean)) { obj.legal_entities = [{ type: /^ИП\b/i.test(primaryName) ? 'ИП' : (/^(ЧС|ФЛ|Физ)/i.test(primaryName) ? 'Частное лицо' : 'ТОО'), organizationName: primaryName, director: req.director || '', legalAddress: req.legalAddress || obj.address || '', bin: req.bin || '', iik: req.iik || '', bank: req.bank || '', bik: req.bik || '', kbe: req.kbe || '', email: req.email || '' }, ...orgs.slice(1).map(name => ({ type: /^ИП\b/i.test(name) ? 'ИП' : (/^(ЧС|ФЛ|Физ)/i.test(name) ? 'Частное лицо' : 'ТОО'), organizationName: name }))]; } else { obj.legal_entities = []; } } return obj; }
+function convertToClient(doc) {
+    if (!doc) return null;
+    const obj = doc.toObject ? doc.toObject() : { ...doc };
+    obj.id = obj._id;
+    delete obj._id;
+    delete obj.__v;
+    delete obj.password;
+
+    if (obj.products) {
+        obj.products = obj.products.map(product => {
+            if (!product) return product;
+            if (typeof product === 'object') {
+                const copy = product.toObject ? product.toObject() : { ...product };
+                if (copy._id) {
+                    copy.id = copy._id;
+                    delete copy._id;
+                }
+                return copy;
+            }
+            return product;
+        });
+    }
+
+    if (!Array.isArray(obj.legal_entities)) obj.legal_entities = [];
+    if (obj.contract && typeof obj.contract === 'object') {
+        obj.contract = {
+            isSigned: Boolean(obj.contract.isSigned),
+            date: obj.contract.date || ''
+        };
+    }
+
+    // Legacy duplicates are deliberately not exposed anymore.
+    delete obj.organization;
+    delete obj.organizations;
+    delete obj.requisites;
+    return obj;
+}
 
 function getUserRole(req) { return req.user ? req.user.role : 'guest'; }
 function getUserScope(req) { return req.user ? req.user.scope : 'none'; }
@@ -1502,13 +1642,14 @@ app.get('/api/dealers/:id/photos', requirePermission('can_view_dealers'), async 
 });
 app.post('/api/dealers', requirePermission('can_create_dealer'), async (req, res) => { try {
     const scope = getUserScope(req);
+    const payload = canonicalDealerPayload(req.body);
     if (req.user.role === 'manager' && !isGlobalViewer(req)) {
-        req.body.responsibleUserId = '';
-        req.body.responsibleAssignmentSource = '';
-        if (scope === 'astana') req.body.responsible = 'regional_astana';
-        if (scope === 'regions') req.body.responsible = 'regional_regions';
+        payload.responsibleUserId = '';
+        payload.responsibleAssignmentSource = '';
+        if (scope === 'astana') payload.responsible = 'regional_astana';
+        if (scope === 'regions') payload.responsible = 'regional_regions';
     }
-    const d = new Dealer(req.body);
+    const d = new Dealer(payload);
     await d.save();
     res.status(201).json(convertToClient(d));
 } catch (e) { res.status(500).json({ error: e.message }); } });
@@ -1559,16 +1700,17 @@ app.put('/api/dealers/:id/visits/:index', requirePermission('can_manage_visits')
 
 app.put('/api/dealers/:id', requirePermission('can_edit_dealer'), async (req, res) => {
     try {
+        const payload = canonicalDealerPayload(req.body);
         if (req.user.role === 'manager' && !isGlobalViewer(req)) {
-            req.body.responsibleUserId = '';
-            req.body.responsibleAssignmentSource = '';
-            if (req.user.scope === 'astana') req.body.responsible = 'regional_astana';
-            if (req.user.scope === 'regions') req.body.responsible = 'regional_regions';
+            payload.responsibleUserId = '';
+            payload.responsibleAssignmentSource = '';
+            if (req.user.scope === 'astana') payload.responsible = 'regional_astana';
+            if (req.user.scope === 'regions') payload.responsible = 'regional_regions';
         }
 
         const updated = await Dealer.findOneAndUpdate(
             { _id: req.params.id, ...getDealerFilter(req) },
-            req.body,
+            payload,
             { new: true }
         );
         if (!updated) return res.status(404).json({ error: 'Дилер не найден' });
@@ -1579,7 +1721,7 @@ app.put('/api/dealers/:id', requirePermission('can_edit_dealer'), async (req, re
 });
 app.patch('/api/dealers/:id', requirePermission('can_edit_dealer'), async (req, res) => {
     try {
-        const payload = { ...req.body };
+        const payload = canonicalDealerPayload(req.body);
         if (req.user.role === 'manager' && !isGlobalViewer(req)) {
             payload.responsibleUserId = '';
             payload.responsibleAssignmentSource = '';
