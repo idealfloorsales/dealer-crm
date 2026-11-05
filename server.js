@@ -500,6 +500,60 @@ app.delete('/api/admin/users/:id', requireAdmin, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+function auditRegex(value) {
+    return String(value || '').replace(/[.*+?^$()|[\]\\]/g, '\\app.delete('/api/admin/users/:id', requireAdmin, async (req, res) => {
+    try {
+        if (req.params.id === req.user.id) return res.status(400).json({ error: 'Нельзя удалить самого себя' });
+        await User.findByIdAndDelete(req.params.id);
+        res.json({ status: 'deleted' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});');
+}
+
+app.get('/api/audit', requireAdmin, async (req, res) => {
+    try {
+        const page=Math.max(1,Number(req.query.page)||1);
+        const limit=Math.max(10,Math.min(200,Number(req.query.limit)||50));
+        const filter={};
+        if (req.query.module && req.query.module!=='all') filter.module=String(req.query.module);
+        if (req.query.action && req.query.action!=='all') filter.action=String(req.query.action);
+        if (req.query.actorId) filter['actor.id']=String(req.query.actorId);
+        if (req.query.success==='true') filter.success=true;
+        if (req.query.success==='false') filter.success=false;
+        if (req.query.from || req.query.to) {
+            filter.createdAt={};
+            if (req.query.from) filter.createdAt.$gte=new Date(String(req.query.from)+'T00:00:00.000Z');
+            if (req.query.to) { const end=new Date(String(req.query.to)+'T00:00:00.000Z'); end.setUTCDate(end.getUTCDate()+1); filter.createdAt.$lt=end; }
+        }
+        const q=String(req.query.q||'').trim();
+        if (q) {
+            const regex=new RegExp(auditRegex(q),'i');
+            filter.$or=[{summary:regex},{entityLabel:regex},{'actor.name':regex},{'actor.username':regex},{path:regex}];
+        }
+        const since24h=new Date(Date.now()-24*60*60*1000);
+        const [items,total,actors,modules,last24h,failed24h]=await Promise.all([
+            AuditLog.find(filter).sort({createdAt:-1}).skip((page-1)*limit).limit(limit).lean(),
+            AuditLog.countDocuments(filter),
+            AuditLog.aggregate([{ $match:{'actor.id':{$ne:''}} },{ $group:{_id:'$actor.id',name:{$last:'$actor.name'},username:{$last:'$actor.username'}} },{ $sort:{name:1} }]),
+            AuditLog.distinct('module'),
+            AuditLog.countDocuments({createdAt:{$gte:since24h}}),
+            AuditLog.countDocuments({createdAt:{$gte:since24h},success:false})
+        ]);
+        res.json({
+            items:items.map(convertToClient),total,page,limit,pages:Math.max(1,Math.ceil(total/limit)),
+            filters:{actors:actors.map(item=>({id:String(item._id||''),name:item.name||item.username||'Пользователь'})),modules:modules.filter(Boolean).sort()},
+            stats:{last24h,failed24h}
+        });
+    } catch(e) { res.status(500).json({error:e.message}); }
+});
+
+app.get('/api/audit/entity/:entityType/:entityId', requireAdmin, async (req, res) => {
+    try {
+        const items=await AuditLog.find({entityType:String(req.params.entityType||''),entityId:String(req.params.entityId||'')}).sort({createdAt:-1}).limit(100).lean();
+        res.json(items.map(convertToClient));
+    } catch(e) { res.status(500).json({error:e.message}); }
+});
+
 // --- СТАТИКА ---
 app.get('/sw.js', (req, res) => {
     const filePath = __dirname + '/public/sw.js';
@@ -523,6 +577,7 @@ app.get('/knowledge.html', (req, res) => servePage(res, 'knowledge.html'));
 app.get('/reclamations.html', (req, res) => servePage(res, 'reclamations.html'));
 app.get('/dealer.html', (req, res) => servePage(res, 'dealer.html'));
 app.get('/users.html', (req, res) => servePage(res, 'users.html'));
+app.get('/audit.html', (req, res) => servePage(res, 'audit.html'));
 app.get('/workshop.html', (req, res) => servePage(res, 'workshop.html'));
 app.get('/pricing.html', (req, res) => servePage(res, 'pricing.html'));
 app.use(express.static('public'));
