@@ -1453,22 +1453,57 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 'Производство отменено, остатки восстановлены');
     }
 
-        function openingCurrentQty(recipeId) {
+        function openingCandidates() {
+        const recipeProductIds = new Set(
+            state.recipes
+                .map(recipe => idOf(recipe.product))
+                .filter(Boolean)
+        );
+
+        const recipeRows = state.recipes.map(recipe => ({
+            key:`recipe:${idOf(recipe)}`,
+            recipe,
+            product:recipe.product || null,
+            name:recipe.name || 'Изделие',
+            sku:recipe.sku || recipe.product?.sku || '',
+            outputType:recipe.outputType || 'other',
+            autoRecipe:false
+        }));
+
+        const productRows = state.products
+            .filter(product => !recipeProductIds.has(idOf(product)))
+            .map(product => ({
+                key:`product:${idOf(product)}`,
+                recipe:null,
+                product,
+                name:`Планшет ${product.sku || ''} ${product.name || ''}`.trim(),
+                sku:product.sku || '',
+                outputType:'sample',
+                autoRecipe:true
+            }));
+
+        return [...recipeRows, ...productRows];
+    }
+
+    function openingCurrentQty(candidate) {
+        if (!candidate?.recipe) return 0;
+        const recipeId = idOf(candidate.recipe);
         const location = $('ws-opening-location')?.value || 'workshop';
         if (location === 'dealer') {
             const dealerId = $('ws-opening-dealer')?.value || '';
             const asset = state.dealerAssets.find(item =>
-                idOf(item.dealer) === dealerId && idOf(item.recipe) === String(recipeId || '')
+                idOf(item.dealer) === dealerId && idOf(item.recipe) === recipeId
             );
             return Math.max(0, n(asset?.qty));
         }
-        return Math.max(0, n(recipeById(recipeId)?.stockQty));
+        return Math.max(0, n(candidate.recipe?.stockQty));
     }
 
-    function openingTypeLabel(recipe) {
-        if (recipe?.outputType === 'sample') return 'образец / планшет';
-        if (recipe?.outputType === 'stand') return 'стенд';
-        if (recipe?.outputType === 'sign') return 'табличка';
+    function openingTypeLabel(candidate) {
+        if (candidate?.autoRecipe) return 'образец · карточка создастся автоматически';
+        if (candidate?.outputType === 'sample') return 'образец / планшет';
+        if (candidate?.outputType === 'stand') return 'стенд';
+        if (candidate?.outputType === 'sign') return 'табличка';
         return 'изделие';
     }
 
@@ -1494,11 +1529,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (location !== 'dealer' && $('ws-opening-dealer')) $('ws-opening-dealer').value = '';
     }
 
-    function openingRowMatches(recipe) {
+    function openingRowMatches(candidate) {
         const term = ($('ws-opening-search')?.value || '').trim().toLowerCase();
-        const text = `${recipe.name || ''} ${recipe.sku || ''} ${recipe.product?.sku || ''} ${recipe.product?.name || ''}`.toLowerCase();
+        const text = `${candidate.name || ''} ${candidate.sku || ''} ${candidate.product?.sku || ''} ${candidate.product?.name || ''}`.toLowerCase();
         if (term && !text.includes(term)) return false;
-        if (openingFilter === 'changed') return openingDraft.has(idOf(recipe));
+        if (openingFilter === 'changed') return openingDraft.has(candidate.key);
         return true;
     }
 
@@ -1514,55 +1549,59 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const rows = [...state.recipes]
+        const rank = item => item.outputType === 'sample' ? 0 : item.outputType === 'stand' ? 1 : item.outputType === 'sign' ? 2 : 3;
+        const rows = openingCandidates()
             .filter(openingRowMatches)
-            .sort((a,b) => {
-                const rank = item => item.outputType === 'sample' ? 0 : item.outputType === 'stand' ? 1 : item.outputType === 'sign' ? 2 : 3;
-                return rank(a) - rank(b) || String(a.name || '').localeCompare(String(b.name || ''),'ru',{numeric:true});
-            });
+            .sort((a,b) =>
+                rank(a) - rank(b) ||
+                Number(a.autoRecipe) - Number(b.autoRecipe) ||
+                String(a.sku || a.name || '').localeCompare(String(b.sku || b.name || ''),'ru',{numeric:true})
+            );
 
         if (!rows.length) {
             host.innerHTML = '<div class="workshop-empty"><i class="bi bi-search"></i>Подходящих изделий нет</div>';
             return;
         }
 
-        host.innerHTML = rows.map(recipe => {
-            const recipeId = idOf(recipe);
-            const current = openingCurrentQty(recipeId);
-            const hasDraft = openingDraft.has(recipeId);
-            const draftValue = hasDraft ? openingDraft.get(recipeId) : '';
-            const productMeta = recipe.product?.sku ? ` · ${recipe.product.sku}` : '';
-            return `<div class="workshop-opening-row ${hasDraft ? 'is-changed' : ''}" data-recipe-id="${esc(recipeId)}">
+        host.innerHTML = rows.map(candidate => {
+            const current = openingCurrentQty(candidate);
+            const hasDraft = openingDraft.has(candidate.key);
+            const draftValue = hasDraft ? openingDraft.get(candidate.key) : '';
+            const productMeta = candidate.product?.sku ? ` · ${candidate.product.sku}` : '';
+            return `<div class="workshop-opening-row ${hasDraft ? 'is-changed' : ''} ${candidate.autoRecipe ? 'is-auto' : ''}" data-opening-key="${esc(candidate.key)}">
                 <div class="workshop-opening-name">
-                    <strong>${esc(recipe.name)}</strong>
-                    <small>${esc(openingTypeLabel(recipe) + productMeta)}</small>
+                    <strong>${esc(candidate.name)}</strong>
+                    <small>${esc(openingTypeLabel(candidate) + productMeta)}</small>
                 </div>
                 <div class="workshop-opening-current"><strong>${fmt(current)}</strong><small>шт в CRM</small></div>
                 <label class="workshop-opening-actual">
                     <input type="number" min="0" step="1" inputmode="numeric" class="form-control" value="${hasDraft ? esc(draftValue) : ''}" placeholder="${fmt(current)}">
-                    <small>${hasDraft && n(draftValue) !== current ? (n(draftValue) > current ? '+' : '') + fmt(n(draftValue)-current) + ' к системе' : 'оставьте пустым, если верно'}</small>
+                    <small>${hasDraft && n(draftValue) !== current ? (n(draftValue) > current ? '+' : '') + fmt(n(draftValue)-current) + ' к системе' : candidate.autoRecipe ? 'введите факт — позиция создастся сама' : 'оставьте пустым, если верно'}</small>
                 </label>
             </div>`;
         }).join('');
 
         host.querySelectorAll('.workshop-opening-row').forEach(row => {
             const input = row.querySelector('input');
-            const recipeId = row.dataset.recipeId;
+            const key = row.dataset.openingKey;
             input?.addEventListener('input', () => {
                 const raw = String(input.value || '').trim();
-                if (!raw) openingDraft.delete(recipeId);
-                else openingDraft.set(recipeId, Math.max(0, Math.floor(n(raw))));
-                row.classList.toggle('is-changed', openingDraft.has(recipeId));
+                if (!raw) openingDraft.delete(key);
+                else openingDraft.set(key, Math.max(0, Math.floor(n(raw))));
+                row.classList.toggle('is-changed', openingDraft.has(key));
+
+                const candidate = openingCandidates().find(item => item.key === key);
+                const current = openingCurrentQty(candidate);
                 const hint = row.querySelector('.workshop-opening-actual small');
-                const current = openingCurrentQty(recipeId);
                 if (hint) {
-                    if (!openingDraft.has(recipeId)) hint.textContent = 'оставьте пустым, если верно';
-                    else {
-                        const delta = n(openingDraft.get(recipeId)) - current;
+                    if (!openingDraft.has(key)) {
+                        hint.textContent = candidate?.autoRecipe ? 'введите факт — позиция создастся сама' : 'оставьте пустым, если верно';
+                    } else {
+                        const delta = n(openingDraft.get(key)) - current;
                         hint.textContent = delta ? `${delta > 0 ? '+' : ''}${fmt(delta)} к системе` : 'совпадает с CRM';
                     }
                 }
-                if (openingFilter === 'changed' && !openingDraft.has(recipeId)) row.hidden = true;
+                if (openingFilter === 'changed' && !openingDraft.has(key)) row.hidden = true;
             });
         });
     }
@@ -1591,10 +1630,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const dealerId = $('ws-opening-dealer')?.value || '';
         if (location === 'dealer' && !dealerId) return toast('Выберите дилера', 'warning');
 
-        const lines = [...openingDraft.entries()].map(([recipeId, actualQty]) => ({
-            recipeId,
-            actualQty:Math.max(0, Math.floor(n(actualQty)))
-        }));
+        const candidates = new Map(openingCandidates().map(item => [item.key,item]));
+        const lines = [...openingDraft.entries()].map(([key, actualQty]) => {
+            const candidate = candidates.get(key);
+            if (!candidate) return null;
+            const line = { actualQty:Math.max(0, Math.floor(n(actualQty))) };
+            if (candidate.recipe) line.recipeId = idOf(candidate.recipe);
+            else if (candidate.product) line.productId = idOf(candidate.product);
+            return line;
+        }).filter(Boolean);
+
         if (!lines.length) return toast('Введите фактическое количество хотя бы для одного изделия', 'warning');
 
         await post(API + '/opening-balance', {
