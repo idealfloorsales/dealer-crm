@@ -1434,58 +1434,410 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderTaskList(container, tasks, type) { if (!container) return; if (tasks.length === 0) { const msg = type === 'cooling' ? 'Все посещены недавно' : 'Задач нет'; container.innerHTML = `<div class="text-center py-4 text-muted"><i class="bi bi-check-circle display-6 d-block mb-2 text-success opacity-50"></i><small>${msg}</small></div>`; return; } container.innerHTML = tasks.map(t => { let badgeHtml = ''; let metaHtml = ''; if (type === 'upcoming') { const dateStr = t.date.toLocaleDateString('ru-RU', {day:'numeric', month:'short'}); badgeHtml = t.isToday ? `<span class="task-badge tb-today mt-1 d-inline-block">Сегодня</span>` : `<span class="task-badge tb-future mt-1 d-inline-block">${dateStr}</span>`; metaHtml = `<span class="text-muted small">${safeText(t.comment)}</span>`; } else if (type === 'problem') { if (t.type === 'overdue') { const dateStr = t.date.toLocaleDateString('ru-RU'); badgeHtml = `<span class="task-badge tb-overdue mt-1 d-inline-block">Просрок: ${dateStr}</span>`; metaHtml = `<span class="text-danger small fw-bold">${safeText(t.comment)}</span>`; } else { badgeHtml = `<span class="task-badge tb-overdue mt-1 d-inline-block">Проблема</span>`; metaHtml = `<span class="small text-muted">Внимание!</span>`; } } else if (type === 'cooling') { const daysStr = t.days === 999 ? 'Никогда' : `${t.days} дн.`; badgeHtml = `<span class="task-badge tb-cooling mt-1 d-inline-block">Без визитов: ${daysStr}</span>`; metaHtml = `<span class="text-muted small">Пора навестить</span>`; } const showCheckBtn = (window.CRMAuth && CRMAuth.can('can_manage_visits')) && (type === 'upcoming' || (type === 'problem' && t.type === 'overdue')); const btnHtml = showCheckBtn ? `<button class="btn-task-check btn-complete-task" data-id="${t.dealerId}" data-index="${t.visitIndex}" title="Выполнить"><i class="bi bi-check-lg"></i></button>` : ''; return `<div class="task-item-modern align-items-start"><div class="task-content"><a href="dealer.html?id=${t.dealerId}" target="_blank" class="task-title text-truncate d-block" style="max-width: 200px;">${safeText(t.dealerName)}</a>${badgeHtml}<div class="mt-1">${metaHtml}</div></div><div class="mt-1">${btnHtml}</div></div>`; }).join(''); }
 
-    // --- OTHER ---
-    if(btnExportDealers) btnExportDealers.onclick = () => { if(!allDealers.length) return window.showToast("Нет данных", "error"); renderExportModal(); };
+    // --- OTHER / CUSTOM EXCEL EXPORT ---
+    function ensureExcelJsLoaded() {
+        if (window.ExcelJS) return Promise.resolve(window.ExcelJS);
+        if (excelJsLoadPromise) return excelJsLoadPromise;
 
-    function renderExportModal() {
-        const list = document.getElementById('export-columns-list');
-        if(!list) return;
+        excelJsLoadPromise = new Promise((resolve,reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';
+            script.async = true;
+            script.onload = () => window.ExcelJS ? resolve(window.ExcelJS) : reject(new Error('Excel-модуль не загрузился'));
+            script.onerror = () => reject(new Error('Не удалось загрузить Excel-модуль'));
+            document.head.appendChild(script);
+        }).catch(error => {
+            excelJsLoadPromise = null;
+            throw error;
+        });
 
-        list.innerHTML = exportColumnsConfig.map((col, index) => `
-            <div class="export-option-row" onclick="toggleExportCheckbox(${index})">
-                <label class="form-check-label flex-grow-1 cursor-pointer" for="exp-col-${index}">
-                    ${col.label}
-                </label>
-                <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" id="exp-col-${index}" ${col.isChecked ? 'checked' : ''} onclick="event.stopPropagation()">
-                </div>
-            </div>
-        `).join('');
-
-        if(exportModal) exportModal.show();
+        return excelJsLoadPromise;
     }
 
-    // Глобальная функция для клика по строке
-    window.toggleExportCheckbox = (index) => {
-        const cb = document.getElementById(`exp-col-${index}`);
-        if(cb) cb.checked = !cb.checked;
-    };
+    function getCurrentExportDealers() {
+        const city = filterCity?.value || '';
+        const type = filterPriceType?.value || '';
+        const status = filterStatus?.value || '';
+        const responsible = filterResponsible?.value || '';
+        const healthFilter = filterHealth?.value || '';
+        const search = (searchBar?.value || '').trim().toLowerCase();
+        const sector = document.getElementById('filter-sector')?.value || '';
 
-    window.generateAndDownloadCSV = () => {
-        const selectedCols = [];
-        exportColumnsConfig.forEach((col, index) => {
-            const cb = document.getElementById(`exp-col-${index}`);
-            if (cb && cb.checked) selectedCols.push(col);
+        const baseFiltered = allDealers.filter(dealer => {
+            let visible = true;
+            if (!status) {
+                if (isNonWorkingDealer(dealer)) visible = false;
+                else {
+                    const statusObj = statusList.find(item => item.value === (dealer.status || 'standard'));
+                    if (statusObj && (statusObj.isVisible === false || String(statusObj.isVisible) === 'false')) visible = false;
+                }
+            } else {
+                visible = dealer.status === status;
+            }
+
+            const normalizedCity = normalizeDisplayValue(dealer.city);
+            const normalizedType = normalizeDisplayValue(dealer.price_type);
+            const normalizedSector = normalizeDisplayValue(dealer.region_sector);
+            const searchable = [
+                dealer.name,dealer.dealer_id,normalizedCity,dealer.address,normalizedSector,normalizedType,
+                responsibleLabel(dealer.responsible)
+            ].filter(Boolean).join(' ').toLowerCase();
+
+            return visible &&
+                (!city || normalizedCity === city) &&
+                (!type || normalizedType === type) &&
+                (!responsible ||
+                    (responsible === '__unassigned__' && !dealer.responsible) ||
+                    (responsible !== '__unassigned__' && String(dealer.responsible || '') === String(responsible))) &&
+                (!sector || normalizedSector === sector) &&
+                (!search || searchable.includes(search));
         });
 
-        if (selectedCols.length === 0) { alert("Выберите хотя бы одну колонку!"); return; }
+        let entries = baseFiltered.map(dealer => ({dealer,metrics:getDealerListMetrics(dealer)}));
 
-        let csvContent = "\uFEFF"; 
-        csvContent += selectedCols.map(c => cleanCsv(c.label)).join(";") + "\n";
+        if (healthFilter) entries = entries.filter(({metrics}) => metrics.health.level === healthFilter);
+        entries = entries.filter(({metrics}) => {
+            if (dealerQuickFilter === 'sales') return metrics.fact > 0;
+            if (dealerQuickFilter === 'plan') return metrics.planRisk;
+            if (dealerQuickFilter === 'visit') return metrics.needsVisit;
+            if (dealerQuickFilter === 'problem') return metrics.problem;
+            return true;
+        });
 
-        allDealers.filter(isWorkingDealer).forEach(dealer => {
-            const row = selectedCols.map(col => {
-                const val = col.getValue(dealer);
-                return cleanCsv(val);
+        const sortValue = dealerSortSelect?.value || 'dealer_id_asc';
+        entries.sort((a,b) => {
+            if (sortValue === 'name_asc') return String(a.dealer.name||'').localeCompare(String(b.dealer.name||''),'ru');
+            if (sortValue === 'sales_desc') return b.metrics.fact-a.metrics.fact;
+            if (sortValue === 'achievement_asc') {
+                const av=a.metrics.achievement===null?Number.POSITIVE_INFINITY:a.metrics.achievement;
+                const bv=b.metrics.achievement===null?Number.POSITIVE_INFINITY:b.metrics.achievement;
+                return av-bv;
+            }
+            if (sortValue === 'health_asc') return a.metrics.health.score-b.metrics.health.score;
+            if (sortValue === 'health_desc') return b.metrics.health.score-a.metrics.health.score;
+            if (sortValue === 'visit_desc') {
+                const av=a.metrics.daysSinceVisit===null?Number.POSITIVE_INFINITY:a.metrics.daysSinceVisit;
+                const bv=b.metrics.daysSinceVisit===null?Number.POSITIVE_INFINITY:b.metrics.daysSinceVisit;
+                return bv-av;
+            }
+            return String(a.dealer.dealer_id||'').localeCompare(String(b.dealer.dealer_id||''),undefined,{numeric:true});
+        });
+
+        return entries.map(item => item.dealer);
+    }
+
+    function getExportDealerPool(scope) {
+        if (scope === 'all') return [...allDealers];
+        if (scope === 'working') return allDealers.filter(isWorkingDealer);
+        return getCurrentExportDealers();
+    }
+
+    function getCompetitorPriceRows(dealers) {
+        const filledOnly = Boolean(document.getElementById('export-prices-filled-only')?.checked);
+        const rows = [];
+        dealers.forEach(dealer => {
+            (Array.isArray(dealer.competitors) ? dealer.competitors : []).forEach(competitor => {
+                const hasPrice = String(competitor?.price_opt || '').trim() || String(competitor?.price_retail || '').trim();
+                if (filledOnly && !hasPrice) return;
+                rows.push({dealer,competitor});
             });
-            csvContent += row.join(";") + "\n";
+        });
+        return rows;
+    }
+
+    function currentExportScope() {
+        return document.querySelector('input[name="export-scope"]:checked')?.value || 'current';
+    }
+
+    function exportScopeLabel(scope) {
+        if (scope === 'working') return 'Все рабочие дилеры';
+        if (scope === 'all') return 'Вся доступная база';
+        return 'Текущая выборка';
+    }
+
+    function getSelectedExportColumns() {
+        const selectedIds = new Set(
+            [...document.querySelectorAll('#export-columns-list input[data-export-column]:checked')]
+                .map(input => input.dataset.exportColumn)
+        );
+        return getExportColumns().filter(column => selectedIds.has(column.id));
+    }
+
+    function updateExportBuilderSummary() {
+        const scope = currentExportScope();
+        const dealers = getExportDealerPool(scope);
+        const rows = activeExportType === 'prices' ? getCompetitorPriceRows(dealers) : dealers;
+        const selected = getSelectedExportColumns();
+
+        const rowCount = document.getElementById('export-builder-row-count');
+        const selectedCount = document.getElementById('export-builder-selected-count');
+        const summary = document.getElementById('export-builder-summary');
+        const detail = document.getElementById('export-builder-summary-detail');
+
+        if (rowCount) rowCount.textContent = `${rows.length.toLocaleString('ru-RU')} ${activeExportType==='prices'?'строк цен':'дил.'}`;
+        if (selectedCount) selectedCount.textContent = `${selected.length} выбрано`;
+        if (summary) summary.textContent = activeExportType === 'prices'
+            ? `Цены конкурентов · ${rows.length.toLocaleString('ru-RU')} строк`
+            : `База дилеров · ${rows.length.toLocaleString('ru-RU')} записей`;
+        if (detail) detail.textContent = `${exportScopeLabel(scope)} · ${selected.length} колонок · Excel .xlsx`;
+    }
+
+    function renderExportColumns() {
+        const list = document.getElementById('export-columns-list');
+        if (!list) return;
+
+        const columns = getExportColumns();
+        const groups = [...new Set(columns.map(column => column.group || 'Данные'))];
+        list.innerHTML = groups.map(group => {
+            const groupColumns = columns.filter(column => (column.group || 'Данные') === group);
+            return `<div class="export-column-group">
+                <div class="export-column-group-title">${safeText(group)}</div>
+                <div class="export-column-group-grid">
+                    ${groupColumns.map(column => `
+                        <label class="export-column-option">
+                            <input type="checkbox" data-export-column="${safeAttr(column.id)}" ${column.checked?'checked':''}>
+                            <span class="export-column-check"><i class="bi bi-check-lg"></i></span>
+                            <span>${safeText(column.label)}</span>
+                        </label>`).join('')}
+                </div>
+            </div>`;
+        }).join('');
+
+        list.querySelectorAll('input[data-export-column]').forEach(input => {
+            input.addEventListener('change',() => {
+                document.querySelectorAll('#export-builder-presets .export-preset').forEach(button => button.classList.remove('active'));
+                updateExportBuilderSummary();
+            });
+        });
+    }
+
+    function applyExportPreset(presetId) {
+        const preset = (exportPresets[activeExportType] || []).find(item => item.id === presetId);
+        if (!preset) return;
+        const ids = preset.columns === 'all'
+            ? new Set(getExportColumns().map(column => column.id))
+            : new Set(preset.columns);
+
+        document.querySelectorAll('#export-columns-list input[data-export-column]').forEach(input => {
+            input.checked = ids.has(input.dataset.exportColumn);
+        });
+        document.querySelectorAll('#export-builder-presets .export-preset').forEach(button => {
+            button.classList.toggle('active',button.dataset.exportPreset === presetId);
+        });
+        updateExportBuilderSummary();
+    }
+
+    function renderExportPresets() {
+        const container = document.getElementById('export-builder-presets');
+        if (!container) return;
+        container.innerHTML = (exportPresets[activeExportType] || []).map((preset,index) => `
+            <button type="button" class="export-preset ${index===0?'active':''}" data-export-preset="${safeAttr(preset.id)}">
+                <i class="bi bi-${safeAttr(preset.icon)}"></i><span>${safeText(preset.label)}</span>
+            </button>`).join('');
+        container.querySelectorAll('[data-export-preset]').forEach(button => {
+            button.addEventListener('click',() => applyExportPreset(button.dataset.exportPreset));
+        });
+    }
+
+    function openExportBuilder(type) {
+        if (!allDealers.length) {
+            window.showToast('Нет данных для выгрузки','warning');
+            return;
+        }
+
+        activeExportType = type === 'prices' ? 'prices' : 'dealers';
+        const isPrices = activeExportType === 'prices';
+        const title = document.getElementById('export-builder-title');
+        const description = document.getElementById('export-builder-description');
+        const icon = document.getElementById('export-builder-icon');
+        const priceOptions = document.getElementById('export-price-options');
+
+        if (title) title.textContent = isPrices ? 'Цены конкурентов' : 'База дилеров';
+        if (description) description.textContent = isPrices
+            ? 'Настройте выгрузку мониторинга цен конкурентов по дилерской сети.'
+            : 'Настройте состав базы дилеров — от короткого рабочего списка до полной карточки.';
+        if (icon) icon.innerHTML = isPrices ? '<i class="bi bi-tags"></i>' : '<i class="bi bi-file-earmark-spreadsheet"></i>';
+        if (priceOptions) priceOptions.hidden = !isPrices;
+
+        const currentScope = document.querySelector('input[name="export-scope"][value="current"]');
+        if (currentScope) currentScope.checked = true;
+        const filledOnly = document.getElementById('export-prices-filled-only');
+        if (filledOnly) filledOnly.checked = true;
+
+        renderExportColumns();
+        renderExportPresets();
+        const firstPreset = exportPresets[activeExportType]?.[0]?.id;
+        if (firstPreset) applyExportPreset(firstPreset);
+        updateExportBuilderSummary();
+        exportModal?.show();
+    }
+
+    function exportWorkbookTitle() {
+        return activeExportType === 'prices' ? 'Цены конкурентов' : 'База дилеров';
+    }
+
+    function exportFilename() {
+        const now = new Date();
+        const stamp = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+        return activeExportType === 'prices'
+            ? `IDEAL_FLOOR_Цены_конкурентов_${stamp}.xlsx`
+            : `IDEAL_FLOOR_База_дилеров_${stamp}.xlsx`;
+    }
+
+    function styleExportWorksheet(sheet,selectedColumns,dataStartRow) {
+        const lastColumn = Math.max(1,selectedColumns.length);
+        sheet.views = [{state:'frozen',ySplit:dataStartRow-1}];
+        sheet.autoFilter = {
+            from:{row:dataStartRow-1,column:1},
+            to:{row:dataStartRow-1,column:lastColumn}
+        };
+
+        sheet.mergeCells(1,1,1,lastColumn);
+        const titleCell = sheet.getCell(1,1);
+        titleCell.font = {bold:true,size:16,color:{argb:'FFFFFFFF'}};
+        titleCell.fill = {type:'pattern',pattern:'solid',fgColor:{argb:'FF171719'}};
+        titleCell.alignment = {vertical:'middle'};
+        sheet.getRow(1).height = 30;
+
+        sheet.mergeCells(2,1,2,lastColumn);
+        const metaCell = sheet.getCell(2,1);
+        metaCell.font = {size:10,color:{argb:'FF777A82'}};
+        metaCell.fill = {type:'pattern',pattern:'solid',fgColor:{argb:'FFF4F2EF'}};
+        metaCell.alignment = {vertical:'middle'};
+        sheet.getRow(2).height = 22;
+
+        const header = sheet.getRow(dataStartRow-1);
+        header.font = {bold:true,color:{argb:'FFFFFFFF'}};
+        header.fill = {type:'pattern',pattern:'solid',fgColor:{argb:'FFB9040A'}};
+        header.alignment = {vertical:'middle',horizontal:'left',wrapText:true};
+        header.height = 28;
+
+        selectedColumns.forEach((column,index) => {
+            sheet.getColumn(index+1).width = column.width || 18;
         });
 
-        downloadCsv(csvContent, `Base_Dealers_${new Date().toISOString().slice(0,10)}.csv`);
-        if(exportModal) exportModal.hide();
-    };
+        for (let rowIndex=dataStartRow; rowIndex<=sheet.rowCount; rowIndex++) {
+            const row = sheet.getRow(rowIndex);
+            row.alignment = {vertical:'top',wrapText:true};
+            if ((rowIndex-dataStartRow)%2===1) {
+                row.fill = {type:'pattern',pattern:'solid',fgColor:{argb:'FFFAF9F7'}};
+            }
+            row.eachCell({includeEmpty:true},cell => {
+                cell.border = {
+                    bottom:{style:'hair',color:{argb:'FFE6E1DD'}}
+                };
+                if (typeof cell.value === 'number') cell.numFmt = '#,##0.00';
+            });
+        }
+    }
 
-    if(btnExportCompetitors) btnExportCompetitors.onclick = () => { if(!allDealers.length) return window.showToast("Нет данных", "error"); let csv = "\uFEFFДилер;Город;Бренд;Коллекция;ОПТ;Розница\n"; let count = 0; allDealers.filter(isWorkingDealer).forEach(d => { if(d.competitors && d.competitors.length > 0) { d.competitors.forEach(c => { csv += `${cleanCsv(d.name)};${cleanCsv(d.city)};${cleanCsv(c.brand)};${cleanCsv(c.collection)};${cleanCsv(c.price_opt)};${cleanCsv(c.price_retail)}\n`; count++; }); } }); if(count === 0) return window.showToast("Нет данных о конкурентах", "warning"); downloadCsv(csv, `competitors_prices_${new Date().toISOString().slice(0,10)}.csv`); };
+    async function logExportAction(scope,columns,rowCount) {
+        try {
+            await fetch('/api/exports/log',{
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({
+                    type:activeExportType,
+                    scope,
+                    columns:columns.map(column => column.id),
+                    rowCount
+                }),
+                crmTrackLoading:false
+            });
+        } catch (_) {}
+    }
+
+    async function downloadCustomExport() {
+        const selectedColumns = getSelectedExportColumns();
+        if (!selectedColumns.length) {
+            window.showToast('Выберите хотя бы одну колонку','warning');
+            return;
+        }
+
+        const scope = currentExportScope();
+        const dealers = getExportDealerPool(scope);
+        const sourceRows = activeExportType === 'prices' ? getCompetitorPriceRows(dealers) : dealers;
+        if (!sourceRows.length) {
+            window.showToast(activeExportType==='prices'?'Нет цен конкурентов для выбранной выборки':'В выбранной выборке нет дилеров','warning');
+            return;
+        }
+
+        const button = document.getElementById('export-builder-download');
+        const oldHtml = button?.innerHTML || '';
+        if (button) {
+            button.disabled = true;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm"></span><span>Формируем Excel…</span>';
+        }
+
+        try {
+            await ensureExcelJsLoaded();
+            const workbook = new ExcelJS.Workbook();
+            workbook.creator = 'IDEAL FLOOR CRM';
+            workbook.company = 'IDEAL FLOOR';
+            workbook.subject = exportWorkbookTitle();
+            workbook.created = new Date();
+
+            const sheet = workbook.addWorksheet(activeExportType==='prices'?'Цены конкурентов':'Дилеры',{
+                properties:{defaultRowHeight:20}
+            });
+            sheet.columns = selectedColumns.map(column => ({key:column.id,width:column.width||18}));
+
+            const title = exportWorkbookTitle();
+            sheet.getCell(1,1).value = title;
+            sheet.getCell(2,1).value = `${exportScopeLabel(scope)} · ${sourceRows.length.toLocaleString('ru-RU')} строк · сформировано ${new Date().toLocaleString('ru-RU')}`;
+            sheet.getRow(3).values = selectedColumns.map(column => column.label);
+
+            sourceRows.forEach(source => {
+                sheet.addRow(selectedColumns.map(column => {
+                    try { return column.getValue(source); }
+                    catch (_) { return ''; }
+                }));
+            });
+
+            styleExportWorksheet(sheet,selectedColumns,4);
+
+            const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = exportFilename();
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(url),1200);
+
+            logExportAction(scope,selectedColumns,sourceRows.length);
+            exportModal?.hide();
+            window.showToast(`Excel готов: ${sourceRows.length.toLocaleString('ru-RU')} строк`,'success');
+        } catch (error) {
+            console.error('Custom export error',error);
+            window.showToast(error.message || 'Не удалось сформировать Excel','error');
+        } finally {
+            if (button) {
+                button.disabled = false;
+                button.innerHTML = oldHtml;
+            }
+        }
+    }
+
+    btnExportDealers?.addEventListener('click',() => openExportBuilder('dealers'));
+    btnExportCompetitors?.addEventListener('click',() => openExportBuilder('prices'));
+
+    document.querySelectorAll('input[name="export-scope"]').forEach(input => {
+        input.addEventListener('change',updateExportBuilderSummary);
+    });
+    document.getElementById('export-prices-filled-only')?.addEventListener('change',updateExportBuilderSummary);
+    document.getElementById('export-builder-select-all')?.addEventListener('click',() => {
+        const inputs = [...document.querySelectorAll('#export-columns-list input[data-export-column]')];
+        const shouldCheck = inputs.some(input => !input.checked);
+        inputs.forEach(input => { input.checked = shouldCheck; });
+        document.querySelectorAll('#export-builder-presets .export-preset').forEach(button => button.classList.remove('active'));
+        const control = document.getElementById('export-builder-select-all');
+        if (control) control.textContent = shouldCheck ? 'Снять всё' : 'Выбрать всё';
+        updateExportBuilderSummary();
+    });
+    document.getElementById('export-builder-download')?.addEventListener('click',downloadCustomExport);
 
     // --- ОТКРЫТИЕ РЕДАКТИРОВАНИЯ (С УЧЕТОМ СЕКТОРА) ---
     async function openEditModal(id) {
