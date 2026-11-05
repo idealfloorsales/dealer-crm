@@ -70,7 +70,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalIds = {
         memo:'ws-memo-modal', receipt:'ws-receipt-modal', production:'ws-production-modal', dealer:'ws-dealer-modal',
         material:'ws-material-modal', writeoff:'ws-writeoff-modal', recipe:'ws-recipe-modal',
-        stocktake:'ws-stocktake-modal', opening:'ws-opening-modal', 'new-material':'ws-new-material-modal', 'production-edit':'ws-production-edit-modal'
+        stocktake:'ws-stocktake-modal', opening:'ws-opening-modal', print:'ws-print-modal',
+        'new-material':'ws-new-material-modal', 'production-edit':'ws-production-edit-modal'
     };
     function showModal(name) {
         const el = $(modalIds[name]);
@@ -84,6 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (name === 'recipe') resetRecipe();
         if (name === 'stocktake') buildStocktake();
         if (name === 'opening') resetOpening();
+        if (name === 'print') preparePrintCenter();
         if (name === 'new-material') resetNewMaterial();
         bootstrap.Modal.getOrCreateInstance(el).show();
     }
