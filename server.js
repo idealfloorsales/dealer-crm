@@ -272,9 +272,10 @@ function auditRouteMeta(req) {
     else if (path.startsWith('/api/reclamations')) { module='reclamations'; entityType='reclamation'; }
     else if (path.startsWith('/api/workshop')) { module='workshop'; entityType='workshop'; }
     else if (path.startsWith('/api/pricing')) { module='pricing'; entityType='pricing'; }
+    else if (path.startsWith('/api/exports')) { module='exports'; entityType='export'; }
     else if (path.startsWith('/api/statuses') || path.startsWith('/api/sectors')) { module='settings'; entityType=path.startsWith('/api/statuses')?'status':'sector'; }
     let action = req.method === 'DELETE' ? 'delete' : ((req.method === 'PUT' || req.method === 'PATCH') ? 'update' : 'create');
-    if (path === '/api/sales' || /\/visits(?:\/|$)/.test(path) || /\/receive$/.test(path) || /\/material-movement$/.test(path) || /\/production$/.test(path) || /\/writeoff$/.test(path) || /\/dealer-movement$/.test(path) || /\/opening-balance$/.test(path) || /\/stocktake$/.test(path) || path === '/api/admin/import-catalog') action='execute';
+    if (path === '/api/sales' || path.startsWith('/api/exports') || /\/visits(?:\/|$)/.test(path) || /\/receive$/.test(path) || /\/material-movement$/.test(path) || /\/production$/.test(path) || /\/writeoff$/.test(path) || /\/dealer-movement$/.test(path) || /\/opening-balance$/.test(path) || /\/stocktake$/.test(path) || path === '/api/admin/import-catalog') action='execute';
     return { module, entityType, action };
 }
 
@@ -347,7 +348,16 @@ function auditSummary(req, route, label) {
     if (path.endsWith('/opening-balance')) return 'Зафиксировал стартовые остатки цеха';
     if (path.endsWith('/stocktake')) return 'Провёл инвентаризацию цеха';
     if (path === '/api/admin/import-catalog') return 'Импортировал товарную матрицу';
-    const nouns={users:'сотрудника',dealers:'дилера',products:'товар',competitors:'конкурента',knowledge:'статью',reclamations:'рекламацию',pricing:'ценовое условие',settings:'настройку',workshop:'запись цеха',matrix:'выставленность',sales:'продажи'};
+    if (path === '/api/exports/log') {
+        const type=String(req.body?.type||'');
+        const rows=Math.max(0,Number(req.body?.rowCount)||0);
+        const scope=String(req.body?.scope||'');
+        const scopeLabel=scope==='all'?'вся доступная база':(scope==='working'?'все рабочие дилеры':'текущая выборка');
+        return type==='prices'
+            ? 'Выгрузил цены конкурентов в Excel · '+rows+' строк · '+scopeLabel
+            : 'Выгрузил базу дилеров в Excel · '+rows+' строк · '+scopeLabel;
+    }
+    const nouns={users:'сотрудника',dealers:'дилера',products:'товар',competitors:'конкурента',knowledge:'статью',reclamations:'рекламацию',pricing:'ценовое условие',exports:'выгрузку',settings:'настройку',workshop:'запись цеха',matrix:'выставленность',sales:'продажи'};
     const verbs={create:'Добавил',update:'Изменил',delete:'Удалил',execute:'Выполнил действие с'};
     return (verbs[route.action] || 'Изменил') + ' ' + (nouns[route.module] || 'запись') + suffix;
 }
@@ -1575,6 +1585,22 @@ app.delete('/api/statuses/:id', requirePermission('can_edit_dealer'), async (req
 app.get('/api/sectors', requireAnyPermission('can_view_dealers', 'can_view_sales'), async (req, res) => { const list = await Sector.find().sort({name:1}); res.json(list.map(convertToClient)); });
 app.post('/api/sectors', requirePermission('can_edit_dealer'), async (req, res) => { const s = new Sector(req.body); await s.save(); res.json(convertToClient(s)); });
 app.delete('/api/sectors/:id', requirePermission('can_edit_dealer'), async (req, res) => { await Sector.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
+
+app.post('/api/exports/log', requireAnyPermission('can_export_base', 'can_export_prices'), async (req, res) => {
+    try {
+        const type=String(req.body?.type||'').trim();
+        if (!['dealers','prices'].includes(type)) return res.status(400).json({error:'Неизвестный тип выгрузки'});
+        if (type==='dealers' && !hasPermission(req,'can_export_base')) return res.status(403).json({error:'Нет права выгружать базу дилеров'});
+        if (type==='prices' && !hasPermission(req,'can_export_prices')) return res.status(403).json({error:'Нет права выгружать цены конкурентов'});
+
+        const scope=['current','working','all'].includes(String(req.body?.scope||'')) ? String(req.body.scope) : 'current';
+        const columns=Array.isArray(req.body?.columns) ? req.body.columns.map(value=>String(value).slice(0,80)).slice(0,60) : [];
+        const rowCount=Math.max(0,Math.min(100000,Number(req.body?.rowCount)||0));
+        res.json({status:'logged',type,scope,columns,rowCount});
+    } catch(e) {
+        res.status(500).json({error:e.message});
+    }
+});
 
 app.get('/api/dealers', requireAnyPermission('can_view_dealers', 'can_view_map', 'can_view_sales', 'can_view_competitors', 'can_view_reclamations'), async (req, res) => {
     try {
