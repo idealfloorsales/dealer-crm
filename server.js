@@ -82,6 +82,32 @@ const userSchema = new mongoose.Schema({
 }, { timestamps: true });
 const User = mongoose.model('User', userSchema);
 
+// ==========================================
+// ЕДИНЫЙ ЖУРНАЛ ДЕЙСТВИЙ CRM
+// ==========================================
+const auditLogSchema = new mongoose.Schema({
+    actor: { id: String, username: String, name: String, role: String },
+    module: { type: String, index: true },
+    action: { type: String, index: true },
+    method: String,
+    path: String,
+    entityType: String,
+    entityId: String,
+    entityLabel: String,
+    summary: String,
+    success: { type: Boolean, default: true },
+    statusCode: Number,
+    requestData: mongoose.Schema.Types.Mixed,
+    before: mongoose.Schema.Types.Mixed,
+    after: mongoose.Schema.Types.Mixed,
+    changes: [mongoose.Schema.Types.Mixed],
+    meta: mongoose.Schema.Types.Mixed
+}, { timestamps: true });
+auditLogSchema.index({ createdAt: -1 });
+auditLogSchema.index({ 'actor.id': 1, createdAt: -1 });
+auditLogSchema.index({ entityType: 1, entityId: 1, createdAt: -1 });
+const AuditLog = mongoose.model('AuditLog', auditLogSchema);
+
 // --- ФУНКЦИЯ СОЗДАНИЯ АДМИНА ---
 async function seedUsers() {
     const admin = await User.findOne({ username: 'admin' });
