@@ -223,7 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 { value: 'archive', label: 'Архив' }
             ];
 
-        filterStatus.innerHTML = '<option value="">Все статусы</option>' +
+        filterStatus.innerHTML = '<option value="">Рабочие дилеры</option>' +
             options.map(status => `<option value="${escapeHtml(status.value)}">${escapeHtml(status.label)}</option>`).join('');
     }
 
