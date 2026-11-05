@@ -2885,9 +2885,32 @@ app.post('/api/workshop/opening-balance', requirePermission('can_manage_workshop
 
         const changed = [];
         for (const line of inputLines) {
-            const recipeId = line.recipeId;
-            if (!recipeId) continue;
-            const recipe = await WorkshopRecipe.findOne({ _id: recipeId, active: { $ne: false } });
+            let recipe = null;
+            if (line.recipeId) {
+                recipe = await WorkshopRecipe.findOne({ _id: line.recipeId, active: { $ne: false } });
+            } else if (line.productId) {
+                const product = await Product.findById(line.productId).lean();
+                if (!product) continue;
+                recipe = await WorkshopRecipe.findOne({
+                    product: product._id,
+                    outputType: 'sample',
+                    active: { $ne: false }
+                });
+                if (!recipe) {
+                    recipe = await WorkshopRecipe.create({
+                        name: `Планшет ${product.sku || ''} ${product.name || ''}`.trim(),
+                        outputType: 'sample',
+                        sku: `SAMPLE-${product.sku || String(product._id).slice(-6)}`,
+                        product: product._id,
+                        planksPerUnit: 0,
+                        packQtyOverride: 0,
+                        stockQty: 0,
+                        minStockQty: 0,
+                        active: true,
+                        note: 'Создано автоматически при вводе стартовых остатков. Норму производства можно заполнить позже.'
+                    });
+                }
+            }
             if (!recipe) continue;
 
             const actualQty = Math.max(0, workshopNumber(line.actualQty));
