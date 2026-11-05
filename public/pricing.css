@@ -410,3 +410,103 @@ html,body.pricing-page{max-width:100%;overflow-x:hidden}
 @media(max-width:600px){
   .pricing-shell{width:calc(100% - 20px)!important}
 }
+
+
+/* =========================================================
+   2026-11-05 — STABLE DEALER PRICING MODAL
+   Header/footer stay fixed; only form body scrolls.
+   ========================================================= */
+.pricing-condition-modal-shell{
+  overflow:hidden!important;
+  padding:0!important;
+}
+.pricing-condition-dialog{
+  width:min(1180px,calc(100% - 28px))!important;
+  max-width:1180px!important;
+  height:calc(100dvh - 28px)!important;
+  max-height:calc(100dvh - 28px)!important;
+  margin:14px auto!important;
+  display:flex!important;
+  align-items:stretch!important;
+  transform:none!important;
+}
+.pricing-condition-dialog .pricing-modal{
+  width:100%!important;
+  height:100%!important;
+  max-height:100%!important;
+  min-height:0!important;
+  display:flex!important;
+  flex-direction:column!important;
+  overflow:hidden!important;
+}
+.pricing-condition-dialog .pricing-modal>.modal-header{
+  position:relative!important;
+  z-index:3!important;
+  flex:0 0 auto!important;
+  min-height:62px;
+  margin:0!important;
+  background:#fff!important;
+}
+.pricing-condition-dialog #pricing-condition-form{
+  flex:1 1 auto!important;
+  min-height:0!important;
+  height:auto!important;
+  display:flex!important;
+  flex-direction:column!important;
+  overflow:hidden!important;
+}
+.pricing-condition-dialog #pricing-condition-form>.modal-body{
+  flex:1 1 auto!important;
+  min-height:0!important;
+  height:0!important;
+  overflow-x:hidden!important;
+  overflow-y:auto!important;
+  overscroll-behavior:contain!important;
+  scrollbar-gutter:stable;
+  -webkit-overflow-scrolling:touch;
+}
+.pricing-condition-dialog #pricing-condition-form>.modal-footer{
+  position:relative!important;
+  z-index:3!important;
+  flex:0 0 auto!important;
+  margin:0!important;
+  background:#fff!important;
+  box-shadow:0 -8px 20px rgba(30,25,25,.035);
+}
+.pricing-condition-dialog .pricing-checkbox-label{
+  position:relative;
+  margin:0!important;
+}
+.pricing-condition-dialog .pricing-checkbox-label .form-check-input{
+  flex:0 0 18px;
+  width:18px;
+  height:18px;
+  margin:0!important;
+}
+.pricing-condition-dialog .pricing-checkbox-label:has(.form-check-input:checked){
+  border-color:rgba(185,4,10,.25);
+  background:#fff9f9;
+}
+
+@media(max-width:600px){
+  .pricing-condition-modal-shell{
+    padding:0!important;
+  }
+  .pricing-condition-dialog{
+    width:calc(100% - 12px)!important;
+    max-width:calc(100% - 12px)!important;
+    height:calc(100dvh - 12px)!important;
+    max-height:calc(100dvh - 12px)!important;
+    margin:6px auto!important;
+  }
+  .pricing-condition-dialog .pricing-modal>.modal-header{
+    min-height:58px;
+    padding:12px 14px!important;
+  }
+  .pricing-condition-dialog #pricing-condition-form>.modal-body{
+    padding:10px!important;
+  }
+  .pricing-condition-dialog #pricing-condition-form>.modal-footer{
+    padding:8px 10px max(8px,env(safe-area-inset-bottom))!important;
+  }
+}
