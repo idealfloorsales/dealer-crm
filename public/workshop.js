@@ -1456,6 +1456,7 @@ document.addEventListener('DOMContentLoaded', () => {
         function openingCandidates() {
         const recipeProductIds = new Set(
             state.recipes
+                .filter(recipe => recipe.outputType === 'sample')
                 .map(recipe => idOf(recipe.product))
                 .filter(Boolean)
         );
