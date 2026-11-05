@@ -198,7 +198,58 @@ document.addEventListener('DOMContentLoaded', () => {
 }
     function renderPhotoPreviews(container, photosArray) { if(container) container.innerHTML = photosArray.map((p, index) => `<div class="photo-preview-item"><img src="${p.photo_url}"><button type="button" class="btn-remove-photo" data-index="${index}"><i class="bi bi-x"></i></button></div>`).join(''); }
     function createPosEntryHTML(p={}) { return `<div class="pos-entry"><input type="text" class="form-control pos-name" list="pos-materials-datalist" placeholder="Название стенда" value="${safeAttr(p.name||'')}" autocomplete="off"><input type="number" class="form-control pos-quantity" value="${p.quantity||1}" min="1" placeholder="Шт"><button type="button" class="btn-remove-entry" onclick="this.closest('.pos-entry').remove()" title="Удалить"><i class="bi bi-x-lg"></i></button></div>`; }
-    function createCompetitorEntryHTML(c={}) { let brandOpts = `<option value="">-- Бренд --</option>`; competitorsRef.forEach(ref => { const sel = ref.name === c.brand ? 'selected' : ''; brandOpts += `<option value="${ref.name}" ${sel}>${ref.name}</option>`; }); let collOpts = `<option value="">-- Коллекция --</option>`; if (c.brand) { const ref = competitorsRef.find(r => r.name === c.brand); if (ref && ref.collections) { const sortedCols = [...ref.collections].sort((a, b) => { const typeA = (typeof a === 'object') ? a.type : 'std'; const typeB = (typeof b === 'object') ? b.type : 'std'; if (typeA === 'std' && typeB !== 'std') return 1; if (typeA !== 'std' && typeB === 'std') return -1; return 0; }); sortedCols.forEach(col => { const colName = (typeof col === 'string') ? col : col.name; const colType = (typeof col === 'object') ? col.type : 'std'; let label = ''; if(colType.includes('eng')) label = ' (Елка)'; else if(colType.includes('french')) label = ' (Фр. Елка)'; else if(colType.includes('art')) label = ' (Арт)'; const sel = colName === c.collection ? 'selected' : ''; collOpts += `<option value="${colName}" ${sel}>${colName}${label}</option>`; }); } } return `<div class="competitor-entry"><select class="form-select competitor-brand" onchange="updateCollections(this)">${brandOpts}</select><select class="form-select competitor-collection">${collOpts}</select><input type="text" class="form-control competitor-price-opt" placeholder="ОПТ" value="${c.price_opt||''}"><input type="text" class="form-control competitor-price-retail" placeholder="Розн" value="${c.price_retail||''}"><button type="button" class="btn-remove-entry" onclick="this.closest('.competitor-entry').remove()" title="Удалить"><i class="bi bi-x-lg"></i></button></div>`; }
+    function createCompetitorEntryHTML(c={}) {
+        let brandOpts = '<option value="">Выберите бренд</option>';
+        competitorsRef.forEach(ref => {
+            const sel = ref.name === c.brand ? 'selected' : '';
+            brandOpts += `<option value="${safeAttr(ref.name)}" ${sel}>${safeText(ref.name)}</option>`;
+        });
+
+        let collOpts = '<option value="">Выберите коллекцию</option>';
+        if (c.brand) {
+            const ref = competitorsRef.find(r => r.name === c.brand);
+            if (ref && ref.collections) {
+                const sortedCols = [...ref.collections].sort((a, b) => {
+                    const typeA = (typeof a === 'object') ? a.type : 'std';
+                    const typeB = (typeof b === 'object') ? b.type : 'std';
+                    if (typeA === 'std' && typeB !== 'std') return 1;
+                    if (typeA !== 'std' && typeB === 'std') return -1;
+                    return 0;
+                });
+                sortedCols.forEach(col => {
+                    const colName = (typeof col === 'string') ? col : col.name;
+                    const colType = (typeof col === 'object') ? col.type : 'std';
+                    let label = '';
+                    if(String(colType).includes('eng')) label = ' · Ёлка';
+                    else if(String(colType).includes('french')) label = ' · Фр. ёлка';
+                    else if(String(colType).includes('art')) label = ' · Арт';
+                    const sel = colName === c.collection ? 'selected' : '';
+                    collOpts += `<option value="${safeAttr(colName)}" ${sel}>${safeText(colName)}${label}</option>`;
+                });
+            }
+        }
+
+        return `
+            <div class="competitor-entry dealer-competitor-entry">
+                <label class="dealer-competitor-field is-brand">
+                    <span>Бренд</span>
+                    <select class="form-select competitor-brand" onchange="updateCollections(this)">${brandOpts}</select>
+                </label>
+                <label class="dealer-competitor-field is-collection">
+                    <span>Коллекция</span>
+                    <select class="form-select competitor-collection">${collOpts}</select>
+                </label>
+                <label class="dealer-competitor-field is-price">
+                    <span>ОПТ</span>
+                    <input type="text" inputmode="decimal" class="form-control competitor-price-opt" placeholder="Цена" value="${safeAttr(c.price_opt||'')}">
+                </label>
+                <label class="dealer-competitor-field is-price">
+                    <span>Розница</span>
+                    <input type="text" inputmode="decimal" class="form-control competitor-price-retail" placeholder="Цена" value="${safeAttr(c.price_retail||'')}">
+                </label>
+                <button type="button" class="btn-remove-entry" onclick="this.closest('.competitor-entry').remove()" title="Удалить конкурента"><i class="bi bi-trash3"></i></button>
+            </div>`;
+    }
     function inferLegalEntityType(type, name='') {
         const explicit = String(type || '').trim();
         if (explicit) return explicit;
@@ -394,18 +445,130 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(e) { alert("Ошибка удаления"); }
     };
 
-    // ФУНКЦИЯ КАТАЛОГА С ФИЛЬТРАЦИЕЙ
+    // Полевой селектор выставленности: поиск + быстрые режимы + крупные строки для телефона.
     function renderProductChecklist(container, selectedIds=[]) { 
         if(!container) return; 
-        const set = new Set(selectedIds); 
-        const filteredCatalog = fullProductCatalog.filter(p => !posMaterialsList.includes(p.name));
+        const selected = new Set((selectedIds || []).map(String));
         const canEditMatrix = window.CRMAuth && CRMAuth.can('can_edit_matrix');
-        container.innerHTML = filteredCatalog.map(p => 
-            `<div class="checklist-item form-check">
-                <input type="checkbox" class="form-check-input" id="prod-${container.id}-${p.id}" value="${p.id}" ${set.has(p.id)?'checked':''} ${canEditMatrix ? '' : 'disabled'}>
-                <label class="form-check-label" for="prod-${container.id}-${p.id}"><strong>${p.sku}</strong> - ${p.name}</label>
-             </div>`
-        ).join(''); 
+        const filteredCatalog = fullProductCatalog
+            .filter(p => !posMaterialsList.includes(p.name))
+            .sort((a,b) => {
+                const aSelected = selected.has(String(a.id));
+                const bSelected = selected.has(String(b.id));
+                if (aSelected !== bSelected) return aSelected ? -1 : 1;
+                const aLiquid = a.is_liquid !== false;
+                const bLiquid = b.is_liquid !== false;
+                if (aLiquid !== bLiquid) return aLiquid ? -1 : 1;
+                return String(a.sku || '').localeCompare(String(b.sku || ''), 'ru', { numeric:true });
+            });
+
+        const defaultMode = selected.size ? 'selected' : 'liquid';
+        const itemsHtml = filteredCatalog.map(p => {
+            const id = String(p.id);
+            const isSelected = selected.has(id);
+            const isLiquid = p.is_liquid !== false;
+            const chars = [
+                p.characteristics?.class ? `${safeText(p.characteristics.class)} кл` : '',
+                p.characteristics?.thickness ? `${safeText(p.characteristics.thickness)} мм` : ''
+            ].filter(Boolean).join(' · ');
+            const searchBlob = [
+                p.sku, p.name, p.characteristics?.class, p.characteristics?.thickness,
+                p.characteristics?.size, p.characteristics?.bevel
+            ].filter(Boolean).join(' ').toLowerCase();
+
+            return `
+                <label class="dealer-field-product-item ${isSelected ? 'is-selected' : ''}" 
+                       data-product-search="${safeAttr(searchBlob)}"
+                       data-selected="${isSelected ? '1' : '0'}"
+                       data-liquid="${isLiquid ? '1' : '0'}"
+                       for="prod-${container.id}-${safeAttr(id)}">
+                    <input type="checkbox" id="prod-${container.id}-${safeAttr(id)}" value="${safeAttr(id)}"
+                           ${isSelected ? 'checked' : ''} ${canEditMatrix ? '' : 'disabled'}>
+                    <span class="dealer-field-product-check"><i class="bi bi-check-lg"></i></span>
+                    <span class="dealer-field-product-copy">
+                        <span><strong>${safeText(p.sku || '—')}</strong><b>${safeText(p.name || 'Без названия')}</b></span>
+                        <small>${chars || 'Характеристики не указаны'}${!isLiquid ? ' · Неликвид' : ''}</small>
+                    </span>
+                    ${!isLiquid ? '<em>Неликвид</em>' : ''}
+                </label>`;
+        }).join('');
+
+        container.innerHTML = `
+            <div class="dealer-field-product-controls">
+                <div class="dealer-field-product-search">
+                    <i class="bi bi-search"></i>
+                    <input type="search" class="form-control" placeholder="Артикул или название…" autocomplete="off">
+                    <button type="button" class="dealer-field-product-clear" title="Очистить"><i class="bi bi-x-lg"></i></button>
+                </div>
+                <div class="dealer-field-product-filterbar">
+                    <button type="button" data-product-view="selected" class="${defaultMode === 'selected' ? 'active' : ''}">Выбрано <span data-selected-count>${selected.size}</span></button>
+                    <button type="button" data-product-view="liquid" class="${defaultMode === 'liquid' ? 'active' : ''}">Ликвид</button>
+                    <button type="button" data-product-view="all">Все</button>
+                    <button type="button" data-product-view="illiquid">Неликвид</button>
+                </div>
+            </div>
+            <div class="dealer-field-product-items" data-current-view="${defaultMode}">
+                ${itemsHtml || '<div class="dealer-field-product-empty">Каталог пуст</div>'}
+            </div>
+            <div class="dealer-field-product-footer">
+                <span><strong data-visible-product-count>0</strong> позиций видно</span>
+                <span><strong data-total-selected-count>${selected.size}</strong> отмечено у дилера</span>
+            </div>`;
+
+        const searchInput = container.querySelector('.dealer-field-product-search input');
+        const clearBtn = container.querySelector('.dealer-field-product-clear');
+        const itemsHost = container.querySelector('.dealer-field-product-items');
+        const viewButtons = [...container.querySelectorAll('[data-product-view]')];
+
+        function refreshProductPicker() {
+            const query = String(searchInput?.value || '').trim().toLowerCase();
+            const view = itemsHost?.dataset.currentView || 'all';
+            let visible = 0;
+            let selectedCount = 0;
+
+            container.querySelectorAll('.dealer-field-product-item').forEach(item => {
+                const checkbox = item.querySelector('input[type="checkbox"]');
+                const checked = Boolean(checkbox?.checked);
+                item.dataset.selected = checked ? '1' : '0';
+                item.classList.toggle('is-selected', checked);
+                if (checked) selectedCount++;
+
+                const matchSearch = !query || String(item.dataset.productSearch || '').includes(query);
+                const matchView =
+                    view === 'all' ||
+                    (view === 'selected' && checked) ||
+                    (view === 'liquid' && item.dataset.liquid === '1') ||
+                    (view === 'illiquid' && item.dataset.liquid === '0');
+
+                const show = matchSearch && matchView;
+                item.hidden = !show;
+                if (show) visible++;
+            });
+
+            container.querySelectorAll('[data-selected-count],[data-total-selected-count]').forEach(el => el.textContent = String(selectedCount));
+            const visibleEl = container.querySelector('[data-visible-product-count]');
+            if (visibleEl) visibleEl.textContent = String(visible);
+            if (clearBtn) clearBtn.hidden = !query;
+        }
+
+        viewButtons.forEach(button => button.addEventListener('click', () => {
+            if (!itemsHost) return;
+            itemsHost.dataset.currentView = button.dataset.productView || 'all';
+            viewButtons.forEach(item => item.classList.toggle('active', item === button));
+            refreshProductPicker();
+        }));
+        searchInput?.addEventListener('input', refreshProductPicker);
+        clearBtn?.addEventListener('click', () => {
+            if (!searchInput) return;
+            searchInput.value = '';
+            refreshProductPicker();
+            searchInput.focus();
+        });
+        container.querySelectorAll('.dealer-field-product-item input[type="checkbox"]').forEach(cb => {
+            cb.addEventListener('change', refreshProductPicker);
+        });
+
+        refreshProductPicker();
     }
 
     function getSelectedProductIds(containerId) { const el=document.getElementById(containerId); if(!el) return []; return Array.from(el.querySelectorAll('input:checked')).map(cb=>cb.value); }
@@ -413,7 +576,21 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderList(container, data, htmlGen) { if(container) container.innerHTML = (data && data.length > 0) ? data.map(htmlGen).join('') : htmlGen(); }
 
     // --- SETUP BUTTONS ---
-    const setupListBtn = (id, list, genFunc) => { const btn = document.getElementById(id); if(btn) btn.onclick = () => list.insertAdjacentHTML('beforeend', genFunc()); };
+    const setupListBtn = (id, list, genFunc) => {
+        const btn = document.getElementById(id);
+        if(!btn || !list) return;
+        btn.onclick = () => {
+            list.insertAdjacentHTML('beforeend', genFunc());
+            const entry = list.lastElementChild;
+            if (!entry) return;
+            if (window.innerWidth <= 767) {
+                setTimeout(() => {
+                    entry.scrollIntoView({ behavior:'smooth', block:'center' });
+                    entry.querySelector('select, input, textarea')?.focus({ preventScroll:true });
+                }, 60);
+            }
+        };
+    };
     setupListBtn('add-contact-btn-add-modal', addContactList, createContactEntryHTML); setupListBtn('add-address-btn-add-modal', addAddressList, createAddressEntryHTML); setupListBtn('add-pos-btn-add-modal', addPosList, createPosEntryHTML); setupListBtn('add-visits-btn-add-modal', addVisitsList, createVisitEntryHTML); setupListBtn('add-competitor-btn-add-modal', addCompetitorList, createCompetitorEntryHTML);
     setupListBtn('add-contact-btn-edit-modal', editContactList, createContactEntryHTML); setupListBtn('add-address-btn-edit-modal', editAddressList, createAddressEntryHTML); setupListBtn('add-pos-btn-edit-modal', editPosList, createPosEntryHTML); setupListBtn('add-visits-btn-edit-modal', editVisitsList, createVisitEntryHTML); setupListBtn('add-competitor-btn-edit-modal', editCompetitorList, createCompetitorEntryHTML);
 
@@ -2217,6 +2394,46 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
         const body = addModalEl?.querySelector('.modal-body');
         if (body) body.scrollTop = 0;
     }
+
+    function scrollFieldTarget(selector) {
+        if (!selector) return;
+        const target = document.querySelector(selector);
+        if (!target) return;
+        setTimeout(() => {
+            target.scrollIntoView({ behavior:'smooth', block:'start' });
+            const search = target.querySelector('input[type="search"]');
+            if (search) setTimeout(() => search.focus({preventScroll:true}), 180);
+        }, 120);
+    }
+
+    document.querySelectorAll('[data-field-shortcuts="add"] [data-add-step]').forEach(button => {
+        button.addEventListener('click', () => {
+            const targetStep = Number(button.dataset.addStep || 1);
+            if (targetStep > 1) {
+                const dealerId = document.getElementById('dealer_id')?.value.trim();
+                const name = document.getElementById('name')?.value.trim();
+                if (!dealerId || !name) {
+                    showStep(1);
+                    window.showToast('Сначала укажите ID и название дилера', 'warning');
+                    return;
+                }
+            }
+            currentStep = targetStep;
+            showStep(targetStep);
+            document.querySelectorAll('[data-field-shortcuts="add"] button').forEach(item => item.classList.toggle('active', item === button));
+            scrollFieldTarget(button.dataset.fieldFocus);
+        });
+    });
+
+    document.querySelectorAll('[data-field-shortcuts="edit"] [data-edit-tab]').forEach(button => {
+        button.addEventListener('click', () => {
+            const target = button.dataset.editTab;
+            const tabButton = document.querySelector(`#editTabs button[data-bs-target="${target}"]`);
+            if (tabButton) bootstrap.Tab.getOrCreateInstance(tabButton).show();
+            document.querySelectorAll('[data-field-shortcuts="edit"] button').forEach(item => item.classList.toggle('active', item === button));
+            scrollFieldTarget(button.dataset.fieldFocus);
+        });
+    });
 
     if (nextBtn) {
         nextBtn.onclick = () => {
