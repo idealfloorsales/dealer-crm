@@ -150,7 +150,7 @@
                 </section>
                 <div class="workshop-grid-2 mt-3">
                     <section class="workshop-panel">
-                        <div class="workshop-panel-head"><div><span>ГОТОВАЯ ПРОДУКЦИЯ</span><h2>Образцы и стенды</h2></div></div>
+                        <div class="workshop-panel-head"><div><span>ГОТОВАЯ ПРОДУКЦИЯ</span><h2>Образцы и торговое оборудование</h2></div></div>
                         <div id="ws-finished-stock" class="workshop-stock-cards"></div>
                     </section>
                     <section class="workshop-panel">
@@ -173,7 +173,7 @@
                         </div>
                     </div>
                     <div class="workshop-filter-row">
-                        <div class="workshop-search"><i class="bi bi-search"></i><input id="ws-dealer-search" type="search" placeholder="Дилер, город, образец или стенд"></div>
+                        <div class="workshop-search"><i class="bi bi-search"></i><input id="ws-dealer-search" type="search" placeholder="Дилер, город, образец или торговое оборудование"></div>
                     </div>
                     <div id="ws-dealer-assets" class="workshop-dealer-assets"></div>
                 </section>
@@ -367,7 +367,7 @@
             <form id="ws-dealer-form"><div class="modal-body">
                 <div class="workshop-simple-form">
                     <label class="span-2"><span>Дилер</span><select id="ws-dealer-id" class="form-select" required></select></label>
-                    <label class="span-2"><span>Образец / стенд</span><select id="ws-dealer-recipe" class="form-select" required></select></label>
+                    <label class="span-2"><span>Образец / торговое оборудование</span><select id="ws-dealer-recipe" class="form-select" required></select></label>
                     <label><span>Что делаем</span><select id="ws-dealer-action" class="form-select"><option value="issue">Выдать</option><option value="return">Вернуть</option><option value="replacement">Заменить</option></select></label>
                     <label><span>Количество</span><input id="ws-dealer-qty" type="number" min="1" step="1" inputmode="numeric" value="1" class="form-control"></label>
                     <label><span>Дата</span><input id="ws-dealer-date" type="date" class="form-control"></label>
@@ -463,7 +463,7 @@
                 <input type="hidden" id="ws-recipe-id">
                 <div class="workshop-form-grid">
                     <label class="wide"><span>Название изделия</span><input id="ws-recipe-name" class="form-control" placeholder="Планшет EH-702 Дуб Арабика" required></label>
-                    <label><span>Тип</span><select id="ws-recipe-type" class="form-select"><option value="sample">Планшет / образец</option><option value="stand">Стенд</option><option value="sign">Табличка</option><option value="other">Другое</option></select></label>
+                    <label><span>Тип</span><select id="ws-recipe-type" class="form-select"><option value="sample">Планшет / образец</option><option value="stand">Торговое оборудование</option><option value="sign">Торговое оборудование</option><option value="other">Торговое оборудование / другое</option></select></label>
                     <label><span>Код</span><input id="ws-recipe-sku" class="form-control"></label>
                     <label class="wide"><span>Ламинат</span><select id="ws-recipe-product" class="form-select"></select></label>
                     <label><span>Планок на 1 изделие</span><input id="ws-recipe-planks" type="number" min="0" step="1" class="form-control" value="0"></label>
