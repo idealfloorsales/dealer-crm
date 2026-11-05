@@ -688,9 +688,11 @@ html,body.workshop-page{max-width:100%;overflow-x:hidden}
 
   .workshop-advanced-fields>summary{min-height:47px;padding:0 9px}
   .workshop-advanced-fields>summary small{display:none}
-  .workshop-simple-footer{display:grid!important;grid-template-columns:auto minmax(0,1fr);padding:8px!important}
-  .workshop-simple-footer .btn{min-height:45px}
-  .workshop-simple-footer .btn-dark:last-child{min-width:0}
+  .workshop-simple-footer{display:flex!important;padding:8px!important}
+  .workshop-simple-footer>.btn{min-height:45px}
+  .workshop-simple-footer>.btn-light{display:none}
+  .workshop-simple-footer>.btn-outline-dark{flex:0 0 auto}
+  .workshop-simple-footer>.btn-dark{flex:1;min-width:0}
 
   .workshop-opening-controls{grid-template-columns:1fr 1fr}
   .workshop-opening-controls label:nth-child(2){grid-column:1/-1;grid-row:2}
