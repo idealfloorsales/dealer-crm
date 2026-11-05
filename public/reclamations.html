@@ -6,7 +6,8 @@
     <title>CRM - Рекламации</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="style.css?v={{VER}}"> 
+    <link rel="stylesheet" href="style.css?v={{VER}}">
+    <link rel="stylesheet" href="reclamations.css?v={{VER}}">
     <link rel="icon" href="favicon.gif" type="image/gif">
     <style>
         :root { --bs-primary: #B9040A; --bs-primary-rgb: 185, 4, 10; }
@@ -87,42 +88,81 @@
             </div>
         </section>
 
-        <div class="app-toolbar-card">
-            <div class="row g-2">
-                <div class="col-md-8">
-                    <div class="input-group">
-                        <span class="input-group-text bg-light border-end-0"><i class="bi bi-search"></i></span>
-                        <input type="text" id="search-input" class="form-control border-start-0 bg-light" placeholder="Поиск по дилеру или товару...">
-                    </div>
+        <section id="reclamation-kpis" class="rec-kpi-grid">
+            <div class="rec-kpi-loading">Загрузка реестра рекламаций…</div>
+        </section>
+
+        <section class="app-toolbar-card rec-toolbar">
+            <div class="rec-search-row">
+                <div class="rec-search">
+                    <i class="bi bi-search"></i>
+                    <input type="search" id="search-input" class="form-control" placeholder="Дилер, товар, накладная, клиент…">
+                    <button type="button" id="rec-search-clear" hidden><i class="bi bi-x-lg"></i></button>
                 </div>
-                <div class="col-md-4">
-                    <select id="sort-select" class="form-select bg-light">
+                <button type="button" id="rec-reset-filters" class="rec-reset-btn"><i class="bi bi-arrow-counterclockwise"></i><span>Сбросить</span></button>
+            </div>
+            <div class="rec-filter-grid">
+                <label><span>Статус</span>
+                    <select id="status-filter" class="form-select">
+                        <option value="all">Все</option>
+                        <option value="open">В работе</option>
+                        <option value="resolved">Решено</option>
+                    </select>
+                </label>
+                <label><span>Фото / видео</span>
+                    <select id="media-filter" class="form-select">
+                        <option value="all">Любые</option>
+                        <option value="with">Есть медиа</option>
+                        <option value="without">Без медиа</option>
+                    </select>
+                </label>
+                <label><span>Дилер</span>
+                    <select id="dealer-filter" class="form-select"><option value="">Все дилеры</option></select>
+                </label>
+                <label><span>Сортировка</span>
+                    <select id="sort-select" class="form-select">
                         <option value="newest">Сначала новые</option>
                         <option value="oldest">Сначала старые</option>
-                        <option value="dealer_asc">По дилеру (А-Я)</option>
-                        <option value="dealer_desc">По дилеру (Я-А)</option>
+                        <option value="dealer_asc">Дилер А–Я</option>
+                        <option value="dealer_desc">Дилер Я–А</option>
                     </select>
-                </div>
+                </label>
             </div>
-        </div>
+            <div class="rec-toolbar-meta">
+                <span id="rec-filter-summary">Все рекламации</span>
+                <span id="rec-visible-summary"></span>
+            </div>
+        </section>
 
-        <div id="reclamations-list" class="d-flex flex-column gap-3 mt-3">
+        <div id="reclamations-list" class="rec-list">
             <p class="text-center text-muted mt-5"><span class="spinner-border spinner-border-sm"></span> Загрузка...</p>
         </div>
     </main>
 
-    <div class="modal fade" id="add-modal" tabindex="-1" data-bs-backdrop="static">
-        <div class="modal-dialog modal-xl modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header border-0 pb-0">
-                    <h5 class="modal-title fw-bold" id="add-modal-title">Оформление рекламации</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <div class="modal fade rec-form-modal" id="add-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
+            <div class="modal-content rec-form-content">
+                <div class="rec-modal-header">
+                    <div>
+                        <div class="rec-modal-kicker">IDEAL FLOOR CRM · СЕРВИС</div>
+                        <h5 class="modal-title" id="add-modal-title">Оформление рекламации</h5>
+                        <p>Зафиксируйте обстоятельства, дефект и фото прямо на объекте.</p>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
+                <div class="rec-field-shortcuts">
+                    <button type="button" data-rec-target="#rec-section-main"><i class="bi bi-file-earmark-text"></i><span>Основное</span></button>
+                    <button type="button" data-rec-target="#rec-section-tech"><i class="bi bi-rulers"></i><span>Техника</span></button>
+                    <button type="button" data-rec-target="#rec-section-problem"><i class="bi bi-exclamation-diamond"></i><span>Проблема</span></button>
+                    <button type="button" data-rec-target="#r_photos"><i class="bi bi-camera"></i><span>Фото</span></button>
+                    <button type="button" data-rec-target="#rec-section-resolution"><i class="bi bi-check2-circle"></i><span>Решение</span></button>
+                </div>
+                <div class="rec-form-progress"><span id="rec-form-progress-bar"></span><small id="rec-form-progress-text">Заполните обязательные поля</small></div>
+                <div class="modal-body rec-modal-body">
                     <form id="reclamation-form">
                         <input type="hidden" id="r_id">
                         
-                        <h6 class="fw-bold text-brand mt-2 border-bottom pb-2">1. Общая информация</h6>
+                        <h6 id="rec-section-main" class="rec-section-title"><span>01</span><div><strong>Общая информация</strong><small>Дилер, товар и документы</small></div></h6>
                         <div class="row g-3 mb-3">
                             <div class="col-md-6">
                                 <label class="form-label small fw-bold text-muted">Дилер *</label>
@@ -146,7 +186,7 @@
                             </div>
                         </div>
 
-                        <h6 class="fw-bold text-brand mt-4 border-bottom pb-2">2. Данные объекта и клиента</h6>
+                        <h6 id="rec-section-client" class="rec-section-title"><span>02</span><div><strong>Объект и клиент</strong><small>Контакты и место эксплуатации</small></div></h6>
                         <div class="row g-3 mb-3">
                             <div class="col-md-6">
                                 <label class="form-label small fw-bold text-muted">ФИО клиента</label>
@@ -178,7 +218,7 @@
                             </div>
                         </div>
 
-                        <h6 class="fw-bold text-brand mt-4 border-bottom pb-2">3. Технические нюансы (Крайне важно)</h6>
+                        <h6 id="rec-section-tech" class="rec-section-title is-critical"><span>03</span><div><strong>Технические условия</strong><small>Основание, укладка, хранение и тёплый пол</small></div></h6>
                         <div class="row g-3 mb-3">
                             <div class="col-md-3">
                                 <label class="form-label small fw-bold text-muted">Тип основания</label>
@@ -215,7 +255,7 @@
                             </div>
                         </div>
 
-                        <h6 class="fw-bold text-brand mt-4 border-bottom pb-2">4. Суть претензии</h6>
+                        <h6 id="rec-section-problem" class="rec-section-title is-danger"><span>04</span><div><strong>Суть претензии</strong><small>Объём брака, партии, описание и доказательства</small></div></h6>
                         <div class="row g-3 mb-3">
                             <div class="col-md-3">
                                 <label class="form-label small fw-bold text-muted">Момент выявления дефекта</label>
@@ -245,12 +285,17 @@
                             <div class="col-12 mt-3">
                                 <label class="form-label small fw-bold text-muted">Фотографии / Видео брака</label>
                                 <div class="alert alert-warning py-1 small mb-2"><i class="bi bi-info-circle me-1"></i> Максимальный размер видео 8 МБ. Большие видео лучше отправлять ссылкой.</div>
-                                <input type="file" id="r_photos" class="form-control form-control-sm" multiple accept="image/*, video/*">
-                                <div id="r_photos_preview" class="photo-preview-grid"></div>
+                                <div class="rec-media-actions">
+                                    <label class="rec-media-btn is-primary" for="r_camera"><i class="bi bi-camera-fill"></i><span>Сделать фото</span></label>
+                                    <label class="rec-media-btn" for="r_photos"><i class="bi bi-images"></i><span>Выбрать фото / видео</span></label>
+                                </div>
+                                <input type="file" id="r_camera" class="visually-hidden" accept="image/*" capture="environment">
+                                <input type="file" id="r_photos" class="visually-hidden" multiple accept="image/*, video/*">
+                                <div id="r_photos_preview" class="photo-preview-grid rec-media-preview"></div>
                             </div>
                         </div>
 
-                        <h6 class="fw-bold text-success mt-4 border-bottom pb-2">5. Решение и Компенсация</h6>
+                        <h6 id="rec-section-resolution" class="rec-section-title is-success"><span>05</span><div><strong>Решение и компенсация</strong><small>Официальный итог по обращению</small></div></h6>
                         <div class="row g-3 mb-3">
                             <div class="col-md-9">
                                 <label class="form-label small fw-bold text-muted">Официальное решение (Видно клиенту)</label>
@@ -262,7 +307,7 @@
                             </div>
                         </div>
 
-                        <h6 class="fw-bold text-warning mt-4 border-bottom pb-2">6. Служебные заметки (Не для печати)</h6>
+                        <h6 id="rec-section-notes" class="rec-section-title is-note"><span>06</span><div><strong>Служебные заметки</strong><small>Внутренние комментарии — в акт не печатаются</small></div></h6>
                         <div class="row g-3 mb-3">
                             <div class="col-12">
                                 <textarea id="r_internal_notes" class="form-control bg-warning bg-opacity-10 border-warning" rows="2" placeholder="Скрытые комментарии для менеджеров..."></textarea>
@@ -271,9 +316,9 @@
 
                     </form>
                 </div>
-                <div class="modal-footer border-0 pt-0">
-                    <button type="button" class="btn btn-light rounded-pill px-4 border" data-bs-dismiss="modal">Отмена</button>
-                    <button type="submit" form="reclamation-form" class="btn btn-primary rounded-pill px-4" id="btn-save"><i class="bi bi-send me-2"></i>Сохранить</button>
+                <div class="modal-footer rec-modal-footer">
+                    <button type="button" class="rec-cancel-btn" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" form="reclamation-form" class="rec-save-btn" id="btn-save"><i class="bi bi-check-lg"></i><span>Сохранить рекламацию</span></button>
                 </div>
             </div>
         </div>
