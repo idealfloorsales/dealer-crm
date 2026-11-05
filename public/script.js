@@ -1127,6 +1127,53 @@ document.addEventListener('DOMContentLoaded', () => {
         const container = document.getElementById('activity-feed');
         if (!container) return;
 
+        if (window.CRMAuth?.can?.('can_manage_users')) {
+            if (!renderActivityFeed.auditLoaded && !renderActivityFeed.auditLoading) {
+                renderActivityFeed.auditLoading = true;
+                fetch('/api/audit?limit=8')
+                    .then(async response => {
+                        const data = await response.json();
+                        if (!response.ok) throw new Error(data.error || 'Не удалось загрузить журнал');
+                        renderActivityFeed.auditItems = Array.isArray(data.items) ? data.items : [];
+                    })
+                    .catch(() => { renderActivityFeed.auditItems = []; })
+                    .finally(() => {
+                        renderActivityFeed.auditLoaded = true;
+                        renderActivityFeed.auditLoading = false;
+                        renderActivityFeed();
+                    });
+            }
+
+            if (renderActivityFeed.auditLoading && !renderActivityFeed.auditLoaded) {
+                container.innerHTML = '<div class="cc-empty">Загружаем реальные действия сотрудников…</div>';
+                return;
+            }
+
+            if (Array.isArray(renderActivityFeed.auditItems) && renderActivityFeed.auditItems.length) {
+                const moduleMeta = {
+                    dealers:['shop-window','/'], matrix:['grid-3x3-gap','/report.html'], visits:['geo-alt','/'],
+                    products:['boxes','/products.html'], sales:['graph-up-arrow','/sales.html'], competitors:['globe2','/competitors.html'],
+                    knowledge:['journal-text','/knowledge.html'], reclamations:['shield-exclamation','/reclamations.html'],
+                    workshop:['tools','/workshop.html'], pricing:['percent','/pricing.html'], users:['people','/users.html'],
+                    settings:['gear','/']
+                };
+                container.innerHTML = renderActivityFeed.auditItems.slice(0,8).map(item => {
+                    const meta = moduleMeta[item.module] || ['activity','/audit.html'];
+                    const date = new Date(item.createdAt);
+                    const actor = item.actor?.name || item.actor?.username || 'Пользователь';
+                    const when = Number.isNaN(date.getTime()) ? '' : date.toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+                    return `<a class="cc-event-item" href="/audit.html">
+                        <span class="cc-event-icon"><i class="bi bi-${meta[0]}"></i></span>
+                        <span class="cc-event-copy">
+                            <span class="cc-event-title">${safeText(item.summary || 'Действие в CRM')}</span>
+                            <span class="cc-event-meta">${safeText(when)} · ${safeText(actor)}${item.success === false ? ' · Ошибка' : ''}</span>
+                        </span>
+                    </a>`;
+                }).join('');
+                return;
+            }
+        }
+
         const events = [];
 
         const objectIdDate = (id) => {
