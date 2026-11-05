@@ -2175,10 +2175,18 @@ app.delete('/api/workshop/recipes/:id', requireIsAdmin, async (req, res) => {
 
 app.post('/api/workshop/memos', requirePermission('can_manage_workshop'), async (req, res) => {
     try {
-        const number = String(req.body.number || '').trim();
+        let number = String(req.body.number || '').trim();
         const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
-        if (!number) return res.status(400).json({ error: 'Укажите номер служебной записки' });
         if (!inputLines.length) return res.status(400).json({ error: 'Добавьте хотя бы одну позицию' });
+        if (!number) {
+            let seq = Math.max(1, (await WorkshopMemo.countDocuments()) + 1);
+            while (!number) {
+                const candidate = `ЦЕХ-${String(seq).padStart(4, '0')}`;
+                const exists = await WorkshopMemo.exists({ number: candidate });
+                if (!exists) number = candidate;
+                else seq += 1;
+            }
+        }
 
         const lines = [];
         const seenProducts = new Set();
