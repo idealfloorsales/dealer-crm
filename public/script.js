@@ -1845,8 +1845,14 @@ function resetStatusForm() { if(!statusForm) return; statusForm.reset(); documen
         const baseFiltered = allDealers.filter(d => {
             let isVisible = true;
             if (!status) {
-                const statusObj = statusList.find(s => s.value === (d.status || 'standard'));
-                if (statusObj && (statusObj.isVisible === false || String(statusObj.isVisible) === 'false')) isVisible = false;
+                // По умолчанию на главной показываем только рабочих дилеров.
+                // Потенциальные и архивные остаются доступны через явный фильтр по статусу.
+                if (isNonWorkingDealer(d)) {
+                    isVisible = false;
+                } else {
+                    const statusObj = statusList.find(s => s.value === (d.status || 'standard'));
+                    if (statusObj && (statusObj.isVisible === false || String(statusObj.isVisible) === 'false')) isVisible = false;
+                }
             } else {
                 isVisible = d.status === status;
             }
