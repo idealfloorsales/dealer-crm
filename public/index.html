@@ -976,7 +976,103 @@
         </div>
     </div>
     
-    <div class="modal fade" id="status-manager-modal" tabindex="-1"><div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title fw-bold">Управление статусами</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="card bg-light border-0 mb-4"><div class="card-body"><form id="status-form" class="row g-2 align-items-end"><input type="hidden" id="st_id"><div class="col-md-3"><label class="form-label small fw-bold text-muted">Код (ID)</label><input type="text" id="st_value" class="form-control" placeholder="vip" required><div class="form-text" style="font-size: 0.7rem; margin-top: 2px;">На латинице</div></div><div class="col-md-4"><label class="form-label small fw-bold text-muted">Название</label><input type="text" id="st_label" class="form-control" placeholder="VIP Клиент" required></div><div class="col-md-2 col-3"><label class="form-label small fw-bold text-muted">Цвет</label><input type="color" id="st_color" class="form-control form-control-color w-100" value="#B9040A" title="Выберите цвет"></div><div class="col-md-3 col-9"><div class="form-check mb-2"><input class="form-check-input" type="checkbox" id="st_visible" checked><label class="form-check-label small" for="st_visible">В списке</label></div></div><div class="col-12 mt-2 text-end"><button type="button" id="btn-cancel-edit-status" class="btn btn-sm btn-link text-muted me-2" style="display:none;">Отмена</button><button type="submit" class="btn btn-primary px-4" id="btn-save-status">Сохранить</button></div></form></div></div><div class="table-responsive"><table class="table table-hover align-middle"><thead class="table-light small text-muted text-uppercase"><tr><th>Цвет</th><th>Название</th><th>Код (ID)</th><th class="text-center">В списке</th><th class="text-end">Действия</th></tr></thead><tbody id="status-manager-list"></tbody></table></div></div></div></div></div>
+    <div class="modal fade status-manager-modal" id="status-manager-modal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
+            <div class="modal-content status-manager-content">
+                <div class="status-manager-header">
+                    <div>
+                        <span>СПРАВОЧНИК ДИЛЕРОВ</span>
+                        <h5>Управление статусами</h5>
+                        <p>Настройте названия, цвета и видимость статусов. Скрытые статусы не мешают в рабочем списке, но остаются в CRM.</p>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="status-manager-stats">
+                    <article><small>Всего статусов</small><strong id="status-stat-total">0</strong></article>
+                    <article><small>Показываются</small><strong id="status-stat-visible">0</strong></article>
+                    <article><small>Скрыты</small><strong id="status-stat-hidden">0</strong></article>
+                    <article><small>Дилеров со статусом</small><strong id="status-stat-dealers">0</strong></article>
+                </div>
+
+                <div class="status-manager-body">
+                    <section class="status-manager-list-panel">
+                        <div class="status-manager-panel-head">
+                            <div>
+                                <strong>Статусы дилеров</strong>
+                                <small>Глазик управляет отображением статуса в рабочем списке.</small>
+                            </div>
+                            <button type="button" id="btn-new-status" class="status-manager-add">
+                                <i class="bi bi-plus-lg"></i><span>Новый статус</span>
+                            </button>
+                        </div>
+                        <div class="status-manager-hint">
+                            <i class="bi bi-info-circle"></i>
+                            <span><b>Скрыть</b> — статус и дилеры с ним останутся в базе, но не будут мешать в основном рабочем списке. Их можно будет найти через соответствующие фильтры.</span>
+                        </div>
+                        <div id="status-manager-list" class="status-manager-list"></div>
+                    </section>
+
+                    <aside class="status-manager-editor" id="status-manager-editor">
+                        <div class="status-editor-head">
+                            <span class="status-editor-icon"><i class="bi bi-tag"></i></span>
+                            <div>
+                                <small id="status-editor-kicker">НОВЫЙ СТАТУС</small>
+                                <strong id="status-editor-title">Добавить статус</strong>
+                            </div>
+                        </div>
+
+                        <form id="status-form">
+                            <input type="hidden" id="st_id">
+
+                            <label class="status-editor-field">
+                                <span>Название статуса</span>
+                                <input type="text" id="st_label" class="form-control" placeholder="Например: Потенциальный" required>
+                                <small>Так статус будет отображаться сотрудникам.</small>
+                            </label>
+
+                            <label class="status-editor-field">
+                                <span>Код</span>
+                                <div class="status-code-input">
+                                    <input type="text" id="st_value" class="form-control" placeholder="potential" required>
+                                    <button type="button" id="status-generate-code" title="Сформировать из названия"><i class="bi bi-magic"></i></button>
+                                </div>
+                                <small>Системный код на латинице. После использования лучше его не менять.</small>
+                            </label>
+
+                            <div class="status-editor-color-row">
+                                <label class="status-editor-field">
+                                    <span>Цвет</span>
+                                    <div class="status-color-control">
+                                        <input type="color" id="st_color" value="#B9040A" title="Выберите цвет">
+                                        <span id="status-color-preview"><i></i><b>Предпросмотр</b></span>
+                                    </div>
+                                </label>
+                            </div>
+
+                            <label class="status-visibility-card" for="st_visible">
+                                <span class="status-visibility-icon"><i class="bi bi-eye"></i></span>
+                                <span class="status-visibility-copy">
+                                    <strong>Показывать в рабочем списке</strong>
+                                    <small>Выключите для потенциальных, архивных и других статусов, которые не должны мешать ежедневной работе.</small>
+                                </span>
+                                <span class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="st_visible" checked>
+                                </span>
+                            </label>
+
+                            <div class="status-editor-actions">
+                                <button type="button" id="btn-cancel-edit-status" class="status-editor-cancel">Очистить</button>
+                                <button type="submit" class="status-editor-save" id="btn-save-status">
+                                    <i class="bi bi-check-lg"></i><span>Добавить статус</span>
+                                </button>
+                            </div>
+                        </form>
+                    </aside>
+                </div>
+            </div>
+        </div>
+    </div>
     
     <div class="modal fade" id="dashboard-settings-modal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered modal-sm">
