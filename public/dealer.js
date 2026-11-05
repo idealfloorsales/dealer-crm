@@ -333,24 +333,24 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const infoEl = document.getElementById('dealer-info-main');
             if(infoEl) {
-                // 1. ОРГАНИЗАЦИИ
+                // 1. ЮРИДИЧЕСКИЕ ЛИЦА — единый источник legal_entities
                 let orgsHtml = '<span class="text-muted">Не указано</span>';
-                if (dealer.organizations && dealer.organizations.length > 0) {
-                    orgsHtml = dealer.organizations.map(o => `<div>${safeText(o)}</div>`).join('');
-                } else if (dealer.organization) {
-                    orgsHtml = safeText(dealer.organization); // Обратная совместимость
+                if (Array.isArray(dealer.legal_entities) && dealer.legal_entities.length > 0) {
+                    orgsHtml = dealer.legal_entities
+                        .map(entity => entity?.organizationName)
+                        .filter(Boolean)
+                        .map(name => `<div>${safeText(name)}</div>`)
+                        .join('');
                 }
 
-                // 2. ДОГОВОР
-                let contractHtml = '<span class="text-muted">Нет данных</span>';
-                if (dealer.contract) {
-                    const isSigned = dealer.contract.isSigned;
-                    const date = dealer.contract.date ? ` <small class="text-muted">(${dealer.contract.date})</small>` : '';
-                    const number = dealer.contract.number ? ` <span class="badge bg-light text-dark border ms-1">${safeText(dealer.contract.number)}</span>` : '';
-                    contractHtml = isSigned 
-                        ? `<span class="text-success fw-bold"><i class="bi bi-file-earmark-check-fill me-1"></i>Подписан</span>${number}${date}` 
-                        : `<span class="text-danger"><i class="bi bi-file-earmark-x me-1"></i>Не подписан</span>${number}${date}`;
-                }
+                // 2. ДОГОВОР — номер всегда равен ID дилера
+                const contractNumber = String(dealer.dealer_id || '').trim();
+                const isSigned = Boolean(dealer.contract?.isSigned);
+                const date = dealer.contract?.date ? ` <small class="text-muted">(${dealer.contract.date})</small>` : '';
+                const number = contractNumber ? ` <span class="badge bg-light text-dark border ms-1">${safeText(contractNumber)}</span>` : '';
+                const contractHtml = isSigned 
+                    ? `<span class="text-success fw-bold"><i class="bi bi-file-earmark-check-fill me-1"></i>Подписан</span>${number}${date}` 
+                    : `<span class="text-danger"><i class="bi bi-file-earmark-x me-1"></i>Не подписан</span>${number}${date}`;
 
                 // 3. СЕКТОР (Только если есть)
                 let sectorRow = '';
@@ -701,9 +701,9 @@ document.addEventListener('DOMContentLoaded', () => {
                                         </div>
                                     </div>
                                     <div class="dealer-profile-edit-section">
-                                        <div class="dealer-profile-edit-section-title"><i class="bi bi-file-earmark-check"></i><div><strong>Договор</strong><small>Номер, дата и статус подписания</small></div></div>
+                                        <div class="dealer-profile-edit-section-title"><i class="bi bi-file-earmark-check"></i><div><strong>Договор</strong><small>№ договора берётся из ID дилера</small></div></div>
                                         <div class="row g-3 align-items-end">
-                                            <div class="col-md-5"><label>Номер договора</label><input id="profile-edit-contract-number" class="form-control"></div>
+                                            <div class="col-md-5"><label>№ договора</label><input class="form-control" value="${safeText(currentDealer?.dealer_id || '')}" disabled><small class="text-muted">Формируется автоматически из ID дилера.</small></div>
                                             <div class="col-md-4"><label>Дата договора</label><input id="profile-edit-contract-date" type="date" class="form-control"></div>
                                             <div class="col-md-3">
                                                 <div class="dealer-profile-edit-switch">
@@ -875,7 +875,6 @@ document.addEventListener('DOMContentLoaded', () => {
             'profile-edit-website': currentDealer.website,
             'profile-edit-instagram': currentDealer.instagram,
             'profile-edit-bonuses': currentDealer.bonuses,
-            'profile-edit-contract-number': currentDealer.contract?.number,
             'profile-edit-contract-date': currentDealer.contract?.date
         };
         Object.entries(values).forEach(([id, value]) => {
@@ -963,12 +962,9 @@ document.addEventListener('DOMContentLoaded', () => {
             contacts: collectProfileContacts(),
             contract: {
                 isSigned: Boolean(document.getElementById('profile-edit-contract-signed')?.checked),
-                date: editValue('profile-edit-contract-date'),
-                number: editValue('profile-edit-contract-number')
+                date: editValue('profile-edit-contract-date')
             },
-            requisites: legal,
-            legal_entities: legalEntities,
-            organizations: legalEntities.map(item => item.organizationName).filter(Boolean)
+            legal_entities: legalEntities
         };
 
         try {
