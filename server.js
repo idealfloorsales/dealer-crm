@@ -853,17 +853,6 @@ const photoSchema = new mongoose.Schema({ description: String, photo_url: String
 const additionalAddressSchema = new mongoose.Schema({ description: String, city: String, address: String }, { _id: false });
 const visitSchema = new mongoose.Schema({ date: String, comment: String, isCompleted: { type: Boolean, default: false } }, { _id: false });
 const posMaterialSchema = new mongoose.Schema({ name: String, quantity: Number }, { _id: false });
-const dealerRequisitesSchema = new mongoose.Schema({
-    organizationName: String,
-    director: String,
-    legalAddress: String,
-    bin: String,
-    iik: String,
-    bank: String,
-    bik: String,
-    kbe: String,
-    email: String
-}, { _id: false });
 const dealerLegalEntitySchema = new mongoose.Schema({
     type: { type: String, default: 'ТОО' },
     organizationName: String,
