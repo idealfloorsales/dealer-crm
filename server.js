@@ -2965,6 +2965,10 @@ app.get('/api/reclamations', requirePermission('can_view_reclamations'), async (
                 description: 1,
                 clientDemand: 1,
                 resolution: 1,
+                invoiceNumber: 1,
+                clientName: 1,
+                defectVolume: 1,
+                compensationAmount: 1,
                 createdAt: 1,
                 updatedAt: 1,
                 photoCount: { $size: { $ifNull: ['$photos', []] } }
