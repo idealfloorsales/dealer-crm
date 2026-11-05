@@ -203,7 +203,185 @@ const authMiddleware = (req, res, next) => {
         }
     });
 };
+const AUDIT_MUTATION_METHODS = new Set(['POST','PUT','PATCH','DELETE']);
+const AUDIT_SECRET_KEY = /(password|token|authorization|secret|jwt|cookie)/i;
+const AUDIT_FILE_KEY = /(photo|photos|image|images|avatar|media|video|file|files|attachment|attachments|base64|documentData)/i;
+
+function auditSanitize(value, key = '', depth = 0) {
+    if (AUDIT_SECRET_KEY.test(key)) return '[скрыто]';
+    if (AUDIT_FILE_KEY.test(key)) {
+        if (Array.isArray(value)) return '[файлов: ' + value.length + ']';
+        return value ? '[файл]' : value;
+    }
+    if (value === null || value === undefined) return value;
+    if (depth > 5) return '[…]';
+    if (value instanceof Date) return value.toISOString();
+    if (Buffer.isBuffer(value)) return '[buffer: ' + value.length + ' bytes]';
+    if (typeof value === 'string') return value.length > 700 ? value.slice(0,700) + '…' : value;
+    if (typeof value !== 'object') return value;
+    if (Array.isArray(value)) {
+        const max = 50;
+        const list = value.slice(0,max).map(item => auditSanitize(item,key,depth+1));
+        if (value.length > max) list.push('[… ещё ' + (value.length-max) + ']');
+        return list;
+    }
+    const out = {};
+    Object.entries(value).forEach(([childKey, childValue]) => {
+        if (childKey === '__v') return;
+        out[childKey] = auditSanitize(childValue, childKey, depth + 1);
+    });
+    return out;
+}
+
+function auditComparable(value) {
+    try { return JSON.stringify(value); } catch (_) { return String(value); }
+}
+
+function auditDiff(before, after, prefix = '', changes = [], depth = 0) {
+    if (changes.length >= 80) return changes;
+    if (depth > 4) {
+        if (auditComparable(before) !== auditComparable(after)) changes.push({ field: prefix || 'данные', before, after });
+        return changes;
+    }
+    const beforeObj = before && typeof before === 'object' && !Array.isArray(before);
+    const afterObj = after && typeof after === 'object' && !Array.isArray(after);
+    if (beforeObj && afterObj) {
+        const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
+        keys.forEach(key => {
+            if (['_id','id','createdAt','updatedAt'].includes(key)) return;
+            auditDiff(before[key], after[key], prefix ? prefix + '.' + key : key, changes, depth + 1);
+        });
+        return changes;
+    }
+    if (auditComparable(before) !== auditComparable(after)) changes.push({ field: prefix || 'данные', before, after });
+    return changes;
+}
+
+function auditRouteMeta(req) {
+    const path = req.path || '';
+    let module = 'system';
+    let entityType = 'record';
+    if (path.startsWith('/api/admin/users')) { module='users'; entityType='user'; }
+    else if (path.startsWith('/api/dealers') && path.includes('/products')) { module='matrix'; entityType='dealer'; }
+    else if (path.startsWith('/api/dealers') && path.includes('/visits')) { module='visits'; entityType='dealer'; }
+    else if (path.startsWith('/api/dealers')) { module='dealers'; entityType='dealer'; }
+    else if (path.startsWith('/api/products') || path.startsWith('/api/admin/import-catalog')) { module='products'; entityType='product'; }
+    else if (path.startsWith('/api/sales')) { module='sales'; entityType='sales'; }
+    else if (path.startsWith('/api/competitors-ref')) { module='competitors'; entityType='competitor'; }
+    else if (path.startsWith('/api/knowledge')) { module='knowledge'; entityType='article'; }
+    else if (path.startsWith('/api/reclamations')) { module='reclamations'; entityType='reclamation'; }
+    else if (path.startsWith('/api/workshop')) { module='workshop'; entityType='workshop'; }
+    else if (path.startsWith('/api/pricing')) { module='pricing'; entityType='pricing'; }
+    else if (path.startsWith('/api/statuses') || path.startsWith('/api/sectors')) { module='settings'; entityType=path.startsWith('/api/statuses')?'status':'sector'; }
+    let action = req.method === 'DELETE' ? 'delete' : ((req.method === 'PUT' || req.method === 'PATCH') ? 'update' : 'create');
+    if (path === '/api/sales' || /\/visits(?:\/|$)/.test(path) || /\/receive$/.test(path) || /\/material-movement$/.test(path) || /\/production$/.test(path) || /\/writeoff$/.test(path) || /\/dealer-movement$/.test(path) || /\/opening-balance$/.test(path) || /\/stocktake$/.test(path) || path === '/api/admin/import-catalog') action='execute';
+    return { module, entityType, action };
+}
+
+function auditModelDescriptor(req, responseBody = null) {
+    const path = req.path || '';
+    let m;
+    if ((m=path.match(/^\/api\/admin\/users\/([^/]+)$/))) return {model:User,id:m[1],entityType:'user'};
+    if ((m=path.match(/^\/api\/statuses\/([^/]+)$/))) return {model:Status,id:m[1],entityType:'status'};
+    if ((m=path.match(/^\/api\/sectors\/([^/]+)$/))) return {model:Sector,id:m[1],entityType:'sector'};
+    if ((m=path.match(/^\/api\/dealers\/([^/]+)/))) return {model:Dealer,id:m[1],entityType:'dealer'};
+    if ((m=path.match(/^\/api\/pricing\/conditions\/([^/]+)$/))) return {model:PricingCondition,id:m[1],entityType:'pricing'};
+    if ((m=path.match(/^\/api\/products\/([^/]+)$/))) return {model:Product,id:m[1],entityType:'product'};
+    if ((m=path.match(/^\/api\/competitors-ref\/([^/]+)$/))) return {model:CompRef,id:m[1],entityType:'competitor'};
+    if ((m=path.match(/^\/api\/knowledge\/([^/]+)$/))) return {model:Knowledge,id:m[1],entityType:'article'};
+    if ((m=path.match(/^\/api\/reclamations\/([^/]+)$/))) return {model:Reclamation,id:m[1],entityType:'reclamation'};
+    if ((m=path.match(/^\/api\/workshop\/materials\/([^/]+)$/))) return {model:WorkshopMaterial,id:m[1],entityType:'workshop_material'};
+    if ((m=path.match(/^\/api\/workshop\/recipes\/([^/]+)$/))) return {model:WorkshopRecipe,id:m[1],entityType:'workshop_recipe'};
+    if ((m=path.match(/^\/api\/workshop\/memos\/([^/]+)(?:\/receive)?$/))) return {model:WorkshopMemo,id:m[1],entityType:'workshop_memo'};
+    if ((m=path.match(/^\/api\/workshop\/productions\/([^/]+)$/))) return {model:WorkshopProduction,id:m[1],entityType:'workshop_production'};
+    const responseId = responseBody && (responseBody.id || responseBody._id);
+    if (!responseId) return null;
+    if (path === '/api/dealers') return {model:Dealer,id:responseId,entityType:'dealer'};
+    if (path === '/api/products') return {model:Product,id:responseId,entityType:'product'};
+    if (path === '/api/competitors-ref') return {model:CompRef,id:responseId,entityType:'competitor'};
+    if (path === '/api/knowledge') return {model:Knowledge,id:responseId,entityType:'article'};
+    if (path === '/api/reclamations') return {model:Reclamation,id:responseId,entityType:'reclamation'};
+    if (path === '/api/pricing/conditions') return {model:PricingCondition,id:responseId,entityType:'pricing'};
+    if (path === '/api/workshop/materials') return {model:WorkshopMaterial,id:responseId,entityType:'workshop_material'};
+    if (path === '/api/workshop/recipes') return {model:WorkshopRecipe,id:responseId,entityType:'workshop_recipe'};
+    if (path === '/api/workshop/memos') return {model:WorkshopMemo,id:responseId,entityType:'workshop_memo'};
+    if (path === '/api/workshop/production') return {model:WorkshopProduction,id:responseId,entityType:'workshop_production'};
+    return null;
+}
+
+async function auditLoadSnapshot(req, responseBody = null) {
+    try {
+        const d = auditModelDescriptor(req,responseBody);
+        if (!d?.model || !d.id) return null;
+        const query = d.model.findById(d.id);
+        if (d.model === User) query.select('-password');
+        const doc = await query.lean();
+        return doc ? auditSanitize(doc) : null;
+    } catch (_) { return null; }
+}
+
+function auditEntityLabel(before, after, requestData) {
+    const src = after || before || requestData || {};
+    return String(src.name || src.dealerName || src.productName || src.title || src.username || src.number || src.sku || src.code || src.dealer_id || '').trim();
+}
+
+function auditSummary(req, route, label) {
+    const path=req.path || '';
+    const suffix=label ? ' «'+label+'»' : '';
+    if (path.includes('/visits')) return (req.method==='POST'?'Добавил визит дилеру':'Изменил визит дилера') + suffix;
+    if (path.includes('/dealers/') && path.endsWith('/products')) return 'Изменил выставленность дилера' + suffix;
+    if (path === '/api/sales') return 'Сохранил продажи' + (req.body?.month ? ' за '+req.body.month : '');
+    if (path.endsWith('/receive')) return 'Принял упаковки в цех' + suffix;
+    if (path.endsWith('/material-movement')) return 'Провёл движение материала в цехе';
+    if (path.endsWith('/production')) return 'Записал производство в цехе';
+    if (path.endsWith('/writeoff')) return 'Провёл списание в цехе';
+    if (path.endsWith('/dealer-movement')) return 'Провёл выдачу / возврат по дилеру';
+    if (path.endsWith('/opening-balance')) return 'Зафиксировал стартовые остатки цеха';
+    if (path.endsWith('/stocktake')) return 'Провёл инвентаризацию цеха';
+    if (path === '/api/admin/import-catalog') return 'Импортировал товарную матрицу';
+    const nouns={users:'сотрудника',dealers:'дилера',products:'товар',competitors:'конкурента',knowledge:'статью',reclamations:'рекламацию',pricing:'ценовое условие',settings:'настройку',workshop:'запись цеха',matrix:'выставленность',sales:'продажи'};
+    const verbs={create:'Добавил',update:'Изменил',delete:'Удалил',execute:'Выполнил действие с'};
+    return (verbs[route.action] || 'Изменил') + ' ' + (nouns[route.module] || 'запись') + suffix;
+}
+
+function auditCompactRequest(req) {
+    const body=req.body || {};
+    if (req.path === '/api/sales') return auditSanitize({month:body.month,rows:Array.isArray(body.data)?body.data.length:0,data:Array.isArray(body.data)?body.data.slice(0,25):[]});
+    return auditSanitize(body);
+}
+
+async function auditMutationMiddleware(req,res,next) {
+    if (!req.path.startsWith('/api') || !AUDIT_MUTATION_METHODS.has(req.method)) return next();
+    if (req.path === '/api/auth/login' || req.path.startsWith('/api/audit')) return next();
+    const requestData=auditCompactRequest(req);
+    const before=await auditLoadSnapshot(req);
+    let responseBody=null;
+    const originalJson=res.json.bind(res);
+    res.json=(body)=>{responseBody=body;return originalJson(body);};
+    res.on('finish',()=>{
+        setImmediate(async()=>{
+            try {
+                const route=auditRouteMeta(req);
+                const success=res.statusCode>=200 && res.statusCode<400;
+                const after=success && req.method!=='DELETE' ? await auditLoadSnapshot(req,responseBody) : null;
+                const label=auditEntityLabel(before,after,requestData);
+                const descriptor=auditModelDescriptor(req,responseBody);
+                await AuditLog.create({
+                    actor:{id:String(req.user?.id||''),username:String(req.user?.username||''),name:String(req.user?.fullName||req.user?.username||'Пользователь'),role:String(req.user?.role||'')},
+                    module:route.module,action:route.action,method:req.method,path:req.originalUrl||req.path,
+                    entityType:descriptor?.entityType||route.entityType,entityId:String(descriptor?.id||responseBody?.id||responseBody?._id||req.params?.id||''),entityLabel:label,
+                    summary:auditSummary(req,route,label),success,statusCode:res.statusCode,requestData,before,after,
+                    changes:before&&after?auditDiff(before,after):[],
+                    meta:{ip:String(req.headers['x-forwarded-for']||req.ip||'').split(',')[0].trim(),userAgent:auditSanitize(String(req.headers['user-agent']||''),'userAgent')}
+                });
+            } catch(error) { console.error('Audit log write failed:',error.message); }
+        });
+    });
+    next();
+}
+
 app.use(authMiddleware);
+app.use(auditMutationMiddleware);
 
 // --- API ВХОДА ---
 app.post('/api/auth/login', async (req, res) => {
