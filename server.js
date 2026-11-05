@@ -297,6 +297,8 @@ function auditModelDescriptor(req, responseBody = null) {
     const responseId = responseBody && (responseBody.id || responseBody._id);
     if (!responseId) return null;
     if (path === '/api/dealers') return {model:Dealer,id:responseId,entityType:'dealer'};
+    if (path === '/api/statuses') return {model:Status,id:responseId,entityType:'status'};
+    if (path === '/api/sectors') return {model:Sector,id:responseId,entityType:'sector'};
     if (path === '/api/products') return {model:Product,id:responseId,entityType:'product'};
     if (path === '/api/competitors-ref') return {model:CompRef,id:responseId,entityType:'competitor'};
     if (path === '/api/knowledge') return {model:Knowledge,id:responseId,entityType:'article'};
@@ -312,11 +314,17 @@ function auditModelDescriptor(req, responseBody = null) {
 async function auditLoadSnapshot(req, responseBody = null) {
     try {
         const d = auditModelDescriptor(req,responseBody);
-        if (!d?.model || !d.id) return null;
-        const query = d.model.findById(d.id);
-        if (d.model === User) query.select('-password');
-        const doc = await query.lean();
-        return doc ? auditSanitize(doc) : null;
+        if (d?.model && d.id) {
+            const query = d.model.findById(d.id);
+            if (d.model === User) query.select('-password');
+            const doc = await query.lean();
+            return doc ? auditSanitize(doc) : null;
+        }
+        if (req.path === '/api/admin/users' && req.method === 'POST' && req.body?.username) {
+            const doc = await User.findOne({ username: String(req.body.username).trim().toLowerCase() }).select('-password').lean();
+            return doc ? auditSanitize(doc) : null;
+        }
+        return null;
     } catch (_) { return null; }
 }
 
