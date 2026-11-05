@@ -1672,7 +1672,28 @@ app.get('/api/sales', requirePermission('can_view_sales'), async (req, res) => {
         }
 
         const s = await Sales.find(filter).lean();
-        res.json(s);
+
+        // Нерабочие дилеры (potential/archive) не участвуют в текущей
+        // операционной статистике продаж. Сами исторические строки Sales
+        // остаются в базе и могут снова участвовать после возврата дилера
+        // в рабочий статус.
+        const workingBaseFilter = (companySalesView || isGlobalViewer(req)) ? {} : getDealerFilter(req);
+        const workingDealers = await Dealer.find(getWorkingDealerFilter(workingBaseFilter)).select('_id').lean();
+        const workingDealerIds = new Set(workingDealers.map(item => String(item._id)));
+
+        const visibleSales = s.filter(row => {
+            if (row.isCustom) return true;
+            const rowDealerId = String(row.dealerId || '');
+            if (!rowDealerId) return true;
+
+            if (rowDealerId.startsWith('PLAN_vip_')) {
+                return workingDealerIds.has(rowDealerId.replace('PLAN_vip_', ''));
+            }
+            if (rowDealerId.startsWith('PLAN_')) return true;
+            return workingDealerIds.has(rowDealerId);
+        });
+
+        res.json(visibleSales);
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
