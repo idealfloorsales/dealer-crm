@@ -1813,21 +1813,49 @@ async function findPricingDuplicate(payload, excludeId = '') {
     }) || null;
 }
 
-async function validatePricingDealerTargets(req, payload) {
-    if (payload.scopeType !== 'dealer') return '';
-    const ids = Array.isArray(payload.dealers) ? payload.dealers.filter(Boolean) : [];
-    if (!ids.length) return 'Выберите хотя бы одного дилера';
+async function validatePricingTargets(req, payload) {
+    if (payload.scopeType === 'all') return '';
 
-    const available = await Dealer.find({
-        $and: [
-            { _id: { $in: ids } },
-            getWorkingDealerFilter(getDealerFilter(req))
-        ]
-    }).select('_id').lean();
+    const dealerFilter = getWorkingDealerFilter(getDealerFilter(req));
 
-    const availableIds = new Set(available.map(item => String(item._id)));
-    const missing = ids.filter(id => !availableIds.has(String(id)));
-    return missing.length ? 'Один или несколько выбранных дилеров недоступны' : '';
+    if (payload.scopeType === 'dealer') {
+        const ids = Array.isArray(payload.dealers) ? payload.dealers.filter(Boolean) : [];
+        if (!ids.length) return 'Выберите хотя бы одного дилера';
+
+        const available = await Dealer.find({
+            $and: [
+                { _id: { $in: ids } },
+                dealerFilter
+            ]
+        }).select('_id').lean();
+
+        const availableIds = new Set(available.map(item => String(item._id)));
+        const missing = ids.filter(id => !availableIds.has(String(id)));
+        return missing.length ? 'Один или несколько выбранных дилеров недоступны' : '';
+    }
+
+    if (payload.scopeType === 'city' || payload.scopeType === 'sector') {
+        const values = Array.isArray(payload.scopeValues) ? payload.scopeValues.filter(Boolean) : [];
+        if (!values.length) return payload.scopeType === 'city'
+            ? 'Выберите хотя бы один город'
+            : 'Выберите хотя бы один сектор';
+
+        const field = payload.scopeType === 'city' ? 'city' : 'region_sector';
+        const dealers = await Dealer.find(dealerFilter).select(field).lean();
+        const available = new Set(
+            dealers
+                .map(item => normalizePricingText(item[field]))
+                .filter(Boolean)
+        );
+        const missing = values.filter(value => !available.has(normalizePricingText(value)));
+        return missing.length
+            ? (payload.scopeType === 'city'
+                ? 'Один или несколько выбранных городов отсутствуют в рабочей базе'
+                : 'Один или несколько выбранных секторов отсутствуют в рабочей базе')
+            : '';
+    }
+
+    return '';
 }
 
 async function cleanupAmbiguousLegacyOwnership() {
@@ -2618,8 +2646,8 @@ app.post('/api/pricing/conditions', requirePermission('can_manage_pricing'), asy
         if (!isGlobalViewer(req) && payload.scopeType !== 'dealer') {
             return res.status(403).json({ error: 'Региональные и общие ценовые условия может создавать только пользователь с доступом ко всей компании' });
         }
-        if (payload.scopeType === 'dealer') {
-            const targetError = await validatePricingDealerTargets(req, payload);
+        if (payload.scopeType !== 'all') {
+            const targetError = await validatePricingTargets(req, payload);
             if (targetError) return res.status(404).json({ error: targetError });
         }
 
@@ -2656,8 +2684,8 @@ app.put('/api/pricing/conditions/:id', requirePermission('can_manage_pricing'), 
         if (!isGlobalViewer(req) && payload.scopeType !== 'dealer') {
             return res.status(403).json({ error: 'Региональные и общие ценовые условия может менять только пользователь с доступом ко всей компании' });
         }
-        if (payload.scopeType === 'dealer') {
-            const targetError = await validatePricingDealerTargets(req, payload);
+        if (payload.scopeType !== 'all') {
+            const targetError = await validatePricingTargets(req, payload);
             if (targetError) return res.status(404).json({ error: targetError });
         }
 
