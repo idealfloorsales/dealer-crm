@@ -1736,11 +1736,20 @@ function pricingConditionStatus(condition, today = pricingTodayKey()) {
 
     if (linkedPriceList?.active === false) return 'expired';
 
-    const startDate = String(condition?.startDate || linkedPriceList?.validFrom || '').trim();
-    const endDate = String(condition?.endDate || linkedPriceList?.validTo || '').trim();
+    const startDates = [condition?.startDate, linkedPriceList?.validFrom]
+        .map(value => String(value || '').trim())
+        .filter(Boolean)
+        .sort();
+    const endDates = [condition?.endDate, linkedPriceList?.validTo]
+        .map(value => String(value || '').trim())
+        .filter(Boolean)
+        .sort();
 
-    if (startDate && startDate > today) return 'planned';
-    if (endDate && endDate < today) return 'expired';
+    const effectiveStartDate = startDates.length ? startDates[startDates.length - 1] : '';
+    const effectiveEndDate = endDates.length ? endDates[0] : '';
+
+    if (effectiveStartDate && effectiveStartDate > today) return 'planned';
+    if (effectiveEndDate && effectiveEndDate < today) return 'expired';
     return 'active';
 }
 

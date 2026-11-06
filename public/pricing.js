@@ -190,7 +190,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function priceListOptionsHtml(selectedId = '', includeEmpty = true) {
         const selected = String(selectedId || '');
-        const lists = state.priceLists.filter(item => item.active !== false || String(item.id) === selected);
+        const lists = state.priceLists.filter(item =>
+            String(item.id) === selected ||
+            (item.active !== false && (!item.validTo || !state.today || item.validTo >= state.today))
+        );
         const empty = includeEmpty ? '<option value="">Выберите прайс</option>' : '';
         return empty + lists.map(item => {
             const dateState = priceListDateState(item);
