@@ -2,6 +2,8 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const compression = require('compression');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const fs = require('fs'); 
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -12,9 +14,38 @@ const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(64).toString('hex');
 if (!process.env.JWT_SECRET) console.warn('JWT_SECRET is not configured: sessions will reset after server restart.'); 
 
-app.use(express.json({ limit: '50mb' })); 
-app.use(cors());
+const APP_ORIGIN = String(process.env.APP_ORIGIN || 'https://dealer-crm.onrender.com').replace(/\/+$/, '');
+const ALLOWED_ORIGINS = new Set([
+    APP_ORIGIN,
+    process.env.RENDER_EXTERNAL_URL,
+    process.env.NODE_ENV !== 'production' ? 'http://localhost:3000' : ''
+].filter(Boolean).map(value => String(value).replace(/\/+$/, '')));
+
+app.use(helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false
+}));
+app.use(express.json({ limit: '50mb' }));
+app.use(cors({
+    origin(origin, callback) {
+        if (!origin || ALLOWED_ORIGINS.has(String(origin).replace(/\/+$/, ''))) return callback(null, true);
+        return callback(null, false);
+    },
+    methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+    allowedHeaders: ['Content-Type','Authorization'],
+    maxAge: 86400
+}));
 app.use(compression());
+
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 20,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    skipSuccessfulRequests: true,
+    message: { error: 'Слишком много неудачных попыток входа. Попробуйте позже.' }
+});
+app.use('/api/auth/login', loginLimiter);
 
 // --- АВТО-ВЕРСИЯ КЭША ---
 const APP_VERSION = Date.now(); 
