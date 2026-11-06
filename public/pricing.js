@@ -191,7 +191,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const selected = String(selectedId || '');
         const lists = state.priceLists.filter(item => item.active !== false || String(item.id) === selected);
         const empty = includeEmpty ? '<option value="">Выберите прайс</option>' : '';
-        return empty + lists.map(item => `<option value="${esc(item.id)}" ${String(item.id) === selected ? 'selected' : ''}>${esc(item.name)}${item.versionDate ? ' · '+dateText(item.versionDate) : ''}${item.active === false ? ' · архив' : ''}</option>`).join('');
+        return empty + lists.map(item => {
+            const dateState = priceListDateState(item);
+            return `<option value="${esc(item.id)}" ${String(item.id) === selected ? 'selected' : ''}>${esc(item.name)}${item.versionDate ? ' · '+dateText(item.versionDate) : ''}${dateState.key !== 'active' ? ' · '+dateState.label.toLowerCase() : ''}</option>`;
+        }).join('');
     }
 
     function fillPriceListOptions() {
@@ -490,10 +493,25 @@ document.addEventListener('DOMContentLoaded', () => {
         if (filter === 'active' && item.active === false) return false;
         if (filter === 'archive' && item.active !== false) return false;
         if (term) {
-            const hay = [item.name,item.code,item.versionDate,item.note].join(' ').toLowerCase();
+            const hay = [item.name,item.code,item.versionDate,item.validFrom,item.validTo,item.note].join(' ').toLowerCase();
             if (!hay.includes(term)) return false;
         }
         return true;
+    }
+
+    function priceListDateState(item) {
+        const today = state.today || todayValue();
+        if (item.active === false) return { key:'archive', label:'Архив' };
+        if (item.validFrom && item.validFrom > today) return { key:'planned', label:'Запланирован' };
+        if (item.validTo && item.validTo < today) return { key:'expired', label:'Истёк' };
+        return { key:'active', label:'Действует' };
+    }
+
+    function priceListPeriodText(item) {
+        if (!item.validFrom && !item.validTo) return 'Без ограничения по сроку';
+        const from = item.validFrom ? dateText(item.validFrom) : 'без даты начала';
+        const to = item.validTo ? dateText(item.validTo) : 'без даты окончания';
+        return from + ' — ' + to;
     }
 
     function renderPriceLists() {
@@ -505,15 +523,17 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        host.innerHTML = lists.map(item => `
-            <article class="pricing-price-list-card ${item.active === false ? 'is-archive' : ''}">
+        host.innerHTML = lists.map(item => {
+            const dateState = priceListDateState(item);
+            return `
+            <article class="pricing-price-list-card ${dateState.key === 'archive' ? 'is-archive' : ''}">
                 <div class="pricing-price-list-card-top">
                     <div>
                         <span>${esc(item.code || 'ПРАЙС')}</span>
                         <strong>${esc(item.name)}</strong>
-                        <small>${item.versionDate ? 'Версия '+dateText(item.versionDate) : 'Версия без даты'}</small>
+                        <small>${item.versionDate ? 'Версия '+dateText(item.versionDate) : 'Версия без даты'} · ${esc(priceListPeriodText(item))}</small>
                     </div>
-                    <span class="pricing-list-state ${item.active === false ? 'is-archive' : 'is-active'}">${item.active === false ? 'Архив' : 'Действует'}</span>
+                    <span class="pricing-list-state is-${dateState.key}">${dateState.label}</span>
                 </div>
                 <div class="pricing-price-list-stats">
                     <div><small>Позиций</small><strong>${fmt(item.rowsCount)}</strong></div>
@@ -526,7 +546,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     <button type="button" class="pricing-list-action" data-edit-price-list="${esc(item.id)}"><i class="bi bi-pencil"></i> Открыть</button>
                     ${manage && item.active !== false ? `<button type="button" class="pricing-list-action is-danger" data-archive-price-list="${esc(item.id)}"><i class="bi bi-archive"></i></button>` : ''}
                 </div>
-            </article>`).join('');
+            </article>`;
+        }).join('');
 
         host.querySelectorAll('[data-edit-price-list]').forEach(button => button.addEventListener('click', () => openPriceListEditor(button.dataset.editPriceList)));
         host.querySelectorAll('[data-assign-price-list]').forEach(button => button.addEventListener('click', () => assignPriceList(button.dataset.assignPriceList)));
@@ -610,6 +631,8 @@ document.addEventListener('DOMContentLoaded', () => {
         $('pricing-list-name').value = '';
         $('pricing-list-code').value = '';
         $('pricing-list-version').value = state.today || todayValue();
+        $('pricing-list-valid-from').value = state.today || todayValue();
+        $('pricing-list-valid-to').value = '';
         $('pricing-list-active').value = 'true';
         $('pricing-list-note').value = '';
         renderPriceListEditorRows([]);
@@ -622,6 +645,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 $('pricing-list-name').value = data.name || '';
                 $('pricing-list-code').value = data.code || '';
                 $('pricing-list-version').value = data.versionDate || '';
+                $('pricing-list-valid-from').value = data.validFrom || '';
+                $('pricing-list-valid-to').value = data.validTo || '';
                 $('pricing-list-active').value = data.active === false ? 'false' : 'true';
                 $('pricing-list-note').value = data.note || '';
                 renderPriceListEditorRows(data.rows || []);
@@ -653,11 +678,16 @@ document.addEventListener('DOMContentLoaded', () => {
             name:$('pricing-list-name').value.trim(),
             code:$('pricing-list-code').value.trim(),
             versionDate:$('pricing-list-version').value,
+            validFrom:$('pricing-list-valid-from').value,
+            validTo:$('pricing-list-valid-to').value,
             active:$('pricing-list-active').value === 'true',
             note:$('pricing-list-note').value.trim(),
             rows:collectPriceListRows()
         };
         if (!payload.name) return toast('Укажите название прайса','error');
+        if (payload.validFrom && payload.validTo && payload.validTo < payload.validFrom) {
+            return toast('Дата окончания прайса не может быть раньше даты начала','error');
+        }
         const button = $('pricing-list-save-btn');
         try {
             button.disabled = true;

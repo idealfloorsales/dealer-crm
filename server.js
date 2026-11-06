@@ -1027,6 +1027,8 @@ const priceListSchema = new mongoose.Schema({
     name: { type: String, required: true, trim: true },
     code: { type: String, trim: true },
     versionDate: { type: String, default: '' },
+    validFrom: { type: String, default: '' },
+    validTo: { type: String, default: '' },
     active: { type: Boolean, default: true },
     archivedAt: Date,
     note: String,
@@ -1586,6 +1588,8 @@ function convertToClient(doc) {
             name: priceList.name || '',
             code: priceList.code || '',
             versionDate: priceList.versionDate || '',
+            validFrom: priceList.validFrom || '',
+            validTo: priceList.validTo || '',
             active: priceList.active !== false
         };
     } else if (obj.price_list) {
@@ -1696,6 +1700,15 @@ async function getPricingWorkingDealerFilter(baseFilter = {}) {
     return { $and: [baseFilter, working] };
 }
 
+function priceListIsEffective(priceList, today = pricingTodayKey()) {
+    if (!priceList || priceList.active === false) return false;
+    const from = String(priceList.validFrom || '').trim();
+    const to = String(priceList.validTo || '').trim();
+    if (from && from > today) return false;
+    if (to && to < today) return false;
+    return true;
+}
+
 function pricingTodayKey() {
     const parts = new Intl.DateTimeFormat('en-CA', {
         timeZone: 'Asia/Almaty',
@@ -1761,7 +1774,9 @@ function buildDealerPricingSummary(dealer, allConditions, today = pricingTodayKe
     const active = matched.filter(condition => condition.computedStatus === 'active');
 
     const priceLists = active
-        .filter(condition => condition.kind === 'price_list')
+        .filter(condition => condition.kind === 'price_list' && (
+            !condition.priceList || typeof condition.priceList !== 'object' || priceListIsEffective(condition.priceList, today)
+        ))
         .sort((a, b) =>
             (Number(b.priority) || 0) - (Number(a.priority) || 0) ||
             pricingScopeSpecificity(b) - pricingScopeSpecificity(a) ||
@@ -1773,7 +1788,9 @@ function buildDealerPricingSummary(dealer, allConditions, today = pricingTodayKe
         ? dealer.price_list
         : null;
     const dealerPriceListId = String(dealerPriceList?._id || dealerPriceList?.id || dealer?.price_list || '');
-    const dealerPriceListName = dealerPriceList?.name || '';
+    const dealerPriceListEffective = dealerPriceList ? priceListIsEffective(dealerPriceList, today) : Boolean(dealer?.price_list);
+    const dealerPriceListName = dealerPriceListEffective ? (dealerPriceList?.name || '') : '';
+    const effectiveDealerPriceListId = dealerPriceListEffective ? dealerPriceListId : '';
     const activeDiscounts = active.filter(condition => condition.kind === 'discount');
 
     const exclusive = activeDiscounts
@@ -1814,7 +1831,7 @@ function buildDealerPricingSummary(dealer, allConditions, today = pricingTodayKe
         assignedPriceList: dealerPriceListName || '',
         assignedPriceListId: dealerPriceListId,
         effectivePriceList: selectedPriceList?.priceList?.name || selectedPriceList?.priceListName || selectedPriceList?.name || dealerPriceListName || dealer.price_type || 'Спец.цена',
-        effectivePriceListId: String(selectedPriceList?.priceList?._id || selectedPriceList?.priceList || dealerPriceListId || ''),
+        effectivePriceListId: String(selectedPriceList?.priceList?._id || selectedPriceList?.priceList || effectiveDealerPriceListId || ''),
         priceListCondition: selectedPriceList,
         priceListConflicts: Math.max(0, priceLists.length - 1),
         activeDiscounts: appliedDiscounts,
@@ -2100,7 +2117,7 @@ app.get('/api/dealers', requireAnyPermission('can_view_dealers', 'can_view_map',
             query = query.select('_id name city address contacts latitude longitude status responsible responsibleUserId');
         } else {
             query = query.select('-photos -visits -products -avatarUrl')
-                .populate('price_list', 'name code versionDate active');
+                .populate('price_list', 'name code versionDate validFrom validTo active');
         }
         const dealers = await query.lean();
         res.json(dealers.map(d => ({ id: d._id, ...d })));
@@ -2124,7 +2141,7 @@ app.get('/api/dealers/:id/avatar', requirePermission('can_view_dealers'), async 
 app.get('/api/dealers/:id', requirePermission('can_view_dealers'), async (req, res) => {
     try {
         let query = Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) })
-            .populate('price_list', 'name code versionDate active');
+            .populate('price_list', 'name code versionDate validFrom validTo active');
         if (req.query.view === 'profile') {
             query = query.select('-photos').populate('products', 'sku name');
         } else {
@@ -2336,11 +2353,12 @@ async function resolveSummaryPriceList(summary) {
     const byId = summary?.effectivePriceListId;
     if (byId && mongoose.Types.ObjectId.isValid(byId)) {
         const found = await PriceList.findById(byId).lean();
-        if (found) return found;
+        if (found && priceListIsEffective(found)) return found;
     }
     const name = String(summary?.effectivePriceList || '').trim();
     if (!name) return null;
-    return PriceList.findOne({ name, active: { $ne: false } }).sort({ versionDate: -1, updatedAt: -1 }).lean();
+    const candidates = await PriceList.find({ name, active: { $ne: false } }).sort({ versionDate: -1, updatedAt: -1 }).lean();
+    return candidates.find(item => priceListIsEffective(item)) || null;
 }
 
 app.get('/api/pricing/catalog', requirePermission('can_view_pricing'), async (req, res) => {
@@ -2372,7 +2390,7 @@ app.get('/api/pricing/catalog', requirePermission('can_view_pricing'), async (re
 app.get('/api/pricing/price-lists', requireAnyPermission('can_view_pricing', 'can_view_dealers'), async (req, res) => {
     try {
         const lists = await PriceList.find({})
-            .select('_id name code versionDate active archivedAt note rows createdAt updatedAt')
+            .select('_id name code versionDate validFrom validTo active archivedAt note rows createdAt updatedAt')
             .sort({ active: -1, versionDate: -1, updatedAt: -1 })
             .lean();
         res.json(lists.map(item => ({
@@ -2380,6 +2398,8 @@ app.get('/api/pricing/price-lists', requireAnyPermission('can_view_pricing', 'ca
             name: item.name || '',
             code: item.code || '',
             versionDate: item.versionDate || '',
+            validFrom: item.validFrom || '',
+            validTo: item.validTo || '',
             active: item.active !== false,
             archivedAt: item.archivedAt || null,
             note: item.note || '',
@@ -2402,6 +2422,8 @@ app.get('/api/pricing/price-lists/:id', requirePermission('can_view_pricing'), a
             name: list.name || '',
             code: list.code || '',
             versionDate: list.versionDate || '',
+            validFrom: list.validFrom || '',
+            validTo: list.validTo || '',
             active: list.active !== false,
             note: list.note || '',
             rows: (list.rows || []).map(row => ({
@@ -2426,11 +2448,19 @@ app.post('/api/pricing/price-lists', requirePermission('can_manage_pricing'), as
     try {
         const name = String(req.body?.name || '').trim();
         if (!name) return res.status(400).json({ error: 'Укажите название прайса' });
+        const validFrom = String(req.body?.validFrom || '').trim();
+        const validTo = String(req.body?.validTo || '').trim();
+        const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+        if (validFrom && !dateRe.test(validFrom)) return res.status(400).json({ error:'Некорректная дата начала прайса' });
+        if (validTo && !dateRe.test(validTo)) return res.status(400).json({ error:'Некорректная дата окончания прайса' });
+        if (validFrom && validTo && validTo < validFrom) return res.status(400).json({ error:'Дата окончания прайса не может быть раньше даты начала' });
         const user = pricingUserMeta(req);
         const list = await PriceList.create({
             name,
             code: String(req.body?.code || '').trim(),
             versionDate: String(req.body?.versionDate || '').trim(),
+            validFrom,
+            validTo,
             active: req.body?.active !== false,
             note: String(req.body?.note || '').trim(),
             rows: cleanPriceListRows(req.body?.rows),
@@ -2449,9 +2479,17 @@ app.put('/api/pricing/price-lists/:id', requirePermission('can_manage_pricing'),
         if (!list) return res.status(404).json({ error: 'Прайс не найден' });
         const name = String(req.body?.name || '').trim();
         if (!name) return res.status(400).json({ error: 'Укажите название прайса' });
+        const validFrom = String(req.body?.validFrom || '').trim();
+        const validTo = String(req.body?.validTo || '').trim();
+        const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+        if (validFrom && !dateRe.test(validFrom)) return res.status(400).json({ error:'Некорректная дата начала прайса' });
+        if (validTo && !dateRe.test(validTo)) return res.status(400).json({ error:'Некорректная дата окончания прайса' });
+        if (validFrom && validTo && validTo < validFrom) return res.status(400).json({ error:'Дата окончания прайса не может быть раньше даты начала' });
         list.name = name;
         list.code = String(req.body?.code || '').trim();
         list.versionDate = String(req.body?.versionDate || '').trim();
+        list.validFrom = validFrom;
+        list.validTo = validTo;
         list.active = req.body?.active !== false;
         list.archivedAt = list.active ? null : (list.archivedAt || new Date());
         list.note = String(req.body?.note || '').trim();
@@ -2486,14 +2524,14 @@ app.get('/api/pricing/dealers/:id/price-sheet', requirePermission('can_view_pric
                 await getPricingWorkingDealerFilter(getDealerFilter(req))
             ]
         }).select('_id dealer_id name city region_sector price_type price_list responsible contacts')
-            .populate('price_list', 'name code versionDate active')
+            .populate('price_list', 'name code versionDate validFrom validTo active')
             .lean();
         if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
 
         const conditions = await PricingCondition.find({})
             .populate('dealer', '_id dealer_id name city region_sector price_type responsible')
             .populate('dealers', '_id dealer_id name city region_sector price_type responsible')
-            .populate('priceList', '_id name code versionDate active')
+            .populate('priceList', '_id name code versionDate validFrom validTo active')
             .sort({ createdAt: -1 })
             .lean();
 
@@ -2615,6 +2653,8 @@ app.get('/api/pricing/dealers/:id/price-sheet', requirePermission('can_view_pric
                 name: list.name || '',
                 code: list.code || '',
                 versionDate: list.versionDate || '',
+                validFrom: list.validFrom || '',
+                validTo: list.validTo || '',
                 active: list.active !== false
             } : null,
             priceType,
@@ -2682,13 +2722,13 @@ app.get('/api/pricing/overview', requirePermission('can_view_pricing'), async (r
     try {
         const dealers = await Dealer.find(await getPricingWorkingDealerFilter(getDealerFilter(req)))
             .select('_id dealer_id name city region_sector price_type price_list responsible')
-            .populate('price_list', 'name code versionDate active')
+            .populate('price_list', 'name code versionDate validFrom validTo active')
             .sort({ name: 1 })
             .lean();
         const conditions = await PricingCondition.find({})
             .populate('dealer', '_id dealer_id name city region_sector price_type responsible')
             .populate('dealers', '_id dealer_id name city region_sector price_type responsible')
-            .populate('priceList', '_id name code versionDate active')
+            .populate('priceList', '_id name code versionDate validFrom validTo active')
             .sort({ createdAt: -1 })
             .lean();
 
@@ -2748,14 +2788,14 @@ app.get('/api/pricing/dealers/:id', requirePermission('can_view_pricing'), async
                 await getPricingWorkingDealerFilter(getDealerFilter(req))
             ]
         }).select('_id dealer_id name city region_sector price_type price_list responsible')
-            .populate('price_list', 'name code versionDate active')
+            .populate('price_list', 'name code versionDate validFrom validTo active')
             .lean();
         if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
 
         const conditions = await PricingCondition.find({})
             .populate('dealer', '_id dealer_id name city region_sector price_type responsible')
             .populate('dealers', '_id dealer_id name city region_sector price_type responsible')
-            .populate('priceList', '_id name code versionDate active')
+            .populate('priceList', '_id name code versionDate validFrom validTo active')
             .sort({ createdAt: -1 })
             .lean();
         res.json(buildDealerPricingSummary(dealer, conditions));
@@ -2947,7 +2987,7 @@ app.post('/api/pricing/conditions', requirePermission('can_manage_pricing'), asy
         });
         const populated = await PricingCondition.findById(condition._id).populate('dealer', '_id dealer_id name city region_sector price_type responsible')
             .populate('dealers', '_id dealer_id name city region_sector price_type responsible')
-            .populate('priceList', '_id name code versionDate active').lean();
+            .populate('priceList', '_id name code versionDate validFrom validTo active').lean();
         res.status(201).json({ ...populated, computedStatus: pricingConditionStatus(populated) });
     } catch (e) {
         res.status(400).json({ error: e.message });
@@ -2983,7 +3023,7 @@ app.put('/api/pricing/conditions/:id', requirePermission('can_manage_pricing'), 
 
         const populated = await PricingCondition.findById(existing._id).populate('dealer', '_id dealer_id name city region_sector price_type responsible')
             .populate('dealers', '_id dealer_id name city region_sector price_type responsible')
-            .populate('priceList', '_id name code versionDate active').lean();
+            .populate('priceList', '_id name code versionDate validFrom validTo active').lean();
         res.json({ ...populated, computedStatus: pricingConditionStatus(populated) });
     } catch (e) {
         res.status(400).json({ error: e.message });
