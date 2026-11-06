@@ -598,10 +598,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const has10 = discounts.some(item => Math.abs((Number(item.discountPercent) || 0) - 10) < 0.001);
 
             const rowHtml = row => {
-                const wholesale = Number(row.basePrice) || Number(row.opt) || 0;
+                const wholesale = Number(row.basePrice ?? row.opt) || 0;
                 const price5 = has5 ? priceAfterDiscount(wholesale, 5) : 0;
                 const price10 = has10 ? priceAfterDiscount(wholesale, 10) : 0;
-                const finalWholesale = totalDiscount > 0 ? priceAfterDiscount(wholesale, totalDiscount) : wholesale;
+                const finalWholesale = Number.isFinite(Number(row.finalPrice)) ? Number(row.finalPrice) : (totalDiscount > 0 ? priceAfterDiscount(wholesale, totalDiscount) : wholesale);
 
                 return `
                     <div class="dealer-price-detail-row">
@@ -610,12 +610,12 @@ document.addEventListener('DOMContentLoaded', () => {
                             <small>${safeText((row.members || 0) + ' поз. в коллекции')}</small>
                         </div>
                         <div class="dealer-price-detail-values dealer-price-detail-values-expanded">
-                            <span><small>Оптовая цена</small><strong>${formatDealerPrice(wholesale)}</strong></span>
+                            <span class="is-final"><small>Действующая оптовая цена</small><strong>${formatDealerPrice(finalWholesale)}</strong></span>
                             <span><small>Рекомендуемая розница</small><strong>${formatDealerPrice(row.rrp)}</strong></span>
                             <span class="is-display"><small>Цена на витрине</small><strong>${formatDealerPrice(row.displayPrice)}</strong></span>
                             ${has5 ? `<span class="is-action"><small>Опт −5%</small><strong>${formatDealerPrice(price5)}</strong></span>` : ''}
                             ${has10 ? `<span class="is-action"><small>Опт −10%</small><strong>${formatDealerPrice(price10)}</strong></span>` : ''}
-                            ${totalDiscount > 0 ? `<span class="is-final"><small>Итоговая оптовая</small><strong>${formatDealerPrice(finalWholesale)}</strong><em>−${totalDiscount.toLocaleString('ru-RU',{maximumFractionDigits:2})}%</em></span>` : ''}
+                            ${totalDiscount > 0 ? `<span><small>Оптовая до скидки</small><strong>${formatDealerPrice(wholesale)}</strong><em>−${totalDiscount.toLocaleString('ru-RU',{maximumFractionDigits:2})}%</em></span>` : ''}
                         </div>
                     </div>`;
             };
