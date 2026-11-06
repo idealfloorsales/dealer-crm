@@ -652,7 +652,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="dealer-price-overview">
                     <div class="dealer-price-metric">
                         <small>Базовый прайс</small>
-                        <strong>${safeText(pricing.effectivePriceList || pricing.defaultPriceType || 'Оптовая цена')}</strong>
+                        <strong>${safeText(pricing.effectivePriceList || pricing.defaultPriceType || 'Спец.цена')}</strong>
                         <span>${pricing.priceListCondition ? 'специальный / региональный' : 'из карточки дилера'}</span>
                     </div>
                     <div class="dealer-price-metric is-accent">
