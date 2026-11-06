@@ -589,8 +589,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         <small>${safeText(isIlliquid ? (row.collection || '') : ((row.members || 0) + ' поз. в коллекции'))}</small>
                     </div>
                     <div class="dealer-price-detail-values">
-                        <span><small>База</small><strong>${formatDealerPrice(row.basePrice)}</strong></span>
-                        <span><small>Итог</small><strong>${formatDealerPrice(row.finalPrice)}</strong></span>
+                        <span><small>Спец.цена</small><strong>${formatDealerPrice(row.finalPrice)}</strong></span>
+                        <span><small>Рекомендуемая розница</small><strong>${formatDealerPrice(row.rrp)}</strong></span>
+                        <span><small>Цена на витрине</small><strong>${formatDealerPrice(row.displayPrice)}</strong></span>
                     </div>
                 </div>`;
 
@@ -600,7 +601,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <strong>${safeText(sheet.priceList?.name || 'Прайс')}</strong>
                         <small>${sheet.priceList?.versionDate ? 'Версия от '+new Date(sheet.priceList.versionDate+'T00:00:00').toLocaleDateString('ru-RU') : 'Без даты версии'}</small>
                     </div>
-                    <span>${safeText(sheet.priceType?.label || sheet.dealer?.priceType || 'ОПТ')}</span>
+                    <span>${safeText(sheet.priceType?.label || sheet.dealer?.priceType || 'Спец.цена')}</span>
                 </div>` +
                 (liquid.length ? `<div class="dealer-price-detail-section-title">Ликвид · по коллекциям</div>${liquid.map(row=>rowHtml(row,false)).join('')}` : '') +
                 (illiquid.length ? `<div class="dealer-price-detail-section-title is-illiquid">Неликвид · отдельные позиции</div>${illiquid.map(row=>rowHtml(row,true)).join('')}` : '') +
