@@ -46,8 +46,8 @@
             </div>
             <div class="app-page-actions">
                 <button class="app-hero-secondary" onclick="openGlobalCalc()"><i class="bi bi-calculator"></i><span>Калькулятор</span></button>
-                <input type="file" id="excel-input" hidden accept=".xlsx, .xls">
-                <button id="btn-import" class="app-hero-icon" title="Загрузить остатки"><i class="bi bi-file-earmark-spreadsheet"></i></button>
+                <input type="file" id="excel-input" hidden accept=".xlsx,.xls">
+                <button id="btn-import" class="app-hero-secondary" title="Загрузить остатки из Excel"><i class="bi bi-file-earmark-spreadsheet"></i><span>Загрузить остатки Excel</span></button>
                 <button id="reset-catalog-btn" class="app-hero-icon" title="Сброс"><i class="bi bi-arrow-clockwise"></i></button>
                 <button id="add-product-btn" class="app-hero-primary"><i class="bi bi-plus-lg"></i><span>Товар</span></button>
             </div>
@@ -68,6 +68,14 @@
             </div>
 
             <div class="product-filter-grid">
+                <label>
+                    <span>Тип позиции</span>
+                    <select id="type-filter" class="form-select">
+                        <option value="all">Все</option>
+                        <option value="laminate" selected>Ламинат</option>
+                        <option value="equipment">Торговое оборудование</option>
+                    </select>
+                </label>
                 <label>
                     <span>Актуальность</span>
                     <select id="filter-select" class="form-select">
@@ -137,67 +145,105 @@
         <p id="total-count" class="product-total-count">Загрузка…</p>
     </main>
 
-    <div class="modal fade" id="product-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-        <div class="modal-dialog modal-dialog-centered">
+    <div class="modal fade product-editor-modal" id="product-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
-                <div class="modal-header border-0 pb-0">
-                    <h5 class="modal-title fw-bold" id="product-modal-title">Товар</h5>
+                <div class="product-editor-head">
+                    <div>
+                        <span>ТОВАРНАЯ МАТРИЦА</span>
+                        <h5 id="product-modal-title">Позиция</h5>
+                        <p>Тип позиции определяет, какие поля нужны и где товар используется в CRM.</p>
+                    </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
-                    <form id="product-form">
-                        <input type="hidden" id="prod_id">
-                        
-                        <div class="mb-3">
-                            <label class="form-label text-secondary small fw-bold">Артикул (SKU)</label>
-                            <input type="text" class="form-control fw-bold" id="prod_sku" required placeholder="AS-81">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label text-secondary small fw-bold">Название</label>
-                            <input type="text" class="form-control" id="prod_name" required placeholder="Дуб Снежный">
-                        </div>
 
-                        <div class="mb-3">
-                            <label class="form-label text-secondary small fw-bold">Коллекция</label>
-                            <input type="text" class="form-control" id="prod_collection" list="product-collection-options" placeholder="Например: ENGLAND HERRINGBONE">
-                            <datalist id="product-collection-options"></datalist>
-                            <div class="form-text">Используется в прайсах. Пишите одинаковое название для всех декоров одной коллекции.</div>
-                        </div>
-
-                        <div class="form-check form-switch mb-3 bg-light p-2 rounded">
-                            <input class="form-check-input ms-0 me-2" type="checkbox" id="prod_is_liquid" checked>
-                            <label class="form-check-label fw-bold small" for="prod_is_liquid">Ликвидный товар</label>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label text-secondary small fw-bold">Характеристики</label>
-                            <div class="input-group input-group-sm mb-2">
-                                <input type="text" class="form-control" id="char_class" placeholder="Класс">
-                                <input type="text" class="form-control" id="char_thick" placeholder="Толщ">
-                                <input type="text" class="form-control" id="char_bevel" placeholder="Фаска">
+                <form id="product-form">
+                    <input type="hidden" id="prod_id">
+                    <div class="modal-body product-editor-body">
+                        <section class="product-editor-section">
+                            <div class="product-editor-section-title">
+                                <i class="bi bi-grid"></i>
+                                <div><strong>Тип позиции</strong><small>Ламинат участвует в коллекциях и прайсах. Торговое оборудование — нет.</small></div>
                             </div>
-                            <div class="input-group input-group-sm mb-2">
-                                <input type="text" class="form-control" id="char_size" placeholder="Размер доски">
-                                <input type="number" step="0.1" class="form-control" id="pkg_weight" placeholder="Вес кг">
+                            <div class="product-type-switch" id="product-type-switch">
+                                <label>
+                                    <input type="radio" name="product_type" value="laminate" checked>
+                                    <span><i class="bi bi-layers"></i><b>Ламинат</b><small>Коллекция, класс, толщина, упаковка</small></span>
+                                </label>
+                                <label>
+                                    <input type="radio" name="product_type" value="equipment">
+                                    <span><i class="bi bi-display"></i><b>Торговое оборудование</b><small>Стенды, таблички, POS и другие элементы</small></span>
+                                </label>
                             </div>
-                            <div class="input-group input-group-sm">
-                                <input type="number" step="0.001" class="form-control" id="pkg_area" placeholder="М² упак">
-                                <span class="input-group-text">м²</span>
-                                <input type="number" class="form-control" id="pkg_qty" placeholder="Шт упак">
-                                <span class="input-group-text">шт</span>
-                            </div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label text-secondary small fw-bold">Название в Excel</label>
-                            <input type="text" class="form-control form-control-sm bg-light" id="prod_alias" placeholder="Для авто-загрузки">
-                        </div>
+                        </section>
 
-                        <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-primary rounded-pill">Сохранить</button>
-                            <button type="button" class="btn btn-outline-danger btn-sm border-0" id="btn-delete-prod" style="display:none">Удалить</button>
-                        </div>
-                    </form>
+                        <section class="product-editor-section">
+                            <div class="product-editor-section-title">
+                                <i class="bi bi-card-text"></i>
+                                <div><strong>Основное</strong><small>Данные, по которым позиция идентифицируется в CRM</small></div>
+                            </div>
+                            <div class="product-editor-grid">
+                                <label><span>Артикул / код</span><input type="text" class="form-control fw-bold" id="prod_sku" required placeholder="8EH34-702"></label>
+                                <label><span>Название</span><input type="text" class="form-control" id="prod_name" required placeholder="Дуб Арабика"></label>
+                                <label class="product-laminate-field"><span>Коллекция</span><input type="text" class="form-control" id="prod_collection" list="product-collection-options" placeholder="ENGLAND HERRINGBONE"><datalist id="product-collection-options"></datalist><small>Одинаковое название для всех декоров одной коллекции.</small></label>
+                                <label><span>Идентификатор в Excel</span><input type="text" class="form-control" id="prod_alias" placeholder="Как позиция называется в выгрузке"><small>Нужен только если артикул/название в Excel отличаются от CRM.</small></label>
+                            </div>
+                            <div class="product-editor-switch product-laminate-field">
+                                <div><strong>Ликвидная позиция</strong><small>Неликвид можно учитывать отдельно в прайсах.</small></div>
+                                <div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" id="prod_is_liquid" checked></div>
+                            </div>
+                        </section>
+
+                        <section class="product-editor-section product-laminate-field" id="product-laminate-fields">
+                            <div class="product-editor-section-title">
+                                <i class="bi bi-rulers"></i>
+                                <div><strong>Характеристики ламината</strong><small>Эти поля не используются для торгового оборудования</small></div>
+                            </div>
+                            <div class="product-editor-grid product-editor-grid-3">
+                                <label><span>Класс</span><input type="text" class="form-control" id="char_class" placeholder="34"></label>
+                                <label><span>Толщина, мм</span><input type="text" class="form-control" id="char_thick" placeholder="8"></label>
+                                <label><span>Фаска</span><input type="text" class="form-control" id="char_bevel" placeholder="4V"></label>
+                                <label><span>Размер доски</span><input type="text" class="form-control" id="char_size" placeholder="600×100×8"></label>
+                                <label><span>Вес упаковки, кг</span><input type="number" step="0.1" class="form-control" id="pkg_weight" placeholder="0"></label>
+                                <label><span>м² в упаковке</span><input type="number" step="0.001" class="form-control" id="pkg_area" placeholder="1.8"></label>
+                                <label><span>Шт. в упаковке</span><input type="number" class="form-control" id="pkg_qty" placeholder="30"></label>
+                            </div>
+                        </section>
+                    </div>
+
+                    <div class="modal-footer product-editor-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button>
+                        <button type="button" class="btn btn-outline-danger me-auto" id="btn-delete-prod" style="display:none"><i class="bi bi-trash"></i> Удалить</button>
+                        <button type="submit" class="btn btn-dark"><i class="bi bi-check2"></i> Сохранить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade stock-import-modal" id="stock-import-modal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="product-editor-head">
+                    <div>
+                        <span>ОСТАТКИ</span>
+                        <h5>Загрузка из Excel</h5>
+                        <p>CRM найдёт позиции автоматически и обновит только остатки.</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body stock-import-body">
+                    <div class="stock-import-rules">
+                        <div><span>1</span><p><strong>Артикул</strong><small>Самый надёжный способ. Если в Excel есть колонка «Артикул»/SKU — CRM использует её первой.</small></p></div>
+                        <div><span>2</span><p><strong>Идентификатор в Excel</strong><small>Если название в учётной системе отличается, укажите его в карточке позиции.</small></p></div>
+                        <div><span>3</span><p><strong>Точное название</strong><small>Если первые два способа не сработали, CRM сверит наименование.</small></p></div>
+                    </div>
+                    <div class="stock-import-file-box">
+                        <i class="bi bi-file-earmark-spreadsheet"></i>
+                        <div><strong id="stock-import-file-name">Выберите Excel-файл</strong><small>Нужны колонки «Остаток» и хотя бы «Артикул» или «Наименование».</small></div>
+                        <button type="button" class="btn btn-dark" id="stock-import-choose"><i class="bi bi-folder2-open"></i> Выбрать файл</button>
+                    </div>
+                    <div id="stock-import-result" class="stock-import-result d-none"></div>
                 </div>
             </div>
         </div>
