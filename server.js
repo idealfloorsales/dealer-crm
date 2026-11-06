@@ -966,6 +966,40 @@ const CompRef = mongoose.model('CompRef', compRefSchema);
 const dealerSchema = new mongoose.Schema({ dealer_id: String, name: String, price_type: String, city: String, address: String, contacts: [contactSchema], bonuses: String, photos: [photoSchema], legal_entities: [dealerLegalEntitySchema], contract: { isSigned: Boolean, date: String }, region_sector: String, hasPersonalPlan: { type: Boolean, default: false }, delivery: String, website: String, instagram: String, additional_addresses: [additionalAddressSchema], pos_materials: [posMaterialSchema], visits: [visitSchema], products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }], latitude: Number, longitude: Number, status: { type: String, default: 'standard' }, avatarUrl: String, competitors: [competitorSchema], responsible: String, responsibleUserId: String, responsibleAssignmentSource: String }, { timestamps: true });
 const Dealer = mongoose.model('Dealer', dealerSchema);
 
+const priceListRowSchema = new mongoose.Schema({
+    product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
+    sku: String,
+    name: String,
+    opt: { type: Number, default: 0 },
+    rrp: { type: Number, default: 0 },
+    maxRrp: { type: Number, default: 0 },
+    currency: { type: String, default: 'KZT' }
+}, { _id: false });
+
+const priceListSchema = new mongoose.Schema({
+    name: { type: String, required: true, trim: true },
+    code: { type: String, trim: true },
+    versionDate: { type: String, default: '' },
+    active: { type: Boolean, default: true },
+    archivedAt: Date,
+    note: String,
+    rows: [priceListRowSchema],
+    createdBy: { id: String, name: String },
+    updatedBy: { id: String, name: String }
+}, { timestamps: true });
+priceListSchema.index({ active: 1, name: 1, versionDate: -1 });
+priceListSchema.index({ code: 1, versionDate: 1 });
+const PriceList = mongoose.model('PriceList', priceListSchema);
+
+const dealerDisplayPriceSchema = new mongoose.Schema({
+    dealer: { type: mongoose.Schema.Types.ObjectId, ref: 'Dealer', required: true, index: true },
+    product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true, index: true },
+    price: { type: Number, default: 0 },
+    updatedBy: { id: String, name: String }
+}, { timestamps: true });
+dealerDisplayPriceSchema.index({ dealer: 1, product: 1 }, { unique: true });
+const DealerDisplayPrice = mongoose.model('DealerDisplayPrice', dealerDisplayPriceSchema);
+
 const pricingAuditSchema = new mongoose.Schema({
     at: { type: Date, default: Date.now },
     action: String,
@@ -984,6 +1018,7 @@ const pricingConditionSchema = new mongoose.Schema({
 
     discountPercent: { type: Number, default: 0 },
     priceListName: String,
+    priceList: { type: mongoose.Schema.Types.ObjectId, ref: 'PriceList' },
     stackable: { type: Boolean, default: true },
     priority: { type: Number, default: 0 },
 
@@ -1588,7 +1623,8 @@ function buildDealerPricingSummary(dealer, allConditions, today = pricingTodayKe
         sector: dealer.region_sector || '',
         responsible: dealer.responsible || '',
         defaultPriceType: dealer.price_type || '',
-        effectivePriceList: selectedPriceList?.priceListName || selectedPriceList?.name || dealer.price_type || 'Оптовая цена',
+        effectivePriceList: selectedPriceList?.priceList?.name || selectedPriceList?.priceListName || selectedPriceList?.name || dealer.price_type || 'Оптовая цена',
+        effectivePriceListId: String(selectedPriceList?.priceList?._id || selectedPriceList?.priceList || ''),
         priceListCondition: selectedPriceList,
         priceListConflicts: Math.max(0, priceLists.length - 1),
         activeDiscounts: appliedDiscounts,
@@ -1625,6 +1661,7 @@ function cleanPricingPayload(body = {}) {
         scopeValue: scopeType === 'sector' || scopeType === 'city' ? String(body.scopeValue || '').trim() : '',
         discountPercent: kind === 'discount' ? Math.max(0, Number(body.discountPercent) || 0) : 0,
         priceListName: kind === 'price_list' ? String(body.priceListName || '').trim() : '',
+        priceList: kind === 'price_list' && body.priceListId ? body.priceListId : null,
         stackable: kind === 'discount' ? body.stackable !== false : false,
         priority: Number(body.priority) || 0,
         startDate: String(body.startDate || '').trim(),
@@ -1646,7 +1683,7 @@ function validatePricingPayload(payload) {
     if (payload.kind === 'discount' && (payload.discountPercent <= 0 || payload.discountPercent > 100)) {
         return 'Скидка должна быть больше 0% и не больше 100%';
     }
-    if (payload.kind === 'price_list' && !payload.priceListName) return 'Укажите название базового прайса';
+    if (payload.kind === 'price_list' && !payload.priceListName && !payload.priceList) return 'Выберите базовый прайс';
     if (payload.scopeType === 'dealer' && !payload.dealer) return 'Выберите дилера';
     if ((payload.scopeType === 'sector' || payload.scopeType === 'city') && !payload.scopeValue) {
         return 'Укажите сектор / город';
@@ -1958,6 +1995,258 @@ app.put('/api/dealers/:id/products', requirePermission('can_edit_matrix'), async
 // ==========================================
 // ЦЕНОВЫЕ УСЛОВИЯ ДИЛЕРОВ
 // ==========================================
+function cleanPriceListRows(rows = []) {
+    return (Array.isArray(rows) ? rows : [])
+        .filter(row => row && typeof row === 'object')
+        .map(row => ({
+            product: row.productId || row.product || null,
+            sku: String(row.sku || '').trim(),
+            name: String(row.name || '').trim(),
+            opt: Math.max(0, Number(row.opt) || 0),
+            rrp: Math.max(0, Number(row.rrp) || 0),
+            maxRrp: Math.max(0, Number(row.maxRrp) || 0),
+            currency: String(row.currency || 'KZT').trim() || 'KZT'
+        }))
+        .filter(row => row.product || row.sku || row.name);
+}
+
+function dealerPriceColumn(priceType = '') {
+    const value = String(priceType || '').trim().toLowerCase();
+    if (value.includes('макс')) return { key: 'maxRrp', label: 'МАКС РРЦ' };
+    if (value.includes('ррц') || value.includes('рознич')) return { key: 'rrp', label: 'РРЦ' };
+    return { key: 'opt', label: 'ОПТ' };
+}
+
+function firstDealerPhone(contacts = []) {
+    for (const contact of Array.isArray(contacts) ? contacts : []) {
+        const raw = String(contact?.contactInfo || '').trim();
+        if (!raw) continue;
+        const digits = raw.replace(/\D/g, '');
+        if (digits.length >= 10) {
+            if (digits.length === 10) return '7' + digits;
+            if (digits.startsWith('8') && digits.length === 11) return '7' + digits.slice(1);
+            return digits;
+        }
+    }
+    return '';
+}
+
+async function resolveSummaryPriceList(summary) {
+    const byId = summary?.effectivePriceListId;
+    if (byId && mongoose.Types.ObjectId.isValid(byId)) {
+        const found = await PriceList.findById(byId).lean();
+        if (found) return found;
+    }
+    const name = String(summary?.effectivePriceList || '').trim();
+    if (!name) return null;
+    return PriceList.findOne({ name, active: { $ne: false } }).sort({ versionDate: -1, updatedAt: -1 }).lean();
+}
+
+app.get('/api/pricing/price-lists', requirePermission('can_view_pricing'), async (req, res) => {
+    try {
+        const lists = await PriceList.find({})
+            .select('_id name code versionDate active archivedAt note rows createdAt updatedAt')
+            .sort({ active: -1, versionDate: -1, updatedAt: -1 })
+            .lean();
+        res.json(lists.map(item => ({
+            id: String(item._id),
+            name: item.name || '',
+            code: item.code || '',
+            versionDate: item.versionDate || '',
+            active: item.active !== false,
+            archivedAt: item.archivedAt || null,
+            note: item.note || '',
+            rowsCount: Array.isArray(item.rows) ? item.rows.length : 0,
+            pricedCount: Array.isArray(item.rows) ? item.rows.filter(row => Number(row.opt) > 0 || Number(row.rrp) > 0 || Number(row.maxRrp) > 0).length : 0,
+            createdAt: item.createdAt,
+            updatedAt: item.updatedAt
+        })));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/pricing/price-lists/:id', requirePermission('can_view_pricing'), async (req, res) => {
+    try {
+        const list = await PriceList.findById(req.params.id).lean();
+        if (!list) return res.status(404).json({ error: 'Прайс не найден' });
+        res.json({
+            id: String(list._id),
+            name: list.name || '',
+            code: list.code || '',
+            versionDate: list.versionDate || '',
+            active: list.active !== false,
+            note: list.note || '',
+            rows: (list.rows || []).map(row => ({
+                productId: String(row.product || ''),
+                sku: row.sku || '',
+                name: row.name || '',
+                opt: Number(row.opt) || 0,
+                rrp: Number(row.rrp) || 0,
+                maxRrp: Number(row.maxRrp) || 0,
+                currency: row.currency || 'KZT'
+            }))
+        });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/pricing/price-lists', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const name = String(req.body?.name || '').trim();
+        if (!name) return res.status(400).json({ error: 'Укажите название прайса' });
+        const user = pricingUserMeta(req);
+        const list = await PriceList.create({
+            name,
+            code: String(req.body?.code || '').trim(),
+            versionDate: String(req.body?.versionDate || '').trim(),
+            active: req.body?.active !== false,
+            note: String(req.body?.note || '').trim(),
+            rows: cleanPriceListRows(req.body?.rows),
+            createdBy: user,
+            updatedBy: user
+        });
+        res.status(201).json({ id: String(list._id), status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.put('/api/pricing/price-lists/:id', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const list = await PriceList.findById(req.params.id);
+        if (!list) return res.status(404).json({ error: 'Прайс не найден' });
+        const name = String(req.body?.name || '').trim();
+        if (!name) return res.status(400).json({ error: 'Укажите название прайса' });
+        list.name = name;
+        list.code = String(req.body?.code || '').trim();
+        list.versionDate = String(req.body?.versionDate || '').trim();
+        list.active = req.body?.active !== false;
+        list.archivedAt = list.active ? null : (list.archivedAt || new Date());
+        list.note = String(req.body?.note || '').trim();
+        list.rows = cleanPriceListRows(req.body?.rows);
+        list.updatedBy = pricingUserMeta(req);
+        await list.save();
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.delete('/api/pricing/price-lists/:id', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const list = await PriceList.findById(req.params.id);
+        if (!list) return res.status(404).json({ error: 'Прайс не найден' });
+        list.active = false;
+        list.archivedAt = new Date();
+        list.updatedBy = pricingUserMeta(req);
+        await list.save();
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.get('/api/pricing/dealers/:id/price-sheet', requirePermission('can_view_pricing'), async (req, res) => {
+    try {
+        const dealer = await Dealer.findOne({
+            $and: [
+                { _id: req.params.id },
+                getWorkingDealerFilter(getDealerFilter(req))
+            ]
+        }).select('_id dealer_id name city region_sector price_type responsible contacts').lean();
+        if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
+
+        const conditions = await PricingCondition.find({})
+            .populate('dealer', '_id dealer_id name city region_sector price_type responsible')
+            .populate('priceList', '_id name code versionDate active')
+            .sort({ createdAt: -1 })
+            .lean();
+
+        const summary = buildDealerPricingSummary(dealer, conditions);
+        const list = await resolveSummaryPriceList(summary);
+        const priceType = dealerPriceColumn(dealer.price_type);
+        const displayPrices = await DealerDisplayPrice.find({ dealer: dealer._id }).lean();
+        const displayMap = new Map(displayPrices.map(item => [String(item.product), Number(item.price) || 0]));
+        const discount = Math.min(100, Math.max(0, Number(summary.totalDiscountPercent) || 0));
+
+        const rows = list ? (list.rows || []).map(row => {
+            const basePrice = Math.max(0, Number(row[priceType.key]) || 0);
+            const finalPrice = basePrice > 0 ? Math.round(basePrice * (1 - discount / 100) * 100) / 100 : 0;
+            return {
+                productId: String(row.product || ''),
+                sku: row.sku || '',
+                name: row.name || '',
+                opt: Number(row.opt) || 0,
+                rrp: Number(row.rrp) || 0,
+                maxRrp: Number(row.maxRrp) || 0,
+                basePrice,
+                finalPrice,
+                displayPrice: displayMap.get(String(row.product || '')) || 0,
+                currency: row.currency || 'KZT'
+            };
+        }) : [];
+
+        res.json({
+            dealer: {
+                id: String(dealer._id),
+                dealer_id: dealer.dealer_id || '',
+                name: dealer.name || '',
+                city: dealer.city || '',
+                sector: dealer.region_sector || '',
+                priceType: dealer.price_type || '',
+                phone: firstDealerPhone(dealer.contacts)
+            },
+            priceList: list ? {
+                id: String(list._id),
+                name: list.name || '',
+                code: list.code || '',
+                versionDate: list.versionDate || '',
+                active: list.active !== false
+            } : null,
+            priceType,
+            totalDiscountPercent: discount,
+            activeDiscounts: summary.activeDiscounts || [],
+            rows
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.put('/api/pricing/dealers/:id/display-prices', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const dealer = await Dealer.findOne({
+            $and: [
+                { _id: req.params.id },
+                getWorkingDealerFilter(getDealerFilter(req))
+            ]
+        }).select('_id').lean();
+        if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
+
+        const user = pricingUserMeta(req);
+        const prices = Array.isArray(req.body?.prices) ? req.body.prices : [];
+        for (const row of prices) {
+            const productId = String(row?.productId || '').trim();
+            if (!mongoose.Types.ObjectId.isValid(productId)) continue;
+            const price = Math.max(0, Number(row?.price) || 0);
+            if (price <= 0) {
+                await DealerDisplayPrice.deleteOne({ dealer: dealer._id, product: productId });
+            } else {
+                await DealerDisplayPrice.updateOne(
+                    { dealer: dealer._id, product: productId },
+                    { $set: { price, updatedBy: user } },
+                    { upsert: true }
+                );
+            }
+        }
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
 app.get('/api/pricing/overview', requirePermission('can_view_pricing'), async (req, res) => {
     try {
         const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req)))
@@ -1966,6 +2255,7 @@ app.get('/api/pricing/overview', requirePermission('can_view_pricing'), async (r
             .lean();
         const conditions = await PricingCondition.find({})
             .populate('dealer', '_id dealer_id name city region_sector price_type responsible')
+            .populate('priceList', '_id name code versionDate active')
             .sort({ createdAt: -1 })
             .lean();
 
@@ -2030,6 +2320,7 @@ app.get('/api/pricing/dealers/:id', requirePermission('can_view_pricing'), async
 
         const conditions = await PricingCondition.find({})
             .populate('dealer', '_id dealer_id name city region_sector price_type responsible')
+            .populate('priceList', '_id name code versionDate active')
             .sort({ createdAt: -1 })
             .lean();
         res.json(buildDealerPricingSummary(dealer, conditions));
@@ -2068,7 +2359,8 @@ app.post('/api/pricing/conditions', requirePermission('can_manage_pricing'), asy
             updatedBy: user,
             audit: [{ action: 'created', userId: user.id, userName: user.name, note: 'Условие создано' }]
         });
-        const populated = await PricingCondition.findById(condition._id).populate('dealer', '_id dealer_id name city region_sector price_type responsible').lean();
+        const populated = await PricingCondition.findById(condition._id).populate('dealer', '_id dealer_id name city region_sector price_type responsible')
+            .populate('priceList', '_id name code versionDate active').lean();
         res.status(201).json({ ...populated, computedStatus: pricingConditionStatus(populated) });
     } catch (e) {
         res.status(400).json({ error: e.message });
@@ -2107,7 +2399,8 @@ app.put('/api/pricing/conditions/:id', requirePermission('can_manage_pricing'), 
         existing.audit.push({ action: 'updated', userId: user.id, userName: user.name, note: String(req.body.auditNote || 'Условие изменено').trim() });
         await existing.save();
 
-        const populated = await PricingCondition.findById(existing._id).populate('dealer', '_id dealer_id name city region_sector price_type responsible').lean();
+        const populated = await PricingCondition.findById(existing._id).populate('dealer', '_id dealer_id name city region_sector price_type responsible')
+            .populate('priceList', '_id name code versionDate active').lean();
         res.json({ ...populated, computedStatus: pricingConditionStatus(populated) });
     } catch (e) {
         res.status(400).json({ error: e.message });
