@@ -367,6 +367,57 @@ document.addEventListener('DOMContentLoaded', () => {
         return { diff, forecast, percent };
     }
 
+    function formatSigned(value, suffix = '') {
+        const numeric = Number(value) || 0;
+        const normalized = Math.abs(numeric) < 0.005 ? 0 : numeric;
+        const sign = normalized > 0 ? '+' : normalized < 0 ? '−' : '';
+        return sign + fmt(Math.abs(normalized)) + suffix;
+    }
+
+    function deviationTone(value) {
+        const numeric = Number(value) || 0;
+        if (numeric > 0.005) return 'positive';
+        if (numeric < -0.005) return 'negative';
+        return 'neutral';
+    }
+
+    function isCurrentSelectedMonth() {
+        const selected = new Date(monthPicker.value + '-01T00:00:00');
+        const today = new Date();
+        return selected.getFullYear() === today.getFullYear() && selected.getMonth() === today.getMonth();
+    }
+
+    function buildDeviationStrip(plan, fact, daysInMonth, currentDay) {
+        const planValue = Number(plan) || 0;
+        const factValue = Number(fact) || 0;
+        if (!(planValue > 0)) return '';
+
+        const progress = calculateProgress(planValue, factValue, daysInMonth, currentDay);
+        const monthlyDiff = progress.forecast - planValue;
+        const monthlyPct = planValue > 0 ? (monthlyDiff / planValue) * 100 : 0;
+
+        const monthItem = `<div class="sales-deviation-item is-${deviationTone(monthlyDiff)}">
+            <span>Месяц</span>
+            <strong>${formatSigned(monthlyDiff, ' м²')}</strong>
+            <em>${formatSigned(monthlyPct, '%')}</em>
+        </div>`;
+
+        if (!isCurrentSelectedMonth()) {
+            return `<div class="sales-deviation-strip is-single">${monthItem}</div>`;
+        }
+
+        const planToDate = planValue * (Math.max(0, Math.min(currentDay, daysInMonth)) / Math.max(1, daysInMonth));
+        const todayDiff = factValue - planToDate;
+        const todayPct = planToDate > 0 ? (todayDiff / planToDate) * 100 : 0;
+        const todayItem = `<div class="sales-deviation-item is-${deviationTone(todayDiff)}">
+            <span>На сегодня</span>
+            <strong>${formatSigned(todayDiff, ' м²')}</strong>
+            <em>${formatSigned(todayPct, '%')}</em>
+        </div>`;
+
+        return `<div class="sales-deviation-strip">${todayItem}${monthItem}</div>`;
+    }
+
     function captureState() {
         if (canEditFact) document.querySelectorAll('.sales-input.inp-fact').forEach(inp => {
             const row = inp.closest('.sales-row');
@@ -788,13 +839,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const plan = plans[planKey] || 0;
-            const { percent, forecast, diff } = calculateProgress(plan, factVal, daysInMonth, currentDay);
+            const { percent, forecast } = calculateProgress(plan, factVal, daysInMonth, currentDay);
             const level = percent >= 90 ? 'good' : percent >= 70 ? 'mid' : 'low';
             const planVal = plan !== 0 ? plan : '';
             const width = Math.min(percent, 100);
-            const diffText = plan > 0
-                ? (diff < 0 ? `Осталось ${fmt(Math.abs(diff))} м²` : `Сверх плана ${fmt(diff)} м²`)
-                : 'План не заполнен';
+            const deviationStrip = buildDeviationStrip(plan, factVal, daysInMonth, currentDay);
 
             return `<div class="summary-item ${isSubItem ? 'is-sub' : ''}">
                 <div class="summary-header">
@@ -810,7 +859,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div><span>Прогноз, м²</span><strong>${fmt(forecast)}</strong></div>
                 </div>
                 <div class="sales-summary-progress"><span class="is-${level}" style="width:${width}%"></span></div>
-                <div class="summary-diff ${diff >= 0 && plan > 0 ? 'is-good' : ''}">${diffText}</div>
+                ${deviationStrip}
             </div>`;
         };
 
