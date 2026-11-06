@@ -150,10 +150,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function syncProductTypeFields() {
         const type = selectedProductType();
         laminateFields.forEach(field => field.classList.toggle('d-none', type === 'equipment'));
-        if (type === 'equipment') {
-            if (inpCollection) inpCollection.value = '';
-            if (inpLiquid) inpLiquid.checked = true;
-        }
     }
 
     function isProductComplete(product) {
