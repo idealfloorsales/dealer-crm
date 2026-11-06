@@ -4270,6 +4270,77 @@ body.bg-light {
     font-weight: 550;
 }
 
+.sales-deviation-strip {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0,1fr));
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.sales-deviation-strip.is-single {
+    grid-template-columns: minmax(0,1fr);
+}
+
+.sales-deviation-item {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    padding: 6px 8px;
+    border-radius: 9px;
+    border: 1px solid rgba(34,35,39,.07);
+    background: #f7f6f3;
+}
+
+.sales-deviation-item span {
+    color: #8e9095;
+    font-size: .56rem;
+    font-weight: 650;
+    white-space: nowrap;
+}
+
+.sales-deviation-item strong {
+    overflow: hidden;
+    font-size: .64rem;
+    font-weight: 750;
+    text-align: right;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sales-deviation-item em {
+    font-style: normal;
+    font-size: .58rem;
+    font-weight: 750;
+    white-space: nowrap;
+}
+
+.sales-deviation-item.is-positive strong,
+.sales-deviation-item.is-positive em {
+    color: #197450;
+}
+
+.sales-deviation-item.is-negative strong,
+.sales-deviation-item.is-negative em {
+    color: #b9040a;
+}
+
+.sales-deviation-item.is-neutral strong,
+.sales-deviation-item.is-neutral em {
+    color: #74767b;
+}
+
+@media (max-width: 767px) {
+    .sales-deviation-strip {
+        grid-template-columns: 1fr;
+    }
+
+    .sales-deviation-item {
+        grid-template-columns: auto 1fr auto;
+    }
+}
+
 .sales-print-report {
     display: none;
 }
