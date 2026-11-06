@@ -10,7 +10,17 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 
 const app = express();
-const PORT = process.env.PORT || 3000; 
+const PORT = process.env.PORT || 3000;
+
+// Render terminates TLS and forwards the real client address through X-Forwarded-For.
+// Trust exactly one proxy hop so express-rate-limit can safely resolve req.ip.
+app.set('trust proxy', 1);
+
+let appReady = false;
+let shuttingDown = false;
+let serverInstance = null;
+let dbReconnectTimer = null;
+let dbConnectInFlight = null; 
 const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(64).toString('hex');
 if (!process.env.JWT_SECRET) console.warn('JWT_SECRET is not configured: sessions will reset after server restart.'); 
 
@@ -36,6 +46,33 @@ app.use(cors({
     maxAge: 86400
 }));
 app.use(compression());
+
+function healthPayload() {
+    const dbState = mongoose.connection.readyState;
+    return {
+        ok: appReady && dbState === 1 && !shuttingDown,
+        ready: appReady,
+        shuttingDown,
+        db: dbState === 1 ? 'connected'
+            : dbState === 2 ? 'connecting'
+            : dbState === 3 ? 'disconnecting'
+            : 'disconnected',
+        uptimeSec: Math.round(process.uptime()),
+        version: process.env.RENDER_GIT_COMMIT || process.env.RENDER_SERVICE_ID || 'local'
+    };
+}
+
+// Liveness: process is responding. Useful for external monitoring.
+app.get('/healthz', (req, res) => {
+    const payload = healthPayload();
+    res.status(payload.ok ? 200 : 503).json(payload);
+});
+
+// Readiness: only 200 after MongoDB connection + startup migrations/seeds are complete.
+app.get('/readyz', (req, res) => {
+    const payload = healthPayload();
+    res.status(payload.ok ? 200 : 503).json(payload);
+});
 
 const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -1186,19 +1223,76 @@ async function migrateDealerCanonicalFields() {
 }
 
 async function connectToDB() {
-    if (!DB_CONNECTION_STRING) return console.error("No DB String");
-    try { 
-        await mongoose.connect(DB_CONNECTION_STRING); 
-        console.log('MongoDB Connected');
-        await migrateDealerCanonicalFields();
-        await seedStatuses(); 
-        await seedUsers(); 
-        await seedSectors();
-        await seedWorkshopMaterials();
-        await seedWorkshopRecipes();
-        await normalizeWorkshopPosRecipes(); 
-    } catch (e) { console.error(e); }
+    if (dbConnectInFlight) return dbConnectInFlight;
+
+    dbConnectInFlight = (async () => {
+        if (!DB_CONNECTION_STRING) {
+            appReady = false;
+            console.error('No DB String');
+            return false;
+        }
+
+        try {
+            if (mongoose.connection.readyState !== 1) {
+                await mongoose.connect(DB_CONNECTION_STRING, {
+                    serverSelectionTimeoutMS: 10000,
+                    connectTimeoutMS: 10000,
+                    socketTimeoutMS: 45000,
+                    maxPoolSize: 20,
+                    minPoolSize: 1
+                });
+            }
+
+            console.log('MongoDB Connected');
+            await migrateDealerCanonicalFields();
+            await seedStatuses();
+            await seedUsers();
+            await seedSectors();
+            await seedWorkshopMaterials();
+            await seedWorkshopRecipes();
+            await normalizeWorkshopPosRecipes();
+
+            appReady = true;
+            if (dbReconnectTimer) {
+                clearTimeout(dbReconnectTimer);
+                dbReconnectTimer = null;
+            }
+            return true;
+        } catch (e) {
+            appReady = false;
+            console.error('MongoDB startup/connect error:', e);
+            if (!shuttingDown && !dbReconnectTimer) {
+                dbReconnectTimer = setTimeout(() => {
+                    dbReconnectTimer = null;
+                    connectToDB().catch(err => console.error('MongoDB reconnect error:', err));
+                }, 5000);
+                dbReconnectTimer.unref?.();
+            }
+            return false;
+        } finally {
+            dbConnectInFlight = null;
+        }
+    })();
+
+    return dbConnectInFlight;
 }
+
+mongoose.connection.on('disconnected', () => {
+    appReady = false;
+    console.error('MongoDB disconnected');
+    if (!shuttingDown && !dbReconnectTimer) {
+        dbReconnectTimer = setTimeout(() => {
+            dbReconnectTimer = null;
+            connectToDB().catch(err => console.error('MongoDB reconnect error:', err));
+        }, 5000);
+        dbReconnectTimer.unref?.();
+    }
+});
+
+mongoose.connection.on('error', err => {
+    appReady = false;
+    console.error('MongoDB connection error:', err);
+});
 
 async function seedWorkshopMaterials() {
     const defaults = [
@@ -4678,4 +4772,55 @@ app.delete('/api/reclamations/:id', requirePermission('can_manage_reclamations')
     } catch(e) { res.status(500).json({error: e.message}); }
 });
 
-app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
+serverInstance = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server port ${PORT}`);
+    connectToDB().catch(err => console.error('Initial DB connection error:', err));
+});
+
+serverInstance.keepAliveTimeout = 65000;
+serverInstance.headersTimeout = 66000;
+serverInstance.requestTimeout = 120000;
+
+async function gracefulShutdown(signal) {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    appReady = false;
+    console.log(`${signal} received, shutting down gracefully`);
+
+    if (dbReconnectTimer) {
+        clearTimeout(dbReconnectTimer);
+        dbReconnectTimer = null;
+    }
+
+    const forceExit = setTimeout(() => {
+        console.error('Graceful shutdown timeout exceeded');
+        process.exit(1);
+    }, 15000);
+    forceExit.unref?.();
+
+    try {
+        if (serverInstance) {
+            await new Promise(resolve => serverInstance.close(() => resolve()));
+        }
+        if (mongoose.connection.readyState !== 0) {
+            await mongoose.connection.close(false);
+        }
+        clearTimeout(forceExit);
+        process.exit(0);
+    } catch (err) {
+        console.error('Graceful shutdown error:', err);
+        process.exit(1);
+    }
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+process.on('unhandledRejection', reason => {
+    console.error('Unhandled promise rejection:', reason);
+});
+
+process.on('uncaughtException', err => {
+    console.error('Uncaught exception:', err);
+    appReady = false;
+});
