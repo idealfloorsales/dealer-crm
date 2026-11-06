@@ -553,7 +553,6 @@ document.addEventListener('DOMContentLoaded', () => {
             .map(([collection,members]) => {
                 const existing = collectionRows.get(collection) || legacyByCollection.get(collection) || {};
                 return `<tr class="pricing-list-collection-row" data-price-row data-scope-type="collection" data-collection="${esc(collection)}" data-name="${esc(collection)}">
-                    <td><span class="pricing-list-kind is-liquid">Ликвид</span></td>
                     <td><strong>${esc(collection)}</strong><small>${members.length} поз.</small></td>
                     <td><input type="number" min="0" step="0.01" inputmode="decimal" class="form-control" data-price-opt value="${n(existing.opt) || ''}" placeholder="0"></td>
                     <td><input type="number" min="0" step="0.01" inputmode="decimal" class="form-control" data-price-rrp value="${n(existing.rrp) || ''}" placeholder="0"></td>
@@ -561,9 +560,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </tr>`;
             }).join('');
 
-        host.innerHTML =
-            `<tr class="pricing-list-section-row"><td colspan="5"><strong>Ликвид</strong><span>цена задаётся один раз на всю коллекцию</span></td></tr>` +
-            (liquidHtml || '<tr><td colspan="5" class="pricing-empty">Коллекций для прайса пока нет</td></tr>');
+        host.innerHTML = liquidHtml || '<tr><td colspan="4" class="pricing-empty">Коллекций для прайса пока нет</td></tr>';
     }
 
     function collectPriceListRows() {
