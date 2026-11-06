@@ -12550,7 +12550,7 @@ body.bg-light {
 }
 .dealer-price-detail-values{
     display:grid;
-    grid-template-columns:repeat(2,minmax(70px,auto));
+    grid-template-columns:repeat(3,minmax(76px,auto));
     gap:6px;
 }
 .dealer-price-detail-values>span{
@@ -12574,7 +12574,7 @@ body.bg-light {
     .dealer-price-expand-wrap{justify-content:stretch}
     .dealer-price-expand-btn{width:100%;justify-content:center;min-height:38px}
     .dealer-price-detail-row{grid-template-columns:1fr}
-    .dealer-price-detail-values{grid-template-columns:repeat(2,1fr)}
+    .dealer-price-detail-values{grid-template-columns:1fr}
     .dealer-price-detail-values>span{text-align:left}
 }
 
