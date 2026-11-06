@@ -484,8 +484,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         const matches = allProducts.filter(p => 
-            (p.name && p.name.toLowerCase().includes(val)) || 
-            (p.sku && p.sku.toLowerCase().includes(val))
+            productType(p) === 'laminate' && (
+                (p.name && p.name.toLowerCase().includes(val)) || 
+                (p.sku && p.sku.toLowerCase().includes(val))
+            )
         ).slice(0, 10); // Максимум 10 подсказок
 
         if(matches.length > 0) {
@@ -574,11 +576,14 @@ document.addEventListener('DOMContentLoaded', () => {
     window.openModal = (id) => {
         if (!canManageProducts) return;
         form.reset();
+        productTypeInputs.forEach(input => { input.checked = input.value === 'laminate'; });
         if(btnDelete) btnDelete.style.display = 'none';
-        
+
         if (id) {
             const p = allProducts.find(x => String(x.id) === String(id));
             if(p) {
+                const type = productType(p);
+                productTypeInputs.forEach(input => { input.checked = input.value === type; });
                 inpId.value = p.id;
                 inpSku.value = p.sku || '';
                 inpName.value = p.name || '';
@@ -597,7 +602,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if(pkgWeight) pkgWeight.value = c.weight || '';
                 }
 
-                modalTitle.textContent = 'Редактирование';
+                modalTitle.textContent = type === 'equipment' ? 'Торговое оборудование' : 'Ламинат';
                 if(btnDelete) {
                     btnDelete.style.display = 'block';
                     btnDelete.onclick = () => deleteProduct(p.id);
@@ -605,9 +610,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } else {
             inpId.value = '';
-            modalTitle.textContent = 'Новый товар';
+            modalTitle.textContent = 'Новая позиция';
             if(inpLiquid) inpLiquid.checked = true;
         }
+
+        syncProductTypeFields();
         modal.show();
     };
 
@@ -631,13 +638,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 package_qty: pkgQty ? pkgQty.value.trim() : '',
                 weight: pkgWeight ? pkgWeight.value.trim() : ''
             };
+            const type = selectedProductType();
             const data = { 
                 sku: inpSku.value.trim(),
                 name: inpName.value.trim(),
-                collection: inpCollection ? inpCollection.value.trim() : '',
-                is_liquid: inpLiquid ? inpLiquid.checked : true,
+                product_type: type,
+                collection: type === 'laminate' && inpCollection ? inpCollection.value.trim() : '',
+                is_liquid: type === 'laminate' ? (inpLiquid ? inpLiquid.checked : true) : true,
                 excel_alias: inpAlias ? inpAlias.value.trim() : '',
-                characteristics: chars
+                characteristics: type === 'laminate' ? chars : {
+                    class:'', thickness:'', bevel:'', size:'', package_area:'', package_qty:'', weight:''
+                }
             };
             const id = inpId.value;
             let url = API_URL; let method = 'POST';
