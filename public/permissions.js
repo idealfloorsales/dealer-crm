@@ -1,4 +1,61 @@
 (function () {
+    const CRM_LIGHT_THEMES = {
+        clean: { label:'Белая', icon:'circle-fill' },
+        warm: { label:'Тёплая', icon:'sun' },
+        cool: { label:'Холодная', icon:'snow' },
+        pearl: { label:'Жемчужная', icon:'gem' }
+    };
+
+    function currentLightTheme() {
+        const saved = localStorage.getItem('crm_light_theme') || 'clean';
+        return CRM_LIGHT_THEMES[saved] ? saved : 'clean';
+    }
+
+    function applyLightTheme(theme) {
+        const key = CRM_LIGHT_THEMES[theme] ? theme : 'clean';
+        document.documentElement.dataset.crmTheme = key;
+        localStorage.setItem('crm_light_theme', key);
+        document.querySelectorAll('[data-crm-theme-choice]').forEach(button => {
+            button.classList.toggle('active', button.dataset.crmThemeChoice === key);
+            button.setAttribute('aria-pressed', button.dataset.crmThemeChoice === key ? 'true' : 'false');
+        });
+        const label = document.querySelector('[data-crm-theme-label]');
+        if (label) label.textContent = CRM_LIGHT_THEMES[key].label;
+    }
+
+    applyLightTheme(currentLightTheme());
+
+    function ensureThemeStyles() {
+        if (document.getElementById('crm-light-theme-styles')) return;
+        const style = document.createElement('style');
+        style.id = 'crm-light-theme-styles';
+        style.textContent = `
+          :root[data-crm-theme="clean"]{--crm-theme-bg:#f3f4f6;--crm-theme-surface:#fff;--crm-theme-soft:#f8f8f9;--crm-theme-border:#e6e7e9}
+          :root[data-crm-theme="warm"]{--crm-theme-bg:#f4f0eb;--crm-theme-surface:#fffdf9;--crm-theme-soft:#f7f1ea;--crm-theme-border:#e7ddd2}
+          :root[data-crm-theme="cool"]{--crm-theme-bg:#eef3f7;--crm-theme-surface:#fbfdff;--crm-theme-soft:#f1f6fa;--crm-theme-border:#dce6ed}
+          :root[data-crm-theme="pearl"]{--crm-theme-bg:#f0f0f2;--crm-theme-surface:#fdfdfd;--crm-theme-soft:#f5f5f6;--crm-theme-border:#dedfe2}
+          body{background-color:var(--crm-theme-bg,var(--bg-light))!important}
+          .crm-topbar{background:color-mix(in srgb,var(--crm-theme-surface,#fff) 96%,transparent)!important}
+          .crm-mobile-nav,.crm-mobile-sheet,.dealer-form-content,.app-workspace-card,.cc-card,.card{
+            border-color:var(--crm-theme-border,#e6e7e9)!important;
+          }
+          .crm-mobile-nav{background:color-mix(in srgb,var(--crm-theme-surface,#fff) 96%,transparent)!important}
+          .crm-mobile-sheet{background:var(--crm-theme-bg,#f7f5f2)!important}
+          .crm-mobile-sheet-link,.crm-mobile-sheet-account{background:var(--crm-theme-surface,#fff)!important}
+          .crm-theme-row{margin-top:10px;padding:11px 12px;border:1px solid var(--crm-theme-border,#e5e5e5);border-radius:15px;background:var(--crm-theme-surface,#fff)}
+          .crm-theme-row-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+          .crm-theme-row-head strong{font-size:.68rem;color:#4b4d52}
+          .crm-theme-row-head small{font-size:.55rem;color:#9a9ca1}
+          .crm-theme-options{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+          .crm-theme-choice{min-height:48px;padding:5px;border:1px solid var(--crm-theme-border,#dedede);border-radius:11px;background:var(--crm-theme-soft,#f7f7f7);color:#73757a;font-size:.52rem;font-weight:700}
+          .crm-theme-choice i{display:block;margin-bottom:3px;font-size:.8rem}
+          .crm-theme-choice.active{border-color:#b9040a;background:#fff1f1;color:#a20a10}
+          .crm-theme-desktop{display:grid;place-items:center;width:36px;height:36px;border:1px solid rgba(23,24,27,.08);border-radius:11px;background:var(--crm-theme-surface,#fff);color:#77797e}
+        `;
+        document.head.appendChild(style);
+    }
+    ensureThemeStyles();
+
     function ensureMotionStyles() {
         if (document.getElementById('crm-motion-styles')) return;
         const link = document.createElement('link');
@@ -123,6 +180,7 @@
                         ${itemsHtml}
                     </ul>
                     <div class="crm-topbar-account">
+                        <button type="button" class="crm-theme-desktop" id="crm-theme-cycle" title="Сменить светлую тему"><i class="bi bi-palette"></i></button>
                         <button type="button" class="crm-connection-chip" data-crm-network-status title="Состояние соединения">
                             <span class="crm-topbar-live-dot"></span><span data-crm-network-label>Связь</span>
                         </button>
@@ -141,6 +199,14 @@
 
         const logoutButton = document.getElementById('logout-btn');
         if (logoutButton) logoutButton.addEventListener('click', logout);
+        const themeCycle = document.getElementById('crm-theme-cycle');
+        if (themeCycle) themeCycle.addEventListener('click', () => {
+            const keys = Object.keys(CRM_LIGHT_THEMES);
+            const current = currentLightTheme();
+            const next = keys[(keys.indexOf(current) + 1) % keys.length];
+            applyLightTheme(next);
+            showToast('Тема: ' + CRM_LIGHT_THEMES[next].label, 'info', { duration:1800 });
+        });
     }
 
 
@@ -571,6 +637,12 @@
                             </a>`;
                         }).join('')}
                     </div>
+                    <div class="crm-theme-row">
+                        <div class="crm-theme-row-head"><strong>Светлая тема</strong><small data-crm-theme-label>${CRM_LIGHT_THEMES[currentLightTheme()].label}</small></div>
+                        <div class="crm-theme-options">
+                            ${Object.entries(CRM_LIGHT_THEMES).map(([key,item]) => `<button type="button" class="crm-theme-choice${currentLightTheme()===key ? ' active' : ''}" data-crm-theme-choice="${key}"><i class="bi bi-${item.icon}"></i>${item.label}</button>`).join('')}
+                        </div>
+                    </div>
                     <div class="crm-mobile-sheet-account">
                         <div class="crm-mobile-sheet-user">
                             <strong id="crm-mobile-user-name">Пользователь</strong>
@@ -600,6 +672,9 @@
         openButton?.addEventListener('click', openSheet);
         closeButton?.addEventListener('click', closeSheet);
         logoutButton?.addEventListener('click', logout);
+        backdrop.querySelectorAll('[data-crm-theme-choice]').forEach(button => {
+            button.addEventListener('click', () => applyLightTheme(button.dataset.crmThemeChoice));
+        });
         backdrop.addEventListener('click', e => {
             if (e.target === backdrop) closeSheet();
         });

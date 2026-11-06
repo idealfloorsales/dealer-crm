@@ -54,6 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
             responsible: filterResponsible?.value || '',
             health: filterHealth?.value || '',
             sector: sector?.value || '',
+            pos: filterPos?.value || '',
             sort: dealerSortSelect?.value || 'dealer_id_asc',
             quickFilter: dealerQuickFilter || 'all',
             filtersOpen: Boolean(toolbar?.classList.contains('filters-open')),
@@ -79,6 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
         restoreSelect(filterResponsible, state.responsible);
         restoreSelect(filterHealth, state.health);
         restoreSelect(document.getElementById('filter-sector'), state.sector);
+        restoreSelect(filterPos, state.pos);
         restoreSelect(dealerSortSelect, state.sort || 'dealer_id_asc');
 
         dealerQuickFilter = state.quickFilter || 'all';
@@ -171,7 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const addProductChecklist = document.getElementById('add-product-checklist'); const addContactList = document.getElementById('add-contact-list'); const addAddressList = document.getElementById('add-address-list'); const addPosList = document.getElementById('add-pos-list'); const addVisitsList = document.getElementById('add-visits-list'); const addCompetitorList = document.getElementById('add-competitor-list'); const addPhotoInput = document.getElementById('add-photo-input'); const addPhotoPreviewContainer = document.getElementById('add-photo-preview-container'); const addAvatarInput = document.getElementById('add-avatar-input'); const addAvatarPreview = document.getElementById('add-avatar-preview');
     const editProductChecklist = document.getElementById('edit-product-checklist'); const editContactList = document.getElementById('edit-contact-list'); const editAddressList = document.getElementById('edit-address-list'); const editPosList = document.getElementById('edit-pos-list'); const editVisitsList = document.getElementById('edit-visits-list'); const editCompetitorList = document.getElementById('edit-competitor-list'); const editPhotoInput = document.getElementById('edit-photo-input'); const editPhotoPreviewContainer = document.getElementById('edit-photo-preview-container'); const editAvatarInput = document.getElementById('edit-avatar-input'); const editAvatarPreview = document.getElementById('edit-avatar-preview'); const editCurrentAvatarUrl = document.getElementById('edit-current-avatar-url');
     
-    const filterCity = document.getElementById('filter-city'); const filterPriceType = document.getElementById('filter-price-type'); const filterStatus = document.getElementById('filter-status'); const filterResponsible = document.getElementById('filter-responsible'); const searchBar = document.getElementById('search-bar');
+    const filterCity = document.getElementById('filter-city'); const filterPriceType = document.getElementById('filter-price-type'); const filterStatus = document.getElementById('filter-status'); const filterResponsible = document.getElementById('filter-responsible'); const filterPos = document.getElementById('filter-pos'); const searchBar = document.getElementById('search-bar');
     const dealerVisibleCount = document.getElementById('dealer-visible-count');
     const dealerSortSelect = document.getElementById('dealer-sort-select');
     const dealerResetFilters = document.getElementById('dealer-reset-filters');
@@ -363,7 +365,38 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>`; 
 }
     function renderPhotoPreviews(container, photosArray) { if(container) container.innerHTML = photosArray.map((p, index) => `<div class="photo-preview-item"><img src="${p.photo_url}"><button type="button" class="btn-remove-photo" data-index="${index}"><i class="bi bi-x"></i></button></div>`).join(''); }
-    function createPosEntryHTML(p={}) { return `<div class="pos-entry"><input type="text" class="form-control pos-name" list="pos-materials-datalist" placeholder="Название стенда" value="${safeAttr(p.name||'')}" autocomplete="off"><input type="number" class="form-control pos-quantity" value="${p.quantity||1}" min="1" placeholder="Шт"><button type="button" class="btn-remove-entry" onclick="this.closest('.pos-entry').remove()" title="Удалить"><i class="bi bi-x-lg"></i></button></div>`; }
+    function availablePosMaterials() {
+        const values = new Map();
+        const add = value => {
+            const clean = normalizeDisplayValue(value);
+            if (!clean) return;
+            const key = clean.toLocaleLowerCase('ru-RU');
+            if (!values.has(key)) values.set(key, clean);
+        };
+        posMaterialsList.forEach(add);
+        (allDealers || []).forEach(dealer => {
+            (dealer.pos_materials || []).forEach(item => add(item?.name));
+        });
+        return [...values.values()].sort((a,b)=>a.localeCompare(b,'ru'));
+    }
+
+    function posMaterialOptions(selected = '') {
+        const wanted = normalizeDisplayValue(selected);
+        const options = availablePosMaterials();
+        if (wanted && !options.some(item => item.toLocaleLowerCase('ru-RU') === wanted.toLocaleLowerCase('ru-RU'))) {
+            options.unshift(wanted);
+        }
+        return '<option value="">Выберите торговое оборудование</option>' +
+            options.map(item => `<option value="${safeAttr(item)}" ${item === wanted ? 'selected' : ''}>${safeText(item)}</option>`).join('');
+    }
+
+    function createPosEntryHTML(p={}) {
+        return `<div class="pos-entry">
+            <label class="pos-entry-main"><span>Торговое оборудование</span><select class="form-select pos-name">${posMaterialOptions(p.name || '')}</select></label>
+            <label class="pos-entry-qty"><span>Количество</span><input type="number" class="form-control pos-quantity" value="${Number(p.quantity)||1}" min="1" placeholder="Шт"></label>
+            <button type="button" class="btn-remove-entry" onclick="this.closest('.pos-entry').remove()" title="Удалить"><i class="bi bi-x-lg"></i></button>
+        </div>`;
+    }
     function createCompetitorEntryHTML(c={}) {
         let brandOpts = '<option value="">Выберите бренд</option>';
         competitorsRef.forEach(ref => {
@@ -927,6 +960,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(filterStatus) filterStatus.onchange = renderDealerList;
         if(filterResponsible) filterResponsible.onchange = renderDealerList;
         if(filterHealth) filterHealth.onchange = renderDealerList;
+        if(filterPos) filterPos.onchange = renderDealerList;
         const sectorFilter = document.getElementById('filter-sector');
         if(sectorFilter) sectorFilter.onchange = renderDealerList;
         if(searchBar) searchBar.oninput = renderDealerList;
@@ -983,6 +1017,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (filterPriceType) filterPriceType.value = '';
                 if (filterResponsible) filterResponsible.value = '';
                 if (filterHealth) filterHealth.value = '';
+                if (filterPos) filterPos.value = '';
                 if (sectorFilter) sectorFilter.value = '';
                 if (dealerSortSelect) dealerSortSelect.value = 'dealer_id_asc';
                 dealerQuickFilter = 'all';
@@ -1572,6 +1607,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const healthFilter = filterHealth?.value || '';
         const search = (searchBar?.value || '').trim().toLowerCase();
         const sector = document.getElementById('filter-sector')?.value || '';
+        const posFilter = filterPos?.value || '';
 
         const baseFiltered = allDealers.filter(dealer => {
             let visible = true;
@@ -1600,6 +1636,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     (responsible === '__unassigned__' && !dealer.responsible) ||
                     (responsible !== '__unassigned__' && String(dealer.responsible || '') === String(responsible))) &&
                 (!sector || normalizedSector === sector) &&
+                (!posFilter || (d.pos_materials || []).some(item => normalizeDisplayValue(item?.name) === posFilter)) &&
                 (!search || searchable.includes(search));
         });
 
@@ -2443,7 +2480,10 @@ document.addEventListener('DOMContentLoaded', () => {
         updateBrandsDatalist();
     }
     function updateBrandsDatalist() { if (!brandsDatalist) return; let html = ''; competitorsRef.forEach(ref => { html += `<option value="${ref.name}">`; }); brandsDatalist.innerHTML = html; }
-    function updatePosDatalist() { if (!posDatalist) return; let html = ''; posMaterialsList.forEach(s => { html += `<option value="${s}">`; }); posDatalist.innerHTML = html; }
+    function updatePosDatalist() {
+        if (!posDatalist) return;
+        posDatalist.innerHTML = availablePosMaterials().map(s => `<option value="${safeAttr(s)}">`).join('');
+    }
     function populateFilters(dealers) {
         if(!filterCity || !filterPriceType) return;
 
@@ -2461,6 +2501,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const cities = uniqueNormalized(dealers.map(d => d.city));
         const types = uniqueNormalized(dealers.map(dealerPriceListName));
         const sectors = uniqueNormalized(dealers.map(d => d.region_sector));
+        const posItems = uniqueNormalized(dealers.flatMap(d => (d.pos_materials || []).map(item => item?.name)));
 
         const sc = normalizeDisplayValue(filterCity.value);
         const st = normalizeDisplayValue(filterPriceType.value);
@@ -2471,6 +2512,13 @@ document.addEventListener('DOMContentLoaded', () => {
         types.forEach(t => filterPriceType.add(new Option(t, t)));
         if (cities.includes(sc)) filterCity.value = sc;
         if (types.includes(st)) filterPriceType.value = st;
+
+        if (filterPos) {
+            const currentPos = normalizeDisplayValue(filterPos.value);
+            filterPos.innerHTML = '<option value="">Все торговое оборудование</option>';
+            posItems.forEach(item => filterPos.add(new Option(item,item)));
+            if (posItems.includes(currentPos)) filterPos.value = currentPos;
+        }
 
         const fs = document.getElementById('filter-sector');
         if(fs) {
@@ -2917,6 +2965,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const healthFilter = filterHealth?.value || '';
         const search = (searchBar?.value || '').trim().toLowerCase();
         const sector = document.getElementById('filter-sector')?.value || '';
+        const posFilter = filterPos?.value || '';
 
         const baseFiltered = allDealers.filter(d => {
             let isVisible = true;
@@ -2938,7 +2987,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const normalizedSector = normalizeDisplayValue(d.region_sector);
             const searchable = [
                 d.name, d.dealer_id, normalizedCity, d.address, normalizedSector, normalizedType,
-                responsibleLabel(d.responsible)
+                responsibleLabel(d.responsible),
+                ...(d.pos_materials || []).map(item => item?.name)
             ].filter(Boolean).join(' ').toLowerCase();
 
             return isVisible &&
@@ -2948,6 +2998,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     (responsible === '__unassigned__' && !d.responsible) ||
                     (responsible !== '__unassigned__' && String(d.responsible || '') === String(responsible))) &&
                 (!sector || normalizedSector === sector) &&
+                (!posFilter || (d.pos_materials || []).some(item => normalizeDisplayValue(item?.name) === posFilter)) &&
                 (!search || searchable.includes(search));
         });
 
@@ -3537,7 +3588,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if(filterCity) filterCity.onchange = renderDealerList; 
     if(filterPriceType) filterPriceType.onchange = renderDealerList; 
     if(filterStatus) filterStatus.onchange = renderDealerList; 
-    if(filterResponsible) filterResponsible.onchange = renderDealerList; 
+    if(filterResponsible) filterResponsible.onchange = renderDealerList;
+    if(filterPos) filterPos.onchange = renderDealerList;
     if(searchBar) searchBar.oninput = renderDealerList;
 
     initApp();
