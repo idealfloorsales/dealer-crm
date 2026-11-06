@@ -940,11 +940,293 @@
         });
     }
 
+    const CRM_CONTEXT_VERSION = 2;
+    const CRM_CONTEXT_CONTROL_SELECTOR = [
+        'input[id*="filter"]',
+        'select[id*="filter"]',
+        'textarea[id*="filter"]',
+        'input[id*="search"]',
+        'select[id*="search"]',
+        'select[id*="sort"]',
+        'input[id*="sort"]',
+        '#month-picker',
+        '[data-crm-context]'
+    ].join(',');
+    const CRM_CONTEXT_VIEW_ATTRS = [
+        'data-pricing-view',
+        'data-report-view',
+        'data-stock-view',
+        'data-ws-tab',
+        'data-stock-view-tab',
+        'data-view'
+    ];
+
+    function crmContextKey() {
+        return 'crm_ui_context_v' + CRM_CONTEXT_VERSION + ':' + window.location.pathname;
+    }
+
+    function readPageContext() {
+        try {
+            const parsed = JSON.parse(sessionStorage.getItem(crmContextKey()) || '{}');
+            return parsed && typeof parsed === 'object' ? parsed : {};
+        } catch (_) {
+            return {};
+        }
+    }
+
+    function writePageContext(context) {
+        try {
+            sessionStorage.setItem(crmContextKey(), JSON.stringify({
+                ...context,
+                path:window.location.pathname,
+                updatedAt:Date.now()
+            }));
+        } catch (_) {}
+    }
+
+    function isContextControl(element) {
+        if (!element?.matches?.(CRM_CONTEXT_CONTROL_SELECTOR)) return false;
+        if (element.closest('.modal')) return false;
+        if (element.disabled) return false;
+        if (element.type === 'password' || element.type === 'file' || element.type === 'hidden') return false;
+        return Boolean(element.id || element.name || element.dataset.crmContext);
+    }
+
+    function contextControlKey(element) {
+        if (element.id) return '#' + element.id;
+        if (element.name) return '[name="' + String(element.name).replace(/"/g, '\\"') + '"]';
+        return '[data-crm-context="' + String(element.dataset.crmContext || '').replace(/"/g, '\\"') + '"]';
+    }
+
+    function readControlValue(element) {
+        if (element.type === 'checkbox' || element.type === 'radio') return Boolean(element.checked);
+        return element.value ?? '';
+    }
+
+    function writeControlValue(element, value) {
+        if (!element) return false;
+        if (element.type === 'checkbox' || element.type === 'radio') {
+            const wanted = Boolean(value);
+            if (element.checked === wanted) return false;
+            element.checked = wanted;
+            return true;
+        }
+        const wanted = String(value ?? '');
+        if (element.tagName === 'SELECT' && ![...element.options].some(option => String(option.value) === wanted)) {
+            return false;
+        }
+        if (String(element.value ?? '') === wanted) return false;
+        element.value = wanted;
+        return true;
+    }
+
+    function saveControlToContext(element) {
+        if (!isContextControl(element)) return;
+        const context = readPageContext();
+        context.controls = context.controls || {};
+        context.controls[contextControlKey(element)] = readControlValue(element);
+        writePageContext(context);
+    }
+
+    function capturePageContext() {
+        const context = readPageContext();
+        context.controls = context.controls || {};
+        document.querySelectorAll(CRM_CONTEXT_CONTROL_SELECTOR).forEach(element => {
+            if (!isContextControl(element)) return;
+            context.controls[contextControlKey(element)] = readControlValue(element);
+        });
+        context.scroll = {
+            x:window.scrollX || 0,
+            y:window.scrollY || document.documentElement.scrollTop || 0
+        };
+        writePageContext(context);
+        return context;
+    }
+
+    function restoreContextControls({ notify = true } = {}) {
+        const context = readPageContext();
+        const controls = context.controls || {};
+        Object.entries(controls).forEach(([selector,value]) => {
+            let element = null;
+            try { element = document.querySelector(selector); } catch (_) { return; }
+            if (!isContextControl(element)) return;
+            const changed = writeControlValue(element, value);
+            if (changed && notify) {
+                const eventName = element.tagName === 'SELECT' || element.type === 'checkbox' || element.type === 'radio'
+                    ? 'change'
+                    : 'input';
+                element.dispatchEvent(new Event(eventName, { bubbles:true }));
+            }
+        });
+    }
+
+    function viewContextSelector(attr, value) {
+        const escaped = String(value || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+        return '[' + attr + '="' + escaped + '"]';
+    }
+
+    function saveViewToContext(element) {
+        if (!element) return;
+        const context = readPageContext();
+        context.views = context.views || {};
+        for (const attr of CRM_CONTEXT_VIEW_ATTRS) {
+            if (element.hasAttribute(attr)) {
+                context.views[attr] = element.getAttribute(attr) || '';
+                writePageContext(context);
+                return;
+            }
+        }
+    }
+
+    function restoreContextViews() {
+        const context = readPageContext();
+        const views = context.views || {};
+        Object.entries(views).forEach(([attr,value]) => {
+            if (!CRM_CONTEXT_VIEW_ATTRS.includes(attr)) return;
+            let target = null;
+            try { target = document.querySelector(viewContextSelector(attr,value)); } catch (_) { return; }
+            if (!target || target.closest('.modal')) return;
+            const alreadyActive = target.classList.contains('active') ||
+                target.getAttribute('aria-selected') === 'true' ||
+                target.getAttribute('aria-pressed') === 'true';
+            if (!alreadyActive) target.click();
+        });
+
+        if (context.bootstrapTab) {
+            let tab = null;
+            try { tab = document.querySelector(context.bootstrapTab); } catch (_) {}
+            if (tab && !tab.closest('.modal')) {
+                try {
+                    if (window.bootstrap?.Tab) bootstrap.Tab.getOrCreateInstance(tab).show();
+                    else tab.click();
+                } catch (_) {}
+            }
+        }
+    }
+
+    function restoreContextScroll() {
+        const context = readPageContext();
+        const scroll = context.scroll;
+        if (!scroll || !Number.isFinite(Number(scroll.y))) return;
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                window.scrollTo({
+                    left:Math.max(0, Number(scroll.x) || 0),
+                    top:Math.max(0, Number(scroll.y) || 0),
+                    behavior:'auto'
+                });
+            });
+        });
+    }
+
+    function clearPageContext({ keepScroll = false } = {}) {
+        if (!keepScroll) {
+            try { sessionStorage.removeItem(crmContextKey()); } catch (_) {}
+            return;
+        }
+        const context = readPageContext();
+        writePageContext({ scroll:context.scroll || {x:0,y:0} });
+    }
+
+    function initPageContextLayer() {
+        if (!document.body || document.body.dataset.crmContextReady === '1') return;
+        document.body.dataset.crmContextReady = '1';
+
+        let scrollTimer = null;
+        const rememberScroll = () => {
+            clearTimeout(scrollTimer);
+            scrollTimer = setTimeout(() => {
+                const context = readPageContext();
+                context.scroll = {
+                    x:window.scrollX || 0,
+                    y:window.scrollY || document.documentElement.scrollTop || 0
+                };
+                writePageContext(context);
+            }, 120);
+        };
+
+        document.addEventListener('input', event => saveControlToContext(event.target), true);
+        document.addEventListener('change', event => saveControlToContext(event.target), true);
+        window.addEventListener('scroll', rememberScroll, { passive:true });
+
+        document.addEventListener('click', event => {
+            const view = event.target.closest(CRM_CONTEXT_VIEW_ATTRS.map(attr => '[' + attr + ']').join(','));
+            if (view && !view.closest('.modal')) saveViewToContext(view);
+
+            const reset = event.target.closest(
+                '#dealer-reset-filters,#report-reset-filters,#reset-filters,#product-reset-filters,#rec-reset-filters,#map-reset-filters,[data-reset-filters],[data-crm-context-reset]'
+            );
+            if (reset) {
+                setTimeout(() => {
+                    const context = readPageContext();
+                    context.controls = {};
+                    context.views = context.views || {};
+                    document.querySelectorAll(CRM_CONTEXT_CONTROL_SELECTOR).forEach(element => {
+                        if (isContextControl(element)) {
+                            context.controls[contextControlKey(element)] = readControlValue(element);
+                        }
+                    });
+                    writePageContext(context);
+                }, 0);
+            }
+        }, true);
+
+        document.addEventListener('shown.bs.tab', event => {
+            const tab = event.target;
+            if (!tab || tab.closest('.modal')) return;
+            const id = tab.id ? '#' + tab.id : null;
+            const target = tab.getAttribute('data-bs-target') || tab.getAttribute('href');
+            const selector = id || (target ? '[data-bs-target="' + String(target).replace(/"/g, '\\"') + '"]' : null);
+            if (!selector) return;
+            const context = readPageContext();
+            context.bootstrapTab = selector;
+            writePageContext(context);
+        });
+
+        window.addEventListener('pagehide', capturePageContext);
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') capturePageContext();
+        });
+
+        const restore = () => {
+            restoreContextControls({ notify:true });
+            restoreContextViews();
+            restoreContextScroll();
+        };
+
+        setTimeout(restore, 80);
+        setTimeout(restore, 350);
+        setTimeout(restore, 900);
+
+        let mutationTimer = null;
+        const observer = new MutationObserver(mutations => {
+            const relevant = mutations.some(mutation => {
+                const target = mutation.target;
+                if (!target?.closest) return false;
+                return Boolean(
+                    target.matches?.(CRM_CONTEXT_CONTROL_SELECTOR) ||
+                    target.closest(CRM_CONTEXT_CONTROL_SELECTOR) ||
+                    Array.from(mutation.addedNodes || []).some(node =>
+                        node?.nodeType === 1 && (
+                            node.matches?.(CRM_CONTEXT_CONTROL_SELECTOR) ||
+                            node.querySelector?.(CRM_CONTEXT_CONTROL_SELECTOR)
+                        )
+                    )
+                );
+            });
+            if (!relevant) return;
+            clearTimeout(mutationTimer);
+            mutationTimer = setTimeout(() => restoreContextControls({ notify:true }), 40);
+        });
+        observer.observe(document.body, { childList:true, subtree:true });
+    }
+
     function initInteractionLayer() {
         if (!document.body || document.body.dataset.crmUiReady === '1') return;
         document.body.dataset.crmUiReady = '1';
         document.body.classList.add('crm-ui-enhanced');
         initSeamlessNavigation();
+        initPageContextLayer();
         ensureFeedbackShell();
         initConnectivityLayer();
         scheduleReveal(document);
@@ -1216,7 +1498,14 @@
         setButtonLoading,
         startLoading: startNetworkActivity,
         stopLoading: stopNetworkActivity,
-        reveal: scheduleReveal
+        reveal: scheduleReveal,
+        captureContext: capturePageContext,
+        restoreContext: () => {
+            restoreContextControls({ notify:true });
+            restoreContextViews();
+            restoreContextScroll();
+        },
+        clearContext: clearPageContext
     };
 
     if (document.readyState === 'loading') {
