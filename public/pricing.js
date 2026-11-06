@@ -1053,7 +1053,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function scopeChoices(type) {    function scopeChoices(type) {
+    function scopeChoices(type) {
         if (type === 'dealer') {
             return state.rows
                 .slice()
