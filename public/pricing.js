@@ -695,16 +695,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!item) return;
         switchPricingView('conditions');
         openCreate();
-        const radio = document.querySelector('input[name="pricing-kind"][value="price_list"]');
-        if (radio) radio.checked = true;
-        syncKindFields();
-        $('pricing-name').value = item.name + ' — базовый прайс';
-        $('pricing-code').value = 'PRICE-' + (item.code || String(item.id).slice(-6)).toUpperCase();
         $('pricing-price-list').value = item.id;
-        $('pricing-reason-type').value = 'regional_price';
-        $('pricing-requirement-target').value = 0;
-        $('pricing-requirement-current').value = 0;
-        $('pricing-requirement-verified').checked = false;
     }
 
     function ensureXlsxLoaded() {
@@ -1353,8 +1344,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (payload.scopeType !== 'all' && !selectedTargets.size) {
                 throw new Error('Выберите, на кого действует настройка');
             }
-            if (!payload.priceListId && !payload.discounts.length) {
-                throw new Error('Выберите прайс или хотя бы одну скидку');
+            if (!payload.priceListId) {
+                throw new Error('Выберите прайс');
             }
             await send(API+'/setup','POST',payload);
             bootstrap.Modal.getOrCreateInstance($('pricing-condition-modal')).hide();

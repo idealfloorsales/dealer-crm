@@ -2651,17 +2651,12 @@ app.post('/api/pricing/setup', requirePermission('can_manage_pricing'), async (r
         }
 
         const priceListId = String(req.body?.priceListId || '').trim();
+        if (!priceListId || !mongoose.Types.ObjectId.isValid(priceListId)) return res.status(400).json({ error:'Выберите прайс' });
+        const priceList = await PriceList.findOne({ _id:priceListId, active:{ $ne:false } }).lean();
+        if (!priceList) return res.status(404).json({ error:'Прайс не найден или находится в архиве' });
+
         const discounts = [...new Set((Array.isArray(req.body?.discounts) ? req.body.discounts : [])
             .map(Number).filter(value => value === 5 || value === 10))];
-        if (!priceListId && !discounts.length) return res.status(400).json({ error:'Выберите прайс или хотя бы одну скидку' });
-
-        let priceList = null;
-        if (priceListId) {
-            if (!mongoose.Types.ObjectId.isValid(priceListId)) return res.status(400).json({ error:'Некорректный прайс' });
-            priceList = await PriceList.findOne({ _id:priceListId, active:{ $ne:false } }).lean();
-            if (!priceList) return res.status(404).json({ error:'Прайс не найден или находится в архиве' });
-        }
-
         const startDate = String(req.body?.startDate || '').trim();
         const endDate = String(req.body?.endDate || '').trim();
         const dateRe = /^\d{4}-\d{2}-\d{2}$/;
@@ -2678,55 +2673,117 @@ app.post('/api/pricing/setup', requirePermission('can_manage_pricing'), async (r
             scopeValue:targetPayload.scopeValue,
             scopeValues:targetPayload.scopeValues
         };
-        const created = [];
 
-        if (priceList) {
-            const item = await PricingCondition.create({
+        const normalizeTarget = value => String(value?._id || value?.id || value || '').trim().toLowerCase();
+        const exactTarget = condition => {
+            if (condition.scopeType !== scopeType) return false;
+            if (scopeType === 'all') return true;
+            const wantedRaw = scopeType === 'dealer' ? targetPayload.dealers : targetPayload.scopeValues;
+            const actualRaw = scopeType === 'dealer'
+                ? (Array.isArray(condition.dealers) && condition.dealers.length ? condition.dealers : [condition.dealer])
+                : (Array.isArray(condition.scopeValues) && condition.scopeValues.length ? condition.scopeValues : [condition.scopeValue]);
+            const wanted = new Set((wantedRaw || []).map(normalizeTarget).filter(Boolean));
+            const actual = new Set((actualRaw || []).map(normalizeTarget).filter(Boolean));
+            return wanted.size === actual.size && [...wanted].every(value => actual.has(value));
+        };
+
+        const standardCodes = ['BASE-PRICE','SOCIAL-5','SUPPORT-10'];
+        const candidates = (await PricingCondition.find({
+            scopeType,
+            code:{ $in:standardCodes },
+            cancelledAt:null
+        })).filter(exactTarget);
+
+        const chosenCodes = new Set(['BASE-PRICE']);
+        if (discounts.includes(5)) chosenCodes.add('SOCIAL-5');
+        if (discounts.includes(10)) chosenCodes.add('SUPPORT-10');
+
+        for (const existing of candidates) {
+            if (chosenCodes.has(existing.code)) continue;
+            existing.cancelledAt = new Date();
+            existing.updatedBy = user;
+            existing.audit.push({
+                action:'cancelled',
+                userId:user.id,
+                userName:user.name,
+                note:'Отключено при изменении настройки цен'
+            });
+            await existing.save();
+        }
+
+        async function upsertStandard(code, values, auditNote) {
+            const matches = candidates.filter(item => item.code === code && !item.cancelledAt);
+            let item = matches[0] || null;
+            if (item) {
+                Object.assign(item, base, values, { cancelledAt:null, updatedBy:user });
+                item.audit.push({ action:'updated', userId:user.id, userName:user.name, note:auditNote });
+                await item.save();
+                for (const duplicate of matches.slice(1)) {
+                    duplicate.cancelledAt = new Date();
+                    duplicate.updatedBy = user;
+                    duplicate.audit.push({ action:'cancelled', userId:user.id, userName:user.name, note:'Удалён дубль условия' });
+                    await duplicate.save();
+                }
+                return item._id;
+            }
+            item = await PricingCondition.create({
                 ...base,
-                kind:'price_list',
-                name:priceList.name,
-                code:'BASE-PRICE',
-                priceList:priceList._id,
-                priceListName:priceList.name,
-                stackable:false,
-                priority:100,
-                startDate:'',
-                endDate:'',
-                reasonType:'other',
-                requirementTarget:0,
-                requirementCurrent:0,
-                note,
+                ...values,
+                code,
                 createdBy:user,
                 updatedBy:user,
-                audit:[{ action:'created', userId:user.id, userName:user.name, note:'Прайс назначен через настройку цен' }]
+                audit:[{ action:'created', userId:user.id, userName:user.name, note:auditNote }]
             });
-            created.push(item._id);
+            return item._id;
         }
+
+        const saved = [];
+        saved.push(await upsertStandard('BASE-PRICE', {
+            kind:'price_list',
+            name:priceList.name,
+            priceList:priceList._id,
+            priceListName:priceList.name,
+            discountPercent:0,
+            stackable:false,
+            priority:100,
+            startDate:'',
+            endDate:'',
+            paused:false,
+            reasonType:'other',
+            requirementTarget:0,
+            requirementCurrent:0,
+            requirementUnit:'публикаций',
+            requirementDueDate:'',
+            requirementVerified:false,
+            proofNote:'',
+            note
+        }, 'Прайс назначен через настройку цен'));
 
         for (const discount of discounts) {
             const code = discount === 5 ? 'SOCIAL-5' : 'SUPPORT-10';
-            const item = await PricingCondition.create({
-                ...base,
+            saved.push(await upsertStandard(code, {
                 kind:'discount',
                 name:`Скидка −${discount}%`,
-                code,
+                priceList:null,
+                priceListName:'',
                 discountPercent:discount,
                 stackable:true,
                 priority:discount,
                 startDate,
                 endDate,
+                paused:false,
                 reasonType:'other',
                 requirementTarget:0,
                 requirementCurrent:0,
-                note,
-                createdBy:user,
-                updatedBy:user,
-                audit:[{ action:'created', userId:user.id, userName:user.name, note:`Скидка −${discount}% назначена через настройку цен` }]
-            });
-            created.push(item._id);
+                requirementUnit:'публикаций',
+                requirementDueDate:'',
+                requirementVerified:false,
+                proofNote:'',
+                note
+            }, `Скидка −${discount}% сохранена через настройку цен`));
         }
 
-        res.status(201).json({ status:'ok', created:created.map(String) });
+        res.json({ status:'ok', saved:saved.map(String) });
     } catch (e) {
         res.status(400).json({ error:e.message });
     }
