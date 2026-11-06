@@ -184,13 +184,19 @@
                 <div class="row g-4">
                     <div class="col-md-6">
                         <div class="content-card h-100">
-                            <h5 class="card-heading"><i class="bi bi-info-circle me-2"></i>Основное</h5>
+                            <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+    <h5 class="card-heading mb-0"><i class="bi bi-info-circle me-2"></i>Основное</h5>
+    <button type="button" class="btn btn-sm btn-light border" data-profile-edit-open="main" title="Редактировать основное"><i class="bi bi-pencil"></i></button>
+</div>
                             <div id="dealer-info-main" class="info-list"></div>
                         </div>
                     </div>
                     <div class="col-md-6">
                         <div class="content-card h-100">
-                            <h5 class="card-heading"><i class="bi bi-truck me-2"></i>Логистика и Адреса</h5>
+                            <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+    <h5 class="card-heading mb-0"><i class="bi bi-truck me-2"></i>Логистика и Адреса</h5>
+    <button type="button" class="btn btn-sm btn-light border" data-profile-edit-open="logistics" title="Редактировать логистику"><i class="bi bi-pencil"></i></button>
+</div>
                             <div class="mb-3">
                                 <label class="small text-muted fw-bold">Условия доставки</label>
                                 <div id="dealer-delivery" class="text-dark">Нет данных</div>
@@ -201,7 +207,10 @@
                     </div>
                     <div class="col-12">
                         <div class="content-card">
-                            <h5 class="card-heading"><i class="bi bi-sticky me-2"></i>Бонусы и Заметки</h5>
+                            <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+    <h5 class="card-heading mb-0"><i class="bi bi-sticky me-2"></i>Бонусы и Заметки</h5>
+    <button type="button" class="btn btn-sm btn-light border" data-profile-edit-open="notes" title="Редактировать заметки"><i class="bi bi-pencil"></i></button>
+</div>
                             <div id="dealer-bonuses" class="p-3 bg-light rounded border text-muted">Нет примечаний</div>
                         </div>
                     </div>
@@ -230,7 +239,10 @@
 
             <div class="tab-pane fade" id="contacts-pane">
                 <div class="content-card">
-                    <h5 class="card-heading mb-3">Сотрудники</h5>
+                    <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+    <h5 class="card-heading mb-0">Сотрудники</h5>
+    <button type="button" class="btn btn-sm btn-light border" data-profile-edit-open="contacts" title="Редактировать контакты"><i class="bi bi-pencil"></i></button>
+</div>
                     <div id="dealer-contacts-list" class="row g-3"></div>
                 </div>
             </div>
