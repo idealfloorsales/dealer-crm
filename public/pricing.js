@@ -1,8 +1,10 @@
 document.addEventListener('DOMContentLoaded', () => {
     const $ = id => document.getElementById(id);
     const API = '/api/pricing';
-    const state = { today:'', rows:[], conditions:[], stats:{} };
+    const state = { today:'', rows:[], conditions:[], stats:{}, priceLists:[], catalog:[], currentSheet:null, activeView:'dealers' };
     let manage = false;
+    let xlsxLoadPromise = null;
+    let pdfMakeLoadPromise = null;
 
     const esc = value => String(value ?? '')
         .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
@@ -77,13 +79,23 @@ document.addEventListener('DOMContentLoaded', () => {
             const addBtn = $('pricing-add-btn');
             if (addBtn) addBtn.style.display = manage ? '' : 'none';
 
-            const res = await fetch(API + '/overview');
-            const data = await res.json().catch(()=>({}));
-            if (!res.ok) throw new Error(data.error || 'Не удалось загрузить ценовые условия');
+            const [overviewRes, listsRes, catalogRes] = await Promise.all([
+                fetch(API + '/overview'),
+                fetch(API + '/price-lists'),
+                fetch(API + '/catalog')
+            ]);
+            const data = await overviewRes.json().catch(()=>({}));
+            const lists = await listsRes.json().catch(()=>[]);
+            const catalog = await catalogRes.json().catch(()=>[]);
+            if (!overviewRes.ok) throw new Error(data.error || 'Не удалось загрузить ценовые условия');
+            if (!listsRes.ok) throw new Error(lists.error || 'Не удалось загрузить прайсы');
+            if (!catalogRes.ok) throw new Error(catalog.error || 'Не удалось загрузить каталог');
             state.today = data.today || todayValue();
             state.rows = Array.isArray(data.rows) ? data.rows : [];
             state.conditions = Array.isArray(data.conditions) ? data.conditions : [];
             state.stats = data.stats || {};
+            state.priceLists = Array.isArray(lists) ? lists : [];
+            state.catalog = Array.isArray(catalog) ? catalog : [];
             renderAll();
 
             const presetDealer = new URLSearchParams(location.search).get('dealer');
@@ -99,9 +111,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderAll() {
         renderKpis();
         renderDealers();
+        renderPriceLists();
         renderConditions();
         fillDealerOptions();
+        fillPriceListOptions();
         if ($('pricing-today')) $('pricing-today').textContent = `На ${dateText(state.today)}`;
+        switchPricingView(state.activeView || 'dealers');
     }
 
     function renderKpis() {
