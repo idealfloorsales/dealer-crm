@@ -871,12 +871,30 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    function syncMatrixTypeFilters() {
+        const equipmentOnly = (typeFilter?.value || typeMode) === 'equipment';
+        if (equipmentOnly) {
+            if (filterSelect) filterSelect.value = 'all';
+            if (classFilter) classFilter.value = '';
+            if (thicknessFilter) thicknessFilter.value = '';
+        }
+        if (filterSelect) filterSelect.disabled = equipmentOnly;
+        if (classFilter) classFilter.disabled = equipmentOnly;
+        if (thicknessFilter) thicknessFilter.disabled = equipmentOnly;
+    }
+
+    productTypeInputs.forEach(input => input.addEventListener('change', syncProductTypeFields));
+
     searchInput?.addEventListener('input', applyLogic);
     searchClear?.addEventListener('click',()=>{
         searchInput.value='';
         searchClear.hidden=true;
         applyLogic();
         searchInput.focus();
+    });
+    typeFilter?.addEventListener('change',()=>{
+        syncMatrixTypeFilters();
+        applyLogic();
     });
     filterSelect?.addEventListener('change',applyLogic);
     stockFilter?.addEventListener('change',applyLogic);
@@ -902,6 +920,8 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
+        syncMatrixTypeFilters();
+        syncProductTypeFields();
         await loadProducts();
     }
 
