@@ -12384,3 +12384,39 @@ body.bg-light {
         border-left: 0;
     }
 }
+
+
+/* Dashboard activity feed: keep long names inside the card */
+.cc-activity-feed {
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.cc-event-item {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.cc-event-copy {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.cc-event-title,
+.cc-event-meta {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cc-event-title {
+    cursor: help;
+}
