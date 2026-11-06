@@ -1471,3 +1471,50 @@ html,body.pricing-page{max-width:100%;overflow-x:hidden}
   .pricing-commercial-grid{grid-template-columns:1fr}
   .pricing-promo-period-grid{grid-template-columns:1fr 1fr}
 }
+
+
+/* 2026-11-06 — mobile pricing card actions: never overflow dealer card */
+@media(max-width:600px){
+  .pricing-dealer-row{
+    grid-template-columns:minmax(0,1fr)!important;
+    overflow:hidden;
+  }
+  .pricing-dealer-main{
+    grid-column:1!important;
+    grid-row:auto!important;
+    min-width:0;
+  }
+  .pricing-row-actions{
+    grid-column:1!important;
+    grid-row:auto!important;
+    width:100%;
+    min-width:0!important;
+    display:grid!important;
+    grid-template-columns:36px 58px 58px;
+    justify-content:start!important;
+    align-items:center;
+    gap:7px!important;
+    margin-top:2px;
+    overflow:visible;
+  }
+  .pricing-row-actions .pricing-settings-btn{
+    width:36px!important;
+    min-width:36px!important;
+    height:36px!important;
+    flex:0 0 36px!important;
+  }
+  .pricing-row-actions .pricing-quick-btn{
+    width:58px!important;
+    min-width:58px!important;
+    height:36px!important;
+    padding:0 8px!important;
+    font-size:.66rem!important;
+  }
+  .pricing-dealer-meta,
+  .pricing-price-base,
+  .pricing-badges,
+  .pricing-total,
+  .pricing-end{
+    grid-column:1!important;
+  }
+}
