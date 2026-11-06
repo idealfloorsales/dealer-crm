@@ -1732,6 +1732,10 @@ app.post('/api/exports/log', requireAnyPermission('can_export_base', 'can_export
     }
 });
 
+function escapeRegexLiteral(value) {
+    return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 async function nextDealerCode() {
     const rows = await Dealer.find({ dealer_id: { $regex: /^IF\d+$/i } }).select('dealer_id').lean();
     let max = 0;
@@ -1741,7 +1745,14 @@ async function nextDealerCode() {
     });
     let next = max + 1;
     let code = 'IF' + String(next).padStart(3,'0');
-    while (await Dealer.exists({ dealer_id: new RegExp('^' + code + '
+    while (await Dealer.exists({ dealer_id: new RegExp('^' + escapeRegexLiteral(code) + '$','i') })) {
+        next += 1;
+        code = 'IF' + String(next).padStart(3,'0');
+    }
+    return code;
+}
+
+app.get('/api/dealers', requireAnyPermission('can_view_dealers', 'can_view_map', 'can_view_sales', 'can_view_competitors', 'can_view_reclamations'), async (req, res) => {
     try {
         let filter = getDealerFilter(req);
         if (req.query.scope === 'all' && req.user.permissions && req.user.permissions.is_admin) filter = {};
@@ -1760,6 +1771,7 @@ async function nextDealerCode() {
         res.status(500).json({ error: e.message });
     }
 });
+
 app.get('/api/dealers/next-id', requirePermission('can_create_dealer'), async (req, res) => {
     try {
         res.json({ dealer_id: await nextDealerCode() });
@@ -1776,6 +1788,7 @@ app.get('/api/dealers/:id/avatar', requirePermission('can_view_dealers'), async 
         res.json({ avatarUrl: d.avatarUrl || '' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
+
 app.get('/api/dealers/:id', requirePermission('can_view_dealers'), async (req, res) => {
     try {
         let query = Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) });
@@ -1792,6 +1805,7 @@ app.get('/api/dealers/:id', requirePermission('can_view_dealers'), async (req, r
         res.status(500).json({ error: e.message });
     }
 });
+
 app.get('/api/dealers/:id/photos', requirePermission('can_view_dealers'), async (req, res) => {
     try {
         const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).select('photos').lean();
@@ -1802,32 +1816,38 @@ app.get('/api/dealers/:id/photos', requirePermission('can_view_dealers'), async 
         res.status(500).json({ error: e.message });
     }
 });
-app.post('/api/dealers', requirePermission('can_create_dealer'), async (req, res) => { try {
-    const scope = getUserScope(req);
-    const payload = canonicalDealerPayload(req.body);
-    delete payload._cloneSourceId;
-    delete payload._cloneSourceDealerId;
-    delete payload._cloneSourceLabel;
 
-    payload.dealer_id = String(payload.dealer_id || '').trim().toUpperCase();
-    if (!payload.dealer_id) payload.dealer_id = await nextDealerCode();
+app.post('/api/dealers', requirePermission('can_create_dealer'), async (req, res) => {
+    try {
+        const scope = getUserScope(req);
+        const payload = canonicalDealerPayload(req.body);
+        delete payload._cloneSourceId;
+        delete payload._cloneSourceDealerId;
+        delete payload._cloneSourceLabel;
 
-    const existingId = await Dealer.findOne({ dealer_id: { $regex: new RegExp('^' + payload.dealer_id.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '$','i') } }).select('_id').lean();
-    if (existingId) return res.status(409).json({ error: 'Дилер с ID ' + payload.dealer_id + ' уже существует' });
+        payload.dealer_id = String(payload.dealer_id || '').trim().toUpperCase();
+        if (!payload.dealer_id) payload.dealer_id = await nextDealerCode();
 
-    if (req.user.role === 'manager' && !isGlobalViewer(req)) {
-        payload.responsibleUserId = String(req.user.id || '');
-        payload.responsibleAssignmentSource = req.body && req.body._cloneSourceId ? 'duplicate_self' : 'self_create';
-        if (scope === 'astana') payload.responsible = 'regional_astana';
-        if (scope === 'regions') payload.responsible = 'regional_regions';
-    } else if (req.body && req.body._cloneSourceId && req.body.responsibleUserId) {
-        payload.responsibleUserId = String(req.body.responsibleUserId || '');
-        payload.responsibleAssignmentSource = 'duplicate';
+        const existingId = await Dealer.exists({ dealer_id: new RegExp('^' + escapeRegexLiteral(payload.dealer_id) + '$','i') });
+        if (existingId) return res.status(409).json({ error: 'Дилер с ID ' + payload.dealer_id + ' уже существует' });
+
+        if (req.user.role === 'manager' && !isGlobalViewer(req)) {
+            payload.responsibleUserId = String(req.user.id || '');
+            payload.responsibleAssignmentSource = req.body && req.body._cloneSourceId ? 'duplicate_self' : 'self_create';
+            if (scope === 'astana') payload.responsible = 'regional_astana';
+            if (scope === 'regions') payload.responsible = 'regional_regions';
+        } else if (req.body && req.body._cloneSourceId && req.body.responsibleUserId) {
+            payload.responsibleUserId = String(req.body.responsibleUserId || '');
+            payload.responsibleAssignmentSource = 'duplicate';
+        }
+
+        const d = new Dealer(payload);
+        await d.save();
+        res.status(201).json(convertToClient(d));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
     }
-    const d = new Dealer(payload);
-    await d.save();
-    res.status(201).json(convertToClient(d));
-} catch (e) { res.status(500).json({ error: e.message }); } });
+});
 app.post('/api/dealers/:id/visits', requirePermission('can_manage_visits'), async (req, res) => {
     try {
         const dealer = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) });
@@ -1876,17 +1896,17 @@ app.put('/api/dealers/:id/visits/:index', requirePermission('can_manage_visits')
 app.put('/api/dealers/:id', requirePermission('can_edit_dealer'), async (req, res) => {
     try {
         const payload = canonicalDealerPayload(req.body);
-        if (Object.prototype.hasOwnProperty.call(payload,'dealer_id')) {
+        if (Object.prototype.hasOwnProperty.call(payload, 'dealer_id')) {
             payload.dealer_id = String(payload.dealer_id || '').trim().toUpperCase();
             if (payload.dealer_id) {
-                const escapedId = payload.dealer_id.replace(/[.*+?^${}()|[\]\\]/g,'\\        const payload = canonicalDealerPayload(req.body);
-        if (Object.prototype.hasOwnProperty.call(payload,'dealer_id')) {
-            payload.dealer_id = String(payload.dealer_id || '').trim().toUpperCase();
-            if (payload.dealer_id) {
-                const escapedId = payload.dealer_id.replace(/[.*+?^${}()|[\]\\]/g,'\\        const payload = canonicalDealerPayload(req.body);
-        if (req.user.role === 'manager' && !isGlobalViewer(req)) {');
-                const duplicateId = await Dealer.findOne({ dealer_id:{ $regex:new RegExp('^'+escapedId+'');
-                const duplicateId = await Dealer.findOne({ dealer_id:{ $regex:new RegExp('^'+escapedId+'
+                const duplicateId = await Dealer.exists({
+                    dealer_id: new RegExp('^' + escapeRegexLiteral(payload.dealer_id) + '$','i'),
+                    _id: { $ne: req.params.id }
+                });
+                if (duplicateId) return res.status(409).json({ error: 'Дилер с ID ' + payload.dealer_id + ' уже существует' });
+            }
+        }
+        if (req.user.role === 'manager' && !isGlobalViewer(req)) {
             delete payload.responsibleUserId;
             delete payload.responsibleAssignmentSource;
             if (req.user.scope === 'astana') payload.responsible = 'regional_astana';
@@ -1899,14 +1919,25 @@ app.put('/api/dealers/:id', requirePermission('can_edit_dealer'), async (req, re
             { new: true }
         );
         if (!updated) return res.status(404).json({ error: 'Дилер не найден' });
-        res.json({status:'ok'});
+        res.json({ status:'ok' });
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
 });
+
 app.patch('/api/dealers/:id', requirePermission('can_edit_dealer'), async (req, res) => {
     try {
         const payload = canonicalDealerPayload(req.body);
+        if (Object.prototype.hasOwnProperty.call(payload, 'dealer_id')) {
+            payload.dealer_id = String(payload.dealer_id || '').trim().toUpperCase();
+            if (payload.dealer_id) {
+                const duplicateId = await Dealer.exists({
+                    dealer_id: new RegExp('^' + escapeRegexLiteral(payload.dealer_id) + '$','i'),
+                    _id: { $ne: req.params.id }
+                });
+                if (duplicateId) return res.status(409).json({ error: 'Дилер с ID ' + payload.dealer_id + ' уже существует' });
+            }
+        }
         if (req.user.role === 'manager' && !isGlobalViewer(req)) {
             delete payload.responsibleUserId;
             delete payload.responsibleAssignmentSource;
@@ -1921,7 +1952,7 @@ app.patch('/api/dealers/:id', requirePermission('can_edit_dealer'), async (req, 
         ).lean();
 
         if (!updated) return res.status(404).json({ error: 'Дилер не найден' });
-        res.json({ status: 'ok' });
+        res.json({ status:'ok' });
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
