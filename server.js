@@ -1823,9 +1823,13 @@ function buildDealerPricingSummary(dealer, allConditions, today = pricingTodayKe
             (Number(b.discountPercent) || 0) - (Number(a.discountPercent) || 0)
         );
 
-    const appliedDiscounts = exclusive.length
-        ? [exclusive[0]]
-        : activeDiscounts.filter(condition => condition.stackable !== false);
+    // An active priority price list replaces the entire discount calculation.
+    // Discounts remain assigned and automatically resume after the override expires.
+    const appliedDiscounts = selectedPriceList
+        ? []
+        : (exclusive.length
+            ? [exclusive[0]]
+            : activeDiscounts.filter(condition => condition.stackable !== false));
 
     const totalDiscountPercent = appliedDiscounts.reduce(
         (sum, condition) => sum + Math.max(0, Number(condition.discountPercent) || 0),
