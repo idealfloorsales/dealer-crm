@@ -720,7 +720,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="dealer-price-metric is-accent">
                         <small>Итоговая скидка</small>
                         <strong>${pricing.totalDiscountPercent ? '−'+Number(pricing.totalDiscountPercent).toLocaleString('ru-RU',{maximumFractionDigits:2})+'%' : '0%'}</strong>
-                        <span>${discounts.length ? 'от действующей оптовой цены' : 'без дополнительной скидки'}</span>
+                        <span>${override ? 'скидки приостановлены приоритетным прайсом' : (discounts.length ? 'от действующей оптовой цены' : 'без дополнительной скидки')}</span>
                     </div>
                     <div class="dealer-price-metric ${override ? 'is-return':''}">
                         <small>${override ? 'Период приоритетного прайса' : 'Приоритетный прайс'}</small>
