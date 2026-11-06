@@ -1033,7 +1033,9 @@ const pricingConditionSchema = new mongoose.Schema({
     kind: { type: String, enum: ['discount', 'price_list'], required: true },
     scopeType: { type: String, enum: ['dealer', 'sector', 'city', 'all'], default: 'dealer' },
     dealer: { type: mongoose.Schema.Types.ObjectId, ref: 'Dealer' },
+    dealers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Dealer' }],
     scopeValue: String,
+    scopeValues: [String],
 
     discountPercent: { type: Number, default: 0 },
     priceListName: String,
@@ -1596,15 +1598,26 @@ function pricingScopeSpecificity(condition) {
 function pricingConditionMatchesDealer(condition, dealer) {
     if (!condition || !dealer) return false;
     if (condition.scopeType === 'all') return true;
+
     if (condition.scopeType === 'dealer') {
-        const target = condition.dealer?._id || condition.dealer;
-        return String(target || '') === String(dealer._id || dealer.id || '');
+        const targets = Array.isArray(condition.dealers) && condition.dealers.length
+            ? condition.dealers
+            : (condition.dealer ? [condition.dealer] : []);
+        const dealerId = String(dealer._id || dealer.id || '');
+        return targets.some(target => String(target?._id || target?.id || target || '') === dealerId);
     }
+
+    const values = Array.isArray(condition.scopeValues) && condition.scopeValues.length
+        ? condition.scopeValues
+        : (condition.scopeValue ? [condition.scopeValue] : []);
+
     if (condition.scopeType === 'sector') {
-        return normalizePricingText(condition.scopeValue) === normalizePricingText(dealer.region_sector);
+        const sector = normalizePricingText(dealer.region_sector);
+        return values.some(value => normalizePricingText(value) === sector);
     }
     if (condition.scopeType === 'city') {
-        return normalizePricingText(condition.scopeValue) === normalizePricingText(dealer.city);
+        const city = normalizePricingText(dealer.city);
+        return values.some(value => normalizePricingText(value) === city);
     }
     return false;
 }
@@ -1698,13 +1711,31 @@ function cleanPricingPayload(body = {}) {
     const reasonType = reasonTypes.includes(body.reasonType) ? body.reasonType : 'other';
     const targetDefault = reasonType === 'social_posts' ? 8 : 0;
 
+    const dealerIds = scopeType === 'dealer'
+        ? [...new Set(
+            (Array.isArray(body.dealerIds) ? body.dealerIds : [body.dealerId])
+                .map(value => String(value || '').trim())
+                .filter(value => mongoose.Types.ObjectId.isValid(value))
+        )]
+        : [];
+
+    const scopeValues = (scopeType === 'sector' || scopeType === 'city')
+        ? [...new Set(
+            (Array.isArray(body.scopeValues) ? body.scopeValues : [body.scopeValue])
+                .map(value => String(value || '').trim())
+                .filter(Boolean)
+        )]
+        : [];
+
     return {
         name: String(body.name || '').trim(),
         code: String(body.code || '').trim(),
         kind,
         scopeType,
-        dealer: scopeType === 'dealer' && body.dealerId ? body.dealerId : null,
-        scopeValue: scopeType === 'sector' || scopeType === 'city' ? String(body.scopeValue || '').trim() : '',
+        dealer: dealerIds[0] || null,
+        dealers: dealerIds,
+        scopeValue: scopeValues[0] || '',
+        scopeValues,
         discountPercent: kind === 'discount' ? Math.max(0, Number(body.discountPercent) || 0) : 0,
         priceListName: kind === 'price_list' ? String(body.priceListName || '').trim() : '',
         priceList: kind === 'price_list' && body.priceListId ? body.priceListId : null,
@@ -1730,9 +1761,9 @@ function validatePricingPayload(payload) {
         return 'Скидка должна быть больше 0% и не больше 100%';
     }
     if (payload.kind === 'price_list' && !payload.priceListName && !payload.priceList) return 'Выберите базовый прайс';
-    if (payload.scopeType === 'dealer' && !payload.dealer) return 'Выберите дилера';
-    if ((payload.scopeType === 'sector' || payload.scopeType === 'city') && !payload.scopeValue) {
-        return 'Укажите сектор / город';
+    if (payload.scopeType === 'dealer' && (!Array.isArray(payload.dealers) || !payload.dealers.length)) return 'Выберите хотя бы одного дилера';
+    if ((payload.scopeType === 'sector' || payload.scopeType === 'city') && (!Array.isArray(payload.scopeValues) || !payload.scopeValues.length)) {
+        return payload.scopeType === 'city' ? 'Выберите хотя бы один город' : 'Выберите хотя бы один сектор';
     }
     const dateRe = /^\d{4}-\d{2}-\d{2}$/;
     if (payload.startDate && !dateRe.test(payload.startDate)) return 'Некорректная дата начала';
@@ -1753,18 +1784,33 @@ function pricingPeriodsOverlap(aStart, aEnd, bStart, bEnd) {
 
 async function findPricingDuplicate(payload, excludeId = '') {
     if (!payload.code) return null;
+
     const query = {
         code: payload.code,
         kind: payload.kind,
         scopeType: payload.scopeType,
         cancelledAt: { $in: [null] }
     };
-    if (payload.scopeType === 'dealer') query.dealer = payload.dealer;
-    else if (payload.scopeType === 'sector' || payload.scopeType === 'city') query.scopeValue = payload.scopeValue;
     if (excludeId) query._id = { $ne: excludeId };
 
+    const targetSet = values => new Set((values || []).map(value => String(value?._id || value?.id || value || '').trim()).filter(Boolean));
+    const textSet = values => new Set((values || []).map(value => normalizePricingText(value)).filter(Boolean));
+
     const candidates = await PricingCondition.find(query).lean();
-    return candidates.find(item => pricingPeriodsOverlap(payload.startDate, payload.endDate, item.startDate, item.endDate)) || null;
+    return candidates.find(item => {
+        if (!pricingPeriodsOverlap(payload.startDate, payload.endDate, item.startDate, item.endDate)) return false;
+        if (payload.scopeType === 'all') return true;
+
+        if (payload.scopeType === 'dealer') {
+            const current = targetSet(payload.dealers?.length ? payload.dealers : [payload.dealer]);
+            const existing = targetSet(item.dealers?.length ? item.dealers : [item.dealer]);
+            return [...current].some(value => existing.has(value));
+        }
+
+        const current = textSet(payload.scopeValues?.length ? payload.scopeValues : [payload.scopeValue]);
+        const existing = textSet(item.scopeValues?.length ? item.scopeValues : [item.scopeValue]);
+        return [...current].some(value => existing.has(value));
+    }) || null;
 }
 
 async function cleanupAmbiguousLegacyOwnership() {
