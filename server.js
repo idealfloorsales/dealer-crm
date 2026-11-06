@@ -2230,6 +2230,7 @@ app.get('/api/sales', requirePermission('can_view_sales'), async (req, res) => {
             const rowDealerId = String(row.dealerId || '');
             if (!rowDealerId) return true;
 
+            if (rowDealerId.startsWith('PLAN_manager_')) return false;
             if (rowDealerId.startsWith('PLAN_vip_')) {
                 return workingDealerIds.has(rowDealerId.replace('PLAN_vip_', ''));
             }
@@ -2271,7 +2272,7 @@ app.post('/api/sales', async (req, res) => {
             if (row.isCustom) {
                 row.ownerUserId = String(req.user.id);
             } else if (dealerId.startsWith('PLAN_manager_')) {
-                if (dealerId !== `PLAN_manager_${req.user.id}`) return;
+                return;
             } else if (dealerId.startsWith('PLAN_vip_')) {
                 const ownedDealerId = dealerId.replace('PLAN_vip_', '');
                 if (!managerDealerIds.has(ownedDealerId)) return;
@@ -2281,6 +2282,7 @@ app.post('/api/sales', async (req, res) => {
                 return;
             }
         }
+        if (String(row.dealerId || '').startsWith('PLAN_manager_')) return;
         if (!canFact) delete row.fact;
         if (!canPlan) delete row.plan;
 
@@ -2316,6 +2318,12 @@ app.post('/api/sales', async (req, res) => {
     if (ops.length > 0) {
         await Sales.bulkWrite(ops); 
     }
+
+    // Старые планы менеджеров больше не используются: план задаётся по зоне/сектору/дилеру.
+    await Sales.deleteMany({
+        month: req.body.month,
+        dealerId: { $regex: '^PLAN_manager_' }
+    });
 
     // 3. Умное удаление (Очистка разовых продаж)
     // Определяем, к каким группам имеет доступ текущий пользователь
