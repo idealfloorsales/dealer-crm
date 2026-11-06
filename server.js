@@ -1877,7 +1877,8 @@ app.get('/api/dealers', requireAnyPermission('can_view_dealers', 'can_view_map',
         if (req.query.view === 'map') {
             query = query.select('_id name city address contacts latitude longitude status responsible responsibleUserId');
         } else {
-            query = query.select('-photos -visits -products -avatarUrl');
+            query = query.select('-photos -visits -products -avatarUrl')
+                .populate('price_list', 'name code versionDate active');
         }
         const dealers = await query.lean();
         res.json(dealers.map(d => ({ id: d._id, ...d })));
