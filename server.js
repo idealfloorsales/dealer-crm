@@ -644,7 +644,12 @@ const statusSchema = new mongoose.Schema({ value: String, label: String, color: 
 const Status = mongoose.model('Status', statusSchema);
 
 const productSchema = new mongoose.Schema({
-    sku: String, name: String, is_liquid: { type: Boolean, default: true }, excel_alias: String, stock_qty: Number,
+    sku: String,
+    name: String,
+    collection: String,
+    is_liquid: { type: Boolean, default: true },
+    excel_alias: String,
+    stock_qty: Number,
     characteristics: { class: String, thickness: String, bevel: String, size: String, package_area: String, package_qty: String, weight: String }
 });
 
@@ -967,9 +972,12 @@ const dealerSchema = new mongoose.Schema({ dealer_id: String, name: String, pric
 const Dealer = mongoose.model('Dealer', dealerSchema);
 
 const priceListRowSchema = new mongoose.Schema({
+    scopeType: { type: String, enum: ['collection', 'product'], default: 'product' },
+    collection: String,
     product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
     sku: String,
     name: String,
+    isLiquid: { type: Boolean, default: true },
     opt: { type: Number, default: 0 },
     rrp: { type: Number, default: 0 },
     maxRrp: { type: Number, default: 0 },
@@ -999,6 +1007,15 @@ const dealerDisplayPriceSchema = new mongoose.Schema({
 }, { timestamps: true });
 dealerDisplayPriceSchema.index({ dealer: 1, product: 1 }, { unique: true });
 const DealerDisplayPrice = mongoose.model('DealerDisplayPrice', dealerDisplayPriceSchema);
+
+const dealerCollectionDisplayPriceSchema = new mongoose.Schema({
+    dealer: { type: mongoose.Schema.Types.ObjectId, ref: 'Dealer', required: true, index: true },
+    collection: { type: String, required: true, trim: true },
+    price: { type: Number, default: 0 },
+    updatedBy: { id: String, name: String }
+}, { timestamps: true });
+dealerCollectionDisplayPriceSchema.index({ dealer: 1, collection: 1 }, { unique: true });
+const DealerCollectionDisplayPrice = mongoose.model('DealerCollectionDisplayPrice', dealerCollectionDisplayPriceSchema);
 
 const pricingAuditSchema = new mongoose.Schema({
     at: { type: Date, default: Date.now },
@@ -1995,19 +2012,63 @@ app.put('/api/dealers/:id/products', requirePermission('can_edit_matrix'), async
 // ==========================================
 // ЦЕНОВЫЕ УСЛОВИЯ ДИЛЕРОВ
 // ==========================================
+function normalizePricingSku(value) {
+    return String(value || '').toUpperCase().replace(/Ё/g, 'Е').replace(/\s+/g, '').trim();
+}
+
+function inferPricingCollection(product = {}) {
+    const explicit = String(product.collection || '').trim();
+    if (explicit) return explicit.toUpperCase();
+
+    const sku = normalizePricingSku(product.sku);
+    const raw = (sku + ' ' + String(product.name || '').toUpperCase()).replace(/Ё/g, 'Е');
+
+    if (sku.includes('EH')) return 'ENGLAND HERRINGBONE';
+    if (sku.includes('HP')) return 'HERRINGBONE PARQUET';
+    if (sku.includes('FP')) return 'FRENCH PARQUET';
+    if (sku.includes('MC')) return 'MAGIC COLLECTION';
+    if (sku.includes('IC')) return 'IDEAL CLASSIC';
+    if (sku.startsWith('RWN') || raw.includes('REAL WOOD NATURE')) return 'REAL WOOD NATURE';
+    if (sku.startsWith('RWZ') || raw.includes('REAL WOOD ANTIC')) return 'REAL WOOD ANTIC';
+    if (raw.includes('ROYAL PARQUET')) return 'ROYAL PARQUET';
+
+    const prefix = sku.match(/^([A-Z0-9]+)-/i)?.[1] || '';
+    return prefix || 'ДРУГИЕ КОЛЛЕКЦИИ';
+}
+
+function isPricingLaminateProduct(product = {}) {
+    const sku = normalizePricingSku(product.sku);
+    const name = String(product.name || '').toUpperCase().replace(/Ё/g, 'Е');
+    if (!sku && !name) return false;
+    if (sku === 'POS' || sku.startsWith('POS-')) return false;
+    if (/СТЕНД|ТАБЛИЧК|НАКЛЕЙК|РАСЧЕСК|ЗАДНЯЯ\s*СТЕНК|ОБОРУДОВАН|ПЛИНТУС|ПОРОГ|ПРОФИЛ/.test(name)) return false;
+    return true;
+}
+
 function cleanPriceListRows(rows = []) {
     return (Array.isArray(rows) ? rows : [])
         .filter(row => row && typeof row === 'object')
-        .map(row => ({
-            product: row.productId || row.product || null,
-            sku: String(row.sku || '').trim(),
-            name: String(row.name || '').trim(),
-            opt: Math.max(0, Number(row.opt) || 0),
-            rrp: Math.max(0, Number(row.rrp) || 0),
-            maxRrp: Math.max(0, Number(row.maxRrp) || 0),
-            currency: String(row.currency || 'KZT').trim() || 'KZT'
-        }))
-        .filter(row => row.product || row.sku || row.name);
+        .map(row => {
+            const scopeType = row.scopeType === 'collection' ? 'collection' : 'product';
+            return {
+                scopeType,
+                collection: String(row.collection || '').trim().toUpperCase(),
+                product: scopeType === 'product' ? (row.productId || row.product || null) : null,
+                sku: scopeType === 'product' ? String(row.sku || '').trim() : '',
+                name: scopeType === 'product' ? String(row.name || '').trim() : String(row.collection || row.name || '').trim(),
+                isLiquid: scopeType === 'collection' ? true : row.isLiquid !== false,
+                opt: Math.max(0, Number(row.opt) || 0),
+                rrp: Math.max(0, Number(row.rrp) || 0),
+                maxRrp: Math.max(0, Number(row.maxRrp) || 0),
+                currency: String(row.currency || 'KZT').trim() || 'KZT'
+            };
+        })
+        .filter(row => row.scopeType === 'collection' ? row.collection : (row.product || row.sku || row.name));
+}
+
+function legacyRowCollection(row, productMap) {
+    const product = row?.product ? productMap.get(String(row.product)) : null;
+    return String(row?.collection || inferPricingCollection(product || row || '')).trim().toUpperCase();
 }
 
 function dealerPriceColumn(priceType = '') {
@@ -2045,15 +2106,24 @@ async function resolveSummaryPriceList(summary) {
 app.get('/api/pricing/catalog', requirePermission('can_view_pricing'), async (req, res) => {
     try {
         const products = await Product.find({})
-            .select('_id sku name is_liquid')
+            .select('_id sku name collection is_liquid')
             .sort({ sku: 1, name: 1 })
             .lean();
-        res.json(products.map(product => ({
-            id: String(product._id),
-            sku: product.sku || '',
-            name: product.name || '',
-            active: product.is_liquid !== false
-        })));
+
+        res.json(products
+            .filter(isPricingLaminateProduct)
+            .map(product => ({
+                id: String(product._id),
+                sku: product.sku || '',
+                name: product.name || '',
+                collection: inferPricingCollection(product),
+                isLiquid: product.is_liquid !== false
+            }))
+            .sort((a, b) =>
+                Number(b.isLiquid) - Number(a.isLiquid) ||
+                String(a.collection).localeCompare(String(b.collection), 'ru') ||
+                String(a.sku).localeCompare(String(b.sku), 'ru')
+            ));
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
@@ -2095,9 +2165,12 @@ app.get('/api/pricing/price-lists/:id', requirePermission('can_view_pricing'), a
             active: list.active !== false,
             note: list.note || '',
             rows: (list.rows || []).map(row => ({
+                scopeType: row.scopeType || (row.product ? 'product' : 'collection'),
+                collection: row.collection || '',
                 productId: String(row.product || ''),
                 sku: row.sku || '',
                 name: row.name || '',
+                isLiquid: row.isLiquid !== false,
                 opt: Number(row.opt) || 0,
                 rrp: Number(row.rrp) || 0,
                 maxRrp: Number(row.maxRrp) || 0,
@@ -2184,26 +2257,107 @@ app.get('/api/pricing/dealers/:id/price-sheet', requirePermission('can_view_pric
         const summary = buildDealerPricingSummary(dealer, conditions);
         const list = await resolveSummaryPriceList(summary);
         const priceType = dealerPriceColumn(dealer.price_type);
-        const displayPrices = await DealerDisplayPrice.find({ dealer: dealer._id }).lean();
-        const displayMap = new Map(displayPrices.map(item => [String(item.product), Number(item.price) || 0]));
         const discount = Math.min(100, Math.max(0, Number(summary.totalDiscountPercent) || 0));
 
-        const rows = list ? (list.rows || []).map(row => {
-            const basePrice = Math.max(0, Number(row[priceType.key]) || 0);
-            const finalPrice = basePrice > 0 ? Math.round(basePrice * (1 - discount / 100) * 100) / 100 : 0;
-            return {
-                productId: String(row.product || ''),
-                sku: row.sku || '',
-                name: row.name || '',
-                opt: Number(row.opt) || 0,
-                rrp: Number(row.rrp) || 0,
-                maxRrp: Number(row.maxRrp) || 0,
-                basePrice,
-                finalPrice,
-                displayPrice: displayMap.get(String(row.product || '')) || 0,
-                currency: row.currency || 'KZT'
-            };
-        }) : [];
+        const products = await Product.find({})
+            .select('_id sku name collection is_liquid')
+            .sort({ sku: 1, name: 1 })
+            .lean();
+        const laminate = products.filter(isPricingLaminateProduct);
+        const productMap = new Map(laminate.map(product => [String(product._id), product]));
+
+        const productDisplay = await DealerDisplayPrice.find({ dealer: dealer._id }).lean();
+        const productDisplayMap = new Map(productDisplay.map(item => [String(item.product), Number(item.price) || 0]));
+        const collectionDisplay = await DealerCollectionDisplayPrice.find({ dealer: dealer._id }).lean();
+        const collectionDisplayMap = new Map(collectionDisplay.map(item => [String(item.collection || '').trim().toUpperCase(), Number(item.price) || 0]));
+
+        const listRows = Array.isArray(list?.rows) ? list.rows : [];
+        const collectionRows = new Map();
+        const productRows = new Map();
+        const skuRows = new Map();
+        const legacyByCollection = new Map();
+
+        listRows.forEach(row => {
+            const scope = row.scopeType || (row.product ? 'product' : 'collection');
+            const collection = String(row.collection || legacyRowCollection(row, productMap)).trim().toUpperCase();
+
+            if (scope === 'collection' && collection) {
+                collectionRows.set(collection, row);
+                return;
+            }
+
+            if (row.product) productRows.set(String(row.product), row);
+            if (row.sku) skuRows.set(normalizePricingSku(row.sku), row);
+            if (collection && !legacyByCollection.has(collection)) legacyByCollection.set(collection, row);
+        });
+
+        const liquidGroups = new Map();
+        laminate.filter(product => product.is_liquid !== false).forEach(product => {
+            const collection = inferPricingCollection(product);
+            if (!liquidGroups.has(collection)) liquidGroups.set(collection, []);
+            liquidGroups.get(collection).push(product);
+        });
+
+        const rows = [];
+
+        [...liquidGroups.entries()]
+            .sort((a, b) => String(a[0]).localeCompare(String(b[0]), 'ru'))
+            .forEach(([collection, members]) => {
+                const source = collectionRows.get(collection) || legacyByCollection.get(collection) || null;
+                const basePrice = source ? Math.max(0, Number(source[priceType.key]) || 0) : 0;
+                const finalPrice = basePrice > 0 ? Math.round(basePrice * (1 - discount / 100) * 100) / 100 : 0;
+                rows.push({
+                    rowType: 'collection',
+                    collection,
+                    label: collection,
+                    sku: '',
+                    name: collection,
+                    productId: '',
+                    members: members.length,
+                    isLiquid: true,
+                    inherited: false,
+                    opt: Number(source?.opt) || 0,
+                    rrp: Number(source?.rrp) || 0,
+                    maxRrp: Number(source?.maxRrp) || 0,
+                    basePrice,
+                    finalPrice,
+                    displayPrice: collectionDisplayMap.get(collection) || 0,
+                    currency: source?.currency || 'KZT'
+                });
+            });
+
+        laminate.filter(product => product.is_liquid === false)
+            .sort((a, b) =>
+                String(inferPricingCollection(a)).localeCompare(String(inferPricingCollection(b)), 'ru') ||
+                String(a.sku || '').localeCompare(String(b.sku || ''), 'ru')
+            )
+            .forEach(product => {
+                const collection = inferPricingCollection(product);
+                const override = productRows.get(String(product._id)) || skuRows.get(normalizePricingSku(product.sku)) || null;
+                const inherited = collectionRows.get(collection) || legacyByCollection.get(collection) || null;
+                const source = override || inherited;
+                const basePrice = source ? Math.max(0, Number(source[priceType.key]) || 0) : 0;
+                const finalPrice = basePrice > 0 ? Math.round(basePrice * (1 - discount / 100) * 100) / 100 : 0;
+
+                rows.push({
+                    rowType: 'product',
+                    collection,
+                    label: [product.sku, product.name].filter(Boolean).join(' · '),
+                    sku: product.sku || '',
+                    name: product.name || '',
+                    productId: String(product._id),
+                    members: 1,
+                    isLiquid: false,
+                    inherited: !override && Boolean(inherited),
+                    opt: Number(source?.opt) || 0,
+                    rrp: Number(source?.rrp) || 0,
+                    maxRrp: Number(source?.maxRrp) || 0,
+                    basePrice,
+                    finalPrice,
+                    displayPrice: productDisplayMap.get(String(product._id)) || 0,
+                    currency: source?.currency || 'KZT'
+                });
+            });
 
         res.json({
             dealer: {
@@ -2244,10 +2398,28 @@ app.put('/api/pricing/dealers/:id/display-prices', requirePermission('can_manage
 
         const user = pricingUserMeta(req);
         const prices = Array.isArray(req.body?.prices) ? req.body.prices : [];
+
         for (const row of prices) {
+            const rowType = row?.rowType === 'collection' ? 'collection' : 'product';
+            const price = Math.max(0, Number(row?.price) || 0);
+
+            if (rowType === 'collection') {
+                const collection = String(row?.collection || '').trim().toUpperCase();
+                if (!collection) continue;
+                if (price <= 0) {
+                    await DealerCollectionDisplayPrice.deleteOne({ dealer: dealer._id, collection });
+                } else {
+                    await DealerCollectionDisplayPrice.updateOne(
+                        { dealer: dealer._id, collection },
+                        { $set: { price, updatedBy: user } },
+                        { upsert: true }
+                    );
+                }
+                continue;
+            }
+
             const productId = String(row?.productId || '').trim();
             if (!mongoose.Types.ObjectId.isValid(productId)) continue;
-            const price = Math.max(0, Number(row?.price) || 0);
             if (price <= 0) {
                 await DealerDisplayPrice.deleteOne({ dealer: dealer._id, product: productId });
             } else {
@@ -2258,6 +2430,7 @@ app.put('/api/pricing/dealers/:id/display-prices', requirePermission('can_manage
                 );
             }
         }
+
         res.json({ status: 'ok' });
     } catch (e) {
         res.status(400).json({ error: e.message });
