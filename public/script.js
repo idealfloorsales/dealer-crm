@@ -40,6 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let newAvatarBase64 = null; 
     let currentUserRole = 'guest';
     let addCloneMeta = null;
+    let duplicateQueryHandled = false;
 
     // Для секторов
     const sectorModalEl = document.getElementById('sector-manager-modal');
@@ -770,6 +771,15 @@ document.addEventListener('DOMContentLoaded', () => {
             setupGlobalSearch();
             renderDealerList();
             setupEventListeners();
+
+            const duplicateFromUrl = new URLSearchParams(window.location.search).get('duplicate');
+            if (!duplicateQueryHandled && duplicateFromUrl && window.CRMAuth && CRMAuth.can('can_create_dealer')) {
+                duplicateQueryHandled = true;
+                const cleanUrl = new URL(window.location.href);
+                cleanUrl.searchParams.delete('duplicate');
+                window.history.replaceState({},'',cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
+                setTimeout(() => window.openDuplicateDealer?.(duplicateFromUrl),80);
+            }
 
             // Legacy redirect-based dealer editing is no longer used.
             localStorage.removeItem('pendingEditDealerId');
