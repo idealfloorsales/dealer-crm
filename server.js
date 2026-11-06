@@ -2042,6 +2042,23 @@ async function resolveSummaryPriceList(summary) {
     return PriceList.findOne({ name, active: { $ne: false } }).sort({ versionDate: -1, updatedAt: -1 }).lean();
 }
 
+app.get('/api/pricing/catalog', requirePermission('can_view_pricing'), async (req, res) => {
+    try {
+        const products = await Product.find({})
+            .select('_id sku name is_liquid')
+            .sort({ sku: 1, name: 1 })
+            .lean();
+        res.json(products.map(product => ({
+            id: String(product._id),
+            sku: product.sku || '',
+            name: product.name || '',
+            active: product.is_liquid !== false
+        })));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 app.get('/api/pricing/price-lists', requirePermission('can_view_pricing'), async (req, res) => {
     try {
         const lists = await PriceList.find({})
