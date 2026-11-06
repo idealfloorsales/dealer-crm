@@ -118,19 +118,42 @@ document.addEventListener('DOMContentLoaded', () => {
         return Number.isFinite(value) ? value : null;
     }
 
+    function productType(product) {
+        return String(product?.product_type || 'laminate') === 'equipment' ? 'equipment' : 'laminate';
+    }
+
     function missingProductFields(product) {
         const c = product?.characteristics || {};
         const fields = [
             ['артикул', product?.sku],
-            ['название', product?.name],
-            ['коллекция', product?.collection],
-            ['класс', c.class],
-            ['толщина', c.thickness],
-            ['размер', c.size],
-            ['м²/уп', c.package_area],
-            ['шт/уп', c.package_qty]
+            ['название', product?.name]
         ];
+
+        if (productType(product) === 'laminate') {
+            fields.push(
+                ['коллекция', product?.collection],
+                ['класс', c.class],
+                ['толщина', c.thickness],
+                ['размер', c.size],
+                ['м²/уп', c.package_area],
+                ['шт/уп', c.package_qty]
+            );
+        }
+
         return fields.filter(([,value]) => !String(value ?? '').trim()).map(([label]) => label);
+    }
+
+    function selectedProductType() {
+        return productTypeInputs.find(input => input.checked)?.value === 'equipment' ? 'equipment' : 'laminate';
+    }
+
+    function syncProductTypeFields() {
+        const type = selectedProductType();
+        laminateFields.forEach(field => field.classList.toggle('d-none', type === 'equipment'));
+        if (type === 'equipment') {
+            if (inpCollection) inpCollection.value = '';
+            if (inpLiquid) inpLiquid.checked = true;
+        }
     }
 
     function isProductComplete(product) {
@@ -141,11 +164,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const selectedClass = classFilter?.value || '';
         const selectedThickness = thicknessFilter?.value || '';
 
-        const classes = [...new Set(allProducts.map(p => String(p.characteristics?.class || '').trim()).filter(Boolean))]
+        const laminateProducts = allProducts.filter(p => productType(p) === 'laminate');
+        const classes = [...new Set(laminateProducts.map(p => String(p.characteristics?.class || '').trim()).filter(Boolean))]
             .sort((a,b)=>a.localeCompare(b,'ru',{numeric:true}));
-        const thicknesses = [...new Set(allProducts.map(p => String(p.characteristics?.thickness || '').trim()).filter(Boolean))]
+        const thicknesses = [...new Set(laminateProducts.map(p => String(p.characteristics?.thickness || '').trim()).filter(Boolean))]
             .sort((a,b)=>a.localeCompare(b,'ru',{numeric:true}));
-        const collections = [...new Set(allProducts.map(p => String(p.collection || '').trim()).filter(Boolean))]
+        const collections = [...new Set(laminateProducts.map(p => String(p.collection || '').trim()).filter(Boolean))]
             .sort((a,b)=>a.localeCompare(b,'ru',{numeric:true}));
 
         if (collectionOptions) {
