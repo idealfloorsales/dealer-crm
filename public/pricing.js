@@ -138,7 +138,6 @@ document.addEventListener('DOMContentLoaded', () => {
         renderDealers();
         renderPriceLists();
         renderConditions();
-        fillDealerOptions();
         fillPriceListOptions();
         if ($('pricing-today')) $('pricing-today').textContent = `На ${dateText(state.today)}`;
         switchPricingView(state.activeView || 'dealers');
