@@ -598,16 +598,14 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         };
 
-        if (personalManagerView) {
-            addRow('Мой результат', authUser.fullName || authUser.username || 'Мой план', totalFactAll, plans[managerPlanKey] || 0, true);
-        } else if (currentScope === 'all') {
+        if (currentScope === 'all') {
             addRow('Компания', 'Вся компания', totalFactAll, plans.total_all || 0, true);
         }
 
-        if (!personalManagerView && currentScope !== 'regions') {
+        if (currentScope !== 'regions') {
             addRow('Астана', 'Астана — всего', totalAstanaFact, plans.astana_all || 0, true);
             groupsConfig.forEach(g => {
-                if (g.type === 'astana' && ((facts[g.key] || 0) !== 0 || (plans[g.key] || 0) !== 0)) {
+                if (g.type === 'astana') {
                     addRow('Астана', g.title.replace('Астана — ', ''), facts[g.key] || 0, plans[g.key] || 0);
                 }
             });
@@ -617,10 +615,10 @@ document.addEventListener('DOMContentLoaded', () => {
             addRow('Индивидуальные планы', v.name, v.fact, plans[`vip_${v.id}`] || 0);
         });
 
-        if (!personalManagerView && currentScope !== 'astana') {
+        if (currentScope !== 'astana') {
             addRow('Регионы', 'Регионы — всего', totalRegionsFact, plans.regions_all || 0, true);
             groupsConfig.forEach(g => {
-                if (g.type === 'region' && ((facts[g.key] || 0) !== 0 || (plans[g.key] || 0) !== 0)) {
+                if (g.type === 'region') {
                     addRow('Регионы', g.title.replace('Регион ', ''), facts[g.key] || 0, plans[g.key] || 0);
                 }
             });
