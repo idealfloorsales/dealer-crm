@@ -41,6 +41,33 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentUserRole = 'guest';
     let addCloneMeta = null;
     let duplicateQueryHandled = false;
+    let dealerPriceLists = [];
+
+    function fillDealerPriceListSelect(selectId, selectedId = '') {
+        const select = document.getElementById(selectId);
+        if (!select) return;
+        const wanted = String(selectedId || select.value || '');
+        select.innerHTML = '';
+        select.add(new Option('Не назначен', ''));
+        dealerPriceLists
+            .filter(item => item.active !== false)
+            .sort((a,b) => String(a.name || '').localeCompare(String(b.name || ''), 'ru'))
+            .forEach(item => {
+                const label = [item.name, item.versionDate ? 'от ' + item.versionDate.split('-').reverse().join('.') : ''].filter(Boolean).join(' · ');
+                select.add(new Option(label, item.id));
+            });
+        if ([...select.options].some(option => option.value === wanted)) select.value = wanted;
+    }
+
+    async function fetchDealerPriceLists(selectedAdd = '', selectedEdit = '') {
+        const response = await fetch('/api/pricing/price-lists', { crmTrackLoading:false });
+        if (!response.ok) throw new Error('Не удалось загрузить прайсы');
+        const data = await response.json();
+        dealerPriceLists = Array.isArray(data) ? data : [];
+        fillDealerPriceListSelect('price_list', selectedAdd);
+        fillDealerPriceListSelect('edit_price_list', selectedEdit);
+        return dealerPriceLists;
+    }
 
     // Для секторов
     const sectorModalEl = document.getElementById('sector-manager-modal');
@@ -1881,7 +1908,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const [res] = await Promise.all([
                 fetch(`${API_DEALERS_URL}/${id}`),
                 fetchProductCatalog().catch(e => console.warn('Каталог недоступен', e)),
-                fetchCompetitorsRef().catch(e => console.warn('Справочник конкурентов недоступен', e))
+                fetchCompetitorsRef().catch(e => console.warn('Справочник конкурентов недоступен', e)),
+                fetchDealerPriceLists().catch(e => console.warn('Прайсы недоступны', e))
             ]);
             if(!res.ok) throw new Error("Ошибка");
             const d = await res.json();
@@ -1889,7 +1917,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if(titleEl) titleEl.textContent = 'Редактирование дилера';
             const subtitleEl = document.getElementById('edit-modal-subtitle');
             if(subtitleEl) subtitleEl.textContent = d.name ? `${d.name} · измените только нужные данные` : 'Измените только нужные данные';
-            document.getElementById('edit_db_id').value=d.id; document.getElementById('edit_dealer_id').value=d.dealer_id; document.getElementById('edit_name').value=d.name; document.getElementById('edit_price_type').value=d.price_type; document.getElementById('edit_city').value=d.city; document.getElementById('edit_address').value=d.address; document.getElementById('edit_delivery').value=d.delivery; document.getElementById('edit_website').value=d.website; document.getElementById('edit_instagram').value=d.instagram;
+            document.getElementById('edit_db_id').value=d.id; document.getElementById('edit_dealer_id').value=d.dealer_id; document.getElementById('edit_name').value=d.name; fillDealerPriceListSelect('edit_price_list', d.price_list?.id || d.price_list || ''); document.getElementById('edit_city').value=d.city; document.getElementById('edit_address').value=d.address; document.getElementById('edit_delivery').value=d.delivery; document.getElementById('edit_website').value=d.website; document.getElementById('edit_instagram').value=d.instagram;
             if(document.getElementById('edit_latitude')) document.getElementById('edit_latitude').value=d.latitude||''; if(document.getElementById('edit_longitude')) document.getElementById('edit_longitude').value=d.longitude||'';
             document.getElementById('edit_bonuses').value=d.bonuses; populateStatusSelects(d.status); 
             
@@ -3147,7 +3175,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         try {
-            await Promise.allSettled([fetchProductCatalog(), fetchCompetitorsRef()]);
+            await Promise.allSettled([fetchProductCatalog(), fetchCompetitorsRef(), fetchDealerPriceLists()]);
             const dealerRes = await fetch(`${API_DEALERS_URL}/${encodeURIComponent(id)}`);
             if (!dealerRes.ok) throw new Error('Не удалось загрузить исходного дилера');
 
@@ -3169,7 +3197,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             setValue('dealer_id',d.dealer_id || '');
             setValue('name',d.name || '');
-            setValue('price_type',d.price_type || '');
+            fillDealerPriceListSelect('price_list', d.price_list?.id || d.price_list || '');
             setValue('city',d.city || '');
             setValue('address',d.address || '');
             setValue('delivery',d.delivery || '');
@@ -3239,7 +3267,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         try {
-            await Promise.all([fetchProductCatalog(), fetchCompetitorsRef()]);
+            await Promise.all([fetchProductCatalog(), fetchCompetitorsRef(), fetchDealerPriceLists()]);
         } catch (e) {
             console.warn('Не удалось заранее загрузить справочники формы', e);
         }
@@ -3368,7 +3396,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if(addForm) addForm.addEventListener('submit', async (e) => { e.preventDefault(); if (!window.CRMAuth || !CRMAuth.can('can_create_dealer')) { window.showToast("Нет права создавать дилеров", "error"); return; } if (isSaving) return; isSaving = true; const btn = document.getElementById('btn-finish-step'); const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; 
         const legalEntities = collectLegalEntities(addLegalEntityList);
-        const data = { dealer_id: getVal('dealer_id'), name: getVal('name'), legal_entities: legalEntities, price_type: getVal('price_type'), city: getVal('city'), address: getVal('address'), delivery: getVal('delivery'), website: getVal('website'), instagram: getVal('instagram'), latitude: getVal('add_latitude'), longitude: getVal('add_longitude'), bonuses: getVal('bonuses'), status: getVal('status'), responsible: document.getElementById('responsible').value, region_sector: document.getElementById('add_region_sector').value, hasPersonalPlan: document.getElementById('add_has_personal_plan')?.checked || false, contract: { isSigned: document.getElementById('add_contract_signed').checked, date: getVal('add_contract_date') }, contacts: collectData(addContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]), additional_addresses: collectData(addAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]), pos_materials: collectData(addPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]), visits: collectData(addVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'}]), photos: addPhotosData, avatarUrl: newAvatarBase64, competitors: collectData(addCompetitorList, '.competitor-entry', [{key:'brand',class:'.competitor-brand'},{key:'collection',class:'.competitor-collection'},{key:'price_opt',class:'.competitor-price-opt'},{key:'price_retail',class:'.competitor-price-retail'}]) };
+        const data = { dealer_id: getVal('dealer_id'), name: getVal('name'), legal_entities: legalEntities, price_list: getVal('price_list') || null, city: getVal('city'), address: getVal('address'), delivery: getVal('delivery'), website: getVal('website'), instagram: getVal('instagram'), latitude: getVal('add_latitude'), longitude: getVal('add_longitude'), bonuses: getVal('bonuses'), status: getVal('status'), responsible: document.getElementById('responsible').value, region_sector: document.getElementById('add_region_sector').value, hasPersonalPlan: document.getElementById('add_has_personal_plan')?.checked || false, contract: { isSigned: document.getElementById('add_contract_signed').checked, date: getVal('add_contract_date') }, contacts: collectData(addContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]), additional_addresses: collectData(addAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]), pos_materials: collectData(addPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]), visits: collectData(addVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'}]), photos: addPhotosData, avatarUrl: newAvatarBase64, competitors: collectData(addCompetitorList, '.competitor-entry', [{key:'brand',class:'.competitor-brand'},{key:'collection',class:'.competitor-collection'},{key:'price_opt',class:'.competitor-price-opt'},{key:'price_retail',class:'.competitor-price-retail'}]) };
         if (addCloneMeta) {
             data._cloneSourceId = addCloneMeta.sourceId;
             data._cloneSourceDealerId = addCloneMeta.sourceDealerId;
@@ -3379,7 +3407,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(editForm) editForm.addEventListener('submit', async (e) => { e.preventDefault(); if (!window.CRMAuth || !CRMAuth.can('can_edit_dealer')) { window.showToast("Нет права редактировать дилеров", "error"); return; } if (isSaving) return; isSaving = true; const btn = document.querySelector('button[form="edit-dealer-form"]'); const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; const id = document.getElementById('edit_db_id').value; let avatarToSend = getVal('edit-current-avatar-url'); if (newAvatarBase64) avatarToSend = newAvatarBase64; 
         const legalEntities = collectLegalEntities(editLegalEntityList);
         const data = { 
-            dealer_id: getVal('edit_dealer_id'), name: getVal('edit_name'), legal_entities: legalEntities, price_type: getVal('edit_price_type'), city: getVal('edit_city'), address: getVal('edit_address'), delivery: getVal('edit_delivery'), website: getVal('edit_website'), instagram: getVal('edit_instagram'), latitude: getVal('edit_latitude'), longitude: getVal('edit_longitude'), bonuses: getVal('edit_bonuses'), status: getVal('edit_status'), responsible: document.getElementById('edit_responsible').value, region_sector: document.getElementById('edit_region_sector').value, 
+            dealer_id: getVal('edit_dealer_id'), name: getVal('edit_name'), legal_entities: legalEntities, price_list: getVal('edit_price_list') || null, city: getVal('edit_city'), address: getVal('edit_address'), delivery: getVal('edit_delivery'), website: getVal('edit_website'), instagram: getVal('edit_instagram'), latitude: getVal('edit_latitude'), longitude: getVal('edit_longitude'), bonuses: getVal('edit_bonuses'), status: getVal('edit_status'), responsible: document.getElementById('edit_responsible').value, region_sector: document.getElementById('edit_region_sector').value, 
             hasPersonalPlan: document.getElementById('edit_has_personal_plan').checked,
             contract: { isSigned: document.getElementById('edit_contract_signed').checked, date: getVal('edit_contract_date') }, avatarUrl: avatarToSend, contacts: collectData(editContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]), additional_addresses: collectData(editAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]), pos_materials: collectData(editPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]), visits: collectData(editVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'},{key:'isCompleted',class:'.visit-completed'}]), photos: editPhotosData, competitors: collectData(editCompetitorList, '.competitor-entry', [{key:'brand',class:'.competitor-brand'},{key:'collection',class:'.competitor-collection'},{key:'price_opt',class:'.competitor-price-opt'},{key:'price_retail',class:'.competitor-price-retail'}]) 
         }; 
