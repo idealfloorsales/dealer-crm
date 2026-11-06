@@ -77,7 +77,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!window.CRMAuth?.can('can_view_pricing')) return;
             manage = Boolean(window.CRMAuth?.can('can_manage_pricing'));
             const addBtn = $('pricing-add-btn');
+            const addListBtn = $('pricing-add-list-btn');
             if (addBtn) addBtn.style.display = manage ? '' : 'none';
+            if (addListBtn) addListBtn.style.display = manage ? '' : 'none';
 
             const [overviewRes, listsRes, catalogRes] = await Promise.all([
                 fetch(API + '/overview'),
@@ -1202,10 +1204,28 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    document.querySelectorAll('[data-pricing-view]').forEach(button => {
+        button.addEventListener('click', () => switchPricingView(button.dataset.pricingView || 'dealers'));
+    });
+
     $('pricing-search')?.addEventListener('input',renderDealers);
     $('pricing-filter')?.addEventListener('change',renderDealers);
+    $('pricing-list-search')?.addEventListener('input',renderPriceLists);
+    $('pricing-list-filter')?.addEventListener('change',renderPriceLists);
     $('pricing-condition-status')?.addEventListener('change',renderConditions);
+
     $('pricing-add-btn')?.addEventListener('click',()=>openCreate());
+    $('pricing-add-list-btn')?.addEventListener('click',()=>openPriceListEditor());
+    $('pricing-price-list-form')?.addEventListener('submit',savePriceList);
+    $('pricing-list-import-btn')?.addEventListener('click',()=>$('pricing-list-import-input')?.click());
+    $('pricing-list-import-input')?.addEventListener('change',event=>importPriceListExcel(event.target.files?.[0]));
+    $('pricing-list-copy-opt-btn')?.addEventListener('click',copyOptToRrp);
+
+    $('pricing-sheet-save-display')?.addEventListener('click',saveDisplayPrices);
+    $('pricing-sheet-excel')?.addEventListener('click',exportDealerExcel);
+    $('pricing-sheet-pdf')?.addEventListener('click',exportDealerPdf);
+    $('pricing-sheet-share')?.addEventListener('click',shareDealerPrice);
+
     $('pricing-scope-type')?.addEventListener('change',syncScopeFields);
     document.querySelectorAll('input[name="pricing-kind"]').forEach(input=>input.addEventListener('change',syncKindFields));
     $('pricing-reason-type')?.addEventListener('change',()=>syncReasonDefaults(true));
