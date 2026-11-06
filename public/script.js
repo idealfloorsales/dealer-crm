@@ -233,6 +233,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
     const safeText = (text) => (text || '').toString().replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const safeAttr = (text) => (text || '').toString().replace(/"/g, '&quot;');
+    const compactActivityText = (text, max = 72) => {
+        const value = String(text || '').replace(/\s+/g, ' ').trim();
+        if (value.length <= max) return value;
+        return value.slice(0, Math.max(1, max - 1)).trimEnd() + '…';
+    };
 
     function normalizeDisplayValue(value) {
         let text = String(value || '').trim().replace(/\s+/g, ' ');
@@ -1229,11 +1234,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     const date = new Date(item.createdAt);
                     const actor = item.actor?.name || item.actor?.username || 'Пользователь';
                     const when = Number.isNaN(date.getTime()) ? '' : date.toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
-                    return `<a class="cc-event-item" href="/audit.html">
+                    const fullTitle = String(item.summary || 'Действие в CRM').replace(/\s+/g, ' ').trim();
+                    const displayTitle = compactActivityText(fullTitle);
+                    const metaText = `${when} · ${actor}${item.success === false ? ' · Ошибка' : ''}`;
+                    return `<a class="cc-event-item" href="/audit.html" title="${safeAttr(safeText(fullTitle))}">
                         <span class="cc-event-icon"><i class="bi bi-${meta[0]}"></i></span>
                         <span class="cc-event-copy">
-                            <span class="cc-event-title">${safeText(item.summary || 'Действие в CRM')}</span>
-                            <span class="cc-event-meta">${safeText(when)} · ${safeText(actor)}${item.success === false ? ' · Ошибка' : ''}</span>
+                            <span class="cc-event-title" title="${safeAttr(safeText(fullTitle))}">${safeText(displayTitle)}</span>
+                            <span class="cc-event-meta" title="${safeAttr(safeText(metaText))}">${safeText(metaText)}</span>
                         </span>
                     </a>`;
                 }).join('');
@@ -1326,14 +1334,18 @@ document.addEventListener('DOMContentLoaded', () => {
         events.sort((a,b) => b.date-a.date);
         const top = events.slice(0,8);
 
-        container.innerHTML = top.length ? top.map(e => `
-            <a class="cc-event-item" href="${e.href}">
+        container.innerHTML = top.length ? top.map(e => {
+            const fullTitle = String(e.title || '').replace(/\s+/g, ' ').trim();
+            const displayTitle = compactActivityText(fullTitle);
+            const metaText = `${e.date.toLocaleDateString('ru-RU', {day:'numeric',month:'short'})} · ${e.meta || ''}`;
+            return `<a class="cc-event-item" href="${e.href}" title="${safeAttr(safeText(fullTitle))}">
                 <span class="cc-event-icon"><i class="bi bi-${e.icon}"></i></span>
                 <span class="cc-event-copy">
-                    <span class="cc-event-title">${safeText(e.title)}</span>
-                    <span class="cc-event-meta">${e.date.toLocaleDateString('ru-RU', {day:'numeric',month:'short'})} · ${safeText(e.meta)}</span>
+                    <span class="cc-event-title" title="${safeAttr(safeText(fullTitle))}">${safeText(displayTitle)}</span>
+                    <span class="cc-event-meta" title="${safeAttr(safeText(metaText))}">${safeText(metaText)}</span>
                 </span>
-            </a>`).join('') : '<div class="cc-empty">Событий пока нет</div>';
+            </a>`;
+        }).join('') : '<div class="cc-empty">Событий пока нет</div>';
     }
 
     function renderUpcomingPlan() {
