@@ -2017,29 +2017,15 @@ function normalizePricingSku(value) {
 }
 
 function inferPricingCollection(product = {}) {
-    const explicit = String(product.collection || '').trim();
-    if (explicit) return explicit.toUpperCase();
-
-    const sku = normalizePricingSku(product.sku);
-    const raw = (sku + ' ' + String(product.name || '').toUpperCase()).replace(/Ё/g, 'Е');
-
-    if (sku.includes('EH')) return 'ENGLAND HERRINGBONE';
-    if (sku.includes('HP')) return 'HERRINGBONE PARQUET';
-    if (sku.includes('FP')) return 'FRENCH PARQUET';
-    if (sku.includes('MC')) return 'MAGIC COLLECTION';
-    if (sku.includes('IC')) return 'IDEAL CLASSIC';
-    if (sku.startsWith('RWN') || raw.includes('REAL WOOD NATURE')) return 'REAL WOOD NATURE';
-    if (sku.startsWith('RWZ') || raw.includes('REAL WOOD ANTIC')) return 'REAL WOOD ANTIC';
-    if (raw.includes('ROYAL PARQUET')) return 'ROYAL PARQUET';
-
-    const prefix = sku.match(/^([A-Z0-9]+)-/i)?.[1] || '';
-    return prefix || 'ДРУГИЕ КОЛЛЕКЦИИ';
+    return String(product.collection || '').trim().toUpperCase();
 }
 
 function isPricingLaminateProduct(product = {}) {
     const sku = normalizePricingSku(product.sku);
     const name = String(product.name || '').toUpperCase().replace(/Ё/g, 'Е');
+    const collection = String(product.collection || '').trim();
     if (!sku && !name) return false;
+    if (!collection) return false;
     if (sku === 'POS' || sku.startsWith('POS-')) return false;
     if (/СТЕНД|ТАБЛИЧК|НАКЛЕЙК|РАСЧЕСК|ЗАДНЯЯ\s*СТЕНК|ОБОРУДОВАН|ПЛИНТУС|ПОРОГ|ПРОФИЛ/.test(name)) return false;
     return true;
@@ -2627,7 +2613,7 @@ app.get('/api/products/count', requireAnyPermission('can_view_products', 'can_vi
         res.status(500).json({ error: e.message });
     }
 });
-app.get('/api/products', requireAnyPermission('can_view_products', 'can_view_report', 'can_view_reclamations', 'can_view_dealers'), async (req, res) => { const s = new RegExp(req.query.search||'', 'i'); const p = await Product.find({$or:[{sku:s},{name:s}]}).sort({sku:1}).lean(); res.json(p.map(x=>{x.id=x._id;return x;})); });
+app.get('/api/products', requireAnyPermission('can_view_products', 'can_view_report', 'can_view_reclamations', 'can_view_dealers'), async (req, res) => { const s = new RegExp(req.query.search||'', 'i'); const p = await Product.find({$or:[{sku:s},{name:s},{collection:s}]}).sort({sku:1}).lean(); res.json(p.map(x=>{x.id=x._id;return x;})); });
 app.post('/api/products', requirePermission('can_manage_products'), async (req, res) => { const p = new Product(req.body); await p.save(); res.json(convertToClient(p)); });
 app.put('/api/products/:id', requirePermission('can_manage_products'), async (req, res) => { const p = await Product.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(p)); });
 app.delete('/api/products/:id', requirePermission('can_manage_products'), async (req, res) => { await Product.findByIdAndDelete(req.params.id); res.json({}); });
@@ -2635,7 +2621,7 @@ app.post('/api/admin/import-catalog', requirePermission('can_manage_products'), 
 app.get('/api/matrix', requireAnyPermission('can_view_products', 'can_view_report'), async (req, res) => {
     try {
         const [prods, dealers] = await Promise.all([
-            Product.find({}).select('sku name is_liquid').sort({sku:1}).lean(),
+            Product.find({}).select('sku name collection is_liquid').sort({sku:1}).lean(),
             Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id name city responsible products pos_materials status').lean()
         ]);
         const dealerIds = dealers.map(d => d._id);
@@ -2660,6 +2646,7 @@ app.get('/api/matrix', requireAnyPermission('can_view_products', 'can_view_repor
         const matrix = prods.map(p => ({
             sku: p.sku,
             name: p.name,
+            collection: p.collection || '',
             type: 'product',
             is_liquid: p.is_liquid !== false,
             dealers: dealers.map(d => ({
