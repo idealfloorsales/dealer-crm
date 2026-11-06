@@ -1515,3 +1515,14 @@ html:root[data-crm-theme="dark"] .app-workspace-page .form-select:focus{
   color:#f3f4f6!important;
   border-color:#5b5e68!important;
 }
+
+html:root[data-crm-theme="dark"] .dealer-price-detail-values-final-only .is-final{
+  background:rgba(185,4,10,.14)!important;
+  border-color:rgba(214,64,70,.26)!important;
+}
+html:root[data-crm-theme="dark"] .dealer-price-detail-values-final-only .is-final strong{
+  color:#f07d82!important;
+}
+html:root[data-crm-theme="dark"] .dealer-price-detail-values-final-only .is-final em{
+  color:#c9a0a3!important;
+}
