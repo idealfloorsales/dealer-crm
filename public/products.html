@@ -249,19 +249,23 @@
         </div>
     </div>
 
-    <div class="modal fade" id="mapping-modal" data-bs-backdrop="static" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content border-0">
-                <div class="modal-header border-0 bg-warning-subtle">
-                    <h6 class="modal-title fw-bold text-dark">Привязка товаров</h6>
+    <div class="modal fade stock-mapping-modal" id="mapping-modal" data-bs-backdrop="static" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="product-editor-head">
+                    <div>
+                        <span>СОПОСТАВЛЕНИЕ EXCEL</span>
+                        <h5>Не удалось найти несколько позиций</h5>
+                        <p>Выберите соответствие один раз. CRM сохранит название из Excel как идентификатор и в следующий раз найдёт позицию автоматически.</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
-                    <p class="small text-muted">Не найдены в базе. Укажите соответствие:</p>
-                    <div id="mapping-list" class="d-flex flex-column gap-3"></div>
+                <div class="modal-body stock-import-body">
+                    <div id="mapping-list" class="d-flex flex-column gap-2"></div>
                 </div>
-                <div class="modal-footer border-0 p-2">
-                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                    <button type="button" class="btn btn-sm btn-primary" id="btn-save-mapping">Сохранить связи</button>
+                <div class="modal-footer product-editor-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Пропустить</button>
+                    <button type="button" class="btn btn-dark" id="btn-save-mapping"><i class="bi bi-link-45deg"></i> Сохранить привязки</button>
                 </div>
             </div>
         </div>
