@@ -337,6 +337,10 @@ function auditEntityLabel(before, after, requestData) {
 function auditSummary(req, route, label) {
     const path=req.path || '';
     const suffix=label ? ' «'+label+'»' : '';
+    if (path === '/api/dealers' && req.method === 'POST' && req.body && req.body._cloneSourceId) {
+        const source=String(req.body._cloneSourceLabel || req.body._cloneSourceDealerId || '').trim();
+        return 'Продублировал дилера' + suffix + (source ? ' из «'+source+'»' : '');
+    }
     if (path.includes('/visits')) return (req.method==='POST'?'Добавил визит дилеру':'Изменил визит дилера') + suffix;
     if (path.includes('/dealers/') && path.endsWith('/products')) return 'Изменил выставленность дилера' + suffix;
     if (path === '/api/sales') return 'Сохранил продажи' + (req.body?.month ? ' за '+req.body.month : '');
@@ -1727,6 +1731,14431 @@ app.post('/api/exports/log', requireAnyPermission('can_export_base', 'can_export
         res.status(500).json({error:e.message});
     }
 });
+
+async function nextDealerCode() {
+    const rows = await Dealer.find({ dealer_id: { $regex: /^IF\d+$/i } }).select('dealer_id').lean();
+    let max = 0;
+    rows.forEach(row => {
+        const match = String(row.dealer_id || '').trim().match(/^IF(\d+)$/i);
+        if (match) max = Math.max(max, Number(match[1]) || 0);
+    });
+    let next = max + 1;
+    let code = 'IF' + String(next).padStart(3,'0');
+    while (await Dealer.exists({ dealer_id: new RegExp('^' + code + '
+    try {
+        let filter = getDealerFilter(req);
+        if (req.query.scope === 'all' && req.user.permissions && req.user.permissions.is_admin) filter = {};
+        if (req.query.context === 'sales' && hasPermission(req, 'can_view_sales')) filter = {};
+        if (!shouldIncludeNonWorkingDealers(req)) filter = getWorkingDealerFilter(filter);
+
+        let query = Dealer.find(filter);
+        if (req.query.view === 'map') {
+            query = query.select('_id name city address contacts latitude longitude status responsible responsibleUserId');
+        } else {
+            query = query.select('-photos -visits -products -avatarUrl');
+        }
+        const dealers = await query.lean();
+        res.json(dealers.map(d => ({ id: d._id, ...d })));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.get('/api/dealers/next-id', requirePermission('can_create_dealer'), async (req, res) => {
+    try {
+        res.json({ dealer_id: await nextDealerCode() });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/dealers/:id/avatar', requirePermission('can_view_dealers'), async (req, res) => {
+    try {
+        const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).select('avatarUrl').lean();
+        if (!d) return res.status(404).json({ error: 'Дилер не найден' });
+        res.set('Cache-Control', 'private, max-age=900');
+        res.json({ avatarUrl: d.avatarUrl || '' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.get('/api/dealers/:id', requirePermission('can_view_dealers'), async (req, res) => {
+    try {
+        let query = Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) });
+        if (req.query.view === 'profile') {
+            query = query.select('-photos').populate('products', 'sku name');
+        } else {
+            query = query.populate('products');
+        }
+        const d = await query.lean();
+        if (!d) return res.status(404).json({ error: 'Дилер не найден' });
+        if (req.query.view === 'profile') res.set('Cache-Control', 'private, max-age=30');
+        res.json(convertToClient(d));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.get('/api/dealers/:id/photos', requirePermission('can_view_dealers'), async (req, res) => {
+    try {
+        const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).select('photos').lean();
+        if (!d) return res.status(404).json({ error: 'Дилер не найден' });
+        res.set('Cache-Control', 'private, max-age=60');
+        res.json(Array.isArray(d.photos) ? d.photos : []);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.post('/api/dealers', requirePermission('can_create_dealer'), async (req, res) => { try {
+    const scope = getUserScope(req);
+    const payload = canonicalDealerPayload(req.body);
+    delete payload._cloneSourceId;
+    delete payload._cloneSourceDealerId;
+    delete payload._cloneSourceLabel;
+
+    payload.dealer_id = String(payload.dealer_id || '').trim().toUpperCase();
+    if (!payload.dealer_id) payload.dealer_id = await nextDealerCode();
+
+    const existingId = await Dealer.findOne({ dealer_id: { $regex: new RegExp('^' + payload.dealer_id.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '$','i') } }).select('_id').lean();
+    if (existingId) return res.status(409).json({ error: 'Дилер с ID ' + payload.dealer_id + ' уже существует' });
+
+    if (req.user.role === 'manager' && !isGlobalViewer(req)) {
+        payload.responsibleUserId = String(req.user.id || '');
+        payload.responsibleAssignmentSource = req.body && req.body._cloneSourceId ? 'duplicate_self' : 'self_create';
+        if (scope === 'astana') payload.responsible = 'regional_astana';
+        if (scope === 'regions') payload.responsible = 'regional_regions';
+    } else if (req.body && req.body._cloneSourceId && req.body.responsibleUserId) {
+        payload.responsibleUserId = String(req.body.responsibleUserId || '');
+        payload.responsibleAssignmentSource = 'duplicate';
+    }
+    const d = new Dealer(payload);
+    await d.save();
+    res.status(201).json(convertToClient(d));
+} catch (e) { res.status(500).json({ error: e.message }); } });
+app.post('/api/dealers/:id/visits', requirePermission('can_manage_visits'), async (req, res) => {
+    try {
+        const dealer = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) });
+        if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
+
+        const visit = {
+            date: req.body.date || new Date().toISOString().slice(0, 10),
+            comment: String(req.body.comment || '').trim(),
+            isCompleted: req.body.isCompleted !== false
+        };
+        if (!visit.comment) return res.status(400).json({ error: 'Комментарий визита обязателен' });
+
+        dealer.visits = dealer.visits || [];
+        dealer.visits.push(visit);
+        await dealer.save();
+
+        res.status(201).json({ status: 'ok', visit });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/dealers/:id/visits/:index', requirePermission('can_manage_visits'), async (req, res) => {
+    try {
+        const dealer = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) });
+        if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
+
+        const index = Number(req.params.index);
+        if (!Number.isInteger(index) || index < 0 || !dealer.visits || !dealer.visits[index]) {
+            return res.status(404).json({ error: 'Визит не найден' });
+        }
+
+        if (Object.prototype.hasOwnProperty.call(req.body, 'isCompleted')) {
+            dealer.visits[index].isCompleted = Boolean(req.body.isCompleted);
+        }
+        if (Object.prototype.hasOwnProperty.call(req.body, 'comment')) {
+            dealer.visits[index].comment = String(req.body.comment || '').trim();
+        }
+        if (Object.prototype.hasOwnProperty.call(req.body, 'date')) {
+            dealer.visits[index].date = String(req.body.date || '');
+        }
+
+        await dealer.save();
+        res.json({ status: 'ok', visit: dealer.visits[index] });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/dealers/:id', requirePermission('can_edit_dealer'), async (req, res) => {
+    try {
+        const payload = canonicalDealerPayload(req.body);
+        if (Object.prototype.hasOwnProperty.call(payload,'dealer_id')) {
+            payload.dealer_id = String(payload.dealer_id || '').trim().toUpperCase();
+            if (payload.dealer_id) {
+                const escapedId = payload.dealer_id.replace(/[.*+?^${}()|[\]\\]/g,'\\        const payload = canonicalDealerPayload(req.body);
+        if (Object.prototype.hasOwnProperty.call(payload,'dealer_id')) {
+            payload.dealer_id = String(payload.dealer_id || '').trim().toUpperCase();
+            if (payload.dealer_id) {
+                const escapedId = payload.dealer_id.replace(/[.*+?^${}()|[\]\\]/g,'\\        const payload = canonicalDealerPayload(req.body);
+        if (req.user.role === 'manager' && !isGlobalViewer(req)) {');
+                const duplicateId = await Dealer.findOne({ dealer_id:{ $regex:new RegExp('^'+escapedId+'');
+                const duplicateId = await Dealer.findOne({ dealer_id:{ $regex:new RegExp('^'+escapedId+'
+            delete payload.responsibleUserId;
+            delete payload.responsibleAssignmentSource;
+            if (req.user.scope === 'astana') payload.responsible = 'regional_astana';
+            if (req.user.scope === 'regions') payload.responsible = 'regional_regions';
+        }
+
+        const updated = await Dealer.findOneAndUpdate(
+            { _id: req.params.id, ...getDealerFilter(req) },
+            payload,
+            { new: true }
+        );
+        if (!updated) return res.status(404).json({ error: 'Дилер не найден' });
+        res.json({status:'ok'});
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.patch('/api/dealers/:id', requirePermission('can_edit_dealer'), async (req, res) => {
+    try {
+        const payload = canonicalDealerPayload(req.body);
+        if (req.user.role === 'manager' && !isGlobalViewer(req)) {
+            delete payload.responsibleUserId;
+            delete payload.responsibleAssignmentSource;
+            if (req.user.scope === 'astana') payload.responsible = 'regional_astana';
+            if (req.user.scope === 'regions') payload.responsible = 'regional_regions';
+        }
+
+        const updated = await Dealer.findOneAndUpdate(
+            { _id: req.params.id, ...getDealerFilter(req) },
+            { $set: payload },
+            { new: true }
+        ).lean();
+
+        if (!updated) return res.status(404).json({ error: 'Дилер не найден' });
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.delete('/api/dealers/:id', requirePermission('can_delete_dealer'), async (req, res) => { try { await Dealer.findOneAndDelete({ _id: req.params.id, ...getDealerFilter(req) }); res.json({status:'deleted'}); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.get('/api/dealers/:id/products', requireAnyPermission('can_view_dealers', 'can_view_products'), async (req, res) => { const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).populate('products'); if (!d) return res.status(404).json({ error: 'Дилер не найден' }); res.json(d.products.map(convertToClient)); });
+app.put('/api/dealers/:id/products', requirePermission('can_edit_matrix'), async (req, res) => { const d = await Dealer.findOneAndUpdate({ _id: req.params.id, ...getDealerFilter(req) }, { products: req.body.productIds }); if (!d) return res.status(404).json({ error: 'Дилер не найден' }); res.json({status:'ok'}); });
+// ==========================================
+// ЦЕНОВЫЕ УСЛОВИЯ ДИЛЕРОВ
+// ==========================================
+app.get('/api/pricing/overview', requirePermission('can_view_pricing'), async (req, res) => {
+    try {
+        const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req)))
+            .select('_id dealer_id name city region_sector price_type responsible')
+            .sort({ name: 1 })
+            .lean();
+        const conditions = await PricingCondition.find({})
+            .populate('dealer', '_id dealer_id name city region_sector price_type responsible')
+            .sort({ createdAt: -1 })
+            .lean();
+
+        const rows = dealers.map(dealer => buildDealerPricingSummary(dealer, conditions));
+        const today = pricingTodayKey();
+        const inSeven = new Date(today + 'T00:00:00Z');
+        inSeven.setUTCDate(inSeven.getUTCDate() + 7);
+        const sevenKey = inSeven.toISOString().slice(0, 10);
+
+        const activeConditionIds = new Set();
+        rows.forEach(row => row.matchedConditions.forEach(condition => {
+            if (condition.computedStatus === 'active') activeConditionIds.add(String(condition._id));
+        }));
+
+        const visibleConditions = conditions
+            .filter(condition => rows.some(row => pricingConditionMatchesDealer(condition, {
+                _id: row.dealerId,
+                name: row.dealerName,
+                city: row.city,
+                region_sector: row.sector,
+                price_type: row.defaultPriceType,
+                responsible: row.responsible
+            })))
+            .map(condition => ({
+                ...condition,
+                computedStatus: pricingConditionStatus(condition, today)
+            }));
+
+        res.json({
+            today,
+            rows,
+            conditions: visibleConditions,
+            stats: {
+                dealersWith5: rows.filter(row => row.has5 && !row.has10).length,
+                dealersWith10: rows.filter(row => row.has10 && !row.has5).length,
+                dealersWithBoth: rows.filter(row => row.has5 && row.has10).length,
+                activePriceOverrides: rows.filter(row => row.priceListCondition).length,
+                expiringSoon: visibleConditions.filter(condition =>
+                    condition.computedStatus === 'active' &&
+                    condition.endDate &&
+                    condition.endDate >= today &&
+                    condition.endDate <= sevenKey
+                ).length,
+                pendingRequirements: rows.reduce((sum, row) => sum + row.pendingRequirements, 0)
+            }
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/pricing/dealers/:id', requirePermission('can_view_pricing'), async (req, res) => {
+    try {
+        const dealer = await Dealer.findOne({
+            $and: [
+                { _id: req.params.id },
+                getWorkingDealerFilter(getDealerFilter(req))
+            ]
+        }).select('_id dealer_id name city region_sector price_type responsible')
+            .lean();
+        if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
+
+        const conditions = await PricingCondition.find({})
+            .populate('dealer', '_id dealer_id name city region_sector price_type responsible')
+            .sort({ createdAt: -1 })
+            .lean();
+        res.json(buildDealerPricingSummary(dealer, conditions));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/pricing/conditions', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const payload = cleanPricingPayload(req.body);
+        const validation = validatePricingPayload(payload);
+        if (validation) return res.status(400).json({ error: validation });
+        const duplicate = await findPricingDuplicate(payload);
+        if (duplicate) {
+            return res.status(400).json({ error: `Условие с кодом «${payload.code}» уже действует на эту же цель в пересекающийся период` });
+        }
+
+        if (!isGlobalViewer(req) && payload.scopeType !== 'dealer') {
+            return res.status(403).json({ error: 'Региональные и общие ценовые условия может создавать только пользователь с доступом ко всей компании' });
+        }
+        if (payload.scopeType === 'dealer') {
+            const dealer = await Dealer.findOne({
+                $and: [
+                    { _id: payload.dealer },
+                    getWorkingDealerFilter(getDealerFilter(req))
+                ]
+            }).select('_id').lean();
+            if (!dealer) return res.status(404).json({ error: 'Дилер недоступен' });
+        }
+
+        const user = pricingUserMeta(req);
+        const condition = await PricingCondition.create({
+            ...payload,
+            createdBy: user,
+            updatedBy: user,
+            audit: [{ action: 'created', userId: user.id, userName: user.name, note: 'Условие создано' }]
+        });
+        const populated = await PricingCondition.findById(condition._id).populate('dealer', '_id dealer_id name city region_sector price_type responsible').lean();
+        res.status(201).json({ ...populated, computedStatus: pricingConditionStatus(populated) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.put('/api/pricing/conditions/:id', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const existing = await PricingCondition.findById(req.params.id);
+        if (!existing) return res.status(404).json({ error: 'Ценовое условие не найдено' });
+        if (existing.cancelledAt) return res.status(400).json({ error: 'Отменённое условие нельзя редактировать' });
+
+        const payload = cleanPricingPayload(req.body);
+        const validation = validatePricingPayload(payload);
+        if (validation) return res.status(400).json({ error: validation });
+        const duplicate = await findPricingDuplicate(payload, existing._id);
+        if (duplicate) {
+            return res.status(400).json({ error: `Условие с кодом «${payload.code}» уже действует на эту же цель в пересекающийся период` });
+        }
+
+        if (!isGlobalViewer(req) && payload.scopeType !== 'dealer') {
+            return res.status(403).json({ error: 'Региональные и общие ценовые условия может менять только пользователь с доступом ко всей компании' });
+        }
+        if (payload.scopeType === 'dealer') {
+            const dealer = await Dealer.findOne({
+                $and: [
+                    { _id: payload.dealer },
+                    getWorkingDealerFilter(getDealerFilter(req))
+                ]
+            }).select('_id').lean();
+            if (!dealer) return res.status(404).json({ error: 'Дилер недоступен' });
+        }
+
+        const user = pricingUserMeta(req);
+        Object.assign(existing, payload, { updatedBy: user });
+        existing.audit.push({ action: 'updated', userId: user.id, userName: user.name, note: String(req.body.auditNote || 'Условие изменено').trim() });
+        await existing.save();
+
+        const populated = await PricingCondition.findById(existing._id).populate('dealer', '_id dealer_id name city region_sector price_type responsible').lean();
+        res.json({ ...populated, computedStatus: pricingConditionStatus(populated) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.delete('/api/pricing/conditions/:id', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const condition = await PricingCondition.findById(req.params.id);
+        if (!condition) return res.status(404).json({ error: 'Ценовое условие не найдено' });
+        if (condition.cancelledAt) return res.status(400).json({ error: 'Условие уже отменено' });
+
+        const user = pricingUserMeta(req);
+        condition.cancelledAt = new Date();
+        condition.updatedBy = user;
+        condition.audit.push({
+            action: 'cancelled',
+            userId: user.id,
+            userName: user.name,
+            note: String(req.body?.reason || 'Условие отменено').trim()
+        });
+        await condition.save();
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.get('/api/products/count', requireAnyPermission('can_view_products', 'can_view_report', 'can_view_reclamations', 'can_view_dealers'), async (req, res) => {
+    try {
+        const count = await Product.countDocuments({});
+        res.json({ count });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.get('/api/products', requireAnyPermission('can_view_products', 'can_view_report', 'can_view_reclamations', 'can_view_dealers'), async (req, res) => { const s = new RegExp(req.query.search||'', 'i'); const p = await Product.find({$or:[{sku:s},{name:s}]}).sort({sku:1}).lean(); res.json(p.map(x=>{x.id=x._id;return x;})); });
+app.post('/api/products', requirePermission('can_manage_products'), async (req, res) => { const p = new Product(req.body); await p.save(); res.json(convertToClient(p)); });
+app.put('/api/products/:id', requirePermission('can_manage_products'), async (req, res) => { const p = await Product.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(p)); });
+app.delete('/api/products/:id', requirePermission('can_manage_products'), async (req, res) => { await Product.findByIdAndDelete(req.params.id); res.json({}); });
+app.post('/api/admin/import-catalog', requirePermission('can_manage_products'), async (req, res) => { res.json({status: 'ok'}); });
+app.get('/api/matrix', requireAnyPermission('can_view_products', 'can_view_report'), async (req, res) => {
+    try {
+        const [prods, dealers] = await Promise.all([
+            Product.find({}).select('sku name is_liquid').sort({sku:1}).lean(),
+            Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id name city responsible products pos_materials status').lean()
+        ]);
+        const dealerIds = dealers.map(d => d._id);
+        const assets = dealerIds.length
+            ? await WorkshopDealerAsset.find({ dealer: { $in: dealerIds }, qty: { $gt: 0 } })
+                .populate('recipe', 'product outputType')
+                .lean()
+            : [];
+
+        const productMap = new Map();
+        dealers.forEach(d => productMap.set(d._id.toString(), new Set((d.products||[]).map(String))));
+
+        const sampleMap = new Map();
+        assets.forEach(asset => {
+            const productId = asset.recipe?.outputType === 'sample' ? asset.recipe?.product : null;
+            if (!productId) return;
+            const key = `${asset.dealer}|${productId}`;
+            sampleMap.set(key, (sampleMap.get(key) || 0) + (Number(asset.qty) || 0));
+        });
+
+        const posList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"];
+        const matrix = prods.map(p => ({
+            sku: p.sku,
+            name: p.name,
+            type: 'product',
+            is_liquid: p.is_liquid !== false,
+            dealers: dealers.map(d => ({
+                value: productMap.get(d._id.toString()).has(p._id.toString()) ? 1 : 0,
+                sample_qty: sampleMap.get(`${d._id}|${p._id}`) || 0,
+                is_pos: false
+            }))
+        }));
+
+        posList.forEach(pn => {
+            matrix.push({
+                sku: "POS",
+                name: pn,
+                type: 'pos',
+                dealers: dealers.map(d => ({
+                    value: (d.pos_materials||[]).find(m=>m.name===pn)?.quantity||0,
+                    is_pos: true
+                }))
+            });
+        });
+        res.json({
+            headers: dealers.map(d=>({id:d._id, name:d.name, city:d.city, responsible:d.responsible})),
+            matrix
+        });
+    } catch (e) {
+        res.status(500).json({error:e.message});
+    }
+});
+
+app.get('/api/sales', requirePermission('can_view_sales'), async (req, res) => {
+    try {
+        const { month, months, dealerId } = req.query;
+        let filter = month ? { month } : {};
+        if (!month && months) {
+            const count = Math.max(1, Math.min(24, Number(months) || 6));
+            const now = new Date();
+            now.setUTCDate(1);
+            now.setUTCMonth(now.getUTCMonth() - (count - 1));
+            const minMonth = now.toISOString().slice(0, 7);
+            filter = { month: { $gte: minMonth } };
+        }
+        const scope = getUserScope(req);
+        const companySalesView = req.query.context === 'sales' && hasPermission(req, 'can_view_sales');
+
+        if (!companySalesView && !isGlobalViewer(req) && req.user.role === 'manager') {
+            const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id').lean();
+            const dealerIds = dealers.map(d => String(d._id));
+            const zonePlanId = scope === 'astana'
+                ? 'PLAN_astana_all'
+                : scope === 'regions'
+                    ? 'PLAN_regions_all'
+                    : 'PLAN_total_all';
+
+            filter = {
+                $and: [
+                    filter,
+                    {
+                        $or: [
+                            // Факт менеджера считается исключительно по дилерам,
+                            // где он выбран ответственным.
+                            { isCustom: { $ne: true }, dealerId: { $in: dealerIds } },
+                            // План берём из сводки его зоны на странице Продажи.
+                            { isCustom: { $ne: true }, dealerId: zonePlanId }
+                        ]
+                    }
+                ]
+            };
+        } else if (!companySalesView && !isGlobalViewer(req) && scope !== 'all') {
+            const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id').lean();
+            const dealerIds = dealers.map(d => String(d._id));
+            const personalPlanIds = dealerIds.map(id => `PLAN_vip_${id}`);
+
+            const sectorType = scope === 'astana' ? 'astana' : 'region';
+            const sectors = await Sector.find({ type: sectorType }).select('name').lean();
+            const slug = name => String(name || '').trim().replace(/\s+/g, '_').toLowerCase();
+            const groupKeys = scope === 'astana'
+                ? [...sectors.map(s => `astana_${slug(s.name)}`), 'regional_astana']
+                : [...sectors.map(s => `sector_${slug(s.name)}`), 'regional_regions'];
+
+            const groupPlanIds = groupKeys.map(key => `PLAN_${key}`);
+            groupPlanIds.push(scope === 'astana' ? 'PLAN_astana_all' : 'PLAN_regions_all');
+            const allowedPlanIds = [...personalPlanIds, ...groupPlanIds];
+
+            filter = {
+                $and: [
+                    filter,
+                    {
+                        $or: [
+                            { isCustom: { $ne: true }, dealerId: { $in: dealerIds } },
+                            { isCustom: { $ne: true }, dealerId: { $in: allowedPlanIds } },
+                            { isCustom: true, group: { $in: groupKeys } }
+                        ]
+                    }
+                ]
+            };
+        }
+
+        if (dealerId) {
+            const requestedDealerId = String(dealerId);
+            const requestedPlanId = `PLAN_vip_${requestedDealerId}`;
+            filter = {
+                $and: [
+                    filter,
+                    { dealerId: { $in: [requestedDealerId, requestedPlanId] } }
+                ]
+            };
+        }
+
+        const s = await Sales.find(filter).lean();
+
+        // Нерабочие дилеры (potential/archive) не участвуют в текущей
+        // операционной статистике продаж. Сами исторические строки Sales
+        // остаются в базе и могут снова участвовать после возврата дилера
+        // в рабочий статус.
+        const workingBaseFilter = (companySalesView || isGlobalViewer(req)) ? {} : getDealerFilter(req);
+        const workingDealers = await Dealer.find(getWorkingDealerFilter(workingBaseFilter)).select('_id').lean();
+        const workingDealerIds = new Set(workingDealers.map(item => String(item._id)));
+
+        const visibleSales = s.filter(row => {
+            if (row.isCustom) return true;
+            const rowDealerId = String(row.dealerId || '');
+            if (!rowDealerId) return true;
+
+            if (rowDealerId.startsWith('PLAN_manager_')) return false;
+            if (rowDealerId.startsWith('PLAN_vip_')) {
+                return workingDealerIds.has(rowDealerId.replace('PLAN_vip_', ''));
+            }
+            if (rowDealerId.startsWith('PLAN_')) return true;
+            return workingDealerIds.has(rowDealerId);
+        });
+
+        res.json(visibleSales);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ===== ИСПРАВЛЕННЫЙ БЛОК: СОХРАНЕНИЕ, АГРЕГАЦИЯ И УДАЛЕНИЕ =====
+app.post('/api/sales', async (req, res) => {
+    const canFact = hasPermission(req, 'can_edit_sales_fact');
+    const canPlan = hasPermission(req, 'can_edit_sales_plan');
+    if (!canFact && !canPlan) {
+        return res.status(403).json({ error: 'Недостаточно прав для изменения продаж' });
+    }
+
+    const now = new Date();
+    const scope = req.user ? req.user.scope : 'none';
+    const companySalesView = req.query.context === 'sales' && hasPermission(req, 'can_view_sales');
+    const managerRestricted = Boolean(req.user && req.user.role === 'manager' && !isGlobalViewer(req) && !companySalesView);
+    let managerDealerIds = null;
+    if (managerRestricted) {
+        const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id').lean();
+        managerDealerIds = new Set(dealers.map(d => String(d._id)));
+    }
+
+    // 1. Агрегируем дубликаты из присланных данных (если ввели несколько с одинаковым именем)
+    const aggregatedData = {};
+    (Array.isArray(req.body.data) ? req.body.data : []).forEach(i => {
+        const row = { ...i };
+
+        if (managerRestricted) {
+            const dealerId = String(row.dealerId || '');
+            if (row.isCustom) {
+                row.ownerUserId = String(req.user.id);
+            } else if (dealerId.startsWith('PLAN_manager_')) {
+                return;
+            } else if (dealerId.startsWith('PLAN_vip_')) {
+                const ownedDealerId = dealerId.replace('PLAN_vip_', '');
+                if (!managerDealerIds.has(ownedDealerId)) return;
+            } else if (dealerId.startsWith('PLAN_')) {
+                return;
+            } else if (!managerDealerIds.has(dealerId)) {
+                return;
+            }
+        }
+        if (String(row.dealerId || '').startsWith('PLAN_manager_')) return;
+        if (!canFact) delete row.fact;
+        if (!canPlan) delete row.plan;
+
+        const key = row.isCustom ? `custom_${row.group}_${row.dealerName}` : `dealer_${row.dealerId}`;
+        if (!aggregatedData[key]) {
+            aggregatedData[key] = row;
+        } else {
+            if (canFact) aggregatedData[key].fact = (Number(aggregatedData[key].fact) || 0) + (Number(row.fact) || 0);
+            if (canPlan) aggregatedData[key].plan = (Number(aggregatedData[key].plan) || 0) + (Number(row.plan) || 0);
+        }
+    });
+
+    // 2. Обновляем/Добавляем записи
+    const ops = Object.values(aggregatedData).map(i => {
+        const filter = { month: req.body.month };
+        if (i.isCustom) {
+            filter.isCustom = true;
+            filter.dealerName = i.dealerName;
+            if (i.group) filter.group = i.group; 
+        } else {
+            filter.dealerId = i.dealerId;
+        }
+
+        return {
+            updateOne: { 
+                filter: filter, 
+                update: { $set: { ...i, updatedAt: now } }, 
+                upsert: true 
+            } 
+        };
+    }); 
+    
+    if (ops.length > 0) {
+        await Sales.bulkWrite(ops); 
+    }
+
+    // Старые планы менеджеров больше не используются: план задаётся по зоне/сектору/дилеру.
+    await Sales.deleteMany({
+        month: req.body.month,
+        dealerId: { $regex: '^PLAN_manager_' }
+    });
+
+    // 3. Умное удаление (Очистка разовых продаж)
+    // Определяем, к каким группам имеет доступ текущий пользователь
+    let groupFilter = {};
+    if (managerRestricted) {
+        groupFilter = { ownerUserId: String(req.user.id) };
+    } else if (!companySalesView && scope === 'astana') {
+        const sectors = await Sector.find({ type: 'astana' });
+        groupFilter = { group: { $in: sectors.map(s => s.name) } };
+    } else if (!companySalesView && scope === 'regions') {
+        const sectors = await Sector.find({ type: 'region' });
+        groupFilter = { group: { $in: sectors.map(s => s.name) } };
+    }
+    // Если admin или all, groupFilter остается пустым (имеет доступ ко всем)
+
+    // Ищем все разовые продажи за этот месяц в базе (в рамках доступа пользователя)
+    const dbCustomSales = await Sales.find({ 
+        month: req.body.month, 
+        isCustom: true, 
+        ...groupFilter 
+    });
+
+    const idsToDelete = [];
+    const incomingArray = Object.values(aggregatedData);
+
+    if (canFact) dbCustomSales.forEach(dbSale => {
+        // Проверяем, осталась ли эта продажа в присланных данных
+        const existsInIncoming = incomingArray.some(
+            i => i.isCustom && i.group === dbSale.group && i.dealerName === dbSale.dealerName
+        );
+        
+        // Если в присланных данных её больше нет — помечаем на удаление
+        if (!existsInIncoming) {
+            idsToDelete.push(dbSale._id);
+        }
+    });
+
+    // Удаляем всё лишнее
+    if (canFact && idsToDelete.length > 0) {
+        await Sales.deleteMany({ _id: { $in: idsToDelete } });
+    }
+
+    res.json({status:'ok'}); 
+});
+// ===================================================================
+
+app.get('/api/competitors-ref', requirePermission('can_view_competitors'), async (req, res) => { const l = await CompRef.find().sort({name:1}); res.json(l.map(convertToClient)); });
+app.post('/api/competitors-ref', requirePermission('can_manage_competitors'), async (req, res) => { const c = new CompRef(req.body); await c.save(); res.json(convertToClient(c)); });
+app.put('/api/competitors-ref/:id', requirePermission('can_manage_competitors'), async (req, res) => { await CompRef.findByIdAndUpdate(req.params.id, req.body); res.json({status:'ok'}); });
+app.delete('/api/competitors-ref/:id', requirePermission('can_manage_competitors'), async (req, res) => { await CompRef.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
+app.get('/api/knowledge', requirePermission('can_view_knowledge'), async (req, res) => { const l = await Knowledge.find().sort({title:1}); res.json(l.map(convertToClient)); });
+app.get('/api/knowledge/:id', requirePermission('can_view_knowledge'), async (req, res) => { res.json(convertToClient(await Knowledge.findById(req.params.id))); });
+app.post('/api/knowledge', requirePermission('can_manage_knowledge'), async (req, res) => { const a = new Knowledge(req.body); await a.save(); res.json(convertToClient(a)); });
+app.put('/api/knowledge/:id', requirePermission('can_manage_knowledge'), async (req, res) => { const a = await Knowledge.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(a)); });
+app.delete('/api/knowledge/:id', requirePermission('can_manage_knowledge'), async (req, res) => { await Knowledge.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
+app.get('/api/tasks', requirePermission('can_view_dashboard'), async (req, res) => { try { const data = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('name visits status responsible').lean(); res.json(data.map(d => ({ id: d._id, name: d.name, status: d.status, visits: d.visits || [], responsible: d.responsible }))); } catch (e) { res.status(500).json([]); } });
+
+async function getScopedDealerIds(req) {
+    const baseFilter = isGlobalViewer(req) ? {} : getDealerFilter(req);
+    const dealers = await Dealer.find(getWorkingDealerFilter(baseFilter)).select('_id').lean();
+    return dealers.map(d => String(d._id));
+}
+
+// ==========================================
+// РЕКВИЗИТЫ И РЕКЛАМАЦИИ
+// ==========================================
+const reclamationSchema = new mongoose.Schema({
+    dealerId: String,
+    dealerName: String,
+    date: String,
+    productName: String,
+    invoiceNumber: String,
+    purchaseDate: String,
+    clientName: String,
+    clientPhone: String,
+    address: String,
+    floor: String,
+    houseType: String,
+    totalArea: String,
+    purchasedVolume: String,
+    batchNumbers: [String],
+    baseType: String,
+    underlayment: String,
+    warmFloor: String,
+    installer: String,
+    
+    // --- НОВЫЕ ТЕХНИЧЕСКИЕ ПОЛЯ ---
+    acclimatization: String, 
+    storageMethod: String,
+    dryingTime: String,
+    floorFlatness: String,
+// --- НОВЫЕ ПОЛЯ ---
+    defectMoment: String,       // Момент выявления
+    compensationAmount: Number, // Сумма компенсации
+    internalNotes: String,
+    
+    description: String,
+    clientDemand: String,
+    resolution: String,
+    photos: [{ photo_url: String }]
+}, { timestamps: true });
+const Reclamation = mongoose.model('Reclamation', reclamationSchema);
+
+
+// ==========================================
+// ЦЕХ API
+// ==========================================
+async function syncWorkshopPosToDealer(dealerId, recipeId) {
+    const recipe = await WorkshopRecipe.findById(recipeId).select('matrixPosName').lean();
+    const posName = String(recipe?.matrixPosName || '').trim();
+    if (!posName) return;
+
+    const recipes = await WorkshopRecipe.find({ matrixPosName: posName }).select('_id').lean();
+    const recipeIds = recipes.map(item => item._id);
+    const assets = await WorkshopDealerAsset.find({ dealer: dealerId, recipe: { $in: recipeIds } }).lean();
+    const qty = assets.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+
+    const dealer = await Dealer.findById(dealerId);
+    if (!dealer) return;
+    dealer.pos_materials = Array.isArray(dealer.pos_materials) ? dealer.pos_materials : [];
+    const index = dealer.pos_materials.findIndex(item => item.name === posName);
+    if (qty > 0) {
+        if (index >= 0) dealer.pos_materials[index].quantity = qty;
+        else dealer.pos_materials.push({ name: posName, quantity: qty });
+    } else if (index >= 0) {
+        dealer.pos_materials.splice(index, 1);
+    }
+    await dealer.save();
+}
+
+app.post('/api/workshop/print-log', requirePermission('can_view_workshop'), async (req, res) => {
+    try {
+        const type=String(req.body?.type||'report').trim().slice(0,60);
+        const referenceId=String(req.body?.referenceId||'').trim().slice(0,120);
+        const title=String(req.body?.title||'Документ цеха').trim().slice(0,180);
+        res.json({status:'logged',type,referenceId,title});
+    } catch(e) {
+        res.status(500).json({error:e.message});
+    }
+});
+
+app.get('/api/workshop/bootstrap', requirePermission('can_view_workshop'), async (req, res) => {
+    try {
+        const [products, dealers, materials, recipes, laminateStocks, assets, productions, movements, memos] = await Promise.all([
+            Product.find().select('sku name is_liquid characteristics.package_qty characteristics.size characteristics.class characteristics.thickness').sort({ sku: 1 }).lean(),
+            Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id dealer_id name city status').sort({ name: 1 }).lean(),
+            WorkshopMaterial.find({ active: { $ne: false } }).sort({ category: 1, name: 1 }).lean(),
+            WorkshopRecipe.find({ active: { $ne: false } })
+                .populate('product', 'sku name is_liquid characteristics.package_qty')
+                .populate('materials.material', 'code name unit purchaseUnit purchaseUnitSize stockQty')
+                .populate('components.recipe', 'name outputType stockQty')
+                .sort({ outputType: 1, name: 1 }).lean(),
+            WorkshopLaminateStock.find().populate('product', 'sku name is_liquid characteristics.package_qty').lean(),
+            WorkshopDealerAsset.find({ qty: { $gt: 0 } })
+                .populate('dealer', 'dealer_id name city status')
+                .populate({ path: 'recipe', populate: { path: 'product', select: 'sku name is_liquid' } })
+                .sort({ updatedAt: -1 }).lean(),
+            WorkshopProduction.find({ cancelledAt: { $exists: false } })
+                .populate('recipe', 'name outputType')
+                .populate('product', 'sku name')
+                .sort({ date: -1, createdAt: -1 }).limit(30).lean(),
+            WorkshopMovement.find()
+                .populate('product', 'sku name')
+                .populate('material', 'code name unit')
+                .populate('recipe', 'name outputType')
+                .populate('dealer', 'dealer_id name city')
+                .sort({ date: -1, createdAt: -1 }).limit(60).lean(),
+            WorkshopMemo.find()
+                .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+                .populate('lines.actualProduct', 'sku name is_liquid characteristics.package_qty')
+                .populate('lines.recipe', 'name outputType planksPerUnit')
+                .sort({ date: -1, createdAt: -1 }).limit(80).lean()
+        ]);
+
+        const memoIds = memos.map(item => item._id);
+        const producedByMemoLine = memoIds.length ? await WorkshopProduction.aggregate([
+            { $match: { memo: { $in: memoIds }, memoLineId: { $nin: [null, ''] }, cancelledAt: { $exists: false } } },
+            { $group: { _id: '$memoLineId', qty: { $sum: '$outputQty' } } }
+        ]) : [];
+        const producedMap = new Map(producedByMemoLine.map(item => [String(item._id), Number(item.qty) || 0]));
+        memos.forEach(memo => {
+            (memo.lines || []).forEach(line => {
+                line.producedQty = producedMap.get(String(line._id)) || 0;
+            });
+        });
+
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const todayRows = await WorkshopProduction.find({ date: { $gte: today }, cancelledAt: { $exists: false } }).select('outputQty').lean();
+        const todayProduction = todayRows.reduce((sum, item) => sum + (Number(item.outputQty) || 0), 0);
+        const finishedStock = recipes.reduce((sum, item) => sum + (Number(item.stockQty) || 0), 0);
+        const lowMaterials = materials.filter(item => Number(item.minQty) > 0 && Number(item.stockQty) <= Number(item.minQty)).length;
+        const laminatePlanks = laminateStocks.reduce((sum, item) => sum + (Number(item.planksQty) || 0), 0);
+        const openMemos = memos.filter(item => item.status === 'created' || item.status === 'mismatch').length;
+        const visibleAssets = assets.filter(asset => !isNonWorkingDealerStatus(asset.dealer?.status));
+        const dealerAssetStock = visibleAssets.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+        const openingBalanceCount = await WorkshopMovement.countDocuments({
+            type: { $in: ['opening_balance', 'opening_dealer_balance'] }
+        });
+
+        res.json({
+            products: products.map(convertToClient),
+            dealers: dealers.map(convertToClient),
+            materials: materials.map(convertToClient),
+            recipes: recipes.map(convertToClient),
+            laminateStocks: laminateStocks.map(convertToClient),
+            dealerAssets: visibleAssets.map(convertToClient),
+            productions: productions.map(convertToClient),
+            movements: movements.map(convertToClient),
+            memos: memos.map(convertToClient),
+            stats: { todayProduction, finishedStock, lowMaterials, laminatePlanks, openMemos, dealerAssetStock, openingBalanceCount }
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/workshop/movements', requirePermission('can_view_workshop'), async (req, res) => {
+    try {
+        const limit = Math.max(1, Math.min(500, Number(req.query.limit) || 150));
+        const filter = {};
+        if (req.query.type) filter.type = req.query.type;
+        const list = await WorkshopMovement.find(filter)
+            .populate('product', 'sku name')
+            .populate('material', 'code name unit')
+            .populate('recipe', 'name outputType')
+            .populate('dealer', 'dealer_id name city')
+            .sort({ date: -1, createdAt: -1 }).limit(limit).lean();
+        res.json(list.map(convertToClient));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/materials', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const item = new WorkshopMaterial({
+            code: String(req.body.code || '').trim(),
+            name: String(req.body.name || '').trim(),
+            category: req.body.category || 'consumable',
+            unit: req.body.unit || 'шт',
+            purchaseUnit: String(req.body.purchaseUnit || req.body.unit || 'шт').trim(),
+            purchaseUnitSize: Math.max(0.0001, workshopNumber(req.body.purchaseUnitSize) || 1),
+            stockQty: Math.max(0, workshopNumber(req.body.stockQty)),
+            minQty: Math.max(0, workshopNumber(req.body.minQty)),
+            active: req.body.active !== false,
+            note: String(req.body.note || '').trim()
+        });
+        if (!item.name) return res.status(400).json({ error: 'Укажите название материала' });
+        await item.save();
+        res.status(201).json(convertToClient(item));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.put('/api/workshop/materials/:id', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const payload = {
+            code: String(req.body.code || '').trim(),
+            name: String(req.body.name || '').trim(),
+            category: req.body.category || 'consumable',
+            unit: req.body.unit || 'шт',
+            purchaseUnit: String(req.body.purchaseUnit || req.body.unit || 'шт').trim(),
+            purchaseUnitSize: Math.max(0.0001, workshopNumber(req.body.purchaseUnitSize) || 1),
+            minQty: Math.max(0, workshopNumber(req.body.minQty)),
+            active: req.body.active !== false,
+            note: String(req.body.note || '').trim()
+        };
+        const item = await WorkshopMaterial.findByIdAndUpdate(req.params.id, payload, { new: true });
+        if (!item) return res.status(404).json({ error: 'Материал не найден' });
+        res.json(convertToClient(item));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.delete('/api/workshop/materials/:id', requireIsAdmin, async (req, res) => {
+    try {
+        const item = await WorkshopMaterial.findById(req.params.id);
+        if (!item) return res.status(404).json({ error: 'Материал не найден' });
+
+        const [movementUsed, recipeUsed] = await Promise.all([
+            WorkshopMovement.exists({ material: item._id }),
+            WorkshopRecipe.exists({ 'materials.material': item._id })
+        ]);
+        if (movementUsed || recipeUsed) {
+            return res.status(400).json({ error: 'Материал уже используется в истории или рецептурах. Его можно отредактировать/деактивировать, но не удалить.' });
+        }
+        await WorkshopMaterial.deleteOne({ _id: item._id });
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/material-movement', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const materialId = req.body.materialId;
+        const qty = Math.abs(workshopNumber(req.body.qty));
+        const direction = req.body.direction === 'out' ? 'out' : 'in';
+        if (!materialId || qty <= 0) return res.status(400).json({ error: 'Укажите материал и количество' });
+
+        const delta = direction === 'out' ? -qty : qty;
+        const material = await workshopChangeMaterial(materialId, delta);
+        const movement = await WorkshopMovement.create({
+            date: req.body.date || new Date(),
+            type: req.body.type || (direction === 'out' ? 'material_issue' : 'material_receipt'),
+            entityType: 'material',
+            material: materialId,
+            direction,
+            qty,
+            unit: material.unit || 'шт',
+            serviceMemoNumber: String(req.body.serviceMemoNumber || '').trim(),
+            note: String(req.body.note || '').trim(),
+            createdBy: workshopUser(req)
+        });
+        res.status(201).json({ material: convertToClient(material), movement: convertToClient(movement) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/recipes', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const recipe = new WorkshopRecipe({
+            name: String(req.body.name || '').trim(),
+            outputType: req.body.outputType || 'sample',
+            sku: String(req.body.sku || '').trim(),
+            product: req.body.productId || null,
+            sideA: String(req.body.sideA || '').trim(),
+            sideB: String(req.body.sideB || '').trim(),
+            planksPerUnit: Math.max(0, workshopNumber(req.body.planksPerUnit)),
+            packQtyOverride: Math.max(0, workshopNumber(req.body.packQtyOverride)),
+            matrixPosName: String(req.body.matrixPosName || '').trim(),
+            minStockQty: Math.max(0, workshopNumber(req.body.minStockQty)),
+            materials: Array.isArray(req.body.materials) ? req.body.materials.map(item => ({
+                material: item.materialId,
+                qty: Math.max(0, workshopNumber(item.qty)),
+                mode: item.mode === 'estimate' ? 'estimate' : 'strict'
+            })).filter(item => item.material && item.qty >= 0) : [],
+            components: Array.isArray(req.body.components) ? req.body.components.map(item => ({
+                recipe: item.recipeId,
+                qty: Math.max(0, workshopNumber(item.qty))
+            })).filter(item => item.recipe && item.qty > 0) : [],
+            active: req.body.active !== false,
+            note: String(req.body.note || '').trim()
+        });
+        if (!recipe.name) return res.status(400).json({ error: 'Укажите название изделия' });
+        await recipe.save();
+        res.status(201).json(convertToClient(recipe));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.put('/api/workshop/recipes/:id', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const payload = {
+            name: String(req.body.name || '').trim(),
+            outputType: req.body.outputType || 'sample',
+            sku: String(req.body.sku || '').trim(),
+            product: req.body.productId || null,
+            sideA: String(req.body.sideA || '').trim(),
+            sideB: String(req.body.sideB || '').trim(),
+            planksPerUnit: Math.max(0, workshopNumber(req.body.planksPerUnit)),
+            packQtyOverride: Math.max(0, workshopNumber(req.body.packQtyOverride)),
+            matrixPosName: String(req.body.matrixPosName || '').trim(),
+            minStockQty: Math.max(0, workshopNumber(req.body.minStockQty)),
+            materials: Array.isArray(req.body.materials) ? req.body.materials.map(item => ({
+                material: item.materialId,
+                qty: Math.max(0, workshopNumber(item.qty)),
+                mode: item.mode === 'estimate' ? 'estimate' : 'strict'
+            })).filter(item => item.material && item.qty >= 0) : [],
+            components: Array.isArray(req.body.components) ? req.body.components.map(item => ({
+                recipe: item.recipeId,
+                qty: Math.max(0, workshopNumber(item.qty))
+            })).filter(item => item.recipe && item.qty > 0) : [],
+            active: req.body.active !== false,
+            note: String(req.body.note || '').trim()
+        };
+        const recipe = await WorkshopRecipe.findByIdAndUpdate(req.params.id, payload, { new: true });
+        if (!recipe) return res.status(404).json({ error: 'Рецептура не найдена' });
+        res.json(convertToClient(recipe));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.delete('/api/workshop/recipes/:id', requireIsAdmin, async (req, res) => {
+    try {
+        const recipe = await WorkshopRecipe.findById(req.params.id);
+        if (!recipe) return res.status(404).json({ error: 'Рецептура не найдена' });
+
+        const [productionUsed, movementUsed, dealerUsed, componentUsed, memoUsed] = await Promise.all([
+            WorkshopProduction.exists({ recipe: recipe._id }),
+            WorkshopMovement.exists({ recipe: recipe._id }),
+            WorkshopDealerAsset.exists({ recipe: recipe._id, qty: { $gt: 0 } }),
+            WorkshopRecipe.exists({ 'components.recipe': recipe._id }),
+            WorkshopMemo.exists({ 'lines.recipe': recipe._id })
+        ]);
+        if (productionUsed || movementUsed || dealerUsed || componentUsed || memoUsed || Math.abs(Number(recipe.stockQty) || 0) > 0.0001) {
+            return res.status(400).json({ error: 'Рецептура уже участвует в учёте. Её можно редактировать или деактивировать, но нельзя удалить без нарушения истории.' });
+        }
+        await WorkshopRecipe.deleteOne({ _id: recipe._id });
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/memos', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        let number = String(req.body.number || '').trim();
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
+        if (!inputLines.length) return res.status(400).json({ error: 'Добавьте хотя бы одну позицию' });
+        if (!number) {
+            let seq = Math.max(1, (await WorkshopMemo.countDocuments()) + 1);
+            while (!number) {
+                const candidate = `ЦЕХ-${String(seq).padStart(4, '0')}`;
+                const exists = await WorkshopMemo.exists({ number: candidate });
+                if (!exists) number = candidate;
+                else seq += 1;
+            }
+        }
+
+        const lines = [];
+        const seenProducts = new Set();
+        for (const input of inputLines) {
+            const requestedPacks = Math.max(0, Math.floor(workshopNumber(input.requestedPacks)));
+            if (!input.productId || requestedPacks <= 0) continue;
+
+            const product = await Product.findById(input.productId).lean();
+            if (!product) continue;
+            const productKey = String(product._id);
+            if (seenProducts.has(productKey)) {
+                return res.status(400).json({ error: `Позиция «${product.sku || product.name}» добавлена в служебку дважды` });
+            }
+            seenProducts.add(productKey);
+
+            let recipe = null;
+            if (input.recipeId) {
+                recipe = await WorkshopRecipe.findOne({
+                    _id: input.recipeId,
+                    product: product._id,
+                    active: { $ne: false }
+                }).lean();
+                if (!recipe) {
+                    return res.status(400).json({ error: `Выбранная рецептура не подходит для «${product.sku || product.name}»` });
+                }
+            } else {
+                const recipes = await WorkshopRecipe.find({
+                    product: product._id,
+                    active: { $ne: false },
+                    planksPerUnit: { $gt: 0 }
+                }).lean();
+                recipe = recipes.find(item => item.outputType === 'sample')
+                    || recipes.find(item => item.outputType === 'stand')
+                    || recipes[0]
+                    || null;
+            }
+
+            const packQty = workshopPackQty(product, recipe?.packQtyOverride || 0);
+            if (packQty <= 0) {
+                return res.status(400).json({ error: `У «${product.sku || product.name}» не заполнено количество планок в упаковке` });
+            }
+            const planksPerUnit = recipe ? Math.max(0, workshopNumber(recipe.planksPerUnit)) : 0;
+
+            const totalPlanks = requestedPacks * packQty;
+            const plannedOutputQty = planksPerUnit > 0 ? Math.floor(totalPlanks / planksPerUnit) : 0;
+            const plannedRemainderPlanks = planksPerUnit > 0 ? totalPlanks - plannedOutputQty * planksPerUnit : totalPlanks;
+
+            lines.push({
+                product: product._id,
+                recipe: recipe?._id || null,
+                requestedPacks,
+                plannedOutputQty,
+                plannedRemainderPlanks,
+                packQty,
+                planksPerUnit,
+                actualProduct: product._id,
+                deliveredPacks: 0,
+                checked: false,
+                isMatch: false,
+                discrepancyReason: ''
+            });
+        }
+
+        if (!lines.length) return res.status(400).json({ error: 'Нет корректных позиций для служебной записки' });
+
+        const memo = await WorkshopMemo.create({
+            number,
+            date: req.body.date || new Date(),
+            lines,
+            note: String(req.body.note || '').trim(),
+            signedBy: String(req.body.signedBy || req.user?.fullName || req.user?.username || '').trim(),
+            createdBy: workshopUser(req)
+        });
+
+        const populated = await WorkshopMemo.findById(memo._id)
+            .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+            .populate('lines.recipe', 'name outputType planksPerUnit')
+            .lean();
+        res.status(201).json(convertToClient(populated));
+    } catch (e) {
+        if (e && e.code === 11000) return res.status(400).json({ error: 'Служебная записка с таким номером уже существует' });
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.put('/api/workshop/memos/:id', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const memo = await WorkshopMemo.findById(req.params.id);
+        if (!memo) return res.status(404).json({ error: 'Служебная записка не найдена' });
+        if (memo.postedAt || memo.status === 'accepted') {
+            return res.status(400).json({ error: 'Принятую служебную записку нельзя редактировать. Используйте корректировку/отмену.' });
+        }
+
+        const number = String(req.body.number || memo.number || '').trim();
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
+        if (!number) return res.status(400).json({ error: 'Укажите номер служебной записки' });
+        if (!inputLines.length) return res.status(400).json({ error: 'Добавьте хотя бы одну позицию' });
+
+        const duplicateNumber = await WorkshopMemo.exists({ number, _id: { $ne: memo._id } });
+        if (duplicateNumber) return res.status(400).json({ error: 'Служебная записка с таким номером уже существует' });
+
+        const seenProducts = new Set();
+        const lines = [];
+        for (const input of inputLines) {
+            const requestedPacks = Math.max(0, Math.floor(workshopNumber(input.requestedPacks)));
+            if (!input.productId || requestedPacks <= 0) continue;
+
+            const product = await Product.findById(input.productId).lean();
+            if (!product) continue;
+            const productKey = String(product._id);
+            if (seenProducts.has(productKey)) {
+                return res.status(400).json({ error: `Позиция «${product.sku || product.name}» добавлена в служебку дважды` });
+            }
+            seenProducts.add(productKey);
+
+            let recipe = null;
+            if (input.recipeId) {
+                recipe = await WorkshopRecipe.findOne({ _id: input.recipeId, product: product._id, active: { $ne: false } }).lean();
+            }
+            if (!recipe) {
+                const recipes = await WorkshopRecipe.find({ product: product._id, active: { $ne: false }, planksPerUnit: { $gt: 0 } }).lean();
+                recipe = recipes.find(item => item.outputType === 'sample') || recipes.find(item => item.outputType === 'stand') || recipes[0] || null;
+            }
+            const packQty = workshopPackQty(product, recipe?.packQtyOverride || 0);
+            const planksPerUnit = recipe ? Math.max(0, workshopNumber(recipe.planksPerUnit)) : 0;
+            if (packQty <= 0) {
+                return res.status(400).json({ error: `У «${product.sku || product.name}» не заполнено количество планок в упаковке` });
+            }
+
+            const totalPlanks = requestedPacks * packQty;
+            const plannedOutputQty = planksPerUnit > 0 ? Math.floor(totalPlanks / planksPerUnit) : 0;
+            const plannedRemainderPlanks = planksPerUnit > 0 ? totalPlanks - plannedOutputQty * planksPerUnit : totalPlanks;
+            lines.push({
+                product: product._id,
+                recipe: recipe?._id || null,
+                requestedPacks,
+                plannedOutputQty,
+                plannedRemainderPlanks,
+                packQty,
+                planksPerUnit,
+                actualProduct: product._id,
+                deliveredPacks: 0,
+                checked: false,
+                isMatch: false,
+                discrepancyReason: ''
+            });
+        }
+
+        if (!lines.length) return res.status(400).json({ error: 'Нет корректных позиций' });
+
+        memo.number = number;
+        memo.date = req.body.date || memo.date || new Date();
+        memo.lines = lines;
+        memo.note = String(req.body.note || '').trim();
+        memo.signedBy = String(req.body.signedBy || '').trim();
+        memo.status = 'created';
+        memo.receiptAttempts = [];
+        await memo.save();
+
+        const populated = await WorkshopMemo.findById(memo._id)
+            .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+            .populate('lines.recipe', 'name outputType planksPerUnit minStockQty stockQty')
+            .lean();
+        res.json(convertToClient(populated));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.delete('/api/workshop/memos/:id', requireIsAdmin, async (req, res) => {
+    try {
+        const memo = await WorkshopMemo.findById(req.params.id);
+        if (!memo) return res.status(404).json({ error: 'Служебная записка не найдена' });
+        if (memo.postedAt || memo.status === 'accepted') {
+            return res.status(400).json({ error: 'Проведённую служебную записку нельзя удалить напрямую: она уже изменила остатки.' });
+        }
+        const linkedProduction = await WorkshopProduction.exists({ memo: memo._id });
+        if (linkedProduction) return res.status(400).json({ error: 'По этой служебке уже есть производство. Сначала отмените связанные операции.' });
+        await WorkshopMemo.deleteOne({ _id: memo._id });
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/memos/:id/receive', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const memo = await WorkshopMemo.findById(req.params.id);
+        if (!memo) return res.status(404).json({ error: 'Служебная записка не найдена' });
+        if (memo.status === 'accepted' && memo.postedAt) {
+            return res.status(400).json({ error: 'Эта служебная записка уже принята и оприходована' });
+        }
+
+        const submitted = Array.isArray(req.body.lines) ? req.body.lines : [];
+        if (!submitted.length) return res.status(400).json({ error: 'Нет строк для сверки' });
+
+        const attemptLines = [];
+        let allMatch = true;
+
+        for (const line of memo.lines) {
+            const row = submitted.find(item => String(item.lineId || '') === String(line._id));
+            const actualProductId = row?.actualProductId || line.product;
+            const deliveredPacks = Math.max(0, Math.floor(workshopNumber(row?.deliveredPacks)));
+            const checked = Boolean(row?.checked);
+            const sameProduct = String(actualProductId || '') === String(line.product || '');
+            const sameQty = deliveredPacks === Number(line.requestedPacks || 0);
+            const isMatch = checked && sameProduct && sameQty;
+
+            line.actualProduct = actualProductId || line.product;
+            line.deliveredPacks = deliveredPacks;
+            line.checked = checked;
+            line.isMatch = isMatch;
+            line.discrepancyReason = String(row?.discrepancyReason || '').trim();
+
+            if (!isMatch) allMatch = false;
+            attemptLines.push({
+                lineId: String(line._id),
+                expectedProductId: String(line.product || ''),
+                actualProductId: String(line.actualProduct || ''),
+                requestedPacks: Number(line.requestedPacks || 0),
+                deliveredPacks,
+                checked,
+                isMatch,
+                discrepancyReason: line.discrepancyReason
+            });
+        }
+
+        memo.receiptAttempts.push({
+            date: req.body.date || new Date(),
+            status: allMatch ? 'accepted' : 'mismatch',
+            lines: attemptLines,
+            note: String(req.body.note || '').trim(),
+            createdBy: workshopUser(req)
+        });
+
+        if (!allMatch) {
+            memo.status = 'mismatch';
+            await memo.save();
+            const populated = await WorkshopMemo.findById(memo._id)
+                .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+                .populate('lines.actualProduct', 'sku name is_liquid characteristics.package_qty')
+                .populate('lines.recipe', 'name outputType planksPerUnit')
+                .lean();
+            return res.status(200).json({
+                accepted: false,
+                status: 'mismatch',
+                message: 'Есть расхождения. Упаковки пока не оприходованы — требуется обмен/повторная сверка.',
+                memo: convertToClient(populated)
+            });
+        }
+
+        if (!memo.postedAt) {
+            for (const line of memo.lines) {
+                const product = await Product.findById(line.product).lean();
+                if (!product) throw new Error('Одна из позиций служебки больше не найдена в каталоге');
+                const packQty = Number(line.packQty) > 0 ? Number(line.packQty) : workshopPackQty(product);
+                const planksQty = Number(line.requestedPacks || 0) * packQty;
+                await workshopChangeLaminate(line.product, planksQty);
+                await WorkshopMovement.create({
+                    date: req.body.date || new Date(),
+                    type: 'laminate_receipt',
+                    entityType: 'laminate',
+                    product: line.product,
+                    direction: 'in',
+                    qty: planksQty,
+                    unit: 'планка',
+                    serviceMemoNumber: memo.number,
+                    note: String(req.body.note || '').trim(),
+                    meta: {
+                        memoId: String(memo._id),
+                        memoLineId: String(line._id),
+                        requestedPacks: Number(line.requestedPacks || 0),
+                        deliveredPacks: Number(line.deliveredPacks || 0),
+                        packQty,
+                        plannedOutputQty: Number(line.plannedOutputQty || 0)
+                    },
+                    createdBy: workshopUser(req)
+                });
+            }
+            memo.postedAt = new Date();
+        }
+
+        memo.status = 'accepted';
+        memo.acceptedAt = new Date();
+        memo.acceptedBy = workshopUser(req);
+        await memo.save();
+
+        const populated = await WorkshopMemo.findById(memo._id)
+            .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+            .populate('lines.actualProduct', 'sku name is_liquid characteristics.package_qty')
+            .populate('lines.recipe', 'name outputType planksPerUnit')
+            .lean();
+
+        res.json({
+            accepted: true,
+            status: 'accepted',
+            message: 'Все позиции совпали. Упаковки оприходованы в цех.',
+            memo: convertToClient(populated)
+        });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/laminate-receipt', requirePermission('can_manage_workshop'), async (req, res) => {
+    return res.status(400).json({
+        error: 'Одиночный приход отключен. Ламинат принимается только целыми упаковками по многострочной служебной записке.'
+    });
+});
+
+app.post('/api/workshop/production', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const recipe = await WorkshopRecipe.findById(req.body.recipeId)
+            .populate('product')
+            .populate('materials.material')
+            .populate('components.recipe');
+        if (!recipe) return res.status(404).json({ error: 'Рецептура не найдена' });
+
+        let sourceMemo = null;
+        let sourceMemoLine = null;
+        if (req.body.memoId) {
+            sourceMemo = await WorkshopMemo.findById(req.body.memoId).lean();
+            if (!sourceMemo || sourceMemo.status !== 'accepted') {
+                return res.status(400).json({ error: 'Можно привязать производство только к принятой служебной записке' });
+            }
+            sourceMemoLine = (sourceMemo.lines || []).find(line => String(line._id) === String(req.body.memoLineId || ''));
+            if (!sourceMemoLine) return res.status(400).json({ error: 'Строка служебной записки не найдена' });
+            if (recipe.product && String(sourceMemoLine.product) !== String(recipe.product._id)) {
+                return res.status(400).json({ error: 'Ламинат рецептуры не совпадает с выбранной строкой служебки' });
+            }
+        }
+
+        const outputQty = Math.max(0, workshopNumber(req.body.outputQty));
+        const scrapPlanks = Math.max(0, workshopNumber(req.body.scrapPlanks));
+        const acceptedPacks = Math.max(0, workshopNumber(req.body.acceptedPacks));
+        const acceptedLoosePlanks = Math.max(0, workshopNumber(req.body.acceptedLoosePlanks));
+        if (outputQty <= 0) return res.status(400).json({ error: 'Укажите количество изготовленных изделий' });
+
+        const packQty = workshopPackQty(recipe.product, recipe.packQtyOverride);
+        const standardPlanksPerUnit = Math.max(0, workshopNumber(recipe.planksPerUnit));
+        const requestedActualNorm = Math.max(0, workshopNumber(req.body.actualPlanksPerUnit));
+        const actualPlanksPerUnit = requestedActualNorm > 0 ? requestedActualNorm : standardPlanksPerUnit;
+        const customNormReason = String(req.body.customNormReason || '').trim();
+        const customOrderName = String(req.body.customOrderName || '').trim();
+        const customDimensions = String(req.body.customDimensions || '').trim();
+        if (requestedActualNorm > 0 && Math.abs(requestedActualNorm - standardPlanksPerUnit) > 0.0001 && !customNormReason) {
+            return res.status(400).json({ error: 'При изменении стандартной нормы укажите причину (например, индивидуальный образец)' });
+        }
+        const usedForOutput = actualPlanksPerUnit * outputQty;
+        const consumedPlanks = usedForOutput + scrapPlanks;
+        const acceptedTotal = acceptedPacks * packQty + acceptedLoosePlanks;
+
+        if (consumedPlanks > 0) {
+            if (!recipe.product) return res.status(400).json({ error: 'Для этой рецептуры не выбран ламинат' });
+            const stock = await WorkshopLaminateStock.findOne({ product: recipe.product._id }).lean();
+            if ((Number(stock?.planksQty) || 0) < consumedPlanks) {
+                return res.status(400).json({ error: 'Недостаточно планок ламината в остатках цеха' });
+            }
+        }
+
+        for (const line of recipe.materials || []) {
+            if (line.mode === 'estimate') continue;
+            const need = (Number(line.qty) || 0) * outputQty;
+            if (need > 0 && (Number(line.material?.stockQty) || 0) < need) {
+                return res.status(400).json({ error: `Недостаточно материала «${line.material?.name || 'материал'}»` });
+            }
+        }
+
+        for (const line of recipe.components || []) {
+            const need = (Number(line.qty) || 0) * outputQty;
+            if (need > 0 && (Number(line.recipe?.stockQty) || 0) < need) {
+                return res.status(400).json({ error: `Недостаточно готовых компонентов «${line.recipe?.name || 'компонент'}»` });
+            }
+        }
+
+        if (consumedPlanks > 0) {
+            await workshopChangeLaminate(recipe.product._id, -consumedPlanks);
+            await WorkshopMovement.create({
+                date: req.body.date || new Date(), type: 'production_laminate',
+                entityType: 'laminate', product: recipe.product._id, direction: 'out',
+                qty: consumedPlanks, unit: 'планка', note: String(req.body.note || '').trim(),
+                serviceMemoNumber: sourceMemo?.number || '',
+                meta: { recipeId: recipe._id, outputQty, scrapPlanks, standardPlanksPerUnit, actualPlanksPerUnit, customNormReason, customOrderName, customDimensions, memoId: sourceMemo?._id || null, memoLineId: sourceMemoLine?._id || null }, createdBy: workshopUser(req)
+            });
+        }
+
+        for (const line of recipe.materials || []) {
+            const need = (Number(line.qty) || 0) * outputQty;
+            if (line.mode === 'estimate') {
+                if (need > 0) {
+                    await WorkshopMovement.create({
+                        date: req.body.date || new Date(), type: 'production_material_estimate',
+                        entityType: 'material', material: line.material._id, direction: 'neutral',
+                        qty: need, unit: line.material.unit || 'шт',
+                        note: 'Расчетный расход; фактический остаток автоматически не уменьшается',
+                        meta: { recipeId: recipe._id, outputQty, estimate: true }, createdBy: workshopUser(req)
+                    });
+                }
+                continue;
+            }
+            if (need <= 0) continue;
+            await workshopChangeMaterial(line.material._id, -need);
+            await WorkshopMovement.create({
+                date: req.body.date || new Date(), type: 'production_material',
+                entityType: 'material', material: line.material._id, direction: 'out',
+                qty: need, unit: line.material.unit || 'шт',
+                meta: { recipeId: recipe._id, outputQty }, createdBy: workshopUser(req)
+            });
+        }
+
+        for (const line of recipe.components || []) {
+            const need = (Number(line.qty) || 0) * outputQty;
+            if (need <= 0) continue;
+            await workshopChangeRecipe(line.recipe._id, -need);
+            await WorkshopMovement.create({
+                date: req.body.date || new Date(), type: 'production_component',
+                entityType: 'finished', recipe: line.recipe._id, direction: 'out',
+                qty: need, unit: 'шт', meta: { recipeId: recipe._id, outputQty },
+                createdBy: workshopUser(req)
+            });
+        }
+
+        const resultStock = await workshopChangeRecipe(recipe._id, outputQty);
+        await WorkshopMovement.create({
+            date: req.body.date || new Date(), type: 'production_output',
+            entityType: 'finished', recipe: recipe._id, direction: 'in',
+            qty: outputQty, unit: 'шт', note: String(req.body.note || '').trim(),
+            serviceMemoNumber: sourceMemo?.number || '',
+            meta: { acceptedPacks, acceptedLoosePlanks, acceptedTotal, packQty, consumedPlanks, scrapPlanks, memoId: sourceMemo?._id || null, memoLineId: sourceMemoLine?._id || null },
+            createdBy: workshopUser(req)
+        });
+
+        const production = await WorkshopProduction.create({
+            date: req.body.date || new Date(),
+            recipe: recipe._id,
+            product: recipe.product?._id || null,
+            memo: sourceMemo?._id || null,
+            memoLineId: sourceMemoLine?._id ? String(sourceMemoLine._id) : '',
+            serviceMemoNumber: sourceMemo?.number || '',
+            acceptedPacks,
+            acceptedLoosePlanks,
+            packQty,
+            totalAcceptedPlanks: acceptedTotal,
+            outputQty,
+            standardPlanksPerUnit,
+            actualPlanksPerUnit,
+            customNormReason,
+            customOrderName,
+            customDimensions,
+            consumedPlanks,
+            scrapPlanks,
+            operations: Array.isArray(req.body.operations)
+                ? req.body.operations.map(item => ({
+                    type: String(item.type || '').trim(),
+                    qty: Math.max(0, workshopNumber(item.qty)),
+                    note: String(item.note || '').trim()
+                })).filter(item => item.type)
+                : [],
+            note: String(req.body.note || '').trim(),
+            createdBy: workshopUser(req)
+        });
+
+        res.status(201).json({ production: convertToClient(production), stock: convertToClient(resultStock) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.put('/api/workshop/productions/:id', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const production = await WorkshopProduction.findById(req.params.id);
+        if (!production) return res.status(404).json({ error: 'Запись производства не найдена' });
+        if (production.cancelledAt) return res.status(400).json({ error: 'Отменённую запись нельзя редактировать' });
+
+        production.date = req.body.date || production.date;
+        production.note = String(req.body.note ?? production.note ?? '').trim();
+        production.customOrderName = String(req.body.customOrderName ?? production.customOrderName ?? '').trim();
+        production.customDimensions = String(req.body.customDimensions ?? production.customDimensions ?? '').trim();
+        production.customNormReason = String(req.body.customNormReason ?? production.customNormReason ?? '').trim();
+        if (Array.isArray(req.body.operations)) {
+            production.operations = req.body.operations.map(item => ({
+                type: String(item.type || '').trim(),
+                qty: Math.max(0, workshopNumber(item.qty)),
+                note: String(item.note || '').trim()
+            })).filter(item => item.type);
+        }
+        await production.save();
+        res.json(convertToClient(production));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.delete('/api/workshop/productions/:id', requireIsAdmin, async (req, res) => {
+    try {
+        const production = await WorkshopProduction.findById(req.params.id)
+            .populate({
+                path: 'recipe',
+                populate: [
+                    { path: 'materials.material' },
+                    { path: 'components.recipe' }
+                ]
+            })
+            .populate('product');
+        if (!production) return res.status(404).json({ error: 'Запись производства не найдена' });
+        if (production.cancelledAt) return res.status(400).json({ error: 'Эта запись уже отменена' });
+
+        const recipe = production.recipe;
+        if (!recipe) return res.status(400).json({ error: 'Рецептура производства не найдена' });
+        const outputQty = Number(production.outputQty) || 0;
+
+        if ((Number(recipe.stockQty) || 0) + 1e-9 < outputQty) {
+            return res.status(400).json({ error: 'Нельзя отменить производство: часть изготовленных изделий уже выдана или использована.' });
+        }
+
+        if (outputQty > 0) await workshopChangeRecipe(recipe._id, -outputQty);
+        if (production.product && Number(production.consumedPlanks) > 0) {
+            await workshopChangeLaminate(production.product._id, Number(production.consumedPlanks));
+        }
+
+        for (const line of recipe.materials || []) {
+            if (line.mode === 'estimate') continue;
+            const qty = (Number(line.qty) || 0) * outputQty;
+            if (qty > 0 && line.material?._id) await workshopChangeMaterial(line.material._id, qty);
+        }
+        for (const line of recipe.components || []) {
+            const qty = (Number(line.qty) || 0) * outputQty;
+            if (qty > 0 && line.recipe?._id) await workshopChangeRecipe(line.recipe._id, qty);
+        }
+
+        await WorkshopMovement.create({
+            date: new Date(),
+            type: 'production_cancelled',
+            entityType: 'finished',
+            recipe: recipe._id,
+            direction: 'out',
+            qty: outputQty,
+            unit: 'шт',
+            serviceMemoNumber: production.serviceMemoNumber || '',
+            note: String(req.body?.reason || 'Отмена записи производства администратором'),
+            meta: {
+                productionId: String(production._id),
+                restoredPlanks: Number(production.consumedPlanks) || 0,
+                cancellation: true
+            },
+            createdBy: workshopUser(req)
+        });
+
+        production.cancelledAt = new Date();
+        production.cancelledBy = workshopUser(req);
+        production.cancelReason = String(req.body?.reason || '').trim();
+        await production.save();
+
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/writeoff', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const entityType = req.body.entityType;
+        const qty = Math.abs(workshopNumber(req.body.qty));
+        const serviceMemoNumber = String(req.body.serviceMemoNumber || '').trim();
+        if (qty <= 0) return res.status(400).json({ error: 'Укажите количество списания' });
+        if (!serviceMemoNumber) return res.status(400).json({ error: 'Для списания укажите номер служебной записки' });
+
+        let movementData = {
+            date: req.body.date || new Date(), type: 'writeoff', entityType,
+            direction: 'out', qty, serviceMemoNumber,
+            note: String(req.body.note || '').trim(), createdBy: workshopUser(req)
+        };
+
+        if (entityType === 'laminate') {
+            await workshopChangeLaminate(req.body.productId, -qty);
+            movementData.product = req.body.productId;
+            movementData.unit = 'планка';
+        } else if (entityType === 'material') {
+            const material = await workshopChangeMaterial(req.body.materialId, -qty);
+            movementData.material = req.body.materialId;
+            movementData.unit = material.unit || 'шт';
+        } else if (entityType === 'finished') {
+            await workshopChangeRecipe(req.body.recipeId, -qty);
+            movementData.recipe = req.body.recipeId;
+            movementData.unit = 'шт';
+        } else {
+            return res.status(400).json({ error: 'Неизвестный тип списания' });
+        }
+
+        const movement = await WorkshopMovement.create(movementData);
+        res.status(201).json(convertToClient(movement));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/dealer-movement', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const dealerId = req.body.dealerId;
+        const recipeId = req.body.recipeId;
+        const action = req.body.action || 'issue';
+        const qty = Math.abs(workshopNumber(req.body.qty));
+        if (!dealerId || !recipeId || qty <= 0) return res.status(400).json({ error: 'Выберите дилера, изделие и количество' });
+
+        const [dealer, recipe] = await Promise.all([
+            Dealer.findById(dealerId).select('_id name'),
+            WorkshopRecipe.findById(recipeId)
+        ]);
+        if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
+        if (!recipe) return res.status(404).json({ error: 'Изделие не найдено' });
+
+        let asset = await WorkshopDealerAsset.findOne({ dealer: dealerId, recipe: recipeId });
+        if (!asset) asset = new WorkshopDealerAsset({ dealer: dealerId, recipe: recipeId, qty: 0 });
+
+        const condition = req.body.returnCondition || 'defect';
+        let issued = 0;
+        let returned = 0;
+
+        if (action === 'issue') {
+            if (Number(recipe.stockQty) < qty) return res.status(400).json({ error: 'Недостаточно готовых изделий в цехе' });
+            await workshopChangeRecipe(recipeId, -qty);
+            asset.qty += qty;
+            issued = qty;
+        } else if (action === 'return') {
+            if (Number(asset.qty) < qty) return res.status(400).json({ error: 'У дилера числится меньше изделий' });
+            asset.qty -= qty;
+            returned = qty;
+            if (condition === 'reusable') await workshopChangeRecipe(recipeId, qty);
+        } else if (action === 'replacement') {
+            const returnQty = Math.abs(workshopNumber(req.body.returnQty || qty));
+            const issueQty = Math.abs(workshopNumber(req.body.issueQty || qty));
+            if (Number(asset.qty) < returnQty) return res.status(400).json({ error: 'У дилера числится меньше изделий для возврата' });
+            if (Number(recipe.stockQty) < issueQty) return res.status(400).json({ error: 'Недостаточно изделий для замены' });
+            asset.qty = Number(asset.qty) - returnQty + issueQty;
+            await workshopChangeRecipe(recipeId, -issueQty);
+            if (condition === 'reusable') await workshopChangeRecipe(recipeId, returnQty);
+            returned = returnQty;
+            issued = issueQty;
+        } else {
+            return res.status(400).json({ error: 'Неизвестная операция с дилером' });
+        }
+
+        asset.qty = Math.max(0, Number(asset.qty) || 0);
+        await asset.save();
+
+        const movement = await WorkshopMovement.create({
+            date: req.body.date || new Date(),
+            type: `dealer_${action}`,
+            entityType: 'finished',
+            recipe: recipeId,
+            dealer: dealerId,
+            direction: action === 'return' ? 'in' : action === 'issue' ? 'out' : 'neutral',
+            qty,
+            unit: 'шт',
+            note: String(req.body.note || '').trim(),
+            meta: { issued, returned, returnCondition: condition, reason: String(req.body.reason || '').trim() },
+            createdBy: workshopUser(req)
+        });
+
+        await syncWorkshopPosToDealer(dealerId, recipeId);
+        res.status(201).json({ asset: convertToClient(asset), movement: convertToClient(movement) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.get('/api/workshop/dealers/:dealerId/assets', requireAnyPermission('can_view_workshop', 'can_view_dealers'), async (req, res) => {
+    try {
+        const assets = await WorkshopDealerAsset.find({ dealer: req.params.dealerId, qty: { $gt: 0 } })
+            .populate({ path: 'recipe', populate: { path: 'product', select: 'sku name is_liquid' } })
+            .sort({ updatedAt: -1 }).lean();
+        res.json(assets.map(convertToClient));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/opening-balance', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const location = req.body.location === 'dealer' ? 'dealer' : 'workshop';
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
+        const date = req.body.date || new Date();
+        const note = String(req.body.note || '').trim();
+        if (!inputLines.length) return res.status(400).json({ error: 'Укажите хотя бы один фактический остаток' });
+
+        let dealer = null;
+        if (location === 'dealer') {
+            if (!req.body.dealerId) return res.status(400).json({ error: 'Выберите дилера' });
+            dealer = await Dealer.findOne({
+                _id: req.body.dealerId,
+                ...getWorkingDealerFilter(getDealerFilter(req))
+            }).select('_id name');
+            if (!dealer) return res.status(404).json({ error: 'Дилер не найден или недоступен' });
+        }
+
+        const changed = [];
+        for (const line of inputLines) {
+            let recipe = null;
+            if (line.recipeId) {
+                recipe = await WorkshopRecipe.findOne({ _id: line.recipeId, active: { $ne: false } });
+            } else if (line.productId) {
+                const product = await Product.findById(line.productId).lean();
+                if (!product) continue;
+
+                const posDef = workshopPosDefinition({ product });
+                if (posDef?.recipeSku) {
+                    recipe = await WorkshopRecipe.findOne({ sku:posDef.recipeSku, active:{ $ne:false } });
+                } else {
+                    recipe = await WorkshopRecipe.findOne({
+                        product: product._id,
+                        outputType: 'sample',
+                        active: { $ne: false }
+                    });
+                    if (!recipe) {
+                        recipe = await WorkshopRecipe.create({
+                            name: `Планшет ${product.sku || ''} ${product.name || ''}`.trim(),
+                            outputType: 'sample',
+                            sku: `SAMPLE-${product.sku || String(product._id).slice(-6)}`,
+                            product: product._id,
+                            planksPerUnit: 0,
+                            packQtyOverride: 0,
+                            stockQty: 0,
+                            minStockQty: 0,
+                            active: true,
+                            note: 'Создано автоматически при вводе стартовых остатков. Норму производства можно заполнить позже.'
+                        });
+                    }
+                }
+            }
+            if (!recipe) continue;
+
+            const actualQty = Math.max(0, workshopNumber(line.actualQty));
+            const lineNote = String(line.note || '').trim();
+
+            if (location === 'workshop') {
+                const previousQty = Number(recipe.stockQty) || 0;
+                const delta = actualQty - previousQty;
+                if (Math.abs(delta) <= 0.0001) continue;
+
+                await workshopChangeRecipe(recipe._id, delta);
+                await WorkshopMovement.create({
+                    date,
+                    type: 'opening_balance',
+                    entityType: 'finished',
+                    recipe: recipe._id,
+                    direction: delta > 0 ? 'in' : 'out',
+                    qty: Math.abs(delta),
+                    unit: 'шт',
+                    note: lineNote || note || 'Стартовый остаток готовых образцов до начала учёта в CRM',
+                    meta: { previousQty, actualQty, delta, source: 'legacy_opening_balance' },
+                    createdBy: workshopUser(req)
+                });
+                changed.push({ recipeId: String(recipe._id), previousQty, actualQty, delta });
+            } else {
+                let asset = await WorkshopDealerAsset.findOne({ dealer: dealer._id, recipe: recipe._id });
+                const previousQty = Number(asset?.qty) || 0;
+                const delta = actualQty - previousQty;
+                if (Math.abs(delta) <= 0.0001) continue;
+
+                if (!asset) asset = new WorkshopDealerAsset({ dealer: dealer._id, recipe: recipe._id, qty: 0 });
+                asset.qty = actualQty;
+                await asset.save();
+
+                await WorkshopMovement.create({
+                    date,
+                    type: 'opening_dealer_balance',
+                    entityType: 'finished',
+                    recipe: recipe._id,
+                    dealer: dealer._id,
+                    direction: 'neutral',
+                    qty: Math.abs(delta),
+                    unit: 'шт',
+                    note: lineNote || note || 'Образцы уже находились у дилера до начала учёта в CRM',
+                    meta: { previousQty, actualQty, delta, source: 'legacy_opening_balance' },
+                    createdBy: workshopUser(req)
+                });
+                await syncWorkshopPosToDealer(dealer._id, recipe._id);
+                changed.push({ recipeId: String(recipe._id), previousQty, actualQty, delta });
+            }
+        }
+
+        if (!changed.length) return res.status(400).json({ error: 'Фактические остатки не отличаются от текущих' });
+        res.status(201).json({
+            status: 'ok',
+            location,
+            dealerId: dealer ? String(dealer._id) : '',
+            changed
+        });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/correction', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const reason = String(req.body.reason || '').trim();
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines.slice(0, 10) : [];
+        if (reason.length < 3) return res.status(400).json({ error: 'Укажите причину исправления' });
+        if (!inputLines.length) return res.status(400).json({ error: 'Добавьте хотя бы одну позицию' });
+
+        const prepared = [];
+        const seen = new Set();
+
+        for (const line of inputLines) {
+            const entityType = String(line.entityType || '').trim();
+            const id = String(line.id || '').trim();
+            const actualQty = Math.max(0, workshopNumber(line.actualQty));
+            if (!['finished','laminate','material'].includes(entityType) || !id) {
+                return res.status(400).json({ error: 'Некорректная позиция для исправления' });
+            }
+
+            const key = entityType + ':' + id;
+            if (seen.has(key)) return res.status(400).json({ error: 'Одна и та же позиция добавлена дважды' });
+            seen.add(key);
+
+            if (entityType === 'finished') {
+                const item = await WorkshopRecipe.findById(id).lean();
+                if (!item) return res.status(404).json({ error: 'Готовое изделие не найдено' });
+                prepared.push({
+                    entityType, id, actualQty,
+                    previousQty: Math.max(0, Number(item.stockQty) || 0),
+                    unit: 'шт',
+                    name: item.name || 'Готовое изделие',
+                    recipe: id
+                });
+            } else if (entityType === 'material') {
+                const item = await WorkshopMaterial.findById(id).lean();
+                if (!item) return res.status(404).json({ error: 'Материал не найден' });
+                prepared.push({
+                    entityType, id, actualQty,
+                    previousQty: Math.max(0, Number(item.stockQty) || 0),
+                    unit: item.unit || 'шт',
+                    name: item.name || 'Материал',
+                    material: id
+                });
+            } else {
+                const product = await Product.findById(id).select('sku name').lean();
+                if (!product) return res.status(404).json({ error: 'Ламинат не найден' });
+                const stock = await WorkshopLaminateStock.findOne({ product: id }).lean();
+                prepared.push({
+                    entityType, id, actualQty,
+                    previousQty: Math.max(0, Number(stock?.planksQty) || 0),
+                    unit: 'планка',
+                    name: [product.sku, product.name].filter(Boolean).join(' · ') || 'Ламинат',
+                    product: id
+                });
+            }
+        }
+
+        const changed = prepared
+            .map(item => ({ ...item, delta: item.actualQty - item.previousQty }))
+            .filter(item => Math.abs(item.delta) > 0.0001);
+
+        if (!changed.length) return res.status(400).json({ error: 'Новые остатки совпадают с текущими' });
+
+        const savedLines = [];
+        for (const item of changed) {
+            if (item.entityType === 'finished') {
+                await WorkshopRecipe.updateOne({ _id: item.id }, { $set: { stockQty: item.actualQty } });
+            } else if (item.entityType === 'material') {
+                await WorkshopMaterial.updateOne({ _id: item.id }, { $set: { stockQty: item.actualQty } });
+            } else {
+                await WorkshopLaminateStock.findOneAndUpdate(
+                    { product: item.id },
+                    { $set: { planksQty: item.actualQty } },
+                    { upsert: true, new: true, setDefaultsOnInsert: true }
+                );
+            }
+
+            await WorkshopMovement.create({
+                date: req.body.date || new Date(),
+                type: 'manual_correction',
+                entityType: item.entityType,
+                product: item.product || null,
+                material: item.material || null,
+                recipe: item.recipe || null,
+                direction: item.delta > 0 ? 'in' : 'out',
+                qty: Math.abs(item.delta),
+                unit: item.unit,
+                note: reason,
+                meta: {
+                    previousQty: item.previousQty,
+                    actualQty: item.actualQty,
+                    delta: item.delta,
+                    reason,
+                    source: 'manual_correction'
+                },
+                createdBy: workshopUser(req)
+            });
+
+            savedLines.push({
+                entityType: item.entityType,
+                product: item.product || null,
+                material: item.material || null,
+                recipe: item.recipe || null,
+                systemQty: item.previousQty,
+                actualQty: item.actualQty,
+                delta: item.delta,
+                note: reason
+            });
+        }
+
+        await WorkshopStocktake.create({
+            date: req.body.date || new Date(),
+            lines: savedLines,
+            note: 'Корректировка остатка: ' + reason,
+            createdBy: workshopUser(req)
+        });
+
+        res.status(201).json({
+            status: 'ok',
+            reason,
+            changed: changed.map(item => ({
+                entityType: item.entityType,
+                id: item.id,
+                name: item.name,
+                previousQty: item.previousQty,
+                actualQty: item.actualQty,
+                delta: item.delta,
+                unit: item.unit
+            }))
+        });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/stocktake', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
+        if (!inputLines.length) return res.status(400).json({ error: 'Добавьте позиции инвентаризации' });
+        const savedLines = [];
+
+        for (const line of inputLines) {
+            const actualQty = Math.max(0, workshopNumber(line.actualQty));
+            let systemQty = 0;
+            let delta = 0;
+            let movement = null;
+
+            if (line.entityType === 'laminate' && line.productId) {
+                const current = await WorkshopLaminateStock.findOne({ product: line.productId }).lean();
+                systemQty = Number(current?.planksQty) || 0;
+                delta = actualQty - systemQty;
+                if (Math.abs(delta) > 0.0001) {
+                    await workshopChangeLaminate(line.productId, delta);
+                    movement = { entityType:'laminate', product:line.productId, unit:'планка' };
+                }
+                savedLines.push({ entityType:'laminate', product:line.productId, systemQty, actualQty, delta, note:line.note || '' });
+            } else if (line.entityType === 'material' && line.materialId) {
+                const current = await WorkshopMaterial.findById(line.materialId).lean();
+                if (!current) continue;
+                systemQty = Number(current.stockQty) || 0;
+                delta = actualQty - systemQty;
+                if (Math.abs(delta) > 0.0001) {
+                    await workshopChangeMaterial(line.materialId, delta);
+                    movement = { entityType:'material', material:line.materialId, unit:current.unit || 'шт' };
+                }
+                savedLines.push({ entityType:'material', material:line.materialId, systemQty, actualQty, delta, note:line.note || '' });
+            } else if (line.entityType === 'finished' && line.recipeId) {
+                const current = await WorkshopRecipe.findById(line.recipeId).lean();
+                if (!current) continue;
+                systemQty = Number(current.stockQty) || 0;
+                delta = actualQty - systemQty;
+                if (Math.abs(delta) > 0.0001) {
+                    await workshopChangeRecipe(line.recipeId, delta);
+                    movement = { entityType:'finished', recipe:line.recipeId, unit:'шт' };
+                }
+                savedLines.push({ entityType:'finished', recipe:line.recipeId, systemQty, actualQty, delta, note:line.note || '' });
+            }
+
+            if (movement && Math.abs(delta) > 0.0001) {
+                await WorkshopMovement.create({
+                    date: req.body.date || new Date(),
+                    type: 'stocktake_adjustment',
+                    ...movement,
+                    direction: delta > 0 ? 'in' : 'out',
+                    qty: Math.abs(delta),
+                    note: line.note || '',
+                    meta: { systemQty, actualQty, delta },
+                    createdBy: workshopUser(req)
+                });
+            }
+        }
+
+        const stocktake = await WorkshopStocktake.create({
+            date: req.body.date || new Date(),
+            lines: savedLines,
+            note: String(req.body.note || '').trim(),
+            createdBy: workshopUser(req)
+        });
+        res.status(201).json(convertToClient(stocktake));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.get('/api/reclamations/dashboard', requirePermission('can_view_reclamations'), async (req, res) => {
+    try {
+        const dealerIds = await getScopedDealerIds(req);
+        const query = {
+            $or: [
+                { resolution: { $exists: false } },
+                { resolution: null },
+                { resolution: '' }
+            ]
+        };
+        if (dealerIds) query.dealerId = { $in: dealerIds };
+
+        const list = await Reclamation.find(query)
+            .select('dealerId dealerName resolution createdAt date')
+            .sort({ createdAt: -1 })
+            .lean();
+        res.json(list.map(convertToClient));
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+
+app.get('/api/reclamations', requirePermission('can_view_reclamations'), async (req, res) => {
+    try {
+        const dealerIds = await getScopedDealerIds(req);
+        const pipeline = [];
+        if (dealerIds) pipeline.push({ $match: { dealerId: { $in: dealerIds } } });
+        pipeline.push(
+            { $sort: { createdAt: -1 } },
+            { $project: {
+                dealerId: 1,
+                dealerName: 1,
+                date: 1,
+                productName: 1,
+                purchasedVolume: 1,
+                description: 1,
+                clientDemand: 1,
+                resolution: 1,
+                invoiceNumber: 1,
+                clientName: 1,
+                defectVolume: 1,
+                compensationAmount: 1,
+                createdAt: 1,
+                updatedAt: 1,
+                photoCount: { $size: { $ifNull: ['$photos', []] } }
+            } }
+        );
+        const list = await Reclamation.aggregate(pipeline);
+        res.json(list.map(item => ({ ...item, id: String(item._id), _id: undefined })));
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+app.get('/api/reclamations/:id', requirePermission('can_view_reclamations'), async (req, res) => {
+    try {
+        const dealerIds = await getScopedDealerIds(req);
+        const query = { _id: req.params.id };
+        if (dealerIds) query.dealerId = { $in: dealerIds };
+        const item = await Reclamation.findOne(query).lean();
+        if (!item) return res.status(404).json({ error: 'Рекламация не найдена' });
+        res.json(convertToClient(item));
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+
+app.post('/api/reclamations', requirePermission('can_manage_reclamations'), async (req, res) => {
+    try { 
+        const r = new Reclamation(req.body); 
+        await r.save(); 
+        res.json(convertToClient(r)); 
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+app.put('/api/reclamations/:id', requirePermission('can_manage_reclamations'), async (req, res) => {
+    try { 
+        const r = await Reclamation.findByIdAndUpdate(req.params.id, req.body, { new: true }); 
+        res.json(convertToClient(r)); 
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+app.delete('/api/reclamations/:id', requirePermission('can_manage_reclamations'), async (req, res) => {
+    try { 
+        await Reclamation.findByIdAndDelete(req.params.id); 
+        res.json({status: 'deleted'}); 
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+
+app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
+,'i') })) {
+        next += 1;
+        code = 'IF' + String(next).padStart(3,'0');
+    }
+    return code;
+}
+
+app.get('/api/dealers', requireAnyPermission('can_view_dealers', 'can_view_map', 'can_view_sales', 'can_view_competitors', 'can_view_reclamations'), async (req, res) => {
+    try {
+        let filter = getDealerFilter(req);
+        if (req.query.scope === 'all' && req.user.permissions && req.user.permissions.is_admin) filter = {};
+        if (req.query.context === 'sales' && hasPermission(req, 'can_view_sales')) filter = {};
+        if (!shouldIncludeNonWorkingDealers(req)) filter = getWorkingDealerFilter(filter);
+
+        let query = Dealer.find(filter);
+        if (req.query.view === 'map') {
+            query = query.select('_id name city address contacts latitude longitude status responsible responsibleUserId');
+        } else {
+            query = query.select('-photos -visits -products -avatarUrl');
+        }
+        const dealers = await query.lean();
+        res.json(dealers.map(d => ({ id: d._id, ...d })));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.get('/api/dealers/:id/avatar', requirePermission('can_view_dealers'), async (req, res) => {
+    try {
+        const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).select('avatarUrl').lean();
+        if (!d) return res.status(404).json({ error: 'Дилер не найден' });
+        res.set('Cache-Control', 'private, max-age=900');
+        res.json({ avatarUrl: d.avatarUrl || '' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.get('/api/dealers/:id', requirePermission('can_view_dealers'), async (req, res) => {
+    try {
+        let query = Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) });
+        if (req.query.view === 'profile') {
+            query = query.select('-photos').populate('products', 'sku name');
+        } else {
+            query = query.populate('products');
+        }
+        const d = await query.lean();
+        if (!d) return res.status(404).json({ error: 'Дилер не найден' });
+        if (req.query.view === 'profile') res.set('Cache-Control', 'private, max-age=30');
+        res.json(convertToClient(d));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.get('/api/dealers/:id/photos', requirePermission('can_view_dealers'), async (req, res) => {
+    try {
+        const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).select('photos').lean();
+        if (!d) return res.status(404).json({ error: 'Дилер не найден' });
+        res.set('Cache-Control', 'private, max-age=60');
+        res.json(Array.isArray(d.photos) ? d.photos : []);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.post('/api/dealers', requirePermission('can_create_dealer'), async (req, res) => { try {
+    const scope = getUserScope(req);
+    const payload = canonicalDealerPayload(req.body);
+    if (req.user.role === 'manager' && !isGlobalViewer(req)) {
+        payload.responsibleUserId = String(req.user.id || '');
+        payload.responsibleAssignmentSource = 'self_create';
+        if (scope === 'astana') payload.responsible = 'regional_astana';
+        if (scope === 'regions') payload.responsible = 'regional_regions';
+    }
+    const d = new Dealer(payload);
+    await d.save();
+    res.status(201).json(convertToClient(d));
+} catch (e) { res.status(500).json({ error: e.message }); } });
+app.post('/api/dealers/:id/visits', requirePermission('can_manage_visits'), async (req, res) => {
+    try {
+        const dealer = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) });
+        if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
+
+        const visit = {
+            date: req.body.date || new Date().toISOString().slice(0, 10),
+            comment: String(req.body.comment || '').trim(),
+            isCompleted: req.body.isCompleted !== false
+        };
+        if (!visit.comment) return res.status(400).json({ error: 'Комментарий визита обязателен' });
+
+        dealer.visits = dealer.visits || [];
+        dealer.visits.push(visit);
+        await dealer.save();
+
+        res.status(201).json({ status: 'ok', visit });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/dealers/:id/visits/:index', requirePermission('can_manage_visits'), async (req, res) => {
+    try {
+        const dealer = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) });
+        if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
+
+        const index = Number(req.params.index);
+        if (!Number.isInteger(index) || index < 0 || !dealer.visits || !dealer.visits[index]) {
+            return res.status(404).json({ error: 'Визит не найден' });
+        }
+
+        if (Object.prototype.hasOwnProperty.call(req.body, 'isCompleted')) {
+            dealer.visits[index].isCompleted = Boolean(req.body.isCompleted);
+        }
+        if (Object.prototype.hasOwnProperty.call(req.body, 'comment')) {
+            dealer.visits[index].comment = String(req.body.comment || '').trim();
+        }
+        if (Object.prototype.hasOwnProperty.call(req.body, 'date')) {
+            dealer.visits[index].date = String(req.body.date || '');
+        }
+
+        await dealer.save();
+        res.json({ status: 'ok', visit: dealer.visits[index] });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/dealers/:id', requirePermission('can_edit_dealer'), async (req, res) => {
+    try {
+        const payload = canonicalDealerPayload(req.body);
+        if (req.user.role === 'manager' && !isGlobalViewer(req)) {
+            delete payload.responsibleUserId;
+            delete payload.responsibleAssignmentSource;
+            if (req.user.scope === 'astana') payload.responsible = 'regional_astana';
+            if (req.user.scope === 'regions') payload.responsible = 'regional_regions';
+        }
+
+        const updated = await Dealer.findOneAndUpdate(
+            { _id: req.params.id, ...getDealerFilter(req) },
+            payload,
+            { new: true }
+        );
+        if (!updated) return res.status(404).json({ error: 'Дилер не найден' });
+        res.json({status:'ok'});
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.patch('/api/dealers/:id', requirePermission('can_edit_dealer'), async (req, res) => {
+    try {
+        const payload = canonicalDealerPayload(req.body);
+        if (req.user.role === 'manager' && !isGlobalViewer(req)) {
+            delete payload.responsibleUserId;
+            delete payload.responsibleAssignmentSource;
+            if (req.user.scope === 'astana') payload.responsible = 'regional_astana';
+            if (req.user.scope === 'regions') payload.responsible = 'regional_regions';
+        }
+
+        const updated = await Dealer.findOneAndUpdate(
+            { _id: req.params.id, ...getDealerFilter(req) },
+            { $set: payload },
+            { new: true }
+        ).lean();
+
+        if (!updated) return res.status(404).json({ error: 'Дилер не найден' });
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.delete('/api/dealers/:id', requirePermission('can_delete_dealer'), async (req, res) => { try { await Dealer.findOneAndDelete({ _id: req.params.id, ...getDealerFilter(req) }); res.json({status:'deleted'}); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.get('/api/dealers/:id/products', requireAnyPermission('can_view_dealers', 'can_view_products'), async (req, res) => { const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).populate('products'); if (!d) return res.status(404).json({ error: 'Дилер не найден' }); res.json(d.products.map(convertToClient)); });
+app.put('/api/dealers/:id/products', requirePermission('can_edit_matrix'), async (req, res) => { const d = await Dealer.findOneAndUpdate({ _id: req.params.id, ...getDealerFilter(req) }, { products: req.body.productIds }); if (!d) return res.status(404).json({ error: 'Дилер не найден' }); res.json({status:'ok'}); });
+// ==========================================
+// ЦЕНОВЫЕ УСЛОВИЯ ДИЛЕРОВ
+// ==========================================
+app.get('/api/pricing/overview', requirePermission('can_view_pricing'), async (req, res) => {
+    try {
+        const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req)))
+            .select('_id dealer_id name city region_sector price_type responsible')
+            .sort({ name: 1 })
+            .lean();
+        const conditions = await PricingCondition.find({})
+            .populate('dealer', '_id dealer_id name city region_sector price_type responsible')
+            .sort({ createdAt: -1 })
+            .lean();
+
+        const rows = dealers.map(dealer => buildDealerPricingSummary(dealer, conditions));
+        const today = pricingTodayKey();
+        const inSeven = new Date(today + 'T00:00:00Z');
+        inSeven.setUTCDate(inSeven.getUTCDate() + 7);
+        const sevenKey = inSeven.toISOString().slice(0, 10);
+
+        const activeConditionIds = new Set();
+        rows.forEach(row => row.matchedConditions.forEach(condition => {
+            if (condition.computedStatus === 'active') activeConditionIds.add(String(condition._id));
+        }));
+
+        const visibleConditions = conditions
+            .filter(condition => rows.some(row => pricingConditionMatchesDealer(condition, {
+                _id: row.dealerId,
+                name: row.dealerName,
+                city: row.city,
+                region_sector: row.sector,
+                price_type: row.defaultPriceType,
+                responsible: row.responsible
+            })))
+            .map(condition => ({
+                ...condition,
+                computedStatus: pricingConditionStatus(condition, today)
+            }));
+
+        res.json({
+            today,
+            rows,
+            conditions: visibleConditions,
+            stats: {
+                dealersWith5: rows.filter(row => row.has5 && !row.has10).length,
+                dealersWith10: rows.filter(row => row.has10 && !row.has5).length,
+                dealersWithBoth: rows.filter(row => row.has5 && row.has10).length,
+                activePriceOverrides: rows.filter(row => row.priceListCondition).length,
+                expiringSoon: visibleConditions.filter(condition =>
+                    condition.computedStatus === 'active' &&
+                    condition.endDate &&
+                    condition.endDate >= today &&
+                    condition.endDate <= sevenKey
+                ).length,
+                pendingRequirements: rows.reduce((sum, row) => sum + row.pendingRequirements, 0)
+            }
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/pricing/dealers/:id', requirePermission('can_view_pricing'), async (req, res) => {
+    try {
+        const dealer = await Dealer.findOne({
+            $and: [
+                { _id: req.params.id },
+                getWorkingDealerFilter(getDealerFilter(req))
+            ]
+        }).select('_id dealer_id name city region_sector price_type responsible')
+            .lean();
+        if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
+
+        const conditions = await PricingCondition.find({})
+            .populate('dealer', '_id dealer_id name city region_sector price_type responsible')
+            .sort({ createdAt: -1 })
+            .lean();
+        res.json(buildDealerPricingSummary(dealer, conditions));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/pricing/conditions', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const payload = cleanPricingPayload(req.body);
+        const validation = validatePricingPayload(payload);
+        if (validation) return res.status(400).json({ error: validation });
+        const duplicate = await findPricingDuplicate(payload);
+        if (duplicate) {
+            return res.status(400).json({ error: `Условие с кодом «${payload.code}» уже действует на эту же цель в пересекающийся период` });
+        }
+
+        if (!isGlobalViewer(req) && payload.scopeType !== 'dealer') {
+            return res.status(403).json({ error: 'Региональные и общие ценовые условия может создавать только пользователь с доступом ко всей компании' });
+        }
+        if (payload.scopeType === 'dealer') {
+            const dealer = await Dealer.findOne({
+                $and: [
+                    { _id: payload.dealer },
+                    getWorkingDealerFilter(getDealerFilter(req))
+                ]
+            }).select('_id').lean();
+            if (!dealer) return res.status(404).json({ error: 'Дилер недоступен' });
+        }
+
+        const user = pricingUserMeta(req);
+        const condition = await PricingCondition.create({
+            ...payload,
+            createdBy: user,
+            updatedBy: user,
+            audit: [{ action: 'created', userId: user.id, userName: user.name, note: 'Условие создано' }]
+        });
+        const populated = await PricingCondition.findById(condition._id).populate('dealer', '_id dealer_id name city region_sector price_type responsible').lean();
+        res.status(201).json({ ...populated, computedStatus: pricingConditionStatus(populated) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.put('/api/pricing/conditions/:id', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const existing = await PricingCondition.findById(req.params.id);
+        if (!existing) return res.status(404).json({ error: 'Ценовое условие не найдено' });
+        if (existing.cancelledAt) return res.status(400).json({ error: 'Отменённое условие нельзя редактировать' });
+
+        const payload = cleanPricingPayload(req.body);
+        const validation = validatePricingPayload(payload);
+        if (validation) return res.status(400).json({ error: validation });
+        const duplicate = await findPricingDuplicate(payload, existing._id);
+        if (duplicate) {
+            return res.status(400).json({ error: `Условие с кодом «${payload.code}» уже действует на эту же цель в пересекающийся период` });
+        }
+
+        if (!isGlobalViewer(req) && payload.scopeType !== 'dealer') {
+            return res.status(403).json({ error: 'Региональные и общие ценовые условия может менять только пользователь с доступом ко всей компании' });
+        }
+        if (payload.scopeType === 'dealer') {
+            const dealer = await Dealer.findOne({
+                $and: [
+                    { _id: payload.dealer },
+                    getWorkingDealerFilter(getDealerFilter(req))
+                ]
+            }).select('_id').lean();
+            if (!dealer) return res.status(404).json({ error: 'Дилер недоступен' });
+        }
+
+        const user = pricingUserMeta(req);
+        Object.assign(existing, payload, { updatedBy: user });
+        existing.audit.push({ action: 'updated', userId: user.id, userName: user.name, note: String(req.body.auditNote || 'Условие изменено').trim() });
+        await existing.save();
+
+        const populated = await PricingCondition.findById(existing._id).populate('dealer', '_id dealer_id name city region_sector price_type responsible').lean();
+        res.json({ ...populated, computedStatus: pricingConditionStatus(populated) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.delete('/api/pricing/conditions/:id', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const condition = await PricingCondition.findById(req.params.id);
+        if (!condition) return res.status(404).json({ error: 'Ценовое условие не найдено' });
+        if (condition.cancelledAt) return res.status(400).json({ error: 'Условие уже отменено' });
+
+        const user = pricingUserMeta(req);
+        condition.cancelledAt = new Date();
+        condition.updatedBy = user;
+        condition.audit.push({
+            action: 'cancelled',
+            userId: user.id,
+            userName: user.name,
+            note: String(req.body?.reason || 'Условие отменено').trim()
+        });
+        await condition.save();
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.get('/api/products/count', requireAnyPermission('can_view_products', 'can_view_report', 'can_view_reclamations', 'can_view_dealers'), async (req, res) => {
+    try {
+        const count = await Product.countDocuments({});
+        res.json({ count });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.get('/api/products', requireAnyPermission('can_view_products', 'can_view_report', 'can_view_reclamations', 'can_view_dealers'), async (req, res) => { const s = new RegExp(req.query.search||'', 'i'); const p = await Product.find({$or:[{sku:s},{name:s}]}).sort({sku:1}).lean(); res.json(p.map(x=>{x.id=x._id;return x;})); });
+app.post('/api/products', requirePermission('can_manage_products'), async (req, res) => { const p = new Product(req.body); await p.save(); res.json(convertToClient(p)); });
+app.put('/api/products/:id', requirePermission('can_manage_products'), async (req, res) => { const p = await Product.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(p)); });
+app.delete('/api/products/:id', requirePermission('can_manage_products'), async (req, res) => { await Product.findByIdAndDelete(req.params.id); res.json({}); });
+app.post('/api/admin/import-catalog', requirePermission('can_manage_products'), async (req, res) => { res.json({status: 'ok'}); });
+app.get('/api/matrix', requireAnyPermission('can_view_products', 'can_view_report'), async (req, res) => {
+    try {
+        const [prods, dealers] = await Promise.all([
+            Product.find({}).select('sku name is_liquid').sort({sku:1}).lean(),
+            Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id name city responsible products pos_materials status').lean()
+        ]);
+        const dealerIds = dealers.map(d => d._id);
+        const assets = dealerIds.length
+            ? await WorkshopDealerAsset.find({ dealer: { $in: dealerIds }, qty: { $gt: 0 } })
+                .populate('recipe', 'product outputType')
+                .lean()
+            : [];
+
+        const productMap = new Map();
+        dealers.forEach(d => productMap.set(d._id.toString(), new Set((d.products||[]).map(String))));
+
+        const sampleMap = new Map();
+        assets.forEach(asset => {
+            const productId = asset.recipe?.outputType === 'sample' ? asset.recipe?.product : null;
+            if (!productId) return;
+            const key = `${asset.dealer}|${productId}`;
+            sampleMap.set(key, (sampleMap.get(key) || 0) + (Number(asset.qty) || 0));
+        });
+
+        const posList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"];
+        const matrix = prods.map(p => ({
+            sku: p.sku,
+            name: p.name,
+            type: 'product',
+            is_liquid: p.is_liquid !== false,
+            dealers: dealers.map(d => ({
+                value: productMap.get(d._id.toString()).has(p._id.toString()) ? 1 : 0,
+                sample_qty: sampleMap.get(`${d._id}|${p._id}`) || 0,
+                is_pos: false
+            }))
+        }));
+
+        posList.forEach(pn => {
+            matrix.push({
+                sku: "POS",
+                name: pn,
+                type: 'pos',
+                dealers: dealers.map(d => ({
+                    value: (d.pos_materials||[]).find(m=>m.name===pn)?.quantity||0,
+                    is_pos: true
+                }))
+            });
+        });
+        res.json({
+            headers: dealers.map(d=>({id:d._id, name:d.name, city:d.city, responsible:d.responsible})),
+            matrix
+        });
+    } catch (e) {
+        res.status(500).json({error:e.message});
+    }
+});
+
+app.get('/api/sales', requirePermission('can_view_sales'), async (req, res) => {
+    try {
+        const { month, months, dealerId } = req.query;
+        let filter = month ? { month } : {};
+        if (!month && months) {
+            const count = Math.max(1, Math.min(24, Number(months) || 6));
+            const now = new Date();
+            now.setUTCDate(1);
+            now.setUTCMonth(now.getUTCMonth() - (count - 1));
+            const minMonth = now.toISOString().slice(0, 7);
+            filter = { month: { $gte: minMonth } };
+        }
+        const scope = getUserScope(req);
+        const companySalesView = req.query.context === 'sales' && hasPermission(req, 'can_view_sales');
+
+        if (!companySalesView && !isGlobalViewer(req) && req.user.role === 'manager') {
+            const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id').lean();
+            const dealerIds = dealers.map(d => String(d._id));
+            const zonePlanId = scope === 'astana'
+                ? 'PLAN_astana_all'
+                : scope === 'regions'
+                    ? 'PLAN_regions_all'
+                    : 'PLAN_total_all';
+
+            filter = {
+                $and: [
+                    filter,
+                    {
+                        $or: [
+                            // Факт менеджера считается исключительно по дилерам,
+                            // где он выбран ответственным.
+                            { isCustom: { $ne: true }, dealerId: { $in: dealerIds } },
+                            // План берём из сводки его зоны на странице Продажи.
+                            { isCustom: { $ne: true }, dealerId: zonePlanId }
+                        ]
+                    }
+                ]
+            };
+        } else if (!companySalesView && !isGlobalViewer(req) && scope !== 'all') {
+            const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id').lean();
+            const dealerIds = dealers.map(d => String(d._id));
+            const personalPlanIds = dealerIds.map(id => `PLAN_vip_${id}`);
+
+            const sectorType = scope === 'astana' ? 'astana' : 'region';
+            const sectors = await Sector.find({ type: sectorType }).select('name').lean();
+            const slug = name => String(name || '').trim().replace(/\s+/g, '_').toLowerCase();
+            const groupKeys = scope === 'astana'
+                ? [...sectors.map(s => `astana_${slug(s.name)}`), 'regional_astana']
+                : [...sectors.map(s => `sector_${slug(s.name)}`), 'regional_regions'];
+
+            const groupPlanIds = groupKeys.map(key => `PLAN_${key}`);
+            groupPlanIds.push(scope === 'astana' ? 'PLAN_astana_all' : 'PLAN_regions_all');
+            const allowedPlanIds = [...personalPlanIds, ...groupPlanIds];
+
+            filter = {
+                $and: [
+                    filter,
+                    {
+                        $or: [
+                            { isCustom: { $ne: true }, dealerId: { $in: dealerIds } },
+                            { isCustom: { $ne: true }, dealerId: { $in: allowedPlanIds } },
+                            { isCustom: true, group: { $in: groupKeys } }
+                        ]
+                    }
+                ]
+            };
+        }
+
+        if (dealerId) {
+            const requestedDealerId = String(dealerId);
+            const requestedPlanId = `PLAN_vip_${requestedDealerId}`;
+            filter = {
+                $and: [
+                    filter,
+                    { dealerId: { $in: [requestedDealerId, requestedPlanId] } }
+                ]
+            };
+        }
+
+        const s = await Sales.find(filter).lean();
+
+        // Нерабочие дилеры (potential/archive) не участвуют в текущей
+        // операционной статистике продаж. Сами исторические строки Sales
+        // остаются в базе и могут снова участвовать после возврата дилера
+        // в рабочий статус.
+        const workingBaseFilter = (companySalesView || isGlobalViewer(req)) ? {} : getDealerFilter(req);
+        const workingDealers = await Dealer.find(getWorkingDealerFilter(workingBaseFilter)).select('_id').lean();
+        const workingDealerIds = new Set(workingDealers.map(item => String(item._id)));
+
+        const visibleSales = s.filter(row => {
+            if (row.isCustom) return true;
+            const rowDealerId = String(row.dealerId || '');
+            if (!rowDealerId) return true;
+
+            if (rowDealerId.startsWith('PLAN_manager_')) return false;
+            if (rowDealerId.startsWith('PLAN_vip_')) {
+                return workingDealerIds.has(rowDealerId.replace('PLAN_vip_', ''));
+            }
+            if (rowDealerId.startsWith('PLAN_')) return true;
+            return workingDealerIds.has(rowDealerId);
+        });
+
+        res.json(visibleSales);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ===== ИСПРАВЛЕННЫЙ БЛОК: СОХРАНЕНИЕ, АГРЕГАЦИЯ И УДАЛЕНИЕ =====
+app.post('/api/sales', async (req, res) => {
+    const canFact = hasPermission(req, 'can_edit_sales_fact');
+    const canPlan = hasPermission(req, 'can_edit_sales_plan');
+    if (!canFact && !canPlan) {
+        return res.status(403).json({ error: 'Недостаточно прав для изменения продаж' });
+    }
+
+    const now = new Date();
+    const scope = req.user ? req.user.scope : 'none';
+    const companySalesView = req.query.context === 'sales' && hasPermission(req, 'can_view_sales');
+    const managerRestricted = Boolean(req.user && req.user.role === 'manager' && !isGlobalViewer(req) && !companySalesView);
+    let managerDealerIds = null;
+    if (managerRestricted) {
+        const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id').lean();
+        managerDealerIds = new Set(dealers.map(d => String(d._id)));
+    }
+
+    // 1. Агрегируем дубликаты из присланных данных (если ввели несколько с одинаковым именем)
+    const aggregatedData = {};
+    (Array.isArray(req.body.data) ? req.body.data : []).forEach(i => {
+        const row = { ...i };
+
+        if (managerRestricted) {
+            const dealerId = String(row.dealerId || '');
+            if (row.isCustom) {
+                row.ownerUserId = String(req.user.id);
+            } else if (dealerId.startsWith('PLAN_manager_')) {
+                return;
+            } else if (dealerId.startsWith('PLAN_vip_')) {
+                const ownedDealerId = dealerId.replace('PLAN_vip_', '');
+                if (!managerDealerIds.has(ownedDealerId)) return;
+            } else if (dealerId.startsWith('PLAN_')) {
+                return;
+            } else if (!managerDealerIds.has(dealerId)) {
+                return;
+            }
+        }
+        if (String(row.dealerId || '').startsWith('PLAN_manager_')) return;
+        if (!canFact) delete row.fact;
+        if (!canPlan) delete row.plan;
+
+        const key = row.isCustom ? `custom_${row.group}_${row.dealerName}` : `dealer_${row.dealerId}`;
+        if (!aggregatedData[key]) {
+            aggregatedData[key] = row;
+        } else {
+            if (canFact) aggregatedData[key].fact = (Number(aggregatedData[key].fact) || 0) + (Number(row.fact) || 0);
+            if (canPlan) aggregatedData[key].plan = (Number(aggregatedData[key].plan) || 0) + (Number(row.plan) || 0);
+        }
+    });
+
+    // 2. Обновляем/Добавляем записи
+    const ops = Object.values(aggregatedData).map(i => {
+        const filter = { month: req.body.month };
+        if (i.isCustom) {
+            filter.isCustom = true;
+            filter.dealerName = i.dealerName;
+            if (i.group) filter.group = i.group; 
+        } else {
+            filter.dealerId = i.dealerId;
+        }
+
+        return {
+            updateOne: { 
+                filter: filter, 
+                update: { $set: { ...i, updatedAt: now } }, 
+                upsert: true 
+            } 
+        };
+    }); 
+    
+    if (ops.length > 0) {
+        await Sales.bulkWrite(ops); 
+    }
+
+    // Старые планы менеджеров больше не используются: план задаётся по зоне/сектору/дилеру.
+    await Sales.deleteMany({
+        month: req.body.month,
+        dealerId: { $regex: '^PLAN_manager_' }
+    });
+
+    // 3. Умное удаление (Очистка разовых продаж)
+    // Определяем, к каким группам имеет доступ текущий пользователь
+    let groupFilter = {};
+    if (managerRestricted) {
+        groupFilter = { ownerUserId: String(req.user.id) };
+    } else if (!companySalesView && scope === 'astana') {
+        const sectors = await Sector.find({ type: 'astana' });
+        groupFilter = { group: { $in: sectors.map(s => s.name) } };
+    } else if (!companySalesView && scope === 'regions') {
+        const sectors = await Sector.find({ type: 'region' });
+        groupFilter = { group: { $in: sectors.map(s => s.name) } };
+    }
+    // Если admin или all, groupFilter остается пустым (имеет доступ ко всем)
+
+    // Ищем все разовые продажи за этот месяц в базе (в рамках доступа пользователя)
+    const dbCustomSales = await Sales.find({ 
+        month: req.body.month, 
+        isCustom: true, 
+        ...groupFilter 
+    });
+
+    const idsToDelete = [];
+    const incomingArray = Object.values(aggregatedData);
+
+    if (canFact) dbCustomSales.forEach(dbSale => {
+        // Проверяем, осталась ли эта продажа в присланных данных
+        const existsInIncoming = incomingArray.some(
+            i => i.isCustom && i.group === dbSale.group && i.dealerName === dbSale.dealerName
+        );
+        
+        // Если в присланных данных её больше нет — помечаем на удаление
+        if (!existsInIncoming) {
+            idsToDelete.push(dbSale._id);
+        }
+    });
+
+    // Удаляем всё лишнее
+    if (canFact && idsToDelete.length > 0) {
+        await Sales.deleteMany({ _id: { $in: idsToDelete } });
+    }
+
+    res.json({status:'ok'}); 
+});
+// ===================================================================
+
+app.get('/api/competitors-ref', requirePermission('can_view_competitors'), async (req, res) => { const l = await CompRef.find().sort({name:1}); res.json(l.map(convertToClient)); });
+app.post('/api/competitors-ref', requirePermission('can_manage_competitors'), async (req, res) => { const c = new CompRef(req.body); await c.save(); res.json(convertToClient(c)); });
+app.put('/api/competitors-ref/:id', requirePermission('can_manage_competitors'), async (req, res) => { await CompRef.findByIdAndUpdate(req.params.id, req.body); res.json({status:'ok'}); });
+app.delete('/api/competitors-ref/:id', requirePermission('can_manage_competitors'), async (req, res) => { await CompRef.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
+app.get('/api/knowledge', requirePermission('can_view_knowledge'), async (req, res) => { const l = await Knowledge.find().sort({title:1}); res.json(l.map(convertToClient)); });
+app.get('/api/knowledge/:id', requirePermission('can_view_knowledge'), async (req, res) => { res.json(convertToClient(await Knowledge.findById(req.params.id))); });
+app.post('/api/knowledge', requirePermission('can_manage_knowledge'), async (req, res) => { const a = new Knowledge(req.body); await a.save(); res.json(convertToClient(a)); });
+app.put('/api/knowledge/:id', requirePermission('can_manage_knowledge'), async (req, res) => { const a = await Knowledge.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(a)); });
+app.delete('/api/knowledge/:id', requirePermission('can_manage_knowledge'), async (req, res) => { await Knowledge.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
+app.get('/api/tasks', requirePermission('can_view_dashboard'), async (req, res) => { try { const data = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('name visits status responsible').lean(); res.json(data.map(d => ({ id: d._id, name: d.name, status: d.status, visits: d.visits || [], responsible: d.responsible }))); } catch (e) { res.status(500).json([]); } });
+
+async function getScopedDealerIds(req) {
+    const baseFilter = isGlobalViewer(req) ? {} : getDealerFilter(req);
+    const dealers = await Dealer.find(getWorkingDealerFilter(baseFilter)).select('_id').lean();
+    return dealers.map(d => String(d._id));
+}
+
+// ==========================================
+// РЕКВИЗИТЫ И РЕКЛАМАЦИИ
+// ==========================================
+const reclamationSchema = new mongoose.Schema({
+    dealerId: String,
+    dealerName: String,
+    date: String,
+    productName: String,
+    invoiceNumber: String,
+    purchaseDate: String,
+    clientName: String,
+    clientPhone: String,
+    address: String,
+    floor: String,
+    houseType: String,
+    totalArea: String,
+    purchasedVolume: String,
+    batchNumbers: [String],
+    baseType: String,
+    underlayment: String,
+    warmFloor: String,
+    installer: String,
+    
+    // --- НОВЫЕ ТЕХНИЧЕСКИЕ ПОЛЯ ---
+    acclimatization: String, 
+    storageMethod: String,
+    dryingTime: String,
+    floorFlatness: String,
+// --- НОВЫЕ ПОЛЯ ---
+    defectMoment: String,       // Момент выявления
+    compensationAmount: Number, // Сумма компенсации
+    internalNotes: String,
+    
+    description: String,
+    clientDemand: String,
+    resolution: String,
+    photos: [{ photo_url: String }]
+}, { timestamps: true });
+const Reclamation = mongoose.model('Reclamation', reclamationSchema);
+
+
+// ==========================================
+// ЦЕХ API
+// ==========================================
+async function syncWorkshopPosToDealer(dealerId, recipeId) {
+    const recipe = await WorkshopRecipe.findById(recipeId).select('matrixPosName').lean();
+    const posName = String(recipe?.matrixPosName || '').trim();
+    if (!posName) return;
+
+    const recipes = await WorkshopRecipe.find({ matrixPosName: posName }).select('_id').lean();
+    const recipeIds = recipes.map(item => item._id);
+    const assets = await WorkshopDealerAsset.find({ dealer: dealerId, recipe: { $in: recipeIds } }).lean();
+    const qty = assets.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+
+    const dealer = await Dealer.findById(dealerId);
+    if (!dealer) return;
+    dealer.pos_materials = Array.isArray(dealer.pos_materials) ? dealer.pos_materials : [];
+    const index = dealer.pos_materials.findIndex(item => item.name === posName);
+    if (qty > 0) {
+        if (index >= 0) dealer.pos_materials[index].quantity = qty;
+        else dealer.pos_materials.push({ name: posName, quantity: qty });
+    } else if (index >= 0) {
+        dealer.pos_materials.splice(index, 1);
+    }
+    await dealer.save();
+}
+
+app.post('/api/workshop/print-log', requirePermission('can_view_workshop'), async (req, res) => {
+    try {
+        const type=String(req.body?.type||'report').trim().slice(0,60);
+        const referenceId=String(req.body?.referenceId||'').trim().slice(0,120);
+        const title=String(req.body?.title||'Документ цеха').trim().slice(0,180);
+        res.json({status:'logged',type,referenceId,title});
+    } catch(e) {
+        res.status(500).json({error:e.message});
+    }
+});
+
+app.get('/api/workshop/bootstrap', requirePermission('can_view_workshop'), async (req, res) => {
+    try {
+        const [products, dealers, materials, recipes, laminateStocks, assets, productions, movements, memos] = await Promise.all([
+            Product.find().select('sku name is_liquid characteristics.package_qty characteristics.size characteristics.class characteristics.thickness').sort({ sku: 1 }).lean(),
+            Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id dealer_id name city status').sort({ name: 1 }).lean(),
+            WorkshopMaterial.find({ active: { $ne: false } }).sort({ category: 1, name: 1 }).lean(),
+            WorkshopRecipe.find({ active: { $ne: false } })
+                .populate('product', 'sku name is_liquid characteristics.package_qty')
+                .populate('materials.material', 'code name unit purchaseUnit purchaseUnitSize stockQty')
+                .populate('components.recipe', 'name outputType stockQty')
+                .sort({ outputType: 1, name: 1 }).lean(),
+            WorkshopLaminateStock.find().populate('product', 'sku name is_liquid characteristics.package_qty').lean(),
+            WorkshopDealerAsset.find({ qty: { $gt: 0 } })
+                .populate('dealer', 'dealer_id name city status')
+                .populate({ path: 'recipe', populate: { path: 'product', select: 'sku name is_liquid' } })
+                .sort({ updatedAt: -1 }).lean(),
+            WorkshopProduction.find({ cancelledAt: { $exists: false } })
+                .populate('recipe', 'name outputType')
+                .populate('product', 'sku name')
+                .sort({ date: -1, createdAt: -1 }).limit(30).lean(),
+            WorkshopMovement.find()
+                .populate('product', 'sku name')
+                .populate('material', 'code name unit')
+                .populate('recipe', 'name outputType')
+                .populate('dealer', 'dealer_id name city')
+                .sort({ date: -1, createdAt: -1 }).limit(60).lean(),
+            WorkshopMemo.find()
+                .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+                .populate('lines.actualProduct', 'sku name is_liquid characteristics.package_qty')
+                .populate('lines.recipe', 'name outputType planksPerUnit')
+                .sort({ date: -1, createdAt: -1 }).limit(80).lean()
+        ]);
+
+        const memoIds = memos.map(item => item._id);
+        const producedByMemoLine = memoIds.length ? await WorkshopProduction.aggregate([
+            { $match: { memo: { $in: memoIds }, memoLineId: { $nin: [null, ''] }, cancelledAt: { $exists: false } } },
+            { $group: { _id: '$memoLineId', qty: { $sum: '$outputQty' } } }
+        ]) : [];
+        const producedMap = new Map(producedByMemoLine.map(item => [String(item._id), Number(item.qty) || 0]));
+        memos.forEach(memo => {
+            (memo.lines || []).forEach(line => {
+                line.producedQty = producedMap.get(String(line._id)) || 0;
+            });
+        });
+
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const todayRows = await WorkshopProduction.find({ date: { $gte: today }, cancelledAt: { $exists: false } }).select('outputQty').lean();
+        const todayProduction = todayRows.reduce((sum, item) => sum + (Number(item.outputQty) || 0), 0);
+        const finishedStock = recipes.reduce((sum, item) => sum + (Number(item.stockQty) || 0), 0);
+        const lowMaterials = materials.filter(item => Number(item.minQty) > 0 && Number(item.stockQty) <= Number(item.minQty)).length;
+        const laminatePlanks = laminateStocks.reduce((sum, item) => sum + (Number(item.planksQty) || 0), 0);
+        const openMemos = memos.filter(item => item.status === 'created' || item.status === 'mismatch').length;
+        const visibleAssets = assets.filter(asset => !isNonWorkingDealerStatus(asset.dealer?.status));
+        const dealerAssetStock = visibleAssets.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+        const openingBalanceCount = await WorkshopMovement.countDocuments({
+            type: { $in: ['opening_balance', 'opening_dealer_balance'] }
+        });
+
+        res.json({
+            products: products.map(convertToClient),
+            dealers: dealers.map(convertToClient),
+            materials: materials.map(convertToClient),
+            recipes: recipes.map(convertToClient),
+            laminateStocks: laminateStocks.map(convertToClient),
+            dealerAssets: visibleAssets.map(convertToClient),
+            productions: productions.map(convertToClient),
+            movements: movements.map(convertToClient),
+            memos: memos.map(convertToClient),
+            stats: { todayProduction, finishedStock, lowMaterials, laminatePlanks, openMemos, dealerAssetStock, openingBalanceCount }
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/workshop/movements', requirePermission('can_view_workshop'), async (req, res) => {
+    try {
+        const limit = Math.max(1, Math.min(500, Number(req.query.limit) || 150));
+        const filter = {};
+        if (req.query.type) filter.type = req.query.type;
+        const list = await WorkshopMovement.find(filter)
+            .populate('product', 'sku name')
+            .populate('material', 'code name unit')
+            .populate('recipe', 'name outputType')
+            .populate('dealer', 'dealer_id name city')
+            .sort({ date: -1, createdAt: -1 }).limit(limit).lean();
+        res.json(list.map(convertToClient));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/materials', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const item = new WorkshopMaterial({
+            code: String(req.body.code || '').trim(),
+            name: String(req.body.name || '').trim(),
+            category: req.body.category || 'consumable',
+            unit: req.body.unit || 'шт',
+            purchaseUnit: String(req.body.purchaseUnit || req.body.unit || 'шт').trim(),
+            purchaseUnitSize: Math.max(0.0001, workshopNumber(req.body.purchaseUnitSize) || 1),
+            stockQty: Math.max(0, workshopNumber(req.body.stockQty)),
+            minQty: Math.max(0, workshopNumber(req.body.minQty)),
+            active: req.body.active !== false,
+            note: String(req.body.note || '').trim()
+        });
+        if (!item.name) return res.status(400).json({ error: 'Укажите название материала' });
+        await item.save();
+        res.status(201).json(convertToClient(item));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.put('/api/workshop/materials/:id', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const payload = {
+            code: String(req.body.code || '').trim(),
+            name: String(req.body.name || '').trim(),
+            category: req.body.category || 'consumable',
+            unit: req.body.unit || 'шт',
+            purchaseUnit: String(req.body.purchaseUnit || req.body.unit || 'шт').trim(),
+            purchaseUnitSize: Math.max(0.0001, workshopNumber(req.body.purchaseUnitSize) || 1),
+            minQty: Math.max(0, workshopNumber(req.body.minQty)),
+            active: req.body.active !== false,
+            note: String(req.body.note || '').trim()
+        };
+        const item = await WorkshopMaterial.findByIdAndUpdate(req.params.id, payload, { new: true });
+        if (!item) return res.status(404).json({ error: 'Материал не найден' });
+        res.json(convertToClient(item));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.delete('/api/workshop/materials/:id', requireIsAdmin, async (req, res) => {
+    try {
+        const item = await WorkshopMaterial.findById(req.params.id);
+        if (!item) return res.status(404).json({ error: 'Материал не найден' });
+
+        const [movementUsed, recipeUsed] = await Promise.all([
+            WorkshopMovement.exists({ material: item._id }),
+            WorkshopRecipe.exists({ 'materials.material': item._id })
+        ]);
+        if (movementUsed || recipeUsed) {
+            return res.status(400).json({ error: 'Материал уже используется в истории или рецептурах. Его можно отредактировать/деактивировать, но не удалить.' });
+        }
+        await WorkshopMaterial.deleteOne({ _id: item._id });
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/material-movement', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const materialId = req.body.materialId;
+        const qty = Math.abs(workshopNumber(req.body.qty));
+        const direction = req.body.direction === 'out' ? 'out' : 'in';
+        if (!materialId || qty <= 0) return res.status(400).json({ error: 'Укажите материал и количество' });
+
+        const delta = direction === 'out' ? -qty : qty;
+        const material = await workshopChangeMaterial(materialId, delta);
+        const movement = await WorkshopMovement.create({
+            date: req.body.date || new Date(),
+            type: req.body.type || (direction === 'out' ? 'material_issue' : 'material_receipt'),
+            entityType: 'material',
+            material: materialId,
+            direction,
+            qty,
+            unit: material.unit || 'шт',
+            serviceMemoNumber: String(req.body.serviceMemoNumber || '').trim(),
+            note: String(req.body.note || '').trim(),
+            createdBy: workshopUser(req)
+        });
+        res.status(201).json({ material: convertToClient(material), movement: convertToClient(movement) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/recipes', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const recipe = new WorkshopRecipe({
+            name: String(req.body.name || '').trim(),
+            outputType: req.body.outputType || 'sample',
+            sku: String(req.body.sku || '').trim(),
+            product: req.body.productId || null,
+            sideA: String(req.body.sideA || '').trim(),
+            sideB: String(req.body.sideB || '').trim(),
+            planksPerUnit: Math.max(0, workshopNumber(req.body.planksPerUnit)),
+            packQtyOverride: Math.max(0, workshopNumber(req.body.packQtyOverride)),
+            matrixPosName: String(req.body.matrixPosName || '').trim(),
+            minStockQty: Math.max(0, workshopNumber(req.body.minStockQty)),
+            materials: Array.isArray(req.body.materials) ? req.body.materials.map(item => ({
+                material: item.materialId,
+                qty: Math.max(0, workshopNumber(item.qty)),
+                mode: item.mode === 'estimate' ? 'estimate' : 'strict'
+            })).filter(item => item.material && item.qty >= 0) : [],
+            components: Array.isArray(req.body.components) ? req.body.components.map(item => ({
+                recipe: item.recipeId,
+                qty: Math.max(0, workshopNumber(item.qty))
+            })).filter(item => item.recipe && item.qty > 0) : [],
+            active: req.body.active !== false,
+            note: String(req.body.note || '').trim()
+        });
+        if (!recipe.name) return res.status(400).json({ error: 'Укажите название изделия' });
+        await recipe.save();
+        res.status(201).json(convertToClient(recipe));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.put('/api/workshop/recipes/:id', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const payload = {
+            name: String(req.body.name || '').trim(),
+            outputType: req.body.outputType || 'sample',
+            sku: String(req.body.sku || '').trim(),
+            product: req.body.productId || null,
+            sideA: String(req.body.sideA || '').trim(),
+            sideB: String(req.body.sideB || '').trim(),
+            planksPerUnit: Math.max(0, workshopNumber(req.body.planksPerUnit)),
+            packQtyOverride: Math.max(0, workshopNumber(req.body.packQtyOverride)),
+            matrixPosName: String(req.body.matrixPosName || '').trim(),
+            minStockQty: Math.max(0, workshopNumber(req.body.minStockQty)),
+            materials: Array.isArray(req.body.materials) ? req.body.materials.map(item => ({
+                material: item.materialId,
+                qty: Math.max(0, workshopNumber(item.qty)),
+                mode: item.mode === 'estimate' ? 'estimate' : 'strict'
+            })).filter(item => item.material && item.qty >= 0) : [],
+            components: Array.isArray(req.body.components) ? req.body.components.map(item => ({
+                recipe: item.recipeId,
+                qty: Math.max(0, workshopNumber(item.qty))
+            })).filter(item => item.recipe && item.qty > 0) : [],
+            active: req.body.active !== false,
+            note: String(req.body.note || '').trim()
+        };
+        const recipe = await WorkshopRecipe.findByIdAndUpdate(req.params.id, payload, { new: true });
+        if (!recipe) return res.status(404).json({ error: 'Рецептура не найдена' });
+        res.json(convertToClient(recipe));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.delete('/api/workshop/recipes/:id', requireIsAdmin, async (req, res) => {
+    try {
+        const recipe = await WorkshopRecipe.findById(req.params.id);
+        if (!recipe) return res.status(404).json({ error: 'Рецептура не найдена' });
+
+        const [productionUsed, movementUsed, dealerUsed, componentUsed, memoUsed] = await Promise.all([
+            WorkshopProduction.exists({ recipe: recipe._id }),
+            WorkshopMovement.exists({ recipe: recipe._id }),
+            WorkshopDealerAsset.exists({ recipe: recipe._id, qty: { $gt: 0 } }),
+            WorkshopRecipe.exists({ 'components.recipe': recipe._id }),
+            WorkshopMemo.exists({ 'lines.recipe': recipe._id })
+        ]);
+        if (productionUsed || movementUsed || dealerUsed || componentUsed || memoUsed || Math.abs(Number(recipe.stockQty) || 0) > 0.0001) {
+            return res.status(400).json({ error: 'Рецептура уже участвует в учёте. Её можно редактировать или деактивировать, но нельзя удалить без нарушения истории.' });
+        }
+        await WorkshopRecipe.deleteOne({ _id: recipe._id });
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/memos', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        let number = String(req.body.number || '').trim();
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
+        if (!inputLines.length) return res.status(400).json({ error: 'Добавьте хотя бы одну позицию' });
+        if (!number) {
+            let seq = Math.max(1, (await WorkshopMemo.countDocuments()) + 1);
+            while (!number) {
+                const candidate = `ЦЕХ-${String(seq).padStart(4, '0')}`;
+                const exists = await WorkshopMemo.exists({ number: candidate });
+                if (!exists) number = candidate;
+                else seq += 1;
+            }
+        }
+
+        const lines = [];
+        const seenProducts = new Set();
+        for (const input of inputLines) {
+            const requestedPacks = Math.max(0, Math.floor(workshopNumber(input.requestedPacks)));
+            if (!input.productId || requestedPacks <= 0) continue;
+
+            const product = await Product.findById(input.productId).lean();
+            if (!product) continue;
+            const productKey = String(product._id);
+            if (seenProducts.has(productKey)) {
+                return res.status(400).json({ error: `Позиция «${product.sku || product.name}» добавлена в служебку дважды` });
+            }
+            seenProducts.add(productKey);
+
+            let recipe = null;
+            if (input.recipeId) {
+                recipe = await WorkshopRecipe.findOne({
+                    _id: input.recipeId,
+                    product: product._id,
+                    active: { $ne: false }
+                }).lean();
+                if (!recipe) {
+                    return res.status(400).json({ error: `Выбранная рецептура не подходит для «${product.sku || product.name}»` });
+                }
+            } else {
+                const recipes = await WorkshopRecipe.find({
+                    product: product._id,
+                    active: { $ne: false },
+                    planksPerUnit: { $gt: 0 }
+                }).lean();
+                recipe = recipes.find(item => item.outputType === 'sample')
+                    || recipes.find(item => item.outputType === 'stand')
+                    || recipes[0]
+                    || null;
+            }
+
+            const packQty = workshopPackQty(product, recipe?.packQtyOverride || 0);
+            if (packQty <= 0) {
+                return res.status(400).json({ error: `У «${product.sku || product.name}» не заполнено количество планок в упаковке` });
+            }
+            const planksPerUnit = recipe ? Math.max(0, workshopNumber(recipe.planksPerUnit)) : 0;
+
+            const totalPlanks = requestedPacks * packQty;
+            const plannedOutputQty = planksPerUnit > 0 ? Math.floor(totalPlanks / planksPerUnit) : 0;
+            const plannedRemainderPlanks = planksPerUnit > 0 ? totalPlanks - plannedOutputQty * planksPerUnit : totalPlanks;
+
+            lines.push({
+                product: product._id,
+                recipe: recipe?._id || null,
+                requestedPacks,
+                plannedOutputQty,
+                plannedRemainderPlanks,
+                packQty,
+                planksPerUnit,
+                actualProduct: product._id,
+                deliveredPacks: 0,
+                checked: false,
+                isMatch: false,
+                discrepancyReason: ''
+            });
+        }
+
+        if (!lines.length) return res.status(400).json({ error: 'Нет корректных позиций для служебной записки' });
+
+        const memo = await WorkshopMemo.create({
+            number,
+            date: req.body.date || new Date(),
+            lines,
+            note: String(req.body.note || '').trim(),
+            signedBy: String(req.body.signedBy || req.user?.fullName || req.user?.username || '').trim(),
+            createdBy: workshopUser(req)
+        });
+
+        const populated = await WorkshopMemo.findById(memo._id)
+            .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+            .populate('lines.recipe', 'name outputType planksPerUnit')
+            .lean();
+        res.status(201).json(convertToClient(populated));
+    } catch (e) {
+        if (e && e.code === 11000) return res.status(400).json({ error: 'Служебная записка с таким номером уже существует' });
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.put('/api/workshop/memos/:id', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const memo = await WorkshopMemo.findById(req.params.id);
+        if (!memo) return res.status(404).json({ error: 'Служебная записка не найдена' });
+        if (memo.postedAt || memo.status === 'accepted') {
+            return res.status(400).json({ error: 'Принятую служебную записку нельзя редактировать. Используйте корректировку/отмену.' });
+        }
+
+        const number = String(req.body.number || memo.number || '').trim();
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
+        if (!number) return res.status(400).json({ error: 'Укажите номер служебной записки' });
+        if (!inputLines.length) return res.status(400).json({ error: 'Добавьте хотя бы одну позицию' });
+
+        const duplicateNumber = await WorkshopMemo.exists({ number, _id: { $ne: memo._id } });
+        if (duplicateNumber) return res.status(400).json({ error: 'Служебная записка с таким номером уже существует' });
+
+        const seenProducts = new Set();
+        const lines = [];
+        for (const input of inputLines) {
+            const requestedPacks = Math.max(0, Math.floor(workshopNumber(input.requestedPacks)));
+            if (!input.productId || requestedPacks <= 0) continue;
+
+            const product = await Product.findById(input.productId).lean();
+            if (!product) continue;
+            const productKey = String(product._id);
+            if (seenProducts.has(productKey)) {
+                return res.status(400).json({ error: `Позиция «${product.sku || product.name}» добавлена в служебку дважды` });
+            }
+            seenProducts.add(productKey);
+
+            let recipe = null;
+            if (input.recipeId) {
+                recipe = await WorkshopRecipe.findOne({ _id: input.recipeId, product: product._id, active: { $ne: false } }).lean();
+            }
+            if (!recipe) {
+                const recipes = await WorkshopRecipe.find({ product: product._id, active: { $ne: false }, planksPerUnit: { $gt: 0 } }).lean();
+                recipe = recipes.find(item => item.outputType === 'sample') || recipes.find(item => item.outputType === 'stand') || recipes[0] || null;
+            }
+            const packQty = workshopPackQty(product, recipe?.packQtyOverride || 0);
+            const planksPerUnit = recipe ? Math.max(0, workshopNumber(recipe.planksPerUnit)) : 0;
+            if (packQty <= 0) {
+                return res.status(400).json({ error: `У «${product.sku || product.name}» не заполнено количество планок в упаковке` });
+            }
+
+            const totalPlanks = requestedPacks * packQty;
+            const plannedOutputQty = planksPerUnit > 0 ? Math.floor(totalPlanks / planksPerUnit) : 0;
+            const plannedRemainderPlanks = planksPerUnit > 0 ? totalPlanks - plannedOutputQty * planksPerUnit : totalPlanks;
+            lines.push({
+                product: product._id,
+                recipe: recipe?._id || null,
+                requestedPacks,
+                plannedOutputQty,
+                plannedRemainderPlanks,
+                packQty,
+                planksPerUnit,
+                actualProduct: product._id,
+                deliveredPacks: 0,
+                checked: false,
+                isMatch: false,
+                discrepancyReason: ''
+            });
+        }
+
+        if (!lines.length) return res.status(400).json({ error: 'Нет корректных позиций' });
+
+        memo.number = number;
+        memo.date = req.body.date || memo.date || new Date();
+        memo.lines = lines;
+        memo.note = String(req.body.note || '').trim();
+        memo.signedBy = String(req.body.signedBy || '').trim();
+        memo.status = 'created';
+        memo.receiptAttempts = [];
+        await memo.save();
+
+        const populated = await WorkshopMemo.findById(memo._id)
+            .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+            .populate('lines.recipe', 'name outputType planksPerUnit minStockQty stockQty')
+            .lean();
+        res.json(convertToClient(populated));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.delete('/api/workshop/memos/:id', requireIsAdmin, async (req, res) => {
+    try {
+        const memo = await WorkshopMemo.findById(req.params.id);
+        if (!memo) return res.status(404).json({ error: 'Служебная записка не найдена' });
+        if (memo.postedAt || memo.status === 'accepted') {
+            return res.status(400).json({ error: 'Проведённую служебную записку нельзя удалить напрямую: она уже изменила остатки.' });
+        }
+        const linkedProduction = await WorkshopProduction.exists({ memo: memo._id });
+        if (linkedProduction) return res.status(400).json({ error: 'По этой служебке уже есть производство. Сначала отмените связанные операции.' });
+        await WorkshopMemo.deleteOne({ _id: memo._id });
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/memos/:id/receive', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const memo = await WorkshopMemo.findById(req.params.id);
+        if (!memo) return res.status(404).json({ error: 'Служебная записка не найдена' });
+        if (memo.status === 'accepted' && memo.postedAt) {
+            return res.status(400).json({ error: 'Эта служебная записка уже принята и оприходована' });
+        }
+
+        const submitted = Array.isArray(req.body.lines) ? req.body.lines : [];
+        if (!submitted.length) return res.status(400).json({ error: 'Нет строк для сверки' });
+
+        const attemptLines = [];
+        let allMatch = true;
+
+        for (const line of memo.lines) {
+            const row = submitted.find(item => String(item.lineId || '') === String(line._id));
+            const actualProductId = row?.actualProductId || line.product;
+            const deliveredPacks = Math.max(0, Math.floor(workshopNumber(row?.deliveredPacks)));
+            const checked = Boolean(row?.checked);
+            const sameProduct = String(actualProductId || '') === String(line.product || '');
+            const sameQty = deliveredPacks === Number(line.requestedPacks || 0);
+            const isMatch = checked && sameProduct && sameQty;
+
+            line.actualProduct = actualProductId || line.product;
+            line.deliveredPacks = deliveredPacks;
+            line.checked = checked;
+            line.isMatch = isMatch;
+            line.discrepancyReason = String(row?.discrepancyReason || '').trim();
+
+            if (!isMatch) allMatch = false;
+            attemptLines.push({
+                lineId: String(line._id),
+                expectedProductId: String(line.product || ''),
+                actualProductId: String(line.actualProduct || ''),
+                requestedPacks: Number(line.requestedPacks || 0),
+                deliveredPacks,
+                checked,
+                isMatch,
+                discrepancyReason: line.discrepancyReason
+            });
+        }
+
+        memo.receiptAttempts.push({
+            date: req.body.date || new Date(),
+            status: allMatch ? 'accepted' : 'mismatch',
+            lines: attemptLines,
+            note: String(req.body.note || '').trim(),
+            createdBy: workshopUser(req)
+        });
+
+        if (!allMatch) {
+            memo.status = 'mismatch';
+            await memo.save();
+            const populated = await WorkshopMemo.findById(memo._id)
+                .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+                .populate('lines.actualProduct', 'sku name is_liquid characteristics.package_qty')
+                .populate('lines.recipe', 'name outputType planksPerUnit')
+                .lean();
+            return res.status(200).json({
+                accepted: false,
+                status: 'mismatch',
+                message: 'Есть расхождения. Упаковки пока не оприходованы — требуется обмен/повторная сверка.',
+                memo: convertToClient(populated)
+            });
+        }
+
+        if (!memo.postedAt) {
+            for (const line of memo.lines) {
+                const product = await Product.findById(line.product).lean();
+                if (!product) throw new Error('Одна из позиций служебки больше не найдена в каталоге');
+                const packQty = Number(line.packQty) > 0 ? Number(line.packQty) : workshopPackQty(product);
+                const planksQty = Number(line.requestedPacks || 0) * packQty;
+                await workshopChangeLaminate(line.product, planksQty);
+                await WorkshopMovement.create({
+                    date: req.body.date || new Date(),
+                    type: 'laminate_receipt',
+                    entityType: 'laminate',
+                    product: line.product,
+                    direction: 'in',
+                    qty: planksQty,
+                    unit: 'планка',
+                    serviceMemoNumber: memo.number,
+                    note: String(req.body.note || '').trim(),
+                    meta: {
+                        memoId: String(memo._id),
+                        memoLineId: String(line._id),
+                        requestedPacks: Number(line.requestedPacks || 0),
+                        deliveredPacks: Number(line.deliveredPacks || 0),
+                        packQty,
+                        plannedOutputQty: Number(line.plannedOutputQty || 0)
+                    },
+                    createdBy: workshopUser(req)
+                });
+            }
+            memo.postedAt = new Date();
+        }
+
+        memo.status = 'accepted';
+        memo.acceptedAt = new Date();
+        memo.acceptedBy = workshopUser(req);
+        await memo.save();
+
+        const populated = await WorkshopMemo.findById(memo._id)
+            .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+            .populate('lines.actualProduct', 'sku name is_liquid characteristics.package_qty')
+            .populate('lines.recipe', 'name outputType planksPerUnit')
+            .lean();
+
+        res.json({
+            accepted: true,
+            status: 'accepted',
+            message: 'Все позиции совпали. Упаковки оприходованы в цех.',
+            memo: convertToClient(populated)
+        });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/laminate-receipt', requirePermission('can_manage_workshop'), async (req, res) => {
+    return res.status(400).json({
+        error: 'Одиночный приход отключен. Ламинат принимается только целыми упаковками по многострочной служебной записке.'
+    });
+});
+
+app.post('/api/workshop/production', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const recipe = await WorkshopRecipe.findById(req.body.recipeId)
+            .populate('product')
+            .populate('materials.material')
+            .populate('components.recipe');
+        if (!recipe) return res.status(404).json({ error: 'Рецептура не найдена' });
+
+        let sourceMemo = null;
+        let sourceMemoLine = null;
+        if (req.body.memoId) {
+            sourceMemo = await WorkshopMemo.findById(req.body.memoId).lean();
+            if (!sourceMemo || sourceMemo.status !== 'accepted') {
+                return res.status(400).json({ error: 'Можно привязать производство только к принятой служебной записке' });
+            }
+            sourceMemoLine = (sourceMemo.lines || []).find(line => String(line._id) === String(req.body.memoLineId || ''));
+            if (!sourceMemoLine) return res.status(400).json({ error: 'Строка служебной записки не найдена' });
+            if (recipe.product && String(sourceMemoLine.product) !== String(recipe.product._id)) {
+                return res.status(400).json({ error: 'Ламинат рецептуры не совпадает с выбранной строкой служебки' });
+            }
+        }
+
+        const outputQty = Math.max(0, workshopNumber(req.body.outputQty));
+        const scrapPlanks = Math.max(0, workshopNumber(req.body.scrapPlanks));
+        const acceptedPacks = Math.max(0, workshopNumber(req.body.acceptedPacks));
+        const acceptedLoosePlanks = Math.max(0, workshopNumber(req.body.acceptedLoosePlanks));
+        if (outputQty <= 0) return res.status(400).json({ error: 'Укажите количество изготовленных изделий' });
+
+        const packQty = workshopPackQty(recipe.product, recipe.packQtyOverride);
+        const standardPlanksPerUnit = Math.max(0, workshopNumber(recipe.planksPerUnit));
+        const requestedActualNorm = Math.max(0, workshopNumber(req.body.actualPlanksPerUnit));
+        const actualPlanksPerUnit = requestedActualNorm > 0 ? requestedActualNorm : standardPlanksPerUnit;
+        const customNormReason = String(req.body.customNormReason || '').trim();
+        const customOrderName = String(req.body.customOrderName || '').trim();
+        const customDimensions = String(req.body.customDimensions || '').trim();
+        if (requestedActualNorm > 0 && Math.abs(requestedActualNorm - standardPlanksPerUnit) > 0.0001 && !customNormReason) {
+            return res.status(400).json({ error: 'При изменении стандартной нормы укажите причину (например, индивидуальный образец)' });
+        }
+        const usedForOutput = actualPlanksPerUnit * outputQty;
+        const consumedPlanks = usedForOutput + scrapPlanks;
+        const acceptedTotal = acceptedPacks * packQty + acceptedLoosePlanks;
+
+        if (consumedPlanks > 0) {
+            if (!recipe.product) return res.status(400).json({ error: 'Для этой рецептуры не выбран ламинат' });
+            const stock = await WorkshopLaminateStock.findOne({ product: recipe.product._id }).lean();
+            if ((Number(stock?.planksQty) || 0) < consumedPlanks) {
+                return res.status(400).json({ error: 'Недостаточно планок ламината в остатках цеха' });
+            }
+        }
+
+        for (const line of recipe.materials || []) {
+            if (line.mode === 'estimate') continue;
+            const need = (Number(line.qty) || 0) * outputQty;
+            if (need > 0 && (Number(line.material?.stockQty) || 0) < need) {
+                return res.status(400).json({ error: `Недостаточно материала «${line.material?.name || 'материал'}»` });
+            }
+        }
+
+        for (const line of recipe.components || []) {
+            const need = (Number(line.qty) || 0) * outputQty;
+            if (need > 0 && (Number(line.recipe?.stockQty) || 0) < need) {
+                return res.status(400).json({ error: `Недостаточно готовых компонентов «${line.recipe?.name || 'компонент'}»` });
+            }
+        }
+
+        if (consumedPlanks > 0) {
+            await workshopChangeLaminate(recipe.product._id, -consumedPlanks);
+            await WorkshopMovement.create({
+                date: req.body.date || new Date(), type: 'production_laminate',
+                entityType: 'laminate', product: recipe.product._id, direction: 'out',
+                qty: consumedPlanks, unit: 'планка', note: String(req.body.note || '').trim(),
+                serviceMemoNumber: sourceMemo?.number || '',
+                meta: { recipeId: recipe._id, outputQty, scrapPlanks, standardPlanksPerUnit, actualPlanksPerUnit, customNormReason, customOrderName, customDimensions, memoId: sourceMemo?._id || null, memoLineId: sourceMemoLine?._id || null }, createdBy: workshopUser(req)
+            });
+        }
+
+        for (const line of recipe.materials || []) {
+            const need = (Number(line.qty) || 0) * outputQty;
+            if (line.mode === 'estimate') {
+                if (need > 0) {
+                    await WorkshopMovement.create({
+                        date: req.body.date || new Date(), type: 'production_material_estimate',
+                        entityType: 'material', material: line.material._id, direction: 'neutral',
+                        qty: need, unit: line.material.unit || 'шт',
+                        note: 'Расчетный расход; фактический остаток автоматически не уменьшается',
+                        meta: { recipeId: recipe._id, outputQty, estimate: true }, createdBy: workshopUser(req)
+                    });
+                }
+                continue;
+            }
+            if (need <= 0) continue;
+            await workshopChangeMaterial(line.material._id, -need);
+            await WorkshopMovement.create({
+                date: req.body.date || new Date(), type: 'production_material',
+                entityType: 'material', material: line.material._id, direction: 'out',
+                qty: need, unit: line.material.unit || 'шт',
+                meta: { recipeId: recipe._id, outputQty }, createdBy: workshopUser(req)
+            });
+        }
+
+        for (const line of recipe.components || []) {
+            const need = (Number(line.qty) || 0) * outputQty;
+            if (need <= 0) continue;
+            await workshopChangeRecipe(line.recipe._id, -need);
+            await WorkshopMovement.create({
+                date: req.body.date || new Date(), type: 'production_component',
+                entityType: 'finished', recipe: line.recipe._id, direction: 'out',
+                qty: need, unit: 'шт', meta: { recipeId: recipe._id, outputQty },
+                createdBy: workshopUser(req)
+            });
+        }
+
+        const resultStock = await workshopChangeRecipe(recipe._id, outputQty);
+        await WorkshopMovement.create({
+            date: req.body.date || new Date(), type: 'production_output',
+            entityType: 'finished', recipe: recipe._id, direction: 'in',
+            qty: outputQty, unit: 'шт', note: String(req.body.note || '').trim(),
+            serviceMemoNumber: sourceMemo?.number || '',
+            meta: { acceptedPacks, acceptedLoosePlanks, acceptedTotal, packQty, consumedPlanks, scrapPlanks, memoId: sourceMemo?._id || null, memoLineId: sourceMemoLine?._id || null },
+            createdBy: workshopUser(req)
+        });
+
+        const production = await WorkshopProduction.create({
+            date: req.body.date || new Date(),
+            recipe: recipe._id,
+            product: recipe.product?._id || null,
+            memo: sourceMemo?._id || null,
+            memoLineId: sourceMemoLine?._id ? String(sourceMemoLine._id) : '',
+            serviceMemoNumber: sourceMemo?.number || '',
+            acceptedPacks,
+            acceptedLoosePlanks,
+            packQty,
+            totalAcceptedPlanks: acceptedTotal,
+            outputQty,
+            standardPlanksPerUnit,
+            actualPlanksPerUnit,
+            customNormReason,
+            customOrderName,
+            customDimensions,
+            consumedPlanks,
+            scrapPlanks,
+            operations: Array.isArray(req.body.operations)
+                ? req.body.operations.map(item => ({
+                    type: String(item.type || '').trim(),
+                    qty: Math.max(0, workshopNumber(item.qty)),
+                    note: String(item.note || '').trim()
+                })).filter(item => item.type)
+                : [],
+            note: String(req.body.note || '').trim(),
+            createdBy: workshopUser(req)
+        });
+
+        res.status(201).json({ production: convertToClient(production), stock: convertToClient(resultStock) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.put('/api/workshop/productions/:id', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const production = await WorkshopProduction.findById(req.params.id);
+        if (!production) return res.status(404).json({ error: 'Запись производства не найдена' });
+        if (production.cancelledAt) return res.status(400).json({ error: 'Отменённую запись нельзя редактировать' });
+
+        production.date = req.body.date || production.date;
+        production.note = String(req.body.note ?? production.note ?? '').trim();
+        production.customOrderName = String(req.body.customOrderName ?? production.customOrderName ?? '').trim();
+        production.customDimensions = String(req.body.customDimensions ?? production.customDimensions ?? '').trim();
+        production.customNormReason = String(req.body.customNormReason ?? production.customNormReason ?? '').trim();
+        if (Array.isArray(req.body.operations)) {
+            production.operations = req.body.operations.map(item => ({
+                type: String(item.type || '').trim(),
+                qty: Math.max(0, workshopNumber(item.qty)),
+                note: String(item.note || '').trim()
+            })).filter(item => item.type);
+        }
+        await production.save();
+        res.json(convertToClient(production));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.delete('/api/workshop/productions/:id', requireIsAdmin, async (req, res) => {
+    try {
+        const production = await WorkshopProduction.findById(req.params.id)
+            .populate({
+                path: 'recipe',
+                populate: [
+                    { path: 'materials.material' },
+                    { path: 'components.recipe' }
+                ]
+            })
+            .populate('product');
+        if (!production) return res.status(404).json({ error: 'Запись производства не найдена' });
+        if (production.cancelledAt) return res.status(400).json({ error: 'Эта запись уже отменена' });
+
+        const recipe = production.recipe;
+        if (!recipe) return res.status(400).json({ error: 'Рецептура производства не найдена' });
+        const outputQty = Number(production.outputQty) || 0;
+
+        if ((Number(recipe.stockQty) || 0) + 1e-9 < outputQty) {
+            return res.status(400).json({ error: 'Нельзя отменить производство: часть изготовленных изделий уже выдана или использована.' });
+        }
+
+        if (outputQty > 0) await workshopChangeRecipe(recipe._id, -outputQty);
+        if (production.product && Number(production.consumedPlanks) > 0) {
+            await workshopChangeLaminate(production.product._id, Number(production.consumedPlanks));
+        }
+
+        for (const line of recipe.materials || []) {
+            if (line.mode === 'estimate') continue;
+            const qty = (Number(line.qty) || 0) * outputQty;
+            if (qty > 0 && line.material?._id) await workshopChangeMaterial(line.material._id, qty);
+        }
+        for (const line of recipe.components || []) {
+            const qty = (Number(line.qty) || 0) * outputQty;
+            if (qty > 0 && line.recipe?._id) await workshopChangeRecipe(line.recipe._id, qty);
+        }
+
+        await WorkshopMovement.create({
+            date: new Date(),
+            type: 'production_cancelled',
+            entityType: 'finished',
+            recipe: recipe._id,
+            direction: 'out',
+            qty: outputQty,
+            unit: 'шт',
+            serviceMemoNumber: production.serviceMemoNumber || '',
+            note: String(req.body?.reason || 'Отмена записи производства администратором'),
+            meta: {
+                productionId: String(production._id),
+                restoredPlanks: Number(production.consumedPlanks) || 0,
+                cancellation: true
+            },
+            createdBy: workshopUser(req)
+        });
+
+        production.cancelledAt = new Date();
+        production.cancelledBy = workshopUser(req);
+        production.cancelReason = String(req.body?.reason || '').trim();
+        await production.save();
+
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/writeoff', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const entityType = req.body.entityType;
+        const qty = Math.abs(workshopNumber(req.body.qty));
+        const serviceMemoNumber = String(req.body.serviceMemoNumber || '').trim();
+        if (qty <= 0) return res.status(400).json({ error: 'Укажите количество списания' });
+        if (!serviceMemoNumber) return res.status(400).json({ error: 'Для списания укажите номер служебной записки' });
+
+        let movementData = {
+            date: req.body.date || new Date(), type: 'writeoff', entityType,
+            direction: 'out', qty, serviceMemoNumber,
+            note: String(req.body.note || '').trim(), createdBy: workshopUser(req)
+        };
+
+        if (entityType === 'laminate') {
+            await workshopChangeLaminate(req.body.productId, -qty);
+            movementData.product = req.body.productId;
+            movementData.unit = 'планка';
+        } else if (entityType === 'material') {
+            const material = await workshopChangeMaterial(req.body.materialId, -qty);
+            movementData.material = req.body.materialId;
+            movementData.unit = material.unit || 'шт';
+        } else if (entityType === 'finished') {
+            await workshopChangeRecipe(req.body.recipeId, -qty);
+            movementData.recipe = req.body.recipeId;
+            movementData.unit = 'шт';
+        } else {
+            return res.status(400).json({ error: 'Неизвестный тип списания' });
+        }
+
+        const movement = await WorkshopMovement.create(movementData);
+        res.status(201).json(convertToClient(movement));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/dealer-movement', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const dealerId = req.body.dealerId;
+        const recipeId = req.body.recipeId;
+        const action = req.body.action || 'issue';
+        const qty = Math.abs(workshopNumber(req.body.qty));
+        if (!dealerId || !recipeId || qty <= 0) return res.status(400).json({ error: 'Выберите дилера, изделие и количество' });
+
+        const [dealer, recipe] = await Promise.all([
+            Dealer.findById(dealerId).select('_id name'),
+            WorkshopRecipe.findById(recipeId)
+        ]);
+        if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
+        if (!recipe) return res.status(404).json({ error: 'Изделие не найдено' });
+
+        let asset = await WorkshopDealerAsset.findOne({ dealer: dealerId, recipe: recipeId });
+        if (!asset) asset = new WorkshopDealerAsset({ dealer: dealerId, recipe: recipeId, qty: 0 });
+
+        const condition = req.body.returnCondition || 'defect';
+        let issued = 0;
+        let returned = 0;
+
+        if (action === 'issue') {
+            if (Number(recipe.stockQty) < qty) return res.status(400).json({ error: 'Недостаточно готовых изделий в цехе' });
+            await workshopChangeRecipe(recipeId, -qty);
+            asset.qty += qty;
+            issued = qty;
+        } else if (action === 'return') {
+            if (Number(asset.qty) < qty) return res.status(400).json({ error: 'У дилера числится меньше изделий' });
+            asset.qty -= qty;
+            returned = qty;
+            if (condition === 'reusable') await workshopChangeRecipe(recipeId, qty);
+        } else if (action === 'replacement') {
+            const returnQty = Math.abs(workshopNumber(req.body.returnQty || qty));
+            const issueQty = Math.abs(workshopNumber(req.body.issueQty || qty));
+            if (Number(asset.qty) < returnQty) return res.status(400).json({ error: 'У дилера числится меньше изделий для возврата' });
+            if (Number(recipe.stockQty) < issueQty) return res.status(400).json({ error: 'Недостаточно изделий для замены' });
+            asset.qty = Number(asset.qty) - returnQty + issueQty;
+            await workshopChangeRecipe(recipeId, -issueQty);
+            if (condition === 'reusable') await workshopChangeRecipe(recipeId, returnQty);
+            returned = returnQty;
+            issued = issueQty;
+        } else {
+            return res.status(400).json({ error: 'Неизвестная операция с дилером' });
+        }
+
+        asset.qty = Math.max(0, Number(asset.qty) || 0);
+        await asset.save();
+
+        const movement = await WorkshopMovement.create({
+            date: req.body.date || new Date(),
+            type: `dealer_${action}`,
+            entityType: 'finished',
+            recipe: recipeId,
+            dealer: dealerId,
+            direction: action === 'return' ? 'in' : action === 'issue' ? 'out' : 'neutral',
+            qty,
+            unit: 'шт',
+            note: String(req.body.note || '').trim(),
+            meta: { issued, returned, returnCondition: condition, reason: String(req.body.reason || '').trim() },
+            createdBy: workshopUser(req)
+        });
+
+        await syncWorkshopPosToDealer(dealerId, recipeId);
+        res.status(201).json({ asset: convertToClient(asset), movement: convertToClient(movement) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.get('/api/workshop/dealers/:dealerId/assets', requireAnyPermission('can_view_workshop', 'can_view_dealers'), async (req, res) => {
+    try {
+        const assets = await WorkshopDealerAsset.find({ dealer: req.params.dealerId, qty: { $gt: 0 } })
+            .populate({ path: 'recipe', populate: { path: 'product', select: 'sku name is_liquid' } })
+            .sort({ updatedAt: -1 }).lean();
+        res.json(assets.map(convertToClient));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/opening-balance', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const location = req.body.location === 'dealer' ? 'dealer' : 'workshop';
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
+        const date = req.body.date || new Date();
+        const note = String(req.body.note || '').trim();
+        if (!inputLines.length) return res.status(400).json({ error: 'Укажите хотя бы один фактический остаток' });
+
+        let dealer = null;
+        if (location === 'dealer') {
+            if (!req.body.dealerId) return res.status(400).json({ error: 'Выберите дилера' });
+            dealer = await Dealer.findOne({
+                _id: req.body.dealerId,
+                ...getWorkingDealerFilter(getDealerFilter(req))
+            }).select('_id name');
+            if (!dealer) return res.status(404).json({ error: 'Дилер не найден или недоступен' });
+        }
+
+        const changed = [];
+        for (const line of inputLines) {
+            let recipe = null;
+            if (line.recipeId) {
+                recipe = await WorkshopRecipe.findOne({ _id: line.recipeId, active: { $ne: false } });
+            } else if (line.productId) {
+                const product = await Product.findById(line.productId).lean();
+                if (!product) continue;
+
+                const posDef = workshopPosDefinition({ product });
+                if (posDef?.recipeSku) {
+                    recipe = await WorkshopRecipe.findOne({ sku:posDef.recipeSku, active:{ $ne:false } });
+                } else {
+                    recipe = await WorkshopRecipe.findOne({
+                        product: product._id,
+                        outputType: 'sample',
+                        active: { $ne: false }
+                    });
+                    if (!recipe) {
+                        recipe = await WorkshopRecipe.create({
+                            name: `Планшет ${product.sku || ''} ${product.name || ''}`.trim(),
+                            outputType: 'sample',
+                            sku: `SAMPLE-${product.sku || String(product._id).slice(-6)}`,
+                            product: product._id,
+                            planksPerUnit: 0,
+                            packQtyOverride: 0,
+                            stockQty: 0,
+                            minStockQty: 0,
+                            active: true,
+                            note: 'Создано автоматически при вводе стартовых остатков. Норму производства можно заполнить позже.'
+                        });
+                    }
+                }
+            }
+            if (!recipe) continue;
+
+            const actualQty = Math.max(0, workshopNumber(line.actualQty));
+            const lineNote = String(line.note || '').trim();
+
+            if (location === 'workshop') {
+                const previousQty = Number(recipe.stockQty) || 0;
+                const delta = actualQty - previousQty;
+                if (Math.abs(delta) <= 0.0001) continue;
+
+                await workshopChangeRecipe(recipe._id, delta);
+                await WorkshopMovement.create({
+                    date,
+                    type: 'opening_balance',
+                    entityType: 'finished',
+                    recipe: recipe._id,
+                    direction: delta > 0 ? 'in' : 'out',
+                    qty: Math.abs(delta),
+                    unit: 'шт',
+                    note: lineNote || note || 'Стартовый остаток готовых образцов до начала учёта в CRM',
+                    meta: { previousQty, actualQty, delta, source: 'legacy_opening_balance' },
+                    createdBy: workshopUser(req)
+                });
+                changed.push({ recipeId: String(recipe._id), previousQty, actualQty, delta });
+            } else {
+                let asset = await WorkshopDealerAsset.findOne({ dealer: dealer._id, recipe: recipe._id });
+                const previousQty = Number(asset?.qty) || 0;
+                const delta = actualQty - previousQty;
+                if (Math.abs(delta) <= 0.0001) continue;
+
+                if (!asset) asset = new WorkshopDealerAsset({ dealer: dealer._id, recipe: recipe._id, qty: 0 });
+                asset.qty = actualQty;
+                await asset.save();
+
+                await WorkshopMovement.create({
+                    date,
+                    type: 'opening_dealer_balance',
+                    entityType: 'finished',
+                    recipe: recipe._id,
+                    dealer: dealer._id,
+                    direction: 'neutral',
+                    qty: Math.abs(delta),
+                    unit: 'шт',
+                    note: lineNote || note || 'Образцы уже находились у дилера до начала учёта в CRM',
+                    meta: { previousQty, actualQty, delta, source: 'legacy_opening_balance' },
+                    createdBy: workshopUser(req)
+                });
+                await syncWorkshopPosToDealer(dealer._id, recipe._id);
+                changed.push({ recipeId: String(recipe._id), previousQty, actualQty, delta });
+            }
+        }
+
+        if (!changed.length) return res.status(400).json({ error: 'Фактические остатки не отличаются от текущих' });
+        res.status(201).json({
+            status: 'ok',
+            location,
+            dealerId: dealer ? String(dealer._id) : '',
+            changed
+        });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/correction', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const reason = String(req.body.reason || '').trim();
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines.slice(0, 10) : [];
+        if (reason.length < 3) return res.status(400).json({ error: 'Укажите причину исправления' });
+        if (!inputLines.length) return res.status(400).json({ error: 'Добавьте хотя бы одну позицию' });
+
+        const prepared = [];
+        const seen = new Set();
+
+        for (const line of inputLines) {
+            const entityType = String(line.entityType || '').trim();
+            const id = String(line.id || '').trim();
+            const actualQty = Math.max(0, workshopNumber(line.actualQty));
+            if (!['finished','laminate','material'].includes(entityType) || !id) {
+                return res.status(400).json({ error: 'Некорректная позиция для исправления' });
+            }
+
+            const key = entityType + ':' + id;
+            if (seen.has(key)) return res.status(400).json({ error: 'Одна и та же позиция добавлена дважды' });
+            seen.add(key);
+
+            if (entityType === 'finished') {
+                const item = await WorkshopRecipe.findById(id).lean();
+                if (!item) return res.status(404).json({ error: 'Готовое изделие не найдено' });
+                prepared.push({
+                    entityType, id, actualQty,
+                    previousQty: Math.max(0, Number(item.stockQty) || 0),
+                    unit: 'шт',
+                    name: item.name || 'Готовое изделие',
+                    recipe: id
+                });
+            } else if (entityType === 'material') {
+                const item = await WorkshopMaterial.findById(id).lean();
+                if (!item) return res.status(404).json({ error: 'Материал не найден' });
+                prepared.push({
+                    entityType, id, actualQty,
+                    previousQty: Math.max(0, Number(item.stockQty) || 0),
+                    unit: item.unit || 'шт',
+                    name: item.name || 'Материал',
+                    material: id
+                });
+            } else {
+                const product = await Product.findById(id).select('sku name').lean();
+                if (!product) return res.status(404).json({ error: 'Ламинат не найден' });
+                const stock = await WorkshopLaminateStock.findOne({ product: id }).lean();
+                prepared.push({
+                    entityType, id, actualQty,
+                    previousQty: Math.max(0, Number(stock?.planksQty) || 0),
+                    unit: 'планка',
+                    name: [product.sku, product.name].filter(Boolean).join(' · ') || 'Ламинат',
+                    product: id
+                });
+            }
+        }
+
+        const changed = prepared
+            .map(item => ({ ...item, delta: item.actualQty - item.previousQty }))
+            .filter(item => Math.abs(item.delta) > 0.0001);
+
+        if (!changed.length) return res.status(400).json({ error: 'Новые остатки совпадают с текущими' });
+
+        const savedLines = [];
+        for (const item of changed) {
+            if (item.entityType === 'finished') {
+                await WorkshopRecipe.updateOne({ _id: item.id }, { $set: { stockQty: item.actualQty } });
+            } else if (item.entityType === 'material') {
+                await WorkshopMaterial.updateOne({ _id: item.id }, { $set: { stockQty: item.actualQty } });
+            } else {
+                await WorkshopLaminateStock.findOneAndUpdate(
+                    { product: item.id },
+                    { $set: { planksQty: item.actualQty } },
+                    { upsert: true, new: true, setDefaultsOnInsert: true }
+                );
+            }
+
+            await WorkshopMovement.create({
+                date: req.body.date || new Date(),
+                type: 'manual_correction',
+                entityType: item.entityType,
+                product: item.product || null,
+                material: item.material || null,
+                recipe: item.recipe || null,
+                direction: item.delta > 0 ? 'in' : 'out',
+                qty: Math.abs(item.delta),
+                unit: item.unit,
+                note: reason,
+                meta: {
+                    previousQty: item.previousQty,
+                    actualQty: item.actualQty,
+                    delta: item.delta,
+                    reason,
+                    source: 'manual_correction'
+                },
+                createdBy: workshopUser(req)
+            });
+
+            savedLines.push({
+                entityType: item.entityType,
+                product: item.product || null,
+                material: item.material || null,
+                recipe: item.recipe || null,
+                systemQty: item.previousQty,
+                actualQty: item.actualQty,
+                delta: item.delta,
+                note: reason
+            });
+        }
+
+        await WorkshopStocktake.create({
+            date: req.body.date || new Date(),
+            lines: savedLines,
+            note: 'Корректировка остатка: ' + reason,
+            createdBy: workshopUser(req)
+        });
+
+        res.status(201).json({
+            status: 'ok',
+            reason,
+            changed: changed.map(item => ({
+                entityType: item.entityType,
+                id: item.id,
+                name: item.name,
+                previousQty: item.previousQty,
+                actualQty: item.actualQty,
+                delta: item.delta,
+                unit: item.unit
+            }))
+        });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/stocktake', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
+        if (!inputLines.length) return res.status(400).json({ error: 'Добавьте позиции инвентаризации' });
+        const savedLines = [];
+
+        for (const line of inputLines) {
+            const actualQty = Math.max(0, workshopNumber(line.actualQty));
+            let systemQty = 0;
+            let delta = 0;
+            let movement = null;
+
+            if (line.entityType === 'laminate' && line.productId) {
+                const current = await WorkshopLaminateStock.findOne({ product: line.productId }).lean();
+                systemQty = Number(current?.planksQty) || 0;
+                delta = actualQty - systemQty;
+                if (Math.abs(delta) > 0.0001) {
+                    await workshopChangeLaminate(line.productId, delta);
+                    movement = { entityType:'laminate', product:line.productId, unit:'планка' };
+                }
+                savedLines.push({ entityType:'laminate', product:line.productId, systemQty, actualQty, delta, note:line.note || '' });
+            } else if (line.entityType === 'material' && line.materialId) {
+                const current = await WorkshopMaterial.findById(line.materialId).lean();
+                if (!current) continue;
+                systemQty = Number(current.stockQty) || 0;
+                delta = actualQty - systemQty;
+                if (Math.abs(delta) > 0.0001) {
+                    await workshopChangeMaterial(line.materialId, delta);
+                    movement = { entityType:'material', material:line.materialId, unit:current.unit || 'шт' };
+                }
+                savedLines.push({ entityType:'material', material:line.materialId, systemQty, actualQty, delta, note:line.note || '' });
+            } else if (line.entityType === 'finished' && line.recipeId) {
+                const current = await WorkshopRecipe.findById(line.recipeId).lean();
+                if (!current) continue;
+                systemQty = Number(current.stockQty) || 0;
+                delta = actualQty - systemQty;
+                if (Math.abs(delta) > 0.0001) {
+                    await workshopChangeRecipe(line.recipeId, delta);
+                    movement = { entityType:'finished', recipe:line.recipeId, unit:'шт' };
+                }
+                savedLines.push({ entityType:'finished', recipe:line.recipeId, systemQty, actualQty, delta, note:line.note || '' });
+            }
+
+            if (movement && Math.abs(delta) > 0.0001) {
+                await WorkshopMovement.create({
+                    date: req.body.date || new Date(),
+                    type: 'stocktake_adjustment',
+                    ...movement,
+                    direction: delta > 0 ? 'in' : 'out',
+                    qty: Math.abs(delta),
+                    note: line.note || '',
+                    meta: { systemQty, actualQty, delta },
+                    createdBy: workshopUser(req)
+                });
+            }
+        }
+
+        const stocktake = await WorkshopStocktake.create({
+            date: req.body.date || new Date(),
+            lines: savedLines,
+            note: String(req.body.note || '').trim(),
+            createdBy: workshopUser(req)
+        });
+        res.status(201).json(convertToClient(stocktake));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.get('/api/reclamations/dashboard', requirePermission('can_view_reclamations'), async (req, res) => {
+    try {
+        const dealerIds = await getScopedDealerIds(req);
+        const query = {
+            $or: [
+                { resolution: { $exists: false } },
+                { resolution: null },
+                { resolution: '' }
+            ]
+        };
+        if (dealerIds) query.dealerId = { $in: dealerIds };
+
+        const list = await Reclamation.find(query)
+            .select('dealerId dealerName resolution createdAt date')
+            .sort({ createdAt: -1 })
+            .lean();
+        res.json(list.map(convertToClient));
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+
+app.get('/api/reclamations', requirePermission('can_view_reclamations'), async (req, res) => {
+    try {
+        const dealerIds = await getScopedDealerIds(req);
+        const pipeline = [];
+        if (dealerIds) pipeline.push({ $match: { dealerId: { $in: dealerIds } } });
+        pipeline.push(
+            { $sort: { createdAt: -1 } },
+            { $project: {
+                dealerId: 1,
+                dealerName: 1,
+                date: 1,
+                productName: 1,
+                purchasedVolume: 1,
+                description: 1,
+                clientDemand: 1,
+                resolution: 1,
+                invoiceNumber: 1,
+                clientName: 1,
+                defectVolume: 1,
+                compensationAmount: 1,
+                createdAt: 1,
+                updatedAt: 1,
+                photoCount: { $size: { $ifNull: ['$photos', []] } }
+            } }
+        );
+        const list = await Reclamation.aggregate(pipeline);
+        res.json(list.map(item => ({ ...item, id: String(item._id), _id: undefined })));
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+app.get('/api/reclamations/:id', requirePermission('can_view_reclamations'), async (req, res) => {
+    try {
+        const dealerIds = await getScopedDealerIds(req);
+        const query = { _id: req.params.id };
+        if (dealerIds) query.dealerId = { $in: dealerIds };
+        const item = await Reclamation.findOne(query).lean();
+        if (!item) return res.status(404).json({ error: 'Рекламация не найдена' });
+        res.json(convertToClient(item));
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+
+app.post('/api/reclamations', requirePermission('can_manage_reclamations'), async (req, res) => {
+    try { 
+        const r = new Reclamation(req.body); 
+        await r.save(); 
+        res.json(convertToClient(r)); 
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+app.put('/api/reclamations/:id', requirePermission('can_manage_reclamations'), async (req, res) => {
+    try { 
+        const r = await Reclamation.findByIdAndUpdate(req.params.id, req.body, { new: true }); 
+        res.json(convertToClient(r)); 
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+app.delete('/api/reclamations/:id', requirePermission('can_manage_reclamations'), async (req, res) => {
+    try { 
+        await Reclamation.findByIdAndDelete(req.params.id); 
+        res.json({status: 'deleted'}); 
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+
+app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
+,'i') }, _id:{ $ne:req.params.id } }).select('_id').lean();
+                if (duplicateId) return res.status(409).json({ error:'Дилер с ID '+payload.dealer_id+' уже существует' });
+            }
+        }
+        if (req.user.role === 'manager' && !isGlobalViewer(req)) {
+            delete payload.responsibleUserId;
+            delete payload.responsibleAssignmentSource;
+            if (req.user.scope === 'astana') payload.responsible = 'regional_astana';
+            if (req.user.scope === 'regions') payload.responsible = 'regional_regions';
+        }
+
+        const updated = await Dealer.findOneAndUpdate(
+            { _id: req.params.id, ...getDealerFilter(req) },
+            payload,
+            { new: true }
+        );
+        if (!updated) return res.status(404).json({ error: 'Дилер не найден' });
+        res.json({status:'ok'});
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.patch('/api/dealers/:id', requirePermission('can_edit_dealer'), async (req, res) => {
+    try {
+        const payload = canonicalDealerPayload(req.body);
+        if (req.user.role === 'manager' && !isGlobalViewer(req)) {
+            delete payload.responsibleUserId;
+            delete payload.responsibleAssignmentSource;
+            if (req.user.scope === 'astana') payload.responsible = 'regional_astana';
+            if (req.user.scope === 'regions') payload.responsible = 'regional_regions';
+        }
+
+        const updated = await Dealer.findOneAndUpdate(
+            { _id: req.params.id, ...getDealerFilter(req) },
+            { $set: payload },
+            { new: true }
+        ).lean();
+
+        if (!updated) return res.status(404).json({ error: 'Дилер не найден' });
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.delete('/api/dealers/:id', requirePermission('can_delete_dealer'), async (req, res) => { try { await Dealer.findOneAndDelete({ _id: req.params.id, ...getDealerFilter(req) }); res.json({status:'deleted'}); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.get('/api/dealers/:id/products', requireAnyPermission('can_view_dealers', 'can_view_products'), async (req, res) => { const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).populate('products'); if (!d) return res.status(404).json({ error: 'Дилер не найден' }); res.json(d.products.map(convertToClient)); });
+app.put('/api/dealers/:id/products', requirePermission('can_edit_matrix'), async (req, res) => { const d = await Dealer.findOneAndUpdate({ _id: req.params.id, ...getDealerFilter(req) }, { products: req.body.productIds }); if (!d) return res.status(404).json({ error: 'Дилер не найден' }); res.json({status:'ok'}); });
+// ==========================================
+// ЦЕНОВЫЕ УСЛОВИЯ ДИЛЕРОВ
+// ==========================================
+app.get('/api/pricing/overview', requirePermission('can_view_pricing'), async (req, res) => {
+    try {
+        const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req)))
+            .select('_id dealer_id name city region_sector price_type responsible')
+            .sort({ name: 1 })
+            .lean();
+        const conditions = await PricingCondition.find({})
+            .populate('dealer', '_id dealer_id name city region_sector price_type responsible')
+            .sort({ createdAt: -1 })
+            .lean();
+
+        const rows = dealers.map(dealer => buildDealerPricingSummary(dealer, conditions));
+        const today = pricingTodayKey();
+        const inSeven = new Date(today + 'T00:00:00Z');
+        inSeven.setUTCDate(inSeven.getUTCDate() + 7);
+        const sevenKey = inSeven.toISOString().slice(0, 10);
+
+        const activeConditionIds = new Set();
+        rows.forEach(row => row.matchedConditions.forEach(condition => {
+            if (condition.computedStatus === 'active') activeConditionIds.add(String(condition._id));
+        }));
+
+        const visibleConditions = conditions
+            .filter(condition => rows.some(row => pricingConditionMatchesDealer(condition, {
+                _id: row.dealerId,
+                name: row.dealerName,
+                city: row.city,
+                region_sector: row.sector,
+                price_type: row.defaultPriceType,
+                responsible: row.responsible
+            })))
+            .map(condition => ({
+                ...condition,
+                computedStatus: pricingConditionStatus(condition, today)
+            }));
+
+        res.json({
+            today,
+            rows,
+            conditions: visibleConditions,
+            stats: {
+                dealersWith5: rows.filter(row => row.has5 && !row.has10).length,
+                dealersWith10: rows.filter(row => row.has10 && !row.has5).length,
+                dealersWithBoth: rows.filter(row => row.has5 && row.has10).length,
+                activePriceOverrides: rows.filter(row => row.priceListCondition).length,
+                expiringSoon: visibleConditions.filter(condition =>
+                    condition.computedStatus === 'active' &&
+                    condition.endDate &&
+                    condition.endDate >= today &&
+                    condition.endDate <= sevenKey
+                ).length,
+                pendingRequirements: rows.reduce((sum, row) => sum + row.pendingRequirements, 0)
+            }
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/pricing/dealers/:id', requirePermission('can_view_pricing'), async (req, res) => {
+    try {
+        const dealer = await Dealer.findOne({
+            $and: [
+                { _id: req.params.id },
+                getWorkingDealerFilter(getDealerFilter(req))
+            ]
+        }).select('_id dealer_id name city region_sector price_type responsible')
+            .lean();
+        if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
+
+        const conditions = await PricingCondition.find({})
+            .populate('dealer', '_id dealer_id name city region_sector price_type responsible')
+            .sort({ createdAt: -1 })
+            .lean();
+        res.json(buildDealerPricingSummary(dealer, conditions));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/pricing/conditions', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const payload = cleanPricingPayload(req.body);
+        const validation = validatePricingPayload(payload);
+        if (validation) return res.status(400).json({ error: validation });
+        const duplicate = await findPricingDuplicate(payload);
+        if (duplicate) {
+            return res.status(400).json({ error: `Условие с кодом «${payload.code}» уже действует на эту же цель в пересекающийся период` });
+        }
+
+        if (!isGlobalViewer(req) && payload.scopeType !== 'dealer') {
+            return res.status(403).json({ error: 'Региональные и общие ценовые условия может создавать только пользователь с доступом ко всей компании' });
+        }
+        if (payload.scopeType === 'dealer') {
+            const dealer = await Dealer.findOne({
+                $and: [
+                    { _id: payload.dealer },
+                    getWorkingDealerFilter(getDealerFilter(req))
+                ]
+            }).select('_id').lean();
+            if (!dealer) return res.status(404).json({ error: 'Дилер недоступен' });
+        }
+
+        const user = pricingUserMeta(req);
+        const condition = await PricingCondition.create({
+            ...payload,
+            createdBy: user,
+            updatedBy: user,
+            audit: [{ action: 'created', userId: user.id, userName: user.name, note: 'Условие создано' }]
+        });
+        const populated = await PricingCondition.findById(condition._id).populate('dealer', '_id dealer_id name city region_sector price_type responsible').lean();
+        res.status(201).json({ ...populated, computedStatus: pricingConditionStatus(populated) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.put('/api/pricing/conditions/:id', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const existing = await PricingCondition.findById(req.params.id);
+        if (!existing) return res.status(404).json({ error: 'Ценовое условие не найдено' });
+        if (existing.cancelledAt) return res.status(400).json({ error: 'Отменённое условие нельзя редактировать' });
+
+        const payload = cleanPricingPayload(req.body);
+        const validation = validatePricingPayload(payload);
+        if (validation) return res.status(400).json({ error: validation });
+        const duplicate = await findPricingDuplicate(payload, existing._id);
+        if (duplicate) {
+            return res.status(400).json({ error: `Условие с кодом «${payload.code}» уже действует на эту же цель в пересекающийся период` });
+        }
+
+        if (!isGlobalViewer(req) && payload.scopeType !== 'dealer') {
+            return res.status(403).json({ error: 'Региональные и общие ценовые условия может менять только пользователь с доступом ко всей компании' });
+        }
+        if (payload.scopeType === 'dealer') {
+            const dealer = await Dealer.findOne({
+                $and: [
+                    { _id: payload.dealer },
+                    getWorkingDealerFilter(getDealerFilter(req))
+                ]
+            }).select('_id').lean();
+            if (!dealer) return res.status(404).json({ error: 'Дилер недоступен' });
+        }
+
+        const user = pricingUserMeta(req);
+        Object.assign(existing, payload, { updatedBy: user });
+        existing.audit.push({ action: 'updated', userId: user.id, userName: user.name, note: String(req.body.auditNote || 'Условие изменено').trim() });
+        await existing.save();
+
+        const populated = await PricingCondition.findById(existing._id).populate('dealer', '_id dealer_id name city region_sector price_type responsible').lean();
+        res.json({ ...populated, computedStatus: pricingConditionStatus(populated) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.delete('/api/pricing/conditions/:id', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const condition = await PricingCondition.findById(req.params.id);
+        if (!condition) return res.status(404).json({ error: 'Ценовое условие не найдено' });
+        if (condition.cancelledAt) return res.status(400).json({ error: 'Условие уже отменено' });
+
+        const user = pricingUserMeta(req);
+        condition.cancelledAt = new Date();
+        condition.updatedBy = user;
+        condition.audit.push({
+            action: 'cancelled',
+            userId: user.id,
+            userName: user.name,
+            note: String(req.body?.reason || 'Условие отменено').trim()
+        });
+        await condition.save();
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.get('/api/products/count', requireAnyPermission('can_view_products', 'can_view_report', 'can_view_reclamations', 'can_view_dealers'), async (req, res) => {
+    try {
+        const count = await Product.countDocuments({});
+        res.json({ count });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.get('/api/products', requireAnyPermission('can_view_products', 'can_view_report', 'can_view_reclamations', 'can_view_dealers'), async (req, res) => { const s = new RegExp(req.query.search||'', 'i'); const p = await Product.find({$or:[{sku:s},{name:s}]}).sort({sku:1}).lean(); res.json(p.map(x=>{x.id=x._id;return x;})); });
+app.post('/api/products', requirePermission('can_manage_products'), async (req, res) => { const p = new Product(req.body); await p.save(); res.json(convertToClient(p)); });
+app.put('/api/products/:id', requirePermission('can_manage_products'), async (req, res) => { const p = await Product.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(p)); });
+app.delete('/api/products/:id', requirePermission('can_manage_products'), async (req, res) => { await Product.findByIdAndDelete(req.params.id); res.json({}); });
+app.post('/api/admin/import-catalog', requirePermission('can_manage_products'), async (req, res) => { res.json({status: 'ok'}); });
+app.get('/api/matrix', requireAnyPermission('can_view_products', 'can_view_report'), async (req, res) => {
+    try {
+        const [prods, dealers] = await Promise.all([
+            Product.find({}).select('sku name is_liquid').sort({sku:1}).lean(),
+            Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id name city responsible products pos_materials status').lean()
+        ]);
+        const dealerIds = dealers.map(d => d._id);
+        const assets = dealerIds.length
+            ? await WorkshopDealerAsset.find({ dealer: { $in: dealerIds }, qty: { $gt: 0 } })
+                .populate('recipe', 'product outputType')
+                .lean()
+            : [];
+
+        const productMap = new Map();
+        dealers.forEach(d => productMap.set(d._id.toString(), new Set((d.products||[]).map(String))));
+
+        const sampleMap = new Map();
+        assets.forEach(asset => {
+            const productId = asset.recipe?.outputType === 'sample' ? asset.recipe?.product : null;
+            if (!productId) return;
+            const key = `${asset.dealer}|${productId}`;
+            sampleMap.set(key, (sampleMap.get(key) || 0) + (Number(asset.qty) || 0));
+        });
+
+        const posList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"];
+        const matrix = prods.map(p => ({
+            sku: p.sku,
+            name: p.name,
+            type: 'product',
+            is_liquid: p.is_liquid !== false,
+            dealers: dealers.map(d => ({
+                value: productMap.get(d._id.toString()).has(p._id.toString()) ? 1 : 0,
+                sample_qty: sampleMap.get(`${d._id}|${p._id}`) || 0,
+                is_pos: false
+            }))
+        }));
+
+        posList.forEach(pn => {
+            matrix.push({
+                sku: "POS",
+                name: pn,
+                type: 'pos',
+                dealers: dealers.map(d => ({
+                    value: (d.pos_materials||[]).find(m=>m.name===pn)?.quantity||0,
+                    is_pos: true
+                }))
+            });
+        });
+        res.json({
+            headers: dealers.map(d=>({id:d._id, name:d.name, city:d.city, responsible:d.responsible})),
+            matrix
+        });
+    } catch (e) {
+        res.status(500).json({error:e.message});
+    }
+});
+
+app.get('/api/sales', requirePermission('can_view_sales'), async (req, res) => {
+    try {
+        const { month, months, dealerId } = req.query;
+        let filter = month ? { month } : {};
+        if (!month && months) {
+            const count = Math.max(1, Math.min(24, Number(months) || 6));
+            const now = new Date();
+            now.setUTCDate(1);
+            now.setUTCMonth(now.getUTCMonth() - (count - 1));
+            const minMonth = now.toISOString().slice(0, 7);
+            filter = { month: { $gte: minMonth } };
+        }
+        const scope = getUserScope(req);
+        const companySalesView = req.query.context === 'sales' && hasPermission(req, 'can_view_sales');
+
+        if (!companySalesView && !isGlobalViewer(req) && req.user.role === 'manager') {
+            const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id').lean();
+            const dealerIds = dealers.map(d => String(d._id));
+            const zonePlanId = scope === 'astana'
+                ? 'PLAN_astana_all'
+                : scope === 'regions'
+                    ? 'PLAN_regions_all'
+                    : 'PLAN_total_all';
+
+            filter = {
+                $and: [
+                    filter,
+                    {
+                        $or: [
+                            // Факт менеджера считается исключительно по дилерам,
+                            // где он выбран ответственным.
+                            { isCustom: { $ne: true }, dealerId: { $in: dealerIds } },
+                            // План берём из сводки его зоны на странице Продажи.
+                            { isCustom: { $ne: true }, dealerId: zonePlanId }
+                        ]
+                    }
+                ]
+            };
+        } else if (!companySalesView && !isGlobalViewer(req) && scope !== 'all') {
+            const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id').lean();
+            const dealerIds = dealers.map(d => String(d._id));
+            const personalPlanIds = dealerIds.map(id => `PLAN_vip_${id}`);
+
+            const sectorType = scope === 'astana' ? 'astana' : 'region';
+            const sectors = await Sector.find({ type: sectorType }).select('name').lean();
+            const slug = name => String(name || '').trim().replace(/\s+/g, '_').toLowerCase();
+            const groupKeys = scope === 'astana'
+                ? [...sectors.map(s => `astana_${slug(s.name)}`), 'regional_astana']
+                : [...sectors.map(s => `sector_${slug(s.name)}`), 'regional_regions'];
+
+            const groupPlanIds = groupKeys.map(key => `PLAN_${key}`);
+            groupPlanIds.push(scope === 'astana' ? 'PLAN_astana_all' : 'PLAN_regions_all');
+            const allowedPlanIds = [...personalPlanIds, ...groupPlanIds];
+
+            filter = {
+                $and: [
+                    filter,
+                    {
+                        $or: [
+                            { isCustom: { $ne: true }, dealerId: { $in: dealerIds } },
+                            { isCustom: { $ne: true }, dealerId: { $in: allowedPlanIds } },
+                            { isCustom: true, group: { $in: groupKeys } }
+                        ]
+                    }
+                ]
+            };
+        }
+
+        if (dealerId) {
+            const requestedDealerId = String(dealerId);
+            const requestedPlanId = `PLAN_vip_${requestedDealerId}`;
+            filter = {
+                $and: [
+                    filter,
+                    { dealerId: { $in: [requestedDealerId, requestedPlanId] } }
+                ]
+            };
+        }
+
+        const s = await Sales.find(filter).lean();
+
+        // Нерабочие дилеры (potential/archive) не участвуют в текущей
+        // операционной статистике продаж. Сами исторические строки Sales
+        // остаются в базе и могут снова участвовать после возврата дилера
+        // в рабочий статус.
+        const workingBaseFilter = (companySalesView || isGlobalViewer(req)) ? {} : getDealerFilter(req);
+        const workingDealers = await Dealer.find(getWorkingDealerFilter(workingBaseFilter)).select('_id').lean();
+        const workingDealerIds = new Set(workingDealers.map(item => String(item._id)));
+
+        const visibleSales = s.filter(row => {
+            if (row.isCustom) return true;
+            const rowDealerId = String(row.dealerId || '');
+            if (!rowDealerId) return true;
+
+            if (rowDealerId.startsWith('PLAN_manager_')) return false;
+            if (rowDealerId.startsWith('PLAN_vip_')) {
+                return workingDealerIds.has(rowDealerId.replace('PLAN_vip_', ''));
+            }
+            if (rowDealerId.startsWith('PLAN_')) return true;
+            return workingDealerIds.has(rowDealerId);
+        });
+
+        res.json(visibleSales);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ===== ИСПРАВЛЕННЫЙ БЛОК: СОХРАНЕНИЕ, АГРЕГАЦИЯ И УДАЛЕНИЕ =====
+app.post('/api/sales', async (req, res) => {
+    const canFact = hasPermission(req, 'can_edit_sales_fact');
+    const canPlan = hasPermission(req, 'can_edit_sales_plan');
+    if (!canFact && !canPlan) {
+        return res.status(403).json({ error: 'Недостаточно прав для изменения продаж' });
+    }
+
+    const now = new Date();
+    const scope = req.user ? req.user.scope : 'none';
+    const companySalesView = req.query.context === 'sales' && hasPermission(req, 'can_view_sales');
+    const managerRestricted = Boolean(req.user && req.user.role === 'manager' && !isGlobalViewer(req) && !companySalesView);
+    let managerDealerIds = null;
+    if (managerRestricted) {
+        const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id').lean();
+        managerDealerIds = new Set(dealers.map(d => String(d._id)));
+    }
+
+    // 1. Агрегируем дубликаты из присланных данных (если ввели несколько с одинаковым именем)
+    const aggregatedData = {};
+    (Array.isArray(req.body.data) ? req.body.data : []).forEach(i => {
+        const row = { ...i };
+
+        if (managerRestricted) {
+            const dealerId = String(row.dealerId || '');
+            if (row.isCustom) {
+                row.ownerUserId = String(req.user.id);
+            } else if (dealerId.startsWith('PLAN_manager_')) {
+                return;
+            } else if (dealerId.startsWith('PLAN_vip_')) {
+                const ownedDealerId = dealerId.replace('PLAN_vip_', '');
+                if (!managerDealerIds.has(ownedDealerId)) return;
+            } else if (dealerId.startsWith('PLAN_')) {
+                return;
+            } else if (!managerDealerIds.has(dealerId)) {
+                return;
+            }
+        }
+        if (String(row.dealerId || '').startsWith('PLAN_manager_')) return;
+        if (!canFact) delete row.fact;
+        if (!canPlan) delete row.plan;
+
+        const key = row.isCustom ? `custom_${row.group}_${row.dealerName}` : `dealer_${row.dealerId}`;
+        if (!aggregatedData[key]) {
+            aggregatedData[key] = row;
+        } else {
+            if (canFact) aggregatedData[key].fact = (Number(aggregatedData[key].fact) || 0) + (Number(row.fact) || 0);
+            if (canPlan) aggregatedData[key].plan = (Number(aggregatedData[key].plan) || 0) + (Number(row.plan) || 0);
+        }
+    });
+
+    // 2. Обновляем/Добавляем записи
+    const ops = Object.values(aggregatedData).map(i => {
+        const filter = { month: req.body.month };
+        if (i.isCustom) {
+            filter.isCustom = true;
+            filter.dealerName = i.dealerName;
+            if (i.group) filter.group = i.group; 
+        } else {
+            filter.dealerId = i.dealerId;
+        }
+
+        return {
+            updateOne: { 
+                filter: filter, 
+                update: { $set: { ...i, updatedAt: now } }, 
+                upsert: true 
+            } 
+        };
+    }); 
+    
+    if (ops.length > 0) {
+        await Sales.bulkWrite(ops); 
+    }
+
+    // Старые планы менеджеров больше не используются: план задаётся по зоне/сектору/дилеру.
+    await Sales.deleteMany({
+        month: req.body.month,
+        dealerId: { $regex: '^PLAN_manager_' }
+    });
+
+    // 3. Умное удаление (Очистка разовых продаж)
+    // Определяем, к каким группам имеет доступ текущий пользователь
+    let groupFilter = {};
+    if (managerRestricted) {
+        groupFilter = { ownerUserId: String(req.user.id) };
+    } else if (!companySalesView && scope === 'astana') {
+        const sectors = await Sector.find({ type: 'astana' });
+        groupFilter = { group: { $in: sectors.map(s => s.name) } };
+    } else if (!companySalesView && scope === 'regions') {
+        const sectors = await Sector.find({ type: 'region' });
+        groupFilter = { group: { $in: sectors.map(s => s.name) } };
+    }
+    // Если admin или all, groupFilter остается пустым (имеет доступ ко всем)
+
+    // Ищем все разовые продажи за этот месяц в базе (в рамках доступа пользователя)
+    const dbCustomSales = await Sales.find({ 
+        month: req.body.month, 
+        isCustom: true, 
+        ...groupFilter 
+    });
+
+    const idsToDelete = [];
+    const incomingArray = Object.values(aggregatedData);
+
+    if (canFact) dbCustomSales.forEach(dbSale => {
+        // Проверяем, осталась ли эта продажа в присланных данных
+        const existsInIncoming = incomingArray.some(
+            i => i.isCustom && i.group === dbSale.group && i.dealerName === dbSale.dealerName
+        );
+        
+        // Если в присланных данных её больше нет — помечаем на удаление
+        if (!existsInIncoming) {
+            idsToDelete.push(dbSale._id);
+        }
+    });
+
+    // Удаляем всё лишнее
+    if (canFact && idsToDelete.length > 0) {
+        await Sales.deleteMany({ _id: { $in: idsToDelete } });
+    }
+
+    res.json({status:'ok'}); 
+});
+// ===================================================================
+
+app.get('/api/competitors-ref', requirePermission('can_view_competitors'), async (req, res) => { const l = await CompRef.find().sort({name:1}); res.json(l.map(convertToClient)); });
+app.post('/api/competitors-ref', requirePermission('can_manage_competitors'), async (req, res) => { const c = new CompRef(req.body); await c.save(); res.json(convertToClient(c)); });
+app.put('/api/competitors-ref/:id', requirePermission('can_manage_competitors'), async (req, res) => { await CompRef.findByIdAndUpdate(req.params.id, req.body); res.json({status:'ok'}); });
+app.delete('/api/competitors-ref/:id', requirePermission('can_manage_competitors'), async (req, res) => { await CompRef.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
+app.get('/api/knowledge', requirePermission('can_view_knowledge'), async (req, res) => { const l = await Knowledge.find().sort({title:1}); res.json(l.map(convertToClient)); });
+app.get('/api/knowledge/:id', requirePermission('can_view_knowledge'), async (req, res) => { res.json(convertToClient(await Knowledge.findById(req.params.id))); });
+app.post('/api/knowledge', requirePermission('can_manage_knowledge'), async (req, res) => { const a = new Knowledge(req.body); await a.save(); res.json(convertToClient(a)); });
+app.put('/api/knowledge/:id', requirePermission('can_manage_knowledge'), async (req, res) => { const a = await Knowledge.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(a)); });
+app.delete('/api/knowledge/:id', requirePermission('can_manage_knowledge'), async (req, res) => { await Knowledge.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
+app.get('/api/tasks', requirePermission('can_view_dashboard'), async (req, res) => { try { const data = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('name visits status responsible').lean(); res.json(data.map(d => ({ id: d._id, name: d.name, status: d.status, visits: d.visits || [], responsible: d.responsible }))); } catch (e) { res.status(500).json([]); } });
+
+async function getScopedDealerIds(req) {
+    const baseFilter = isGlobalViewer(req) ? {} : getDealerFilter(req);
+    const dealers = await Dealer.find(getWorkingDealerFilter(baseFilter)).select('_id').lean();
+    return dealers.map(d => String(d._id));
+}
+
+// ==========================================
+// РЕКВИЗИТЫ И РЕКЛАМАЦИИ
+// ==========================================
+const reclamationSchema = new mongoose.Schema({
+    dealerId: String,
+    dealerName: String,
+    date: String,
+    productName: String,
+    invoiceNumber: String,
+    purchaseDate: String,
+    clientName: String,
+    clientPhone: String,
+    address: String,
+    floor: String,
+    houseType: String,
+    totalArea: String,
+    purchasedVolume: String,
+    batchNumbers: [String],
+    baseType: String,
+    underlayment: String,
+    warmFloor: String,
+    installer: String,
+    
+    // --- НОВЫЕ ТЕХНИЧЕСКИЕ ПОЛЯ ---
+    acclimatization: String, 
+    storageMethod: String,
+    dryingTime: String,
+    floorFlatness: String,
+// --- НОВЫЕ ПОЛЯ ---
+    defectMoment: String,       // Момент выявления
+    compensationAmount: Number, // Сумма компенсации
+    internalNotes: String,
+    
+    description: String,
+    clientDemand: String,
+    resolution: String,
+    photos: [{ photo_url: String }]
+}, { timestamps: true });
+const Reclamation = mongoose.model('Reclamation', reclamationSchema);
+
+
+// ==========================================
+// ЦЕХ API
+// ==========================================
+async function syncWorkshopPosToDealer(dealerId, recipeId) {
+    const recipe = await WorkshopRecipe.findById(recipeId).select('matrixPosName').lean();
+    const posName = String(recipe?.matrixPosName || '').trim();
+    if (!posName) return;
+
+    const recipes = await WorkshopRecipe.find({ matrixPosName: posName }).select('_id').lean();
+    const recipeIds = recipes.map(item => item._id);
+    const assets = await WorkshopDealerAsset.find({ dealer: dealerId, recipe: { $in: recipeIds } }).lean();
+    const qty = assets.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+
+    const dealer = await Dealer.findById(dealerId);
+    if (!dealer) return;
+    dealer.pos_materials = Array.isArray(dealer.pos_materials) ? dealer.pos_materials : [];
+    const index = dealer.pos_materials.findIndex(item => item.name === posName);
+    if (qty > 0) {
+        if (index >= 0) dealer.pos_materials[index].quantity = qty;
+        else dealer.pos_materials.push({ name: posName, quantity: qty });
+    } else if (index >= 0) {
+        dealer.pos_materials.splice(index, 1);
+    }
+    await dealer.save();
+}
+
+app.post('/api/workshop/print-log', requirePermission('can_view_workshop'), async (req, res) => {
+    try {
+        const type=String(req.body?.type||'report').trim().slice(0,60);
+        const referenceId=String(req.body?.referenceId||'').trim().slice(0,120);
+        const title=String(req.body?.title||'Документ цеха').trim().slice(0,180);
+        res.json({status:'logged',type,referenceId,title});
+    } catch(e) {
+        res.status(500).json({error:e.message});
+    }
+});
+
+app.get('/api/workshop/bootstrap', requirePermission('can_view_workshop'), async (req, res) => {
+    try {
+        const [products, dealers, materials, recipes, laminateStocks, assets, productions, movements, memos] = await Promise.all([
+            Product.find().select('sku name is_liquid characteristics.package_qty characteristics.size characteristics.class characteristics.thickness').sort({ sku: 1 }).lean(),
+            Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id dealer_id name city status').sort({ name: 1 }).lean(),
+            WorkshopMaterial.find({ active: { $ne: false } }).sort({ category: 1, name: 1 }).lean(),
+            WorkshopRecipe.find({ active: { $ne: false } })
+                .populate('product', 'sku name is_liquid characteristics.package_qty')
+                .populate('materials.material', 'code name unit purchaseUnit purchaseUnitSize stockQty')
+                .populate('components.recipe', 'name outputType stockQty')
+                .sort({ outputType: 1, name: 1 }).lean(),
+            WorkshopLaminateStock.find().populate('product', 'sku name is_liquid characteristics.package_qty').lean(),
+            WorkshopDealerAsset.find({ qty: { $gt: 0 } })
+                .populate('dealer', 'dealer_id name city status')
+                .populate({ path: 'recipe', populate: { path: 'product', select: 'sku name is_liquid' } })
+                .sort({ updatedAt: -1 }).lean(),
+            WorkshopProduction.find({ cancelledAt: { $exists: false } })
+                .populate('recipe', 'name outputType')
+                .populate('product', 'sku name')
+                .sort({ date: -1, createdAt: -1 }).limit(30).lean(),
+            WorkshopMovement.find()
+                .populate('product', 'sku name')
+                .populate('material', 'code name unit')
+                .populate('recipe', 'name outputType')
+                .populate('dealer', 'dealer_id name city')
+                .sort({ date: -1, createdAt: -1 }).limit(60).lean(),
+            WorkshopMemo.find()
+                .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+                .populate('lines.actualProduct', 'sku name is_liquid characteristics.package_qty')
+                .populate('lines.recipe', 'name outputType planksPerUnit')
+                .sort({ date: -1, createdAt: -1 }).limit(80).lean()
+        ]);
+
+        const memoIds = memos.map(item => item._id);
+        const producedByMemoLine = memoIds.length ? await WorkshopProduction.aggregate([
+            { $match: { memo: { $in: memoIds }, memoLineId: { $nin: [null, ''] }, cancelledAt: { $exists: false } } },
+            { $group: { _id: '$memoLineId', qty: { $sum: '$outputQty' } } }
+        ]) : [];
+        const producedMap = new Map(producedByMemoLine.map(item => [String(item._id), Number(item.qty) || 0]));
+        memos.forEach(memo => {
+            (memo.lines || []).forEach(line => {
+                line.producedQty = producedMap.get(String(line._id)) || 0;
+            });
+        });
+
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const todayRows = await WorkshopProduction.find({ date: { $gte: today }, cancelledAt: { $exists: false } }).select('outputQty').lean();
+        const todayProduction = todayRows.reduce((sum, item) => sum + (Number(item.outputQty) || 0), 0);
+        const finishedStock = recipes.reduce((sum, item) => sum + (Number(item.stockQty) || 0), 0);
+        const lowMaterials = materials.filter(item => Number(item.minQty) > 0 && Number(item.stockQty) <= Number(item.minQty)).length;
+        const laminatePlanks = laminateStocks.reduce((sum, item) => sum + (Number(item.planksQty) || 0), 0);
+        const openMemos = memos.filter(item => item.status === 'created' || item.status === 'mismatch').length;
+        const visibleAssets = assets.filter(asset => !isNonWorkingDealerStatus(asset.dealer?.status));
+        const dealerAssetStock = visibleAssets.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+        const openingBalanceCount = await WorkshopMovement.countDocuments({
+            type: { $in: ['opening_balance', 'opening_dealer_balance'] }
+        });
+
+        res.json({
+            products: products.map(convertToClient),
+            dealers: dealers.map(convertToClient),
+            materials: materials.map(convertToClient),
+            recipes: recipes.map(convertToClient),
+            laminateStocks: laminateStocks.map(convertToClient),
+            dealerAssets: visibleAssets.map(convertToClient),
+            productions: productions.map(convertToClient),
+            movements: movements.map(convertToClient),
+            memos: memos.map(convertToClient),
+            stats: { todayProduction, finishedStock, lowMaterials, laminatePlanks, openMemos, dealerAssetStock, openingBalanceCount }
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/workshop/movements', requirePermission('can_view_workshop'), async (req, res) => {
+    try {
+        const limit = Math.max(1, Math.min(500, Number(req.query.limit) || 150));
+        const filter = {};
+        if (req.query.type) filter.type = req.query.type;
+        const list = await WorkshopMovement.find(filter)
+            .populate('product', 'sku name')
+            .populate('material', 'code name unit')
+            .populate('recipe', 'name outputType')
+            .populate('dealer', 'dealer_id name city')
+            .sort({ date: -1, createdAt: -1 }).limit(limit).lean();
+        res.json(list.map(convertToClient));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/materials', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const item = new WorkshopMaterial({
+            code: String(req.body.code || '').trim(),
+            name: String(req.body.name || '').trim(),
+            category: req.body.category || 'consumable',
+            unit: req.body.unit || 'шт',
+            purchaseUnit: String(req.body.purchaseUnit || req.body.unit || 'шт').trim(),
+            purchaseUnitSize: Math.max(0.0001, workshopNumber(req.body.purchaseUnitSize) || 1),
+            stockQty: Math.max(0, workshopNumber(req.body.stockQty)),
+            minQty: Math.max(0, workshopNumber(req.body.minQty)),
+            active: req.body.active !== false,
+            note: String(req.body.note || '').trim()
+        });
+        if (!item.name) return res.status(400).json({ error: 'Укажите название материала' });
+        await item.save();
+        res.status(201).json(convertToClient(item));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.put('/api/workshop/materials/:id', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const payload = {
+            code: String(req.body.code || '').trim(),
+            name: String(req.body.name || '').trim(),
+            category: req.body.category || 'consumable',
+            unit: req.body.unit || 'шт',
+            purchaseUnit: String(req.body.purchaseUnit || req.body.unit || 'шт').trim(),
+            purchaseUnitSize: Math.max(0.0001, workshopNumber(req.body.purchaseUnitSize) || 1),
+            minQty: Math.max(0, workshopNumber(req.body.minQty)),
+            active: req.body.active !== false,
+            note: String(req.body.note || '').trim()
+        };
+        const item = await WorkshopMaterial.findByIdAndUpdate(req.params.id, payload, { new: true });
+        if (!item) return res.status(404).json({ error: 'Материал не найден' });
+        res.json(convertToClient(item));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.delete('/api/workshop/materials/:id', requireIsAdmin, async (req, res) => {
+    try {
+        const item = await WorkshopMaterial.findById(req.params.id);
+        if (!item) return res.status(404).json({ error: 'Материал не найден' });
+
+        const [movementUsed, recipeUsed] = await Promise.all([
+            WorkshopMovement.exists({ material: item._id }),
+            WorkshopRecipe.exists({ 'materials.material': item._id })
+        ]);
+        if (movementUsed || recipeUsed) {
+            return res.status(400).json({ error: 'Материал уже используется в истории или рецептурах. Его можно отредактировать/деактивировать, но не удалить.' });
+        }
+        await WorkshopMaterial.deleteOne({ _id: item._id });
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/material-movement', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const materialId = req.body.materialId;
+        const qty = Math.abs(workshopNumber(req.body.qty));
+        const direction = req.body.direction === 'out' ? 'out' : 'in';
+        if (!materialId || qty <= 0) return res.status(400).json({ error: 'Укажите материал и количество' });
+
+        const delta = direction === 'out' ? -qty : qty;
+        const material = await workshopChangeMaterial(materialId, delta);
+        const movement = await WorkshopMovement.create({
+            date: req.body.date || new Date(),
+            type: req.body.type || (direction === 'out' ? 'material_issue' : 'material_receipt'),
+            entityType: 'material',
+            material: materialId,
+            direction,
+            qty,
+            unit: material.unit || 'шт',
+            serviceMemoNumber: String(req.body.serviceMemoNumber || '').trim(),
+            note: String(req.body.note || '').trim(),
+            createdBy: workshopUser(req)
+        });
+        res.status(201).json({ material: convertToClient(material), movement: convertToClient(movement) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/recipes', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const recipe = new WorkshopRecipe({
+            name: String(req.body.name || '').trim(),
+            outputType: req.body.outputType || 'sample',
+            sku: String(req.body.sku || '').trim(),
+            product: req.body.productId || null,
+            sideA: String(req.body.sideA || '').trim(),
+            sideB: String(req.body.sideB || '').trim(),
+            planksPerUnit: Math.max(0, workshopNumber(req.body.planksPerUnit)),
+            packQtyOverride: Math.max(0, workshopNumber(req.body.packQtyOverride)),
+            matrixPosName: String(req.body.matrixPosName || '').trim(),
+            minStockQty: Math.max(0, workshopNumber(req.body.minStockQty)),
+            materials: Array.isArray(req.body.materials) ? req.body.materials.map(item => ({
+                material: item.materialId,
+                qty: Math.max(0, workshopNumber(item.qty)),
+                mode: item.mode === 'estimate' ? 'estimate' : 'strict'
+            })).filter(item => item.material && item.qty >= 0) : [],
+            components: Array.isArray(req.body.components) ? req.body.components.map(item => ({
+                recipe: item.recipeId,
+                qty: Math.max(0, workshopNumber(item.qty))
+            })).filter(item => item.recipe && item.qty > 0) : [],
+            active: req.body.active !== false,
+            note: String(req.body.note || '').trim()
+        });
+        if (!recipe.name) return res.status(400).json({ error: 'Укажите название изделия' });
+        await recipe.save();
+        res.status(201).json(convertToClient(recipe));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.put('/api/workshop/recipes/:id', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const payload = {
+            name: String(req.body.name || '').trim(),
+            outputType: req.body.outputType || 'sample',
+            sku: String(req.body.sku || '').trim(),
+            product: req.body.productId || null,
+            sideA: String(req.body.sideA || '').trim(),
+            sideB: String(req.body.sideB || '').trim(),
+            planksPerUnit: Math.max(0, workshopNumber(req.body.planksPerUnit)),
+            packQtyOverride: Math.max(0, workshopNumber(req.body.packQtyOverride)),
+            matrixPosName: String(req.body.matrixPosName || '').trim(),
+            minStockQty: Math.max(0, workshopNumber(req.body.minStockQty)),
+            materials: Array.isArray(req.body.materials) ? req.body.materials.map(item => ({
+                material: item.materialId,
+                qty: Math.max(0, workshopNumber(item.qty)),
+                mode: item.mode === 'estimate' ? 'estimate' : 'strict'
+            })).filter(item => item.material && item.qty >= 0) : [],
+            components: Array.isArray(req.body.components) ? req.body.components.map(item => ({
+                recipe: item.recipeId,
+                qty: Math.max(0, workshopNumber(item.qty))
+            })).filter(item => item.recipe && item.qty > 0) : [],
+            active: req.body.active !== false,
+            note: String(req.body.note || '').trim()
+        };
+        const recipe = await WorkshopRecipe.findByIdAndUpdate(req.params.id, payload, { new: true });
+        if (!recipe) return res.status(404).json({ error: 'Рецептура не найдена' });
+        res.json(convertToClient(recipe));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.delete('/api/workshop/recipes/:id', requireIsAdmin, async (req, res) => {
+    try {
+        const recipe = await WorkshopRecipe.findById(req.params.id);
+        if (!recipe) return res.status(404).json({ error: 'Рецептура не найдена' });
+
+        const [productionUsed, movementUsed, dealerUsed, componentUsed, memoUsed] = await Promise.all([
+            WorkshopProduction.exists({ recipe: recipe._id }),
+            WorkshopMovement.exists({ recipe: recipe._id }),
+            WorkshopDealerAsset.exists({ recipe: recipe._id, qty: { $gt: 0 } }),
+            WorkshopRecipe.exists({ 'components.recipe': recipe._id }),
+            WorkshopMemo.exists({ 'lines.recipe': recipe._id })
+        ]);
+        if (productionUsed || movementUsed || dealerUsed || componentUsed || memoUsed || Math.abs(Number(recipe.stockQty) || 0) > 0.0001) {
+            return res.status(400).json({ error: 'Рецептура уже участвует в учёте. Её можно редактировать или деактивировать, но нельзя удалить без нарушения истории.' });
+        }
+        await WorkshopRecipe.deleteOne({ _id: recipe._id });
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/memos', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        let number = String(req.body.number || '').trim();
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
+        if (!inputLines.length) return res.status(400).json({ error: 'Добавьте хотя бы одну позицию' });
+        if (!number) {
+            let seq = Math.max(1, (await WorkshopMemo.countDocuments()) + 1);
+            while (!number) {
+                const candidate = `ЦЕХ-${String(seq).padStart(4, '0')}`;
+                const exists = await WorkshopMemo.exists({ number: candidate });
+                if (!exists) number = candidate;
+                else seq += 1;
+            }
+        }
+
+        const lines = [];
+        const seenProducts = new Set();
+        for (const input of inputLines) {
+            const requestedPacks = Math.max(0, Math.floor(workshopNumber(input.requestedPacks)));
+            if (!input.productId || requestedPacks <= 0) continue;
+
+            const product = await Product.findById(input.productId).lean();
+            if (!product) continue;
+            const productKey = String(product._id);
+            if (seenProducts.has(productKey)) {
+                return res.status(400).json({ error: `Позиция «${product.sku || product.name}» добавлена в служебку дважды` });
+            }
+            seenProducts.add(productKey);
+
+            let recipe = null;
+            if (input.recipeId) {
+                recipe = await WorkshopRecipe.findOne({
+                    _id: input.recipeId,
+                    product: product._id,
+                    active: { $ne: false }
+                }).lean();
+                if (!recipe) {
+                    return res.status(400).json({ error: `Выбранная рецептура не подходит для «${product.sku || product.name}»` });
+                }
+            } else {
+                const recipes = await WorkshopRecipe.find({
+                    product: product._id,
+                    active: { $ne: false },
+                    planksPerUnit: { $gt: 0 }
+                }).lean();
+                recipe = recipes.find(item => item.outputType === 'sample')
+                    || recipes.find(item => item.outputType === 'stand')
+                    || recipes[0]
+                    || null;
+            }
+
+            const packQty = workshopPackQty(product, recipe?.packQtyOverride || 0);
+            if (packQty <= 0) {
+                return res.status(400).json({ error: `У «${product.sku || product.name}» не заполнено количество планок в упаковке` });
+            }
+            const planksPerUnit = recipe ? Math.max(0, workshopNumber(recipe.planksPerUnit)) : 0;
+
+            const totalPlanks = requestedPacks * packQty;
+            const plannedOutputQty = planksPerUnit > 0 ? Math.floor(totalPlanks / planksPerUnit) : 0;
+            const plannedRemainderPlanks = planksPerUnit > 0 ? totalPlanks - plannedOutputQty * planksPerUnit : totalPlanks;
+
+            lines.push({
+                product: product._id,
+                recipe: recipe?._id || null,
+                requestedPacks,
+                plannedOutputQty,
+                plannedRemainderPlanks,
+                packQty,
+                planksPerUnit,
+                actualProduct: product._id,
+                deliveredPacks: 0,
+                checked: false,
+                isMatch: false,
+                discrepancyReason: ''
+            });
+        }
+
+        if (!lines.length) return res.status(400).json({ error: 'Нет корректных позиций для служебной записки' });
+
+        const memo = await WorkshopMemo.create({
+            number,
+            date: req.body.date || new Date(),
+            lines,
+            note: String(req.body.note || '').trim(),
+            signedBy: String(req.body.signedBy || req.user?.fullName || req.user?.username || '').trim(),
+            createdBy: workshopUser(req)
+        });
+
+        const populated = await WorkshopMemo.findById(memo._id)
+            .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+            .populate('lines.recipe', 'name outputType planksPerUnit')
+            .lean();
+        res.status(201).json(convertToClient(populated));
+    } catch (e) {
+        if (e && e.code === 11000) return res.status(400).json({ error: 'Служебная записка с таким номером уже существует' });
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.put('/api/workshop/memos/:id', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const memo = await WorkshopMemo.findById(req.params.id);
+        if (!memo) return res.status(404).json({ error: 'Служебная записка не найдена' });
+        if (memo.postedAt || memo.status === 'accepted') {
+            return res.status(400).json({ error: 'Принятую служебную записку нельзя редактировать. Используйте корректировку/отмену.' });
+        }
+
+        const number = String(req.body.number || memo.number || '').trim();
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
+        if (!number) return res.status(400).json({ error: 'Укажите номер служебной записки' });
+        if (!inputLines.length) return res.status(400).json({ error: 'Добавьте хотя бы одну позицию' });
+
+        const duplicateNumber = await WorkshopMemo.exists({ number, _id: { $ne: memo._id } });
+        if (duplicateNumber) return res.status(400).json({ error: 'Служебная записка с таким номером уже существует' });
+
+        const seenProducts = new Set();
+        const lines = [];
+        for (const input of inputLines) {
+            const requestedPacks = Math.max(0, Math.floor(workshopNumber(input.requestedPacks)));
+            if (!input.productId || requestedPacks <= 0) continue;
+
+            const product = await Product.findById(input.productId).lean();
+            if (!product) continue;
+            const productKey = String(product._id);
+            if (seenProducts.has(productKey)) {
+                return res.status(400).json({ error: `Позиция «${product.sku || product.name}» добавлена в служебку дважды` });
+            }
+            seenProducts.add(productKey);
+
+            let recipe = null;
+            if (input.recipeId) {
+                recipe = await WorkshopRecipe.findOne({ _id: input.recipeId, product: product._id, active: { $ne: false } }).lean();
+            }
+            if (!recipe) {
+                const recipes = await WorkshopRecipe.find({ product: product._id, active: { $ne: false }, planksPerUnit: { $gt: 0 } }).lean();
+                recipe = recipes.find(item => item.outputType === 'sample') || recipes.find(item => item.outputType === 'stand') || recipes[0] || null;
+            }
+            const packQty = workshopPackQty(product, recipe?.packQtyOverride || 0);
+            const planksPerUnit = recipe ? Math.max(0, workshopNumber(recipe.planksPerUnit)) : 0;
+            if (packQty <= 0) {
+                return res.status(400).json({ error: `У «${product.sku || product.name}» не заполнено количество планок в упаковке` });
+            }
+
+            const totalPlanks = requestedPacks * packQty;
+            const plannedOutputQty = planksPerUnit > 0 ? Math.floor(totalPlanks / planksPerUnit) : 0;
+            const plannedRemainderPlanks = planksPerUnit > 0 ? totalPlanks - plannedOutputQty * planksPerUnit : totalPlanks;
+            lines.push({
+                product: product._id,
+                recipe: recipe?._id || null,
+                requestedPacks,
+                plannedOutputQty,
+                plannedRemainderPlanks,
+                packQty,
+                planksPerUnit,
+                actualProduct: product._id,
+                deliveredPacks: 0,
+                checked: false,
+                isMatch: false,
+                discrepancyReason: ''
+            });
+        }
+
+        if (!lines.length) return res.status(400).json({ error: 'Нет корректных позиций' });
+
+        memo.number = number;
+        memo.date = req.body.date || memo.date || new Date();
+        memo.lines = lines;
+        memo.note = String(req.body.note || '').trim();
+        memo.signedBy = String(req.body.signedBy || '').trim();
+        memo.status = 'created';
+        memo.receiptAttempts = [];
+        await memo.save();
+
+        const populated = await WorkshopMemo.findById(memo._id)
+            .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+            .populate('lines.recipe', 'name outputType planksPerUnit minStockQty stockQty')
+            .lean();
+        res.json(convertToClient(populated));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.delete('/api/workshop/memos/:id', requireIsAdmin, async (req, res) => {
+    try {
+        const memo = await WorkshopMemo.findById(req.params.id);
+        if (!memo) return res.status(404).json({ error: 'Служебная записка не найдена' });
+        if (memo.postedAt || memo.status === 'accepted') {
+            return res.status(400).json({ error: 'Проведённую служебную записку нельзя удалить напрямую: она уже изменила остатки.' });
+        }
+        const linkedProduction = await WorkshopProduction.exists({ memo: memo._id });
+        if (linkedProduction) return res.status(400).json({ error: 'По этой служебке уже есть производство. Сначала отмените связанные операции.' });
+        await WorkshopMemo.deleteOne({ _id: memo._id });
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/memos/:id/receive', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const memo = await WorkshopMemo.findById(req.params.id);
+        if (!memo) return res.status(404).json({ error: 'Служебная записка не найдена' });
+        if (memo.status === 'accepted' && memo.postedAt) {
+            return res.status(400).json({ error: 'Эта служебная записка уже принята и оприходована' });
+        }
+
+        const submitted = Array.isArray(req.body.lines) ? req.body.lines : [];
+        if (!submitted.length) return res.status(400).json({ error: 'Нет строк для сверки' });
+
+        const attemptLines = [];
+        let allMatch = true;
+
+        for (const line of memo.lines) {
+            const row = submitted.find(item => String(item.lineId || '') === String(line._id));
+            const actualProductId = row?.actualProductId || line.product;
+            const deliveredPacks = Math.max(0, Math.floor(workshopNumber(row?.deliveredPacks)));
+            const checked = Boolean(row?.checked);
+            const sameProduct = String(actualProductId || '') === String(line.product || '');
+            const sameQty = deliveredPacks === Number(line.requestedPacks || 0);
+            const isMatch = checked && sameProduct && sameQty;
+
+            line.actualProduct = actualProductId || line.product;
+            line.deliveredPacks = deliveredPacks;
+            line.checked = checked;
+            line.isMatch = isMatch;
+            line.discrepancyReason = String(row?.discrepancyReason || '').trim();
+
+            if (!isMatch) allMatch = false;
+            attemptLines.push({
+                lineId: String(line._id),
+                expectedProductId: String(line.product || ''),
+                actualProductId: String(line.actualProduct || ''),
+                requestedPacks: Number(line.requestedPacks || 0),
+                deliveredPacks,
+                checked,
+                isMatch,
+                discrepancyReason: line.discrepancyReason
+            });
+        }
+
+        memo.receiptAttempts.push({
+            date: req.body.date || new Date(),
+            status: allMatch ? 'accepted' : 'mismatch',
+            lines: attemptLines,
+            note: String(req.body.note || '').trim(),
+            createdBy: workshopUser(req)
+        });
+
+        if (!allMatch) {
+            memo.status = 'mismatch';
+            await memo.save();
+            const populated = await WorkshopMemo.findById(memo._id)
+                .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+                .populate('lines.actualProduct', 'sku name is_liquid characteristics.package_qty')
+                .populate('lines.recipe', 'name outputType planksPerUnit')
+                .lean();
+            return res.status(200).json({
+                accepted: false,
+                status: 'mismatch',
+                message: 'Есть расхождения. Упаковки пока не оприходованы — требуется обмен/повторная сверка.',
+                memo: convertToClient(populated)
+            });
+        }
+
+        if (!memo.postedAt) {
+            for (const line of memo.lines) {
+                const product = await Product.findById(line.product).lean();
+                if (!product) throw new Error('Одна из позиций служебки больше не найдена в каталоге');
+                const packQty = Number(line.packQty) > 0 ? Number(line.packQty) : workshopPackQty(product);
+                const planksQty = Number(line.requestedPacks || 0) * packQty;
+                await workshopChangeLaminate(line.product, planksQty);
+                await WorkshopMovement.create({
+                    date: req.body.date || new Date(),
+                    type: 'laminate_receipt',
+                    entityType: 'laminate',
+                    product: line.product,
+                    direction: 'in',
+                    qty: planksQty,
+                    unit: 'планка',
+                    serviceMemoNumber: memo.number,
+                    note: String(req.body.note || '').trim(),
+                    meta: {
+                        memoId: String(memo._id),
+                        memoLineId: String(line._id),
+                        requestedPacks: Number(line.requestedPacks || 0),
+                        deliveredPacks: Number(line.deliveredPacks || 0),
+                        packQty,
+                        plannedOutputQty: Number(line.plannedOutputQty || 0)
+                    },
+                    createdBy: workshopUser(req)
+                });
+            }
+            memo.postedAt = new Date();
+        }
+
+        memo.status = 'accepted';
+        memo.acceptedAt = new Date();
+        memo.acceptedBy = workshopUser(req);
+        await memo.save();
+
+        const populated = await WorkshopMemo.findById(memo._id)
+            .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+            .populate('lines.actualProduct', 'sku name is_liquid characteristics.package_qty')
+            .populate('lines.recipe', 'name outputType planksPerUnit')
+            .lean();
+
+        res.json({
+            accepted: true,
+            status: 'accepted',
+            message: 'Все позиции совпали. Упаковки оприходованы в цех.',
+            memo: convertToClient(populated)
+        });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/laminate-receipt', requirePermission('can_manage_workshop'), async (req, res) => {
+    return res.status(400).json({
+        error: 'Одиночный приход отключен. Ламинат принимается только целыми упаковками по многострочной служебной записке.'
+    });
+});
+
+app.post('/api/workshop/production', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const recipe = await WorkshopRecipe.findById(req.body.recipeId)
+            .populate('product')
+            .populate('materials.material')
+            .populate('components.recipe');
+        if (!recipe) return res.status(404).json({ error: 'Рецептура не найдена' });
+
+        let sourceMemo = null;
+        let sourceMemoLine = null;
+        if (req.body.memoId) {
+            sourceMemo = await WorkshopMemo.findById(req.body.memoId).lean();
+            if (!sourceMemo || sourceMemo.status !== 'accepted') {
+                return res.status(400).json({ error: 'Можно привязать производство только к принятой служебной записке' });
+            }
+            sourceMemoLine = (sourceMemo.lines || []).find(line => String(line._id) === String(req.body.memoLineId || ''));
+            if (!sourceMemoLine) return res.status(400).json({ error: 'Строка служебной записки не найдена' });
+            if (recipe.product && String(sourceMemoLine.product) !== String(recipe.product._id)) {
+                return res.status(400).json({ error: 'Ламинат рецептуры не совпадает с выбранной строкой служебки' });
+            }
+        }
+
+        const outputQty = Math.max(0, workshopNumber(req.body.outputQty));
+        const scrapPlanks = Math.max(0, workshopNumber(req.body.scrapPlanks));
+        const acceptedPacks = Math.max(0, workshopNumber(req.body.acceptedPacks));
+        const acceptedLoosePlanks = Math.max(0, workshopNumber(req.body.acceptedLoosePlanks));
+        if (outputQty <= 0) return res.status(400).json({ error: 'Укажите количество изготовленных изделий' });
+
+        const packQty = workshopPackQty(recipe.product, recipe.packQtyOverride);
+        const standardPlanksPerUnit = Math.max(0, workshopNumber(recipe.planksPerUnit));
+        const requestedActualNorm = Math.max(0, workshopNumber(req.body.actualPlanksPerUnit));
+        const actualPlanksPerUnit = requestedActualNorm > 0 ? requestedActualNorm : standardPlanksPerUnit;
+        const customNormReason = String(req.body.customNormReason || '').trim();
+        const customOrderName = String(req.body.customOrderName || '').trim();
+        const customDimensions = String(req.body.customDimensions || '').trim();
+        if (requestedActualNorm > 0 && Math.abs(requestedActualNorm - standardPlanksPerUnit) > 0.0001 && !customNormReason) {
+            return res.status(400).json({ error: 'При изменении стандартной нормы укажите причину (например, индивидуальный образец)' });
+        }
+        const usedForOutput = actualPlanksPerUnit * outputQty;
+        const consumedPlanks = usedForOutput + scrapPlanks;
+        const acceptedTotal = acceptedPacks * packQty + acceptedLoosePlanks;
+
+        if (consumedPlanks > 0) {
+            if (!recipe.product) return res.status(400).json({ error: 'Для этой рецептуры не выбран ламинат' });
+            const stock = await WorkshopLaminateStock.findOne({ product: recipe.product._id }).lean();
+            if ((Number(stock?.planksQty) || 0) < consumedPlanks) {
+                return res.status(400).json({ error: 'Недостаточно планок ламината в остатках цеха' });
+            }
+        }
+
+        for (const line of recipe.materials || []) {
+            if (line.mode === 'estimate') continue;
+            const need = (Number(line.qty) || 0) * outputQty;
+            if (need > 0 && (Number(line.material?.stockQty) || 0) < need) {
+                return res.status(400).json({ error: `Недостаточно материала «${line.material?.name || 'материал'}»` });
+            }
+        }
+
+        for (const line of recipe.components || []) {
+            const need = (Number(line.qty) || 0) * outputQty;
+            if (need > 0 && (Number(line.recipe?.stockQty) || 0) < need) {
+                return res.status(400).json({ error: `Недостаточно готовых компонентов «${line.recipe?.name || 'компонент'}»` });
+            }
+        }
+
+        if (consumedPlanks > 0) {
+            await workshopChangeLaminate(recipe.product._id, -consumedPlanks);
+            await WorkshopMovement.create({
+                date: req.body.date || new Date(), type: 'production_laminate',
+                entityType: 'laminate', product: recipe.product._id, direction: 'out',
+                qty: consumedPlanks, unit: 'планка', note: String(req.body.note || '').trim(),
+                serviceMemoNumber: sourceMemo?.number || '',
+                meta: { recipeId: recipe._id, outputQty, scrapPlanks, standardPlanksPerUnit, actualPlanksPerUnit, customNormReason, customOrderName, customDimensions, memoId: sourceMemo?._id || null, memoLineId: sourceMemoLine?._id || null }, createdBy: workshopUser(req)
+            });
+        }
+
+        for (const line of recipe.materials || []) {
+            const need = (Number(line.qty) || 0) * outputQty;
+            if (line.mode === 'estimate') {
+                if (need > 0) {
+                    await WorkshopMovement.create({
+                        date: req.body.date || new Date(), type: 'production_material_estimate',
+                        entityType: 'material', material: line.material._id, direction: 'neutral',
+                        qty: need, unit: line.material.unit || 'шт',
+                        note: 'Расчетный расход; фактический остаток автоматически не уменьшается',
+                        meta: { recipeId: recipe._id, outputQty, estimate: true }, createdBy: workshopUser(req)
+                    });
+                }
+                continue;
+            }
+            if (need <= 0) continue;
+            await workshopChangeMaterial(line.material._id, -need);
+            await WorkshopMovement.create({
+                date: req.body.date || new Date(), type: 'production_material',
+                entityType: 'material', material: line.material._id, direction: 'out',
+                qty: need, unit: line.material.unit || 'шт',
+                meta: { recipeId: recipe._id, outputQty }, createdBy: workshopUser(req)
+            });
+        }
+
+        for (const line of recipe.components || []) {
+            const need = (Number(line.qty) || 0) * outputQty;
+            if (need <= 0) continue;
+            await workshopChangeRecipe(line.recipe._id, -need);
+            await WorkshopMovement.create({
+                date: req.body.date || new Date(), type: 'production_component',
+                entityType: 'finished', recipe: line.recipe._id, direction: 'out',
+                qty: need, unit: 'шт', meta: { recipeId: recipe._id, outputQty },
+                createdBy: workshopUser(req)
+            });
+        }
+
+        const resultStock = await workshopChangeRecipe(recipe._id, outputQty);
+        await WorkshopMovement.create({
+            date: req.body.date || new Date(), type: 'production_output',
+            entityType: 'finished', recipe: recipe._id, direction: 'in',
+            qty: outputQty, unit: 'шт', note: String(req.body.note || '').trim(),
+            serviceMemoNumber: sourceMemo?.number || '',
+            meta: { acceptedPacks, acceptedLoosePlanks, acceptedTotal, packQty, consumedPlanks, scrapPlanks, memoId: sourceMemo?._id || null, memoLineId: sourceMemoLine?._id || null },
+            createdBy: workshopUser(req)
+        });
+
+        const production = await WorkshopProduction.create({
+            date: req.body.date || new Date(),
+            recipe: recipe._id,
+            product: recipe.product?._id || null,
+            memo: sourceMemo?._id || null,
+            memoLineId: sourceMemoLine?._id ? String(sourceMemoLine._id) : '',
+            serviceMemoNumber: sourceMemo?.number || '',
+            acceptedPacks,
+            acceptedLoosePlanks,
+            packQty,
+            totalAcceptedPlanks: acceptedTotal,
+            outputQty,
+            standardPlanksPerUnit,
+            actualPlanksPerUnit,
+            customNormReason,
+            customOrderName,
+            customDimensions,
+            consumedPlanks,
+            scrapPlanks,
+            operations: Array.isArray(req.body.operations)
+                ? req.body.operations.map(item => ({
+                    type: String(item.type || '').trim(),
+                    qty: Math.max(0, workshopNumber(item.qty)),
+                    note: String(item.note || '').trim()
+                })).filter(item => item.type)
+                : [],
+            note: String(req.body.note || '').trim(),
+            createdBy: workshopUser(req)
+        });
+
+        res.status(201).json({ production: convertToClient(production), stock: convertToClient(resultStock) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.put('/api/workshop/productions/:id', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const production = await WorkshopProduction.findById(req.params.id);
+        if (!production) return res.status(404).json({ error: 'Запись производства не найдена' });
+        if (production.cancelledAt) return res.status(400).json({ error: 'Отменённую запись нельзя редактировать' });
+
+        production.date = req.body.date || production.date;
+        production.note = String(req.body.note ?? production.note ?? '').trim();
+        production.customOrderName = String(req.body.customOrderName ?? production.customOrderName ?? '').trim();
+        production.customDimensions = String(req.body.customDimensions ?? production.customDimensions ?? '').trim();
+        production.customNormReason = String(req.body.customNormReason ?? production.customNormReason ?? '').trim();
+        if (Array.isArray(req.body.operations)) {
+            production.operations = req.body.operations.map(item => ({
+                type: String(item.type || '').trim(),
+                qty: Math.max(0, workshopNumber(item.qty)),
+                note: String(item.note || '').trim()
+            })).filter(item => item.type);
+        }
+        await production.save();
+        res.json(convertToClient(production));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.delete('/api/workshop/productions/:id', requireIsAdmin, async (req, res) => {
+    try {
+        const production = await WorkshopProduction.findById(req.params.id)
+            .populate({
+                path: 'recipe',
+                populate: [
+                    { path: 'materials.material' },
+                    { path: 'components.recipe' }
+                ]
+            })
+            .populate('product');
+        if (!production) return res.status(404).json({ error: 'Запись производства не найдена' });
+        if (production.cancelledAt) return res.status(400).json({ error: 'Эта запись уже отменена' });
+
+        const recipe = production.recipe;
+        if (!recipe) return res.status(400).json({ error: 'Рецептура производства не найдена' });
+        const outputQty = Number(production.outputQty) || 0;
+
+        if ((Number(recipe.stockQty) || 0) + 1e-9 < outputQty) {
+            return res.status(400).json({ error: 'Нельзя отменить производство: часть изготовленных изделий уже выдана или использована.' });
+        }
+
+        if (outputQty > 0) await workshopChangeRecipe(recipe._id, -outputQty);
+        if (production.product && Number(production.consumedPlanks) > 0) {
+            await workshopChangeLaminate(production.product._id, Number(production.consumedPlanks));
+        }
+
+        for (const line of recipe.materials || []) {
+            if (line.mode === 'estimate') continue;
+            const qty = (Number(line.qty) || 0) * outputQty;
+            if (qty > 0 && line.material?._id) await workshopChangeMaterial(line.material._id, qty);
+        }
+        for (const line of recipe.components || []) {
+            const qty = (Number(line.qty) || 0) * outputQty;
+            if (qty > 0 && line.recipe?._id) await workshopChangeRecipe(line.recipe._id, qty);
+        }
+
+        await WorkshopMovement.create({
+            date: new Date(),
+            type: 'production_cancelled',
+            entityType: 'finished',
+            recipe: recipe._id,
+            direction: 'out',
+            qty: outputQty,
+            unit: 'шт',
+            serviceMemoNumber: production.serviceMemoNumber || '',
+            note: String(req.body?.reason || 'Отмена записи производства администратором'),
+            meta: {
+                productionId: String(production._id),
+                restoredPlanks: Number(production.consumedPlanks) || 0,
+                cancellation: true
+            },
+            createdBy: workshopUser(req)
+        });
+
+        production.cancelledAt = new Date();
+        production.cancelledBy = workshopUser(req);
+        production.cancelReason = String(req.body?.reason || '').trim();
+        await production.save();
+
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/writeoff', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const entityType = req.body.entityType;
+        const qty = Math.abs(workshopNumber(req.body.qty));
+        const serviceMemoNumber = String(req.body.serviceMemoNumber || '').trim();
+        if (qty <= 0) return res.status(400).json({ error: 'Укажите количество списания' });
+        if (!serviceMemoNumber) return res.status(400).json({ error: 'Для списания укажите номер служебной записки' });
+
+        let movementData = {
+            date: req.body.date || new Date(), type: 'writeoff', entityType,
+            direction: 'out', qty, serviceMemoNumber,
+            note: String(req.body.note || '').trim(), createdBy: workshopUser(req)
+        };
+
+        if (entityType === 'laminate') {
+            await workshopChangeLaminate(req.body.productId, -qty);
+            movementData.product = req.body.productId;
+            movementData.unit = 'планка';
+        } else if (entityType === 'material') {
+            const material = await workshopChangeMaterial(req.body.materialId, -qty);
+            movementData.material = req.body.materialId;
+            movementData.unit = material.unit || 'шт';
+        } else if (entityType === 'finished') {
+            await workshopChangeRecipe(req.body.recipeId, -qty);
+            movementData.recipe = req.body.recipeId;
+            movementData.unit = 'шт';
+        } else {
+            return res.status(400).json({ error: 'Неизвестный тип списания' });
+        }
+
+        const movement = await WorkshopMovement.create(movementData);
+        res.status(201).json(convertToClient(movement));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/dealer-movement', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const dealerId = req.body.dealerId;
+        const recipeId = req.body.recipeId;
+        const action = req.body.action || 'issue';
+        const qty = Math.abs(workshopNumber(req.body.qty));
+        if (!dealerId || !recipeId || qty <= 0) return res.status(400).json({ error: 'Выберите дилера, изделие и количество' });
+
+        const [dealer, recipe] = await Promise.all([
+            Dealer.findById(dealerId).select('_id name'),
+            WorkshopRecipe.findById(recipeId)
+        ]);
+        if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
+        if (!recipe) return res.status(404).json({ error: 'Изделие не найдено' });
+
+        let asset = await WorkshopDealerAsset.findOne({ dealer: dealerId, recipe: recipeId });
+        if (!asset) asset = new WorkshopDealerAsset({ dealer: dealerId, recipe: recipeId, qty: 0 });
+
+        const condition = req.body.returnCondition || 'defect';
+        let issued = 0;
+        let returned = 0;
+
+        if (action === 'issue') {
+            if (Number(recipe.stockQty) < qty) return res.status(400).json({ error: 'Недостаточно готовых изделий в цехе' });
+            await workshopChangeRecipe(recipeId, -qty);
+            asset.qty += qty;
+            issued = qty;
+        } else if (action === 'return') {
+            if (Number(asset.qty) < qty) return res.status(400).json({ error: 'У дилера числится меньше изделий' });
+            asset.qty -= qty;
+            returned = qty;
+            if (condition === 'reusable') await workshopChangeRecipe(recipeId, qty);
+        } else if (action === 'replacement') {
+            const returnQty = Math.abs(workshopNumber(req.body.returnQty || qty));
+            const issueQty = Math.abs(workshopNumber(req.body.issueQty || qty));
+            if (Number(asset.qty) < returnQty) return res.status(400).json({ error: 'У дилера числится меньше изделий для возврата' });
+            if (Number(recipe.stockQty) < issueQty) return res.status(400).json({ error: 'Недостаточно изделий для замены' });
+            asset.qty = Number(asset.qty) - returnQty + issueQty;
+            await workshopChangeRecipe(recipeId, -issueQty);
+            if (condition === 'reusable') await workshopChangeRecipe(recipeId, returnQty);
+            returned = returnQty;
+            issued = issueQty;
+        } else {
+            return res.status(400).json({ error: 'Неизвестная операция с дилером' });
+        }
+
+        asset.qty = Math.max(0, Number(asset.qty) || 0);
+        await asset.save();
+
+        const movement = await WorkshopMovement.create({
+            date: req.body.date || new Date(),
+            type: `dealer_${action}`,
+            entityType: 'finished',
+            recipe: recipeId,
+            dealer: dealerId,
+            direction: action === 'return' ? 'in' : action === 'issue' ? 'out' : 'neutral',
+            qty,
+            unit: 'шт',
+            note: String(req.body.note || '').trim(),
+            meta: { issued, returned, returnCondition: condition, reason: String(req.body.reason || '').trim() },
+            createdBy: workshopUser(req)
+        });
+
+        await syncWorkshopPosToDealer(dealerId, recipeId);
+        res.status(201).json({ asset: convertToClient(asset), movement: convertToClient(movement) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.get('/api/workshop/dealers/:dealerId/assets', requireAnyPermission('can_view_workshop', 'can_view_dealers'), async (req, res) => {
+    try {
+        const assets = await WorkshopDealerAsset.find({ dealer: req.params.dealerId, qty: { $gt: 0 } })
+            .populate({ path: 'recipe', populate: { path: 'product', select: 'sku name is_liquid' } })
+            .sort({ updatedAt: -1 }).lean();
+        res.json(assets.map(convertToClient));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/opening-balance', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const location = req.body.location === 'dealer' ? 'dealer' : 'workshop';
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
+        const date = req.body.date || new Date();
+        const note = String(req.body.note || '').trim();
+        if (!inputLines.length) return res.status(400).json({ error: 'Укажите хотя бы один фактический остаток' });
+
+        let dealer = null;
+        if (location === 'dealer') {
+            if (!req.body.dealerId) return res.status(400).json({ error: 'Выберите дилера' });
+            dealer = await Dealer.findOne({
+                _id: req.body.dealerId,
+                ...getWorkingDealerFilter(getDealerFilter(req))
+            }).select('_id name');
+            if (!dealer) return res.status(404).json({ error: 'Дилер не найден или недоступен' });
+        }
+
+        const changed = [];
+        for (const line of inputLines) {
+            let recipe = null;
+            if (line.recipeId) {
+                recipe = await WorkshopRecipe.findOne({ _id: line.recipeId, active: { $ne: false } });
+            } else if (line.productId) {
+                const product = await Product.findById(line.productId).lean();
+                if (!product) continue;
+
+                const posDef = workshopPosDefinition({ product });
+                if (posDef?.recipeSku) {
+                    recipe = await WorkshopRecipe.findOne({ sku:posDef.recipeSku, active:{ $ne:false } });
+                } else {
+                    recipe = await WorkshopRecipe.findOne({
+                        product: product._id,
+                        outputType: 'sample',
+                        active: { $ne: false }
+                    });
+                    if (!recipe) {
+                        recipe = await WorkshopRecipe.create({
+                            name: `Планшет ${product.sku || ''} ${product.name || ''}`.trim(),
+                            outputType: 'sample',
+                            sku: `SAMPLE-${product.sku || String(product._id).slice(-6)}`,
+                            product: product._id,
+                            planksPerUnit: 0,
+                            packQtyOverride: 0,
+                            stockQty: 0,
+                            minStockQty: 0,
+                            active: true,
+                            note: 'Создано автоматически при вводе стартовых остатков. Норму производства можно заполнить позже.'
+                        });
+                    }
+                }
+            }
+            if (!recipe) continue;
+
+            const actualQty = Math.max(0, workshopNumber(line.actualQty));
+            const lineNote = String(line.note || '').trim();
+
+            if (location === 'workshop') {
+                const previousQty = Number(recipe.stockQty) || 0;
+                const delta = actualQty - previousQty;
+                if (Math.abs(delta) <= 0.0001) continue;
+
+                await workshopChangeRecipe(recipe._id, delta);
+                await WorkshopMovement.create({
+                    date,
+                    type: 'opening_balance',
+                    entityType: 'finished',
+                    recipe: recipe._id,
+                    direction: delta > 0 ? 'in' : 'out',
+                    qty: Math.abs(delta),
+                    unit: 'шт',
+                    note: lineNote || note || 'Стартовый остаток готовых образцов до начала учёта в CRM',
+                    meta: { previousQty, actualQty, delta, source: 'legacy_opening_balance' },
+                    createdBy: workshopUser(req)
+                });
+                changed.push({ recipeId: String(recipe._id), previousQty, actualQty, delta });
+            } else {
+                let asset = await WorkshopDealerAsset.findOne({ dealer: dealer._id, recipe: recipe._id });
+                const previousQty = Number(asset?.qty) || 0;
+                const delta = actualQty - previousQty;
+                if (Math.abs(delta) <= 0.0001) continue;
+
+                if (!asset) asset = new WorkshopDealerAsset({ dealer: dealer._id, recipe: recipe._id, qty: 0 });
+                asset.qty = actualQty;
+                await asset.save();
+
+                await WorkshopMovement.create({
+                    date,
+                    type: 'opening_dealer_balance',
+                    entityType: 'finished',
+                    recipe: recipe._id,
+                    dealer: dealer._id,
+                    direction: 'neutral',
+                    qty: Math.abs(delta),
+                    unit: 'шт',
+                    note: lineNote || note || 'Образцы уже находились у дилера до начала учёта в CRM',
+                    meta: { previousQty, actualQty, delta, source: 'legacy_opening_balance' },
+                    createdBy: workshopUser(req)
+                });
+                await syncWorkshopPosToDealer(dealer._id, recipe._id);
+                changed.push({ recipeId: String(recipe._id), previousQty, actualQty, delta });
+            }
+        }
+
+        if (!changed.length) return res.status(400).json({ error: 'Фактические остатки не отличаются от текущих' });
+        res.status(201).json({
+            status: 'ok',
+            location,
+            dealerId: dealer ? String(dealer._id) : '',
+            changed
+        });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/correction', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const reason = String(req.body.reason || '').trim();
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines.slice(0, 10) : [];
+        if (reason.length < 3) return res.status(400).json({ error: 'Укажите причину исправления' });
+        if (!inputLines.length) return res.status(400).json({ error: 'Добавьте хотя бы одну позицию' });
+
+        const prepared = [];
+        const seen = new Set();
+
+        for (const line of inputLines) {
+            const entityType = String(line.entityType || '').trim();
+            const id = String(line.id || '').trim();
+            const actualQty = Math.max(0, workshopNumber(line.actualQty));
+            if (!['finished','laminate','material'].includes(entityType) || !id) {
+                return res.status(400).json({ error: 'Некорректная позиция для исправления' });
+            }
+
+            const key = entityType + ':' + id;
+            if (seen.has(key)) return res.status(400).json({ error: 'Одна и та же позиция добавлена дважды' });
+            seen.add(key);
+
+            if (entityType === 'finished') {
+                const item = await WorkshopRecipe.findById(id).lean();
+                if (!item) return res.status(404).json({ error: 'Готовое изделие не найдено' });
+                prepared.push({
+                    entityType, id, actualQty,
+                    previousQty: Math.max(0, Number(item.stockQty) || 0),
+                    unit: 'шт',
+                    name: item.name || 'Готовое изделие',
+                    recipe: id
+                });
+            } else if (entityType === 'material') {
+                const item = await WorkshopMaterial.findById(id).lean();
+                if (!item) return res.status(404).json({ error: 'Материал не найден' });
+                prepared.push({
+                    entityType, id, actualQty,
+                    previousQty: Math.max(0, Number(item.stockQty) || 0),
+                    unit: item.unit || 'шт',
+                    name: item.name || 'Материал',
+                    material: id
+                });
+            } else {
+                const product = await Product.findById(id).select('sku name').lean();
+                if (!product) return res.status(404).json({ error: 'Ламинат не найден' });
+                const stock = await WorkshopLaminateStock.findOne({ product: id }).lean();
+                prepared.push({
+                    entityType, id, actualQty,
+                    previousQty: Math.max(0, Number(stock?.planksQty) || 0),
+                    unit: 'планка',
+                    name: [product.sku, product.name].filter(Boolean).join(' · ') || 'Ламинат',
+                    product: id
+                });
+            }
+        }
+
+        const changed = prepared
+            .map(item => ({ ...item, delta: item.actualQty - item.previousQty }))
+            .filter(item => Math.abs(item.delta) > 0.0001);
+
+        if (!changed.length) return res.status(400).json({ error: 'Новые остатки совпадают с текущими' });
+
+        const savedLines = [];
+        for (const item of changed) {
+            if (item.entityType === 'finished') {
+                await WorkshopRecipe.updateOne({ _id: item.id }, { $set: { stockQty: item.actualQty } });
+            } else if (item.entityType === 'material') {
+                await WorkshopMaterial.updateOne({ _id: item.id }, { $set: { stockQty: item.actualQty } });
+            } else {
+                await WorkshopLaminateStock.findOneAndUpdate(
+                    { product: item.id },
+                    { $set: { planksQty: item.actualQty } },
+                    { upsert: true, new: true, setDefaultsOnInsert: true }
+                );
+            }
+
+            await WorkshopMovement.create({
+                date: req.body.date || new Date(),
+                type: 'manual_correction',
+                entityType: item.entityType,
+                product: item.product || null,
+                material: item.material || null,
+                recipe: item.recipe || null,
+                direction: item.delta > 0 ? 'in' : 'out',
+                qty: Math.abs(item.delta),
+                unit: item.unit,
+                note: reason,
+                meta: {
+                    previousQty: item.previousQty,
+                    actualQty: item.actualQty,
+                    delta: item.delta,
+                    reason,
+                    source: 'manual_correction'
+                },
+                createdBy: workshopUser(req)
+            });
+
+            savedLines.push({
+                entityType: item.entityType,
+                product: item.product || null,
+                material: item.material || null,
+                recipe: item.recipe || null,
+                systemQty: item.previousQty,
+                actualQty: item.actualQty,
+                delta: item.delta,
+                note: reason
+            });
+        }
+
+        await WorkshopStocktake.create({
+            date: req.body.date || new Date(),
+            lines: savedLines,
+            note: 'Корректировка остатка: ' + reason,
+            createdBy: workshopUser(req)
+        });
+
+        res.status(201).json({
+            status: 'ok',
+            reason,
+            changed: changed.map(item => ({
+                entityType: item.entityType,
+                id: item.id,
+                name: item.name,
+                previousQty: item.previousQty,
+                actualQty: item.actualQty,
+                delta: item.delta,
+                unit: item.unit
+            }))
+        });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/stocktake', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
+        if (!inputLines.length) return res.status(400).json({ error: 'Добавьте позиции инвентаризации' });
+        const savedLines = [];
+
+        for (const line of inputLines) {
+            const actualQty = Math.max(0, workshopNumber(line.actualQty));
+            let systemQty = 0;
+            let delta = 0;
+            let movement = null;
+
+            if (line.entityType === 'laminate' && line.productId) {
+                const current = await WorkshopLaminateStock.findOne({ product: line.productId }).lean();
+                systemQty = Number(current?.planksQty) || 0;
+                delta = actualQty - systemQty;
+                if (Math.abs(delta) > 0.0001) {
+                    await workshopChangeLaminate(line.productId, delta);
+                    movement = { entityType:'laminate', product:line.productId, unit:'планка' };
+                }
+                savedLines.push({ entityType:'laminate', product:line.productId, systemQty, actualQty, delta, note:line.note || '' });
+            } else if (line.entityType === 'material' && line.materialId) {
+                const current = await WorkshopMaterial.findById(line.materialId).lean();
+                if (!current) continue;
+                systemQty = Number(current.stockQty) || 0;
+                delta = actualQty - systemQty;
+                if (Math.abs(delta) > 0.0001) {
+                    await workshopChangeMaterial(line.materialId, delta);
+                    movement = { entityType:'material', material:line.materialId, unit:current.unit || 'шт' };
+                }
+                savedLines.push({ entityType:'material', material:line.materialId, systemQty, actualQty, delta, note:line.note || '' });
+            } else if (line.entityType === 'finished' && line.recipeId) {
+                const current = await WorkshopRecipe.findById(line.recipeId).lean();
+                if (!current) continue;
+                systemQty = Number(current.stockQty) || 0;
+                delta = actualQty - systemQty;
+                if (Math.abs(delta) > 0.0001) {
+                    await workshopChangeRecipe(line.recipeId, delta);
+                    movement = { entityType:'finished', recipe:line.recipeId, unit:'шт' };
+                }
+                savedLines.push({ entityType:'finished', recipe:line.recipeId, systemQty, actualQty, delta, note:line.note || '' });
+            }
+
+            if (movement && Math.abs(delta) > 0.0001) {
+                await WorkshopMovement.create({
+                    date: req.body.date || new Date(),
+                    type: 'stocktake_adjustment',
+                    ...movement,
+                    direction: delta > 0 ? 'in' : 'out',
+                    qty: Math.abs(delta),
+                    note: line.note || '',
+                    meta: { systemQty, actualQty, delta },
+                    createdBy: workshopUser(req)
+                });
+            }
+        }
+
+        const stocktake = await WorkshopStocktake.create({
+            date: req.body.date || new Date(),
+            lines: savedLines,
+            note: String(req.body.note || '').trim(),
+            createdBy: workshopUser(req)
+        });
+        res.status(201).json(convertToClient(stocktake));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.get('/api/reclamations/dashboard', requirePermission('can_view_reclamations'), async (req, res) => {
+    try {
+        const dealerIds = await getScopedDealerIds(req);
+        const query = {
+            $or: [
+                { resolution: { $exists: false } },
+                { resolution: null },
+                { resolution: '' }
+            ]
+        };
+        if (dealerIds) query.dealerId = { $in: dealerIds };
+
+        const list = await Reclamation.find(query)
+            .select('dealerId dealerName resolution createdAt date')
+            .sort({ createdAt: -1 })
+            .lean();
+        res.json(list.map(convertToClient));
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+
+app.get('/api/reclamations', requirePermission('can_view_reclamations'), async (req, res) => {
+    try {
+        const dealerIds = await getScopedDealerIds(req);
+        const pipeline = [];
+        if (dealerIds) pipeline.push({ $match: { dealerId: { $in: dealerIds } } });
+        pipeline.push(
+            { $sort: { createdAt: -1 } },
+            { $project: {
+                dealerId: 1,
+                dealerName: 1,
+                date: 1,
+                productName: 1,
+                purchasedVolume: 1,
+                description: 1,
+                clientDemand: 1,
+                resolution: 1,
+                invoiceNumber: 1,
+                clientName: 1,
+                defectVolume: 1,
+                compensationAmount: 1,
+                createdAt: 1,
+                updatedAt: 1,
+                photoCount: { $size: { $ifNull: ['$photos', []] } }
+            } }
+        );
+        const list = await Reclamation.aggregate(pipeline);
+        res.json(list.map(item => ({ ...item, id: String(item._id), _id: undefined })));
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+app.get('/api/reclamations/:id', requirePermission('can_view_reclamations'), async (req, res) => {
+    try {
+        const dealerIds = await getScopedDealerIds(req);
+        const query = { _id: req.params.id };
+        if (dealerIds) query.dealerId = { $in: dealerIds };
+        const item = await Reclamation.findOne(query).lean();
+        if (!item) return res.status(404).json({ error: 'Рекламация не найдена' });
+        res.json(convertToClient(item));
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+
+app.post('/api/reclamations', requirePermission('can_manage_reclamations'), async (req, res) => {
+    try { 
+        const r = new Reclamation(req.body); 
+        await r.save(); 
+        res.json(convertToClient(r)); 
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+app.put('/api/reclamations/:id', requirePermission('can_manage_reclamations'), async (req, res) => {
+    try { 
+        const r = await Reclamation.findByIdAndUpdate(req.params.id, req.body, { new: true }); 
+        res.json(convertToClient(r)); 
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+app.delete('/api/reclamations/:id', requirePermission('can_manage_reclamations'), async (req, res) => {
+    try { 
+        await Reclamation.findByIdAndDelete(req.params.id); 
+        res.json({status: 'deleted'}); 
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+
+app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
+,'i') })) {
+        next += 1;
+        code = 'IF' + String(next).padStart(3,'0');
+    }
+    return code;
+}
+
+app.get('/api/dealers', requireAnyPermission('can_view_dealers', 'can_view_map', 'can_view_sales', 'can_view_competitors', 'can_view_reclamations'), async (req, res) => {
+    try {
+        let filter = getDealerFilter(req);
+        if (req.query.scope === 'all' && req.user.permissions && req.user.permissions.is_admin) filter = {};
+        if (req.query.context === 'sales' && hasPermission(req, 'can_view_sales')) filter = {};
+        if (!shouldIncludeNonWorkingDealers(req)) filter = getWorkingDealerFilter(filter);
+
+        let query = Dealer.find(filter);
+        if (req.query.view === 'map') {
+            query = query.select('_id name city address contacts latitude longitude status responsible responsibleUserId');
+        } else {
+            query = query.select('-photos -visits -products -avatarUrl');
+        }
+        const dealers = await query.lean();
+        res.json(dealers.map(d => ({ id: d._id, ...d })));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.get('/api/dealers/:id/avatar', requirePermission('can_view_dealers'), async (req, res) => {
+    try {
+        const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).select('avatarUrl').lean();
+        if (!d) return res.status(404).json({ error: 'Дилер не найден' });
+        res.set('Cache-Control', 'private, max-age=900');
+        res.json({ avatarUrl: d.avatarUrl || '' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.get('/api/dealers/:id', requirePermission('can_view_dealers'), async (req, res) => {
+    try {
+        let query = Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) });
+        if (req.query.view === 'profile') {
+            query = query.select('-photos').populate('products', 'sku name');
+        } else {
+            query = query.populate('products');
+        }
+        const d = await query.lean();
+        if (!d) return res.status(404).json({ error: 'Дилер не найден' });
+        if (req.query.view === 'profile') res.set('Cache-Control', 'private, max-age=30');
+        res.json(convertToClient(d));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.get('/api/dealers/:id/photos', requirePermission('can_view_dealers'), async (req, res) => {
+    try {
+        const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).select('photos').lean();
+        if (!d) return res.status(404).json({ error: 'Дилер не найден' });
+        res.set('Cache-Control', 'private, max-age=60');
+        res.json(Array.isArray(d.photos) ? d.photos : []);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.post('/api/dealers', requirePermission('can_create_dealer'), async (req, res) => { try {
+    const scope = getUserScope(req);
+    const payload = canonicalDealerPayload(req.body);
+    if (req.user.role === 'manager' && !isGlobalViewer(req)) {
+        payload.responsibleUserId = String(req.user.id || '');
+        payload.responsibleAssignmentSource = 'self_create';
+        if (scope === 'astana') payload.responsible = 'regional_astana';
+        if (scope === 'regions') payload.responsible = 'regional_regions';
+    }
+    const d = new Dealer(payload);
+    await d.save();
+    res.status(201).json(convertToClient(d));
+} catch (e) { res.status(500).json({ error: e.message }); } });
+app.post('/api/dealers/:id/visits', requirePermission('can_manage_visits'), async (req, res) => {
+    try {
+        const dealer = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) });
+        if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
+
+        const visit = {
+            date: req.body.date || new Date().toISOString().slice(0, 10),
+            comment: String(req.body.comment || '').trim(),
+            isCompleted: req.body.isCompleted !== false
+        };
+        if (!visit.comment) return res.status(400).json({ error: 'Комментарий визита обязателен' });
+
+        dealer.visits = dealer.visits || [];
+        dealer.visits.push(visit);
+        await dealer.save();
+
+        res.status(201).json({ status: 'ok', visit });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/dealers/:id/visits/:index', requirePermission('can_manage_visits'), async (req, res) => {
+    try {
+        const dealer = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) });
+        if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
+
+        const index = Number(req.params.index);
+        if (!Number.isInteger(index) || index < 0 || !dealer.visits || !dealer.visits[index]) {
+            return res.status(404).json({ error: 'Визит не найден' });
+        }
+
+        if (Object.prototype.hasOwnProperty.call(req.body, 'isCompleted')) {
+            dealer.visits[index].isCompleted = Boolean(req.body.isCompleted);
+        }
+        if (Object.prototype.hasOwnProperty.call(req.body, 'comment')) {
+            dealer.visits[index].comment = String(req.body.comment || '').trim();
+        }
+        if (Object.prototype.hasOwnProperty.call(req.body, 'date')) {
+            dealer.visits[index].date = String(req.body.date || '');
+        }
+
+        await dealer.save();
+        res.json({ status: 'ok', visit: dealer.visits[index] });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/dealers/:id', requirePermission('can_edit_dealer'), async (req, res) => {
+    try {
+        const payload = canonicalDealerPayload(req.body);
+        if (req.user.role === 'manager' && !isGlobalViewer(req)) {
+            delete payload.responsibleUserId;
+            delete payload.responsibleAssignmentSource;
+            if (req.user.scope === 'astana') payload.responsible = 'regional_astana';
+            if (req.user.scope === 'regions') payload.responsible = 'regional_regions';
+        }
+
+        const updated = await Dealer.findOneAndUpdate(
+            { _id: req.params.id, ...getDealerFilter(req) },
+            payload,
+            { new: true }
+        );
+        if (!updated) return res.status(404).json({ error: 'Дилер не найден' });
+        res.json({status:'ok'});
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.patch('/api/dealers/:id', requirePermission('can_edit_dealer'), async (req, res) => {
+    try {
+        const payload = canonicalDealerPayload(req.body);
+        if (req.user.role === 'manager' && !isGlobalViewer(req)) {
+            delete payload.responsibleUserId;
+            delete payload.responsibleAssignmentSource;
+            if (req.user.scope === 'astana') payload.responsible = 'regional_astana';
+            if (req.user.scope === 'regions') payload.responsible = 'regional_regions';
+        }
+
+        const updated = await Dealer.findOneAndUpdate(
+            { _id: req.params.id, ...getDealerFilter(req) },
+            { $set: payload },
+            { new: true }
+        ).lean();
+
+        if (!updated) return res.status(404).json({ error: 'Дилер не найден' });
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.delete('/api/dealers/:id', requirePermission('can_delete_dealer'), async (req, res) => { try { await Dealer.findOneAndDelete({ _id: req.params.id, ...getDealerFilter(req) }); res.json({status:'deleted'}); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.get('/api/dealers/:id/products', requireAnyPermission('can_view_dealers', 'can_view_products'), async (req, res) => { const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).populate('products'); if (!d) return res.status(404).json({ error: 'Дилер не найден' }); res.json(d.products.map(convertToClient)); });
+app.put('/api/dealers/:id/products', requirePermission('can_edit_matrix'), async (req, res) => { const d = await Dealer.findOneAndUpdate({ _id: req.params.id, ...getDealerFilter(req) }, { products: req.body.productIds }); if (!d) return res.status(404).json({ error: 'Дилер не найден' }); res.json({status:'ok'}); });
+// ==========================================
+// ЦЕНОВЫЕ УСЛОВИЯ ДИЛЕРОВ
+// ==========================================
+app.get('/api/pricing/overview', requirePermission('can_view_pricing'), async (req, res) => {
+    try {
+        const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req)))
+            .select('_id dealer_id name city region_sector price_type responsible')
+            .sort({ name: 1 })
+            .lean();
+        const conditions = await PricingCondition.find({})
+            .populate('dealer', '_id dealer_id name city region_sector price_type responsible')
+            .sort({ createdAt: -1 })
+            .lean();
+
+        const rows = dealers.map(dealer => buildDealerPricingSummary(dealer, conditions));
+        const today = pricingTodayKey();
+        const inSeven = new Date(today + 'T00:00:00Z');
+        inSeven.setUTCDate(inSeven.getUTCDate() + 7);
+        const sevenKey = inSeven.toISOString().slice(0, 10);
+
+        const activeConditionIds = new Set();
+        rows.forEach(row => row.matchedConditions.forEach(condition => {
+            if (condition.computedStatus === 'active') activeConditionIds.add(String(condition._id));
+        }));
+
+        const visibleConditions = conditions
+            .filter(condition => rows.some(row => pricingConditionMatchesDealer(condition, {
+                _id: row.dealerId,
+                name: row.dealerName,
+                city: row.city,
+                region_sector: row.sector,
+                price_type: row.defaultPriceType,
+                responsible: row.responsible
+            })))
+            .map(condition => ({
+                ...condition,
+                computedStatus: pricingConditionStatus(condition, today)
+            }));
+
+        res.json({
+            today,
+            rows,
+            conditions: visibleConditions,
+            stats: {
+                dealersWith5: rows.filter(row => row.has5 && !row.has10).length,
+                dealersWith10: rows.filter(row => row.has10 && !row.has5).length,
+                dealersWithBoth: rows.filter(row => row.has5 && row.has10).length,
+                activePriceOverrides: rows.filter(row => row.priceListCondition).length,
+                expiringSoon: visibleConditions.filter(condition =>
+                    condition.computedStatus === 'active' &&
+                    condition.endDate &&
+                    condition.endDate >= today &&
+                    condition.endDate <= sevenKey
+                ).length,
+                pendingRequirements: rows.reduce((sum, row) => sum + row.pendingRequirements, 0)
+            }
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/pricing/dealers/:id', requirePermission('can_view_pricing'), async (req, res) => {
+    try {
+        const dealer = await Dealer.findOne({
+            $and: [
+                { _id: req.params.id },
+                getWorkingDealerFilter(getDealerFilter(req))
+            ]
+        }).select('_id dealer_id name city region_sector price_type responsible')
+            .lean();
+        if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
+
+        const conditions = await PricingCondition.find({})
+            .populate('dealer', '_id dealer_id name city region_sector price_type responsible')
+            .sort({ createdAt: -1 })
+            .lean();
+        res.json(buildDealerPricingSummary(dealer, conditions));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/pricing/conditions', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const payload = cleanPricingPayload(req.body);
+        const validation = validatePricingPayload(payload);
+        if (validation) return res.status(400).json({ error: validation });
+        const duplicate = await findPricingDuplicate(payload);
+        if (duplicate) {
+            return res.status(400).json({ error: `Условие с кодом «${payload.code}» уже действует на эту же цель в пересекающийся период` });
+        }
+
+        if (!isGlobalViewer(req) && payload.scopeType !== 'dealer') {
+            return res.status(403).json({ error: 'Региональные и общие ценовые условия может создавать только пользователь с доступом ко всей компании' });
+        }
+        if (payload.scopeType === 'dealer') {
+            const dealer = await Dealer.findOne({
+                $and: [
+                    { _id: payload.dealer },
+                    getWorkingDealerFilter(getDealerFilter(req))
+                ]
+            }).select('_id').lean();
+            if (!dealer) return res.status(404).json({ error: 'Дилер недоступен' });
+        }
+
+        const user = pricingUserMeta(req);
+        const condition = await PricingCondition.create({
+            ...payload,
+            createdBy: user,
+            updatedBy: user,
+            audit: [{ action: 'created', userId: user.id, userName: user.name, note: 'Условие создано' }]
+        });
+        const populated = await PricingCondition.findById(condition._id).populate('dealer', '_id dealer_id name city region_sector price_type responsible').lean();
+        res.status(201).json({ ...populated, computedStatus: pricingConditionStatus(populated) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.put('/api/pricing/conditions/:id', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const existing = await PricingCondition.findById(req.params.id);
+        if (!existing) return res.status(404).json({ error: 'Ценовое условие не найдено' });
+        if (existing.cancelledAt) return res.status(400).json({ error: 'Отменённое условие нельзя редактировать' });
+
+        const payload = cleanPricingPayload(req.body);
+        const validation = validatePricingPayload(payload);
+        if (validation) return res.status(400).json({ error: validation });
+        const duplicate = await findPricingDuplicate(payload, existing._id);
+        if (duplicate) {
+            return res.status(400).json({ error: `Условие с кодом «${payload.code}» уже действует на эту же цель в пересекающийся период` });
+        }
+
+        if (!isGlobalViewer(req) && payload.scopeType !== 'dealer') {
+            return res.status(403).json({ error: 'Региональные и общие ценовые условия может менять только пользователь с доступом ко всей компании' });
+        }
+        if (payload.scopeType === 'dealer') {
+            const dealer = await Dealer.findOne({
+                $and: [
+                    { _id: payload.dealer },
+                    getWorkingDealerFilter(getDealerFilter(req))
+                ]
+            }).select('_id').lean();
+            if (!dealer) return res.status(404).json({ error: 'Дилер недоступен' });
+        }
+
+        const user = pricingUserMeta(req);
+        Object.assign(existing, payload, { updatedBy: user });
+        existing.audit.push({ action: 'updated', userId: user.id, userName: user.name, note: String(req.body.auditNote || 'Условие изменено').trim() });
+        await existing.save();
+
+        const populated = await PricingCondition.findById(existing._id).populate('dealer', '_id dealer_id name city region_sector price_type responsible').lean();
+        res.json({ ...populated, computedStatus: pricingConditionStatus(populated) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.delete('/api/pricing/conditions/:id', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const condition = await PricingCondition.findById(req.params.id);
+        if (!condition) return res.status(404).json({ error: 'Ценовое условие не найдено' });
+        if (condition.cancelledAt) return res.status(400).json({ error: 'Условие уже отменено' });
+
+        const user = pricingUserMeta(req);
+        condition.cancelledAt = new Date();
+        condition.updatedBy = user;
+        condition.audit.push({
+            action: 'cancelled',
+            userId: user.id,
+            userName: user.name,
+            note: String(req.body?.reason || 'Условие отменено').trim()
+        });
+        await condition.save();
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.get('/api/products/count', requireAnyPermission('can_view_products', 'can_view_report', 'can_view_reclamations', 'can_view_dealers'), async (req, res) => {
+    try {
+        const count = await Product.countDocuments({});
+        res.json({ count });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.get('/api/products', requireAnyPermission('can_view_products', 'can_view_report', 'can_view_reclamations', 'can_view_dealers'), async (req, res) => { const s = new RegExp(req.query.search||'', 'i'); const p = await Product.find({$or:[{sku:s},{name:s}]}).sort({sku:1}).lean(); res.json(p.map(x=>{x.id=x._id;return x;})); });
+app.post('/api/products', requirePermission('can_manage_products'), async (req, res) => { const p = new Product(req.body); await p.save(); res.json(convertToClient(p)); });
+app.put('/api/products/:id', requirePermission('can_manage_products'), async (req, res) => { const p = await Product.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(p)); });
+app.delete('/api/products/:id', requirePermission('can_manage_products'), async (req, res) => { await Product.findByIdAndDelete(req.params.id); res.json({}); });
+app.post('/api/admin/import-catalog', requirePermission('can_manage_products'), async (req, res) => { res.json({status: 'ok'}); });
+app.get('/api/matrix', requireAnyPermission('can_view_products', 'can_view_report'), async (req, res) => {
+    try {
+        const [prods, dealers] = await Promise.all([
+            Product.find({}).select('sku name is_liquid').sort({sku:1}).lean(),
+            Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id name city responsible products pos_materials status').lean()
+        ]);
+        const dealerIds = dealers.map(d => d._id);
+        const assets = dealerIds.length
+            ? await WorkshopDealerAsset.find({ dealer: { $in: dealerIds }, qty: { $gt: 0 } })
+                .populate('recipe', 'product outputType')
+                .lean()
+            : [];
+
+        const productMap = new Map();
+        dealers.forEach(d => productMap.set(d._id.toString(), new Set((d.products||[]).map(String))));
+
+        const sampleMap = new Map();
+        assets.forEach(asset => {
+            const productId = asset.recipe?.outputType === 'sample' ? asset.recipe?.product : null;
+            if (!productId) return;
+            const key = `${asset.dealer}|${productId}`;
+            sampleMap.set(key, (sampleMap.get(key) || 0) + (Number(asset.qty) || 0));
+        });
+
+        const posList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"];
+        const matrix = prods.map(p => ({
+            sku: p.sku,
+            name: p.name,
+            type: 'product',
+            is_liquid: p.is_liquid !== false,
+            dealers: dealers.map(d => ({
+                value: productMap.get(d._id.toString()).has(p._id.toString()) ? 1 : 0,
+                sample_qty: sampleMap.get(`${d._id}|${p._id}`) || 0,
+                is_pos: false
+            }))
+        }));
+
+        posList.forEach(pn => {
+            matrix.push({
+                sku: "POS",
+                name: pn,
+                type: 'pos',
+                dealers: dealers.map(d => ({
+                    value: (d.pos_materials||[]).find(m=>m.name===pn)?.quantity||0,
+                    is_pos: true
+                }))
+            });
+        });
+        res.json({
+            headers: dealers.map(d=>({id:d._id, name:d.name, city:d.city, responsible:d.responsible})),
+            matrix
+        });
+    } catch (e) {
+        res.status(500).json({error:e.message});
+    }
+});
+
+app.get('/api/sales', requirePermission('can_view_sales'), async (req, res) => {
+    try {
+        const { month, months, dealerId } = req.query;
+        let filter = month ? { month } : {};
+        if (!month && months) {
+            const count = Math.max(1, Math.min(24, Number(months) || 6));
+            const now = new Date();
+            now.setUTCDate(1);
+            now.setUTCMonth(now.getUTCMonth() - (count - 1));
+            const minMonth = now.toISOString().slice(0, 7);
+            filter = { month: { $gte: minMonth } };
+        }
+        const scope = getUserScope(req);
+        const companySalesView = req.query.context === 'sales' && hasPermission(req, 'can_view_sales');
+
+        if (!companySalesView && !isGlobalViewer(req) && req.user.role === 'manager') {
+            const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id').lean();
+            const dealerIds = dealers.map(d => String(d._id));
+            const zonePlanId = scope === 'astana'
+                ? 'PLAN_astana_all'
+                : scope === 'regions'
+                    ? 'PLAN_regions_all'
+                    : 'PLAN_total_all';
+
+            filter = {
+                $and: [
+                    filter,
+                    {
+                        $or: [
+                            // Факт менеджера считается исключительно по дилерам,
+                            // где он выбран ответственным.
+                            { isCustom: { $ne: true }, dealerId: { $in: dealerIds } },
+                            // План берём из сводки его зоны на странице Продажи.
+                            { isCustom: { $ne: true }, dealerId: zonePlanId }
+                        ]
+                    }
+                ]
+            };
+        } else if (!companySalesView && !isGlobalViewer(req) && scope !== 'all') {
+            const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id').lean();
+            const dealerIds = dealers.map(d => String(d._id));
+            const personalPlanIds = dealerIds.map(id => `PLAN_vip_${id}`);
+
+            const sectorType = scope === 'astana' ? 'astana' : 'region';
+            const sectors = await Sector.find({ type: sectorType }).select('name').lean();
+            const slug = name => String(name || '').trim().replace(/\s+/g, '_').toLowerCase();
+            const groupKeys = scope === 'astana'
+                ? [...sectors.map(s => `astana_${slug(s.name)}`), 'regional_astana']
+                : [...sectors.map(s => `sector_${slug(s.name)}`), 'regional_regions'];
+
+            const groupPlanIds = groupKeys.map(key => `PLAN_${key}`);
+            groupPlanIds.push(scope === 'astana' ? 'PLAN_astana_all' : 'PLAN_regions_all');
+            const allowedPlanIds = [...personalPlanIds, ...groupPlanIds];
+
+            filter = {
+                $and: [
+                    filter,
+                    {
+                        $or: [
+                            { isCustom: { $ne: true }, dealerId: { $in: dealerIds } },
+                            { isCustom: { $ne: true }, dealerId: { $in: allowedPlanIds } },
+                            { isCustom: true, group: { $in: groupKeys } }
+                        ]
+                    }
+                ]
+            };
+        }
+
+        if (dealerId) {
+            const requestedDealerId = String(dealerId);
+            const requestedPlanId = `PLAN_vip_${requestedDealerId}`;
+            filter = {
+                $and: [
+                    filter,
+                    { dealerId: { $in: [requestedDealerId, requestedPlanId] } }
+                ]
+            };
+        }
+
+        const s = await Sales.find(filter).lean();
+
+        // Нерабочие дилеры (potential/archive) не участвуют в текущей
+        // операционной статистике продаж. Сами исторические строки Sales
+        // остаются в базе и могут снова участвовать после возврата дилера
+        // в рабочий статус.
+        const workingBaseFilter = (companySalesView || isGlobalViewer(req)) ? {} : getDealerFilter(req);
+        const workingDealers = await Dealer.find(getWorkingDealerFilter(workingBaseFilter)).select('_id').lean();
+        const workingDealerIds = new Set(workingDealers.map(item => String(item._id)));
+
+        const visibleSales = s.filter(row => {
+            if (row.isCustom) return true;
+            const rowDealerId = String(row.dealerId || '');
+            if (!rowDealerId) return true;
+
+            if (rowDealerId.startsWith('PLAN_manager_')) return false;
+            if (rowDealerId.startsWith('PLAN_vip_')) {
+                return workingDealerIds.has(rowDealerId.replace('PLAN_vip_', ''));
+            }
+            if (rowDealerId.startsWith('PLAN_')) return true;
+            return workingDealerIds.has(rowDealerId);
+        });
+
+        res.json(visibleSales);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ===== ИСПРАВЛЕННЫЙ БЛОК: СОХРАНЕНИЕ, АГРЕГАЦИЯ И УДАЛЕНИЕ =====
+app.post('/api/sales', async (req, res) => {
+    const canFact = hasPermission(req, 'can_edit_sales_fact');
+    const canPlan = hasPermission(req, 'can_edit_sales_plan');
+    if (!canFact && !canPlan) {
+        return res.status(403).json({ error: 'Недостаточно прав для изменения продаж' });
+    }
+
+    const now = new Date();
+    const scope = req.user ? req.user.scope : 'none';
+    const companySalesView = req.query.context === 'sales' && hasPermission(req, 'can_view_sales');
+    const managerRestricted = Boolean(req.user && req.user.role === 'manager' && !isGlobalViewer(req) && !companySalesView);
+    let managerDealerIds = null;
+    if (managerRestricted) {
+        const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id').lean();
+        managerDealerIds = new Set(dealers.map(d => String(d._id)));
+    }
+
+    // 1. Агрегируем дубликаты из присланных данных (если ввели несколько с одинаковым именем)
+    const aggregatedData = {};
+    (Array.isArray(req.body.data) ? req.body.data : []).forEach(i => {
+        const row = { ...i };
+
+        if (managerRestricted) {
+            const dealerId = String(row.dealerId || '');
+            if (row.isCustom) {
+                row.ownerUserId = String(req.user.id);
+            } else if (dealerId.startsWith('PLAN_manager_')) {
+                return;
+            } else if (dealerId.startsWith('PLAN_vip_')) {
+                const ownedDealerId = dealerId.replace('PLAN_vip_', '');
+                if (!managerDealerIds.has(ownedDealerId)) return;
+            } else if (dealerId.startsWith('PLAN_')) {
+                return;
+            } else if (!managerDealerIds.has(dealerId)) {
+                return;
+            }
+        }
+        if (String(row.dealerId || '').startsWith('PLAN_manager_')) return;
+        if (!canFact) delete row.fact;
+        if (!canPlan) delete row.plan;
+
+        const key = row.isCustom ? `custom_${row.group}_${row.dealerName}` : `dealer_${row.dealerId}`;
+        if (!aggregatedData[key]) {
+            aggregatedData[key] = row;
+        } else {
+            if (canFact) aggregatedData[key].fact = (Number(aggregatedData[key].fact) || 0) + (Number(row.fact) || 0);
+            if (canPlan) aggregatedData[key].plan = (Number(aggregatedData[key].plan) || 0) + (Number(row.plan) || 0);
+        }
+    });
+
+    // 2. Обновляем/Добавляем записи
+    const ops = Object.values(aggregatedData).map(i => {
+        const filter = { month: req.body.month };
+        if (i.isCustom) {
+            filter.isCustom = true;
+            filter.dealerName = i.dealerName;
+            if (i.group) filter.group = i.group; 
+        } else {
+            filter.dealerId = i.dealerId;
+        }
+
+        return {
+            updateOne: { 
+                filter: filter, 
+                update: { $set: { ...i, updatedAt: now } }, 
+                upsert: true 
+            } 
+        };
+    }); 
+    
+    if (ops.length > 0) {
+        await Sales.bulkWrite(ops); 
+    }
+
+    // Старые планы менеджеров больше не используются: план задаётся по зоне/сектору/дилеру.
+    await Sales.deleteMany({
+        month: req.body.month,
+        dealerId: { $regex: '^PLAN_manager_' }
+    });
+
+    // 3. Умное удаление (Очистка разовых продаж)
+    // Определяем, к каким группам имеет доступ текущий пользователь
+    let groupFilter = {};
+    if (managerRestricted) {
+        groupFilter = { ownerUserId: String(req.user.id) };
+    } else if (!companySalesView && scope === 'astana') {
+        const sectors = await Sector.find({ type: 'astana' });
+        groupFilter = { group: { $in: sectors.map(s => s.name) } };
+    } else if (!companySalesView && scope === 'regions') {
+        const sectors = await Sector.find({ type: 'region' });
+        groupFilter = { group: { $in: sectors.map(s => s.name) } };
+    }
+    // Если admin или all, groupFilter остается пустым (имеет доступ ко всем)
+
+    // Ищем все разовые продажи за этот месяц в базе (в рамках доступа пользователя)
+    const dbCustomSales = await Sales.find({ 
+        month: req.body.month, 
+        isCustom: true, 
+        ...groupFilter 
+    });
+
+    const idsToDelete = [];
+    const incomingArray = Object.values(aggregatedData);
+
+    if (canFact) dbCustomSales.forEach(dbSale => {
+        // Проверяем, осталась ли эта продажа в присланных данных
+        const existsInIncoming = incomingArray.some(
+            i => i.isCustom && i.group === dbSale.group && i.dealerName === dbSale.dealerName
+        );
+        
+        // Если в присланных данных её больше нет — помечаем на удаление
+        if (!existsInIncoming) {
+            idsToDelete.push(dbSale._id);
+        }
+    });
+
+    // Удаляем всё лишнее
+    if (canFact && idsToDelete.length > 0) {
+        await Sales.deleteMany({ _id: { $in: idsToDelete } });
+    }
+
+    res.json({status:'ok'}); 
+});
+// ===================================================================
+
+app.get('/api/competitors-ref', requirePermission('can_view_competitors'), async (req, res) => { const l = await CompRef.find().sort({name:1}); res.json(l.map(convertToClient)); });
+app.post('/api/competitors-ref', requirePermission('can_manage_competitors'), async (req, res) => { const c = new CompRef(req.body); await c.save(); res.json(convertToClient(c)); });
+app.put('/api/competitors-ref/:id', requirePermission('can_manage_competitors'), async (req, res) => { await CompRef.findByIdAndUpdate(req.params.id, req.body); res.json({status:'ok'}); });
+app.delete('/api/competitors-ref/:id', requirePermission('can_manage_competitors'), async (req, res) => { await CompRef.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
+app.get('/api/knowledge', requirePermission('can_view_knowledge'), async (req, res) => { const l = await Knowledge.find().sort({title:1}); res.json(l.map(convertToClient)); });
+app.get('/api/knowledge/:id', requirePermission('can_view_knowledge'), async (req, res) => { res.json(convertToClient(await Knowledge.findById(req.params.id))); });
+app.post('/api/knowledge', requirePermission('can_manage_knowledge'), async (req, res) => { const a = new Knowledge(req.body); await a.save(); res.json(convertToClient(a)); });
+app.put('/api/knowledge/:id', requirePermission('can_manage_knowledge'), async (req, res) => { const a = await Knowledge.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(a)); });
+app.delete('/api/knowledge/:id', requirePermission('can_manage_knowledge'), async (req, res) => { await Knowledge.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
+app.get('/api/tasks', requirePermission('can_view_dashboard'), async (req, res) => { try { const data = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('name visits status responsible').lean(); res.json(data.map(d => ({ id: d._id, name: d.name, status: d.status, visits: d.visits || [], responsible: d.responsible }))); } catch (e) { res.status(500).json([]); } });
+
+async function getScopedDealerIds(req) {
+    const baseFilter = isGlobalViewer(req) ? {} : getDealerFilter(req);
+    const dealers = await Dealer.find(getWorkingDealerFilter(baseFilter)).select('_id').lean();
+    return dealers.map(d => String(d._id));
+}
+
+// ==========================================
+// РЕКВИЗИТЫ И РЕКЛАМАЦИИ
+// ==========================================
+const reclamationSchema = new mongoose.Schema({
+    dealerId: String,
+    dealerName: String,
+    date: String,
+    productName: String,
+    invoiceNumber: String,
+    purchaseDate: String,
+    clientName: String,
+    clientPhone: String,
+    address: String,
+    floor: String,
+    houseType: String,
+    totalArea: String,
+    purchasedVolume: String,
+    batchNumbers: [String],
+    baseType: String,
+    underlayment: String,
+    warmFloor: String,
+    installer: String,
+    
+    // --- НОВЫЕ ТЕХНИЧЕСКИЕ ПОЛЯ ---
+    acclimatization: String, 
+    storageMethod: String,
+    dryingTime: String,
+    floorFlatness: String,
+// --- НОВЫЕ ПОЛЯ ---
+    defectMoment: String,       // Момент выявления
+    compensationAmount: Number, // Сумма компенсации
+    internalNotes: String,
+    
+    description: String,
+    clientDemand: String,
+    resolution: String,
+    photos: [{ photo_url: String }]
+}, { timestamps: true });
+const Reclamation = mongoose.model('Reclamation', reclamationSchema);
+
+
+// ==========================================
+// ЦЕХ API
+// ==========================================
+async function syncWorkshopPosToDealer(dealerId, recipeId) {
+    const recipe = await WorkshopRecipe.findById(recipeId).select('matrixPosName').lean();
+    const posName = String(recipe?.matrixPosName || '').trim();
+    if (!posName) return;
+
+    const recipes = await WorkshopRecipe.find({ matrixPosName: posName }).select('_id').lean();
+    const recipeIds = recipes.map(item => item._id);
+    const assets = await WorkshopDealerAsset.find({ dealer: dealerId, recipe: { $in: recipeIds } }).lean();
+    const qty = assets.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+
+    const dealer = await Dealer.findById(dealerId);
+    if (!dealer) return;
+    dealer.pos_materials = Array.isArray(dealer.pos_materials) ? dealer.pos_materials : [];
+    const index = dealer.pos_materials.findIndex(item => item.name === posName);
+    if (qty > 0) {
+        if (index >= 0) dealer.pos_materials[index].quantity = qty;
+        else dealer.pos_materials.push({ name: posName, quantity: qty });
+    } else if (index >= 0) {
+        dealer.pos_materials.splice(index, 1);
+    }
+    await dealer.save();
+}
+
+app.post('/api/workshop/print-log', requirePermission('can_view_workshop'), async (req, res) => {
+    try {
+        const type=String(req.body?.type||'report').trim().slice(0,60);
+        const referenceId=String(req.body?.referenceId||'').trim().slice(0,120);
+        const title=String(req.body?.title||'Документ цеха').trim().slice(0,180);
+        res.json({status:'logged',type,referenceId,title});
+    } catch(e) {
+        res.status(500).json({error:e.message});
+    }
+});
+
+app.get('/api/workshop/bootstrap', requirePermission('can_view_workshop'), async (req, res) => {
+    try {
+        const [products, dealers, materials, recipes, laminateStocks, assets, productions, movements, memos] = await Promise.all([
+            Product.find().select('sku name is_liquid characteristics.package_qty characteristics.size characteristics.class characteristics.thickness').sort({ sku: 1 }).lean(),
+            Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id dealer_id name city status').sort({ name: 1 }).lean(),
+            WorkshopMaterial.find({ active: { $ne: false } }).sort({ category: 1, name: 1 }).lean(),
+            WorkshopRecipe.find({ active: { $ne: false } })
+                .populate('product', 'sku name is_liquid characteristics.package_qty')
+                .populate('materials.material', 'code name unit purchaseUnit purchaseUnitSize stockQty')
+                .populate('components.recipe', 'name outputType stockQty')
+                .sort({ outputType: 1, name: 1 }).lean(),
+            WorkshopLaminateStock.find().populate('product', 'sku name is_liquid characteristics.package_qty').lean(),
+            WorkshopDealerAsset.find({ qty: { $gt: 0 } })
+                .populate('dealer', 'dealer_id name city status')
+                .populate({ path: 'recipe', populate: { path: 'product', select: 'sku name is_liquid' } })
+                .sort({ updatedAt: -1 }).lean(),
+            WorkshopProduction.find({ cancelledAt: { $exists: false } })
+                .populate('recipe', 'name outputType')
+                .populate('product', 'sku name')
+                .sort({ date: -1, createdAt: -1 }).limit(30).lean(),
+            WorkshopMovement.find()
+                .populate('product', 'sku name')
+                .populate('material', 'code name unit')
+                .populate('recipe', 'name outputType')
+                .populate('dealer', 'dealer_id name city')
+                .sort({ date: -1, createdAt: -1 }).limit(60).lean(),
+            WorkshopMemo.find()
+                .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+                .populate('lines.actualProduct', 'sku name is_liquid characteristics.package_qty')
+                .populate('lines.recipe', 'name outputType planksPerUnit')
+                .sort({ date: -1, createdAt: -1 }).limit(80).lean()
+        ]);
+
+        const memoIds = memos.map(item => item._id);
+        const producedByMemoLine = memoIds.length ? await WorkshopProduction.aggregate([
+            { $match: { memo: { $in: memoIds }, memoLineId: { $nin: [null, ''] }, cancelledAt: { $exists: false } } },
+            { $group: { _id: '$memoLineId', qty: { $sum: '$outputQty' } } }
+        ]) : [];
+        const producedMap = new Map(producedByMemoLine.map(item => [String(item._id), Number(item.qty) || 0]));
+        memos.forEach(memo => {
+            (memo.lines || []).forEach(line => {
+                line.producedQty = producedMap.get(String(line._id)) || 0;
+            });
+        });
+
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const todayRows = await WorkshopProduction.find({ date: { $gte: today }, cancelledAt: { $exists: false } }).select('outputQty').lean();
+        const todayProduction = todayRows.reduce((sum, item) => sum + (Number(item.outputQty) || 0), 0);
+        const finishedStock = recipes.reduce((sum, item) => sum + (Number(item.stockQty) || 0), 0);
+        const lowMaterials = materials.filter(item => Number(item.minQty) > 0 && Number(item.stockQty) <= Number(item.minQty)).length;
+        const laminatePlanks = laminateStocks.reduce((sum, item) => sum + (Number(item.planksQty) || 0), 0);
+        const openMemos = memos.filter(item => item.status === 'created' || item.status === 'mismatch').length;
+        const visibleAssets = assets.filter(asset => !isNonWorkingDealerStatus(asset.dealer?.status));
+        const dealerAssetStock = visibleAssets.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+        const openingBalanceCount = await WorkshopMovement.countDocuments({
+            type: { $in: ['opening_balance', 'opening_dealer_balance'] }
+        });
+
+        res.json({
+            products: products.map(convertToClient),
+            dealers: dealers.map(convertToClient),
+            materials: materials.map(convertToClient),
+            recipes: recipes.map(convertToClient),
+            laminateStocks: laminateStocks.map(convertToClient),
+            dealerAssets: visibleAssets.map(convertToClient),
+            productions: productions.map(convertToClient),
+            movements: movements.map(convertToClient),
+            memos: memos.map(convertToClient),
+            stats: { todayProduction, finishedStock, lowMaterials, laminatePlanks, openMemos, dealerAssetStock, openingBalanceCount }
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/workshop/movements', requirePermission('can_view_workshop'), async (req, res) => {
+    try {
+        const limit = Math.max(1, Math.min(500, Number(req.query.limit) || 150));
+        const filter = {};
+        if (req.query.type) filter.type = req.query.type;
+        const list = await WorkshopMovement.find(filter)
+            .populate('product', 'sku name')
+            .populate('material', 'code name unit')
+            .populate('recipe', 'name outputType')
+            .populate('dealer', 'dealer_id name city')
+            .sort({ date: -1, createdAt: -1 }).limit(limit).lean();
+        res.json(list.map(convertToClient));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/materials', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const item = new WorkshopMaterial({
+            code: String(req.body.code || '').trim(),
+            name: String(req.body.name || '').trim(),
+            category: req.body.category || 'consumable',
+            unit: req.body.unit || 'шт',
+            purchaseUnit: String(req.body.purchaseUnit || req.body.unit || 'шт').trim(),
+            purchaseUnitSize: Math.max(0.0001, workshopNumber(req.body.purchaseUnitSize) || 1),
+            stockQty: Math.max(0, workshopNumber(req.body.stockQty)),
+            minQty: Math.max(0, workshopNumber(req.body.minQty)),
+            active: req.body.active !== false,
+            note: String(req.body.note || '').trim()
+        });
+        if (!item.name) return res.status(400).json({ error: 'Укажите название материала' });
+        await item.save();
+        res.status(201).json(convertToClient(item));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.put('/api/workshop/materials/:id', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const payload = {
+            code: String(req.body.code || '').trim(),
+            name: String(req.body.name || '').trim(),
+            category: req.body.category || 'consumable',
+            unit: req.body.unit || 'шт',
+            purchaseUnit: String(req.body.purchaseUnit || req.body.unit || 'шт').trim(),
+            purchaseUnitSize: Math.max(0.0001, workshopNumber(req.body.purchaseUnitSize) || 1),
+            minQty: Math.max(0, workshopNumber(req.body.minQty)),
+            active: req.body.active !== false,
+            note: String(req.body.note || '').trim()
+        };
+        const item = await WorkshopMaterial.findByIdAndUpdate(req.params.id, payload, { new: true });
+        if (!item) return res.status(404).json({ error: 'Материал не найден' });
+        res.json(convertToClient(item));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.delete('/api/workshop/materials/:id', requireIsAdmin, async (req, res) => {
+    try {
+        const item = await WorkshopMaterial.findById(req.params.id);
+        if (!item) return res.status(404).json({ error: 'Материал не найден' });
+
+        const [movementUsed, recipeUsed] = await Promise.all([
+            WorkshopMovement.exists({ material: item._id }),
+            WorkshopRecipe.exists({ 'materials.material': item._id })
+        ]);
+        if (movementUsed || recipeUsed) {
+            return res.status(400).json({ error: 'Материал уже используется в истории или рецептурах. Его можно отредактировать/деактивировать, но не удалить.' });
+        }
+        await WorkshopMaterial.deleteOne({ _id: item._id });
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/material-movement', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const materialId = req.body.materialId;
+        const qty = Math.abs(workshopNumber(req.body.qty));
+        const direction = req.body.direction === 'out' ? 'out' : 'in';
+        if (!materialId || qty <= 0) return res.status(400).json({ error: 'Укажите материал и количество' });
+
+        const delta = direction === 'out' ? -qty : qty;
+        const material = await workshopChangeMaterial(materialId, delta);
+        const movement = await WorkshopMovement.create({
+            date: req.body.date || new Date(),
+            type: req.body.type || (direction === 'out' ? 'material_issue' : 'material_receipt'),
+            entityType: 'material',
+            material: materialId,
+            direction,
+            qty,
+            unit: material.unit || 'шт',
+            serviceMemoNumber: String(req.body.serviceMemoNumber || '').trim(),
+            note: String(req.body.note || '').trim(),
+            createdBy: workshopUser(req)
+        });
+        res.status(201).json({ material: convertToClient(material), movement: convertToClient(movement) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/recipes', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const recipe = new WorkshopRecipe({
+            name: String(req.body.name || '').trim(),
+            outputType: req.body.outputType || 'sample',
+            sku: String(req.body.sku || '').trim(),
+            product: req.body.productId || null,
+            sideA: String(req.body.sideA || '').trim(),
+            sideB: String(req.body.sideB || '').trim(),
+            planksPerUnit: Math.max(0, workshopNumber(req.body.planksPerUnit)),
+            packQtyOverride: Math.max(0, workshopNumber(req.body.packQtyOverride)),
+            matrixPosName: String(req.body.matrixPosName || '').trim(),
+            minStockQty: Math.max(0, workshopNumber(req.body.minStockQty)),
+            materials: Array.isArray(req.body.materials) ? req.body.materials.map(item => ({
+                material: item.materialId,
+                qty: Math.max(0, workshopNumber(item.qty)),
+                mode: item.mode === 'estimate' ? 'estimate' : 'strict'
+            })).filter(item => item.material && item.qty >= 0) : [],
+            components: Array.isArray(req.body.components) ? req.body.components.map(item => ({
+                recipe: item.recipeId,
+                qty: Math.max(0, workshopNumber(item.qty))
+            })).filter(item => item.recipe && item.qty > 0) : [],
+            active: req.body.active !== false,
+            note: String(req.body.note || '').trim()
+        });
+        if (!recipe.name) return res.status(400).json({ error: 'Укажите название изделия' });
+        await recipe.save();
+        res.status(201).json(convertToClient(recipe));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.put('/api/workshop/recipes/:id', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const payload = {
+            name: String(req.body.name || '').trim(),
+            outputType: req.body.outputType || 'sample',
+            sku: String(req.body.sku || '').trim(),
+            product: req.body.productId || null,
+            sideA: String(req.body.sideA || '').trim(),
+            sideB: String(req.body.sideB || '').trim(),
+            planksPerUnit: Math.max(0, workshopNumber(req.body.planksPerUnit)),
+            packQtyOverride: Math.max(0, workshopNumber(req.body.packQtyOverride)),
+            matrixPosName: String(req.body.matrixPosName || '').trim(),
+            minStockQty: Math.max(0, workshopNumber(req.body.minStockQty)),
+            materials: Array.isArray(req.body.materials) ? req.body.materials.map(item => ({
+                material: item.materialId,
+                qty: Math.max(0, workshopNumber(item.qty)),
+                mode: item.mode === 'estimate' ? 'estimate' : 'strict'
+            })).filter(item => item.material && item.qty >= 0) : [],
+            components: Array.isArray(req.body.components) ? req.body.components.map(item => ({
+                recipe: item.recipeId,
+                qty: Math.max(0, workshopNumber(item.qty))
+            })).filter(item => item.recipe && item.qty > 0) : [],
+            active: req.body.active !== false,
+            note: String(req.body.note || '').trim()
+        };
+        const recipe = await WorkshopRecipe.findByIdAndUpdate(req.params.id, payload, { new: true });
+        if (!recipe) return res.status(404).json({ error: 'Рецептура не найдена' });
+        res.json(convertToClient(recipe));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.delete('/api/workshop/recipes/:id', requireIsAdmin, async (req, res) => {
+    try {
+        const recipe = await WorkshopRecipe.findById(req.params.id);
+        if (!recipe) return res.status(404).json({ error: 'Рецептура не найдена' });
+
+        const [productionUsed, movementUsed, dealerUsed, componentUsed, memoUsed] = await Promise.all([
+            WorkshopProduction.exists({ recipe: recipe._id }),
+            WorkshopMovement.exists({ recipe: recipe._id }),
+            WorkshopDealerAsset.exists({ recipe: recipe._id, qty: { $gt: 0 } }),
+            WorkshopRecipe.exists({ 'components.recipe': recipe._id }),
+            WorkshopMemo.exists({ 'lines.recipe': recipe._id })
+        ]);
+        if (productionUsed || movementUsed || dealerUsed || componentUsed || memoUsed || Math.abs(Number(recipe.stockQty) || 0) > 0.0001) {
+            return res.status(400).json({ error: 'Рецептура уже участвует в учёте. Её можно редактировать или деактивировать, но нельзя удалить без нарушения истории.' });
+        }
+        await WorkshopRecipe.deleteOne({ _id: recipe._id });
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/memos', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        let number = String(req.body.number || '').trim();
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
+        if (!inputLines.length) return res.status(400).json({ error: 'Добавьте хотя бы одну позицию' });
+        if (!number) {
+            let seq = Math.max(1, (await WorkshopMemo.countDocuments()) + 1);
+            while (!number) {
+                const candidate = `ЦЕХ-${String(seq).padStart(4, '0')}`;
+                const exists = await WorkshopMemo.exists({ number: candidate });
+                if (!exists) number = candidate;
+                else seq += 1;
+            }
+        }
+
+        const lines = [];
+        const seenProducts = new Set();
+        for (const input of inputLines) {
+            const requestedPacks = Math.max(0, Math.floor(workshopNumber(input.requestedPacks)));
+            if (!input.productId || requestedPacks <= 0) continue;
+
+            const product = await Product.findById(input.productId).lean();
+            if (!product) continue;
+            const productKey = String(product._id);
+            if (seenProducts.has(productKey)) {
+                return res.status(400).json({ error: `Позиция «${product.sku || product.name}» добавлена в служебку дважды` });
+            }
+            seenProducts.add(productKey);
+
+            let recipe = null;
+            if (input.recipeId) {
+                recipe = await WorkshopRecipe.findOne({
+                    _id: input.recipeId,
+                    product: product._id,
+                    active: { $ne: false }
+                }).lean();
+                if (!recipe) {
+                    return res.status(400).json({ error: `Выбранная рецептура не подходит для «${product.sku || product.name}»` });
+                }
+            } else {
+                const recipes = await WorkshopRecipe.find({
+                    product: product._id,
+                    active: { $ne: false },
+                    planksPerUnit: { $gt: 0 }
+                }).lean();
+                recipe = recipes.find(item => item.outputType === 'sample')
+                    || recipes.find(item => item.outputType === 'stand')
+                    || recipes[0]
+                    || null;
+            }
+
+            const packQty = workshopPackQty(product, recipe?.packQtyOverride || 0);
+            if (packQty <= 0) {
+                return res.status(400).json({ error: `У «${product.sku || product.name}» не заполнено количество планок в упаковке` });
+            }
+            const planksPerUnit = recipe ? Math.max(0, workshopNumber(recipe.planksPerUnit)) : 0;
+
+            const totalPlanks = requestedPacks * packQty;
+            const plannedOutputQty = planksPerUnit > 0 ? Math.floor(totalPlanks / planksPerUnit) : 0;
+            const plannedRemainderPlanks = planksPerUnit > 0 ? totalPlanks - plannedOutputQty * planksPerUnit : totalPlanks;
+
+            lines.push({
+                product: product._id,
+                recipe: recipe?._id || null,
+                requestedPacks,
+                plannedOutputQty,
+                plannedRemainderPlanks,
+                packQty,
+                planksPerUnit,
+                actualProduct: product._id,
+                deliveredPacks: 0,
+                checked: false,
+                isMatch: false,
+                discrepancyReason: ''
+            });
+        }
+
+        if (!lines.length) return res.status(400).json({ error: 'Нет корректных позиций для служебной записки' });
+
+        const memo = await WorkshopMemo.create({
+            number,
+            date: req.body.date || new Date(),
+            lines,
+            note: String(req.body.note || '').trim(),
+            signedBy: String(req.body.signedBy || req.user?.fullName || req.user?.username || '').trim(),
+            createdBy: workshopUser(req)
+        });
+
+        const populated = await WorkshopMemo.findById(memo._id)
+            .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+            .populate('lines.recipe', 'name outputType planksPerUnit')
+            .lean();
+        res.status(201).json(convertToClient(populated));
+    } catch (e) {
+        if (e && e.code === 11000) return res.status(400).json({ error: 'Служебная записка с таким номером уже существует' });
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.put('/api/workshop/memos/:id', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const memo = await WorkshopMemo.findById(req.params.id);
+        if (!memo) return res.status(404).json({ error: 'Служебная записка не найдена' });
+        if (memo.postedAt || memo.status === 'accepted') {
+            return res.status(400).json({ error: 'Принятую служебную записку нельзя редактировать. Используйте корректировку/отмену.' });
+        }
+
+        const number = String(req.body.number || memo.number || '').trim();
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
+        if (!number) return res.status(400).json({ error: 'Укажите номер служебной записки' });
+        if (!inputLines.length) return res.status(400).json({ error: 'Добавьте хотя бы одну позицию' });
+
+        const duplicateNumber = await WorkshopMemo.exists({ number, _id: { $ne: memo._id } });
+        if (duplicateNumber) return res.status(400).json({ error: 'Служебная записка с таким номером уже существует' });
+
+        const seenProducts = new Set();
+        const lines = [];
+        for (const input of inputLines) {
+            const requestedPacks = Math.max(0, Math.floor(workshopNumber(input.requestedPacks)));
+            if (!input.productId || requestedPacks <= 0) continue;
+
+            const product = await Product.findById(input.productId).lean();
+            if (!product) continue;
+            const productKey = String(product._id);
+            if (seenProducts.has(productKey)) {
+                return res.status(400).json({ error: `Позиция «${product.sku || product.name}» добавлена в служебку дважды` });
+            }
+            seenProducts.add(productKey);
+
+            let recipe = null;
+            if (input.recipeId) {
+                recipe = await WorkshopRecipe.findOne({ _id: input.recipeId, product: product._id, active: { $ne: false } }).lean();
+            }
+            if (!recipe) {
+                const recipes = await WorkshopRecipe.find({ product: product._id, active: { $ne: false }, planksPerUnit: { $gt: 0 } }).lean();
+                recipe = recipes.find(item => item.outputType === 'sample') || recipes.find(item => item.outputType === 'stand') || recipes[0] || null;
+            }
+            const packQty = workshopPackQty(product, recipe?.packQtyOverride || 0);
+            const planksPerUnit = recipe ? Math.max(0, workshopNumber(recipe.planksPerUnit)) : 0;
+            if (packQty <= 0) {
+                return res.status(400).json({ error: `У «${product.sku || product.name}» не заполнено количество планок в упаковке` });
+            }
+
+            const totalPlanks = requestedPacks * packQty;
+            const plannedOutputQty = planksPerUnit > 0 ? Math.floor(totalPlanks / planksPerUnit) : 0;
+            const plannedRemainderPlanks = planksPerUnit > 0 ? totalPlanks - plannedOutputQty * planksPerUnit : totalPlanks;
+            lines.push({
+                product: product._id,
+                recipe: recipe?._id || null,
+                requestedPacks,
+                plannedOutputQty,
+                plannedRemainderPlanks,
+                packQty,
+                planksPerUnit,
+                actualProduct: product._id,
+                deliveredPacks: 0,
+                checked: false,
+                isMatch: false,
+                discrepancyReason: ''
+            });
+        }
+
+        if (!lines.length) return res.status(400).json({ error: 'Нет корректных позиций' });
+
+        memo.number = number;
+        memo.date = req.body.date || memo.date || new Date();
+        memo.lines = lines;
+        memo.note = String(req.body.note || '').trim();
+        memo.signedBy = String(req.body.signedBy || '').trim();
+        memo.status = 'created';
+        memo.receiptAttempts = [];
+        await memo.save();
+
+        const populated = await WorkshopMemo.findById(memo._id)
+            .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+            .populate('lines.recipe', 'name outputType planksPerUnit minStockQty stockQty')
+            .lean();
+        res.json(convertToClient(populated));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.delete('/api/workshop/memos/:id', requireIsAdmin, async (req, res) => {
+    try {
+        const memo = await WorkshopMemo.findById(req.params.id);
+        if (!memo) return res.status(404).json({ error: 'Служебная записка не найдена' });
+        if (memo.postedAt || memo.status === 'accepted') {
+            return res.status(400).json({ error: 'Проведённую служебную записку нельзя удалить напрямую: она уже изменила остатки.' });
+        }
+        const linkedProduction = await WorkshopProduction.exists({ memo: memo._id });
+        if (linkedProduction) return res.status(400).json({ error: 'По этой служебке уже есть производство. Сначала отмените связанные операции.' });
+        await WorkshopMemo.deleteOne({ _id: memo._id });
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/memos/:id/receive', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const memo = await WorkshopMemo.findById(req.params.id);
+        if (!memo) return res.status(404).json({ error: 'Служебная записка не найдена' });
+        if (memo.status === 'accepted' && memo.postedAt) {
+            return res.status(400).json({ error: 'Эта служебная записка уже принята и оприходована' });
+        }
+
+        const submitted = Array.isArray(req.body.lines) ? req.body.lines : [];
+        if (!submitted.length) return res.status(400).json({ error: 'Нет строк для сверки' });
+
+        const attemptLines = [];
+        let allMatch = true;
+
+        for (const line of memo.lines) {
+            const row = submitted.find(item => String(item.lineId || '') === String(line._id));
+            const actualProductId = row?.actualProductId || line.product;
+            const deliveredPacks = Math.max(0, Math.floor(workshopNumber(row?.deliveredPacks)));
+            const checked = Boolean(row?.checked);
+            const sameProduct = String(actualProductId || '') === String(line.product || '');
+            const sameQty = deliveredPacks === Number(line.requestedPacks || 0);
+            const isMatch = checked && sameProduct && sameQty;
+
+            line.actualProduct = actualProductId || line.product;
+            line.deliveredPacks = deliveredPacks;
+            line.checked = checked;
+            line.isMatch = isMatch;
+            line.discrepancyReason = String(row?.discrepancyReason || '').trim();
+
+            if (!isMatch) allMatch = false;
+            attemptLines.push({
+                lineId: String(line._id),
+                expectedProductId: String(line.product || ''),
+                actualProductId: String(line.actualProduct || ''),
+                requestedPacks: Number(line.requestedPacks || 0),
+                deliveredPacks,
+                checked,
+                isMatch,
+                discrepancyReason: line.discrepancyReason
+            });
+        }
+
+        memo.receiptAttempts.push({
+            date: req.body.date || new Date(),
+            status: allMatch ? 'accepted' : 'mismatch',
+            lines: attemptLines,
+            note: String(req.body.note || '').trim(),
+            createdBy: workshopUser(req)
+        });
+
+        if (!allMatch) {
+            memo.status = 'mismatch';
+            await memo.save();
+            const populated = await WorkshopMemo.findById(memo._id)
+                .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+                .populate('lines.actualProduct', 'sku name is_liquid characteristics.package_qty')
+                .populate('lines.recipe', 'name outputType planksPerUnit')
+                .lean();
+            return res.status(200).json({
+                accepted: false,
+                status: 'mismatch',
+                message: 'Есть расхождения. Упаковки пока не оприходованы — требуется обмен/повторная сверка.',
+                memo: convertToClient(populated)
+            });
+        }
+
+        if (!memo.postedAt) {
+            for (const line of memo.lines) {
+                const product = await Product.findById(line.product).lean();
+                if (!product) throw new Error('Одна из позиций служебки больше не найдена в каталоге');
+                const packQty = Number(line.packQty) > 0 ? Number(line.packQty) : workshopPackQty(product);
+                const planksQty = Number(line.requestedPacks || 0) * packQty;
+                await workshopChangeLaminate(line.product, planksQty);
+                await WorkshopMovement.create({
+                    date: req.body.date || new Date(),
+                    type: 'laminate_receipt',
+                    entityType: 'laminate',
+                    product: line.product,
+                    direction: 'in',
+                    qty: planksQty,
+                    unit: 'планка',
+                    serviceMemoNumber: memo.number,
+                    note: String(req.body.note || '').trim(),
+                    meta: {
+                        memoId: String(memo._id),
+                        memoLineId: String(line._id),
+                        requestedPacks: Number(line.requestedPacks || 0),
+                        deliveredPacks: Number(line.deliveredPacks || 0),
+                        packQty,
+                        plannedOutputQty: Number(line.plannedOutputQty || 0)
+                    },
+                    createdBy: workshopUser(req)
+                });
+            }
+            memo.postedAt = new Date();
+        }
+
+        memo.status = 'accepted';
+        memo.acceptedAt = new Date();
+        memo.acceptedBy = workshopUser(req);
+        await memo.save();
+
+        const populated = await WorkshopMemo.findById(memo._id)
+            .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+            .populate('lines.actualProduct', 'sku name is_liquid characteristics.package_qty')
+            .populate('lines.recipe', 'name outputType planksPerUnit')
+            .lean();
+
+        res.json({
+            accepted: true,
+            status: 'accepted',
+            message: 'Все позиции совпали. Упаковки оприходованы в цех.',
+            memo: convertToClient(populated)
+        });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/laminate-receipt', requirePermission('can_manage_workshop'), async (req, res) => {
+    return res.status(400).json({
+        error: 'Одиночный приход отключен. Ламинат принимается только целыми упаковками по многострочной служебной записке.'
+    });
+});
+
+app.post('/api/workshop/production', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const recipe = await WorkshopRecipe.findById(req.body.recipeId)
+            .populate('product')
+            .populate('materials.material')
+            .populate('components.recipe');
+        if (!recipe) return res.status(404).json({ error: 'Рецептура не найдена' });
+
+        let sourceMemo = null;
+        let sourceMemoLine = null;
+        if (req.body.memoId) {
+            sourceMemo = await WorkshopMemo.findById(req.body.memoId).lean();
+            if (!sourceMemo || sourceMemo.status !== 'accepted') {
+                return res.status(400).json({ error: 'Можно привязать производство только к принятой служебной записке' });
+            }
+            sourceMemoLine = (sourceMemo.lines || []).find(line => String(line._id) === String(req.body.memoLineId || ''));
+            if (!sourceMemoLine) return res.status(400).json({ error: 'Строка служебной записки не найдена' });
+            if (recipe.product && String(sourceMemoLine.product) !== String(recipe.product._id)) {
+                return res.status(400).json({ error: 'Ламинат рецептуры не совпадает с выбранной строкой служебки' });
+            }
+        }
+
+        const outputQty = Math.max(0, workshopNumber(req.body.outputQty));
+        const scrapPlanks = Math.max(0, workshopNumber(req.body.scrapPlanks));
+        const acceptedPacks = Math.max(0, workshopNumber(req.body.acceptedPacks));
+        const acceptedLoosePlanks = Math.max(0, workshopNumber(req.body.acceptedLoosePlanks));
+        if (outputQty <= 0) return res.status(400).json({ error: 'Укажите количество изготовленных изделий' });
+
+        const packQty = workshopPackQty(recipe.product, recipe.packQtyOverride);
+        const standardPlanksPerUnit = Math.max(0, workshopNumber(recipe.planksPerUnit));
+        const requestedActualNorm = Math.max(0, workshopNumber(req.body.actualPlanksPerUnit));
+        const actualPlanksPerUnit = requestedActualNorm > 0 ? requestedActualNorm : standardPlanksPerUnit;
+        const customNormReason = String(req.body.customNormReason || '').trim();
+        const customOrderName = String(req.body.customOrderName || '').trim();
+        const customDimensions = String(req.body.customDimensions || '').trim();
+        if (requestedActualNorm > 0 && Math.abs(requestedActualNorm - standardPlanksPerUnit) > 0.0001 && !customNormReason) {
+            return res.status(400).json({ error: 'При изменении стандартной нормы укажите причину (например, индивидуальный образец)' });
+        }
+        const usedForOutput = actualPlanksPerUnit * outputQty;
+        const consumedPlanks = usedForOutput + scrapPlanks;
+        const acceptedTotal = acceptedPacks * packQty + acceptedLoosePlanks;
+
+        if (consumedPlanks > 0) {
+            if (!recipe.product) return res.status(400).json({ error: 'Для этой рецептуры не выбран ламинат' });
+            const stock = await WorkshopLaminateStock.findOne({ product: recipe.product._id }).lean();
+            if ((Number(stock?.planksQty) || 0) < consumedPlanks) {
+                return res.status(400).json({ error: 'Недостаточно планок ламината в остатках цеха' });
+            }
+        }
+
+        for (const line of recipe.materials || []) {
+            if (line.mode === 'estimate') continue;
+            const need = (Number(line.qty) || 0) * outputQty;
+            if (need > 0 && (Number(line.material?.stockQty) || 0) < need) {
+                return res.status(400).json({ error: `Недостаточно материала «${line.material?.name || 'материал'}»` });
+            }
+        }
+
+        for (const line of recipe.components || []) {
+            const need = (Number(line.qty) || 0) * outputQty;
+            if (need > 0 && (Number(line.recipe?.stockQty) || 0) < need) {
+                return res.status(400).json({ error: `Недостаточно готовых компонентов «${line.recipe?.name || 'компонент'}»` });
+            }
+        }
+
+        if (consumedPlanks > 0) {
+            await workshopChangeLaminate(recipe.product._id, -consumedPlanks);
+            await WorkshopMovement.create({
+                date: req.body.date || new Date(), type: 'production_laminate',
+                entityType: 'laminate', product: recipe.product._id, direction: 'out',
+                qty: consumedPlanks, unit: 'планка', note: String(req.body.note || '').trim(),
+                serviceMemoNumber: sourceMemo?.number || '',
+                meta: { recipeId: recipe._id, outputQty, scrapPlanks, standardPlanksPerUnit, actualPlanksPerUnit, customNormReason, customOrderName, customDimensions, memoId: sourceMemo?._id || null, memoLineId: sourceMemoLine?._id || null }, createdBy: workshopUser(req)
+            });
+        }
+
+        for (const line of recipe.materials || []) {
+            const need = (Number(line.qty) || 0) * outputQty;
+            if (line.mode === 'estimate') {
+                if (need > 0) {
+                    await WorkshopMovement.create({
+                        date: req.body.date || new Date(), type: 'production_material_estimate',
+                        entityType: 'material', material: line.material._id, direction: 'neutral',
+                        qty: need, unit: line.material.unit || 'шт',
+                        note: 'Расчетный расход; фактический остаток автоматически не уменьшается',
+                        meta: { recipeId: recipe._id, outputQty, estimate: true }, createdBy: workshopUser(req)
+                    });
+                }
+                continue;
+            }
+            if (need <= 0) continue;
+            await workshopChangeMaterial(line.material._id, -need);
+            await WorkshopMovement.create({
+                date: req.body.date || new Date(), type: 'production_material',
+                entityType: 'material', material: line.material._id, direction: 'out',
+                qty: need, unit: line.material.unit || 'шт',
+                meta: { recipeId: recipe._id, outputQty }, createdBy: workshopUser(req)
+            });
+        }
+
+        for (const line of recipe.components || []) {
+            const need = (Number(line.qty) || 0) * outputQty;
+            if (need <= 0) continue;
+            await workshopChangeRecipe(line.recipe._id, -need);
+            await WorkshopMovement.create({
+                date: req.body.date || new Date(), type: 'production_component',
+                entityType: 'finished', recipe: line.recipe._id, direction: 'out',
+                qty: need, unit: 'шт', meta: { recipeId: recipe._id, outputQty },
+                createdBy: workshopUser(req)
+            });
+        }
+
+        const resultStock = await workshopChangeRecipe(recipe._id, outputQty);
+        await WorkshopMovement.create({
+            date: req.body.date || new Date(), type: 'production_output',
+            entityType: 'finished', recipe: recipe._id, direction: 'in',
+            qty: outputQty, unit: 'шт', note: String(req.body.note || '').trim(),
+            serviceMemoNumber: sourceMemo?.number || '',
+            meta: { acceptedPacks, acceptedLoosePlanks, acceptedTotal, packQty, consumedPlanks, scrapPlanks, memoId: sourceMemo?._id || null, memoLineId: sourceMemoLine?._id || null },
+            createdBy: workshopUser(req)
+        });
+
+        const production = await WorkshopProduction.create({
+            date: req.body.date || new Date(),
+            recipe: recipe._id,
+            product: recipe.product?._id || null,
+            memo: sourceMemo?._id || null,
+            memoLineId: sourceMemoLine?._id ? String(sourceMemoLine._id) : '',
+            serviceMemoNumber: sourceMemo?.number || '',
+            acceptedPacks,
+            acceptedLoosePlanks,
+            packQty,
+            totalAcceptedPlanks: acceptedTotal,
+            outputQty,
+            standardPlanksPerUnit,
+            actualPlanksPerUnit,
+            customNormReason,
+            customOrderName,
+            customDimensions,
+            consumedPlanks,
+            scrapPlanks,
+            operations: Array.isArray(req.body.operations)
+                ? req.body.operations.map(item => ({
+                    type: String(item.type || '').trim(),
+                    qty: Math.max(0, workshopNumber(item.qty)),
+                    note: String(item.note || '').trim()
+                })).filter(item => item.type)
+                : [],
+            note: String(req.body.note || '').trim(),
+            createdBy: workshopUser(req)
+        });
+
+        res.status(201).json({ production: convertToClient(production), stock: convertToClient(resultStock) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.put('/api/workshop/productions/:id', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const production = await WorkshopProduction.findById(req.params.id);
+        if (!production) return res.status(404).json({ error: 'Запись производства не найдена' });
+        if (production.cancelledAt) return res.status(400).json({ error: 'Отменённую запись нельзя редактировать' });
+
+        production.date = req.body.date || production.date;
+        production.note = String(req.body.note ?? production.note ?? '').trim();
+        production.customOrderName = String(req.body.customOrderName ?? production.customOrderName ?? '').trim();
+        production.customDimensions = String(req.body.customDimensions ?? production.customDimensions ?? '').trim();
+        production.customNormReason = String(req.body.customNormReason ?? production.customNormReason ?? '').trim();
+        if (Array.isArray(req.body.operations)) {
+            production.operations = req.body.operations.map(item => ({
+                type: String(item.type || '').trim(),
+                qty: Math.max(0, workshopNumber(item.qty)),
+                note: String(item.note || '').trim()
+            })).filter(item => item.type);
+        }
+        await production.save();
+        res.json(convertToClient(production));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.delete('/api/workshop/productions/:id', requireIsAdmin, async (req, res) => {
+    try {
+        const production = await WorkshopProduction.findById(req.params.id)
+            .populate({
+                path: 'recipe',
+                populate: [
+                    { path: 'materials.material' },
+                    { path: 'components.recipe' }
+                ]
+            })
+            .populate('product');
+        if (!production) return res.status(404).json({ error: 'Запись производства не найдена' });
+        if (production.cancelledAt) return res.status(400).json({ error: 'Эта запись уже отменена' });
+
+        const recipe = production.recipe;
+        if (!recipe) return res.status(400).json({ error: 'Рецептура производства не найдена' });
+        const outputQty = Number(production.outputQty) || 0;
+
+        if ((Number(recipe.stockQty) || 0) + 1e-9 < outputQty) {
+            return res.status(400).json({ error: 'Нельзя отменить производство: часть изготовленных изделий уже выдана или использована.' });
+        }
+
+        if (outputQty > 0) await workshopChangeRecipe(recipe._id, -outputQty);
+        if (production.product && Number(production.consumedPlanks) > 0) {
+            await workshopChangeLaminate(production.product._id, Number(production.consumedPlanks));
+        }
+
+        for (const line of recipe.materials || []) {
+            if (line.mode === 'estimate') continue;
+            const qty = (Number(line.qty) || 0) * outputQty;
+            if (qty > 0 && line.material?._id) await workshopChangeMaterial(line.material._id, qty);
+        }
+        for (const line of recipe.components || []) {
+            const qty = (Number(line.qty) || 0) * outputQty;
+            if (qty > 0 && line.recipe?._id) await workshopChangeRecipe(line.recipe._id, qty);
+        }
+
+        await WorkshopMovement.create({
+            date: new Date(),
+            type: 'production_cancelled',
+            entityType: 'finished',
+            recipe: recipe._id,
+            direction: 'out',
+            qty: outputQty,
+            unit: 'шт',
+            serviceMemoNumber: production.serviceMemoNumber || '',
+            note: String(req.body?.reason || 'Отмена записи производства администратором'),
+            meta: {
+                productionId: String(production._id),
+                restoredPlanks: Number(production.consumedPlanks) || 0,
+                cancellation: true
+            },
+            createdBy: workshopUser(req)
+        });
+
+        production.cancelledAt = new Date();
+        production.cancelledBy = workshopUser(req);
+        production.cancelReason = String(req.body?.reason || '').trim();
+        await production.save();
+
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/writeoff', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const entityType = req.body.entityType;
+        const qty = Math.abs(workshopNumber(req.body.qty));
+        const serviceMemoNumber = String(req.body.serviceMemoNumber || '').trim();
+        if (qty <= 0) return res.status(400).json({ error: 'Укажите количество списания' });
+        if (!serviceMemoNumber) return res.status(400).json({ error: 'Для списания укажите номер служебной записки' });
+
+        let movementData = {
+            date: req.body.date || new Date(), type: 'writeoff', entityType,
+            direction: 'out', qty, serviceMemoNumber,
+            note: String(req.body.note || '').trim(), createdBy: workshopUser(req)
+        };
+
+        if (entityType === 'laminate') {
+            await workshopChangeLaminate(req.body.productId, -qty);
+            movementData.product = req.body.productId;
+            movementData.unit = 'планка';
+        } else if (entityType === 'material') {
+            const material = await workshopChangeMaterial(req.body.materialId, -qty);
+            movementData.material = req.body.materialId;
+            movementData.unit = material.unit || 'шт';
+        } else if (entityType === 'finished') {
+            await workshopChangeRecipe(req.body.recipeId, -qty);
+            movementData.recipe = req.body.recipeId;
+            movementData.unit = 'шт';
+        } else {
+            return res.status(400).json({ error: 'Неизвестный тип списания' });
+        }
+
+        const movement = await WorkshopMovement.create(movementData);
+        res.status(201).json(convertToClient(movement));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/dealer-movement', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const dealerId = req.body.dealerId;
+        const recipeId = req.body.recipeId;
+        const action = req.body.action || 'issue';
+        const qty = Math.abs(workshopNumber(req.body.qty));
+        if (!dealerId || !recipeId || qty <= 0) return res.status(400).json({ error: 'Выберите дилера, изделие и количество' });
+
+        const [dealer, recipe] = await Promise.all([
+            Dealer.findById(dealerId).select('_id name'),
+            WorkshopRecipe.findById(recipeId)
+        ]);
+        if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
+        if (!recipe) return res.status(404).json({ error: 'Изделие не найдено' });
+
+        let asset = await WorkshopDealerAsset.findOne({ dealer: dealerId, recipe: recipeId });
+        if (!asset) asset = new WorkshopDealerAsset({ dealer: dealerId, recipe: recipeId, qty: 0 });
+
+        const condition = req.body.returnCondition || 'defect';
+        let issued = 0;
+        let returned = 0;
+
+        if (action === 'issue') {
+            if (Number(recipe.stockQty) < qty) return res.status(400).json({ error: 'Недостаточно готовых изделий в цехе' });
+            await workshopChangeRecipe(recipeId, -qty);
+            asset.qty += qty;
+            issued = qty;
+        } else if (action === 'return') {
+            if (Number(asset.qty) < qty) return res.status(400).json({ error: 'У дилера числится меньше изделий' });
+            asset.qty -= qty;
+            returned = qty;
+            if (condition === 'reusable') await workshopChangeRecipe(recipeId, qty);
+        } else if (action === 'replacement') {
+            const returnQty = Math.abs(workshopNumber(req.body.returnQty || qty));
+            const issueQty = Math.abs(workshopNumber(req.body.issueQty || qty));
+            if (Number(asset.qty) < returnQty) return res.status(400).json({ error: 'У дилера числится меньше изделий для возврата' });
+            if (Number(recipe.stockQty) < issueQty) return res.status(400).json({ error: 'Недостаточно изделий для замены' });
+            asset.qty = Number(asset.qty) - returnQty + issueQty;
+            await workshopChangeRecipe(recipeId, -issueQty);
+            if (condition === 'reusable') await workshopChangeRecipe(recipeId, returnQty);
+            returned = returnQty;
+            issued = issueQty;
+        } else {
+            return res.status(400).json({ error: 'Неизвестная операция с дилером' });
+        }
+
+        asset.qty = Math.max(0, Number(asset.qty) || 0);
+        await asset.save();
+
+        const movement = await WorkshopMovement.create({
+            date: req.body.date || new Date(),
+            type: `dealer_${action}`,
+            entityType: 'finished',
+            recipe: recipeId,
+            dealer: dealerId,
+            direction: action === 'return' ? 'in' : action === 'issue' ? 'out' : 'neutral',
+            qty,
+            unit: 'шт',
+            note: String(req.body.note || '').trim(),
+            meta: { issued, returned, returnCondition: condition, reason: String(req.body.reason || '').trim() },
+            createdBy: workshopUser(req)
+        });
+
+        await syncWorkshopPosToDealer(dealerId, recipeId);
+        res.status(201).json({ asset: convertToClient(asset), movement: convertToClient(movement) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.get('/api/workshop/dealers/:dealerId/assets', requireAnyPermission('can_view_workshop', 'can_view_dealers'), async (req, res) => {
+    try {
+        const assets = await WorkshopDealerAsset.find({ dealer: req.params.dealerId, qty: { $gt: 0 } })
+            .populate({ path: 'recipe', populate: { path: 'product', select: 'sku name is_liquid' } })
+            .sort({ updatedAt: -1 }).lean();
+        res.json(assets.map(convertToClient));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/opening-balance', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const location = req.body.location === 'dealer' ? 'dealer' : 'workshop';
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
+        const date = req.body.date || new Date();
+        const note = String(req.body.note || '').trim();
+        if (!inputLines.length) return res.status(400).json({ error: 'Укажите хотя бы один фактический остаток' });
+
+        let dealer = null;
+        if (location === 'dealer') {
+            if (!req.body.dealerId) return res.status(400).json({ error: 'Выберите дилера' });
+            dealer = await Dealer.findOne({
+                _id: req.body.dealerId,
+                ...getWorkingDealerFilter(getDealerFilter(req))
+            }).select('_id name');
+            if (!dealer) return res.status(404).json({ error: 'Дилер не найден или недоступен' });
+        }
+
+        const changed = [];
+        for (const line of inputLines) {
+            let recipe = null;
+            if (line.recipeId) {
+                recipe = await WorkshopRecipe.findOne({ _id: line.recipeId, active: { $ne: false } });
+            } else if (line.productId) {
+                const product = await Product.findById(line.productId).lean();
+                if (!product) continue;
+
+                const posDef = workshopPosDefinition({ product });
+                if (posDef?.recipeSku) {
+                    recipe = await WorkshopRecipe.findOne({ sku:posDef.recipeSku, active:{ $ne:false } });
+                } else {
+                    recipe = await WorkshopRecipe.findOne({
+                        product: product._id,
+                        outputType: 'sample',
+                        active: { $ne: false }
+                    });
+                    if (!recipe) {
+                        recipe = await WorkshopRecipe.create({
+                            name: `Планшет ${product.sku || ''} ${product.name || ''}`.trim(),
+                            outputType: 'sample',
+                            sku: `SAMPLE-${product.sku || String(product._id).slice(-6)}`,
+                            product: product._id,
+                            planksPerUnit: 0,
+                            packQtyOverride: 0,
+                            stockQty: 0,
+                            minStockQty: 0,
+                            active: true,
+                            note: 'Создано автоматически при вводе стартовых остатков. Норму производства можно заполнить позже.'
+                        });
+                    }
+                }
+            }
+            if (!recipe) continue;
+
+            const actualQty = Math.max(0, workshopNumber(line.actualQty));
+            const lineNote = String(line.note || '').trim();
+
+            if (location === 'workshop') {
+                const previousQty = Number(recipe.stockQty) || 0;
+                const delta = actualQty - previousQty;
+                if (Math.abs(delta) <= 0.0001) continue;
+
+                await workshopChangeRecipe(recipe._id, delta);
+                await WorkshopMovement.create({
+                    date,
+                    type: 'opening_balance',
+                    entityType: 'finished',
+                    recipe: recipe._id,
+                    direction: delta > 0 ? 'in' : 'out',
+                    qty: Math.abs(delta),
+                    unit: 'шт',
+                    note: lineNote || note || 'Стартовый остаток готовых образцов до начала учёта в CRM',
+                    meta: { previousQty, actualQty, delta, source: 'legacy_opening_balance' },
+                    createdBy: workshopUser(req)
+                });
+                changed.push({ recipeId: String(recipe._id), previousQty, actualQty, delta });
+            } else {
+                let asset = await WorkshopDealerAsset.findOne({ dealer: dealer._id, recipe: recipe._id });
+                const previousQty = Number(asset?.qty) || 0;
+                const delta = actualQty - previousQty;
+                if (Math.abs(delta) <= 0.0001) continue;
+
+                if (!asset) asset = new WorkshopDealerAsset({ dealer: dealer._id, recipe: recipe._id, qty: 0 });
+                asset.qty = actualQty;
+                await asset.save();
+
+                await WorkshopMovement.create({
+                    date,
+                    type: 'opening_dealer_balance',
+                    entityType: 'finished',
+                    recipe: recipe._id,
+                    dealer: dealer._id,
+                    direction: 'neutral',
+                    qty: Math.abs(delta),
+                    unit: 'шт',
+                    note: lineNote || note || 'Образцы уже находились у дилера до начала учёта в CRM',
+                    meta: { previousQty, actualQty, delta, source: 'legacy_opening_balance' },
+                    createdBy: workshopUser(req)
+                });
+                await syncWorkshopPosToDealer(dealer._id, recipe._id);
+                changed.push({ recipeId: String(recipe._id), previousQty, actualQty, delta });
+            }
+        }
+
+        if (!changed.length) return res.status(400).json({ error: 'Фактические остатки не отличаются от текущих' });
+        res.status(201).json({
+            status: 'ok',
+            location,
+            dealerId: dealer ? String(dealer._id) : '',
+            changed
+        });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/correction', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const reason = String(req.body.reason || '').trim();
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines.slice(0, 10) : [];
+        if (reason.length < 3) return res.status(400).json({ error: 'Укажите причину исправления' });
+        if (!inputLines.length) return res.status(400).json({ error: 'Добавьте хотя бы одну позицию' });
+
+        const prepared = [];
+        const seen = new Set();
+
+        for (const line of inputLines) {
+            const entityType = String(line.entityType || '').trim();
+            const id = String(line.id || '').trim();
+            const actualQty = Math.max(0, workshopNumber(line.actualQty));
+            if (!['finished','laminate','material'].includes(entityType) || !id) {
+                return res.status(400).json({ error: 'Некорректная позиция для исправления' });
+            }
+
+            const key = entityType + ':' + id;
+            if (seen.has(key)) return res.status(400).json({ error: 'Одна и та же позиция добавлена дважды' });
+            seen.add(key);
+
+            if (entityType === 'finished') {
+                const item = await WorkshopRecipe.findById(id).lean();
+                if (!item) return res.status(404).json({ error: 'Готовое изделие не найдено' });
+                prepared.push({
+                    entityType, id, actualQty,
+                    previousQty: Math.max(0, Number(item.stockQty) || 0),
+                    unit: 'шт',
+                    name: item.name || 'Готовое изделие',
+                    recipe: id
+                });
+            } else if (entityType === 'material') {
+                const item = await WorkshopMaterial.findById(id).lean();
+                if (!item) return res.status(404).json({ error: 'Материал не найден' });
+                prepared.push({
+                    entityType, id, actualQty,
+                    previousQty: Math.max(0, Number(item.stockQty) || 0),
+                    unit: item.unit || 'шт',
+                    name: item.name || 'Материал',
+                    material: id
+                });
+            } else {
+                const product = await Product.findById(id).select('sku name').lean();
+                if (!product) return res.status(404).json({ error: 'Ламинат не найден' });
+                const stock = await WorkshopLaminateStock.findOne({ product: id }).lean();
+                prepared.push({
+                    entityType, id, actualQty,
+                    previousQty: Math.max(0, Number(stock?.planksQty) || 0),
+                    unit: 'планка',
+                    name: [product.sku, product.name].filter(Boolean).join(' · ') || 'Ламинат',
+                    product: id
+                });
+            }
+        }
+
+        const changed = prepared
+            .map(item => ({ ...item, delta: item.actualQty - item.previousQty }))
+            .filter(item => Math.abs(item.delta) > 0.0001);
+
+        if (!changed.length) return res.status(400).json({ error: 'Новые остатки совпадают с текущими' });
+
+        const savedLines = [];
+        for (const item of changed) {
+            if (item.entityType === 'finished') {
+                await WorkshopRecipe.updateOne({ _id: item.id }, { $set: { stockQty: item.actualQty } });
+            } else if (item.entityType === 'material') {
+                await WorkshopMaterial.updateOne({ _id: item.id }, { $set: { stockQty: item.actualQty } });
+            } else {
+                await WorkshopLaminateStock.findOneAndUpdate(
+                    { product: item.id },
+                    { $set: { planksQty: item.actualQty } },
+                    { upsert: true, new: true, setDefaultsOnInsert: true }
+                );
+            }
+
+            await WorkshopMovement.create({
+                date: req.body.date || new Date(),
+                type: 'manual_correction',
+                entityType: item.entityType,
+                product: item.product || null,
+                material: item.material || null,
+                recipe: item.recipe || null,
+                direction: item.delta > 0 ? 'in' : 'out',
+                qty: Math.abs(item.delta),
+                unit: item.unit,
+                note: reason,
+                meta: {
+                    previousQty: item.previousQty,
+                    actualQty: item.actualQty,
+                    delta: item.delta,
+                    reason,
+                    source: 'manual_correction'
+                },
+                createdBy: workshopUser(req)
+            });
+
+            savedLines.push({
+                entityType: item.entityType,
+                product: item.product || null,
+                material: item.material || null,
+                recipe: item.recipe || null,
+                systemQty: item.previousQty,
+                actualQty: item.actualQty,
+                delta: item.delta,
+                note: reason
+            });
+        }
+
+        await WorkshopStocktake.create({
+            date: req.body.date || new Date(),
+            lines: savedLines,
+            note: 'Корректировка остатка: ' + reason,
+            createdBy: workshopUser(req)
+        });
+
+        res.status(201).json({
+            status: 'ok',
+            reason,
+            changed: changed.map(item => ({
+                entityType: item.entityType,
+                id: item.id,
+                name: item.name,
+                previousQty: item.previousQty,
+                actualQty: item.actualQty,
+                delta: item.delta,
+                unit: item.unit
+            }))
+        });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/stocktake', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
+        if (!inputLines.length) return res.status(400).json({ error: 'Добавьте позиции инвентаризации' });
+        const savedLines = [];
+
+        for (const line of inputLines) {
+            const actualQty = Math.max(0, workshopNumber(line.actualQty));
+            let systemQty = 0;
+            let delta = 0;
+            let movement = null;
+
+            if (line.entityType === 'laminate' && line.productId) {
+                const current = await WorkshopLaminateStock.findOne({ product: line.productId }).lean();
+                systemQty = Number(current?.planksQty) || 0;
+                delta = actualQty - systemQty;
+                if (Math.abs(delta) > 0.0001) {
+                    await workshopChangeLaminate(line.productId, delta);
+                    movement = { entityType:'laminate', product:line.productId, unit:'планка' };
+                }
+                savedLines.push({ entityType:'laminate', product:line.productId, systemQty, actualQty, delta, note:line.note || '' });
+            } else if (line.entityType === 'material' && line.materialId) {
+                const current = await WorkshopMaterial.findById(line.materialId).lean();
+                if (!current) continue;
+                systemQty = Number(current.stockQty) || 0;
+                delta = actualQty - systemQty;
+                if (Math.abs(delta) > 0.0001) {
+                    await workshopChangeMaterial(line.materialId, delta);
+                    movement = { entityType:'material', material:line.materialId, unit:current.unit || 'шт' };
+                }
+                savedLines.push({ entityType:'material', material:line.materialId, systemQty, actualQty, delta, note:line.note || '' });
+            } else if (line.entityType === 'finished' && line.recipeId) {
+                const current = await WorkshopRecipe.findById(line.recipeId).lean();
+                if (!current) continue;
+                systemQty = Number(current.stockQty) || 0;
+                delta = actualQty - systemQty;
+                if (Math.abs(delta) > 0.0001) {
+                    await workshopChangeRecipe(line.recipeId, delta);
+                    movement = { entityType:'finished', recipe:line.recipeId, unit:'шт' };
+                }
+                savedLines.push({ entityType:'finished', recipe:line.recipeId, systemQty, actualQty, delta, note:line.note || '' });
+            }
+
+            if (movement && Math.abs(delta) > 0.0001) {
+                await WorkshopMovement.create({
+                    date: req.body.date || new Date(),
+                    type: 'stocktake_adjustment',
+                    ...movement,
+                    direction: delta > 0 ? 'in' : 'out',
+                    qty: Math.abs(delta),
+                    note: line.note || '',
+                    meta: { systemQty, actualQty, delta },
+                    createdBy: workshopUser(req)
+                });
+            }
+        }
+
+        const stocktake = await WorkshopStocktake.create({
+            date: req.body.date || new Date(),
+            lines: savedLines,
+            note: String(req.body.note || '').trim(),
+            createdBy: workshopUser(req)
+        });
+        res.status(201).json(convertToClient(stocktake));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.get('/api/reclamations/dashboard', requirePermission('can_view_reclamations'), async (req, res) => {
+    try {
+        const dealerIds = await getScopedDealerIds(req);
+        const query = {
+            $or: [
+                { resolution: { $exists: false } },
+                { resolution: null },
+                { resolution: '' }
+            ]
+        };
+        if (dealerIds) query.dealerId = { $in: dealerIds };
+
+        const list = await Reclamation.find(query)
+            .select('dealerId dealerName resolution createdAt date')
+            .sort({ createdAt: -1 })
+            .lean();
+        res.json(list.map(convertToClient));
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+
+app.get('/api/reclamations', requirePermission('can_view_reclamations'), async (req, res) => {
+    try {
+        const dealerIds = await getScopedDealerIds(req);
+        const pipeline = [];
+        if (dealerIds) pipeline.push({ $match: { dealerId: { $in: dealerIds } } });
+        pipeline.push(
+            { $sort: { createdAt: -1 } },
+            { $project: {
+                dealerId: 1,
+                dealerName: 1,
+                date: 1,
+                productName: 1,
+                purchasedVolume: 1,
+                description: 1,
+                clientDemand: 1,
+                resolution: 1,
+                invoiceNumber: 1,
+                clientName: 1,
+                defectVolume: 1,
+                compensationAmount: 1,
+                createdAt: 1,
+                updatedAt: 1,
+                photoCount: { $size: { $ifNull: ['$photos', []] } }
+            } }
+        );
+        const list = await Reclamation.aggregate(pipeline);
+        res.json(list.map(item => ({ ...item, id: String(item._id), _id: undefined })));
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+app.get('/api/reclamations/:id', requirePermission('can_view_reclamations'), async (req, res) => {
+    try {
+        const dealerIds = await getScopedDealerIds(req);
+        const query = { _id: req.params.id };
+        if (dealerIds) query.dealerId = { $in: dealerIds };
+        const item = await Reclamation.findOne(query).lean();
+        if (!item) return res.status(404).json({ error: 'Рекламация не найдена' });
+        res.json(convertToClient(item));
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+
+app.post('/api/reclamations', requirePermission('can_manage_reclamations'), async (req, res) => {
+    try { 
+        const r = new Reclamation(req.body); 
+        await r.save(); 
+        res.json(convertToClient(r)); 
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+app.put('/api/reclamations/:id', requirePermission('can_manage_reclamations'), async (req, res) => {
+    try { 
+        const r = await Reclamation.findByIdAndUpdate(req.params.id, req.body, { new: true }); 
+        res.json(convertToClient(r)); 
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+app.delete('/api/reclamations/:id', requirePermission('can_manage_reclamations'), async (req, res) => {
+    try { 
+        await Reclamation.findByIdAndDelete(req.params.id); 
+        res.json({status: 'deleted'}); 
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+
+app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
+,'i') }, _id:{ $ne:req.params.id } }).select('_id').lean();
+                if (duplicateId) return res.status(409).json({ error:'Дилер с ID '+payload.dealer_id+' уже существует' });
+            }
+        }
+        if (req.user.role === 'manager' && !isGlobalViewer(req)) {');
+                const duplicateId = await Dealer.findOne({ dealer_id:{ $regex:new RegExp('^'+escapedId+'
+            delete payload.responsibleUserId;
+            delete payload.responsibleAssignmentSource;
+            if (req.user.scope === 'astana') payload.responsible = 'regional_astana';
+            if (req.user.scope === 'regions') payload.responsible = 'regional_regions';
+        }
+
+        const updated = await Dealer.findOneAndUpdate(
+            { _id: req.params.id, ...getDealerFilter(req) },
+            payload,
+            { new: true }
+        );
+        if (!updated) return res.status(404).json({ error: 'Дилер не найден' });
+        res.json({status:'ok'});
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.patch('/api/dealers/:id', requirePermission('can_edit_dealer'), async (req, res) => {
+    try {
+        const payload = canonicalDealerPayload(req.body);
+        if (req.user.role === 'manager' && !isGlobalViewer(req)) {
+            delete payload.responsibleUserId;
+            delete payload.responsibleAssignmentSource;
+            if (req.user.scope === 'astana') payload.responsible = 'regional_astana';
+            if (req.user.scope === 'regions') payload.responsible = 'regional_regions';
+        }
+
+        const updated = await Dealer.findOneAndUpdate(
+            { _id: req.params.id, ...getDealerFilter(req) },
+            { $set: payload },
+            { new: true }
+        ).lean();
+
+        if (!updated) return res.status(404).json({ error: 'Дилер не найден' });
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.delete('/api/dealers/:id', requirePermission('can_delete_dealer'), async (req, res) => { try { await Dealer.findOneAndDelete({ _id: req.params.id, ...getDealerFilter(req) }); res.json({status:'deleted'}); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.get('/api/dealers/:id/products', requireAnyPermission('can_view_dealers', 'can_view_products'), async (req, res) => { const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).populate('products'); if (!d) return res.status(404).json({ error: 'Дилер не найден' }); res.json(d.products.map(convertToClient)); });
+app.put('/api/dealers/:id/products', requirePermission('can_edit_matrix'), async (req, res) => { const d = await Dealer.findOneAndUpdate({ _id: req.params.id, ...getDealerFilter(req) }, { products: req.body.productIds }); if (!d) return res.status(404).json({ error: 'Дилер не найден' }); res.json({status:'ok'}); });
+// ==========================================
+// ЦЕНОВЫЕ УСЛОВИЯ ДИЛЕРОВ
+// ==========================================
+app.get('/api/pricing/overview', requirePermission('can_view_pricing'), async (req, res) => {
+    try {
+        const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req)))
+            .select('_id dealer_id name city region_sector price_type responsible')
+            .sort({ name: 1 })
+            .lean();
+        const conditions = await PricingCondition.find({})
+            .populate('dealer', '_id dealer_id name city region_sector price_type responsible')
+            .sort({ createdAt: -1 })
+            .lean();
+
+        const rows = dealers.map(dealer => buildDealerPricingSummary(dealer, conditions));
+        const today = pricingTodayKey();
+        const inSeven = new Date(today + 'T00:00:00Z');
+        inSeven.setUTCDate(inSeven.getUTCDate() + 7);
+        const sevenKey = inSeven.toISOString().slice(0, 10);
+
+        const activeConditionIds = new Set();
+        rows.forEach(row => row.matchedConditions.forEach(condition => {
+            if (condition.computedStatus === 'active') activeConditionIds.add(String(condition._id));
+        }));
+
+        const visibleConditions = conditions
+            .filter(condition => rows.some(row => pricingConditionMatchesDealer(condition, {
+                _id: row.dealerId,
+                name: row.dealerName,
+                city: row.city,
+                region_sector: row.sector,
+                price_type: row.defaultPriceType,
+                responsible: row.responsible
+            })))
+            .map(condition => ({
+                ...condition,
+                computedStatus: pricingConditionStatus(condition, today)
+            }));
+
+        res.json({
+            today,
+            rows,
+            conditions: visibleConditions,
+            stats: {
+                dealersWith5: rows.filter(row => row.has5 && !row.has10).length,
+                dealersWith10: rows.filter(row => row.has10 && !row.has5).length,
+                dealersWithBoth: rows.filter(row => row.has5 && row.has10).length,
+                activePriceOverrides: rows.filter(row => row.priceListCondition).length,
+                expiringSoon: visibleConditions.filter(condition =>
+                    condition.computedStatus === 'active' &&
+                    condition.endDate &&
+                    condition.endDate >= today &&
+                    condition.endDate <= sevenKey
+                ).length,
+                pendingRequirements: rows.reduce((sum, row) => sum + row.pendingRequirements, 0)
+            }
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/pricing/dealers/:id', requirePermission('can_view_pricing'), async (req, res) => {
+    try {
+        const dealer = await Dealer.findOne({
+            $and: [
+                { _id: req.params.id },
+                getWorkingDealerFilter(getDealerFilter(req))
+            ]
+        }).select('_id dealer_id name city region_sector price_type responsible')
+            .lean();
+        if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
+
+        const conditions = await PricingCondition.find({})
+            .populate('dealer', '_id dealer_id name city region_sector price_type responsible')
+            .sort({ createdAt: -1 })
+            .lean();
+        res.json(buildDealerPricingSummary(dealer, conditions));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/pricing/conditions', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const payload = cleanPricingPayload(req.body);
+        const validation = validatePricingPayload(payload);
+        if (validation) return res.status(400).json({ error: validation });
+        const duplicate = await findPricingDuplicate(payload);
+        if (duplicate) {
+            return res.status(400).json({ error: `Условие с кодом «${payload.code}» уже действует на эту же цель в пересекающийся период` });
+        }
+
+        if (!isGlobalViewer(req) && payload.scopeType !== 'dealer') {
+            return res.status(403).json({ error: 'Региональные и общие ценовые условия может создавать только пользователь с доступом ко всей компании' });
+        }
+        if (payload.scopeType === 'dealer') {
+            const dealer = await Dealer.findOne({
+                $and: [
+                    { _id: payload.dealer },
+                    getWorkingDealerFilter(getDealerFilter(req))
+                ]
+            }).select('_id').lean();
+            if (!dealer) return res.status(404).json({ error: 'Дилер недоступен' });
+        }
+
+        const user = pricingUserMeta(req);
+        const condition = await PricingCondition.create({
+            ...payload,
+            createdBy: user,
+            updatedBy: user,
+            audit: [{ action: 'created', userId: user.id, userName: user.name, note: 'Условие создано' }]
+        });
+        const populated = await PricingCondition.findById(condition._id).populate('dealer', '_id dealer_id name city region_sector price_type responsible').lean();
+        res.status(201).json({ ...populated, computedStatus: pricingConditionStatus(populated) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.put('/api/pricing/conditions/:id', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const existing = await PricingCondition.findById(req.params.id);
+        if (!existing) return res.status(404).json({ error: 'Ценовое условие не найдено' });
+        if (existing.cancelledAt) return res.status(400).json({ error: 'Отменённое условие нельзя редактировать' });
+
+        const payload = cleanPricingPayload(req.body);
+        const validation = validatePricingPayload(payload);
+        if (validation) return res.status(400).json({ error: validation });
+        const duplicate = await findPricingDuplicate(payload, existing._id);
+        if (duplicate) {
+            return res.status(400).json({ error: `Условие с кодом «${payload.code}» уже действует на эту же цель в пересекающийся период` });
+        }
+
+        if (!isGlobalViewer(req) && payload.scopeType !== 'dealer') {
+            return res.status(403).json({ error: 'Региональные и общие ценовые условия может менять только пользователь с доступом ко всей компании' });
+        }
+        if (payload.scopeType === 'dealer') {
+            const dealer = await Dealer.findOne({
+                $and: [
+                    { _id: payload.dealer },
+                    getWorkingDealerFilter(getDealerFilter(req))
+                ]
+            }).select('_id').lean();
+            if (!dealer) return res.status(404).json({ error: 'Дилер недоступен' });
+        }
+
+        const user = pricingUserMeta(req);
+        Object.assign(existing, payload, { updatedBy: user });
+        existing.audit.push({ action: 'updated', userId: user.id, userName: user.name, note: String(req.body.auditNote || 'Условие изменено').trim() });
+        await existing.save();
+
+        const populated = await PricingCondition.findById(existing._id).populate('dealer', '_id dealer_id name city region_sector price_type responsible').lean();
+        res.json({ ...populated, computedStatus: pricingConditionStatus(populated) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.delete('/api/pricing/conditions/:id', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const condition = await PricingCondition.findById(req.params.id);
+        if (!condition) return res.status(404).json({ error: 'Ценовое условие не найдено' });
+        if (condition.cancelledAt) return res.status(400).json({ error: 'Условие уже отменено' });
+
+        const user = pricingUserMeta(req);
+        condition.cancelledAt = new Date();
+        condition.updatedBy = user;
+        condition.audit.push({
+            action: 'cancelled',
+            userId: user.id,
+            userName: user.name,
+            note: String(req.body?.reason || 'Условие отменено').trim()
+        });
+        await condition.save();
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.get('/api/products/count', requireAnyPermission('can_view_products', 'can_view_report', 'can_view_reclamations', 'can_view_dealers'), async (req, res) => {
+    try {
+        const count = await Product.countDocuments({});
+        res.json({ count });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.get('/api/products', requireAnyPermission('can_view_products', 'can_view_report', 'can_view_reclamations', 'can_view_dealers'), async (req, res) => { const s = new RegExp(req.query.search||'', 'i'); const p = await Product.find({$or:[{sku:s},{name:s}]}).sort({sku:1}).lean(); res.json(p.map(x=>{x.id=x._id;return x;})); });
+app.post('/api/products', requirePermission('can_manage_products'), async (req, res) => { const p = new Product(req.body); await p.save(); res.json(convertToClient(p)); });
+app.put('/api/products/:id', requirePermission('can_manage_products'), async (req, res) => { const p = await Product.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(p)); });
+app.delete('/api/products/:id', requirePermission('can_manage_products'), async (req, res) => { await Product.findByIdAndDelete(req.params.id); res.json({}); });
+app.post('/api/admin/import-catalog', requirePermission('can_manage_products'), async (req, res) => { res.json({status: 'ok'}); });
+app.get('/api/matrix', requireAnyPermission('can_view_products', 'can_view_report'), async (req, res) => {
+    try {
+        const [prods, dealers] = await Promise.all([
+            Product.find({}).select('sku name is_liquid').sort({sku:1}).lean(),
+            Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id name city responsible products pos_materials status').lean()
+        ]);
+        const dealerIds = dealers.map(d => d._id);
+        const assets = dealerIds.length
+            ? await WorkshopDealerAsset.find({ dealer: { $in: dealerIds }, qty: { $gt: 0 } })
+                .populate('recipe', 'product outputType')
+                .lean()
+            : [];
+
+        const productMap = new Map();
+        dealers.forEach(d => productMap.set(d._id.toString(), new Set((d.products||[]).map(String))));
+
+        const sampleMap = new Map();
+        assets.forEach(asset => {
+            const productId = asset.recipe?.outputType === 'sample' ? asset.recipe?.product : null;
+            if (!productId) return;
+            const key = `${asset.dealer}|${productId}`;
+            sampleMap.set(key, (sampleMap.get(key) || 0) + (Number(asset.qty) || 0));
+        });
+
+        const posList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"];
+        const matrix = prods.map(p => ({
+            sku: p.sku,
+            name: p.name,
+            type: 'product',
+            is_liquid: p.is_liquid !== false,
+            dealers: dealers.map(d => ({
+                value: productMap.get(d._id.toString()).has(p._id.toString()) ? 1 : 0,
+                sample_qty: sampleMap.get(`${d._id}|${p._id}`) || 0,
+                is_pos: false
+            }))
+        }));
+
+        posList.forEach(pn => {
+            matrix.push({
+                sku: "POS",
+                name: pn,
+                type: 'pos',
+                dealers: dealers.map(d => ({
+                    value: (d.pos_materials||[]).find(m=>m.name===pn)?.quantity||0,
+                    is_pos: true
+                }))
+            });
+        });
+        res.json({
+            headers: dealers.map(d=>({id:d._id, name:d.name, city:d.city, responsible:d.responsible})),
+            matrix
+        });
+    } catch (e) {
+        res.status(500).json({error:e.message});
+    }
+});
+
+app.get('/api/sales', requirePermission('can_view_sales'), async (req, res) => {
+    try {
+        const { month, months, dealerId } = req.query;
+        let filter = month ? { month } : {};
+        if (!month && months) {
+            const count = Math.max(1, Math.min(24, Number(months) || 6));
+            const now = new Date();
+            now.setUTCDate(1);
+            now.setUTCMonth(now.getUTCMonth() - (count - 1));
+            const minMonth = now.toISOString().slice(0, 7);
+            filter = { month: { $gte: minMonth } };
+        }
+        const scope = getUserScope(req);
+        const companySalesView = req.query.context === 'sales' && hasPermission(req, 'can_view_sales');
+
+        if (!companySalesView && !isGlobalViewer(req) && req.user.role === 'manager') {
+            const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id').lean();
+            const dealerIds = dealers.map(d => String(d._id));
+            const zonePlanId = scope === 'astana'
+                ? 'PLAN_astana_all'
+                : scope === 'regions'
+                    ? 'PLAN_regions_all'
+                    : 'PLAN_total_all';
+
+            filter = {
+                $and: [
+                    filter,
+                    {
+                        $or: [
+                            // Факт менеджера считается исключительно по дилерам,
+                            // где он выбран ответственным.
+                            { isCustom: { $ne: true }, dealerId: { $in: dealerIds } },
+                            // План берём из сводки его зоны на странице Продажи.
+                            { isCustom: { $ne: true }, dealerId: zonePlanId }
+                        ]
+                    }
+                ]
+            };
+        } else if (!companySalesView && !isGlobalViewer(req) && scope !== 'all') {
+            const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id').lean();
+            const dealerIds = dealers.map(d => String(d._id));
+            const personalPlanIds = dealerIds.map(id => `PLAN_vip_${id}`);
+
+            const sectorType = scope === 'astana' ? 'astana' : 'region';
+            const sectors = await Sector.find({ type: sectorType }).select('name').lean();
+            const slug = name => String(name || '').trim().replace(/\s+/g, '_').toLowerCase();
+            const groupKeys = scope === 'astana'
+                ? [...sectors.map(s => `astana_${slug(s.name)}`), 'regional_astana']
+                : [...sectors.map(s => `sector_${slug(s.name)}`), 'regional_regions'];
+
+            const groupPlanIds = groupKeys.map(key => `PLAN_${key}`);
+            groupPlanIds.push(scope === 'astana' ? 'PLAN_astana_all' : 'PLAN_regions_all');
+            const allowedPlanIds = [...personalPlanIds, ...groupPlanIds];
+
+            filter = {
+                $and: [
+                    filter,
+                    {
+                        $or: [
+                            { isCustom: { $ne: true }, dealerId: { $in: dealerIds } },
+                            { isCustom: { $ne: true }, dealerId: { $in: allowedPlanIds } },
+                            { isCustom: true, group: { $in: groupKeys } }
+                        ]
+                    }
+                ]
+            };
+        }
+
+        if (dealerId) {
+            const requestedDealerId = String(dealerId);
+            const requestedPlanId = `PLAN_vip_${requestedDealerId}`;
+            filter = {
+                $and: [
+                    filter,
+                    { dealerId: { $in: [requestedDealerId, requestedPlanId] } }
+                ]
+            };
+        }
+
+        const s = await Sales.find(filter).lean();
+
+        // Нерабочие дилеры (potential/archive) не участвуют в текущей
+        // операционной статистике продаж. Сами исторические строки Sales
+        // остаются в базе и могут снова участвовать после возврата дилера
+        // в рабочий статус.
+        const workingBaseFilter = (companySalesView || isGlobalViewer(req)) ? {} : getDealerFilter(req);
+        const workingDealers = await Dealer.find(getWorkingDealerFilter(workingBaseFilter)).select('_id').lean();
+        const workingDealerIds = new Set(workingDealers.map(item => String(item._id)));
+
+        const visibleSales = s.filter(row => {
+            if (row.isCustom) return true;
+            const rowDealerId = String(row.dealerId || '');
+            if (!rowDealerId) return true;
+
+            if (rowDealerId.startsWith('PLAN_manager_')) return false;
+            if (rowDealerId.startsWith('PLAN_vip_')) {
+                return workingDealerIds.has(rowDealerId.replace('PLAN_vip_', ''));
+            }
+            if (rowDealerId.startsWith('PLAN_')) return true;
+            return workingDealerIds.has(rowDealerId);
+        });
+
+        res.json(visibleSales);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ===== ИСПРАВЛЕННЫЙ БЛОК: СОХРАНЕНИЕ, АГРЕГАЦИЯ И УДАЛЕНИЕ =====
+app.post('/api/sales', async (req, res) => {
+    const canFact = hasPermission(req, 'can_edit_sales_fact');
+    const canPlan = hasPermission(req, 'can_edit_sales_plan');
+    if (!canFact && !canPlan) {
+        return res.status(403).json({ error: 'Недостаточно прав для изменения продаж' });
+    }
+
+    const now = new Date();
+    const scope = req.user ? req.user.scope : 'none';
+    const companySalesView = req.query.context === 'sales' && hasPermission(req, 'can_view_sales');
+    const managerRestricted = Boolean(req.user && req.user.role === 'manager' && !isGlobalViewer(req) && !companySalesView);
+    let managerDealerIds = null;
+    if (managerRestricted) {
+        const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id').lean();
+        managerDealerIds = new Set(dealers.map(d => String(d._id)));
+    }
+
+    // 1. Агрегируем дубликаты из присланных данных (если ввели несколько с одинаковым именем)
+    const aggregatedData = {};
+    (Array.isArray(req.body.data) ? req.body.data : []).forEach(i => {
+        const row = { ...i };
+
+        if (managerRestricted) {
+            const dealerId = String(row.dealerId || '');
+            if (row.isCustom) {
+                row.ownerUserId = String(req.user.id);
+            } else if (dealerId.startsWith('PLAN_manager_')) {
+                return;
+            } else if (dealerId.startsWith('PLAN_vip_')) {
+                const ownedDealerId = dealerId.replace('PLAN_vip_', '');
+                if (!managerDealerIds.has(ownedDealerId)) return;
+            } else if (dealerId.startsWith('PLAN_')) {
+                return;
+            } else if (!managerDealerIds.has(dealerId)) {
+                return;
+            }
+        }
+        if (String(row.dealerId || '').startsWith('PLAN_manager_')) return;
+        if (!canFact) delete row.fact;
+        if (!canPlan) delete row.plan;
+
+        const key = row.isCustom ? `custom_${row.group}_${row.dealerName}` : `dealer_${row.dealerId}`;
+        if (!aggregatedData[key]) {
+            aggregatedData[key] = row;
+        } else {
+            if (canFact) aggregatedData[key].fact = (Number(aggregatedData[key].fact) || 0) + (Number(row.fact) || 0);
+            if (canPlan) aggregatedData[key].plan = (Number(aggregatedData[key].plan) || 0) + (Number(row.plan) || 0);
+        }
+    });
+
+    // 2. Обновляем/Добавляем записи
+    const ops = Object.values(aggregatedData).map(i => {
+        const filter = { month: req.body.month };
+        if (i.isCustom) {
+            filter.isCustom = true;
+            filter.dealerName = i.dealerName;
+            if (i.group) filter.group = i.group; 
+        } else {
+            filter.dealerId = i.dealerId;
+        }
+
+        return {
+            updateOne: { 
+                filter: filter, 
+                update: { $set: { ...i, updatedAt: now } }, 
+                upsert: true 
+            } 
+        };
+    }); 
+    
+    if (ops.length > 0) {
+        await Sales.bulkWrite(ops); 
+    }
+
+    // Старые планы менеджеров больше не используются: план задаётся по зоне/сектору/дилеру.
+    await Sales.deleteMany({
+        month: req.body.month,
+        dealerId: { $regex: '^PLAN_manager_' }
+    });
+
+    // 3. Умное удаление (Очистка разовых продаж)
+    // Определяем, к каким группам имеет доступ текущий пользователь
+    let groupFilter = {};
+    if (managerRestricted) {
+        groupFilter = { ownerUserId: String(req.user.id) };
+    } else if (!companySalesView && scope === 'astana') {
+        const sectors = await Sector.find({ type: 'astana' });
+        groupFilter = { group: { $in: sectors.map(s => s.name) } };
+    } else if (!companySalesView && scope === 'regions') {
+        const sectors = await Sector.find({ type: 'region' });
+        groupFilter = { group: { $in: sectors.map(s => s.name) } };
+    }
+    // Если admin или all, groupFilter остается пустым (имеет доступ ко всем)
+
+    // Ищем все разовые продажи за этот месяц в базе (в рамках доступа пользователя)
+    const dbCustomSales = await Sales.find({ 
+        month: req.body.month, 
+        isCustom: true, 
+        ...groupFilter 
+    });
+
+    const idsToDelete = [];
+    const incomingArray = Object.values(aggregatedData);
+
+    if (canFact) dbCustomSales.forEach(dbSale => {
+        // Проверяем, осталась ли эта продажа в присланных данных
+        const existsInIncoming = incomingArray.some(
+            i => i.isCustom && i.group === dbSale.group && i.dealerName === dbSale.dealerName
+        );
+        
+        // Если в присланных данных её больше нет — помечаем на удаление
+        if (!existsInIncoming) {
+            idsToDelete.push(dbSale._id);
+        }
+    });
+
+    // Удаляем всё лишнее
+    if (canFact && idsToDelete.length > 0) {
+        await Sales.deleteMany({ _id: { $in: idsToDelete } });
+    }
+
+    res.json({status:'ok'}); 
+});
+// ===================================================================
+
+app.get('/api/competitors-ref', requirePermission('can_view_competitors'), async (req, res) => { const l = await CompRef.find().sort({name:1}); res.json(l.map(convertToClient)); });
+app.post('/api/competitors-ref', requirePermission('can_manage_competitors'), async (req, res) => { const c = new CompRef(req.body); await c.save(); res.json(convertToClient(c)); });
+app.put('/api/competitors-ref/:id', requirePermission('can_manage_competitors'), async (req, res) => { await CompRef.findByIdAndUpdate(req.params.id, req.body); res.json({status:'ok'}); });
+app.delete('/api/competitors-ref/:id', requirePermission('can_manage_competitors'), async (req, res) => { await CompRef.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
+app.get('/api/knowledge', requirePermission('can_view_knowledge'), async (req, res) => { const l = await Knowledge.find().sort({title:1}); res.json(l.map(convertToClient)); });
+app.get('/api/knowledge/:id', requirePermission('can_view_knowledge'), async (req, res) => { res.json(convertToClient(await Knowledge.findById(req.params.id))); });
+app.post('/api/knowledge', requirePermission('can_manage_knowledge'), async (req, res) => { const a = new Knowledge(req.body); await a.save(); res.json(convertToClient(a)); });
+app.put('/api/knowledge/:id', requirePermission('can_manage_knowledge'), async (req, res) => { const a = await Knowledge.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(a)); });
+app.delete('/api/knowledge/:id', requirePermission('can_manage_knowledge'), async (req, res) => { await Knowledge.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
+app.get('/api/tasks', requirePermission('can_view_dashboard'), async (req, res) => { try { const data = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('name visits status responsible').lean(); res.json(data.map(d => ({ id: d._id, name: d.name, status: d.status, visits: d.visits || [], responsible: d.responsible }))); } catch (e) { res.status(500).json([]); } });
+
+async function getScopedDealerIds(req) {
+    const baseFilter = isGlobalViewer(req) ? {} : getDealerFilter(req);
+    const dealers = await Dealer.find(getWorkingDealerFilter(baseFilter)).select('_id').lean();
+    return dealers.map(d => String(d._id));
+}
+
+// ==========================================
+// РЕКВИЗИТЫ И РЕКЛАМАЦИИ
+// ==========================================
+const reclamationSchema = new mongoose.Schema({
+    dealerId: String,
+    dealerName: String,
+    date: String,
+    productName: String,
+    invoiceNumber: String,
+    purchaseDate: String,
+    clientName: String,
+    clientPhone: String,
+    address: String,
+    floor: String,
+    houseType: String,
+    totalArea: String,
+    purchasedVolume: String,
+    batchNumbers: [String],
+    baseType: String,
+    underlayment: String,
+    warmFloor: String,
+    installer: String,
+    
+    // --- НОВЫЕ ТЕХНИЧЕСКИЕ ПОЛЯ ---
+    acclimatization: String, 
+    storageMethod: String,
+    dryingTime: String,
+    floorFlatness: String,
+// --- НОВЫЕ ПОЛЯ ---
+    defectMoment: String,       // Момент выявления
+    compensationAmount: Number, // Сумма компенсации
+    internalNotes: String,
+    
+    description: String,
+    clientDemand: String,
+    resolution: String,
+    photos: [{ photo_url: String }]
+}, { timestamps: true });
+const Reclamation = mongoose.model('Reclamation', reclamationSchema);
+
+
+// ==========================================
+// ЦЕХ API
+// ==========================================
+async function syncWorkshopPosToDealer(dealerId, recipeId) {
+    const recipe = await WorkshopRecipe.findById(recipeId).select('matrixPosName').lean();
+    const posName = String(recipe?.matrixPosName || '').trim();
+    if (!posName) return;
+
+    const recipes = await WorkshopRecipe.find({ matrixPosName: posName }).select('_id').lean();
+    const recipeIds = recipes.map(item => item._id);
+    const assets = await WorkshopDealerAsset.find({ dealer: dealerId, recipe: { $in: recipeIds } }).lean();
+    const qty = assets.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+
+    const dealer = await Dealer.findById(dealerId);
+    if (!dealer) return;
+    dealer.pos_materials = Array.isArray(dealer.pos_materials) ? dealer.pos_materials : [];
+    const index = dealer.pos_materials.findIndex(item => item.name === posName);
+    if (qty > 0) {
+        if (index >= 0) dealer.pos_materials[index].quantity = qty;
+        else dealer.pos_materials.push({ name: posName, quantity: qty });
+    } else if (index >= 0) {
+        dealer.pos_materials.splice(index, 1);
+    }
+    await dealer.save();
+}
+
+app.post('/api/workshop/print-log', requirePermission('can_view_workshop'), async (req, res) => {
+    try {
+        const type=String(req.body?.type||'report').trim().slice(0,60);
+        const referenceId=String(req.body?.referenceId||'').trim().slice(0,120);
+        const title=String(req.body?.title||'Документ цеха').trim().slice(0,180);
+        res.json({status:'logged',type,referenceId,title});
+    } catch(e) {
+        res.status(500).json({error:e.message});
+    }
+});
+
+app.get('/api/workshop/bootstrap', requirePermission('can_view_workshop'), async (req, res) => {
+    try {
+        const [products, dealers, materials, recipes, laminateStocks, assets, productions, movements, memos] = await Promise.all([
+            Product.find().select('sku name is_liquid characteristics.package_qty characteristics.size characteristics.class characteristics.thickness').sort({ sku: 1 }).lean(),
+            Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id dealer_id name city status').sort({ name: 1 }).lean(),
+            WorkshopMaterial.find({ active: { $ne: false } }).sort({ category: 1, name: 1 }).lean(),
+            WorkshopRecipe.find({ active: { $ne: false } })
+                .populate('product', 'sku name is_liquid characteristics.package_qty')
+                .populate('materials.material', 'code name unit purchaseUnit purchaseUnitSize stockQty')
+                .populate('components.recipe', 'name outputType stockQty')
+                .sort({ outputType: 1, name: 1 }).lean(),
+            WorkshopLaminateStock.find().populate('product', 'sku name is_liquid characteristics.package_qty').lean(),
+            WorkshopDealerAsset.find({ qty: { $gt: 0 } })
+                .populate('dealer', 'dealer_id name city status')
+                .populate({ path: 'recipe', populate: { path: 'product', select: 'sku name is_liquid' } })
+                .sort({ updatedAt: -1 }).lean(),
+            WorkshopProduction.find({ cancelledAt: { $exists: false } })
+                .populate('recipe', 'name outputType')
+                .populate('product', 'sku name')
+                .sort({ date: -1, createdAt: -1 }).limit(30).lean(),
+            WorkshopMovement.find()
+                .populate('product', 'sku name')
+                .populate('material', 'code name unit')
+                .populate('recipe', 'name outputType')
+                .populate('dealer', 'dealer_id name city')
+                .sort({ date: -1, createdAt: -1 }).limit(60).lean(),
+            WorkshopMemo.find()
+                .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+                .populate('lines.actualProduct', 'sku name is_liquid characteristics.package_qty')
+                .populate('lines.recipe', 'name outputType planksPerUnit')
+                .sort({ date: -1, createdAt: -1 }).limit(80).lean()
+        ]);
+
+        const memoIds = memos.map(item => item._id);
+        const producedByMemoLine = memoIds.length ? await WorkshopProduction.aggregate([
+            { $match: { memo: { $in: memoIds }, memoLineId: { $nin: [null, ''] }, cancelledAt: { $exists: false } } },
+            { $group: { _id: '$memoLineId', qty: { $sum: '$outputQty' } } }
+        ]) : [];
+        const producedMap = new Map(producedByMemoLine.map(item => [String(item._id), Number(item.qty) || 0]));
+        memos.forEach(memo => {
+            (memo.lines || []).forEach(line => {
+                line.producedQty = producedMap.get(String(line._id)) || 0;
+            });
+        });
+
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const todayRows = await WorkshopProduction.find({ date: { $gte: today }, cancelledAt: { $exists: false } }).select('outputQty').lean();
+        const todayProduction = todayRows.reduce((sum, item) => sum + (Number(item.outputQty) || 0), 0);
+        const finishedStock = recipes.reduce((sum, item) => sum + (Number(item.stockQty) || 0), 0);
+        const lowMaterials = materials.filter(item => Number(item.minQty) > 0 && Number(item.stockQty) <= Number(item.minQty)).length;
+        const laminatePlanks = laminateStocks.reduce((sum, item) => sum + (Number(item.planksQty) || 0), 0);
+        const openMemos = memos.filter(item => item.status === 'created' || item.status === 'mismatch').length;
+        const visibleAssets = assets.filter(asset => !isNonWorkingDealerStatus(asset.dealer?.status));
+        const dealerAssetStock = visibleAssets.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+        const openingBalanceCount = await WorkshopMovement.countDocuments({
+            type: { $in: ['opening_balance', 'opening_dealer_balance'] }
+        });
+
+        res.json({
+            products: products.map(convertToClient),
+            dealers: dealers.map(convertToClient),
+            materials: materials.map(convertToClient),
+            recipes: recipes.map(convertToClient),
+            laminateStocks: laminateStocks.map(convertToClient),
+            dealerAssets: visibleAssets.map(convertToClient),
+            productions: productions.map(convertToClient),
+            movements: movements.map(convertToClient),
+            memos: memos.map(convertToClient),
+            stats: { todayProduction, finishedStock, lowMaterials, laminatePlanks, openMemos, dealerAssetStock, openingBalanceCount }
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/workshop/movements', requirePermission('can_view_workshop'), async (req, res) => {
+    try {
+        const limit = Math.max(1, Math.min(500, Number(req.query.limit) || 150));
+        const filter = {};
+        if (req.query.type) filter.type = req.query.type;
+        const list = await WorkshopMovement.find(filter)
+            .populate('product', 'sku name')
+            .populate('material', 'code name unit')
+            .populate('recipe', 'name outputType')
+            .populate('dealer', 'dealer_id name city')
+            .sort({ date: -1, createdAt: -1 }).limit(limit).lean();
+        res.json(list.map(convertToClient));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/materials', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const item = new WorkshopMaterial({
+            code: String(req.body.code || '').trim(),
+            name: String(req.body.name || '').trim(),
+            category: req.body.category || 'consumable',
+            unit: req.body.unit || 'шт',
+            purchaseUnit: String(req.body.purchaseUnit || req.body.unit || 'шт').trim(),
+            purchaseUnitSize: Math.max(0.0001, workshopNumber(req.body.purchaseUnitSize) || 1),
+            stockQty: Math.max(0, workshopNumber(req.body.stockQty)),
+            minQty: Math.max(0, workshopNumber(req.body.minQty)),
+            active: req.body.active !== false,
+            note: String(req.body.note || '').trim()
+        });
+        if (!item.name) return res.status(400).json({ error: 'Укажите название материала' });
+        await item.save();
+        res.status(201).json(convertToClient(item));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.put('/api/workshop/materials/:id', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const payload = {
+            code: String(req.body.code || '').trim(),
+            name: String(req.body.name || '').trim(),
+            category: req.body.category || 'consumable',
+            unit: req.body.unit || 'шт',
+            purchaseUnit: String(req.body.purchaseUnit || req.body.unit || 'шт').trim(),
+            purchaseUnitSize: Math.max(0.0001, workshopNumber(req.body.purchaseUnitSize) || 1),
+            minQty: Math.max(0, workshopNumber(req.body.minQty)),
+            active: req.body.active !== false,
+            note: String(req.body.note || '').trim()
+        };
+        const item = await WorkshopMaterial.findByIdAndUpdate(req.params.id, payload, { new: true });
+        if (!item) return res.status(404).json({ error: 'Материал не найден' });
+        res.json(convertToClient(item));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.delete('/api/workshop/materials/:id', requireIsAdmin, async (req, res) => {
+    try {
+        const item = await WorkshopMaterial.findById(req.params.id);
+        if (!item) return res.status(404).json({ error: 'Материал не найден' });
+
+        const [movementUsed, recipeUsed] = await Promise.all([
+            WorkshopMovement.exists({ material: item._id }),
+            WorkshopRecipe.exists({ 'materials.material': item._id })
+        ]);
+        if (movementUsed || recipeUsed) {
+            return res.status(400).json({ error: 'Материал уже используется в истории или рецептурах. Его можно отредактировать/деактивировать, но не удалить.' });
+        }
+        await WorkshopMaterial.deleteOne({ _id: item._id });
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/material-movement', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const materialId = req.body.materialId;
+        const qty = Math.abs(workshopNumber(req.body.qty));
+        const direction = req.body.direction === 'out' ? 'out' : 'in';
+        if (!materialId || qty <= 0) return res.status(400).json({ error: 'Укажите материал и количество' });
+
+        const delta = direction === 'out' ? -qty : qty;
+        const material = await workshopChangeMaterial(materialId, delta);
+        const movement = await WorkshopMovement.create({
+            date: req.body.date || new Date(),
+            type: req.body.type || (direction === 'out' ? 'material_issue' : 'material_receipt'),
+            entityType: 'material',
+            material: materialId,
+            direction,
+            qty,
+            unit: material.unit || 'шт',
+            serviceMemoNumber: String(req.body.serviceMemoNumber || '').trim(),
+            note: String(req.body.note || '').trim(),
+            createdBy: workshopUser(req)
+        });
+        res.status(201).json({ material: convertToClient(material), movement: convertToClient(movement) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/recipes', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const recipe = new WorkshopRecipe({
+            name: String(req.body.name || '').trim(),
+            outputType: req.body.outputType || 'sample',
+            sku: String(req.body.sku || '').trim(),
+            product: req.body.productId || null,
+            sideA: String(req.body.sideA || '').trim(),
+            sideB: String(req.body.sideB || '').trim(),
+            planksPerUnit: Math.max(0, workshopNumber(req.body.planksPerUnit)),
+            packQtyOverride: Math.max(0, workshopNumber(req.body.packQtyOverride)),
+            matrixPosName: String(req.body.matrixPosName || '').trim(),
+            minStockQty: Math.max(0, workshopNumber(req.body.minStockQty)),
+            materials: Array.isArray(req.body.materials) ? req.body.materials.map(item => ({
+                material: item.materialId,
+                qty: Math.max(0, workshopNumber(item.qty)),
+                mode: item.mode === 'estimate' ? 'estimate' : 'strict'
+            })).filter(item => item.material && item.qty >= 0) : [],
+            components: Array.isArray(req.body.components) ? req.body.components.map(item => ({
+                recipe: item.recipeId,
+                qty: Math.max(0, workshopNumber(item.qty))
+            })).filter(item => item.recipe && item.qty > 0) : [],
+            active: req.body.active !== false,
+            note: String(req.body.note || '').trim()
+        });
+        if (!recipe.name) return res.status(400).json({ error: 'Укажите название изделия' });
+        await recipe.save();
+        res.status(201).json(convertToClient(recipe));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.put('/api/workshop/recipes/:id', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const payload = {
+            name: String(req.body.name || '').trim(),
+            outputType: req.body.outputType || 'sample',
+            sku: String(req.body.sku || '').trim(),
+            product: req.body.productId || null,
+            sideA: String(req.body.sideA || '').trim(),
+            sideB: String(req.body.sideB || '').trim(),
+            planksPerUnit: Math.max(0, workshopNumber(req.body.planksPerUnit)),
+            packQtyOverride: Math.max(0, workshopNumber(req.body.packQtyOverride)),
+            matrixPosName: String(req.body.matrixPosName || '').trim(),
+            minStockQty: Math.max(0, workshopNumber(req.body.minStockQty)),
+            materials: Array.isArray(req.body.materials) ? req.body.materials.map(item => ({
+                material: item.materialId,
+                qty: Math.max(0, workshopNumber(item.qty)),
+                mode: item.mode === 'estimate' ? 'estimate' : 'strict'
+            })).filter(item => item.material && item.qty >= 0) : [],
+            components: Array.isArray(req.body.components) ? req.body.components.map(item => ({
+                recipe: item.recipeId,
+                qty: Math.max(0, workshopNumber(item.qty))
+            })).filter(item => item.recipe && item.qty > 0) : [],
+            active: req.body.active !== false,
+            note: String(req.body.note || '').trim()
+        };
+        const recipe = await WorkshopRecipe.findByIdAndUpdate(req.params.id, payload, { new: true });
+        if (!recipe) return res.status(404).json({ error: 'Рецептура не найдена' });
+        res.json(convertToClient(recipe));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.delete('/api/workshop/recipes/:id', requireIsAdmin, async (req, res) => {
+    try {
+        const recipe = await WorkshopRecipe.findById(req.params.id);
+        if (!recipe) return res.status(404).json({ error: 'Рецептура не найдена' });
+
+        const [productionUsed, movementUsed, dealerUsed, componentUsed, memoUsed] = await Promise.all([
+            WorkshopProduction.exists({ recipe: recipe._id }),
+            WorkshopMovement.exists({ recipe: recipe._id }),
+            WorkshopDealerAsset.exists({ recipe: recipe._id, qty: { $gt: 0 } }),
+            WorkshopRecipe.exists({ 'components.recipe': recipe._id }),
+            WorkshopMemo.exists({ 'lines.recipe': recipe._id })
+        ]);
+        if (productionUsed || movementUsed || dealerUsed || componentUsed || memoUsed || Math.abs(Number(recipe.stockQty) || 0) > 0.0001) {
+            return res.status(400).json({ error: 'Рецептура уже участвует в учёте. Её можно редактировать или деактивировать, но нельзя удалить без нарушения истории.' });
+        }
+        await WorkshopRecipe.deleteOne({ _id: recipe._id });
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/memos', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        let number = String(req.body.number || '').trim();
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
+        if (!inputLines.length) return res.status(400).json({ error: 'Добавьте хотя бы одну позицию' });
+        if (!number) {
+            let seq = Math.max(1, (await WorkshopMemo.countDocuments()) + 1);
+            while (!number) {
+                const candidate = `ЦЕХ-${String(seq).padStart(4, '0')}`;
+                const exists = await WorkshopMemo.exists({ number: candidate });
+                if (!exists) number = candidate;
+                else seq += 1;
+            }
+        }
+
+        const lines = [];
+        const seenProducts = new Set();
+        for (const input of inputLines) {
+            const requestedPacks = Math.max(0, Math.floor(workshopNumber(input.requestedPacks)));
+            if (!input.productId || requestedPacks <= 0) continue;
+
+            const product = await Product.findById(input.productId).lean();
+            if (!product) continue;
+            const productKey = String(product._id);
+            if (seenProducts.has(productKey)) {
+                return res.status(400).json({ error: `Позиция «${product.sku || product.name}» добавлена в служебку дважды` });
+            }
+            seenProducts.add(productKey);
+
+            let recipe = null;
+            if (input.recipeId) {
+                recipe = await WorkshopRecipe.findOne({
+                    _id: input.recipeId,
+                    product: product._id,
+                    active: { $ne: false }
+                }).lean();
+                if (!recipe) {
+                    return res.status(400).json({ error: `Выбранная рецептура не подходит для «${product.sku || product.name}»` });
+                }
+            } else {
+                const recipes = await WorkshopRecipe.find({
+                    product: product._id,
+                    active: { $ne: false },
+                    planksPerUnit: { $gt: 0 }
+                }).lean();
+                recipe = recipes.find(item => item.outputType === 'sample')
+                    || recipes.find(item => item.outputType === 'stand')
+                    || recipes[0]
+                    || null;
+            }
+
+            const packQty = workshopPackQty(product, recipe?.packQtyOverride || 0);
+            if (packQty <= 0) {
+                return res.status(400).json({ error: `У «${product.sku || product.name}» не заполнено количество планок в упаковке` });
+            }
+            const planksPerUnit = recipe ? Math.max(0, workshopNumber(recipe.planksPerUnit)) : 0;
+
+            const totalPlanks = requestedPacks * packQty;
+            const plannedOutputQty = planksPerUnit > 0 ? Math.floor(totalPlanks / planksPerUnit) : 0;
+            const plannedRemainderPlanks = planksPerUnit > 0 ? totalPlanks - plannedOutputQty * planksPerUnit : totalPlanks;
+
+            lines.push({
+                product: product._id,
+                recipe: recipe?._id || null,
+                requestedPacks,
+                plannedOutputQty,
+                plannedRemainderPlanks,
+                packQty,
+                planksPerUnit,
+                actualProduct: product._id,
+                deliveredPacks: 0,
+                checked: false,
+                isMatch: false,
+                discrepancyReason: ''
+            });
+        }
+
+        if (!lines.length) return res.status(400).json({ error: 'Нет корректных позиций для служебной записки' });
+
+        const memo = await WorkshopMemo.create({
+            number,
+            date: req.body.date || new Date(),
+            lines,
+            note: String(req.body.note || '').trim(),
+            signedBy: String(req.body.signedBy || req.user?.fullName || req.user?.username || '').trim(),
+            createdBy: workshopUser(req)
+        });
+
+        const populated = await WorkshopMemo.findById(memo._id)
+            .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+            .populate('lines.recipe', 'name outputType planksPerUnit')
+            .lean();
+        res.status(201).json(convertToClient(populated));
+    } catch (e) {
+        if (e && e.code === 11000) return res.status(400).json({ error: 'Служебная записка с таким номером уже существует' });
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.put('/api/workshop/memos/:id', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const memo = await WorkshopMemo.findById(req.params.id);
+        if (!memo) return res.status(404).json({ error: 'Служебная записка не найдена' });
+        if (memo.postedAt || memo.status === 'accepted') {
+            return res.status(400).json({ error: 'Принятую служебную записку нельзя редактировать. Используйте корректировку/отмену.' });
+        }
+
+        const number = String(req.body.number || memo.number || '').trim();
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
+        if (!number) return res.status(400).json({ error: 'Укажите номер служебной записки' });
+        if (!inputLines.length) return res.status(400).json({ error: 'Добавьте хотя бы одну позицию' });
+
+        const duplicateNumber = await WorkshopMemo.exists({ number, _id: { $ne: memo._id } });
+        if (duplicateNumber) return res.status(400).json({ error: 'Служебная записка с таким номером уже существует' });
+
+        const seenProducts = new Set();
+        const lines = [];
+        for (const input of inputLines) {
+            const requestedPacks = Math.max(0, Math.floor(workshopNumber(input.requestedPacks)));
+            if (!input.productId || requestedPacks <= 0) continue;
+
+            const product = await Product.findById(input.productId).lean();
+            if (!product) continue;
+            const productKey = String(product._id);
+            if (seenProducts.has(productKey)) {
+                return res.status(400).json({ error: `Позиция «${product.sku || product.name}» добавлена в служебку дважды` });
+            }
+            seenProducts.add(productKey);
+
+            let recipe = null;
+            if (input.recipeId) {
+                recipe = await WorkshopRecipe.findOne({ _id: input.recipeId, product: product._id, active: { $ne: false } }).lean();
+            }
+            if (!recipe) {
+                const recipes = await WorkshopRecipe.find({ product: product._id, active: { $ne: false }, planksPerUnit: { $gt: 0 } }).lean();
+                recipe = recipes.find(item => item.outputType === 'sample') || recipes.find(item => item.outputType === 'stand') || recipes[0] || null;
+            }
+            const packQty = workshopPackQty(product, recipe?.packQtyOverride || 0);
+            const planksPerUnit = recipe ? Math.max(0, workshopNumber(recipe.planksPerUnit)) : 0;
+            if (packQty <= 0) {
+                return res.status(400).json({ error: `У «${product.sku || product.name}» не заполнено количество планок в упаковке` });
+            }
+
+            const totalPlanks = requestedPacks * packQty;
+            const plannedOutputQty = planksPerUnit > 0 ? Math.floor(totalPlanks / planksPerUnit) : 0;
+            const plannedRemainderPlanks = planksPerUnit > 0 ? totalPlanks - plannedOutputQty * planksPerUnit : totalPlanks;
+            lines.push({
+                product: product._id,
+                recipe: recipe?._id || null,
+                requestedPacks,
+                plannedOutputQty,
+                plannedRemainderPlanks,
+                packQty,
+                planksPerUnit,
+                actualProduct: product._id,
+                deliveredPacks: 0,
+                checked: false,
+                isMatch: false,
+                discrepancyReason: ''
+            });
+        }
+
+        if (!lines.length) return res.status(400).json({ error: 'Нет корректных позиций' });
+
+        memo.number = number;
+        memo.date = req.body.date || memo.date || new Date();
+        memo.lines = lines;
+        memo.note = String(req.body.note || '').trim();
+        memo.signedBy = String(req.body.signedBy || '').trim();
+        memo.status = 'created';
+        memo.receiptAttempts = [];
+        await memo.save();
+
+        const populated = await WorkshopMemo.findById(memo._id)
+            .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+            .populate('lines.recipe', 'name outputType planksPerUnit minStockQty stockQty')
+            .lean();
+        res.json(convertToClient(populated));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.delete('/api/workshop/memos/:id', requireIsAdmin, async (req, res) => {
+    try {
+        const memo = await WorkshopMemo.findById(req.params.id);
+        if (!memo) return res.status(404).json({ error: 'Служебная записка не найдена' });
+        if (memo.postedAt || memo.status === 'accepted') {
+            return res.status(400).json({ error: 'Проведённую служебную записку нельзя удалить напрямую: она уже изменила остатки.' });
+        }
+        const linkedProduction = await WorkshopProduction.exists({ memo: memo._id });
+        if (linkedProduction) return res.status(400).json({ error: 'По этой служебке уже есть производство. Сначала отмените связанные операции.' });
+        await WorkshopMemo.deleteOne({ _id: memo._id });
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/memos/:id/receive', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const memo = await WorkshopMemo.findById(req.params.id);
+        if (!memo) return res.status(404).json({ error: 'Служебная записка не найдена' });
+        if (memo.status === 'accepted' && memo.postedAt) {
+            return res.status(400).json({ error: 'Эта служебная записка уже принята и оприходована' });
+        }
+
+        const submitted = Array.isArray(req.body.lines) ? req.body.lines : [];
+        if (!submitted.length) return res.status(400).json({ error: 'Нет строк для сверки' });
+
+        const attemptLines = [];
+        let allMatch = true;
+
+        for (const line of memo.lines) {
+            const row = submitted.find(item => String(item.lineId || '') === String(line._id));
+            const actualProductId = row?.actualProductId || line.product;
+            const deliveredPacks = Math.max(0, Math.floor(workshopNumber(row?.deliveredPacks)));
+            const checked = Boolean(row?.checked);
+            const sameProduct = String(actualProductId || '') === String(line.product || '');
+            const sameQty = deliveredPacks === Number(line.requestedPacks || 0);
+            const isMatch = checked && sameProduct && sameQty;
+
+            line.actualProduct = actualProductId || line.product;
+            line.deliveredPacks = deliveredPacks;
+            line.checked = checked;
+            line.isMatch = isMatch;
+            line.discrepancyReason = String(row?.discrepancyReason || '').trim();
+
+            if (!isMatch) allMatch = false;
+            attemptLines.push({
+                lineId: String(line._id),
+                expectedProductId: String(line.product || ''),
+                actualProductId: String(line.actualProduct || ''),
+                requestedPacks: Number(line.requestedPacks || 0),
+                deliveredPacks,
+                checked,
+                isMatch,
+                discrepancyReason: line.discrepancyReason
+            });
+        }
+
+        memo.receiptAttempts.push({
+            date: req.body.date || new Date(),
+            status: allMatch ? 'accepted' : 'mismatch',
+            lines: attemptLines,
+            note: String(req.body.note || '').trim(),
+            createdBy: workshopUser(req)
+        });
+
+        if (!allMatch) {
+            memo.status = 'mismatch';
+            await memo.save();
+            const populated = await WorkshopMemo.findById(memo._id)
+                .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+                .populate('lines.actualProduct', 'sku name is_liquid characteristics.package_qty')
+                .populate('lines.recipe', 'name outputType planksPerUnit')
+                .lean();
+            return res.status(200).json({
+                accepted: false,
+                status: 'mismatch',
+                message: 'Есть расхождения. Упаковки пока не оприходованы — требуется обмен/повторная сверка.',
+                memo: convertToClient(populated)
+            });
+        }
+
+        if (!memo.postedAt) {
+            for (const line of memo.lines) {
+                const product = await Product.findById(line.product).lean();
+                if (!product) throw new Error('Одна из позиций служебки больше не найдена в каталоге');
+                const packQty = Number(line.packQty) > 0 ? Number(line.packQty) : workshopPackQty(product);
+                const planksQty = Number(line.requestedPacks || 0) * packQty;
+                await workshopChangeLaminate(line.product, planksQty);
+                await WorkshopMovement.create({
+                    date: req.body.date || new Date(),
+                    type: 'laminate_receipt',
+                    entityType: 'laminate',
+                    product: line.product,
+                    direction: 'in',
+                    qty: planksQty,
+                    unit: 'планка',
+                    serviceMemoNumber: memo.number,
+                    note: String(req.body.note || '').trim(),
+                    meta: {
+                        memoId: String(memo._id),
+                        memoLineId: String(line._id),
+                        requestedPacks: Number(line.requestedPacks || 0),
+                        deliveredPacks: Number(line.deliveredPacks || 0),
+                        packQty,
+                        plannedOutputQty: Number(line.plannedOutputQty || 0)
+                    },
+                    createdBy: workshopUser(req)
+                });
+            }
+            memo.postedAt = new Date();
+        }
+
+        memo.status = 'accepted';
+        memo.acceptedAt = new Date();
+        memo.acceptedBy = workshopUser(req);
+        await memo.save();
+
+        const populated = await WorkshopMemo.findById(memo._id)
+            .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+            .populate('lines.actualProduct', 'sku name is_liquid characteristics.package_qty')
+            .populate('lines.recipe', 'name outputType planksPerUnit')
+            .lean();
+
+        res.json({
+            accepted: true,
+            status: 'accepted',
+            message: 'Все позиции совпали. Упаковки оприходованы в цех.',
+            memo: convertToClient(populated)
+        });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/laminate-receipt', requirePermission('can_manage_workshop'), async (req, res) => {
+    return res.status(400).json({
+        error: 'Одиночный приход отключен. Ламинат принимается только целыми упаковками по многострочной служебной записке.'
+    });
+});
+
+app.post('/api/workshop/production', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const recipe = await WorkshopRecipe.findById(req.body.recipeId)
+            .populate('product')
+            .populate('materials.material')
+            .populate('components.recipe');
+        if (!recipe) return res.status(404).json({ error: 'Рецептура не найдена' });
+
+        let sourceMemo = null;
+        let sourceMemoLine = null;
+        if (req.body.memoId) {
+            sourceMemo = await WorkshopMemo.findById(req.body.memoId).lean();
+            if (!sourceMemo || sourceMemo.status !== 'accepted') {
+                return res.status(400).json({ error: 'Можно привязать производство только к принятой служебной записке' });
+            }
+            sourceMemoLine = (sourceMemo.lines || []).find(line => String(line._id) === String(req.body.memoLineId || ''));
+            if (!sourceMemoLine) return res.status(400).json({ error: 'Строка служебной записки не найдена' });
+            if (recipe.product && String(sourceMemoLine.product) !== String(recipe.product._id)) {
+                return res.status(400).json({ error: 'Ламинат рецептуры не совпадает с выбранной строкой служебки' });
+            }
+        }
+
+        const outputQty = Math.max(0, workshopNumber(req.body.outputQty));
+        const scrapPlanks = Math.max(0, workshopNumber(req.body.scrapPlanks));
+        const acceptedPacks = Math.max(0, workshopNumber(req.body.acceptedPacks));
+        const acceptedLoosePlanks = Math.max(0, workshopNumber(req.body.acceptedLoosePlanks));
+        if (outputQty <= 0) return res.status(400).json({ error: 'Укажите количество изготовленных изделий' });
+
+        const packQty = workshopPackQty(recipe.product, recipe.packQtyOverride);
+        const standardPlanksPerUnit = Math.max(0, workshopNumber(recipe.planksPerUnit));
+        const requestedActualNorm = Math.max(0, workshopNumber(req.body.actualPlanksPerUnit));
+        const actualPlanksPerUnit = requestedActualNorm > 0 ? requestedActualNorm : standardPlanksPerUnit;
+        const customNormReason = String(req.body.customNormReason || '').trim();
+        const customOrderName = String(req.body.customOrderName || '').trim();
+        const customDimensions = String(req.body.customDimensions || '').trim();
+        if (requestedActualNorm > 0 && Math.abs(requestedActualNorm - standardPlanksPerUnit) > 0.0001 && !customNormReason) {
+            return res.status(400).json({ error: 'При изменении стандартной нормы укажите причину (например, индивидуальный образец)' });
+        }
+        const usedForOutput = actualPlanksPerUnit * outputQty;
+        const consumedPlanks = usedForOutput + scrapPlanks;
+        const acceptedTotal = acceptedPacks * packQty + acceptedLoosePlanks;
+
+        if (consumedPlanks > 0) {
+            if (!recipe.product) return res.status(400).json({ error: 'Для этой рецептуры не выбран ламинат' });
+            const stock = await WorkshopLaminateStock.findOne({ product: recipe.product._id }).lean();
+            if ((Number(stock?.planksQty) || 0) < consumedPlanks) {
+                return res.status(400).json({ error: 'Недостаточно планок ламината в остатках цеха' });
+            }
+        }
+
+        for (const line of recipe.materials || []) {
+            if (line.mode === 'estimate') continue;
+            const need = (Number(line.qty) || 0) * outputQty;
+            if (need > 0 && (Number(line.material?.stockQty) || 0) < need) {
+                return res.status(400).json({ error: `Недостаточно материала «${line.material?.name || 'материал'}»` });
+            }
+        }
+
+        for (const line of recipe.components || []) {
+            const need = (Number(line.qty) || 0) * outputQty;
+            if (need > 0 && (Number(line.recipe?.stockQty) || 0) < need) {
+                return res.status(400).json({ error: `Недостаточно готовых компонентов «${line.recipe?.name || 'компонент'}»` });
+            }
+        }
+
+        if (consumedPlanks > 0) {
+            await workshopChangeLaminate(recipe.product._id, -consumedPlanks);
+            await WorkshopMovement.create({
+                date: req.body.date || new Date(), type: 'production_laminate',
+                entityType: 'laminate', product: recipe.product._id, direction: 'out',
+                qty: consumedPlanks, unit: 'планка', note: String(req.body.note || '').trim(),
+                serviceMemoNumber: sourceMemo?.number || '',
+                meta: { recipeId: recipe._id, outputQty, scrapPlanks, standardPlanksPerUnit, actualPlanksPerUnit, customNormReason, customOrderName, customDimensions, memoId: sourceMemo?._id || null, memoLineId: sourceMemoLine?._id || null }, createdBy: workshopUser(req)
+            });
+        }
+
+        for (const line of recipe.materials || []) {
+            const need = (Number(line.qty) || 0) * outputQty;
+            if (line.mode === 'estimate') {
+                if (need > 0) {
+                    await WorkshopMovement.create({
+                        date: req.body.date || new Date(), type: 'production_material_estimate',
+                        entityType: 'material', material: line.material._id, direction: 'neutral',
+                        qty: need, unit: line.material.unit || 'шт',
+                        note: 'Расчетный расход; фактический остаток автоматически не уменьшается',
+                        meta: { recipeId: recipe._id, outputQty, estimate: true }, createdBy: workshopUser(req)
+                    });
+                }
+                continue;
+            }
+            if (need <= 0) continue;
+            await workshopChangeMaterial(line.material._id, -need);
+            await WorkshopMovement.create({
+                date: req.body.date || new Date(), type: 'production_material',
+                entityType: 'material', material: line.material._id, direction: 'out',
+                qty: need, unit: line.material.unit || 'шт',
+                meta: { recipeId: recipe._id, outputQty }, createdBy: workshopUser(req)
+            });
+        }
+
+        for (const line of recipe.components || []) {
+            const need = (Number(line.qty) || 0) * outputQty;
+            if (need <= 0) continue;
+            await workshopChangeRecipe(line.recipe._id, -need);
+            await WorkshopMovement.create({
+                date: req.body.date || new Date(), type: 'production_component',
+                entityType: 'finished', recipe: line.recipe._id, direction: 'out',
+                qty: need, unit: 'шт', meta: { recipeId: recipe._id, outputQty },
+                createdBy: workshopUser(req)
+            });
+        }
+
+        const resultStock = await workshopChangeRecipe(recipe._id, outputQty);
+        await WorkshopMovement.create({
+            date: req.body.date || new Date(), type: 'production_output',
+            entityType: 'finished', recipe: recipe._id, direction: 'in',
+            qty: outputQty, unit: 'шт', note: String(req.body.note || '').trim(),
+            serviceMemoNumber: sourceMemo?.number || '',
+            meta: { acceptedPacks, acceptedLoosePlanks, acceptedTotal, packQty, consumedPlanks, scrapPlanks, memoId: sourceMemo?._id || null, memoLineId: sourceMemoLine?._id || null },
+            createdBy: workshopUser(req)
+        });
+
+        const production = await WorkshopProduction.create({
+            date: req.body.date || new Date(),
+            recipe: recipe._id,
+            product: recipe.product?._id || null,
+            memo: sourceMemo?._id || null,
+            memoLineId: sourceMemoLine?._id ? String(sourceMemoLine._id) : '',
+            serviceMemoNumber: sourceMemo?.number || '',
+            acceptedPacks,
+            acceptedLoosePlanks,
+            packQty,
+            totalAcceptedPlanks: acceptedTotal,
+            outputQty,
+            standardPlanksPerUnit,
+            actualPlanksPerUnit,
+            customNormReason,
+            customOrderName,
+            customDimensions,
+            consumedPlanks,
+            scrapPlanks,
+            operations: Array.isArray(req.body.operations)
+                ? req.body.operations.map(item => ({
+                    type: String(item.type || '').trim(),
+                    qty: Math.max(0, workshopNumber(item.qty)),
+                    note: String(item.note || '').trim()
+                })).filter(item => item.type)
+                : [],
+            note: String(req.body.note || '').trim(),
+            createdBy: workshopUser(req)
+        });
+
+        res.status(201).json({ production: convertToClient(production), stock: convertToClient(resultStock) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.put('/api/workshop/productions/:id', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const production = await WorkshopProduction.findById(req.params.id);
+        if (!production) return res.status(404).json({ error: 'Запись производства не найдена' });
+        if (production.cancelledAt) return res.status(400).json({ error: 'Отменённую запись нельзя редактировать' });
+
+        production.date = req.body.date || production.date;
+        production.note = String(req.body.note ?? production.note ?? '').trim();
+        production.customOrderName = String(req.body.customOrderName ?? production.customOrderName ?? '').trim();
+        production.customDimensions = String(req.body.customDimensions ?? production.customDimensions ?? '').trim();
+        production.customNormReason = String(req.body.customNormReason ?? production.customNormReason ?? '').trim();
+        if (Array.isArray(req.body.operations)) {
+            production.operations = req.body.operations.map(item => ({
+                type: String(item.type || '').trim(),
+                qty: Math.max(0, workshopNumber(item.qty)),
+                note: String(item.note || '').trim()
+            })).filter(item => item.type);
+        }
+        await production.save();
+        res.json(convertToClient(production));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.delete('/api/workshop/productions/:id', requireIsAdmin, async (req, res) => {
+    try {
+        const production = await WorkshopProduction.findById(req.params.id)
+            .populate({
+                path: 'recipe',
+                populate: [
+                    { path: 'materials.material' },
+                    { path: 'components.recipe' }
+                ]
+            })
+            .populate('product');
+        if (!production) return res.status(404).json({ error: 'Запись производства не найдена' });
+        if (production.cancelledAt) return res.status(400).json({ error: 'Эта запись уже отменена' });
+
+        const recipe = production.recipe;
+        if (!recipe) return res.status(400).json({ error: 'Рецептура производства не найдена' });
+        const outputQty = Number(production.outputQty) || 0;
+
+        if ((Number(recipe.stockQty) || 0) + 1e-9 < outputQty) {
+            return res.status(400).json({ error: 'Нельзя отменить производство: часть изготовленных изделий уже выдана или использована.' });
+        }
+
+        if (outputQty > 0) await workshopChangeRecipe(recipe._id, -outputQty);
+        if (production.product && Number(production.consumedPlanks) > 0) {
+            await workshopChangeLaminate(production.product._id, Number(production.consumedPlanks));
+        }
+
+        for (const line of recipe.materials || []) {
+            if (line.mode === 'estimate') continue;
+            const qty = (Number(line.qty) || 0) * outputQty;
+            if (qty > 0 && line.material?._id) await workshopChangeMaterial(line.material._id, qty);
+        }
+        for (const line of recipe.components || []) {
+            const qty = (Number(line.qty) || 0) * outputQty;
+            if (qty > 0 && line.recipe?._id) await workshopChangeRecipe(line.recipe._id, qty);
+        }
+
+        await WorkshopMovement.create({
+            date: new Date(),
+            type: 'production_cancelled',
+            entityType: 'finished',
+            recipe: recipe._id,
+            direction: 'out',
+            qty: outputQty,
+            unit: 'шт',
+            serviceMemoNumber: production.serviceMemoNumber || '',
+            note: String(req.body?.reason || 'Отмена записи производства администратором'),
+            meta: {
+                productionId: String(production._id),
+                restoredPlanks: Number(production.consumedPlanks) || 0,
+                cancellation: true
+            },
+            createdBy: workshopUser(req)
+        });
+
+        production.cancelledAt = new Date();
+        production.cancelledBy = workshopUser(req);
+        production.cancelReason = String(req.body?.reason || '').trim();
+        await production.save();
+
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/writeoff', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const entityType = req.body.entityType;
+        const qty = Math.abs(workshopNumber(req.body.qty));
+        const serviceMemoNumber = String(req.body.serviceMemoNumber || '').trim();
+        if (qty <= 0) return res.status(400).json({ error: 'Укажите количество списания' });
+        if (!serviceMemoNumber) return res.status(400).json({ error: 'Для списания укажите номер служебной записки' });
+
+        let movementData = {
+            date: req.body.date || new Date(), type: 'writeoff', entityType,
+            direction: 'out', qty, serviceMemoNumber,
+            note: String(req.body.note || '').trim(), createdBy: workshopUser(req)
+        };
+
+        if (entityType === 'laminate') {
+            await workshopChangeLaminate(req.body.productId, -qty);
+            movementData.product = req.body.productId;
+            movementData.unit = 'планка';
+        } else if (entityType === 'material') {
+            const material = await workshopChangeMaterial(req.body.materialId, -qty);
+            movementData.material = req.body.materialId;
+            movementData.unit = material.unit || 'шт';
+        } else if (entityType === 'finished') {
+            await workshopChangeRecipe(req.body.recipeId, -qty);
+            movementData.recipe = req.body.recipeId;
+            movementData.unit = 'шт';
+        } else {
+            return res.status(400).json({ error: 'Неизвестный тип списания' });
+        }
+
+        const movement = await WorkshopMovement.create(movementData);
+        res.status(201).json(convertToClient(movement));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/dealer-movement', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const dealerId = req.body.dealerId;
+        const recipeId = req.body.recipeId;
+        const action = req.body.action || 'issue';
+        const qty = Math.abs(workshopNumber(req.body.qty));
+        if (!dealerId || !recipeId || qty <= 0) return res.status(400).json({ error: 'Выберите дилера, изделие и количество' });
+
+        const [dealer, recipe] = await Promise.all([
+            Dealer.findById(dealerId).select('_id name'),
+            WorkshopRecipe.findById(recipeId)
+        ]);
+        if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
+        if (!recipe) return res.status(404).json({ error: 'Изделие не найдено' });
+
+        let asset = await WorkshopDealerAsset.findOne({ dealer: dealerId, recipe: recipeId });
+        if (!asset) asset = new WorkshopDealerAsset({ dealer: dealerId, recipe: recipeId, qty: 0 });
+
+        const condition = req.body.returnCondition || 'defect';
+        let issued = 0;
+        let returned = 0;
+
+        if (action === 'issue') {
+            if (Number(recipe.stockQty) < qty) return res.status(400).json({ error: 'Недостаточно готовых изделий в цехе' });
+            await workshopChangeRecipe(recipeId, -qty);
+            asset.qty += qty;
+            issued = qty;
+        } else if (action === 'return') {
+            if (Number(asset.qty) < qty) return res.status(400).json({ error: 'У дилера числится меньше изделий' });
+            asset.qty -= qty;
+            returned = qty;
+            if (condition === 'reusable') await workshopChangeRecipe(recipeId, qty);
+        } else if (action === 'replacement') {
+            const returnQty = Math.abs(workshopNumber(req.body.returnQty || qty));
+            const issueQty = Math.abs(workshopNumber(req.body.issueQty || qty));
+            if (Number(asset.qty) < returnQty) return res.status(400).json({ error: 'У дилера числится меньше изделий для возврата' });
+            if (Number(recipe.stockQty) < issueQty) return res.status(400).json({ error: 'Недостаточно изделий для замены' });
+            asset.qty = Number(asset.qty) - returnQty + issueQty;
+            await workshopChangeRecipe(recipeId, -issueQty);
+            if (condition === 'reusable') await workshopChangeRecipe(recipeId, returnQty);
+            returned = returnQty;
+            issued = issueQty;
+        } else {
+            return res.status(400).json({ error: 'Неизвестная операция с дилером' });
+        }
+
+        asset.qty = Math.max(0, Number(asset.qty) || 0);
+        await asset.save();
+
+        const movement = await WorkshopMovement.create({
+            date: req.body.date || new Date(),
+            type: `dealer_${action}`,
+            entityType: 'finished',
+            recipe: recipeId,
+            dealer: dealerId,
+            direction: action === 'return' ? 'in' : action === 'issue' ? 'out' : 'neutral',
+            qty,
+            unit: 'шт',
+            note: String(req.body.note || '').trim(),
+            meta: { issued, returned, returnCondition: condition, reason: String(req.body.reason || '').trim() },
+            createdBy: workshopUser(req)
+        });
+
+        await syncWorkshopPosToDealer(dealerId, recipeId);
+        res.status(201).json({ asset: convertToClient(asset), movement: convertToClient(movement) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.get('/api/workshop/dealers/:dealerId/assets', requireAnyPermission('can_view_workshop', 'can_view_dealers'), async (req, res) => {
+    try {
+        const assets = await WorkshopDealerAsset.find({ dealer: req.params.dealerId, qty: { $gt: 0 } })
+            .populate({ path: 'recipe', populate: { path: 'product', select: 'sku name is_liquid' } })
+            .sort({ updatedAt: -1 }).lean();
+        res.json(assets.map(convertToClient));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/opening-balance', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const location = req.body.location === 'dealer' ? 'dealer' : 'workshop';
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
+        const date = req.body.date || new Date();
+        const note = String(req.body.note || '').trim();
+        if (!inputLines.length) return res.status(400).json({ error: 'Укажите хотя бы один фактический остаток' });
+
+        let dealer = null;
+        if (location === 'dealer') {
+            if (!req.body.dealerId) return res.status(400).json({ error: 'Выберите дилера' });
+            dealer = await Dealer.findOne({
+                _id: req.body.dealerId,
+                ...getWorkingDealerFilter(getDealerFilter(req))
+            }).select('_id name');
+            if (!dealer) return res.status(404).json({ error: 'Дилер не найден или недоступен' });
+        }
+
+        const changed = [];
+        for (const line of inputLines) {
+            let recipe = null;
+            if (line.recipeId) {
+                recipe = await WorkshopRecipe.findOne({ _id: line.recipeId, active: { $ne: false } });
+            } else if (line.productId) {
+                const product = await Product.findById(line.productId).lean();
+                if (!product) continue;
+
+                const posDef = workshopPosDefinition({ product });
+                if (posDef?.recipeSku) {
+                    recipe = await WorkshopRecipe.findOne({ sku:posDef.recipeSku, active:{ $ne:false } });
+                } else {
+                    recipe = await WorkshopRecipe.findOne({
+                        product: product._id,
+                        outputType: 'sample',
+                        active: { $ne: false }
+                    });
+                    if (!recipe) {
+                        recipe = await WorkshopRecipe.create({
+                            name: `Планшет ${product.sku || ''} ${product.name || ''}`.trim(),
+                            outputType: 'sample',
+                            sku: `SAMPLE-${product.sku || String(product._id).slice(-6)}`,
+                            product: product._id,
+                            planksPerUnit: 0,
+                            packQtyOverride: 0,
+                            stockQty: 0,
+                            minStockQty: 0,
+                            active: true,
+                            note: 'Создано автоматически при вводе стартовых остатков. Норму производства можно заполнить позже.'
+                        });
+                    }
+                }
+            }
+            if (!recipe) continue;
+
+            const actualQty = Math.max(0, workshopNumber(line.actualQty));
+            const lineNote = String(line.note || '').trim();
+
+            if (location === 'workshop') {
+                const previousQty = Number(recipe.stockQty) || 0;
+                const delta = actualQty - previousQty;
+                if (Math.abs(delta) <= 0.0001) continue;
+
+                await workshopChangeRecipe(recipe._id, delta);
+                await WorkshopMovement.create({
+                    date,
+                    type: 'opening_balance',
+                    entityType: 'finished',
+                    recipe: recipe._id,
+                    direction: delta > 0 ? 'in' : 'out',
+                    qty: Math.abs(delta),
+                    unit: 'шт',
+                    note: lineNote || note || 'Стартовый остаток готовых образцов до начала учёта в CRM',
+                    meta: { previousQty, actualQty, delta, source: 'legacy_opening_balance' },
+                    createdBy: workshopUser(req)
+                });
+                changed.push({ recipeId: String(recipe._id), previousQty, actualQty, delta });
+            } else {
+                let asset = await WorkshopDealerAsset.findOne({ dealer: dealer._id, recipe: recipe._id });
+                const previousQty = Number(asset?.qty) || 0;
+                const delta = actualQty - previousQty;
+                if (Math.abs(delta) <= 0.0001) continue;
+
+                if (!asset) asset = new WorkshopDealerAsset({ dealer: dealer._id, recipe: recipe._id, qty: 0 });
+                asset.qty = actualQty;
+                await asset.save();
+
+                await WorkshopMovement.create({
+                    date,
+                    type: 'opening_dealer_balance',
+                    entityType: 'finished',
+                    recipe: recipe._id,
+                    dealer: dealer._id,
+                    direction: 'neutral',
+                    qty: Math.abs(delta),
+                    unit: 'шт',
+                    note: lineNote || note || 'Образцы уже находились у дилера до начала учёта в CRM',
+                    meta: { previousQty, actualQty, delta, source: 'legacy_opening_balance' },
+                    createdBy: workshopUser(req)
+                });
+                await syncWorkshopPosToDealer(dealer._id, recipe._id);
+                changed.push({ recipeId: String(recipe._id), previousQty, actualQty, delta });
+            }
+        }
+
+        if (!changed.length) return res.status(400).json({ error: 'Фактические остатки не отличаются от текущих' });
+        res.status(201).json({
+            status: 'ok',
+            location,
+            dealerId: dealer ? String(dealer._id) : '',
+            changed
+        });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/correction', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const reason = String(req.body.reason || '').trim();
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines.slice(0, 10) : [];
+        if (reason.length < 3) return res.status(400).json({ error: 'Укажите причину исправления' });
+        if (!inputLines.length) return res.status(400).json({ error: 'Добавьте хотя бы одну позицию' });
+
+        const prepared = [];
+        const seen = new Set();
+
+        for (const line of inputLines) {
+            const entityType = String(line.entityType || '').trim();
+            const id = String(line.id || '').trim();
+            const actualQty = Math.max(0, workshopNumber(line.actualQty));
+            if (!['finished','laminate','material'].includes(entityType) || !id) {
+                return res.status(400).json({ error: 'Некорректная позиция для исправления' });
+            }
+
+            const key = entityType + ':' + id;
+            if (seen.has(key)) return res.status(400).json({ error: 'Одна и та же позиция добавлена дважды' });
+            seen.add(key);
+
+            if (entityType === 'finished') {
+                const item = await WorkshopRecipe.findById(id).lean();
+                if (!item) return res.status(404).json({ error: 'Готовое изделие не найдено' });
+                prepared.push({
+                    entityType, id, actualQty,
+                    previousQty: Math.max(0, Number(item.stockQty) || 0),
+                    unit: 'шт',
+                    name: item.name || 'Готовое изделие',
+                    recipe: id
+                });
+            } else if (entityType === 'material') {
+                const item = await WorkshopMaterial.findById(id).lean();
+                if (!item) return res.status(404).json({ error: 'Материал не найден' });
+                prepared.push({
+                    entityType, id, actualQty,
+                    previousQty: Math.max(0, Number(item.stockQty) || 0),
+                    unit: item.unit || 'шт',
+                    name: item.name || 'Материал',
+                    material: id
+                });
+            } else {
+                const product = await Product.findById(id).select('sku name').lean();
+                if (!product) return res.status(404).json({ error: 'Ламинат не найден' });
+                const stock = await WorkshopLaminateStock.findOne({ product: id }).lean();
+                prepared.push({
+                    entityType, id, actualQty,
+                    previousQty: Math.max(0, Number(stock?.planksQty) || 0),
+                    unit: 'планка',
+                    name: [product.sku, product.name].filter(Boolean).join(' · ') || 'Ламинат',
+                    product: id
+                });
+            }
+        }
+
+        const changed = prepared
+            .map(item => ({ ...item, delta: item.actualQty - item.previousQty }))
+            .filter(item => Math.abs(item.delta) > 0.0001);
+
+        if (!changed.length) return res.status(400).json({ error: 'Новые остатки совпадают с текущими' });
+
+        const savedLines = [];
+        for (const item of changed) {
+            if (item.entityType === 'finished') {
+                await WorkshopRecipe.updateOne({ _id: item.id }, { $set: { stockQty: item.actualQty } });
+            } else if (item.entityType === 'material') {
+                await WorkshopMaterial.updateOne({ _id: item.id }, { $set: { stockQty: item.actualQty } });
+            } else {
+                await WorkshopLaminateStock.findOneAndUpdate(
+                    { product: item.id },
+                    { $set: { planksQty: item.actualQty } },
+                    { upsert: true, new: true, setDefaultsOnInsert: true }
+                );
+            }
+
+            await WorkshopMovement.create({
+                date: req.body.date || new Date(),
+                type: 'manual_correction',
+                entityType: item.entityType,
+                product: item.product || null,
+                material: item.material || null,
+                recipe: item.recipe || null,
+                direction: item.delta > 0 ? 'in' : 'out',
+                qty: Math.abs(item.delta),
+                unit: item.unit,
+                note: reason,
+                meta: {
+                    previousQty: item.previousQty,
+                    actualQty: item.actualQty,
+                    delta: item.delta,
+                    reason,
+                    source: 'manual_correction'
+                },
+                createdBy: workshopUser(req)
+            });
+
+            savedLines.push({
+                entityType: item.entityType,
+                product: item.product || null,
+                material: item.material || null,
+                recipe: item.recipe || null,
+                systemQty: item.previousQty,
+                actualQty: item.actualQty,
+                delta: item.delta,
+                note: reason
+            });
+        }
+
+        await WorkshopStocktake.create({
+            date: req.body.date || new Date(),
+            lines: savedLines,
+            note: 'Корректировка остатка: ' + reason,
+            createdBy: workshopUser(req)
+        });
+
+        res.status(201).json({
+            status: 'ok',
+            reason,
+            changed: changed.map(item => ({
+                entityType: item.entityType,
+                id: item.id,
+                name: item.name,
+                previousQty: item.previousQty,
+                actualQty: item.actualQty,
+                delta: item.delta,
+                unit: item.unit
+            }))
+        });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/stocktake', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
+        if (!inputLines.length) return res.status(400).json({ error: 'Добавьте позиции инвентаризации' });
+        const savedLines = [];
+
+        for (const line of inputLines) {
+            const actualQty = Math.max(0, workshopNumber(line.actualQty));
+            let systemQty = 0;
+            let delta = 0;
+            let movement = null;
+
+            if (line.entityType === 'laminate' && line.productId) {
+                const current = await WorkshopLaminateStock.findOne({ product: line.productId }).lean();
+                systemQty = Number(current?.planksQty) || 0;
+                delta = actualQty - systemQty;
+                if (Math.abs(delta) > 0.0001) {
+                    await workshopChangeLaminate(line.productId, delta);
+                    movement = { entityType:'laminate', product:line.productId, unit:'планка' };
+                }
+                savedLines.push({ entityType:'laminate', product:line.productId, systemQty, actualQty, delta, note:line.note || '' });
+            } else if (line.entityType === 'material' && line.materialId) {
+                const current = await WorkshopMaterial.findById(line.materialId).lean();
+                if (!current) continue;
+                systemQty = Number(current.stockQty) || 0;
+                delta = actualQty - systemQty;
+                if (Math.abs(delta) > 0.0001) {
+                    await workshopChangeMaterial(line.materialId, delta);
+                    movement = { entityType:'material', material:line.materialId, unit:current.unit || 'шт' };
+                }
+                savedLines.push({ entityType:'material', material:line.materialId, systemQty, actualQty, delta, note:line.note || '' });
+            } else if (line.entityType === 'finished' && line.recipeId) {
+                const current = await WorkshopRecipe.findById(line.recipeId).lean();
+                if (!current) continue;
+                systemQty = Number(current.stockQty) || 0;
+                delta = actualQty - systemQty;
+                if (Math.abs(delta) > 0.0001) {
+                    await workshopChangeRecipe(line.recipeId, delta);
+                    movement = { entityType:'finished', recipe:line.recipeId, unit:'шт' };
+                }
+                savedLines.push({ entityType:'finished', recipe:line.recipeId, systemQty, actualQty, delta, note:line.note || '' });
+            }
+
+            if (movement && Math.abs(delta) > 0.0001) {
+                await WorkshopMovement.create({
+                    date: req.body.date || new Date(),
+                    type: 'stocktake_adjustment',
+                    ...movement,
+                    direction: delta > 0 ? 'in' : 'out',
+                    qty: Math.abs(delta),
+                    note: line.note || '',
+                    meta: { systemQty, actualQty, delta },
+                    createdBy: workshopUser(req)
+                });
+            }
+        }
+
+        const stocktake = await WorkshopStocktake.create({
+            date: req.body.date || new Date(),
+            lines: savedLines,
+            note: String(req.body.note || '').trim(),
+            createdBy: workshopUser(req)
+        });
+        res.status(201).json(convertToClient(stocktake));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.get('/api/reclamations/dashboard', requirePermission('can_view_reclamations'), async (req, res) => {
+    try {
+        const dealerIds = await getScopedDealerIds(req);
+        const query = {
+            $or: [
+                { resolution: { $exists: false } },
+                { resolution: null },
+                { resolution: '' }
+            ]
+        };
+        if (dealerIds) query.dealerId = { $in: dealerIds };
+
+        const list = await Reclamation.find(query)
+            .select('dealerId dealerName resolution createdAt date')
+            .sort({ createdAt: -1 })
+            .lean();
+        res.json(list.map(convertToClient));
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+
+app.get('/api/reclamations', requirePermission('can_view_reclamations'), async (req, res) => {
+    try {
+        const dealerIds = await getScopedDealerIds(req);
+        const pipeline = [];
+        if (dealerIds) pipeline.push({ $match: { dealerId: { $in: dealerIds } } });
+        pipeline.push(
+            { $sort: { createdAt: -1 } },
+            { $project: {
+                dealerId: 1,
+                dealerName: 1,
+                date: 1,
+                productName: 1,
+                purchasedVolume: 1,
+                description: 1,
+                clientDemand: 1,
+                resolution: 1,
+                invoiceNumber: 1,
+                clientName: 1,
+                defectVolume: 1,
+                compensationAmount: 1,
+                createdAt: 1,
+                updatedAt: 1,
+                photoCount: { $size: { $ifNull: ['$photos', []] } }
+            } }
+        );
+        const list = await Reclamation.aggregate(pipeline);
+        res.json(list.map(item => ({ ...item, id: String(item._id), _id: undefined })));
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+app.get('/api/reclamations/:id', requirePermission('can_view_reclamations'), async (req, res) => {
+    try {
+        const dealerIds = await getScopedDealerIds(req);
+        const query = { _id: req.params.id };
+        if (dealerIds) query.dealerId = { $in: dealerIds };
+        const item = await Reclamation.findOne(query).lean();
+        if (!item) return res.status(404).json({ error: 'Рекламация не найдена' });
+        res.json(convertToClient(item));
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+
+app.post('/api/reclamations', requirePermission('can_manage_reclamations'), async (req, res) => {
+    try { 
+        const r = new Reclamation(req.body); 
+        await r.save(); 
+        res.json(convertToClient(r)); 
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+app.put('/api/reclamations/:id', requirePermission('can_manage_reclamations'), async (req, res) => {
+    try { 
+        const r = await Reclamation.findByIdAndUpdate(req.params.id, req.body, { new: true }); 
+        res.json(convertToClient(r)); 
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+app.delete('/api/reclamations/:id', requirePermission('can_manage_reclamations'), async (req, res) => {
+    try { 
+        await Reclamation.findByIdAndDelete(req.params.id); 
+        res.json({status: 'deleted'}); 
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+
+app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
+,'i') })) {
+        next += 1;
+        code = 'IF' + String(next).padStart(3,'0');
+    }
+    return code;
+}
+
+app.get('/api/dealers', requireAnyPermission('can_view_dealers', 'can_view_map', 'can_view_sales', 'can_view_competitors', 'can_view_reclamations'), async (req, res) => {
+    try {
+        let filter = getDealerFilter(req);
+        if (req.query.scope === 'all' && req.user.permissions && req.user.permissions.is_admin) filter = {};
+        if (req.query.context === 'sales' && hasPermission(req, 'can_view_sales')) filter = {};
+        if (!shouldIncludeNonWorkingDealers(req)) filter = getWorkingDealerFilter(filter);
+
+        let query = Dealer.find(filter);
+        if (req.query.view === 'map') {
+            query = query.select('_id name city address contacts latitude longitude status responsible responsibleUserId');
+        } else {
+            query = query.select('-photos -visits -products -avatarUrl');
+        }
+        const dealers = await query.lean();
+        res.json(dealers.map(d => ({ id: d._id, ...d })));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.get('/api/dealers/:id/avatar', requirePermission('can_view_dealers'), async (req, res) => {
+    try {
+        const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).select('avatarUrl').lean();
+        if (!d) return res.status(404).json({ error: 'Дилер не найден' });
+        res.set('Cache-Control', 'private, max-age=900');
+        res.json({ avatarUrl: d.avatarUrl || '' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.get('/api/dealers/:id', requirePermission('can_view_dealers'), async (req, res) => {
+    try {
+        let query = Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) });
+        if (req.query.view === 'profile') {
+            query = query.select('-photos').populate('products', 'sku name');
+        } else {
+            query = query.populate('products');
+        }
+        const d = await query.lean();
+        if (!d) return res.status(404).json({ error: 'Дилер не найден' });
+        if (req.query.view === 'profile') res.set('Cache-Control', 'private, max-age=30');
+        res.json(convertToClient(d));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.get('/api/dealers/:id/photos', requirePermission('can_view_dealers'), async (req, res) => {
+    try {
+        const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).select('photos').lean();
+        if (!d) return res.status(404).json({ error: 'Дилер не найден' });
+        res.set('Cache-Control', 'private, max-age=60');
+        res.json(Array.isArray(d.photos) ? d.photos : []);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.post('/api/dealers', requirePermission('can_create_dealer'), async (req, res) => { try {
+    const scope = getUserScope(req);
+    const payload = canonicalDealerPayload(req.body);
+    if (req.user.role === 'manager' && !isGlobalViewer(req)) {
+        payload.responsibleUserId = String(req.user.id || '');
+        payload.responsibleAssignmentSource = 'self_create';
+        if (scope === 'astana') payload.responsible = 'regional_astana';
+        if (scope === 'regions') payload.responsible = 'regional_regions';
+    }
+    const d = new Dealer(payload);
+    await d.save();
+    res.status(201).json(convertToClient(d));
+} catch (e) { res.status(500).json({ error: e.message }); } });
+app.post('/api/dealers/:id/visits', requirePermission('can_manage_visits'), async (req, res) => {
+    try {
+        const dealer = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) });
+        if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
+
+        const visit = {
+            date: req.body.date || new Date().toISOString().slice(0, 10),
+            comment: String(req.body.comment || '').trim(),
+            isCompleted: req.body.isCompleted !== false
+        };
+        if (!visit.comment) return res.status(400).json({ error: 'Комментарий визита обязателен' });
+
+        dealer.visits = dealer.visits || [];
+        dealer.visits.push(visit);
+        await dealer.save();
+
+        res.status(201).json({ status: 'ok', visit });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/dealers/:id/visits/:index', requirePermission('can_manage_visits'), async (req, res) => {
+    try {
+        const dealer = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) });
+        if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
+
+        const index = Number(req.params.index);
+        if (!Number.isInteger(index) || index < 0 || !dealer.visits || !dealer.visits[index]) {
+            return res.status(404).json({ error: 'Визит не найден' });
+        }
+
+        if (Object.prototype.hasOwnProperty.call(req.body, 'isCompleted')) {
+            dealer.visits[index].isCompleted = Boolean(req.body.isCompleted);
+        }
+        if (Object.prototype.hasOwnProperty.call(req.body, 'comment')) {
+            dealer.visits[index].comment = String(req.body.comment || '').trim();
+        }
+        if (Object.prototype.hasOwnProperty.call(req.body, 'date')) {
+            dealer.visits[index].date = String(req.body.date || '');
+        }
+
+        await dealer.save();
+        res.json({ status: 'ok', visit: dealer.visits[index] });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/dealers/:id', requirePermission('can_edit_dealer'), async (req, res) => {
+    try {
+        const payload = canonicalDealerPayload(req.body);
+        if (req.user.role === 'manager' && !isGlobalViewer(req)) {
+            delete payload.responsibleUserId;
+            delete payload.responsibleAssignmentSource;
+            if (req.user.scope === 'astana') payload.responsible = 'regional_astana';
+            if (req.user.scope === 'regions') payload.responsible = 'regional_regions';
+        }
+
+        const updated = await Dealer.findOneAndUpdate(
+            { _id: req.params.id, ...getDealerFilter(req) },
+            payload,
+            { new: true }
+        );
+        if (!updated) return res.status(404).json({ error: 'Дилер не найден' });
+        res.json({status:'ok'});
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.patch('/api/dealers/:id', requirePermission('can_edit_dealer'), async (req, res) => {
+    try {
+        const payload = canonicalDealerPayload(req.body);
+        if (req.user.role === 'manager' && !isGlobalViewer(req)) {
+            delete payload.responsibleUserId;
+            delete payload.responsibleAssignmentSource;
+            if (req.user.scope === 'astana') payload.responsible = 'regional_astana';
+            if (req.user.scope === 'regions') payload.responsible = 'regional_regions';
+        }
+
+        const updated = await Dealer.findOneAndUpdate(
+            { _id: req.params.id, ...getDealerFilter(req) },
+            { $set: payload },
+            { new: true }
+        ).lean();
+
+        if (!updated) return res.status(404).json({ error: 'Дилер не найден' });
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.delete('/api/dealers/:id', requirePermission('can_delete_dealer'), async (req, res) => { try { await Dealer.findOneAndDelete({ _id: req.params.id, ...getDealerFilter(req) }); res.json({status:'deleted'}); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.get('/api/dealers/:id/products', requireAnyPermission('can_view_dealers', 'can_view_products'), async (req, res) => { const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).populate('products'); if (!d) return res.status(404).json({ error: 'Дилер не найден' }); res.json(d.products.map(convertToClient)); });
+app.put('/api/dealers/:id/products', requirePermission('can_edit_matrix'), async (req, res) => { const d = await Dealer.findOneAndUpdate({ _id: req.params.id, ...getDealerFilter(req) }, { products: req.body.productIds }); if (!d) return res.status(404).json({ error: 'Дилер не найден' }); res.json({status:'ok'}); });
+// ==========================================
+// ЦЕНОВЫЕ УСЛОВИЯ ДИЛЕРОВ
+// ==========================================
+app.get('/api/pricing/overview', requirePermission('can_view_pricing'), async (req, res) => {
+    try {
+        const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req)))
+            .select('_id dealer_id name city region_sector price_type responsible')
+            .sort({ name: 1 })
+            .lean();
+        const conditions = await PricingCondition.find({})
+            .populate('dealer', '_id dealer_id name city region_sector price_type responsible')
+            .sort({ createdAt: -1 })
+            .lean();
+
+        const rows = dealers.map(dealer => buildDealerPricingSummary(dealer, conditions));
+        const today = pricingTodayKey();
+        const inSeven = new Date(today + 'T00:00:00Z');
+        inSeven.setUTCDate(inSeven.getUTCDate() + 7);
+        const sevenKey = inSeven.toISOString().slice(0, 10);
+
+        const activeConditionIds = new Set();
+        rows.forEach(row => row.matchedConditions.forEach(condition => {
+            if (condition.computedStatus === 'active') activeConditionIds.add(String(condition._id));
+        }));
+
+        const visibleConditions = conditions
+            .filter(condition => rows.some(row => pricingConditionMatchesDealer(condition, {
+                _id: row.dealerId,
+                name: row.dealerName,
+                city: row.city,
+                region_sector: row.sector,
+                price_type: row.defaultPriceType,
+                responsible: row.responsible
+            })))
+            .map(condition => ({
+                ...condition,
+                computedStatus: pricingConditionStatus(condition, today)
+            }));
+
+        res.json({
+            today,
+            rows,
+            conditions: visibleConditions,
+            stats: {
+                dealersWith5: rows.filter(row => row.has5 && !row.has10).length,
+                dealersWith10: rows.filter(row => row.has10 && !row.has5).length,
+                dealersWithBoth: rows.filter(row => row.has5 && row.has10).length,
+                activePriceOverrides: rows.filter(row => row.priceListCondition).length,
+                expiringSoon: visibleConditions.filter(condition =>
+                    condition.computedStatus === 'active' &&
+                    condition.endDate &&
+                    condition.endDate >= today &&
+                    condition.endDate <= sevenKey
+                ).length,
+                pendingRequirements: rows.reduce((sum, row) => sum + row.pendingRequirements, 0)
+            }
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/pricing/dealers/:id', requirePermission('can_view_pricing'), async (req, res) => {
+    try {
+        const dealer = await Dealer.findOne({
+            $and: [
+                { _id: req.params.id },
+                getWorkingDealerFilter(getDealerFilter(req))
+            ]
+        }).select('_id dealer_id name city region_sector price_type responsible')
+            .lean();
+        if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
+
+        const conditions = await PricingCondition.find({})
+            .populate('dealer', '_id dealer_id name city region_sector price_type responsible')
+            .sort({ createdAt: -1 })
+            .lean();
+        res.json(buildDealerPricingSummary(dealer, conditions));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/pricing/conditions', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const payload = cleanPricingPayload(req.body);
+        const validation = validatePricingPayload(payload);
+        if (validation) return res.status(400).json({ error: validation });
+        const duplicate = await findPricingDuplicate(payload);
+        if (duplicate) {
+            return res.status(400).json({ error: `Условие с кодом «${payload.code}» уже действует на эту же цель в пересекающийся период` });
+        }
+
+        if (!isGlobalViewer(req) && payload.scopeType !== 'dealer') {
+            return res.status(403).json({ error: 'Региональные и общие ценовые условия может создавать только пользователь с доступом ко всей компании' });
+        }
+        if (payload.scopeType === 'dealer') {
+            const dealer = await Dealer.findOne({
+                $and: [
+                    { _id: payload.dealer },
+                    getWorkingDealerFilter(getDealerFilter(req))
+                ]
+            }).select('_id').lean();
+            if (!dealer) return res.status(404).json({ error: 'Дилер недоступен' });
+        }
+
+        const user = pricingUserMeta(req);
+        const condition = await PricingCondition.create({
+            ...payload,
+            createdBy: user,
+            updatedBy: user,
+            audit: [{ action: 'created', userId: user.id, userName: user.name, note: 'Условие создано' }]
+        });
+        const populated = await PricingCondition.findById(condition._id).populate('dealer', '_id dealer_id name city region_sector price_type responsible').lean();
+        res.status(201).json({ ...populated, computedStatus: pricingConditionStatus(populated) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.put('/api/pricing/conditions/:id', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const existing = await PricingCondition.findById(req.params.id);
+        if (!existing) return res.status(404).json({ error: 'Ценовое условие не найдено' });
+        if (existing.cancelledAt) return res.status(400).json({ error: 'Отменённое условие нельзя редактировать' });
+
+        const payload = cleanPricingPayload(req.body);
+        const validation = validatePricingPayload(payload);
+        if (validation) return res.status(400).json({ error: validation });
+        const duplicate = await findPricingDuplicate(payload, existing._id);
+        if (duplicate) {
+            return res.status(400).json({ error: `Условие с кодом «${payload.code}» уже действует на эту же цель в пересекающийся период` });
+        }
+
+        if (!isGlobalViewer(req) && payload.scopeType !== 'dealer') {
+            return res.status(403).json({ error: 'Региональные и общие ценовые условия может менять только пользователь с доступом ко всей компании' });
+        }
+        if (payload.scopeType === 'dealer') {
+            const dealer = await Dealer.findOne({
+                $and: [
+                    { _id: payload.dealer },
+                    getWorkingDealerFilter(getDealerFilter(req))
+                ]
+            }).select('_id').lean();
+            if (!dealer) return res.status(404).json({ error: 'Дилер недоступен' });
+        }
+
+        const user = pricingUserMeta(req);
+        Object.assign(existing, payload, { updatedBy: user });
+        existing.audit.push({ action: 'updated', userId: user.id, userName: user.name, note: String(req.body.auditNote || 'Условие изменено').trim() });
+        await existing.save();
+
+        const populated = await PricingCondition.findById(existing._id).populate('dealer', '_id dealer_id name city region_sector price_type responsible').lean();
+        res.json({ ...populated, computedStatus: pricingConditionStatus(populated) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.delete('/api/pricing/conditions/:id', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const condition = await PricingCondition.findById(req.params.id);
+        if (!condition) return res.status(404).json({ error: 'Ценовое условие не найдено' });
+        if (condition.cancelledAt) return res.status(400).json({ error: 'Условие уже отменено' });
+
+        const user = pricingUserMeta(req);
+        condition.cancelledAt = new Date();
+        condition.updatedBy = user;
+        condition.audit.push({
+            action: 'cancelled',
+            userId: user.id,
+            userName: user.name,
+            note: String(req.body?.reason || 'Условие отменено').trim()
+        });
+        await condition.save();
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.get('/api/products/count', requireAnyPermission('can_view_products', 'can_view_report', 'can_view_reclamations', 'can_view_dealers'), async (req, res) => {
+    try {
+        const count = await Product.countDocuments({});
+        res.json({ count });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.get('/api/products', requireAnyPermission('can_view_products', 'can_view_report', 'can_view_reclamations', 'can_view_dealers'), async (req, res) => { const s = new RegExp(req.query.search||'', 'i'); const p = await Product.find({$or:[{sku:s},{name:s}]}).sort({sku:1}).lean(); res.json(p.map(x=>{x.id=x._id;return x;})); });
+app.post('/api/products', requirePermission('can_manage_products'), async (req, res) => { const p = new Product(req.body); await p.save(); res.json(convertToClient(p)); });
+app.put('/api/products/:id', requirePermission('can_manage_products'), async (req, res) => { const p = await Product.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(p)); });
+app.delete('/api/products/:id', requirePermission('can_manage_products'), async (req, res) => { await Product.findByIdAndDelete(req.params.id); res.json({}); });
+app.post('/api/admin/import-catalog', requirePermission('can_manage_products'), async (req, res) => { res.json({status: 'ok'}); });
+app.get('/api/matrix', requireAnyPermission('can_view_products', 'can_view_report'), async (req, res) => {
+    try {
+        const [prods, dealers] = await Promise.all([
+            Product.find({}).select('sku name is_liquid').sort({sku:1}).lean(),
+            Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id name city responsible products pos_materials status').lean()
+        ]);
+        const dealerIds = dealers.map(d => d._id);
+        const assets = dealerIds.length
+            ? await WorkshopDealerAsset.find({ dealer: { $in: dealerIds }, qty: { $gt: 0 } })
+                .populate('recipe', 'product outputType')
+                .lean()
+            : [];
+
+        const productMap = new Map();
+        dealers.forEach(d => productMap.set(d._id.toString(), new Set((d.products||[]).map(String))));
+
+        const sampleMap = new Map();
+        assets.forEach(asset => {
+            const productId = asset.recipe?.outputType === 'sample' ? asset.recipe?.product : null;
+            if (!productId) return;
+            const key = `${asset.dealer}|${productId}`;
+            sampleMap.set(key, (sampleMap.get(key) || 0) + (Number(asset.qty) || 0));
+        });
+
+        const posList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"];
+        const matrix = prods.map(p => ({
+            sku: p.sku,
+            name: p.name,
+            type: 'product',
+            is_liquid: p.is_liquid !== false,
+            dealers: dealers.map(d => ({
+                value: productMap.get(d._id.toString()).has(p._id.toString()) ? 1 : 0,
+                sample_qty: sampleMap.get(`${d._id}|${p._id}`) || 0,
+                is_pos: false
+            }))
+        }));
+
+        posList.forEach(pn => {
+            matrix.push({
+                sku: "POS",
+                name: pn,
+                type: 'pos',
+                dealers: dealers.map(d => ({
+                    value: (d.pos_materials||[]).find(m=>m.name===pn)?.quantity||0,
+                    is_pos: true
+                }))
+            });
+        });
+        res.json({
+            headers: dealers.map(d=>({id:d._id, name:d.name, city:d.city, responsible:d.responsible})),
+            matrix
+        });
+    } catch (e) {
+        res.status(500).json({error:e.message});
+    }
+});
+
+app.get('/api/sales', requirePermission('can_view_sales'), async (req, res) => {
+    try {
+        const { month, months, dealerId } = req.query;
+        let filter = month ? { month } : {};
+        if (!month && months) {
+            const count = Math.max(1, Math.min(24, Number(months) || 6));
+            const now = new Date();
+            now.setUTCDate(1);
+            now.setUTCMonth(now.getUTCMonth() - (count - 1));
+            const minMonth = now.toISOString().slice(0, 7);
+            filter = { month: { $gte: minMonth } };
+        }
+        const scope = getUserScope(req);
+        const companySalesView = req.query.context === 'sales' && hasPermission(req, 'can_view_sales');
+
+        if (!companySalesView && !isGlobalViewer(req) && req.user.role === 'manager') {
+            const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id').lean();
+            const dealerIds = dealers.map(d => String(d._id));
+            const zonePlanId = scope === 'astana'
+                ? 'PLAN_astana_all'
+                : scope === 'regions'
+                    ? 'PLAN_regions_all'
+                    : 'PLAN_total_all';
+
+            filter = {
+                $and: [
+                    filter,
+                    {
+                        $or: [
+                            // Факт менеджера считается исключительно по дилерам,
+                            // где он выбран ответственным.
+                            { isCustom: { $ne: true }, dealerId: { $in: dealerIds } },
+                            // План берём из сводки его зоны на странице Продажи.
+                            { isCustom: { $ne: true }, dealerId: zonePlanId }
+                        ]
+                    }
+                ]
+            };
+        } else if (!companySalesView && !isGlobalViewer(req) && scope !== 'all') {
+            const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id').lean();
+            const dealerIds = dealers.map(d => String(d._id));
+            const personalPlanIds = dealerIds.map(id => `PLAN_vip_${id}`);
+
+            const sectorType = scope === 'astana' ? 'astana' : 'region';
+            const sectors = await Sector.find({ type: sectorType }).select('name').lean();
+            const slug = name => String(name || '').trim().replace(/\s+/g, '_').toLowerCase();
+            const groupKeys = scope === 'astana'
+                ? [...sectors.map(s => `astana_${slug(s.name)}`), 'regional_astana']
+                : [...sectors.map(s => `sector_${slug(s.name)}`), 'regional_regions'];
+
+            const groupPlanIds = groupKeys.map(key => `PLAN_${key}`);
+            groupPlanIds.push(scope === 'astana' ? 'PLAN_astana_all' : 'PLAN_regions_all');
+            const allowedPlanIds = [...personalPlanIds, ...groupPlanIds];
+
+            filter = {
+                $and: [
+                    filter,
+                    {
+                        $or: [
+                            { isCustom: { $ne: true }, dealerId: { $in: dealerIds } },
+                            { isCustom: { $ne: true }, dealerId: { $in: allowedPlanIds } },
+                            { isCustom: true, group: { $in: groupKeys } }
+                        ]
+                    }
+                ]
+            };
+        }
+
+        if (dealerId) {
+            const requestedDealerId = String(dealerId);
+            const requestedPlanId = `PLAN_vip_${requestedDealerId}`;
+            filter = {
+                $and: [
+                    filter,
+                    { dealerId: { $in: [requestedDealerId, requestedPlanId] } }
+                ]
+            };
+        }
+
+        const s = await Sales.find(filter).lean();
+
+        // Нерабочие дилеры (potential/archive) не участвуют в текущей
+        // операционной статистике продаж. Сами исторические строки Sales
+        // остаются в базе и могут снова участвовать после возврата дилера
+        // в рабочий статус.
+        const workingBaseFilter = (companySalesView || isGlobalViewer(req)) ? {} : getDealerFilter(req);
+        const workingDealers = await Dealer.find(getWorkingDealerFilter(workingBaseFilter)).select('_id').lean();
+        const workingDealerIds = new Set(workingDealers.map(item => String(item._id)));
+
+        const visibleSales = s.filter(row => {
+            if (row.isCustom) return true;
+            const rowDealerId = String(row.dealerId || '');
+            if (!rowDealerId) return true;
+
+            if (rowDealerId.startsWith('PLAN_manager_')) return false;
+            if (rowDealerId.startsWith('PLAN_vip_')) {
+                return workingDealerIds.has(rowDealerId.replace('PLAN_vip_', ''));
+            }
+            if (rowDealerId.startsWith('PLAN_')) return true;
+            return workingDealerIds.has(rowDealerId);
+        });
+
+        res.json(visibleSales);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ===== ИСПРАВЛЕННЫЙ БЛОК: СОХРАНЕНИЕ, АГРЕГАЦИЯ И УДАЛЕНИЕ =====
+app.post('/api/sales', async (req, res) => {
+    const canFact = hasPermission(req, 'can_edit_sales_fact');
+    const canPlan = hasPermission(req, 'can_edit_sales_plan');
+    if (!canFact && !canPlan) {
+        return res.status(403).json({ error: 'Недостаточно прав для изменения продаж' });
+    }
+
+    const now = new Date();
+    const scope = req.user ? req.user.scope : 'none';
+    const companySalesView = req.query.context === 'sales' && hasPermission(req, 'can_view_sales');
+    const managerRestricted = Boolean(req.user && req.user.role === 'manager' && !isGlobalViewer(req) && !companySalesView);
+    let managerDealerIds = null;
+    if (managerRestricted) {
+        const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id').lean();
+        managerDealerIds = new Set(dealers.map(d => String(d._id)));
+    }
+
+    // 1. Агрегируем дубликаты из присланных данных (если ввели несколько с одинаковым именем)
+    const aggregatedData = {};
+    (Array.isArray(req.body.data) ? req.body.data : []).forEach(i => {
+        const row = { ...i };
+
+        if (managerRestricted) {
+            const dealerId = String(row.dealerId || '');
+            if (row.isCustom) {
+                row.ownerUserId = String(req.user.id);
+            } else if (dealerId.startsWith('PLAN_manager_')) {
+                return;
+            } else if (dealerId.startsWith('PLAN_vip_')) {
+                const ownedDealerId = dealerId.replace('PLAN_vip_', '');
+                if (!managerDealerIds.has(ownedDealerId)) return;
+            } else if (dealerId.startsWith('PLAN_')) {
+                return;
+            } else if (!managerDealerIds.has(dealerId)) {
+                return;
+            }
+        }
+        if (String(row.dealerId || '').startsWith('PLAN_manager_')) return;
+        if (!canFact) delete row.fact;
+        if (!canPlan) delete row.plan;
+
+        const key = row.isCustom ? `custom_${row.group}_${row.dealerName}` : `dealer_${row.dealerId}`;
+        if (!aggregatedData[key]) {
+            aggregatedData[key] = row;
+        } else {
+            if (canFact) aggregatedData[key].fact = (Number(aggregatedData[key].fact) || 0) + (Number(row.fact) || 0);
+            if (canPlan) aggregatedData[key].plan = (Number(aggregatedData[key].plan) || 0) + (Number(row.plan) || 0);
+        }
+    });
+
+    // 2. Обновляем/Добавляем записи
+    const ops = Object.values(aggregatedData).map(i => {
+        const filter = { month: req.body.month };
+        if (i.isCustom) {
+            filter.isCustom = true;
+            filter.dealerName = i.dealerName;
+            if (i.group) filter.group = i.group; 
+        } else {
+            filter.dealerId = i.dealerId;
+        }
+
+        return {
+            updateOne: { 
+                filter: filter, 
+                update: { $set: { ...i, updatedAt: now } }, 
+                upsert: true 
+            } 
+        };
+    }); 
+    
+    if (ops.length > 0) {
+        await Sales.bulkWrite(ops); 
+    }
+
+    // Старые планы менеджеров больше не используются: план задаётся по зоне/сектору/дилеру.
+    await Sales.deleteMany({
+        month: req.body.month,
+        dealerId: { $regex: '^PLAN_manager_' }
+    });
+
+    // 3. Умное удаление (Очистка разовых продаж)
+    // Определяем, к каким группам имеет доступ текущий пользователь
+    let groupFilter = {};
+    if (managerRestricted) {
+        groupFilter = { ownerUserId: String(req.user.id) };
+    } else if (!companySalesView && scope === 'astana') {
+        const sectors = await Sector.find({ type: 'astana' });
+        groupFilter = { group: { $in: sectors.map(s => s.name) } };
+    } else if (!companySalesView && scope === 'regions') {
+        const sectors = await Sector.find({ type: 'region' });
+        groupFilter = { group: { $in: sectors.map(s => s.name) } };
+    }
+    // Если admin или all, groupFilter остается пустым (имеет доступ ко всем)
+
+    // Ищем все разовые продажи за этот месяц в базе (в рамках доступа пользователя)
+    const dbCustomSales = await Sales.find({ 
+        month: req.body.month, 
+        isCustom: true, 
+        ...groupFilter 
+    });
+
+    const idsToDelete = [];
+    const incomingArray = Object.values(aggregatedData);
+
+    if (canFact) dbCustomSales.forEach(dbSale => {
+        // Проверяем, осталась ли эта продажа в присланных данных
+        const existsInIncoming = incomingArray.some(
+            i => i.isCustom && i.group === dbSale.group && i.dealerName === dbSale.dealerName
+        );
+        
+        // Если в присланных данных её больше нет — помечаем на удаление
+        if (!existsInIncoming) {
+            idsToDelete.push(dbSale._id);
+        }
+    });
+
+    // Удаляем всё лишнее
+    if (canFact && idsToDelete.length > 0) {
+        await Sales.deleteMany({ _id: { $in: idsToDelete } });
+    }
+
+    res.json({status:'ok'}); 
+});
+// ===================================================================
+
+app.get('/api/competitors-ref', requirePermission('can_view_competitors'), async (req, res) => { const l = await CompRef.find().sort({name:1}); res.json(l.map(convertToClient)); });
+app.post('/api/competitors-ref', requirePermission('can_manage_competitors'), async (req, res) => { const c = new CompRef(req.body); await c.save(); res.json(convertToClient(c)); });
+app.put('/api/competitors-ref/:id', requirePermission('can_manage_competitors'), async (req, res) => { await CompRef.findByIdAndUpdate(req.params.id, req.body); res.json({status:'ok'}); });
+app.delete('/api/competitors-ref/:id', requirePermission('can_manage_competitors'), async (req, res) => { await CompRef.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
+app.get('/api/knowledge', requirePermission('can_view_knowledge'), async (req, res) => { const l = await Knowledge.find().sort({title:1}); res.json(l.map(convertToClient)); });
+app.get('/api/knowledge/:id', requirePermission('can_view_knowledge'), async (req, res) => { res.json(convertToClient(await Knowledge.findById(req.params.id))); });
+app.post('/api/knowledge', requirePermission('can_manage_knowledge'), async (req, res) => { const a = new Knowledge(req.body); await a.save(); res.json(convertToClient(a)); });
+app.put('/api/knowledge/:id', requirePermission('can_manage_knowledge'), async (req, res) => { const a = await Knowledge.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(a)); });
+app.delete('/api/knowledge/:id', requirePermission('can_manage_knowledge'), async (req, res) => { await Knowledge.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
+app.get('/api/tasks', requirePermission('can_view_dashboard'), async (req, res) => { try { const data = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('name visits status responsible').lean(); res.json(data.map(d => ({ id: d._id, name: d.name, status: d.status, visits: d.visits || [], responsible: d.responsible }))); } catch (e) { res.status(500).json([]); } });
+
+async function getScopedDealerIds(req) {
+    const baseFilter = isGlobalViewer(req) ? {} : getDealerFilter(req);
+    const dealers = await Dealer.find(getWorkingDealerFilter(baseFilter)).select('_id').lean();
+    return dealers.map(d => String(d._id));
+}
+
+// ==========================================
+// РЕКВИЗИТЫ И РЕКЛАМАЦИИ
+// ==========================================
+const reclamationSchema = new mongoose.Schema({
+    dealerId: String,
+    dealerName: String,
+    date: String,
+    productName: String,
+    invoiceNumber: String,
+    purchaseDate: String,
+    clientName: String,
+    clientPhone: String,
+    address: String,
+    floor: String,
+    houseType: String,
+    totalArea: String,
+    purchasedVolume: String,
+    batchNumbers: [String],
+    baseType: String,
+    underlayment: String,
+    warmFloor: String,
+    installer: String,
+    
+    // --- НОВЫЕ ТЕХНИЧЕСКИЕ ПОЛЯ ---
+    acclimatization: String, 
+    storageMethod: String,
+    dryingTime: String,
+    floorFlatness: String,
+// --- НОВЫЕ ПОЛЯ ---
+    defectMoment: String,       // Момент выявления
+    compensationAmount: Number, // Сумма компенсации
+    internalNotes: String,
+    
+    description: String,
+    clientDemand: String,
+    resolution: String,
+    photos: [{ photo_url: String }]
+}, { timestamps: true });
+const Reclamation = mongoose.model('Reclamation', reclamationSchema);
+
+
+// ==========================================
+// ЦЕХ API
+// ==========================================
+async function syncWorkshopPosToDealer(dealerId, recipeId) {
+    const recipe = await WorkshopRecipe.findById(recipeId).select('matrixPosName').lean();
+    const posName = String(recipe?.matrixPosName || '').trim();
+    if (!posName) return;
+
+    const recipes = await WorkshopRecipe.find({ matrixPosName: posName }).select('_id').lean();
+    const recipeIds = recipes.map(item => item._id);
+    const assets = await WorkshopDealerAsset.find({ dealer: dealerId, recipe: { $in: recipeIds } }).lean();
+    const qty = assets.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+
+    const dealer = await Dealer.findById(dealerId);
+    if (!dealer) return;
+    dealer.pos_materials = Array.isArray(dealer.pos_materials) ? dealer.pos_materials : [];
+    const index = dealer.pos_materials.findIndex(item => item.name === posName);
+    if (qty > 0) {
+        if (index >= 0) dealer.pos_materials[index].quantity = qty;
+        else dealer.pos_materials.push({ name: posName, quantity: qty });
+    } else if (index >= 0) {
+        dealer.pos_materials.splice(index, 1);
+    }
+    await dealer.save();
+}
+
+app.post('/api/workshop/print-log', requirePermission('can_view_workshop'), async (req, res) => {
+    try {
+        const type=String(req.body?.type||'report').trim().slice(0,60);
+        const referenceId=String(req.body?.referenceId||'').trim().slice(0,120);
+        const title=String(req.body?.title||'Документ цеха').trim().slice(0,180);
+        res.json({status:'logged',type,referenceId,title});
+    } catch(e) {
+        res.status(500).json({error:e.message});
+    }
+});
+
+app.get('/api/workshop/bootstrap', requirePermission('can_view_workshop'), async (req, res) => {
+    try {
+        const [products, dealers, materials, recipes, laminateStocks, assets, productions, movements, memos] = await Promise.all([
+            Product.find().select('sku name is_liquid characteristics.package_qty characteristics.size characteristics.class characteristics.thickness').sort({ sku: 1 }).lean(),
+            Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id dealer_id name city status').sort({ name: 1 }).lean(),
+            WorkshopMaterial.find({ active: { $ne: false } }).sort({ category: 1, name: 1 }).lean(),
+            WorkshopRecipe.find({ active: { $ne: false } })
+                .populate('product', 'sku name is_liquid characteristics.package_qty')
+                .populate('materials.material', 'code name unit purchaseUnit purchaseUnitSize stockQty')
+                .populate('components.recipe', 'name outputType stockQty')
+                .sort({ outputType: 1, name: 1 }).lean(),
+            WorkshopLaminateStock.find().populate('product', 'sku name is_liquid characteristics.package_qty').lean(),
+            WorkshopDealerAsset.find({ qty: { $gt: 0 } })
+                .populate('dealer', 'dealer_id name city status')
+                .populate({ path: 'recipe', populate: { path: 'product', select: 'sku name is_liquid' } })
+                .sort({ updatedAt: -1 }).lean(),
+            WorkshopProduction.find({ cancelledAt: { $exists: false } })
+                .populate('recipe', 'name outputType')
+                .populate('product', 'sku name')
+                .sort({ date: -1, createdAt: -1 }).limit(30).lean(),
+            WorkshopMovement.find()
+                .populate('product', 'sku name')
+                .populate('material', 'code name unit')
+                .populate('recipe', 'name outputType')
+                .populate('dealer', 'dealer_id name city')
+                .sort({ date: -1, createdAt: -1 }).limit(60).lean(),
+            WorkshopMemo.find()
+                .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+                .populate('lines.actualProduct', 'sku name is_liquid characteristics.package_qty')
+                .populate('lines.recipe', 'name outputType planksPerUnit')
+                .sort({ date: -1, createdAt: -1 }).limit(80).lean()
+        ]);
+
+        const memoIds = memos.map(item => item._id);
+        const producedByMemoLine = memoIds.length ? await WorkshopProduction.aggregate([
+            { $match: { memo: { $in: memoIds }, memoLineId: { $nin: [null, ''] }, cancelledAt: { $exists: false } } },
+            { $group: { _id: '$memoLineId', qty: { $sum: '$outputQty' } } }
+        ]) : [];
+        const producedMap = new Map(producedByMemoLine.map(item => [String(item._id), Number(item.qty) || 0]));
+        memos.forEach(memo => {
+            (memo.lines || []).forEach(line => {
+                line.producedQty = producedMap.get(String(line._id)) || 0;
+            });
+        });
+
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const todayRows = await WorkshopProduction.find({ date: { $gte: today }, cancelledAt: { $exists: false } }).select('outputQty').lean();
+        const todayProduction = todayRows.reduce((sum, item) => sum + (Number(item.outputQty) || 0), 0);
+        const finishedStock = recipes.reduce((sum, item) => sum + (Number(item.stockQty) || 0), 0);
+        const lowMaterials = materials.filter(item => Number(item.minQty) > 0 && Number(item.stockQty) <= Number(item.minQty)).length;
+        const laminatePlanks = laminateStocks.reduce((sum, item) => sum + (Number(item.planksQty) || 0), 0);
+        const openMemos = memos.filter(item => item.status === 'created' || item.status === 'mismatch').length;
+        const visibleAssets = assets.filter(asset => !isNonWorkingDealerStatus(asset.dealer?.status));
+        const dealerAssetStock = visibleAssets.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+        const openingBalanceCount = await WorkshopMovement.countDocuments({
+            type: { $in: ['opening_balance', 'opening_dealer_balance'] }
+        });
+
+        res.json({
+            products: products.map(convertToClient),
+            dealers: dealers.map(convertToClient),
+            materials: materials.map(convertToClient),
+            recipes: recipes.map(convertToClient),
+            laminateStocks: laminateStocks.map(convertToClient),
+            dealerAssets: visibleAssets.map(convertToClient),
+            productions: productions.map(convertToClient),
+            movements: movements.map(convertToClient),
+            memos: memos.map(convertToClient),
+            stats: { todayProduction, finishedStock, lowMaterials, laminatePlanks, openMemos, dealerAssetStock, openingBalanceCount }
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/workshop/movements', requirePermission('can_view_workshop'), async (req, res) => {
+    try {
+        const limit = Math.max(1, Math.min(500, Number(req.query.limit) || 150));
+        const filter = {};
+        if (req.query.type) filter.type = req.query.type;
+        const list = await WorkshopMovement.find(filter)
+            .populate('product', 'sku name')
+            .populate('material', 'code name unit')
+            .populate('recipe', 'name outputType')
+            .populate('dealer', 'dealer_id name city')
+            .sort({ date: -1, createdAt: -1 }).limit(limit).lean();
+        res.json(list.map(convertToClient));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/materials', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const item = new WorkshopMaterial({
+            code: String(req.body.code || '').trim(),
+            name: String(req.body.name || '').trim(),
+            category: req.body.category || 'consumable',
+            unit: req.body.unit || 'шт',
+            purchaseUnit: String(req.body.purchaseUnit || req.body.unit || 'шт').trim(),
+            purchaseUnitSize: Math.max(0.0001, workshopNumber(req.body.purchaseUnitSize) || 1),
+            stockQty: Math.max(0, workshopNumber(req.body.stockQty)),
+            minQty: Math.max(0, workshopNumber(req.body.minQty)),
+            active: req.body.active !== false,
+            note: String(req.body.note || '').trim()
+        });
+        if (!item.name) return res.status(400).json({ error: 'Укажите название материала' });
+        await item.save();
+        res.status(201).json(convertToClient(item));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.put('/api/workshop/materials/:id', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const payload = {
+            code: String(req.body.code || '').trim(),
+            name: String(req.body.name || '').trim(),
+            category: req.body.category || 'consumable',
+            unit: req.body.unit || 'шт',
+            purchaseUnit: String(req.body.purchaseUnit || req.body.unit || 'шт').trim(),
+            purchaseUnitSize: Math.max(0.0001, workshopNumber(req.body.purchaseUnitSize) || 1),
+            minQty: Math.max(0, workshopNumber(req.body.minQty)),
+            active: req.body.active !== false,
+            note: String(req.body.note || '').trim()
+        };
+        const item = await WorkshopMaterial.findByIdAndUpdate(req.params.id, payload, { new: true });
+        if (!item) return res.status(404).json({ error: 'Материал не найден' });
+        res.json(convertToClient(item));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.delete('/api/workshop/materials/:id', requireIsAdmin, async (req, res) => {
+    try {
+        const item = await WorkshopMaterial.findById(req.params.id);
+        if (!item) return res.status(404).json({ error: 'Материал не найден' });
+
+        const [movementUsed, recipeUsed] = await Promise.all([
+            WorkshopMovement.exists({ material: item._id }),
+            WorkshopRecipe.exists({ 'materials.material': item._id })
+        ]);
+        if (movementUsed || recipeUsed) {
+            return res.status(400).json({ error: 'Материал уже используется в истории или рецептурах. Его можно отредактировать/деактивировать, но не удалить.' });
+        }
+        await WorkshopMaterial.deleteOne({ _id: item._id });
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/material-movement', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const materialId = req.body.materialId;
+        const qty = Math.abs(workshopNumber(req.body.qty));
+        const direction = req.body.direction === 'out' ? 'out' : 'in';
+        if (!materialId || qty <= 0) return res.status(400).json({ error: 'Укажите материал и количество' });
+
+        const delta = direction === 'out' ? -qty : qty;
+        const material = await workshopChangeMaterial(materialId, delta);
+        const movement = await WorkshopMovement.create({
+            date: req.body.date || new Date(),
+            type: req.body.type || (direction === 'out' ? 'material_issue' : 'material_receipt'),
+            entityType: 'material',
+            material: materialId,
+            direction,
+            qty,
+            unit: material.unit || 'шт',
+            serviceMemoNumber: String(req.body.serviceMemoNumber || '').trim(),
+            note: String(req.body.note || '').trim(),
+            createdBy: workshopUser(req)
+        });
+        res.status(201).json({ material: convertToClient(material), movement: convertToClient(movement) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/recipes', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const recipe = new WorkshopRecipe({
+            name: String(req.body.name || '').trim(),
+            outputType: req.body.outputType || 'sample',
+            sku: String(req.body.sku || '').trim(),
+            product: req.body.productId || null,
+            sideA: String(req.body.sideA || '').trim(),
+            sideB: String(req.body.sideB || '').trim(),
+            planksPerUnit: Math.max(0, workshopNumber(req.body.planksPerUnit)),
+            packQtyOverride: Math.max(0, workshopNumber(req.body.packQtyOverride)),
+            matrixPosName: String(req.body.matrixPosName || '').trim(),
+            minStockQty: Math.max(0, workshopNumber(req.body.minStockQty)),
+            materials: Array.isArray(req.body.materials) ? req.body.materials.map(item => ({
+                material: item.materialId,
+                qty: Math.max(0, workshopNumber(item.qty)),
+                mode: item.mode === 'estimate' ? 'estimate' : 'strict'
+            })).filter(item => item.material && item.qty >= 0) : [],
+            components: Array.isArray(req.body.components) ? req.body.components.map(item => ({
+                recipe: item.recipeId,
+                qty: Math.max(0, workshopNumber(item.qty))
+            })).filter(item => item.recipe && item.qty > 0) : [],
+            active: req.body.active !== false,
+            note: String(req.body.note || '').trim()
+        });
+        if (!recipe.name) return res.status(400).json({ error: 'Укажите название изделия' });
+        await recipe.save();
+        res.status(201).json(convertToClient(recipe));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.put('/api/workshop/recipes/:id', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const payload = {
+            name: String(req.body.name || '').trim(),
+            outputType: req.body.outputType || 'sample',
+            sku: String(req.body.sku || '').trim(),
+            product: req.body.productId || null,
+            sideA: String(req.body.sideA || '').trim(),
+            sideB: String(req.body.sideB || '').trim(),
+            planksPerUnit: Math.max(0, workshopNumber(req.body.planksPerUnit)),
+            packQtyOverride: Math.max(0, workshopNumber(req.body.packQtyOverride)),
+            matrixPosName: String(req.body.matrixPosName || '').trim(),
+            minStockQty: Math.max(0, workshopNumber(req.body.minStockQty)),
+            materials: Array.isArray(req.body.materials) ? req.body.materials.map(item => ({
+                material: item.materialId,
+                qty: Math.max(0, workshopNumber(item.qty)),
+                mode: item.mode === 'estimate' ? 'estimate' : 'strict'
+            })).filter(item => item.material && item.qty >= 0) : [],
+            components: Array.isArray(req.body.components) ? req.body.components.map(item => ({
+                recipe: item.recipeId,
+                qty: Math.max(0, workshopNumber(item.qty))
+            })).filter(item => item.recipe && item.qty > 0) : [],
+            active: req.body.active !== false,
+            note: String(req.body.note || '').trim()
+        };
+        const recipe = await WorkshopRecipe.findByIdAndUpdate(req.params.id, payload, { new: true });
+        if (!recipe) return res.status(404).json({ error: 'Рецептура не найдена' });
+        res.json(convertToClient(recipe));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.delete('/api/workshop/recipes/:id', requireIsAdmin, async (req, res) => {
+    try {
+        const recipe = await WorkshopRecipe.findById(req.params.id);
+        if (!recipe) return res.status(404).json({ error: 'Рецептура не найдена' });
+
+        const [productionUsed, movementUsed, dealerUsed, componentUsed, memoUsed] = await Promise.all([
+            WorkshopProduction.exists({ recipe: recipe._id }),
+            WorkshopMovement.exists({ recipe: recipe._id }),
+            WorkshopDealerAsset.exists({ recipe: recipe._id, qty: { $gt: 0 } }),
+            WorkshopRecipe.exists({ 'components.recipe': recipe._id }),
+            WorkshopMemo.exists({ 'lines.recipe': recipe._id })
+        ]);
+        if (productionUsed || movementUsed || dealerUsed || componentUsed || memoUsed || Math.abs(Number(recipe.stockQty) || 0) > 0.0001) {
+            return res.status(400).json({ error: 'Рецептура уже участвует в учёте. Её можно редактировать или деактивировать, но нельзя удалить без нарушения истории.' });
+        }
+        await WorkshopRecipe.deleteOne({ _id: recipe._id });
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/memos', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        let number = String(req.body.number || '').trim();
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
+        if (!inputLines.length) return res.status(400).json({ error: 'Добавьте хотя бы одну позицию' });
+        if (!number) {
+            let seq = Math.max(1, (await WorkshopMemo.countDocuments()) + 1);
+            while (!number) {
+                const candidate = `ЦЕХ-${String(seq).padStart(4, '0')}`;
+                const exists = await WorkshopMemo.exists({ number: candidate });
+                if (!exists) number = candidate;
+                else seq += 1;
+            }
+        }
+
+        const lines = [];
+        const seenProducts = new Set();
+        for (const input of inputLines) {
+            const requestedPacks = Math.max(0, Math.floor(workshopNumber(input.requestedPacks)));
+            if (!input.productId || requestedPacks <= 0) continue;
+
+            const product = await Product.findById(input.productId).lean();
+            if (!product) continue;
+            const productKey = String(product._id);
+            if (seenProducts.has(productKey)) {
+                return res.status(400).json({ error: `Позиция «${product.sku || product.name}» добавлена в служебку дважды` });
+            }
+            seenProducts.add(productKey);
+
+            let recipe = null;
+            if (input.recipeId) {
+                recipe = await WorkshopRecipe.findOne({
+                    _id: input.recipeId,
+                    product: product._id,
+                    active: { $ne: false }
+                }).lean();
+                if (!recipe) {
+                    return res.status(400).json({ error: `Выбранная рецептура не подходит для «${product.sku || product.name}»` });
+                }
+            } else {
+                const recipes = await WorkshopRecipe.find({
+                    product: product._id,
+                    active: { $ne: false },
+                    planksPerUnit: { $gt: 0 }
+                }).lean();
+                recipe = recipes.find(item => item.outputType === 'sample')
+                    || recipes.find(item => item.outputType === 'stand')
+                    || recipes[0]
+                    || null;
+            }
+
+            const packQty = workshopPackQty(product, recipe?.packQtyOverride || 0);
+            if (packQty <= 0) {
+                return res.status(400).json({ error: `У «${product.sku || product.name}» не заполнено количество планок в упаковке` });
+            }
+            const planksPerUnit = recipe ? Math.max(0, workshopNumber(recipe.planksPerUnit)) : 0;
+
+            const totalPlanks = requestedPacks * packQty;
+            const plannedOutputQty = planksPerUnit > 0 ? Math.floor(totalPlanks / planksPerUnit) : 0;
+            const plannedRemainderPlanks = planksPerUnit > 0 ? totalPlanks - plannedOutputQty * planksPerUnit : totalPlanks;
+
+            lines.push({
+                product: product._id,
+                recipe: recipe?._id || null,
+                requestedPacks,
+                plannedOutputQty,
+                plannedRemainderPlanks,
+                packQty,
+                planksPerUnit,
+                actualProduct: product._id,
+                deliveredPacks: 0,
+                checked: false,
+                isMatch: false,
+                discrepancyReason: ''
+            });
+        }
+
+        if (!lines.length) return res.status(400).json({ error: 'Нет корректных позиций для служебной записки' });
+
+        const memo = await WorkshopMemo.create({
+            number,
+            date: req.body.date || new Date(),
+            lines,
+            note: String(req.body.note || '').trim(),
+            signedBy: String(req.body.signedBy || req.user?.fullName || req.user?.username || '').trim(),
+            createdBy: workshopUser(req)
+        });
+
+        const populated = await WorkshopMemo.findById(memo._id)
+            .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+            .populate('lines.recipe', 'name outputType planksPerUnit')
+            .lean();
+        res.status(201).json(convertToClient(populated));
+    } catch (e) {
+        if (e && e.code === 11000) return res.status(400).json({ error: 'Служебная записка с таким номером уже существует' });
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.put('/api/workshop/memos/:id', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const memo = await WorkshopMemo.findById(req.params.id);
+        if (!memo) return res.status(404).json({ error: 'Служебная записка не найдена' });
+        if (memo.postedAt || memo.status === 'accepted') {
+            return res.status(400).json({ error: 'Принятую служебную записку нельзя редактировать. Используйте корректировку/отмену.' });
+        }
+
+        const number = String(req.body.number || memo.number || '').trim();
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
+        if (!number) return res.status(400).json({ error: 'Укажите номер служебной записки' });
+        if (!inputLines.length) return res.status(400).json({ error: 'Добавьте хотя бы одну позицию' });
+
+        const duplicateNumber = await WorkshopMemo.exists({ number, _id: { $ne: memo._id } });
+        if (duplicateNumber) return res.status(400).json({ error: 'Служебная записка с таким номером уже существует' });
+
+        const seenProducts = new Set();
+        const lines = [];
+        for (const input of inputLines) {
+            const requestedPacks = Math.max(0, Math.floor(workshopNumber(input.requestedPacks)));
+            if (!input.productId || requestedPacks <= 0) continue;
+
+            const product = await Product.findById(input.productId).lean();
+            if (!product) continue;
+            const productKey = String(product._id);
+            if (seenProducts.has(productKey)) {
+                return res.status(400).json({ error: `Позиция «${product.sku || product.name}» добавлена в служебку дважды` });
+            }
+            seenProducts.add(productKey);
+
+            let recipe = null;
+            if (input.recipeId) {
+                recipe = await WorkshopRecipe.findOne({ _id: input.recipeId, product: product._id, active: { $ne: false } }).lean();
+            }
+            if (!recipe) {
+                const recipes = await WorkshopRecipe.find({ product: product._id, active: { $ne: false }, planksPerUnit: { $gt: 0 } }).lean();
+                recipe = recipes.find(item => item.outputType === 'sample') || recipes.find(item => item.outputType === 'stand') || recipes[0] || null;
+            }
+            const packQty = workshopPackQty(product, recipe?.packQtyOverride || 0);
+            const planksPerUnit = recipe ? Math.max(0, workshopNumber(recipe.planksPerUnit)) : 0;
+            if (packQty <= 0) {
+                return res.status(400).json({ error: `У «${product.sku || product.name}» не заполнено количество планок в упаковке` });
+            }
+
+            const totalPlanks = requestedPacks * packQty;
+            const plannedOutputQty = planksPerUnit > 0 ? Math.floor(totalPlanks / planksPerUnit) : 0;
+            const plannedRemainderPlanks = planksPerUnit > 0 ? totalPlanks - plannedOutputQty * planksPerUnit : totalPlanks;
+            lines.push({
+                product: product._id,
+                recipe: recipe?._id || null,
+                requestedPacks,
+                plannedOutputQty,
+                plannedRemainderPlanks,
+                packQty,
+                planksPerUnit,
+                actualProduct: product._id,
+                deliveredPacks: 0,
+                checked: false,
+                isMatch: false,
+                discrepancyReason: ''
+            });
+        }
+
+        if (!lines.length) return res.status(400).json({ error: 'Нет корректных позиций' });
+
+        memo.number = number;
+        memo.date = req.body.date || memo.date || new Date();
+        memo.lines = lines;
+        memo.note = String(req.body.note || '').trim();
+        memo.signedBy = String(req.body.signedBy || '').trim();
+        memo.status = 'created';
+        memo.receiptAttempts = [];
+        await memo.save();
+
+        const populated = await WorkshopMemo.findById(memo._id)
+            .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+            .populate('lines.recipe', 'name outputType planksPerUnit minStockQty stockQty')
+            .lean();
+        res.json(convertToClient(populated));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.delete('/api/workshop/memos/:id', requireIsAdmin, async (req, res) => {
+    try {
+        const memo = await WorkshopMemo.findById(req.params.id);
+        if (!memo) return res.status(404).json({ error: 'Служебная записка не найдена' });
+        if (memo.postedAt || memo.status === 'accepted') {
+            return res.status(400).json({ error: 'Проведённую служебную записку нельзя удалить напрямую: она уже изменила остатки.' });
+        }
+        const linkedProduction = await WorkshopProduction.exists({ memo: memo._id });
+        if (linkedProduction) return res.status(400).json({ error: 'По этой служебке уже есть производство. Сначала отмените связанные операции.' });
+        await WorkshopMemo.deleteOne({ _id: memo._id });
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/memos/:id/receive', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const memo = await WorkshopMemo.findById(req.params.id);
+        if (!memo) return res.status(404).json({ error: 'Служебная записка не найдена' });
+        if (memo.status === 'accepted' && memo.postedAt) {
+            return res.status(400).json({ error: 'Эта служебная записка уже принята и оприходована' });
+        }
+
+        const submitted = Array.isArray(req.body.lines) ? req.body.lines : [];
+        if (!submitted.length) return res.status(400).json({ error: 'Нет строк для сверки' });
+
+        const attemptLines = [];
+        let allMatch = true;
+
+        for (const line of memo.lines) {
+            const row = submitted.find(item => String(item.lineId || '') === String(line._id));
+            const actualProductId = row?.actualProductId || line.product;
+            const deliveredPacks = Math.max(0, Math.floor(workshopNumber(row?.deliveredPacks)));
+            const checked = Boolean(row?.checked);
+            const sameProduct = String(actualProductId || '') === String(line.product || '');
+            const sameQty = deliveredPacks === Number(line.requestedPacks || 0);
+            const isMatch = checked && sameProduct && sameQty;
+
+            line.actualProduct = actualProductId || line.product;
+            line.deliveredPacks = deliveredPacks;
+            line.checked = checked;
+            line.isMatch = isMatch;
+            line.discrepancyReason = String(row?.discrepancyReason || '').trim();
+
+            if (!isMatch) allMatch = false;
+            attemptLines.push({
+                lineId: String(line._id),
+                expectedProductId: String(line.product || ''),
+                actualProductId: String(line.actualProduct || ''),
+                requestedPacks: Number(line.requestedPacks || 0),
+                deliveredPacks,
+                checked,
+                isMatch,
+                discrepancyReason: line.discrepancyReason
+            });
+        }
+
+        memo.receiptAttempts.push({
+            date: req.body.date || new Date(),
+            status: allMatch ? 'accepted' : 'mismatch',
+            lines: attemptLines,
+            note: String(req.body.note || '').trim(),
+            createdBy: workshopUser(req)
+        });
+
+        if (!allMatch) {
+            memo.status = 'mismatch';
+            await memo.save();
+            const populated = await WorkshopMemo.findById(memo._id)
+                .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+                .populate('lines.actualProduct', 'sku name is_liquid characteristics.package_qty')
+                .populate('lines.recipe', 'name outputType planksPerUnit')
+                .lean();
+            return res.status(200).json({
+                accepted: false,
+                status: 'mismatch',
+                message: 'Есть расхождения. Упаковки пока не оприходованы — требуется обмен/повторная сверка.',
+                memo: convertToClient(populated)
+            });
+        }
+
+        if (!memo.postedAt) {
+            for (const line of memo.lines) {
+                const product = await Product.findById(line.product).lean();
+                if (!product) throw new Error('Одна из позиций служебки больше не найдена в каталоге');
+                const packQty = Number(line.packQty) > 0 ? Number(line.packQty) : workshopPackQty(product);
+                const planksQty = Number(line.requestedPacks || 0) * packQty;
+                await workshopChangeLaminate(line.product, planksQty);
+                await WorkshopMovement.create({
+                    date: req.body.date || new Date(),
+                    type: 'laminate_receipt',
+                    entityType: 'laminate',
+                    product: line.product,
+                    direction: 'in',
+                    qty: planksQty,
+                    unit: 'планка',
+                    serviceMemoNumber: memo.number,
+                    note: String(req.body.note || '').trim(),
+                    meta: {
+                        memoId: String(memo._id),
+                        memoLineId: String(line._id),
+                        requestedPacks: Number(line.requestedPacks || 0),
+                        deliveredPacks: Number(line.deliveredPacks || 0),
+                        packQty,
+                        plannedOutputQty: Number(line.plannedOutputQty || 0)
+                    },
+                    createdBy: workshopUser(req)
+                });
+            }
+            memo.postedAt = new Date();
+        }
+
+        memo.status = 'accepted';
+        memo.acceptedAt = new Date();
+        memo.acceptedBy = workshopUser(req);
+        await memo.save();
+
+        const populated = await WorkshopMemo.findById(memo._id)
+            .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+            .populate('lines.actualProduct', 'sku name is_liquid characteristics.package_qty')
+            .populate('lines.recipe', 'name outputType planksPerUnit')
+            .lean();
+
+        res.json({
+            accepted: true,
+            status: 'accepted',
+            message: 'Все позиции совпали. Упаковки оприходованы в цех.',
+            memo: convertToClient(populated)
+        });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/laminate-receipt', requirePermission('can_manage_workshop'), async (req, res) => {
+    return res.status(400).json({
+        error: 'Одиночный приход отключен. Ламинат принимается только целыми упаковками по многострочной служебной записке.'
+    });
+});
+
+app.post('/api/workshop/production', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const recipe = await WorkshopRecipe.findById(req.body.recipeId)
+            .populate('product')
+            .populate('materials.material')
+            .populate('components.recipe');
+        if (!recipe) return res.status(404).json({ error: 'Рецептура не найдена' });
+
+        let sourceMemo = null;
+        let sourceMemoLine = null;
+        if (req.body.memoId) {
+            sourceMemo = await WorkshopMemo.findById(req.body.memoId).lean();
+            if (!sourceMemo || sourceMemo.status !== 'accepted') {
+                return res.status(400).json({ error: 'Можно привязать производство только к принятой служебной записке' });
+            }
+            sourceMemoLine = (sourceMemo.lines || []).find(line => String(line._id) === String(req.body.memoLineId || ''));
+            if (!sourceMemoLine) return res.status(400).json({ error: 'Строка служебной записки не найдена' });
+            if (recipe.product && String(sourceMemoLine.product) !== String(recipe.product._id)) {
+                return res.status(400).json({ error: 'Ламинат рецептуры не совпадает с выбранной строкой служебки' });
+            }
+        }
+
+        const outputQty = Math.max(0, workshopNumber(req.body.outputQty));
+        const scrapPlanks = Math.max(0, workshopNumber(req.body.scrapPlanks));
+        const acceptedPacks = Math.max(0, workshopNumber(req.body.acceptedPacks));
+        const acceptedLoosePlanks = Math.max(0, workshopNumber(req.body.acceptedLoosePlanks));
+        if (outputQty <= 0) return res.status(400).json({ error: 'Укажите количество изготовленных изделий' });
+
+        const packQty = workshopPackQty(recipe.product, recipe.packQtyOverride);
+        const standardPlanksPerUnit = Math.max(0, workshopNumber(recipe.planksPerUnit));
+        const requestedActualNorm = Math.max(0, workshopNumber(req.body.actualPlanksPerUnit));
+        const actualPlanksPerUnit = requestedActualNorm > 0 ? requestedActualNorm : standardPlanksPerUnit;
+        const customNormReason = String(req.body.customNormReason || '').trim();
+        const customOrderName = String(req.body.customOrderName || '').trim();
+        const customDimensions = String(req.body.customDimensions || '').trim();
+        if (requestedActualNorm > 0 && Math.abs(requestedActualNorm - standardPlanksPerUnit) > 0.0001 && !customNormReason) {
+            return res.status(400).json({ error: 'При изменении стандартной нормы укажите причину (например, индивидуальный образец)' });
+        }
+        const usedForOutput = actualPlanksPerUnit * outputQty;
+        const consumedPlanks = usedForOutput + scrapPlanks;
+        const acceptedTotal = acceptedPacks * packQty + acceptedLoosePlanks;
+
+        if (consumedPlanks > 0) {
+            if (!recipe.product) return res.status(400).json({ error: 'Для этой рецептуры не выбран ламинат' });
+            const stock = await WorkshopLaminateStock.findOne({ product: recipe.product._id }).lean();
+            if ((Number(stock?.planksQty) || 0) < consumedPlanks) {
+                return res.status(400).json({ error: 'Недостаточно планок ламината в остатках цеха' });
+            }
+        }
+
+        for (const line of recipe.materials || []) {
+            if (line.mode === 'estimate') continue;
+            const need = (Number(line.qty) || 0) * outputQty;
+            if (need > 0 && (Number(line.material?.stockQty) || 0) < need) {
+                return res.status(400).json({ error: `Недостаточно материала «${line.material?.name || 'материал'}»` });
+            }
+        }
+
+        for (const line of recipe.components || []) {
+            const need = (Number(line.qty) || 0) * outputQty;
+            if (need > 0 && (Number(line.recipe?.stockQty) || 0) < need) {
+                return res.status(400).json({ error: `Недостаточно готовых компонентов «${line.recipe?.name || 'компонент'}»` });
+            }
+        }
+
+        if (consumedPlanks > 0) {
+            await workshopChangeLaminate(recipe.product._id, -consumedPlanks);
+            await WorkshopMovement.create({
+                date: req.body.date || new Date(), type: 'production_laminate',
+                entityType: 'laminate', product: recipe.product._id, direction: 'out',
+                qty: consumedPlanks, unit: 'планка', note: String(req.body.note || '').trim(),
+                serviceMemoNumber: sourceMemo?.number || '',
+                meta: { recipeId: recipe._id, outputQty, scrapPlanks, standardPlanksPerUnit, actualPlanksPerUnit, customNormReason, customOrderName, customDimensions, memoId: sourceMemo?._id || null, memoLineId: sourceMemoLine?._id || null }, createdBy: workshopUser(req)
+            });
+        }
+
+        for (const line of recipe.materials || []) {
+            const need = (Number(line.qty) || 0) * outputQty;
+            if (line.mode === 'estimate') {
+                if (need > 0) {
+                    await WorkshopMovement.create({
+                        date: req.body.date || new Date(), type: 'production_material_estimate',
+                        entityType: 'material', material: line.material._id, direction: 'neutral',
+                        qty: need, unit: line.material.unit || 'шт',
+                        note: 'Расчетный расход; фактический остаток автоматически не уменьшается',
+                        meta: { recipeId: recipe._id, outputQty, estimate: true }, createdBy: workshopUser(req)
+                    });
+                }
+                continue;
+            }
+            if (need <= 0) continue;
+            await workshopChangeMaterial(line.material._id, -need);
+            await WorkshopMovement.create({
+                date: req.body.date || new Date(), type: 'production_material',
+                entityType: 'material', material: line.material._id, direction: 'out',
+                qty: need, unit: line.material.unit || 'шт',
+                meta: { recipeId: recipe._id, outputQty }, createdBy: workshopUser(req)
+            });
+        }
+
+        for (const line of recipe.components || []) {
+            const need = (Number(line.qty) || 0) * outputQty;
+            if (need <= 0) continue;
+            await workshopChangeRecipe(line.recipe._id, -need);
+            await WorkshopMovement.create({
+                date: req.body.date || new Date(), type: 'production_component',
+                entityType: 'finished', recipe: line.recipe._id, direction: 'out',
+                qty: need, unit: 'шт', meta: { recipeId: recipe._id, outputQty },
+                createdBy: workshopUser(req)
+            });
+        }
+
+        const resultStock = await workshopChangeRecipe(recipe._id, outputQty);
+        await WorkshopMovement.create({
+            date: req.body.date || new Date(), type: 'production_output',
+            entityType: 'finished', recipe: recipe._id, direction: 'in',
+            qty: outputQty, unit: 'шт', note: String(req.body.note || '').trim(),
+            serviceMemoNumber: sourceMemo?.number || '',
+            meta: { acceptedPacks, acceptedLoosePlanks, acceptedTotal, packQty, consumedPlanks, scrapPlanks, memoId: sourceMemo?._id || null, memoLineId: sourceMemoLine?._id || null },
+            createdBy: workshopUser(req)
+        });
+
+        const production = await WorkshopProduction.create({
+            date: req.body.date || new Date(),
+            recipe: recipe._id,
+            product: recipe.product?._id || null,
+            memo: sourceMemo?._id || null,
+            memoLineId: sourceMemoLine?._id ? String(sourceMemoLine._id) : '',
+            serviceMemoNumber: sourceMemo?.number || '',
+            acceptedPacks,
+            acceptedLoosePlanks,
+            packQty,
+            totalAcceptedPlanks: acceptedTotal,
+            outputQty,
+            standardPlanksPerUnit,
+            actualPlanksPerUnit,
+            customNormReason,
+            customOrderName,
+            customDimensions,
+            consumedPlanks,
+            scrapPlanks,
+            operations: Array.isArray(req.body.operations)
+                ? req.body.operations.map(item => ({
+                    type: String(item.type || '').trim(),
+                    qty: Math.max(0, workshopNumber(item.qty)),
+                    note: String(item.note || '').trim()
+                })).filter(item => item.type)
+                : [],
+            note: String(req.body.note || '').trim(),
+            createdBy: workshopUser(req)
+        });
+
+        res.status(201).json({ production: convertToClient(production), stock: convertToClient(resultStock) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.put('/api/workshop/productions/:id', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const production = await WorkshopProduction.findById(req.params.id);
+        if (!production) return res.status(404).json({ error: 'Запись производства не найдена' });
+        if (production.cancelledAt) return res.status(400).json({ error: 'Отменённую запись нельзя редактировать' });
+
+        production.date = req.body.date || production.date;
+        production.note = String(req.body.note ?? production.note ?? '').trim();
+        production.customOrderName = String(req.body.customOrderName ?? production.customOrderName ?? '').trim();
+        production.customDimensions = String(req.body.customDimensions ?? production.customDimensions ?? '').trim();
+        production.customNormReason = String(req.body.customNormReason ?? production.customNormReason ?? '').trim();
+        if (Array.isArray(req.body.operations)) {
+            production.operations = req.body.operations.map(item => ({
+                type: String(item.type || '').trim(),
+                qty: Math.max(0, workshopNumber(item.qty)),
+                note: String(item.note || '').trim()
+            })).filter(item => item.type);
+        }
+        await production.save();
+        res.json(convertToClient(production));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.delete('/api/workshop/productions/:id', requireIsAdmin, async (req, res) => {
+    try {
+        const production = await WorkshopProduction.findById(req.params.id)
+            .populate({
+                path: 'recipe',
+                populate: [
+                    { path: 'materials.material' },
+                    { path: 'components.recipe' }
+                ]
+            })
+            .populate('product');
+        if (!production) return res.status(404).json({ error: 'Запись производства не найдена' });
+        if (production.cancelledAt) return res.status(400).json({ error: 'Эта запись уже отменена' });
+
+        const recipe = production.recipe;
+        if (!recipe) return res.status(400).json({ error: 'Рецептура производства не найдена' });
+        const outputQty = Number(production.outputQty) || 0;
+
+        if ((Number(recipe.stockQty) || 0) + 1e-9 < outputQty) {
+            return res.status(400).json({ error: 'Нельзя отменить производство: часть изготовленных изделий уже выдана или использована.' });
+        }
+
+        if (outputQty > 0) await workshopChangeRecipe(recipe._id, -outputQty);
+        if (production.product && Number(production.consumedPlanks) > 0) {
+            await workshopChangeLaminate(production.product._id, Number(production.consumedPlanks));
+        }
+
+        for (const line of recipe.materials || []) {
+            if (line.mode === 'estimate') continue;
+            const qty = (Number(line.qty) || 0) * outputQty;
+            if (qty > 0 && line.material?._id) await workshopChangeMaterial(line.material._id, qty);
+        }
+        for (const line of recipe.components || []) {
+            const qty = (Number(line.qty) || 0) * outputQty;
+            if (qty > 0 && line.recipe?._id) await workshopChangeRecipe(line.recipe._id, qty);
+        }
+
+        await WorkshopMovement.create({
+            date: new Date(),
+            type: 'production_cancelled',
+            entityType: 'finished',
+            recipe: recipe._id,
+            direction: 'out',
+            qty: outputQty,
+            unit: 'шт',
+            serviceMemoNumber: production.serviceMemoNumber || '',
+            note: String(req.body?.reason || 'Отмена записи производства администратором'),
+            meta: {
+                productionId: String(production._id),
+                restoredPlanks: Number(production.consumedPlanks) || 0,
+                cancellation: true
+            },
+            createdBy: workshopUser(req)
+        });
+
+        production.cancelledAt = new Date();
+        production.cancelledBy = workshopUser(req);
+        production.cancelReason = String(req.body?.reason || '').trim();
+        await production.save();
+
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/writeoff', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const entityType = req.body.entityType;
+        const qty = Math.abs(workshopNumber(req.body.qty));
+        const serviceMemoNumber = String(req.body.serviceMemoNumber || '').trim();
+        if (qty <= 0) return res.status(400).json({ error: 'Укажите количество списания' });
+        if (!serviceMemoNumber) return res.status(400).json({ error: 'Для списания укажите номер служебной записки' });
+
+        let movementData = {
+            date: req.body.date || new Date(), type: 'writeoff', entityType,
+            direction: 'out', qty, serviceMemoNumber,
+            note: String(req.body.note || '').trim(), createdBy: workshopUser(req)
+        };
+
+        if (entityType === 'laminate') {
+            await workshopChangeLaminate(req.body.productId, -qty);
+            movementData.product = req.body.productId;
+            movementData.unit = 'планка';
+        } else if (entityType === 'material') {
+            const material = await workshopChangeMaterial(req.body.materialId, -qty);
+            movementData.material = req.body.materialId;
+            movementData.unit = material.unit || 'шт';
+        } else if (entityType === 'finished') {
+            await workshopChangeRecipe(req.body.recipeId, -qty);
+            movementData.recipe = req.body.recipeId;
+            movementData.unit = 'шт';
+        } else {
+            return res.status(400).json({ error: 'Неизвестный тип списания' });
+        }
+
+        const movement = await WorkshopMovement.create(movementData);
+        res.status(201).json(convertToClient(movement));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/dealer-movement', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const dealerId = req.body.dealerId;
+        const recipeId = req.body.recipeId;
+        const action = req.body.action || 'issue';
+        const qty = Math.abs(workshopNumber(req.body.qty));
+        if (!dealerId || !recipeId || qty <= 0) return res.status(400).json({ error: 'Выберите дилера, изделие и количество' });
+
+        const [dealer, recipe] = await Promise.all([
+            Dealer.findById(dealerId).select('_id name'),
+            WorkshopRecipe.findById(recipeId)
+        ]);
+        if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
+        if (!recipe) return res.status(404).json({ error: 'Изделие не найдено' });
+
+        let asset = await WorkshopDealerAsset.findOne({ dealer: dealerId, recipe: recipeId });
+        if (!asset) asset = new WorkshopDealerAsset({ dealer: dealerId, recipe: recipeId, qty: 0 });
+
+        const condition = req.body.returnCondition || 'defect';
+        let issued = 0;
+        let returned = 0;
+
+        if (action === 'issue') {
+            if (Number(recipe.stockQty) < qty) return res.status(400).json({ error: 'Недостаточно готовых изделий в цехе' });
+            await workshopChangeRecipe(recipeId, -qty);
+            asset.qty += qty;
+            issued = qty;
+        } else if (action === 'return') {
+            if (Number(asset.qty) < qty) return res.status(400).json({ error: 'У дилера числится меньше изделий' });
+            asset.qty -= qty;
+            returned = qty;
+            if (condition === 'reusable') await workshopChangeRecipe(recipeId, qty);
+        } else if (action === 'replacement') {
+            const returnQty = Math.abs(workshopNumber(req.body.returnQty || qty));
+            const issueQty = Math.abs(workshopNumber(req.body.issueQty || qty));
+            if (Number(asset.qty) < returnQty) return res.status(400).json({ error: 'У дилера числится меньше изделий для возврата' });
+            if (Number(recipe.stockQty) < issueQty) return res.status(400).json({ error: 'Недостаточно изделий для замены' });
+            asset.qty = Number(asset.qty) - returnQty + issueQty;
+            await workshopChangeRecipe(recipeId, -issueQty);
+            if (condition === 'reusable') await workshopChangeRecipe(recipeId, returnQty);
+            returned = returnQty;
+            issued = issueQty;
+        } else {
+            return res.status(400).json({ error: 'Неизвестная операция с дилером' });
+        }
+
+        asset.qty = Math.max(0, Number(asset.qty) || 0);
+        await asset.save();
+
+        const movement = await WorkshopMovement.create({
+            date: req.body.date || new Date(),
+            type: `dealer_${action}`,
+            entityType: 'finished',
+            recipe: recipeId,
+            dealer: dealerId,
+            direction: action === 'return' ? 'in' : action === 'issue' ? 'out' : 'neutral',
+            qty,
+            unit: 'шт',
+            note: String(req.body.note || '').trim(),
+            meta: { issued, returned, returnCondition: condition, reason: String(req.body.reason || '').trim() },
+            createdBy: workshopUser(req)
+        });
+
+        await syncWorkshopPosToDealer(dealerId, recipeId);
+        res.status(201).json({ asset: convertToClient(asset), movement: convertToClient(movement) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.get('/api/workshop/dealers/:dealerId/assets', requireAnyPermission('can_view_workshop', 'can_view_dealers'), async (req, res) => {
+    try {
+        const assets = await WorkshopDealerAsset.find({ dealer: req.params.dealerId, qty: { $gt: 0 } })
+            .populate({ path: 'recipe', populate: { path: 'product', select: 'sku name is_liquid' } })
+            .sort({ updatedAt: -1 }).lean();
+        res.json(assets.map(convertToClient));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/opening-balance', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const location = req.body.location === 'dealer' ? 'dealer' : 'workshop';
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
+        const date = req.body.date || new Date();
+        const note = String(req.body.note || '').trim();
+        if (!inputLines.length) return res.status(400).json({ error: 'Укажите хотя бы один фактический остаток' });
+
+        let dealer = null;
+        if (location === 'dealer') {
+            if (!req.body.dealerId) return res.status(400).json({ error: 'Выберите дилера' });
+            dealer = await Dealer.findOne({
+                _id: req.body.dealerId,
+                ...getWorkingDealerFilter(getDealerFilter(req))
+            }).select('_id name');
+            if (!dealer) return res.status(404).json({ error: 'Дилер не найден или недоступен' });
+        }
+
+        const changed = [];
+        for (const line of inputLines) {
+            let recipe = null;
+            if (line.recipeId) {
+                recipe = await WorkshopRecipe.findOne({ _id: line.recipeId, active: { $ne: false } });
+            } else if (line.productId) {
+                const product = await Product.findById(line.productId).lean();
+                if (!product) continue;
+
+                const posDef = workshopPosDefinition({ product });
+                if (posDef?.recipeSku) {
+                    recipe = await WorkshopRecipe.findOne({ sku:posDef.recipeSku, active:{ $ne:false } });
+                } else {
+                    recipe = await WorkshopRecipe.findOne({
+                        product: product._id,
+                        outputType: 'sample',
+                        active: { $ne: false }
+                    });
+                    if (!recipe) {
+                        recipe = await WorkshopRecipe.create({
+                            name: `Планшет ${product.sku || ''} ${product.name || ''}`.trim(),
+                            outputType: 'sample',
+                            sku: `SAMPLE-${product.sku || String(product._id).slice(-6)}`,
+                            product: product._id,
+                            planksPerUnit: 0,
+                            packQtyOverride: 0,
+                            stockQty: 0,
+                            minStockQty: 0,
+                            active: true,
+                            note: 'Создано автоматически при вводе стартовых остатков. Норму производства можно заполнить позже.'
+                        });
+                    }
+                }
+            }
+            if (!recipe) continue;
+
+            const actualQty = Math.max(0, workshopNumber(line.actualQty));
+            const lineNote = String(line.note || '').trim();
+
+            if (location === 'workshop') {
+                const previousQty = Number(recipe.stockQty) || 0;
+                const delta = actualQty - previousQty;
+                if (Math.abs(delta) <= 0.0001) continue;
+
+                await workshopChangeRecipe(recipe._id, delta);
+                await WorkshopMovement.create({
+                    date,
+                    type: 'opening_balance',
+                    entityType: 'finished',
+                    recipe: recipe._id,
+                    direction: delta > 0 ? 'in' : 'out',
+                    qty: Math.abs(delta),
+                    unit: 'шт',
+                    note: lineNote || note || 'Стартовый остаток готовых образцов до начала учёта в CRM',
+                    meta: { previousQty, actualQty, delta, source: 'legacy_opening_balance' },
+                    createdBy: workshopUser(req)
+                });
+                changed.push({ recipeId: String(recipe._id), previousQty, actualQty, delta });
+            } else {
+                let asset = await WorkshopDealerAsset.findOne({ dealer: dealer._id, recipe: recipe._id });
+                const previousQty = Number(asset?.qty) || 0;
+                const delta = actualQty - previousQty;
+                if (Math.abs(delta) <= 0.0001) continue;
+
+                if (!asset) asset = new WorkshopDealerAsset({ dealer: dealer._id, recipe: recipe._id, qty: 0 });
+                asset.qty = actualQty;
+                await asset.save();
+
+                await WorkshopMovement.create({
+                    date,
+                    type: 'opening_dealer_balance',
+                    entityType: 'finished',
+                    recipe: recipe._id,
+                    dealer: dealer._id,
+                    direction: 'neutral',
+                    qty: Math.abs(delta),
+                    unit: 'шт',
+                    note: lineNote || note || 'Образцы уже находились у дилера до начала учёта в CRM',
+                    meta: { previousQty, actualQty, delta, source: 'legacy_opening_balance' },
+                    createdBy: workshopUser(req)
+                });
+                await syncWorkshopPosToDealer(dealer._id, recipe._id);
+                changed.push({ recipeId: String(recipe._id), previousQty, actualQty, delta });
+            }
+        }
+
+        if (!changed.length) return res.status(400).json({ error: 'Фактические остатки не отличаются от текущих' });
+        res.status(201).json({
+            status: 'ok',
+            location,
+            dealerId: dealer ? String(dealer._id) : '',
+            changed
+        });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/correction', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const reason = String(req.body.reason || '').trim();
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines.slice(0, 10) : [];
+        if (reason.length < 3) return res.status(400).json({ error: 'Укажите причину исправления' });
+        if (!inputLines.length) return res.status(400).json({ error: 'Добавьте хотя бы одну позицию' });
+
+        const prepared = [];
+        const seen = new Set();
+
+        for (const line of inputLines) {
+            const entityType = String(line.entityType || '').trim();
+            const id = String(line.id || '').trim();
+            const actualQty = Math.max(0, workshopNumber(line.actualQty));
+            if (!['finished','laminate','material'].includes(entityType) || !id) {
+                return res.status(400).json({ error: 'Некорректная позиция для исправления' });
+            }
+
+            const key = entityType + ':' + id;
+            if (seen.has(key)) return res.status(400).json({ error: 'Одна и та же позиция добавлена дважды' });
+            seen.add(key);
+
+            if (entityType === 'finished') {
+                const item = await WorkshopRecipe.findById(id).lean();
+                if (!item) return res.status(404).json({ error: 'Готовое изделие не найдено' });
+                prepared.push({
+                    entityType, id, actualQty,
+                    previousQty: Math.max(0, Number(item.stockQty) || 0),
+                    unit: 'шт',
+                    name: item.name || 'Готовое изделие',
+                    recipe: id
+                });
+            } else if (entityType === 'material') {
+                const item = await WorkshopMaterial.findById(id).lean();
+                if (!item) return res.status(404).json({ error: 'Материал не найден' });
+                prepared.push({
+                    entityType, id, actualQty,
+                    previousQty: Math.max(0, Number(item.stockQty) || 0),
+                    unit: item.unit || 'шт',
+                    name: item.name || 'Материал',
+                    material: id
+                });
+            } else {
+                const product = await Product.findById(id).select('sku name').lean();
+                if (!product) return res.status(404).json({ error: 'Ламинат не найден' });
+                const stock = await WorkshopLaminateStock.findOne({ product: id }).lean();
+                prepared.push({
+                    entityType, id, actualQty,
+                    previousQty: Math.max(0, Number(stock?.planksQty) || 0),
+                    unit: 'планка',
+                    name: [product.sku, product.name].filter(Boolean).join(' · ') || 'Ламинат',
+                    product: id
+                });
+            }
+        }
+
+        const changed = prepared
+            .map(item => ({ ...item, delta: item.actualQty - item.previousQty }))
+            .filter(item => Math.abs(item.delta) > 0.0001);
+
+        if (!changed.length) return res.status(400).json({ error: 'Новые остатки совпадают с текущими' });
+
+        const savedLines = [];
+        for (const item of changed) {
+            if (item.entityType === 'finished') {
+                await WorkshopRecipe.updateOne({ _id: item.id }, { $set: { stockQty: item.actualQty } });
+            } else if (item.entityType === 'material') {
+                await WorkshopMaterial.updateOne({ _id: item.id }, { $set: { stockQty: item.actualQty } });
+            } else {
+                await WorkshopLaminateStock.findOneAndUpdate(
+                    { product: item.id },
+                    { $set: { planksQty: item.actualQty } },
+                    { upsert: true, new: true, setDefaultsOnInsert: true }
+                );
+            }
+
+            await WorkshopMovement.create({
+                date: req.body.date || new Date(),
+                type: 'manual_correction',
+                entityType: item.entityType,
+                product: item.product || null,
+                material: item.material || null,
+                recipe: item.recipe || null,
+                direction: item.delta > 0 ? 'in' : 'out',
+                qty: Math.abs(item.delta),
+                unit: item.unit,
+                note: reason,
+                meta: {
+                    previousQty: item.previousQty,
+                    actualQty: item.actualQty,
+                    delta: item.delta,
+                    reason,
+                    source: 'manual_correction'
+                },
+                createdBy: workshopUser(req)
+            });
+
+            savedLines.push({
+                entityType: item.entityType,
+                product: item.product || null,
+                material: item.material || null,
+                recipe: item.recipe || null,
+                systemQty: item.previousQty,
+                actualQty: item.actualQty,
+                delta: item.delta,
+                note: reason
+            });
+        }
+
+        await WorkshopStocktake.create({
+            date: req.body.date || new Date(),
+            lines: savedLines,
+            note: 'Корректировка остатка: ' + reason,
+            createdBy: workshopUser(req)
+        });
+
+        res.status(201).json({
+            status: 'ok',
+            reason,
+            changed: changed.map(item => ({
+                entityType: item.entityType,
+                id: item.id,
+                name: item.name,
+                previousQty: item.previousQty,
+                actualQty: item.actualQty,
+                delta: item.delta,
+                unit: item.unit
+            }))
+        });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/stocktake', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
+        if (!inputLines.length) return res.status(400).json({ error: 'Добавьте позиции инвентаризации' });
+        const savedLines = [];
+
+        for (const line of inputLines) {
+            const actualQty = Math.max(0, workshopNumber(line.actualQty));
+            let systemQty = 0;
+            let delta = 0;
+            let movement = null;
+
+            if (line.entityType === 'laminate' && line.productId) {
+                const current = await WorkshopLaminateStock.findOne({ product: line.productId }).lean();
+                systemQty = Number(current?.planksQty) || 0;
+                delta = actualQty - systemQty;
+                if (Math.abs(delta) > 0.0001) {
+                    await workshopChangeLaminate(line.productId, delta);
+                    movement = { entityType:'laminate', product:line.productId, unit:'планка' };
+                }
+                savedLines.push({ entityType:'laminate', product:line.productId, systemQty, actualQty, delta, note:line.note || '' });
+            } else if (line.entityType === 'material' && line.materialId) {
+                const current = await WorkshopMaterial.findById(line.materialId).lean();
+                if (!current) continue;
+                systemQty = Number(current.stockQty) || 0;
+                delta = actualQty - systemQty;
+                if (Math.abs(delta) > 0.0001) {
+                    await workshopChangeMaterial(line.materialId, delta);
+                    movement = { entityType:'material', material:line.materialId, unit:current.unit || 'шт' };
+                }
+                savedLines.push({ entityType:'material', material:line.materialId, systemQty, actualQty, delta, note:line.note || '' });
+            } else if (line.entityType === 'finished' && line.recipeId) {
+                const current = await WorkshopRecipe.findById(line.recipeId).lean();
+                if (!current) continue;
+                systemQty = Number(current.stockQty) || 0;
+                delta = actualQty - systemQty;
+                if (Math.abs(delta) > 0.0001) {
+                    await workshopChangeRecipe(line.recipeId, delta);
+                    movement = { entityType:'finished', recipe:line.recipeId, unit:'шт' };
+                }
+                savedLines.push({ entityType:'finished', recipe:line.recipeId, systemQty, actualQty, delta, note:line.note || '' });
+            }
+
+            if (movement && Math.abs(delta) > 0.0001) {
+                await WorkshopMovement.create({
+                    date: req.body.date || new Date(),
+                    type: 'stocktake_adjustment',
+                    ...movement,
+                    direction: delta > 0 ? 'in' : 'out',
+                    qty: Math.abs(delta),
+                    note: line.note || '',
+                    meta: { systemQty, actualQty, delta },
+                    createdBy: workshopUser(req)
+                });
+            }
+        }
+
+        const stocktake = await WorkshopStocktake.create({
+            date: req.body.date || new Date(),
+            lines: savedLines,
+            note: String(req.body.note || '').trim(),
+            createdBy: workshopUser(req)
+        });
+        res.status(201).json(convertToClient(stocktake));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.get('/api/reclamations/dashboard', requirePermission('can_view_reclamations'), async (req, res) => {
+    try {
+        const dealerIds = await getScopedDealerIds(req);
+        const query = {
+            $or: [
+                { resolution: { $exists: false } },
+                { resolution: null },
+                { resolution: '' }
+            ]
+        };
+        if (dealerIds) query.dealerId = { $in: dealerIds };
+
+        const list = await Reclamation.find(query)
+            .select('dealerId dealerName resolution createdAt date')
+            .sort({ createdAt: -1 })
+            .lean();
+        res.json(list.map(convertToClient));
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+
+app.get('/api/reclamations', requirePermission('can_view_reclamations'), async (req, res) => {
+    try {
+        const dealerIds = await getScopedDealerIds(req);
+        const pipeline = [];
+        if (dealerIds) pipeline.push({ $match: { dealerId: { $in: dealerIds } } });
+        pipeline.push(
+            { $sort: { createdAt: -1 } },
+            { $project: {
+                dealerId: 1,
+                dealerName: 1,
+                date: 1,
+                productName: 1,
+                purchasedVolume: 1,
+                description: 1,
+                clientDemand: 1,
+                resolution: 1,
+                invoiceNumber: 1,
+                clientName: 1,
+                defectVolume: 1,
+                compensationAmount: 1,
+                createdAt: 1,
+                updatedAt: 1,
+                photoCount: { $size: { $ifNull: ['$photos', []] } }
+            } }
+        );
+        const list = await Reclamation.aggregate(pipeline);
+        res.json(list.map(item => ({ ...item, id: String(item._id), _id: undefined })));
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+app.get('/api/reclamations/:id', requirePermission('can_view_reclamations'), async (req, res) => {
+    try {
+        const dealerIds = await getScopedDealerIds(req);
+        const query = { _id: req.params.id };
+        if (dealerIds) query.dealerId = { $in: dealerIds };
+        const item = await Reclamation.findOne(query).lean();
+        if (!item) return res.status(404).json({ error: 'Рекламация не найдена' });
+        res.json(convertToClient(item));
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+
+app.post('/api/reclamations', requirePermission('can_manage_reclamations'), async (req, res) => {
+    try { 
+        const r = new Reclamation(req.body); 
+        await r.save(); 
+        res.json(convertToClient(r)); 
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+app.put('/api/reclamations/:id', requirePermission('can_manage_reclamations'), async (req, res) => {
+    try { 
+        const r = await Reclamation.findByIdAndUpdate(req.params.id, req.body, { new: true }); 
+        res.json(convertToClient(r)); 
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+app.delete('/api/reclamations/:id', requirePermission('can_manage_reclamations'), async (req, res) => {
+    try { 
+        await Reclamation.findByIdAndDelete(req.params.id); 
+        res.json({status: 'deleted'}); 
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+
+app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
+,'i') }, _id:{ $ne:req.params.id } }).select('_id').lean();
+                if (duplicateId) return res.status(409).json({ error:'Дилер с ID '+payload.dealer_id+' уже существует' });
+            }
+        }
+        if (req.user.role === 'manager' && !isGlobalViewer(req)) {
+            delete payload.responsibleUserId;
+            delete payload.responsibleAssignmentSource;
+            if (req.user.scope === 'astana') payload.responsible = 'regional_astana';
+            if (req.user.scope === 'regions') payload.responsible = 'regional_regions';
+        }
+
+        const updated = await Dealer.findOneAndUpdate(
+            { _id: req.params.id, ...getDealerFilter(req) },
+            payload,
+            { new: true }
+        );
+        if (!updated) return res.status(404).json({ error: 'Дилер не найден' });
+        res.json({status:'ok'});
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.patch('/api/dealers/:id', requirePermission('can_edit_dealer'), async (req, res) => {
+    try {
+        const payload = canonicalDealerPayload(req.body);
+        if (req.user.role === 'manager' && !isGlobalViewer(req)) {
+            delete payload.responsibleUserId;
+            delete payload.responsibleAssignmentSource;
+            if (req.user.scope === 'astana') payload.responsible = 'regional_astana';
+            if (req.user.scope === 'regions') payload.responsible = 'regional_regions';
+        }
+
+        const updated = await Dealer.findOneAndUpdate(
+            { _id: req.params.id, ...getDealerFilter(req) },
+            { $set: payload },
+            { new: true }
+        ).lean();
+
+        if (!updated) return res.status(404).json({ error: 'Дилер не найден' });
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.delete('/api/dealers/:id', requirePermission('can_delete_dealer'), async (req, res) => { try { await Dealer.findOneAndDelete({ _id: req.params.id, ...getDealerFilter(req) }); res.json({status:'deleted'}); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.get('/api/dealers/:id/products', requireAnyPermission('can_view_dealers', 'can_view_products'), async (req, res) => { const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).populate('products'); if (!d) return res.status(404).json({ error: 'Дилер не найден' }); res.json(d.products.map(convertToClient)); });
+app.put('/api/dealers/:id/products', requirePermission('can_edit_matrix'), async (req, res) => { const d = await Dealer.findOneAndUpdate({ _id: req.params.id, ...getDealerFilter(req) }, { products: req.body.productIds }); if (!d) return res.status(404).json({ error: 'Дилер не найден' }); res.json({status:'ok'}); });
+// ==========================================
+// ЦЕНОВЫЕ УСЛОВИЯ ДИЛЕРОВ
+// ==========================================
+app.get('/api/pricing/overview', requirePermission('can_view_pricing'), async (req, res) => {
+    try {
+        const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req)))
+            .select('_id dealer_id name city region_sector price_type responsible')
+            .sort({ name: 1 })
+            .lean();
+        const conditions = await PricingCondition.find({})
+            .populate('dealer', '_id dealer_id name city region_sector price_type responsible')
+            .sort({ createdAt: -1 })
+            .lean();
+
+        const rows = dealers.map(dealer => buildDealerPricingSummary(dealer, conditions));
+        const today = pricingTodayKey();
+        const inSeven = new Date(today + 'T00:00:00Z');
+        inSeven.setUTCDate(inSeven.getUTCDate() + 7);
+        const sevenKey = inSeven.toISOString().slice(0, 10);
+
+        const activeConditionIds = new Set();
+        rows.forEach(row => row.matchedConditions.forEach(condition => {
+            if (condition.computedStatus === 'active') activeConditionIds.add(String(condition._id));
+        }));
+
+        const visibleConditions = conditions
+            .filter(condition => rows.some(row => pricingConditionMatchesDealer(condition, {
+                _id: row.dealerId,
+                name: row.dealerName,
+                city: row.city,
+                region_sector: row.sector,
+                price_type: row.defaultPriceType,
+                responsible: row.responsible
+            })))
+            .map(condition => ({
+                ...condition,
+                computedStatus: pricingConditionStatus(condition, today)
+            }));
+
+        res.json({
+            today,
+            rows,
+            conditions: visibleConditions,
+            stats: {
+                dealersWith5: rows.filter(row => row.has5 && !row.has10).length,
+                dealersWith10: rows.filter(row => row.has10 && !row.has5).length,
+                dealersWithBoth: rows.filter(row => row.has5 && row.has10).length,
+                activePriceOverrides: rows.filter(row => row.priceListCondition).length,
+                expiringSoon: visibleConditions.filter(condition =>
+                    condition.computedStatus === 'active' &&
+                    condition.endDate &&
+                    condition.endDate >= today &&
+                    condition.endDate <= sevenKey
+                ).length,
+                pendingRequirements: rows.reduce((sum, row) => sum + row.pendingRequirements, 0)
+            }
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/pricing/dealers/:id', requirePermission('can_view_pricing'), async (req, res) => {
+    try {
+        const dealer = await Dealer.findOne({
+            $and: [
+                { _id: req.params.id },
+                getWorkingDealerFilter(getDealerFilter(req))
+            ]
+        }).select('_id dealer_id name city region_sector price_type responsible')
+            .lean();
+        if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
+
+        const conditions = await PricingCondition.find({})
+            .populate('dealer', '_id dealer_id name city region_sector price_type responsible')
+            .sort({ createdAt: -1 })
+            .lean();
+        res.json(buildDealerPricingSummary(dealer, conditions));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/pricing/conditions', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const payload = cleanPricingPayload(req.body);
+        const validation = validatePricingPayload(payload);
+        if (validation) return res.status(400).json({ error: validation });
+        const duplicate = await findPricingDuplicate(payload);
+        if (duplicate) {
+            return res.status(400).json({ error: `Условие с кодом «${payload.code}» уже действует на эту же цель в пересекающийся период` });
+        }
+
+        if (!isGlobalViewer(req) && payload.scopeType !== 'dealer') {
+            return res.status(403).json({ error: 'Региональные и общие ценовые условия может создавать только пользователь с доступом ко всей компании' });
+        }
+        if (payload.scopeType === 'dealer') {
+            const dealer = await Dealer.findOne({
+                $and: [
+                    { _id: payload.dealer },
+                    getWorkingDealerFilter(getDealerFilter(req))
+                ]
+            }).select('_id').lean();
+            if (!dealer) return res.status(404).json({ error: 'Дилер недоступен' });
+        }
+
+        const user = pricingUserMeta(req);
+        const condition = await PricingCondition.create({
+            ...payload,
+            createdBy: user,
+            updatedBy: user,
+            audit: [{ action: 'created', userId: user.id, userName: user.name, note: 'Условие создано' }]
+        });
+        const populated = await PricingCondition.findById(condition._id).populate('dealer', '_id dealer_id name city region_sector price_type responsible').lean();
+        res.status(201).json({ ...populated, computedStatus: pricingConditionStatus(populated) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.put('/api/pricing/conditions/:id', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const existing = await PricingCondition.findById(req.params.id);
+        if (!existing) return res.status(404).json({ error: 'Ценовое условие не найдено' });
+        if (existing.cancelledAt) return res.status(400).json({ error: 'Отменённое условие нельзя редактировать' });
+
+        const payload = cleanPricingPayload(req.body);
+        const validation = validatePricingPayload(payload);
+        if (validation) return res.status(400).json({ error: validation });
+        const duplicate = await findPricingDuplicate(payload, existing._id);
+        if (duplicate) {
+            return res.status(400).json({ error: `Условие с кодом «${payload.code}» уже действует на эту же цель в пересекающийся период` });
+        }
+
+        if (!isGlobalViewer(req) && payload.scopeType !== 'dealer') {
+            return res.status(403).json({ error: 'Региональные и общие ценовые условия может менять только пользователь с доступом ко всей компании' });
+        }
+        if (payload.scopeType === 'dealer') {
+            const dealer = await Dealer.findOne({
+                $and: [
+                    { _id: payload.dealer },
+                    getWorkingDealerFilter(getDealerFilter(req))
+                ]
+            }).select('_id').lean();
+            if (!dealer) return res.status(404).json({ error: 'Дилер недоступен' });
+        }
+
+        const user = pricingUserMeta(req);
+        Object.assign(existing, payload, { updatedBy: user });
+        existing.audit.push({ action: 'updated', userId: user.id, userName: user.name, note: String(req.body.auditNote || 'Условие изменено').trim() });
+        await existing.save();
+
+        const populated = await PricingCondition.findById(existing._id).populate('dealer', '_id dealer_id name city region_sector price_type responsible').lean();
+        res.json({ ...populated, computedStatus: pricingConditionStatus(populated) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.delete('/api/pricing/conditions/:id', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const condition = await PricingCondition.findById(req.params.id);
+        if (!condition) return res.status(404).json({ error: 'Ценовое условие не найдено' });
+        if (condition.cancelledAt) return res.status(400).json({ error: 'Условие уже отменено' });
+
+        const user = pricingUserMeta(req);
+        condition.cancelledAt = new Date();
+        condition.updatedBy = user;
+        condition.audit.push({
+            action: 'cancelled',
+            userId: user.id,
+            userName: user.name,
+            note: String(req.body?.reason || 'Условие отменено').trim()
+        });
+        await condition.save();
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.get('/api/products/count', requireAnyPermission('can_view_products', 'can_view_report', 'can_view_reclamations', 'can_view_dealers'), async (req, res) => {
+    try {
+        const count = await Product.countDocuments({});
+        res.json({ count });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.get('/api/products', requireAnyPermission('can_view_products', 'can_view_report', 'can_view_reclamations', 'can_view_dealers'), async (req, res) => { const s = new RegExp(req.query.search||'', 'i'); const p = await Product.find({$or:[{sku:s},{name:s}]}).sort({sku:1}).lean(); res.json(p.map(x=>{x.id=x._id;return x;})); });
+app.post('/api/products', requirePermission('can_manage_products'), async (req, res) => { const p = new Product(req.body); await p.save(); res.json(convertToClient(p)); });
+app.put('/api/products/:id', requirePermission('can_manage_products'), async (req, res) => { const p = await Product.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(p)); });
+app.delete('/api/products/:id', requirePermission('can_manage_products'), async (req, res) => { await Product.findByIdAndDelete(req.params.id); res.json({}); });
+app.post('/api/admin/import-catalog', requirePermission('can_manage_products'), async (req, res) => { res.json({status: 'ok'}); });
+app.get('/api/matrix', requireAnyPermission('can_view_products', 'can_view_report'), async (req, res) => {
+    try {
+        const [prods, dealers] = await Promise.all([
+            Product.find({}).select('sku name is_liquid').sort({sku:1}).lean(),
+            Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id name city responsible products pos_materials status').lean()
+        ]);
+        const dealerIds = dealers.map(d => d._id);
+        const assets = dealerIds.length
+            ? await WorkshopDealerAsset.find({ dealer: { $in: dealerIds }, qty: { $gt: 0 } })
+                .populate('recipe', 'product outputType')
+                .lean()
+            : [];
+
+        const productMap = new Map();
+        dealers.forEach(d => productMap.set(d._id.toString(), new Set((d.products||[]).map(String))));
+
+        const sampleMap = new Map();
+        assets.forEach(asset => {
+            const productId = asset.recipe?.outputType === 'sample' ? asset.recipe?.product : null;
+            if (!productId) return;
+            const key = `${asset.dealer}|${productId}`;
+            sampleMap.set(key, (sampleMap.get(key) || 0) + (Number(asset.qty) || 0));
+        });
+
+        const posList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"];
+        const matrix = prods.map(p => ({
+            sku: p.sku,
+            name: p.name,
+            type: 'product',
+            is_liquid: p.is_liquid !== false,
+            dealers: dealers.map(d => ({
+                value: productMap.get(d._id.toString()).has(p._id.toString()) ? 1 : 0,
+                sample_qty: sampleMap.get(`${d._id}|${p._id}`) || 0,
+                is_pos: false
+            }))
+        }));
+
+        posList.forEach(pn => {
+            matrix.push({
+                sku: "POS",
+                name: pn,
+                type: 'pos',
+                dealers: dealers.map(d => ({
+                    value: (d.pos_materials||[]).find(m=>m.name===pn)?.quantity||0,
+                    is_pos: true
+                }))
+            });
+        });
+        res.json({
+            headers: dealers.map(d=>({id:d._id, name:d.name, city:d.city, responsible:d.responsible})),
+            matrix
+        });
+    } catch (e) {
+        res.status(500).json({error:e.message});
+    }
+});
+
+app.get('/api/sales', requirePermission('can_view_sales'), async (req, res) => {
+    try {
+        const { month, months, dealerId } = req.query;
+        let filter = month ? { month } : {};
+        if (!month && months) {
+            const count = Math.max(1, Math.min(24, Number(months) || 6));
+            const now = new Date();
+            now.setUTCDate(1);
+            now.setUTCMonth(now.getUTCMonth() - (count - 1));
+            const minMonth = now.toISOString().slice(0, 7);
+            filter = { month: { $gte: minMonth } };
+        }
+        const scope = getUserScope(req);
+        const companySalesView = req.query.context === 'sales' && hasPermission(req, 'can_view_sales');
+
+        if (!companySalesView && !isGlobalViewer(req) && req.user.role === 'manager') {
+            const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id').lean();
+            const dealerIds = dealers.map(d => String(d._id));
+            const zonePlanId = scope === 'astana'
+                ? 'PLAN_astana_all'
+                : scope === 'regions'
+                    ? 'PLAN_regions_all'
+                    : 'PLAN_total_all';
+
+            filter = {
+                $and: [
+                    filter,
+                    {
+                        $or: [
+                            // Факт менеджера считается исключительно по дилерам,
+                            // где он выбран ответственным.
+                            { isCustom: { $ne: true }, dealerId: { $in: dealerIds } },
+                            // План берём из сводки его зоны на странице Продажи.
+                            { isCustom: { $ne: true }, dealerId: zonePlanId }
+                        ]
+                    }
+                ]
+            };
+        } else if (!companySalesView && !isGlobalViewer(req) && scope !== 'all') {
+            const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id').lean();
+            const dealerIds = dealers.map(d => String(d._id));
+            const personalPlanIds = dealerIds.map(id => `PLAN_vip_${id}`);
+
+            const sectorType = scope === 'astana' ? 'astana' : 'region';
+            const sectors = await Sector.find({ type: sectorType }).select('name').lean();
+            const slug = name => String(name || '').trim().replace(/\s+/g, '_').toLowerCase();
+            const groupKeys = scope === 'astana'
+                ? [...sectors.map(s => `astana_${slug(s.name)}`), 'regional_astana']
+                : [...sectors.map(s => `sector_${slug(s.name)}`), 'regional_regions'];
+
+            const groupPlanIds = groupKeys.map(key => `PLAN_${key}`);
+            groupPlanIds.push(scope === 'astana' ? 'PLAN_astana_all' : 'PLAN_regions_all');
+            const allowedPlanIds = [...personalPlanIds, ...groupPlanIds];
+
+            filter = {
+                $and: [
+                    filter,
+                    {
+                        $or: [
+                            { isCustom: { $ne: true }, dealerId: { $in: dealerIds } },
+                            { isCustom: { $ne: true }, dealerId: { $in: allowedPlanIds } },
+                            { isCustom: true, group: { $in: groupKeys } }
+                        ]
+                    }
+                ]
+            };
+        }
+
+        if (dealerId) {
+            const requestedDealerId = String(dealerId);
+            const requestedPlanId = `PLAN_vip_${requestedDealerId}`;
+            filter = {
+                $and: [
+                    filter,
+                    { dealerId: { $in: [requestedDealerId, requestedPlanId] } }
+                ]
+            };
+        }
+
+        const s = await Sales.find(filter).lean();
+
+        // Нерабочие дилеры (potential/archive) не участвуют в текущей
+        // операционной статистике продаж. Сами исторические строки Sales
+        // остаются в базе и могут снова участвовать после возврата дилера
+        // в рабочий статус.
+        const workingBaseFilter = (companySalesView || isGlobalViewer(req)) ? {} : getDealerFilter(req);
+        const workingDealers = await Dealer.find(getWorkingDealerFilter(workingBaseFilter)).select('_id').lean();
+        const workingDealerIds = new Set(workingDealers.map(item => String(item._id)));
+
+        const visibleSales = s.filter(row => {
+            if (row.isCustom) return true;
+            const rowDealerId = String(row.dealerId || '');
+            if (!rowDealerId) return true;
+
+            if (rowDealerId.startsWith('PLAN_manager_')) return false;
+            if (rowDealerId.startsWith('PLAN_vip_')) {
+                return workingDealerIds.has(rowDealerId.replace('PLAN_vip_', ''));
+            }
+            if (rowDealerId.startsWith('PLAN_')) return true;
+            return workingDealerIds.has(rowDealerId);
+        });
+
+        res.json(visibleSales);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ===== ИСПРАВЛЕННЫЙ БЛОК: СОХРАНЕНИЕ, АГРЕГАЦИЯ И УДАЛЕНИЕ =====
+app.post('/api/sales', async (req, res) => {
+    const canFact = hasPermission(req, 'can_edit_sales_fact');
+    const canPlan = hasPermission(req, 'can_edit_sales_plan');
+    if (!canFact && !canPlan) {
+        return res.status(403).json({ error: 'Недостаточно прав для изменения продаж' });
+    }
+
+    const now = new Date();
+    const scope = req.user ? req.user.scope : 'none';
+    const companySalesView = req.query.context === 'sales' && hasPermission(req, 'can_view_sales');
+    const managerRestricted = Boolean(req.user && req.user.role === 'manager' && !isGlobalViewer(req) && !companySalesView);
+    let managerDealerIds = null;
+    if (managerRestricted) {
+        const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id').lean();
+        managerDealerIds = new Set(dealers.map(d => String(d._id)));
+    }
+
+    // 1. Агрегируем дубликаты из присланных данных (если ввели несколько с одинаковым именем)
+    const aggregatedData = {};
+    (Array.isArray(req.body.data) ? req.body.data : []).forEach(i => {
+        const row = { ...i };
+
+        if (managerRestricted) {
+            const dealerId = String(row.dealerId || '');
+            if (row.isCustom) {
+                row.ownerUserId = String(req.user.id);
+            } else if (dealerId.startsWith('PLAN_manager_')) {
+                return;
+            } else if (dealerId.startsWith('PLAN_vip_')) {
+                const ownedDealerId = dealerId.replace('PLAN_vip_', '');
+                if (!managerDealerIds.has(ownedDealerId)) return;
+            } else if (dealerId.startsWith('PLAN_')) {
+                return;
+            } else if (!managerDealerIds.has(dealerId)) {
+                return;
+            }
+        }
+        if (String(row.dealerId || '').startsWith('PLAN_manager_')) return;
+        if (!canFact) delete row.fact;
+        if (!canPlan) delete row.plan;
+
+        const key = row.isCustom ? `custom_${row.group}_${row.dealerName}` : `dealer_${row.dealerId}`;
+        if (!aggregatedData[key]) {
+            aggregatedData[key] = row;
+        } else {
+            if (canFact) aggregatedData[key].fact = (Number(aggregatedData[key].fact) || 0) + (Number(row.fact) || 0);
+            if (canPlan) aggregatedData[key].plan = (Number(aggregatedData[key].plan) || 0) + (Number(row.plan) || 0);
+        }
+    });
+
+    // 2. Обновляем/Добавляем записи
+    const ops = Object.values(aggregatedData).map(i => {
+        const filter = { month: req.body.month };
+        if (i.isCustom) {
+            filter.isCustom = true;
+            filter.dealerName = i.dealerName;
+            if (i.group) filter.group = i.group; 
+        } else {
+            filter.dealerId = i.dealerId;
+        }
+
+        return {
+            updateOne: { 
+                filter: filter, 
+                update: { $set: { ...i, updatedAt: now } }, 
+                upsert: true 
+            } 
+        };
+    }); 
+    
+    if (ops.length > 0) {
+        await Sales.bulkWrite(ops); 
+    }
+
+    // Старые планы менеджеров больше не используются: план задаётся по зоне/сектору/дилеру.
+    await Sales.deleteMany({
+        month: req.body.month,
+        dealerId: { $regex: '^PLAN_manager_' }
+    });
+
+    // 3. Умное удаление (Очистка разовых продаж)
+    // Определяем, к каким группам имеет доступ текущий пользователь
+    let groupFilter = {};
+    if (managerRestricted) {
+        groupFilter = { ownerUserId: String(req.user.id) };
+    } else if (!companySalesView && scope === 'astana') {
+        const sectors = await Sector.find({ type: 'astana' });
+        groupFilter = { group: { $in: sectors.map(s => s.name) } };
+    } else if (!companySalesView && scope === 'regions') {
+        const sectors = await Sector.find({ type: 'region' });
+        groupFilter = { group: { $in: sectors.map(s => s.name) } };
+    }
+    // Если admin или all, groupFilter остается пустым (имеет доступ ко всем)
+
+    // Ищем все разовые продажи за этот месяц в базе (в рамках доступа пользователя)
+    const dbCustomSales = await Sales.find({ 
+        month: req.body.month, 
+        isCustom: true, 
+        ...groupFilter 
+    });
+
+    const idsToDelete = [];
+    const incomingArray = Object.values(aggregatedData);
+
+    if (canFact) dbCustomSales.forEach(dbSale => {
+        // Проверяем, осталась ли эта продажа в присланных данных
+        const existsInIncoming = incomingArray.some(
+            i => i.isCustom && i.group === dbSale.group && i.dealerName === dbSale.dealerName
+        );
+        
+        // Если в присланных данных её больше нет — помечаем на удаление
+        if (!existsInIncoming) {
+            idsToDelete.push(dbSale._id);
+        }
+    });
+
+    // Удаляем всё лишнее
+    if (canFact && idsToDelete.length > 0) {
+        await Sales.deleteMany({ _id: { $in: idsToDelete } });
+    }
+
+    res.json({status:'ok'}); 
+});
+// ===================================================================
+
+app.get('/api/competitors-ref', requirePermission('can_view_competitors'), async (req, res) => { const l = await CompRef.find().sort({name:1}); res.json(l.map(convertToClient)); });
+app.post('/api/competitors-ref', requirePermission('can_manage_competitors'), async (req, res) => { const c = new CompRef(req.body); await c.save(); res.json(convertToClient(c)); });
+app.put('/api/competitors-ref/:id', requirePermission('can_manage_competitors'), async (req, res) => { await CompRef.findByIdAndUpdate(req.params.id, req.body); res.json({status:'ok'}); });
+app.delete('/api/competitors-ref/:id', requirePermission('can_manage_competitors'), async (req, res) => { await CompRef.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
+app.get('/api/knowledge', requirePermission('can_view_knowledge'), async (req, res) => { const l = await Knowledge.find().sort({title:1}); res.json(l.map(convertToClient)); });
+app.get('/api/knowledge/:id', requirePermission('can_view_knowledge'), async (req, res) => { res.json(convertToClient(await Knowledge.findById(req.params.id))); });
+app.post('/api/knowledge', requirePermission('can_manage_knowledge'), async (req, res) => { const a = new Knowledge(req.body); await a.save(); res.json(convertToClient(a)); });
+app.put('/api/knowledge/:id', requirePermission('can_manage_knowledge'), async (req, res) => { const a = await Knowledge.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(a)); });
+app.delete('/api/knowledge/:id', requirePermission('can_manage_knowledge'), async (req, res) => { await Knowledge.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
+app.get('/api/tasks', requirePermission('can_view_dashboard'), async (req, res) => { try { const data = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('name visits status responsible').lean(); res.json(data.map(d => ({ id: d._id, name: d.name, status: d.status, visits: d.visits || [], responsible: d.responsible }))); } catch (e) { res.status(500).json([]); } });
+
+async function getScopedDealerIds(req) {
+    const baseFilter = isGlobalViewer(req) ? {} : getDealerFilter(req);
+    const dealers = await Dealer.find(getWorkingDealerFilter(baseFilter)).select('_id').lean();
+    return dealers.map(d => String(d._id));
+}
+
+// ==========================================
+// РЕКВИЗИТЫ И РЕКЛАМАЦИИ
+// ==========================================
+const reclamationSchema = new mongoose.Schema({
+    dealerId: String,
+    dealerName: String,
+    date: String,
+    productName: String,
+    invoiceNumber: String,
+    purchaseDate: String,
+    clientName: String,
+    clientPhone: String,
+    address: String,
+    floor: String,
+    houseType: String,
+    totalArea: String,
+    purchasedVolume: String,
+    batchNumbers: [String],
+    baseType: String,
+    underlayment: String,
+    warmFloor: String,
+    installer: String,
+    
+    // --- НОВЫЕ ТЕХНИЧЕСКИЕ ПОЛЯ ---
+    acclimatization: String, 
+    storageMethod: String,
+    dryingTime: String,
+    floorFlatness: String,
+// --- НОВЫЕ ПОЛЯ ---
+    defectMoment: String,       // Момент выявления
+    compensationAmount: Number, // Сумма компенсации
+    internalNotes: String,
+    
+    description: String,
+    clientDemand: String,
+    resolution: String,
+    photos: [{ photo_url: String }]
+}, { timestamps: true });
+const Reclamation = mongoose.model('Reclamation', reclamationSchema);
+
+
+// ==========================================
+// ЦЕХ API
+// ==========================================
+async function syncWorkshopPosToDealer(dealerId, recipeId) {
+    const recipe = await WorkshopRecipe.findById(recipeId).select('matrixPosName').lean();
+    const posName = String(recipe?.matrixPosName || '').trim();
+    if (!posName) return;
+
+    const recipes = await WorkshopRecipe.find({ matrixPosName: posName }).select('_id').lean();
+    const recipeIds = recipes.map(item => item._id);
+    const assets = await WorkshopDealerAsset.find({ dealer: dealerId, recipe: { $in: recipeIds } }).lean();
+    const qty = assets.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+
+    const dealer = await Dealer.findById(dealerId);
+    if (!dealer) return;
+    dealer.pos_materials = Array.isArray(dealer.pos_materials) ? dealer.pos_materials : [];
+    const index = dealer.pos_materials.findIndex(item => item.name === posName);
+    if (qty > 0) {
+        if (index >= 0) dealer.pos_materials[index].quantity = qty;
+        else dealer.pos_materials.push({ name: posName, quantity: qty });
+    } else if (index >= 0) {
+        dealer.pos_materials.splice(index, 1);
+    }
+    await dealer.save();
+}
+
+app.post('/api/workshop/print-log', requirePermission('can_view_workshop'), async (req, res) => {
+    try {
+        const type=String(req.body?.type||'report').trim().slice(0,60);
+        const referenceId=String(req.body?.referenceId||'').trim().slice(0,120);
+        const title=String(req.body?.title||'Документ цеха').trim().slice(0,180);
+        res.json({status:'logged',type,referenceId,title});
+    } catch(e) {
+        res.status(500).json({error:e.message});
+    }
+});
+
+app.get('/api/workshop/bootstrap', requirePermission('can_view_workshop'), async (req, res) => {
+    try {
+        const [products, dealers, materials, recipes, laminateStocks, assets, productions, movements, memos] = await Promise.all([
+            Product.find().select('sku name is_liquid characteristics.package_qty characteristics.size characteristics.class characteristics.thickness').sort({ sku: 1 }).lean(),
+            Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id dealer_id name city status').sort({ name: 1 }).lean(),
+            WorkshopMaterial.find({ active: { $ne: false } }).sort({ category: 1, name: 1 }).lean(),
+            WorkshopRecipe.find({ active: { $ne: false } })
+                .populate('product', 'sku name is_liquid characteristics.package_qty')
+                .populate('materials.material', 'code name unit purchaseUnit purchaseUnitSize stockQty')
+                .populate('components.recipe', 'name outputType stockQty')
+                .sort({ outputType: 1, name: 1 }).lean(),
+            WorkshopLaminateStock.find().populate('product', 'sku name is_liquid characteristics.package_qty').lean(),
+            WorkshopDealerAsset.find({ qty: { $gt: 0 } })
+                .populate('dealer', 'dealer_id name city status')
+                .populate({ path: 'recipe', populate: { path: 'product', select: 'sku name is_liquid' } })
+                .sort({ updatedAt: -1 }).lean(),
+            WorkshopProduction.find({ cancelledAt: { $exists: false } })
+                .populate('recipe', 'name outputType')
+                .populate('product', 'sku name')
+                .sort({ date: -1, createdAt: -1 }).limit(30).lean(),
+            WorkshopMovement.find()
+                .populate('product', 'sku name')
+                .populate('material', 'code name unit')
+                .populate('recipe', 'name outputType')
+                .populate('dealer', 'dealer_id name city')
+                .sort({ date: -1, createdAt: -1 }).limit(60).lean(),
+            WorkshopMemo.find()
+                .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+                .populate('lines.actualProduct', 'sku name is_liquid characteristics.package_qty')
+                .populate('lines.recipe', 'name outputType planksPerUnit')
+                .sort({ date: -1, createdAt: -1 }).limit(80).lean()
+        ]);
+
+        const memoIds = memos.map(item => item._id);
+        const producedByMemoLine = memoIds.length ? await WorkshopProduction.aggregate([
+            { $match: { memo: { $in: memoIds }, memoLineId: { $nin: [null, ''] }, cancelledAt: { $exists: false } } },
+            { $group: { _id: '$memoLineId', qty: { $sum: '$outputQty' } } }
+        ]) : [];
+        const producedMap = new Map(producedByMemoLine.map(item => [String(item._id), Number(item.qty) || 0]));
+        memos.forEach(memo => {
+            (memo.lines || []).forEach(line => {
+                line.producedQty = producedMap.get(String(line._id)) || 0;
+            });
+        });
+
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const todayRows = await WorkshopProduction.find({ date: { $gte: today }, cancelledAt: { $exists: false } }).select('outputQty').lean();
+        const todayProduction = todayRows.reduce((sum, item) => sum + (Number(item.outputQty) || 0), 0);
+        const finishedStock = recipes.reduce((sum, item) => sum + (Number(item.stockQty) || 0), 0);
+        const lowMaterials = materials.filter(item => Number(item.minQty) > 0 && Number(item.stockQty) <= Number(item.minQty)).length;
+        const laminatePlanks = laminateStocks.reduce((sum, item) => sum + (Number(item.planksQty) || 0), 0);
+        const openMemos = memos.filter(item => item.status === 'created' || item.status === 'mismatch').length;
+        const visibleAssets = assets.filter(asset => !isNonWorkingDealerStatus(asset.dealer?.status));
+        const dealerAssetStock = visibleAssets.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+        const openingBalanceCount = await WorkshopMovement.countDocuments({
+            type: { $in: ['opening_balance', 'opening_dealer_balance'] }
+        });
+
+        res.json({
+            products: products.map(convertToClient),
+            dealers: dealers.map(convertToClient),
+            materials: materials.map(convertToClient),
+            recipes: recipes.map(convertToClient),
+            laminateStocks: laminateStocks.map(convertToClient),
+            dealerAssets: visibleAssets.map(convertToClient),
+            productions: productions.map(convertToClient),
+            movements: movements.map(convertToClient),
+            memos: memos.map(convertToClient),
+            stats: { todayProduction, finishedStock, lowMaterials, laminatePlanks, openMemos, dealerAssetStock, openingBalanceCount }
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/workshop/movements', requirePermission('can_view_workshop'), async (req, res) => {
+    try {
+        const limit = Math.max(1, Math.min(500, Number(req.query.limit) || 150));
+        const filter = {};
+        if (req.query.type) filter.type = req.query.type;
+        const list = await WorkshopMovement.find(filter)
+            .populate('product', 'sku name')
+            .populate('material', 'code name unit')
+            .populate('recipe', 'name outputType')
+            .populate('dealer', 'dealer_id name city')
+            .sort({ date: -1, createdAt: -1 }).limit(limit).lean();
+        res.json(list.map(convertToClient));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/materials', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const item = new WorkshopMaterial({
+            code: String(req.body.code || '').trim(),
+            name: String(req.body.name || '').trim(),
+            category: req.body.category || 'consumable',
+            unit: req.body.unit || 'шт',
+            purchaseUnit: String(req.body.purchaseUnit || req.body.unit || 'шт').trim(),
+            purchaseUnitSize: Math.max(0.0001, workshopNumber(req.body.purchaseUnitSize) || 1),
+            stockQty: Math.max(0, workshopNumber(req.body.stockQty)),
+            minQty: Math.max(0, workshopNumber(req.body.minQty)),
+            active: req.body.active !== false,
+            note: String(req.body.note || '').trim()
+        });
+        if (!item.name) return res.status(400).json({ error: 'Укажите название материала' });
+        await item.save();
+        res.status(201).json(convertToClient(item));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.put('/api/workshop/materials/:id', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const payload = {
+            code: String(req.body.code || '').trim(),
+            name: String(req.body.name || '').trim(),
+            category: req.body.category || 'consumable',
+            unit: req.body.unit || 'шт',
+            purchaseUnit: String(req.body.purchaseUnit || req.body.unit || 'шт').trim(),
+            purchaseUnitSize: Math.max(0.0001, workshopNumber(req.body.purchaseUnitSize) || 1),
+            minQty: Math.max(0, workshopNumber(req.body.minQty)),
+            active: req.body.active !== false,
+            note: String(req.body.note || '').trim()
+        };
+        const item = await WorkshopMaterial.findByIdAndUpdate(req.params.id, payload, { new: true });
+        if (!item) return res.status(404).json({ error: 'Материал не найден' });
+        res.json(convertToClient(item));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.delete('/api/workshop/materials/:id', requireIsAdmin, async (req, res) => {
+    try {
+        const item = await WorkshopMaterial.findById(req.params.id);
+        if (!item) return res.status(404).json({ error: 'Материал не найден' });
+
+        const [movementUsed, recipeUsed] = await Promise.all([
+            WorkshopMovement.exists({ material: item._id }),
+            WorkshopRecipe.exists({ 'materials.material': item._id })
+        ]);
+        if (movementUsed || recipeUsed) {
+            return res.status(400).json({ error: 'Материал уже используется в истории или рецептурах. Его можно отредактировать/деактивировать, но не удалить.' });
+        }
+        await WorkshopMaterial.deleteOne({ _id: item._id });
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/material-movement', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const materialId = req.body.materialId;
+        const qty = Math.abs(workshopNumber(req.body.qty));
+        const direction = req.body.direction === 'out' ? 'out' : 'in';
+        if (!materialId || qty <= 0) return res.status(400).json({ error: 'Укажите материал и количество' });
+
+        const delta = direction === 'out' ? -qty : qty;
+        const material = await workshopChangeMaterial(materialId, delta);
+        const movement = await WorkshopMovement.create({
+            date: req.body.date || new Date(),
+            type: req.body.type || (direction === 'out' ? 'material_issue' : 'material_receipt'),
+            entityType: 'material',
+            material: materialId,
+            direction,
+            qty,
+            unit: material.unit || 'шт',
+            serviceMemoNumber: String(req.body.serviceMemoNumber || '').trim(),
+            note: String(req.body.note || '').trim(),
+            createdBy: workshopUser(req)
+        });
+        res.status(201).json({ material: convertToClient(material), movement: convertToClient(movement) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/recipes', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const recipe = new WorkshopRecipe({
+            name: String(req.body.name || '').trim(),
+            outputType: req.body.outputType || 'sample',
+            sku: String(req.body.sku || '').trim(),
+            product: req.body.productId || null,
+            sideA: String(req.body.sideA || '').trim(),
+            sideB: String(req.body.sideB || '').trim(),
+            planksPerUnit: Math.max(0, workshopNumber(req.body.planksPerUnit)),
+            packQtyOverride: Math.max(0, workshopNumber(req.body.packQtyOverride)),
+            matrixPosName: String(req.body.matrixPosName || '').trim(),
+            minStockQty: Math.max(0, workshopNumber(req.body.minStockQty)),
+            materials: Array.isArray(req.body.materials) ? req.body.materials.map(item => ({
+                material: item.materialId,
+                qty: Math.max(0, workshopNumber(item.qty)),
+                mode: item.mode === 'estimate' ? 'estimate' : 'strict'
+            })).filter(item => item.material && item.qty >= 0) : [],
+            components: Array.isArray(req.body.components) ? req.body.components.map(item => ({
+                recipe: item.recipeId,
+                qty: Math.max(0, workshopNumber(item.qty))
+            })).filter(item => item.recipe && item.qty > 0) : [],
+            active: req.body.active !== false,
+            note: String(req.body.note || '').trim()
+        });
+        if (!recipe.name) return res.status(400).json({ error: 'Укажите название изделия' });
+        await recipe.save();
+        res.status(201).json(convertToClient(recipe));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.put('/api/workshop/recipes/:id', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const payload = {
+            name: String(req.body.name || '').trim(),
+            outputType: req.body.outputType || 'sample',
+            sku: String(req.body.sku || '').trim(),
+            product: req.body.productId || null,
+            sideA: String(req.body.sideA || '').trim(),
+            sideB: String(req.body.sideB || '').trim(),
+            planksPerUnit: Math.max(0, workshopNumber(req.body.planksPerUnit)),
+            packQtyOverride: Math.max(0, workshopNumber(req.body.packQtyOverride)),
+            matrixPosName: String(req.body.matrixPosName || '').trim(),
+            minStockQty: Math.max(0, workshopNumber(req.body.minStockQty)),
+            materials: Array.isArray(req.body.materials) ? req.body.materials.map(item => ({
+                material: item.materialId,
+                qty: Math.max(0, workshopNumber(item.qty)),
+                mode: item.mode === 'estimate' ? 'estimate' : 'strict'
+            })).filter(item => item.material && item.qty >= 0) : [],
+            components: Array.isArray(req.body.components) ? req.body.components.map(item => ({
+                recipe: item.recipeId,
+                qty: Math.max(0, workshopNumber(item.qty))
+            })).filter(item => item.recipe && item.qty > 0) : [],
+            active: req.body.active !== false,
+            note: String(req.body.note || '').trim()
+        };
+        const recipe = await WorkshopRecipe.findByIdAndUpdate(req.params.id, payload, { new: true });
+        if (!recipe) return res.status(404).json({ error: 'Рецептура не найдена' });
+        res.json(convertToClient(recipe));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.delete('/api/workshop/recipes/:id', requireIsAdmin, async (req, res) => {
+    try {
+        const recipe = await WorkshopRecipe.findById(req.params.id);
+        if (!recipe) return res.status(404).json({ error: 'Рецептура не найдена' });
+
+        const [productionUsed, movementUsed, dealerUsed, componentUsed, memoUsed] = await Promise.all([
+            WorkshopProduction.exists({ recipe: recipe._id }),
+            WorkshopMovement.exists({ recipe: recipe._id }),
+            WorkshopDealerAsset.exists({ recipe: recipe._id, qty: { $gt: 0 } }),
+            WorkshopRecipe.exists({ 'components.recipe': recipe._id }),
+            WorkshopMemo.exists({ 'lines.recipe': recipe._id })
+        ]);
+        if (productionUsed || movementUsed || dealerUsed || componentUsed || memoUsed || Math.abs(Number(recipe.stockQty) || 0) > 0.0001) {
+            return res.status(400).json({ error: 'Рецептура уже участвует в учёте. Её можно редактировать или деактивировать, но нельзя удалить без нарушения истории.' });
+        }
+        await WorkshopRecipe.deleteOne({ _id: recipe._id });
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/memos', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        let number = String(req.body.number || '').trim();
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
+        if (!inputLines.length) return res.status(400).json({ error: 'Добавьте хотя бы одну позицию' });
+        if (!number) {
+            let seq = Math.max(1, (await WorkshopMemo.countDocuments()) + 1);
+            while (!number) {
+                const candidate = `ЦЕХ-${String(seq).padStart(4, '0')}`;
+                const exists = await WorkshopMemo.exists({ number: candidate });
+                if (!exists) number = candidate;
+                else seq += 1;
+            }
+        }
+
+        const lines = [];
+        const seenProducts = new Set();
+        for (const input of inputLines) {
+            const requestedPacks = Math.max(0, Math.floor(workshopNumber(input.requestedPacks)));
+            if (!input.productId || requestedPacks <= 0) continue;
+
+            const product = await Product.findById(input.productId).lean();
+            if (!product) continue;
+            const productKey = String(product._id);
+            if (seenProducts.has(productKey)) {
+                return res.status(400).json({ error: `Позиция «${product.sku || product.name}» добавлена в служебку дважды` });
+            }
+            seenProducts.add(productKey);
+
+            let recipe = null;
+            if (input.recipeId) {
+                recipe = await WorkshopRecipe.findOne({
+                    _id: input.recipeId,
+                    product: product._id,
+                    active: { $ne: false }
+                }).lean();
+                if (!recipe) {
+                    return res.status(400).json({ error: `Выбранная рецептура не подходит для «${product.sku || product.name}»` });
+                }
+            } else {
+                const recipes = await WorkshopRecipe.find({
+                    product: product._id,
+                    active: { $ne: false },
+                    planksPerUnit: { $gt: 0 }
+                }).lean();
+                recipe = recipes.find(item => item.outputType === 'sample')
+                    || recipes.find(item => item.outputType === 'stand')
+                    || recipes[0]
+                    || null;
+            }
+
+            const packQty = workshopPackQty(product, recipe?.packQtyOverride || 0);
+            if (packQty <= 0) {
+                return res.status(400).json({ error: `У «${product.sku || product.name}» не заполнено количество планок в упаковке` });
+            }
+            const planksPerUnit = recipe ? Math.max(0, workshopNumber(recipe.planksPerUnit)) : 0;
+
+            const totalPlanks = requestedPacks * packQty;
+            const plannedOutputQty = planksPerUnit > 0 ? Math.floor(totalPlanks / planksPerUnit) : 0;
+            const plannedRemainderPlanks = planksPerUnit > 0 ? totalPlanks - plannedOutputQty * planksPerUnit : totalPlanks;
+
+            lines.push({
+                product: product._id,
+                recipe: recipe?._id || null,
+                requestedPacks,
+                plannedOutputQty,
+                plannedRemainderPlanks,
+                packQty,
+                planksPerUnit,
+                actualProduct: product._id,
+                deliveredPacks: 0,
+                checked: false,
+                isMatch: false,
+                discrepancyReason: ''
+            });
+        }
+
+        if (!lines.length) return res.status(400).json({ error: 'Нет корректных позиций для служебной записки' });
+
+        const memo = await WorkshopMemo.create({
+            number,
+            date: req.body.date || new Date(),
+            lines,
+            note: String(req.body.note || '').trim(),
+            signedBy: String(req.body.signedBy || req.user?.fullName || req.user?.username || '').trim(),
+            createdBy: workshopUser(req)
+        });
+
+        const populated = await WorkshopMemo.findById(memo._id)
+            .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+            .populate('lines.recipe', 'name outputType planksPerUnit')
+            .lean();
+        res.status(201).json(convertToClient(populated));
+    } catch (e) {
+        if (e && e.code === 11000) return res.status(400).json({ error: 'Служебная записка с таким номером уже существует' });
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.put('/api/workshop/memos/:id', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const memo = await WorkshopMemo.findById(req.params.id);
+        if (!memo) return res.status(404).json({ error: 'Служебная записка не найдена' });
+        if (memo.postedAt || memo.status === 'accepted') {
+            return res.status(400).json({ error: 'Принятую служебную записку нельзя редактировать. Используйте корректировку/отмену.' });
+        }
+
+        const number = String(req.body.number || memo.number || '').trim();
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
+        if (!number) return res.status(400).json({ error: 'Укажите номер служебной записки' });
+        if (!inputLines.length) return res.status(400).json({ error: 'Добавьте хотя бы одну позицию' });
+
+        const duplicateNumber = await WorkshopMemo.exists({ number, _id: { $ne: memo._id } });
+        if (duplicateNumber) return res.status(400).json({ error: 'Служебная записка с таким номером уже существует' });
+
+        const seenProducts = new Set();
+        const lines = [];
+        for (const input of inputLines) {
+            const requestedPacks = Math.max(0, Math.floor(workshopNumber(input.requestedPacks)));
+            if (!input.productId || requestedPacks <= 0) continue;
+
+            const product = await Product.findById(input.productId).lean();
+            if (!product) continue;
+            const productKey = String(product._id);
+            if (seenProducts.has(productKey)) {
+                return res.status(400).json({ error: `Позиция «${product.sku || product.name}» добавлена в служебку дважды` });
+            }
+            seenProducts.add(productKey);
+
+            let recipe = null;
+            if (input.recipeId) {
+                recipe = await WorkshopRecipe.findOne({ _id: input.recipeId, product: product._id, active: { $ne: false } }).lean();
+            }
+            if (!recipe) {
+                const recipes = await WorkshopRecipe.find({ product: product._id, active: { $ne: false }, planksPerUnit: { $gt: 0 } }).lean();
+                recipe = recipes.find(item => item.outputType === 'sample') || recipes.find(item => item.outputType === 'stand') || recipes[0] || null;
+            }
+            const packQty = workshopPackQty(product, recipe?.packQtyOverride || 0);
+            const planksPerUnit = recipe ? Math.max(0, workshopNumber(recipe.planksPerUnit)) : 0;
+            if (packQty <= 0) {
+                return res.status(400).json({ error: `У «${product.sku || product.name}» не заполнено количество планок в упаковке` });
+            }
+
+            const totalPlanks = requestedPacks * packQty;
+            const plannedOutputQty = planksPerUnit > 0 ? Math.floor(totalPlanks / planksPerUnit) : 0;
+            const plannedRemainderPlanks = planksPerUnit > 0 ? totalPlanks - plannedOutputQty * planksPerUnit : totalPlanks;
+            lines.push({
+                product: product._id,
+                recipe: recipe?._id || null,
+                requestedPacks,
+                plannedOutputQty,
+                plannedRemainderPlanks,
+                packQty,
+                planksPerUnit,
+                actualProduct: product._id,
+                deliveredPacks: 0,
+                checked: false,
+                isMatch: false,
+                discrepancyReason: ''
+            });
+        }
+
+        if (!lines.length) return res.status(400).json({ error: 'Нет корректных позиций' });
+
+        memo.number = number;
+        memo.date = req.body.date || memo.date || new Date();
+        memo.lines = lines;
+        memo.note = String(req.body.note || '').trim();
+        memo.signedBy = String(req.body.signedBy || '').trim();
+        memo.status = 'created';
+        memo.receiptAttempts = [];
+        await memo.save();
+
+        const populated = await WorkshopMemo.findById(memo._id)
+            .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+            .populate('lines.recipe', 'name outputType planksPerUnit minStockQty stockQty')
+            .lean();
+        res.json(convertToClient(populated));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.delete('/api/workshop/memos/:id', requireIsAdmin, async (req, res) => {
+    try {
+        const memo = await WorkshopMemo.findById(req.params.id);
+        if (!memo) return res.status(404).json({ error: 'Служебная записка не найдена' });
+        if (memo.postedAt || memo.status === 'accepted') {
+            return res.status(400).json({ error: 'Проведённую служебную записку нельзя удалить напрямую: она уже изменила остатки.' });
+        }
+        const linkedProduction = await WorkshopProduction.exists({ memo: memo._id });
+        if (linkedProduction) return res.status(400).json({ error: 'По этой служебке уже есть производство. Сначала отмените связанные операции.' });
+        await WorkshopMemo.deleteOne({ _id: memo._id });
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/memos/:id/receive', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const memo = await WorkshopMemo.findById(req.params.id);
+        if (!memo) return res.status(404).json({ error: 'Служебная записка не найдена' });
+        if (memo.status === 'accepted' && memo.postedAt) {
+            return res.status(400).json({ error: 'Эта служебная записка уже принята и оприходована' });
+        }
+
+        const submitted = Array.isArray(req.body.lines) ? req.body.lines : [];
+        if (!submitted.length) return res.status(400).json({ error: 'Нет строк для сверки' });
+
+        const attemptLines = [];
+        let allMatch = true;
+
+        for (const line of memo.lines) {
+            const row = submitted.find(item => String(item.lineId || '') === String(line._id));
+            const actualProductId = row?.actualProductId || line.product;
+            const deliveredPacks = Math.max(0, Math.floor(workshopNumber(row?.deliveredPacks)));
+            const checked = Boolean(row?.checked);
+            const sameProduct = String(actualProductId || '') === String(line.product || '');
+            const sameQty = deliveredPacks === Number(line.requestedPacks || 0);
+            const isMatch = checked && sameProduct && sameQty;
+
+            line.actualProduct = actualProductId || line.product;
+            line.deliveredPacks = deliveredPacks;
+            line.checked = checked;
+            line.isMatch = isMatch;
+            line.discrepancyReason = String(row?.discrepancyReason || '').trim();
+
+            if (!isMatch) allMatch = false;
+            attemptLines.push({
+                lineId: String(line._id),
+                expectedProductId: String(line.product || ''),
+                actualProductId: String(line.actualProduct || ''),
+                requestedPacks: Number(line.requestedPacks || 0),
+                deliveredPacks,
+                checked,
+                isMatch,
+                discrepancyReason: line.discrepancyReason
+            });
+        }
+
+        memo.receiptAttempts.push({
+            date: req.body.date || new Date(),
+            status: allMatch ? 'accepted' : 'mismatch',
+            lines: attemptLines,
+            note: String(req.body.note || '').trim(),
+            createdBy: workshopUser(req)
+        });
+
+        if (!allMatch) {
+            memo.status = 'mismatch';
+            await memo.save();
+            const populated = await WorkshopMemo.findById(memo._id)
+                .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+                .populate('lines.actualProduct', 'sku name is_liquid characteristics.package_qty')
+                .populate('lines.recipe', 'name outputType planksPerUnit')
+                .lean();
+            return res.status(200).json({
+                accepted: false,
+                status: 'mismatch',
+                message: 'Есть расхождения. Упаковки пока не оприходованы — требуется обмен/повторная сверка.',
+                memo: convertToClient(populated)
+            });
+        }
+
+        if (!memo.postedAt) {
+            for (const line of memo.lines) {
+                const product = await Product.findById(line.product).lean();
+                if (!product) throw new Error('Одна из позиций служебки больше не найдена в каталоге');
+                const packQty = Number(line.packQty) > 0 ? Number(line.packQty) : workshopPackQty(product);
+                const planksQty = Number(line.requestedPacks || 0) * packQty;
+                await workshopChangeLaminate(line.product, planksQty);
+                await WorkshopMovement.create({
+                    date: req.body.date || new Date(),
+                    type: 'laminate_receipt',
+                    entityType: 'laminate',
+                    product: line.product,
+                    direction: 'in',
+                    qty: planksQty,
+                    unit: 'планка',
+                    serviceMemoNumber: memo.number,
+                    note: String(req.body.note || '').trim(),
+                    meta: {
+                        memoId: String(memo._id),
+                        memoLineId: String(line._id),
+                        requestedPacks: Number(line.requestedPacks || 0),
+                        deliveredPacks: Number(line.deliveredPacks || 0),
+                        packQty,
+                        plannedOutputQty: Number(line.plannedOutputQty || 0)
+                    },
+                    createdBy: workshopUser(req)
+                });
+            }
+            memo.postedAt = new Date();
+        }
+
+        memo.status = 'accepted';
+        memo.acceptedAt = new Date();
+        memo.acceptedBy = workshopUser(req);
+        await memo.save();
+
+        const populated = await WorkshopMemo.findById(memo._id)
+            .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
+            .populate('lines.actualProduct', 'sku name is_liquid characteristics.package_qty')
+            .populate('lines.recipe', 'name outputType planksPerUnit')
+            .lean();
+
+        res.json({
+            accepted: true,
+            status: 'accepted',
+            message: 'Все позиции совпали. Упаковки оприходованы в цех.',
+            memo: convertToClient(populated)
+        });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/laminate-receipt', requirePermission('can_manage_workshop'), async (req, res) => {
+    return res.status(400).json({
+        error: 'Одиночный приход отключен. Ламинат принимается только целыми упаковками по многострочной служебной записке.'
+    });
+});
+
+app.post('/api/workshop/production', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const recipe = await WorkshopRecipe.findById(req.body.recipeId)
+            .populate('product')
+            .populate('materials.material')
+            .populate('components.recipe');
+        if (!recipe) return res.status(404).json({ error: 'Рецептура не найдена' });
+
+        let sourceMemo = null;
+        let sourceMemoLine = null;
+        if (req.body.memoId) {
+            sourceMemo = await WorkshopMemo.findById(req.body.memoId).lean();
+            if (!sourceMemo || sourceMemo.status !== 'accepted') {
+                return res.status(400).json({ error: 'Можно привязать производство только к принятой служебной записке' });
+            }
+            sourceMemoLine = (sourceMemo.lines || []).find(line => String(line._id) === String(req.body.memoLineId || ''));
+            if (!sourceMemoLine) return res.status(400).json({ error: 'Строка служебной записки не найдена' });
+            if (recipe.product && String(sourceMemoLine.product) !== String(recipe.product._id)) {
+                return res.status(400).json({ error: 'Ламинат рецептуры не совпадает с выбранной строкой служебки' });
+            }
+        }
+
+        const outputQty = Math.max(0, workshopNumber(req.body.outputQty));
+        const scrapPlanks = Math.max(0, workshopNumber(req.body.scrapPlanks));
+        const acceptedPacks = Math.max(0, workshopNumber(req.body.acceptedPacks));
+        const acceptedLoosePlanks = Math.max(0, workshopNumber(req.body.acceptedLoosePlanks));
+        if (outputQty <= 0) return res.status(400).json({ error: 'Укажите количество изготовленных изделий' });
+
+        const packQty = workshopPackQty(recipe.product, recipe.packQtyOverride);
+        const standardPlanksPerUnit = Math.max(0, workshopNumber(recipe.planksPerUnit));
+        const requestedActualNorm = Math.max(0, workshopNumber(req.body.actualPlanksPerUnit));
+        const actualPlanksPerUnit = requestedActualNorm > 0 ? requestedActualNorm : standardPlanksPerUnit;
+        const customNormReason = String(req.body.customNormReason || '').trim();
+        const customOrderName = String(req.body.customOrderName || '').trim();
+        const customDimensions = String(req.body.customDimensions || '').trim();
+        if (requestedActualNorm > 0 && Math.abs(requestedActualNorm - standardPlanksPerUnit) > 0.0001 && !customNormReason) {
+            return res.status(400).json({ error: 'При изменении стандартной нормы укажите причину (например, индивидуальный образец)' });
+        }
+        const usedForOutput = actualPlanksPerUnit * outputQty;
+        const consumedPlanks = usedForOutput + scrapPlanks;
+        const acceptedTotal = acceptedPacks * packQty + acceptedLoosePlanks;
+
+        if (consumedPlanks > 0) {
+            if (!recipe.product) return res.status(400).json({ error: 'Для этой рецептуры не выбран ламинат' });
+            const stock = await WorkshopLaminateStock.findOne({ product: recipe.product._id }).lean();
+            if ((Number(stock?.planksQty) || 0) < consumedPlanks) {
+                return res.status(400).json({ error: 'Недостаточно планок ламината в остатках цеха' });
+            }
+        }
+
+        for (const line of recipe.materials || []) {
+            if (line.mode === 'estimate') continue;
+            const need = (Number(line.qty) || 0) * outputQty;
+            if (need > 0 && (Number(line.material?.stockQty) || 0) < need) {
+                return res.status(400).json({ error: `Недостаточно материала «${line.material?.name || 'материал'}»` });
+            }
+        }
+
+        for (const line of recipe.components || []) {
+            const need = (Number(line.qty) || 0) * outputQty;
+            if (need > 0 && (Number(line.recipe?.stockQty) || 0) < need) {
+                return res.status(400).json({ error: `Недостаточно готовых компонентов «${line.recipe?.name || 'компонент'}»` });
+            }
+        }
+
+        if (consumedPlanks > 0) {
+            await workshopChangeLaminate(recipe.product._id, -consumedPlanks);
+            await WorkshopMovement.create({
+                date: req.body.date || new Date(), type: 'production_laminate',
+                entityType: 'laminate', product: recipe.product._id, direction: 'out',
+                qty: consumedPlanks, unit: 'планка', note: String(req.body.note || '').trim(),
+                serviceMemoNumber: sourceMemo?.number || '',
+                meta: { recipeId: recipe._id, outputQty, scrapPlanks, standardPlanksPerUnit, actualPlanksPerUnit, customNormReason, customOrderName, customDimensions, memoId: sourceMemo?._id || null, memoLineId: sourceMemoLine?._id || null }, createdBy: workshopUser(req)
+            });
+        }
+
+        for (const line of recipe.materials || []) {
+            const need = (Number(line.qty) || 0) * outputQty;
+            if (line.mode === 'estimate') {
+                if (need > 0) {
+                    await WorkshopMovement.create({
+                        date: req.body.date || new Date(), type: 'production_material_estimate',
+                        entityType: 'material', material: line.material._id, direction: 'neutral',
+                        qty: need, unit: line.material.unit || 'шт',
+                        note: 'Расчетный расход; фактический остаток автоматически не уменьшается',
+                        meta: { recipeId: recipe._id, outputQty, estimate: true }, createdBy: workshopUser(req)
+                    });
+                }
+                continue;
+            }
+            if (need <= 0) continue;
+            await workshopChangeMaterial(line.material._id, -need);
+            await WorkshopMovement.create({
+                date: req.body.date || new Date(), type: 'production_material',
+                entityType: 'material', material: line.material._id, direction: 'out',
+                qty: need, unit: line.material.unit || 'шт',
+                meta: { recipeId: recipe._id, outputQty }, createdBy: workshopUser(req)
+            });
+        }
+
+        for (const line of recipe.components || []) {
+            const need = (Number(line.qty) || 0) * outputQty;
+            if (need <= 0) continue;
+            await workshopChangeRecipe(line.recipe._id, -need);
+            await WorkshopMovement.create({
+                date: req.body.date || new Date(), type: 'production_component',
+                entityType: 'finished', recipe: line.recipe._id, direction: 'out',
+                qty: need, unit: 'шт', meta: { recipeId: recipe._id, outputQty },
+                createdBy: workshopUser(req)
+            });
+        }
+
+        const resultStock = await workshopChangeRecipe(recipe._id, outputQty);
+        await WorkshopMovement.create({
+            date: req.body.date || new Date(), type: 'production_output',
+            entityType: 'finished', recipe: recipe._id, direction: 'in',
+            qty: outputQty, unit: 'шт', note: String(req.body.note || '').trim(),
+            serviceMemoNumber: sourceMemo?.number || '',
+            meta: { acceptedPacks, acceptedLoosePlanks, acceptedTotal, packQty, consumedPlanks, scrapPlanks, memoId: sourceMemo?._id || null, memoLineId: sourceMemoLine?._id || null },
+            createdBy: workshopUser(req)
+        });
+
+        const production = await WorkshopProduction.create({
+            date: req.body.date || new Date(),
+            recipe: recipe._id,
+            product: recipe.product?._id || null,
+            memo: sourceMemo?._id || null,
+            memoLineId: sourceMemoLine?._id ? String(sourceMemoLine._id) : '',
+            serviceMemoNumber: sourceMemo?.number || '',
+            acceptedPacks,
+            acceptedLoosePlanks,
+            packQty,
+            totalAcceptedPlanks: acceptedTotal,
+            outputQty,
+            standardPlanksPerUnit,
+            actualPlanksPerUnit,
+            customNormReason,
+            customOrderName,
+            customDimensions,
+            consumedPlanks,
+            scrapPlanks,
+            operations: Array.isArray(req.body.operations)
+                ? req.body.operations.map(item => ({
+                    type: String(item.type || '').trim(),
+                    qty: Math.max(0, workshopNumber(item.qty)),
+                    note: String(item.note || '').trim()
+                })).filter(item => item.type)
+                : [],
+            note: String(req.body.note || '').trim(),
+            createdBy: workshopUser(req)
+        });
+
+        res.status(201).json({ production: convertToClient(production), stock: convertToClient(resultStock) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.put('/api/workshop/productions/:id', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const production = await WorkshopProduction.findById(req.params.id);
+        if (!production) return res.status(404).json({ error: 'Запись производства не найдена' });
+        if (production.cancelledAt) return res.status(400).json({ error: 'Отменённую запись нельзя редактировать' });
+
+        production.date = req.body.date || production.date;
+        production.note = String(req.body.note ?? production.note ?? '').trim();
+        production.customOrderName = String(req.body.customOrderName ?? production.customOrderName ?? '').trim();
+        production.customDimensions = String(req.body.customDimensions ?? production.customDimensions ?? '').trim();
+        production.customNormReason = String(req.body.customNormReason ?? production.customNormReason ?? '').trim();
+        if (Array.isArray(req.body.operations)) {
+            production.operations = req.body.operations.map(item => ({
+                type: String(item.type || '').trim(),
+                qty: Math.max(0, workshopNumber(item.qty)),
+                note: String(item.note || '').trim()
+            })).filter(item => item.type);
+        }
+        await production.save();
+        res.json(convertToClient(production));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.delete('/api/workshop/productions/:id', requireIsAdmin, async (req, res) => {
+    try {
+        const production = await WorkshopProduction.findById(req.params.id)
+            .populate({
+                path: 'recipe',
+                populate: [
+                    { path: 'materials.material' },
+                    { path: 'components.recipe' }
+                ]
+            })
+            .populate('product');
+        if (!production) return res.status(404).json({ error: 'Запись производства не найдена' });
+        if (production.cancelledAt) return res.status(400).json({ error: 'Эта запись уже отменена' });
+
+        const recipe = production.recipe;
+        if (!recipe) return res.status(400).json({ error: 'Рецептура производства не найдена' });
+        const outputQty = Number(production.outputQty) || 0;
+
+        if ((Number(recipe.stockQty) || 0) + 1e-9 < outputQty) {
+            return res.status(400).json({ error: 'Нельзя отменить производство: часть изготовленных изделий уже выдана или использована.' });
+        }
+
+        if (outputQty > 0) await workshopChangeRecipe(recipe._id, -outputQty);
+        if (production.product && Number(production.consumedPlanks) > 0) {
+            await workshopChangeLaminate(production.product._id, Number(production.consumedPlanks));
+        }
+
+        for (const line of recipe.materials || []) {
+            if (line.mode === 'estimate') continue;
+            const qty = (Number(line.qty) || 0) * outputQty;
+            if (qty > 0 && line.material?._id) await workshopChangeMaterial(line.material._id, qty);
+        }
+        for (const line of recipe.components || []) {
+            const qty = (Number(line.qty) || 0) * outputQty;
+            if (qty > 0 && line.recipe?._id) await workshopChangeRecipe(line.recipe._id, qty);
+        }
+
+        await WorkshopMovement.create({
+            date: new Date(),
+            type: 'production_cancelled',
+            entityType: 'finished',
+            recipe: recipe._id,
+            direction: 'out',
+            qty: outputQty,
+            unit: 'шт',
+            serviceMemoNumber: production.serviceMemoNumber || '',
+            note: String(req.body?.reason || 'Отмена записи производства администратором'),
+            meta: {
+                productionId: String(production._id),
+                restoredPlanks: Number(production.consumedPlanks) || 0,
+                cancellation: true
+            },
+            createdBy: workshopUser(req)
+        });
+
+        production.cancelledAt = new Date();
+        production.cancelledBy = workshopUser(req);
+        production.cancelReason = String(req.body?.reason || '').trim();
+        await production.save();
+
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/writeoff', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const entityType = req.body.entityType;
+        const qty = Math.abs(workshopNumber(req.body.qty));
+        const serviceMemoNumber = String(req.body.serviceMemoNumber || '').trim();
+        if (qty <= 0) return res.status(400).json({ error: 'Укажите количество списания' });
+        if (!serviceMemoNumber) return res.status(400).json({ error: 'Для списания укажите номер служебной записки' });
+
+        let movementData = {
+            date: req.body.date || new Date(), type: 'writeoff', entityType,
+            direction: 'out', qty, serviceMemoNumber,
+            note: String(req.body.note || '').trim(), createdBy: workshopUser(req)
+        };
+
+        if (entityType === 'laminate') {
+            await workshopChangeLaminate(req.body.productId, -qty);
+            movementData.product = req.body.productId;
+            movementData.unit = 'планка';
+        } else if (entityType === 'material') {
+            const material = await workshopChangeMaterial(req.body.materialId, -qty);
+            movementData.material = req.body.materialId;
+            movementData.unit = material.unit || 'шт';
+        } else if (entityType === 'finished') {
+            await workshopChangeRecipe(req.body.recipeId, -qty);
+            movementData.recipe = req.body.recipeId;
+            movementData.unit = 'шт';
+        } else {
+            return res.status(400).json({ error: 'Неизвестный тип списания' });
+        }
+
+        const movement = await WorkshopMovement.create(movementData);
+        res.status(201).json(convertToClient(movement));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/dealer-movement', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const dealerId = req.body.dealerId;
+        const recipeId = req.body.recipeId;
+        const action = req.body.action || 'issue';
+        const qty = Math.abs(workshopNumber(req.body.qty));
+        if (!dealerId || !recipeId || qty <= 0) return res.status(400).json({ error: 'Выберите дилера, изделие и количество' });
+
+        const [dealer, recipe] = await Promise.all([
+            Dealer.findById(dealerId).select('_id name'),
+            WorkshopRecipe.findById(recipeId)
+        ]);
+        if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
+        if (!recipe) return res.status(404).json({ error: 'Изделие не найдено' });
+
+        let asset = await WorkshopDealerAsset.findOne({ dealer: dealerId, recipe: recipeId });
+        if (!asset) asset = new WorkshopDealerAsset({ dealer: dealerId, recipe: recipeId, qty: 0 });
+
+        const condition = req.body.returnCondition || 'defect';
+        let issued = 0;
+        let returned = 0;
+
+        if (action === 'issue') {
+            if (Number(recipe.stockQty) < qty) return res.status(400).json({ error: 'Недостаточно готовых изделий в цехе' });
+            await workshopChangeRecipe(recipeId, -qty);
+            asset.qty += qty;
+            issued = qty;
+        } else if (action === 'return') {
+            if (Number(asset.qty) < qty) return res.status(400).json({ error: 'У дилера числится меньше изделий' });
+            asset.qty -= qty;
+            returned = qty;
+            if (condition === 'reusable') await workshopChangeRecipe(recipeId, qty);
+        } else if (action === 'replacement') {
+            const returnQty = Math.abs(workshopNumber(req.body.returnQty || qty));
+            const issueQty = Math.abs(workshopNumber(req.body.issueQty || qty));
+            if (Number(asset.qty) < returnQty) return res.status(400).json({ error: 'У дилера числится меньше изделий для возврата' });
+            if (Number(recipe.stockQty) < issueQty) return res.status(400).json({ error: 'Недостаточно изделий для замены' });
+            asset.qty = Number(asset.qty) - returnQty + issueQty;
+            await workshopChangeRecipe(recipeId, -issueQty);
+            if (condition === 'reusable') await workshopChangeRecipe(recipeId, returnQty);
+            returned = returnQty;
+            issued = issueQty;
+        } else {
+            return res.status(400).json({ error: 'Неизвестная операция с дилером' });
+        }
+
+        asset.qty = Math.max(0, Number(asset.qty) || 0);
+        await asset.save();
+
+        const movement = await WorkshopMovement.create({
+            date: req.body.date || new Date(),
+            type: `dealer_${action}`,
+            entityType: 'finished',
+            recipe: recipeId,
+            dealer: dealerId,
+            direction: action === 'return' ? 'in' : action === 'issue' ? 'out' : 'neutral',
+            qty,
+            unit: 'шт',
+            note: String(req.body.note || '').trim(),
+            meta: { issued, returned, returnCondition: condition, reason: String(req.body.reason || '').trim() },
+            createdBy: workshopUser(req)
+        });
+
+        await syncWorkshopPosToDealer(dealerId, recipeId);
+        res.status(201).json({ asset: convertToClient(asset), movement: convertToClient(movement) });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.get('/api/workshop/dealers/:dealerId/assets', requireAnyPermission('can_view_workshop', 'can_view_dealers'), async (req, res) => {
+    try {
+        const assets = await WorkshopDealerAsset.find({ dealer: req.params.dealerId, qty: { $gt: 0 } })
+            .populate({ path: 'recipe', populate: { path: 'product', select: 'sku name is_liquid' } })
+            .sort({ updatedAt: -1 }).lean();
+        res.json(assets.map(convertToClient));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/opening-balance', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const location = req.body.location === 'dealer' ? 'dealer' : 'workshop';
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
+        const date = req.body.date || new Date();
+        const note = String(req.body.note || '').trim();
+        if (!inputLines.length) return res.status(400).json({ error: 'Укажите хотя бы один фактический остаток' });
+
+        let dealer = null;
+        if (location === 'dealer') {
+            if (!req.body.dealerId) return res.status(400).json({ error: 'Выберите дилера' });
+            dealer = await Dealer.findOne({
+                _id: req.body.dealerId,
+                ...getWorkingDealerFilter(getDealerFilter(req))
+            }).select('_id name');
+            if (!dealer) return res.status(404).json({ error: 'Дилер не найден или недоступен' });
+        }
+
+        const changed = [];
+        for (const line of inputLines) {
+            let recipe = null;
+            if (line.recipeId) {
+                recipe = await WorkshopRecipe.findOne({ _id: line.recipeId, active: { $ne: false } });
+            } else if (line.productId) {
+                const product = await Product.findById(line.productId).lean();
+                if (!product) continue;
+
+                const posDef = workshopPosDefinition({ product });
+                if (posDef?.recipeSku) {
+                    recipe = await WorkshopRecipe.findOne({ sku:posDef.recipeSku, active:{ $ne:false } });
+                } else {
+                    recipe = await WorkshopRecipe.findOne({
+                        product: product._id,
+                        outputType: 'sample',
+                        active: { $ne: false }
+                    });
+                    if (!recipe) {
+                        recipe = await WorkshopRecipe.create({
+                            name: `Планшет ${product.sku || ''} ${product.name || ''}`.trim(),
+                            outputType: 'sample',
+                            sku: `SAMPLE-${product.sku || String(product._id).slice(-6)}`,
+                            product: product._id,
+                            planksPerUnit: 0,
+                            packQtyOverride: 0,
+                            stockQty: 0,
+                            minStockQty: 0,
+                            active: true,
+                            note: 'Создано автоматически при вводе стартовых остатков. Норму производства можно заполнить позже.'
+                        });
+                    }
+                }
+            }
+            if (!recipe) continue;
+
+            const actualQty = Math.max(0, workshopNumber(line.actualQty));
+            const lineNote = String(line.note || '').trim();
+
+            if (location === 'workshop') {
+                const previousQty = Number(recipe.stockQty) || 0;
+                const delta = actualQty - previousQty;
+                if (Math.abs(delta) <= 0.0001) continue;
+
+                await workshopChangeRecipe(recipe._id, delta);
+                await WorkshopMovement.create({
+                    date,
+                    type: 'opening_balance',
+                    entityType: 'finished',
+                    recipe: recipe._id,
+                    direction: delta > 0 ? 'in' : 'out',
+                    qty: Math.abs(delta),
+                    unit: 'шт',
+                    note: lineNote || note || 'Стартовый остаток готовых образцов до начала учёта в CRM',
+                    meta: { previousQty, actualQty, delta, source: 'legacy_opening_balance' },
+                    createdBy: workshopUser(req)
+                });
+                changed.push({ recipeId: String(recipe._id), previousQty, actualQty, delta });
+            } else {
+                let asset = await WorkshopDealerAsset.findOne({ dealer: dealer._id, recipe: recipe._id });
+                const previousQty = Number(asset?.qty) || 0;
+                const delta = actualQty - previousQty;
+                if (Math.abs(delta) <= 0.0001) continue;
+
+                if (!asset) asset = new WorkshopDealerAsset({ dealer: dealer._id, recipe: recipe._id, qty: 0 });
+                asset.qty = actualQty;
+                await asset.save();
+
+                await WorkshopMovement.create({
+                    date,
+                    type: 'opening_dealer_balance',
+                    entityType: 'finished',
+                    recipe: recipe._id,
+                    dealer: dealer._id,
+                    direction: 'neutral',
+                    qty: Math.abs(delta),
+                    unit: 'шт',
+                    note: lineNote || note || 'Образцы уже находились у дилера до начала учёта в CRM',
+                    meta: { previousQty, actualQty, delta, source: 'legacy_opening_balance' },
+                    createdBy: workshopUser(req)
+                });
+                await syncWorkshopPosToDealer(dealer._id, recipe._id);
+                changed.push({ recipeId: String(recipe._id), previousQty, actualQty, delta });
+            }
+        }
+
+        if (!changed.length) return res.status(400).json({ error: 'Фактические остатки не отличаются от текущих' });
+        res.status(201).json({
+            status: 'ok',
+            location,
+            dealerId: dealer ? String(dealer._id) : '',
+            changed
+        });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/correction', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const reason = String(req.body.reason || '').trim();
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines.slice(0, 10) : [];
+        if (reason.length < 3) return res.status(400).json({ error: 'Укажите причину исправления' });
+        if (!inputLines.length) return res.status(400).json({ error: 'Добавьте хотя бы одну позицию' });
+
+        const prepared = [];
+        const seen = new Set();
+
+        for (const line of inputLines) {
+            const entityType = String(line.entityType || '').trim();
+            const id = String(line.id || '').trim();
+            const actualQty = Math.max(0, workshopNumber(line.actualQty));
+            if (!['finished','laminate','material'].includes(entityType) || !id) {
+                return res.status(400).json({ error: 'Некорректная позиция для исправления' });
+            }
+
+            const key = entityType + ':' + id;
+            if (seen.has(key)) return res.status(400).json({ error: 'Одна и та же позиция добавлена дважды' });
+            seen.add(key);
+
+            if (entityType === 'finished') {
+                const item = await WorkshopRecipe.findById(id).lean();
+                if (!item) return res.status(404).json({ error: 'Готовое изделие не найдено' });
+                prepared.push({
+                    entityType, id, actualQty,
+                    previousQty: Math.max(0, Number(item.stockQty) || 0),
+                    unit: 'шт',
+                    name: item.name || 'Готовое изделие',
+                    recipe: id
+                });
+            } else if (entityType === 'material') {
+                const item = await WorkshopMaterial.findById(id).lean();
+                if (!item) return res.status(404).json({ error: 'Материал не найден' });
+                prepared.push({
+                    entityType, id, actualQty,
+                    previousQty: Math.max(0, Number(item.stockQty) || 0),
+                    unit: item.unit || 'шт',
+                    name: item.name || 'Материал',
+                    material: id
+                });
+            } else {
+                const product = await Product.findById(id).select('sku name').lean();
+                if (!product) return res.status(404).json({ error: 'Ламинат не найден' });
+                const stock = await WorkshopLaminateStock.findOne({ product: id }).lean();
+                prepared.push({
+                    entityType, id, actualQty,
+                    previousQty: Math.max(0, Number(stock?.planksQty) || 0),
+                    unit: 'планка',
+                    name: [product.sku, product.name].filter(Boolean).join(' · ') || 'Ламинат',
+                    product: id
+                });
+            }
+        }
+
+        const changed = prepared
+            .map(item => ({ ...item, delta: item.actualQty - item.previousQty }))
+            .filter(item => Math.abs(item.delta) > 0.0001);
+
+        if (!changed.length) return res.status(400).json({ error: 'Новые остатки совпадают с текущими' });
+
+        const savedLines = [];
+        for (const item of changed) {
+            if (item.entityType === 'finished') {
+                await WorkshopRecipe.updateOne({ _id: item.id }, { $set: { stockQty: item.actualQty } });
+            } else if (item.entityType === 'material') {
+                await WorkshopMaterial.updateOne({ _id: item.id }, { $set: { stockQty: item.actualQty } });
+            } else {
+                await WorkshopLaminateStock.findOneAndUpdate(
+                    { product: item.id },
+                    { $set: { planksQty: item.actualQty } },
+                    { upsert: true, new: true, setDefaultsOnInsert: true }
+                );
+            }
+
+            await WorkshopMovement.create({
+                date: req.body.date || new Date(),
+                type: 'manual_correction',
+                entityType: item.entityType,
+                product: item.product || null,
+                material: item.material || null,
+                recipe: item.recipe || null,
+                direction: item.delta > 0 ? 'in' : 'out',
+                qty: Math.abs(item.delta),
+                unit: item.unit,
+                note: reason,
+                meta: {
+                    previousQty: item.previousQty,
+                    actualQty: item.actualQty,
+                    delta: item.delta,
+                    reason,
+                    source: 'manual_correction'
+                },
+                createdBy: workshopUser(req)
+            });
+
+            savedLines.push({
+                entityType: item.entityType,
+                product: item.product || null,
+                material: item.material || null,
+                recipe: item.recipe || null,
+                systemQty: item.previousQty,
+                actualQty: item.actualQty,
+                delta: item.delta,
+                note: reason
+            });
+        }
+
+        await WorkshopStocktake.create({
+            date: req.body.date || new Date(),
+            lines: savedLines,
+            note: 'Корректировка остатка: ' + reason,
+            createdBy: workshopUser(req)
+        });
+
+        res.status(201).json({
+            status: 'ok',
+            reason,
+            changed: changed.map(item => ({
+                entityType: item.entityType,
+                id: item.id,
+                name: item.name,
+                previousQty: item.previousQty,
+                actualQty: item.actualQty,
+                delta: item.delta,
+                unit: item.unit
+            }))
+        });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/workshop/stocktake', requirePermission('can_manage_workshop'), async (req, res) => {
+    try {
+        const inputLines = Array.isArray(req.body.lines) ? req.body.lines : [];
+        if (!inputLines.length) return res.status(400).json({ error: 'Добавьте позиции инвентаризации' });
+        const savedLines = [];
+
+        for (const line of inputLines) {
+            const actualQty = Math.max(0, workshopNumber(line.actualQty));
+            let systemQty = 0;
+            let delta = 0;
+            let movement = null;
+
+            if (line.entityType === 'laminate' && line.productId) {
+                const current = await WorkshopLaminateStock.findOne({ product: line.productId }).lean();
+                systemQty = Number(current?.planksQty) || 0;
+                delta = actualQty - systemQty;
+                if (Math.abs(delta) > 0.0001) {
+                    await workshopChangeLaminate(line.productId, delta);
+                    movement = { entityType:'laminate', product:line.productId, unit:'планка' };
+                }
+                savedLines.push({ entityType:'laminate', product:line.productId, systemQty, actualQty, delta, note:line.note || '' });
+            } else if (line.entityType === 'material' && line.materialId) {
+                const current = await WorkshopMaterial.findById(line.materialId).lean();
+                if (!current) continue;
+                systemQty = Number(current.stockQty) || 0;
+                delta = actualQty - systemQty;
+                if (Math.abs(delta) > 0.0001) {
+                    await workshopChangeMaterial(line.materialId, delta);
+                    movement = { entityType:'material', material:line.materialId, unit:current.unit || 'шт' };
+                }
+                savedLines.push({ entityType:'material', material:line.materialId, systemQty, actualQty, delta, note:line.note || '' });
+            } else if (line.entityType === 'finished' && line.recipeId) {
+                const current = await WorkshopRecipe.findById(line.recipeId).lean();
+                if (!current) continue;
+                systemQty = Number(current.stockQty) || 0;
+                delta = actualQty - systemQty;
+                if (Math.abs(delta) > 0.0001) {
+                    await workshopChangeRecipe(line.recipeId, delta);
+                    movement = { entityType:'finished', recipe:line.recipeId, unit:'шт' };
+                }
+                savedLines.push({ entityType:'finished', recipe:line.recipeId, systemQty, actualQty, delta, note:line.note || '' });
+            }
+
+            if (movement && Math.abs(delta) > 0.0001) {
+                await WorkshopMovement.create({
+                    date: req.body.date || new Date(),
+                    type: 'stocktake_adjustment',
+                    ...movement,
+                    direction: delta > 0 ? 'in' : 'out',
+                    qty: Math.abs(delta),
+                    note: line.note || '',
+                    meta: { systemQty, actualQty, delta },
+                    createdBy: workshopUser(req)
+                });
+            }
+        }
+
+        const stocktake = await WorkshopStocktake.create({
+            date: req.body.date || new Date(),
+            lines: savedLines,
+            note: String(req.body.note || '').trim(),
+            createdBy: workshopUser(req)
+        });
+        res.status(201).json(convertToClient(stocktake));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.get('/api/reclamations/dashboard', requirePermission('can_view_reclamations'), async (req, res) => {
+    try {
+        const dealerIds = await getScopedDealerIds(req);
+        const query = {
+            $or: [
+                { resolution: { $exists: false } },
+                { resolution: null },
+                { resolution: '' }
+            ]
+        };
+        if (dealerIds) query.dealerId = { $in: dealerIds };
+
+        const list = await Reclamation.find(query)
+            .select('dealerId dealerName resolution createdAt date')
+            .sort({ createdAt: -1 })
+            .lean();
+        res.json(list.map(convertToClient));
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+
+app.get('/api/reclamations', requirePermission('can_view_reclamations'), async (req, res) => {
+    try {
+        const dealerIds = await getScopedDealerIds(req);
+        const pipeline = [];
+        if (dealerIds) pipeline.push({ $match: { dealerId: { $in: dealerIds } } });
+        pipeline.push(
+            { $sort: { createdAt: -1 } },
+            { $project: {
+                dealerId: 1,
+                dealerName: 1,
+                date: 1,
+                productName: 1,
+                purchasedVolume: 1,
+                description: 1,
+                clientDemand: 1,
+                resolution: 1,
+                invoiceNumber: 1,
+                clientName: 1,
+                defectVolume: 1,
+                compensationAmount: 1,
+                createdAt: 1,
+                updatedAt: 1,
+                photoCount: { $size: { $ifNull: ['$photos', []] } }
+            } }
+        );
+        const list = await Reclamation.aggregate(pipeline);
+        res.json(list.map(item => ({ ...item, id: String(item._id), _id: undefined })));
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+app.get('/api/reclamations/:id', requirePermission('can_view_reclamations'), async (req, res) => {
+    try {
+        const dealerIds = await getScopedDealerIds(req);
+        const query = { _id: req.params.id };
+        if (dealerIds) query.dealerId = { $in: dealerIds };
+        const item = await Reclamation.findOne(query).lean();
+        if (!item) return res.status(404).json({ error: 'Рекламация не найдена' });
+        res.json(convertToClient(item));
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+
+app.post('/api/reclamations', requirePermission('can_manage_reclamations'), async (req, res) => {
+    try { 
+        const r = new Reclamation(req.body); 
+        await r.save(); 
+        res.json(convertToClient(r)); 
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+app.put('/api/reclamations/:id', requirePermission('can_manage_reclamations'), async (req, res) => {
+    try { 
+        const r = await Reclamation.findByIdAndUpdate(req.params.id, req.body, { new: true }); 
+        res.json(convertToClient(r)); 
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+app.delete('/api/reclamations/:id', requirePermission('can_manage_reclamations'), async (req, res) => {
+    try { 
+        await Reclamation.findByIdAndDelete(req.params.id); 
+        res.json({status: 'deleted'}); 
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+
+app.listen(PORT, () => { console.log(`Server port ${PORT}`); connectToDB(); });
+,'i') })) {
+        next += 1;
+        code = 'IF' + String(next).padStart(3,'0');
+    }
+    return code;
+}
 
 app.get('/api/dealers', requireAnyPermission('can_view_dealers', 'can_view_map', 'can_view_sales', 'can_view_competitors', 'can_view_reclamations'), async (req, res) => {
     try {
