@@ -61,7 +61,7 @@
             <div class="product-search-row">
                 <div class="product-search-box">
                     <i class="bi bi-search"></i>
-                    <input type="search" id="product-search" class="form-control" placeholder="Артикул, название, размер, класс, фаска…">
+                    <input type="search" id="product-search" class="form-control" placeholder="Артикул, название, коллекция, размер, класс, фаска…">
                     <button type="button" id="product-search-clear" title="Очистить поиск" hidden><i class="bi bi-x-lg"></i></button>
                 </div>
                 <button type="button" id="product-reset-filters" class="product-reset-btn"><i class="bi bi-arrow-counterclockwise"></i><span>Сбросить</span></button>
@@ -155,6 +155,13 @@
                         <div class="mb-3">
                             <label class="form-label text-secondary small fw-bold">Название</label>
                             <input type="text" class="form-control" id="prod_name" required placeholder="Дуб Снежный">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label text-secondary small fw-bold">Коллекция</label>
+                            <input type="text" class="form-control" id="prod_collection" list="product-collection-options" placeholder="Например: ENGLAND HERRINGBONE">
+                            <datalist id="product-collection-options"></datalist>
+                            <div class="form-text">Используется в прайсах. Пишите одинаковое название для всех декоров одной коллекции.</div>
                         </div>
 
                         <div class="form-check form-switch mb-3 bg-light p-2 rounded">
