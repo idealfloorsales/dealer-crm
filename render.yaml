@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: dealer-crm
+    runtime: node
+    repo: https://github.com/idealfloorsales/dealer-crm
+    branch: main
+    plan: free
+    buildCommand: yarn install
+    startCommand: node server.js
+    healthCheckPath: /readyz
+    maxShutdownDelaySeconds: 15
+    autoDeploy: true
