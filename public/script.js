@@ -43,6 +43,62 @@ document.addEventListener('DOMContentLoaded', () => {
     let duplicateQueryHandled = false;
     let dealerPriceLists = [];
 
+    function captureDealerViewState() {
+        const sector = document.getElementById('filter-sector');
+        const toolbar = dealerFilterToggle?.closest('.dealer-list-toolbar');
+        return {
+            search: searchBar?.value || '',
+            city: filterCity?.value || '',
+            priceType: filterPriceType?.value || '',
+            status: filterStatus?.value || '',
+            responsible: filterResponsible?.value || '',
+            health: filterHealth?.value || '',
+            sector: sector?.value || '',
+            sort: dealerSortSelect?.value || 'dealer_id_asc',
+            quickFilter: dealerQuickFilter || 'all',
+            filtersOpen: Boolean(toolbar?.classList.contains('filters-open')),
+            scrollY: window.scrollY || document.documentElement.scrollTop || 0
+        };
+    }
+
+    function restoreDealerViewState(state) {
+        if (!state) return;
+
+        const restoreSelect = (element, value) => {
+            if (!element) return;
+            const wanted = String(value || '');
+            if ([...element.options].some(option => String(option.value) === wanted)) {
+                element.value = wanted;
+            }
+        };
+
+        if (searchBar) searchBar.value = state.search || '';
+        restoreSelect(filterCity, state.city);
+        restoreSelect(filterPriceType, state.priceType);
+        restoreSelect(filterStatus, state.status);
+        restoreSelect(filterResponsible, state.responsible);
+        restoreSelect(filterHealth, state.health);
+        restoreSelect(document.getElementById('filter-sector'), state.sector);
+        restoreSelect(dealerSortSelect, state.sort || 'dealer_id_asc');
+
+        dealerQuickFilter = state.quickFilter || 'all';
+        dealerQuickFilters?.querySelectorAll('.dealer-quick-filter').forEach(el => {
+            el.classList.toggle('active', el.dataset.filter === dealerQuickFilter);
+        });
+
+        const toolbar = dealerFilterToggle?.closest('.dealer-list-toolbar');
+        toolbar?.classList.toggle('filters-open', Boolean(state.filtersOpen));
+        dealerFilterToggle?.classList.toggle('active', Boolean(state.filtersOpen));
+    }
+
+    function restoreDealerScroll(state) {
+        if (!state) return;
+        const y = Math.max(0, Number(state.scrollY) || 0);
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => window.scrollTo({ top:y, left:0, behavior:'auto' }));
+        });
+    }
+
     function fillDealerPriceListSelect(selectId, selectedId = '') {
         const select = document.getElementById(selectId);
         if (!select) return;
@@ -741,7 +797,10 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshEditMap = setupMapLogic('edit-map', 'edit_latitude', 'edit_longitude', 'edit-smart-search', 'btn-search-edit', 'btn-loc-edit', 'edit');
 
     // --- MAIN LOGIC ---
-    async function initApp() {
+    async function initApp(options = {}) {
+        const preservedViewState = options.preserveDealerView
+            ? (options.viewState || captureDealerViewState())
+            : null;
         try {
             console.log("Starting app init...");
 
@@ -799,10 +858,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 3. First meaningful paint: dashboard + dealer directory.
             populateFilters(allDealers);
+            restoreDealerViewState(preservedViewState);
             renderDashboard();
             setupGlobalSearch();
             renderDealerList();
             setupEventListeners();
+            restoreDealerScroll(preservedViewState);
 
             const duplicateFromUrl = new URLSearchParams(window.location.search).get('duplicate');
             if (!duplicateQueryHandled && duplicateFromUrl && window.CRMAuth && CRMAuth.can('can_create_dealer')) {
@@ -2035,7 +2096,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     async function fetchStatuses(rerender = true) { const res = await fetch(API_STATUSES_URL); if(res.ok) { statusList = await res.json(); populateStatusSelects(); renderStatusManagerList(); if(rerender && typeof renderDealerList === 'function') renderDealerList(); } else throw new Error("Ошибка статусов"); }
     
-    function populateStatusSelects(selectedStatus = null) { let filterHtml = '<option value="">Рабочие дилеры</option>'; statusList.forEach(s => { filterHtml += `<option value="${s.value}">${s.label}</option>`; }); if(filterStatus) filterStatus.innerHTML = filterHtml; const modalHtml = statusList.map(s => `<option value="${s.value}" ${selectedStatus === s.value ? 'selected' : ''}>${s.label}</option>`).join(''); const addStatusSel = document.getElementById('status'); if(addStatusSel) addStatusSel.innerHTML = modalHtml; const editStatusSel = document.getElementById('edit_status'); if(editStatusSel) editStatusSel.innerHTML = modalHtml; }
+    function populateStatusSelects(selectedStatus = null) {
+        const currentFilterStatus = filterStatus?.value || '';
+        let filterHtml = '<option value="">Рабочие дилеры</option>';
+        statusList.forEach(s => { filterHtml += `<option value="${s.value}">${s.label}</option>`; });
+        if (filterStatus) {
+            filterStatus.innerHTML = filterHtml;
+            if ([...filterStatus.options].some(option => option.value === currentFilterStatus)) {
+                filterStatus.value = currentFilterStatus;
+            }
+        }
+        const modalHtml = statusList.map(s => `<option value="${s.value}" ${selectedStatus === s.value ? 'selected' : ''}>${s.label}</option>`).join('');
+        const addStatusSel = document.getElementById('status');
+        if(addStatusSel) addStatusSel.innerHTML = modalHtml;
+        const editStatusSel = document.getElementById('edit_status');
+        if(editStatusSel) editStatusSel.innerHTML = modalHtml;
+    }
     function statusDealerCount(value) {
         return (Array.isArray(allDealers) ? allDealers : []).filter(dealer => String(dealer.status || '') === String(value || '')).length;
     }
@@ -2432,7 +2508,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await response.json().catch(() => ({}));
                 throw new Error(data.error || 'Не удалось выполнить задачу');
             }
-            await initApp();
+            await initApp({ preserveDealerView:true });
             window.showToast("Задача выполнена!");
         } catch (e) {
             window.showToast(e.message || "Ошибка", "error");
@@ -3408,7 +3484,7 @@ document.addEventListener('DOMContentLoaded', () => {
             data._cloneSourceLabel = addCloneMeta.sourceLabel;
             if (addCloneMeta.responsibleUserId) data.responsibleUserId = addCloneMeta.responsibleUserId;
         }
-        try { const res = await fetch(API_DEALERS_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Не удалось сохранить дилера'); } const newD = await res.json(); const pIds = getSelectedProductIds('add-product-checklist'); if(window.CRMAuth && CRMAuth.can('can_edit_matrix') && pIds.length) await saveProducts(newD.id, pIds); const wasClone = Boolean(addCloneMeta); addCloneMeta = null; addModal.hide(); setAddDealerModalMode('new'); window.showToast(wasClone ? "Копия дилера создана" : "Дилер добавлен!"); initApp(); } catch (e) { window.showToast(e.message || "Ошибка сохранения", "error"); } finally { isSaving = false; btn.disabled = false; btn.innerHTML = oldText; } });
+        try { const res = await fetch(API_DEALERS_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Не удалось сохранить дилера'); } const newD = await res.json(); const pIds = getSelectedProductIds('add-product-checklist'); if(window.CRMAuth && CRMAuth.can('can_edit_matrix') && pIds.length) await saveProducts(newD.id, pIds); const wasClone = Boolean(addCloneMeta); addCloneMeta = null; const viewState = captureDealerViewState(); addModal.hide(); setAddDealerModalMode('new'); window.showToast(wasClone ? "Копия дилера создана" : "Дилер добавлен!"); await initApp({ preserveDealerView:true, viewState }); } catch (e) { window.showToast(e.message || "Ошибка сохранения", "error"); } finally { isSaving = false; btn.disabled = false; btn.innerHTML = oldText; } });
     if(editForm) editForm.addEventListener('submit', async (e) => { e.preventDefault(); if (!window.CRMAuth || !CRMAuth.can('can_edit_dealer')) { window.showToast("Нет права редактировать дилеров", "error"); return; } if (isSaving) return; isSaving = true; const btn = document.querySelector('button[form="edit-dealer-form"]'); const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; const id = document.getElementById('edit_db_id').value; let avatarToSend = getVal('edit-current-avatar-url'); if (newAvatarBase64) avatarToSend = newAvatarBase64; 
         const legalEntities = collectLegalEntities(editLegalEntityList);
         const data = { 
@@ -3416,7 +3492,7 @@ document.addEventListener('DOMContentLoaded', () => {
             hasPersonalPlan: document.getElementById('edit_has_personal_plan').checked,
             contract: { isSigned: document.getElementById('edit_contract_signed').checked, date: getVal('edit_contract_date') }, avatarUrl: avatarToSend, contacts: collectData(editContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]), additional_addresses: collectData(editAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]), pos_materials: collectData(editPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]), visits: collectData(editVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'},{key:'isCompleted',class:'.visit-completed'}]), photos: editPhotosData, competitors: collectData(editCompetitorList, '.competitor-entry', [{key:'brand',class:'.competitor-brand'},{key:'collection',class:'.competitor-collection'},{key:'price_opt',class:'.competitor-price-opt'},{key:'price_retail',class:'.competitor-price-retail'}]) 
         }; 
-        try { const updateRes = await fetch(`${API_DEALERS_URL}/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); if(!updateRes.ok) throw new Error("Не удалось сохранить карточку дилера"); if(window.CRMAuth && CRMAuth.can('can_edit_matrix')) await saveProducts(id, getSelectedProductIds('edit-product-checklist')); editModal.hide(); window.showToast("Изменения сохранены!"); initApp(); } catch (e) { window.showToast("Ошибка сохранения", "error"); } finally { isSaving = false; if(btn) { btn.disabled = false; btn.innerHTML = oldText; } } });
+        try { const updateRes = await fetch(`${API_DEALERS_URL}/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); if(!updateRes.ok) throw new Error("Не удалось сохранить карточку дилера"); if(window.CRMAuth && CRMAuth.can('can_edit_matrix')) await saveProducts(id, getSelectedProductIds('edit-product-checklist')); const viewState = captureDealerViewState(); editModal.hide(); window.showToast("Изменения сохранены!"); await initApp({ preserveDealerView:true, viewState }); } catch (e) { window.showToast("Ошибка сохранения", "error"); } finally { isSaving = false; if(btn) { btn.disabled = false; btn.innerHTML = oldText; } } });
     if(qvForm) qvForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         if (isSaving) return;
