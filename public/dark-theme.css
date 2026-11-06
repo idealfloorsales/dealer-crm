@@ -4,6 +4,24 @@
 
 :root[data-crm-theme="dark"]{
   color-scheme:dark;
+
+  /* Override the original light design tokens globally. */
+  --if-red:#d64046;
+  --if-red-deep:#9f151a;
+  --if-ink:#f3f4f6;
+  --if-muted:#a0a4ad;
+  --if-canvas:#101114;
+  --if-card:#191a1f;
+  --if-line:rgba(255,255,255,.11);
+  --if-soft-red:rgba(214,64,70,.14);
+  --if-green:#67b88a;
+  --if-amber:#d9a64d;
+  --primary-color:#d64046;
+  --primary-hover:#ef555c;
+  --text-dark:#f3f4f6;
+  --text-gray:#a0a4ad;
+  --bg-light:#101114;
+  --card-bg:#191a1f;
   --dark-bg:#101114;
   --dark-bg-2:#141519;
   --dark-surface:#191a1f;
@@ -790,4 +808,349 @@
 :root[data-crm-theme="dark"] .audit-hero,
 :root[data-crm-theme="dark"] .map-workspace-header{
   color:#fff;
+}
+
+
+/* =========================================================
+   DARK THEME QA PASS — MOBILE DASHBOARD + DEALER DIRECTORY
+   These selectors intentionally mirror the current production markup.
+   ========================================================= */
+html:root[data-crm-theme="dark"] body.bg-light{
+  background:
+    radial-gradient(circle at 12% -8%, rgba(185,4,10,.11), transparent 28rem),
+    linear-gradient(180deg,#111216 0%,#0e0f12 100%)!important;
+}
+
+/* Dashboard KPI cards */
+html:root[data-crm-theme="dark"] .cc-kpi-card{
+  background:#191a1f!important;
+  border-color:#373940!important;
+  box-shadow:0 12px 28px rgba(0,0,0,.22)!important;
+}
+html:root[data-crm-theme="dark"] .cc-kpi-card::after{
+  background:var(--kpi-glow,rgba(185,4,10,.16))!important;
+  opacity:.85;
+}
+html:root[data-crm-theme="dark"] .cc-kpi-icon{
+  background:#f0ede9!important;
+  color:#25262b!important;
+}
+html:root[data-crm-theme="dark"] .cc-kpi-card.is-alert .cc-kpi-icon{
+  background:#f7e8e8!important;
+  color:#a9161c!important;
+}
+html:root[data-crm-theme="dark"] .cc-kpi-card.is-good .cc-kpi-icon{
+  background:#e4f2ea!important;
+  color:#236d4b!important;
+}
+html:root[data-crm-theme="dark"] .cc-kpi-label{
+  color:#b1b4bc!important;
+}
+html:root[data-crm-theme="dark"] .cc-kpi-value,
+html:root[data-crm-theme="dark"] .cc-kpi-value-exact,
+html:root[data-crm-theme="dark"] .cc-kpi-value-exact>span{
+  color:#f4f5f7!important;
+  text-shadow:none!important;
+}
+html:root[data-crm-theme="dark"] .cc-kpi-foot{
+  color:#9b9fa8!important;
+}
+
+/* Attention / activity cards */
+html:root[data-crm-theme="dark"] .attention-item,
+html:root[data-crm-theme="dark"] .cc-event-item,
+html:root[data-crm-theme="dark"] .cc-task-row{
+  background:#202126!important;
+  border-color:#34363d!important;
+  color:#e7e8eb!important;
+}
+html:root[data-crm-theme="dark"] .attention-item:hover,
+html:root[data-crm-theme="dark"] .cc-event-item:hover,
+html:root[data-crm-theme="dark"] .cc-task-row:hover{
+  background:#27282e!important;
+}
+html:root[data-crm-theme="dark"] .attention-title,
+html:root[data-crm-theme="dark"] .cc-event-title,
+html:root[data-crm-theme="dark"] .cc-task-row strong{
+  color:#f2f3f5!important;
+}
+html:root[data-crm-theme="dark"] .attention-meta,
+html:root[data-crm-theme="dark"] .cc-event-meta,
+html:root[data-crm-theme="dark"] .cc-task-row small{
+  color:#a2a6ae!important;
+}
+html:root[data-crm-theme="dark"] .attention-icon,
+html:root[data-crm-theme="dark"] .cc-event-icon{
+  background:#2c2d33!important;
+  color:#b5b8c0!important;
+}
+html:root[data-crm-theme="dark"] .attention-item.is-risk .attention-icon{
+  background:rgba(214,64,70,.16)!important;
+  color:#ee777c!important;
+}
+html:root[data-crm-theme="dark"] .attention-item.is-warn .attention-icon{
+  background:rgba(217,166,77,.15)!important;
+  color:#e7bb6c!important;
+}
+
+/* Pulse panel */
+html:root[data-crm-theme="dark"] .pulse-summary-item{
+  background:#202126!important;
+  border:1px solid #30323a!important;
+}
+html:root[data-crm-theme="dark"] .pulse-summary-item span{
+  color:#9ea2aa!important;
+}
+html:root[data-crm-theme="dark"] .pulse-summary-item strong{
+  color:#f2f3f5!important;
+}
+html:root[data-crm-theme="dark"] .pulse-chart .grid-line{
+  stroke:#31333a!important;
+}
+html:root[data-crm-theme="dark"] .pulse-chart .plan-line{
+  stroke:#777b84!important;
+}
+html:root[data-crm-theme="dark"] .pulse-chart .point{
+  fill:#191a1f!important;
+}
+html:root[data-crm-theme="dark"] .pulse-chart .axis-label{
+  fill:#989ca5!important;
+}
+
+/* Dealer directory heading / count */
+html:root[data-crm-theme="dark"] .dealer-directory-head-v2 h2,
+html:root[data-crm-theme="dark"] .dealer-directory-title-line h2{
+  color:#f3f4f6!important;
+}
+html:root[data-crm-theme="dark"] .dealer-directory-head-v2 p{
+  color:#a1a5ae!important;
+}
+html:root[data-crm-theme="dark"] .dealer-visible-count{
+  background:#2a2b31!important;
+  color:#d4d6db!important;
+}
+
+/* Dealer toolbar */
+html:root[data-crm-theme="dark"] .dealer-list-toolbar{
+  background:#18191d!important;
+  border-color:#34363d!important;
+  box-shadow:0 12px 30px rgba(0,0,0,.25)!important;
+}
+html:root[data-crm-theme="dark"] .dealer-search-field{
+  background:#202126!important;
+  border-color:#36383f!important;
+}
+html:root[data-crm-theme="dark"] .dealer-search-field i{
+  color:#8e929b!important;
+}
+html:root[data-crm-theme="dark"] .dealer-search-field input{
+  color:#f0f1f3!important;
+  background:transparent!important;
+  -webkit-text-fill-color:#f0f1f3!important;
+}
+html:root[data-crm-theme="dark"] .dealer-search-field input::placeholder{
+  color:#777b84!important;
+  -webkit-text-fill-color:#777b84!important;
+}
+html:root[data-crm-theme="dark"] .dealer-quick-filter{
+  background:#202126!important;
+  border-color:#34363d!important;
+  color:#b6bac2!important;
+}
+html:root[data-crm-theme="dark"] .dealer-quick-filter:hover{
+  background:#292a30!important;
+  color:#fff!important;
+}
+html:root[data-crm-theme="dark"] .dealer-quick-filter.active{
+  background:#313238!important;
+  border-color:#4a4c55!important;
+  color:#fff!important;
+}
+html:root[data-crm-theme="dark"] .dealer-quick-filter[data-filter="problem"].active{
+  background:#a80a10!important;
+  border-color:#c62b31!important;
+}
+html:root[data-crm-theme="dark"] .dealer-quick-count{
+  background:rgba(255,255,255,.075)!important;
+  color:inherit!important;
+}
+html:root[data-crm-theme="dark"] .dealer-sort-select,
+html:root[data-crm-theme="dark"] .dealer-filter-toggle,
+html:root[data-crm-theme="dark"] .dealer-reset-filters{
+  background:#202126!important;
+  border-color:#36383f!important;
+  color:#d7d9de!important;
+}
+
+/* Actual dealer v6 card */
+html:root[data-crm-theme="dark"] .dealer-list-v6-card{
+  background:#191a1f!important;
+  border-color:#35373e!important;
+  box-shadow:0 7px 22px rgba(0,0,0,.22)!important;
+}
+html:root[data-crm-theme="dark"] .dealer-list-v6-card:hover{
+  background:#1d1e23!important;
+  border-color:#464850!important;
+  box-shadow:0 10px 28px rgba(0,0,0,.28)!important;
+}
+html:root[data-crm-theme="dark"] .dealer-list-v6-card::before{
+  background:#45474f!important;
+}
+html:root[data-crm-theme="dark"] .dealer-list-v6-card.has-risk::before{
+  background:#d64046!important;
+}
+html:root[data-crm-theme="dark"] .dealer-list-v6-name{
+  color:#f4f5f7!important;
+}
+html:root[data-crm-theme="dark"] .dealer-list-v6-name:hover{
+  color:#ef777c!important;
+}
+html:root[data-crm-theme="dark"] .dealer-list-v6-meta{
+  color:#a8abb3!important;
+}
+html:root[data-crm-theme="dark"] .dealer-list-v6-meta i{
+  color:#7f838d!important;
+}
+html:root[data-crm-theme="dark"] .dealer-list-v6-sub{
+  color:#858993!important;
+}
+html:root[data-crm-theme="dark"] .dealer-list-v6-status{
+  border-color:color-mix(in srgb,var(--status-color) 45%,#33353b)!important;
+  background:color-mix(in srgb,var(--status-color) 17%,#1b1c20)!important;
+  color:color-mix(in srgb,var(--status-color) 72%,#f2f3f5)!important;
+}
+html:root[data-crm-theme="dark"] .dealer-list-v6-route{
+  background:#24252a!important;
+  border-color:#3a3c44!important;
+  color:#9da1aa!important;
+}
+html:root[data-crm-theme="dark"] .dealer-list-v6-route:hover{
+  background:rgba(214,64,70,.14)!important;
+  border-color:rgba(214,64,70,.33)!important;
+  color:#ef777c!important;
+}
+html:root[data-crm-theme="dark"] .dealer-list-v6-route.active{
+  background:rgba(70,155,102,.15)!important;
+  border-color:rgba(103,184,138,.3)!important;
+  color:#7bc49a!important;
+}
+
+/* Inner metric cells — this is what stayed white on the screenshot */
+html:root[data-crm-theme="dark"] .dealer-list-v6-card>.dealer-list-v6-cell{
+  background:#202126!important;
+  border-color:#33353c!important;
+}
+html:root[data-crm-theme="dark"] .dealer-list-v6-label{
+  color:#9a9ea7!important;
+}
+html:root[data-crm-theme="dark"] .dealer-list-v6-cell strong{
+  color:#f1f2f4!important;
+  -webkit-text-fill-color:#f1f2f4!important;
+}
+html:root[data-crm-theme="dark"] .dealer-list-v6-cell small{
+  color:#969aa3!important;
+  -webkit-text-fill-color:#969aa3!important;
+}
+html:root[data-crm-theme="dark"] .dealer-list-v6-progress{
+  background:#35373e!important;
+}
+
+/* Dealer score block */
+html:root[data-crm-theme="dark"] .dealer-list-v6-score{
+  background:#202126!important;
+  border-color:#34363d!important;
+}
+html:root[data-crm-theme="dark"] .dealer-list-v6-score strong{
+  color:#f3f4f6!important;
+  -webkit-text-fill-color:#f3f4f6!important;
+}
+html:root[data-crm-theme="dark"] .dealer-list-v6-score>span,
+html:root[data-crm-theme="dark"] .dealer-list-v6-score small{
+  color:#9b9fa8!important;
+}
+html:root[data-crm-theme="dark"] .dealer-list-v6-score.is-excellent,
+html:root[data-crm-theme="dark"] .dealer-list-v6-score.is-good{
+  background:rgba(62,128,86,.13)!important;
+  border-color:rgba(103,184,138,.22)!important;
+}
+html:root[data-crm-theme="dark"] .dealer-list-v6-score.is-attention{
+  background:rgba(174,123,34,.14)!important;
+  border-color:rgba(224,177,92,.24)!important;
+}
+html:root[data-crm-theme="dark"] .dealer-list-v6-score.is-problem{
+  background:rgba(185,4,10,.14)!important;
+  border-color:rgba(214,64,70,.25)!important;
+}
+
+/* Signals */
+html:root[data-crm-theme="dark"] .dealer-list-v6-signal.is-risk{
+  background:rgba(214,64,70,.15)!important;
+  color:#ef858a!important;
+}
+html:root[data-crm-theme="dark"] .dealer-list-v6-signal.is-warn{
+  background:rgba(217,166,77,.14)!important;
+  color:#e3b96d!important;
+}
+html:root[data-crm-theme="dark"] .dealer-list-v6-signal.is-ok{
+  background:rgba(80,154,108,.15)!important;
+  color:#81c59c!important;
+}
+
+/* Dealer action controls */
+html:root[data-crm-theme="dark"] .dealer-v3-primary-action,
+html:root[data-crm-theme="dark"] .dealer-v3-more-btn,
+html:root[data-crm-theme="dark"] .dealer-list-v6-open{
+  background:#24252a!important;
+  border-color:#3a3c44!important;
+  color:#b3b7bf!important;
+}
+html:root[data-crm-theme="dark"] .dealer-v3-menu{
+  background:#202126!important;
+  border-color:#3a3c44!important;
+  box-shadow:0 15px 36px rgba(0,0,0,.35)!important;
+}
+html:root[data-crm-theme="dark"] .dealer-v3-menu-item{
+  color:#d9dbe0!important;
+}
+html:root[data-crm-theme="dark"] .dealer-v3-menu-item:hover{
+  background:#2a2b31!important;
+}
+
+/* Mobile shortcuts */
+html:root[data-crm-theme="dark"] .cc-mobile-shortcuts a{
+  background:#1b1c20!important;
+  border-color:#34363d!important;
+  color:#b9bcc4!important;
+  box-shadow:0 6px 18px rgba(0,0,0,.18)!important;
+}
+html:root[data-crm-theme="dark"] .cc-mobile-shortcuts a i{
+  color:#e15b61!important;
+}
+
+/* Global safety net: any neutral card-like direct child that still inherits white */
+html:root[data-crm-theme="dark"] .command-center-shell .bg-white,
+html:root[data-crm-theme="dark"] .dealer-directory .bg-white{
+  background:#191a1f!important;
+  color:#e8e9ec!important;
+}
+
+/* Better text contrast in generic dark surfaces */
+html:root[data-crm-theme="dark"] .cc-panel h2,
+html:root[data-crm-theme="dark"] .dealer-directory-head h2,
+html:root[data-crm-theme="dark"] .dealer-directory-head-v2 h2{
+  color:#f3f4f6!important;
+}
+
+/* Mobile bottom nav should visually belong to the dark app */
+@media(max-width:991.98px){
+  html:root[data-crm-theme="dark"] .crm-mobile-nav{
+    background:rgba(24,25,29,.97)!important;
+    border-color:#36383f!important;
+  }
+  html:root[data-crm-theme="dark"] .dealer-list-v6-card{
+    background:#191a1f!important;
+  }
+  html:root[data-crm-theme="dark"] .dealer-list-v6-card>.dealer-list-v6-cell{
+    background:#202126!important;
+  }
 }
