@@ -13029,3 +13029,26 @@ body:not(.app-workspace-page) .modal-header .btn-close{
     justify-content:stretch;
   }
 }
+
+
+/* Dealer price details — all base prices + discount prices calculated from wholesale only */
+.dealer-price-detail-values-expanded{
+  grid-template-columns:repeat(6,minmax(118px,1fr));
+}
+.dealer-price-detail-values-expanded .is-action{
+  background:#fff8f0;
+  border-color:#f1dcc2;
+}
+.dealer-price-detail-values-expanded .is-final{
+  background:#fff2f2;
+  border-color:rgba(185,4,10,.22);
+}
+.dealer-price-detail-values-expanded .is-final strong{
+  color:#b9040a;
+}
+@media(max-width:1200px){
+  .dealer-price-detail-values-expanded{grid-template-columns:repeat(3,minmax(118px,1fr))}
+}
+@media(max-width:700px){
+  .dealer-price-detail-values-expanded{grid-template-columns:repeat(2,minmax(0,1fr))}
+}

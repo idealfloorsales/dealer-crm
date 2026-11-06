@@ -557,6 +557,18 @@ document.addEventListener('DOMContentLoaded', () => {
             : '—';
     }
 
+    let dealerPricingState = {
+        discounts: [],
+        totalDiscountPercent: 0
+    };
+
+    function priceAfterDiscount(value, percent) {
+        const base = Number(value) || 0;
+        const discount = Math.max(0, Number(percent) || 0);
+        if (base <= 0 || discount <= 0) return base;
+        return Math.max(0, base * (1 - discount / 100));
+    }
+
     async function toggleDealerPriceDetails(button) {
         const details = document.getElementById('dealer-price-details');
         if (!details) return;
@@ -581,20 +593,32 @@ document.addEventListener('DOMContentLoaded', () => {
             const liquid = rows.filter(row => row.isLiquid !== false);
 
             const totalDiscount = Math.max(0, Number(sheet.totalDiscountPercent) || 0);
-            const rowHtml = row => `
-                <div class="dealer-price-detail-row">
-                    <div>
-                        <strong>${safeText(row.collection || row.name || 'Коллекция')}</strong>
-                        <small>${safeText((row.members || 0) + ' поз. в коллекции')}</small>
-                    </div>
-                    <div class="dealer-price-detail-values dealer-price-detail-values-final-only">
-                        <span class="is-final">
-                            <small>Итоговая оптовая цена</small>
-                            <strong>${formatDealerPrice(row.finalPrice)}</strong>
-                            ${totalDiscount > 0 ? `<em>с учётом −${totalDiscount.toLocaleString('ru-RU',{maximumFractionDigits:2})}%</em>` : '<em>без дополнительной скидки</em>'}
-                        </span>
-                    </div>
-                </div>`;
+            const discounts = Array.isArray(sheet.activeDiscounts) ? sheet.activeDiscounts : [];
+            const has5 = discounts.some(item => Math.abs((Number(item.discountPercent) || 0) - 5) < 0.001);
+            const has10 = discounts.some(item => Math.abs((Number(item.discountPercent) || 0) - 10) < 0.001);
+
+            const rowHtml = row => {
+                const wholesale = Number(row.basePrice) || Number(row.opt) || 0;
+                const price5 = has5 ? priceAfterDiscount(wholesale, 5) : 0;
+                const price10 = has10 ? priceAfterDiscount(wholesale, 10) : 0;
+                const finalWholesale = totalDiscount > 0 ? priceAfterDiscount(wholesale, totalDiscount) : wholesale;
+
+                return `
+                    <div class="dealer-price-detail-row">
+                        <div>
+                            <strong>${safeText(row.collection || row.name || 'Коллекция')}</strong>
+                            <small>${safeText((row.members || 0) + ' поз. в коллекции')}</small>
+                        </div>
+                        <div class="dealer-price-detail-values dealer-price-detail-values-expanded">
+                            <span><small>Оптовая цена</small><strong>${formatDealerPrice(wholesale)}</strong></span>
+                            <span><small>Рекомендуемая розница</small><strong>${formatDealerPrice(row.rrp)}</strong></span>
+                            <span class="is-display"><small>Цена на витрине</small><strong>${formatDealerPrice(row.displayPrice)}</strong></span>
+                            ${has5 ? `<span class="is-action"><small>Опт −5%</small><strong>${formatDealerPrice(price5)}</strong></span>` : ''}
+                            ${has10 ? `<span class="is-action"><small>Опт −10%</small><strong>${formatDealerPrice(price10)}</strong></span>` : ''}
+                            ${totalDiscount > 0 ? `<span class="is-final"><small>Итоговая оптовая</small><strong>${formatDealerPrice(finalWholesale)}</strong><em>−${totalDiscount.toLocaleString('ru-RU',{maximumFractionDigits:2})}%</em></span>` : ''}
+                        </div>
+                    </div>`;
+            };
 
             details.innerHTML =
                 `<div class="dealer-price-details-head">
@@ -621,6 +645,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) throw new Error('pricing');
             const pricing = await response.json();
             const discounts = Array.isArray(pricing.activeDiscounts) ? pricing.activeDiscounts : [];
+            dealerPricingState = {
+                discounts,
+                totalDiscountPercent: Math.max(0, Number(pricing.totalDiscountPercent) || 0)
+            };
             const matched = Array.isArray(pricing.matchedConditions) ? pricing.matchedConditions : [];
             const active = matched.filter(item => item.computedStatus === 'active');
             const pending = active.filter(item => Number(item.requirementTarget) > 0 && (Number(item.requirementCurrent) < Number(item.requirementTarget) || item.requirementVerified !== true));

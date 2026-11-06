@@ -1526,3 +1526,22 @@ html:root[data-crm-theme="dark"] .dealer-price-detail-values-final-only .is-fina
 html:root[data-crm-theme="dark"] .dealer-price-detail-values-final-only .is-final em{
   color:#c9a0a3!important;
 }
+
+html:root[data-crm-theme="dark"] .dealer-price-detail-values-expanded span{
+  background:#202126!important;
+  border-color:#34363d!important;
+}
+html:root[data-crm-theme="dark"] .dealer-price-detail-values-expanded .is-display{
+  background:#202126!important;
+}
+html:root[data-crm-theme="dark"] .dealer-price-detail-values-expanded .is-action{
+  background:rgba(217,166,77,.14)!important;
+  border-color:rgba(224,177,92,.25)!important;
+}
+html:root[data-crm-theme="dark"] .dealer-price-detail-values-expanded .is-final{
+  background:rgba(185,4,10,.14)!important;
+  border-color:rgba(214,64,70,.27)!important;
+}
+html:root[data-crm-theme="dark"] .dealer-price-detail-values-expanded .is-final strong{
+  color:#f07d82!important;
+}
