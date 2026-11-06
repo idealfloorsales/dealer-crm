@@ -1813,6 +1813,23 @@ async function findPricingDuplicate(payload, excludeId = '') {
     }) || null;
 }
 
+async function validatePricingDealerTargets(req, payload) {
+    if (payload.scopeType !== 'dealer') return '';
+    const ids = Array.isArray(payload.dealers) ? payload.dealers.filter(Boolean) : [];
+    if (!ids.length) return 'Выберите хотя бы одного дилера';
+
+    const available = await Dealer.find({
+        $and: [
+            { _id: { $in: ids } },
+            getWorkingDealerFilter(getDealerFilter(req))
+        ]
+    }).select('_id').lean();
+
+    const availableIds = new Set(available.map(item => String(item._id)));
+    const missing = ids.filter(id => !availableIds.has(String(id)));
+    return missing.length ? 'Один или несколько выбранных дилеров недоступны' : '';
+}
+
 async function cleanupAmbiguousLegacyOwnership() {
     // Старые версии CRM автоматически назначали единственному менеджеру
     // всех дилеров Астаны/регионов. Такое назначение нельзя считать ответственным.
@@ -2316,6 +2333,7 @@ app.get('/api/pricing/dealers/:id/price-sheet', requirePermission('can_view_pric
 
         const conditions = await PricingCondition.find({})
             .populate('dealer', '_id dealer_id name city region_sector price_type responsible')
+            .populate('dealers', '_id dealer_id name city region_sector price_type responsible')
             .populate('priceList', '_id name code versionDate active')
             .sort({ createdAt: -1 })
             .lean();
@@ -2510,6 +2528,7 @@ app.get('/api/pricing/overview', requirePermission('can_view_pricing'), async (r
             .lean();
         const conditions = await PricingCondition.find({})
             .populate('dealer', '_id dealer_id name city region_sector price_type responsible')
+            .populate('dealers', '_id dealer_id name city region_sector price_type responsible')
             .populate('priceList', '_id name code versionDate active')
             .sort({ createdAt: -1 })
             .lean();
@@ -2576,6 +2595,7 @@ app.get('/api/pricing/dealers/:id', requirePermission('can_view_pricing'), async
 
         const conditions = await PricingCondition.find({})
             .populate('dealer', '_id dealer_id name city region_sector price_type responsible')
+            .populate('dealers', '_id dealer_id name city region_sector price_type responsible')
             .populate('priceList', '_id name code versionDate active')
             .sort({ createdAt: -1 })
             .lean();
@@ -2599,13 +2619,8 @@ app.post('/api/pricing/conditions', requirePermission('can_manage_pricing'), asy
             return res.status(403).json({ error: 'Региональные и общие ценовые условия может создавать только пользователь с доступом ко всей компании' });
         }
         if (payload.scopeType === 'dealer') {
-            const dealer = await Dealer.findOne({
-                $and: [
-                    { _id: payload.dealer },
-                    getWorkingDealerFilter(getDealerFilter(req))
-                ]
-            }).select('_id').lean();
-            if (!dealer) return res.status(404).json({ error: 'Дилер недоступен' });
+            const targetError = await validatePricingDealerTargets(req, payload);
+            if (targetError) return res.status(404).json({ error: targetError });
         }
 
         const user = pricingUserMeta(req);
@@ -2616,6 +2631,7 @@ app.post('/api/pricing/conditions', requirePermission('can_manage_pricing'), asy
             audit: [{ action: 'created', userId: user.id, userName: user.name, note: 'Условие создано' }]
         });
         const populated = await PricingCondition.findById(condition._id).populate('dealer', '_id dealer_id name city region_sector price_type responsible')
+            .populate('dealers', '_id dealer_id name city region_sector price_type responsible')
             .populate('priceList', '_id name code versionDate active').lean();
         res.status(201).json({ ...populated, computedStatus: pricingConditionStatus(populated) });
     } catch (e) {
@@ -2641,13 +2657,8 @@ app.put('/api/pricing/conditions/:id', requirePermission('can_manage_pricing'), 
             return res.status(403).json({ error: 'Региональные и общие ценовые условия может менять только пользователь с доступом ко всей компании' });
         }
         if (payload.scopeType === 'dealer') {
-            const dealer = await Dealer.findOne({
-                $and: [
-                    { _id: payload.dealer },
-                    getWorkingDealerFilter(getDealerFilter(req))
-                ]
-            }).select('_id').lean();
-            if (!dealer) return res.status(404).json({ error: 'Дилер недоступен' });
+            const targetError = await validatePricingDealerTargets(req, payload);
+            if (targetError) return res.status(404).json({ error: targetError });
         }
 
         const user = pricingUserMeta(req);
@@ -2656,6 +2667,7 @@ app.put('/api/pricing/conditions/:id', requirePermission('can_manage_pricing'), 
         await existing.save();
 
         const populated = await PricingCondition.findById(existing._id).populate('dealer', '_id dealer_id name city region_sector price_type responsible')
+            .populate('dealers', '_id dealer_id name city region_sector price_type responsible')
             .populate('priceList', '_id name code versionDate active').lean();
         res.json({ ...populated, computedStatus: pricingConditionStatus(populated) });
     } catch (e) {
