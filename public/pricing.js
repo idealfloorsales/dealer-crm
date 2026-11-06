@@ -163,6 +163,21 @@ document.addEventListener('DOMContentLoaded', () => {
             .filter(item => item.computedStatus === 'active' && item.scopeType !== 'dealer');
     }
 
+    function priceListOptionsHtml(selectedId = '', includeEmpty = true) {
+        const selected = String(selectedId || '');
+        const lists = state.priceLists.filter(item => item.active !== false || String(item.id) === selected);
+        const empty = includeEmpty ? '<option value="">Выберите прайс</option>' : '';
+        return empty + lists.map(item => `<option value="${esc(item.id)}" ${String(item.id) === selected ? 'selected' : ''}>${esc(item.name)}${item.versionDate ? ' · '+dateText(item.versionDate) : ''}${item.active === false ? ' · архив' : ''}</option>`).join('');
+    }
+
+    function fillPriceListOptions() {
+        const select = $('pricing-price-list');
+        if (!select) return;
+        const current = select.value;
+        select.innerHTML = priceListOptionsHtml(current, true);
+        if (state.priceLists.some(item => String(item.id) === String(current))) select.value = current;
+    }
+
     function quickEditorHtml(row) {
         const social = dealerCondition(row, 'SOCIAL-5');
         const support = dealerCondition(row, 'SUPPORT-10');
@@ -220,7 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span><strong>Индивидуальный базовый прайс</strong><small>Используется до применения процентных скидок</small></span>
                     </label>
                     <div class="pricing-inline-fields is-base">
-                        <label class="is-name"><span>Название прайса</span><input class="form-control" data-inline-base-name value="${esc(base?.priceListName || '')}" placeholder="Например: Индивидуальный прайс"></label>
+                        <label class="is-name"><span>Прайс</span><select class="form-select" data-inline-base-list>${priceListOptionsHtml(idOf(base?.priceList), true)}</select></label>
                         <label><span>С</span><input type="date" class="form-control" data-inline-base-start value="${esc(base?.startDate || state.today || todayValue())}"></label>
                         <label><span>По</span><input type="date" class="form-control" data-inline-base-end value="${esc(base?.endDate || '')}"></label>
                     </div>
@@ -357,11 +372,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 requirementDueDate:'', requirementVerified:false, proofNote:'', note:''
             };
         }
+        const priceListId = editor.querySelector('[data-inline-base-list]')?.value || '';
+        const list = state.priceLists.find(item => String(item.id) === String(priceListId));
         return {
             scopeType:'dealer', dealerId, kind:'price_list',
             name:'Индивидуальный базовый прайс', code:'DEALER-PRICE',
             discountPercent:0,
-            priceListName:editor.querySelector('[data-inline-base-name]')?.value?.trim() || '',
+            priceListId,
+            priceListName:list?.name || '',
             stackable:false, priority:100,
             startDate:editor.querySelector('[data-inline-base-start]')?.value || state.today,
             endDate:editor.querySelector('[data-inline-base-end]')?.value || '',
@@ -374,8 +392,8 @@ document.addEventListener('DOMContentLoaded', () => {
     async function syncInlineCondition(row, editor, code, enabled, existing) {
         if (enabled) {
             const payload = dealerQuickPayload(row.dealerId, code, editor);
-            if (code === 'DEALER-PRICE' && !payload.priceListName) {
-                throw new Error('Укажите название индивидуального базового прайса');
+            if (code === 'DEALER-PRICE' && !payload.priceListId) {
+                throw new Error('Выберите базовый прайс');
             }
             if (existing) {
                 return send(API + '/conditions/' + encodeURIComponent(idOf(existing)), 'PUT', payload);
@@ -619,7 +637,7 @@ document.addEventListener('DOMContentLoaded', () => {
         $('pricing-name').value = condition.name || '';
         $('pricing-code').value = condition.code || '';
         $('pricing-percent').value = n(condition.discountPercent) || 5;
-        $('pricing-price-list').value = condition.priceListName || '';
+        $('pricing-price-list').value = idOf(condition.priceList) || state.priceLists.find(item => item.name === condition.priceListName)?.id || '';
         $('pricing-stackable').value = condition.stackable === false ? 'false' : 'true';
         $('pricing-priority').value = n(condition.priority);
         $('pricing-start-date').value = condition.startDate || '';
@@ -650,7 +668,8 @@ document.addEventListener('DOMContentLoaded', () => {
             name:$('pricing-name').value,
             code:$('pricing-code').value,
             discountPercent:kind === 'discount' ? n($('pricing-percent').value) : 0,
-            priceListName:kind === 'price_list' ? $('pricing-price-list').value : '',
+            priceListId:kind === 'price_list' ? $('pricing-price-list').value : '',
+            priceListName:kind === 'price_list' ? (state.priceLists.find(item => String(item.id) === String($('pricing-price-list').value))?.name || '') : '',
             stackable:kind === 'discount' ? $('pricing-stackable').value === 'true' : false,
             priority:n($('pricing-priority').value),
             startDate:$('pricing-start-date').value,
