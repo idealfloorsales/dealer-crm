@@ -189,10 +189,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function resetWorkingFilters({showAll=false} = {}) {
+        typeMode = showAll ? 'all' : 'laminate';
         filterMode = showAll ? 'all' : 'liquid';
         stockMode = 'all';
         completenessMode = 'all';
         sortMode = 'sku';
+        if (typeFilter) typeFilter.value = typeMode;
         if (filterSelect) filterSelect.value = filterMode;
         if (stockFilter) stockFilter.value = stockMode;
         if (classFilter) classFilter.value = '';
@@ -205,12 +207,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function applyQuickFilter(kind) {
         resetWorkingFilters({showAll:kind==='all'});
-        if (kind === 'liquid') filterMode = 'liquid';
-        if (kind === 'illiquid') filterMode = 'illiquid';
-        if (kind === 'stock') { filterMode = 'liquid'; stockMode = 'positive'; }
-        if (kind === 'zero') { filterMode = 'liquid'; stockMode = 'zero'; }
-        if (kind === 'incomplete') { filterMode = 'liquid'; completenessMode = 'incomplete'; }
+        if (kind === 'laminate') { typeMode = 'laminate'; filterMode = 'all'; }
+        if (kind === 'equipment') { typeMode = 'equipment'; filterMode = 'all'; }
+        if (kind === 'liquid') { typeMode = 'laminate'; filterMode = 'liquid'; }
+        if (kind === 'illiquid') { typeMode = 'laminate'; filterMode = 'illiquid'; }
+        if (kind === 'stock') { typeMode = 'laminate'; filterMode = 'liquid'; stockMode = 'positive'; }
+        if (kind === 'zero') { typeMode = 'laminate'; filterMode = 'liquid'; stockMode = 'zero'; }
+        if (kind === 'incomplete') { typeMode = 'laminate'; filterMode = 'liquid'; completenessMode = 'incomplete'; }
 
+        if (typeFilter) typeFilter.value = typeMode;
         if (filterSelect) filterSelect.value = filterMode;
         if (stockFilter) stockFilter.value = stockMode;
         if (completenessFilter) completenessFilter.value = completenessMode;
@@ -219,26 +224,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderKpis() {
         if (!kpiHost) return;
-        const liquid = allProducts.filter(p => p.is_liquid !== false);
-        const illiquid = allProducts.filter(p => p.is_liquid === false);
+        const laminate = allProducts.filter(p => productType(p) === 'laminate');
+        const equipment = allProducts.filter(p => productType(p) === 'equipment');
+        const liquid = laminate.filter(p => p.is_liquid !== false);
+        const illiquid = laminate.filter(p => p.is_liquid === false);
         const liquidStock = liquid.reduce((sum,p) => sum + Math.max(0, stockValue(p) ?? 0), 0);
         const zeroStock = liquid.filter(p => {
             const value = stockValue(p);
             return value !== null && value <= 0;
         }).length;
-        const incomplete = liquid.filter(p => !isProductComplete(p)).length;
+        const incomplete = allProducts.filter(p => !isProductComplete(p)).length;
 
         const cleanState = !normalize(searchInput?.value) &&
             !classFilter?.value && !thicknessFilter?.value &&
             stockMode === 'all' && completenessMode === 'all';
 
         const cards = [
-            {key:'all',icon:'bi-grid',label:'Всего в базе',value:allProducts.length,foot:`${liquid.length} рабочих позиций`,tone:'',active:cleanState&&filterMode==='all'},
-            {key:'liquid',icon:'bi-check2-circle',label:'Ликвид',value:liquid.length,foot:'рабочая матрица',tone:'good',active:cleanState&&filterMode==='liquid'},
-            {key:'illiquid',icon:'bi-archive',label:'Неликвид',value:illiquid.length,foot:'доступен для контроля',tone:'risk',active:cleanState&&filterMode==='illiquid'},
-            {key:'stock',icon:'bi-box-seam',label:'Остаток ликвида',value:liquidStock.toLocaleString('ru-RU',{maximumFractionDigits:2}),foot:'м² на складе',tone:'good',active:filterMode==='liquid'&&stockMode==='positive'},
-            {key:'zero',icon:'bi-box',label:'Без остатка',value:zeroStock,foot:'ликвидных позиций',tone:zeroStock?'warn':'',active:filterMode==='liquid'&&stockMode==='zero'},
-            {key:'incomplete',icon:'bi-exclamation-diamond',label:'Нужно заполнить',value:incomplete,foot:'неполных карточек',tone:incomplete?'warn':'',active:filterMode==='liquid'&&completenessMode==='incomplete'}
+            {key:'all',icon:'bi-grid',label:'Всего в базе',value:allProducts.length,foot:`${laminate.length} ламинат · ${equipment.length} оборудование`,tone:'',active:cleanState&&typeMode==='all'},
+            {key:'laminate',icon:'bi-layers',label:'Ламинат',value:laminate.length,foot:`${illiquid.length} неликвид`,tone:'good',active:cleanState&&typeMode==='laminate'&&filterMode==='all'},
+            {key:'equipment',icon:'bi-display',label:'Торговое оборудование',value:equipment.length,foot:'отдельный тип позиции',tone:'',active:cleanState&&typeMode==='equipment'},
+            {key:'liquid',icon:'bi-check2-circle',label:'Ликвид',value:liquid.length,foot:'ламинат',tone:'good',active:cleanState&&typeMode==='laminate'&&filterMode==='liquid'},
+            {key:'illiquid',icon:'bi-archive',label:'Неликвид',value:illiquid.length,foot:'ламинат',tone:'risk',active:cleanState&&typeMode==='laminate'&&filterMode==='illiquid'},
+            {key:'incomplete',icon:'bi-exclamation-diamond',label:'Нужно заполнить',value:incomplete,foot:'неполных карточек',tone:incomplete?'warn':'',active:completenessMode==='incomplete'}
         ];
 
         kpiHost.innerHTML = cards.map(card=>`
