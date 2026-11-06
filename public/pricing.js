@@ -298,6 +298,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                     <div class="pricing-end">${end}</div>
                     <div class="pricing-row-actions">
+                        <button type="button" class="pricing-sheet-btn" data-open-price-sheet="${esc(row.dealerId)}" title="Открыть прайс дилера"><i class="bi bi-receipt-cutoff"></i><span>Прайс</span></button>
                         ${manage ? `<button type="button" class="pricing-quick-btn ${row.has5?'is-active':''}" data-quick-open="${esc(row.dealerId)}" data-focus-rule="social" title="Настроить −5%">−5%</button>
                         <button type="button" class="pricing-quick-btn ${row.has10?'is-active':''}" data-quick-open="${esc(row.dealerId)}" data-focus-rule="support" title="Настроить −10%">−10%</button>
                         <button type="button" class="pricing-settings-btn" data-quick-open="${esc(row.dealerId)}" title="Все условия дилера"><i class="bi bi-sliders2"></i></button>` : ''}
@@ -315,6 +316,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         host.querySelectorAll('[data-save-inline]').forEach(button => {
             button.addEventListener('click', () => saveInlineDealerPricing(button.dataset.saveInline));
+        });
+        host.querySelectorAll('[data-open-price-sheet]').forEach(button => {
+            button.addEventListener('click', () => openDealerPriceSheet(button.dataset.openPriceSheet));
         });
     }
 
