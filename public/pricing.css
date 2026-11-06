@@ -843,3 +843,64 @@ html,body.pricing-page{max-width:100%;overflow-x:hidden}
   .pricing-sheet-footer button{flex:1}
   .pricing-sheet-btn span{display:none}
 }
+
+
+/* Collection-level pricing + illiquid overrides */
+.pricing-list-section-row td{
+  padding:10px 12px!important;
+  background:#f1efec!important;
+  border-bottom:1px solid rgba(23,24,27,.08)!important;
+}
+.pricing-list-section-row td strong{
+  display:inline-block;
+  margin-right:8px;
+  color:#38393d;
+  font-size:.68rem;
+}
+.pricing-list-section-row td span{
+  color:#8d8f95;
+  font-size:.58rem;
+}
+.pricing-list-section-row.is-illiquid td{
+  background:#fff5f5!important;
+}
+.pricing-list-kind{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:64px;
+  min-height:24px;
+  padding:0 7px;
+  border-radius:999px;
+  font-size:.54rem;
+  font-weight:800;
+  white-space:nowrap;
+}
+.pricing-list-kind.is-liquid{
+  background:#e7f4ed;
+  color:#197450;
+}
+.pricing-list-kind.is-illiquid{
+  background:#fff0f0;
+  color:#ad2b31;
+}
+.pricing-list-product-row.is-illiquid{
+  background:#fffafa;
+}
+.pricing-list-collection-row td:nth-child(2) strong,
+.pricing-list-product-row td:nth-child(2) strong{
+  display:block;
+  color:#35363a;
+  font-size:.68rem;
+}
+.pricing-list-collection-row td:nth-child(2) small,
+.pricing-list-product-row td:nth-child(2) small{
+  display:block;
+  margin-top:2px;
+  color:#92949a;
+  font-size:.55rem;
+}
+.pricing-list-product-row .form-control::placeholder{
+  color:#b4b5b9;
+  opacity:1;
+}
