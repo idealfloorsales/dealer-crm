@@ -445,6 +445,475 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+
+    function switchPricingView(view = 'dealers') {
+        const allowed = ['dealers','lists','conditions'];
+        const next = allowed.includes(view) ? view : 'dealers';
+        state.activeView = next;
+        document.querySelectorAll('[data-pricing-view]').forEach(button => {
+            button.classList.toggle('active', button.dataset.pricingView === next);
+        });
+        document.querySelectorAll('[data-pricing-view-panel]').forEach(panel => {
+            panel.hidden = panel.dataset.pricingViewPanel !== next;
+        });
+        const addCondition = $('pricing-add-btn');
+        if (addCondition) addCondition.style.display = manage && next !== 'lists' ? '' : 'none';
+    }
+
+    function priceListMatches(item) {
+        const term = ($('pricing-list-search')?.value || '').trim().toLowerCase();
+        const filter = $('pricing-list-filter')?.value || 'active';
+        if (filter === 'active' && item.active === false) return false;
+        if (filter === 'archive' && item.active !== false) return false;
+        if (term) {
+            const hay = [item.name,item.code,item.versionDate,item.note].join(' ').toLowerCase();
+            if (!hay.includes(term)) return false;
+        }
+        return true;
+    }
+
+    function renderPriceLists() {
+        const host = $('pricing-price-list-grid');
+        if (!host) return;
+        const lists = state.priceLists.filter(priceListMatches);
+        if (!lists.length) {
+            host.innerHTML = '<div class="pricing-empty"><i class="bi bi-receipt me-1"></i>Прайсов пока нет</div>';
+            return;
+        }
+
+        host.innerHTML = lists.map(item => `
+            <article class="pricing-price-list-card ${item.active === false ? 'is-archive' : ''}">
+                <div class="pricing-price-list-card-top">
+                    <div>
+                        <span>${esc(item.code || 'ПРАЙС')}</span>
+                        <strong>${esc(item.name)}</strong>
+                        <small>${item.versionDate ? 'Версия '+dateText(item.versionDate) : 'Версия без даты'}</small>
+                    </div>
+                    <span class="pricing-list-state ${item.active === false ? 'is-archive' : 'is-active'}">${item.active === false ? 'Архив' : 'Действует'}</span>
+                </div>
+                <div class="pricing-price-list-stats">
+                    <div><small>Позиций</small><strong>${fmt(item.rowsCount)}</strong></div>
+                    <div><small>С ценами</small><strong>${fmt(item.pricedCount)}</strong></div>
+                    <div><small>Обновлён</small><strong>${item.updatedAt ? new Date(item.updatedAt).toLocaleDateString('ru-RU') : '—'}</strong></div>
+                </div>
+                ${item.note ? `<p>${esc(item.note)}</p>` : ''}
+                <div class="pricing-price-list-actions">
+                    <button type="button" class="pricing-list-action is-primary" data-assign-price-list="${esc(item.id)}"><i class="bi bi-diagram-3"></i> Назначить</button>
+                    <button type="button" class="pricing-list-action" data-edit-price-list="${esc(item.id)}"><i class="bi bi-pencil"></i> Открыть</button>
+                    ${manage && item.active !== false ? `<button type="button" class="pricing-list-action is-danger" data-archive-price-list="${esc(item.id)}"><i class="bi bi-archive"></i></button>` : ''}
+                </div>
+            </article>`).join('');
+
+        host.querySelectorAll('[data-edit-price-list]').forEach(button => button.addEventListener('click', () => openPriceListEditor(button.dataset.editPriceList)));
+        host.querySelectorAll('[data-assign-price-list]').forEach(button => button.addEventListener('click', () => assignPriceList(button.dataset.assignPriceList)));
+        host.querySelectorAll('[data-archive-price-list]').forEach(button => button.addEventListener('click', () => archivePriceList(button.dataset.archivePriceList)));
+    }
+
+    function renderPriceListEditorRows(existingRows = []) {
+        const host = $('pricing-list-editor-rows');
+        if (!host) return;
+        const byProduct = new Map((existingRows || []).filter(row => row.productId).map(row => [String(row.productId), row]));
+        const bySku = new Map((existingRows || []).filter(row => row.sku).map(row => [String(row.sku).trim().toLowerCase(), row]));
+        const base = state.catalog.map(product => {
+            const existing = byProduct.get(String(product.id)) || bySku.get(String(product.sku || '').trim().toLowerCase()) || {};
+            return {
+                productId: product.id,
+                sku: product.sku || existing.sku || '',
+                name: product.name || existing.name || '',
+                active: product.active !== false,
+                opt: n(existing.opt),
+                rrp: n(existing.rrp),
+                maxRrp: n(existing.maxRrp)
+            };
+        });
+
+        const catalogIds = new Set(base.map(row => String(row.productId)));
+        (existingRows || []).forEach(row => {
+            if (row.productId && catalogIds.has(String(row.productId))) return;
+            base.push({ ...row, active:false });
+        });
+
+        host.innerHTML = base.map(row => `
+            <tr data-price-row data-product-id="${esc(row.productId || '')}" data-sku="${esc(row.sku || '')}" data-name="${esc(row.name || '')}">
+                <td><strong>${esc(row.sku || '—')}</strong></td>
+                <td><span>${esc(row.name || 'Без названия')}</span>${row.active === false ? '<small>Неактивная позиция</small>' : ''}</td>
+                <td><input type="number" min="0" step="0.01" inputmode="decimal" class="form-control" data-price-opt value="${row.opt || ''}" placeholder="0"></td>
+                <td><input type="number" min="0" step="0.01" inputmode="decimal" class="form-control" data-price-rrp value="${row.rrp || ''}" placeholder="0"></td>
+                <td><input type="number" min="0" step="0.01" inputmode="decimal" class="form-control" data-price-max-rrp value="${row.maxRrp || ''}" placeholder="0"></td>
+            </tr>`).join('');
+    }
+
+    function collectPriceListRows() {
+        return [...document.querySelectorAll('#pricing-list-editor-rows [data-price-row]')].map(row => ({
+            productId: row.dataset.productId || '',
+            sku: row.dataset.sku || '',
+            name: row.dataset.name || '',
+            opt: n(row.querySelector('[data-price-opt]')?.value),
+            rrp: n(row.querySelector('[data-price-rrp]')?.value),
+            maxRrp: n(row.querySelector('[data-price-max-rrp]')?.value),
+            currency:'KZT'
+        }));
+    }
+
+    async function openPriceListEditor(priceListId = '') {
+        if (!manage && !priceListId) return;
+        const modalEl = $('pricing-price-list-modal');
+        $('pricing-list-id').value = priceListId || '';
+        $('pricing-list-modal-title').textContent = priceListId ? 'Редактирование прайса' : 'Новый прайс';
+        $('pricing-list-name').value = '';
+        $('pricing-list-code').value = '';
+        $('pricing-list-version').value = state.today || todayValue();
+        $('pricing-list-active').value = 'true';
+        $('pricing-list-note').value = '';
+        renderPriceListEditorRows([]);
+
+        if (priceListId) {
+            try {
+                const response = await fetch(API + '/price-lists/' + encodeURIComponent(priceListId));
+                const data = await response.json().catch(()=>({}));
+                if (!response.ok) throw new Error(data.error || 'Не удалось загрузить прайс');
+                $('pricing-list-name').value = data.name || '';
+                $('pricing-list-code').value = data.code || '';
+                $('pricing-list-version').value = data.versionDate || '';
+                $('pricing-list-active').value = data.active === false ? 'false' : 'true';
+                $('pricing-list-note').value = data.note || '';
+                renderPriceListEditorRows(data.rows || []);
+            } catch (error) {
+                toast(error.message,'error');
+                return;
+            }
+        }
+
+        if (!manage) {
+            modalEl.querySelectorAll('input,select,textarea').forEach(input => input.disabled = true);
+            $('pricing-list-save-btn').style.display = 'none';
+            $('pricing-list-import-btn').style.display = 'none';
+            $('pricing-list-copy-opt-btn').style.display = 'none';
+        } else {
+            modalEl.querySelectorAll('input,select,textarea').forEach(input => input.disabled = false);
+            $('pricing-list-save-btn').style.display = '';
+            $('pricing-list-import-btn').style.display = '';
+            $('pricing-list-copy-opt-btn').style.display = '';
+        }
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+
+    async function savePriceList(event) {
+        event.preventDefault();
+        if (!manage) return;
+        const id = $('pricing-list-id').value;
+        const payload = {
+            name:$('pricing-list-name').value.trim(),
+            code:$('pricing-list-code').value.trim(),
+            versionDate:$('pricing-list-version').value,
+            active:$('pricing-list-active').value === 'true',
+            note:$('pricing-list-note').value.trim(),
+            rows:collectPriceListRows()
+        };
+        if (!payload.name) return toast('Укажите название прайса','error');
+        const button = $('pricing-list-save-btn');
+        try {
+            button.disabled = true;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохраняем';
+            await send(id ? API+'/price-lists/'+encodeURIComponent(id) : API+'/price-lists', id ? 'PUT' : 'POST', payload);
+            bootstrap.Modal.getOrCreateInstance($('pricing-price-list-modal')).hide();
+            toast(id ? 'Прайс обновлён' : 'Прайс создан');
+            await load();
+            switchPricingView('lists');
+        } catch (error) {
+            toast(error.message,'error');
+        } finally {
+            button.disabled = false;
+            button.textContent = 'Сохранить прайс';
+        }
+    }
+
+    async function archivePriceList(id) {
+        if (!manage) return;
+        const item = state.priceLists.find(list => String(list.id) === String(id));
+        if (!item || !confirm(`Перенести прайс «${item.name}» в архив? Привязки и история сохранятся.`)) return;
+        try {
+            await send(API+'/price-lists/'+encodeURIComponent(id),'DELETE',{});
+            toast('Прайс перенесён в архив');
+            await load();
+            switchPricingView('lists');
+        } catch (error) {
+            toast(error.message,'error');
+        }
+    }
+
+    function assignPriceList(id) {
+        if (!manage) return;
+        const item = state.priceLists.find(list => String(list.id) === String(id));
+        if (!item) return;
+        switchPricingView('conditions');
+        openCreate();
+        const radio = document.querySelector('input[name="pricing-kind"][value="price_list"]');
+        if (radio) radio.checked = true;
+        syncKindFields();
+        $('pricing-name').value = item.name + ' — базовый прайс';
+        $('pricing-code').value = 'PRICE-' + (item.code || String(item.id).slice(-6)).toUpperCase();
+        $('pricing-price-list').value = item.id;
+        $('pricing-reason-type').value = 'regional_price';
+        $('pricing-requirement-target').value = 0;
+        $('pricing-requirement-current').value = 0;
+        $('pricing-requirement-verified').checked = false;
+    }
+
+    function ensureXlsxLoaded() {
+        if (window.XLSX) return Promise.resolve(window.XLSX);
+        if (xlsxLoadPromise) return xlsxLoadPromise;
+        xlsxLoadPromise = new Promise((resolve,reject) => {
+            const script=document.createElement('script');
+            script.src='https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js';
+            script.async=true;
+            script.onload=()=>window.XLSX ? resolve(window.XLSX) : reject(new Error('Excel-библиотека не загрузилась'));
+            script.onerror=()=>reject(new Error('Не удалось загрузить Excel-библиотеку'));
+            document.head.appendChild(script);
+        }).catch(error => { xlsxLoadPromise=null; throw error; });
+        return xlsxLoadPromise;
+    }
+
+    async function ensurePdfMakeLoaded() {
+        if (window.pdfMake?.vfs) return window.pdfMake;
+        if (pdfMakeLoadPromise) return pdfMakeLoadPromise;
+        pdfMakeLoadPromise = new Promise((resolve,reject) => {
+            const first=document.createElement('script');
+            first.src='https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/pdfmake.min.js';
+            first.onload=()=>{
+                const second=document.createElement('script');
+                second.src='https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/vfs_fonts.js';
+                second.onload=()=>window.pdfMake ? resolve(window.pdfMake) : reject(new Error('PDF-библиотека не загрузилась'));
+                second.onerror=()=>reject(new Error('Не удалось загрузить шрифты PDF'));
+                document.head.appendChild(second);
+            };
+            first.onerror=()=>reject(new Error('Не удалось загрузить PDF-библиотеку'));
+            document.head.appendChild(first);
+        }).catch(error => { pdfMakeLoadPromise=null; throw error; });
+        return pdfMakeLoadPromise;
+    }
+
+    function normalizeImportHeader(value) {
+        return String(value || '').toLowerCase().replace(/ё/g,'е').replace(/[^a-zа-я0-9]+/g,'');
+    }
+
+    function importPriceValue(source, matcher) {
+        const key = Object.keys(source).find(raw => matcher(normalizeImportHeader(raw)));
+        return key ? n(String(source[key]).replace(/\s/g,'').replace(',','.')) : 0;
+    }
+
+    async function importPriceListExcel(file) {
+        if (!file) return;
+        try {
+            const XLSX = await ensureXlsxLoaded();
+            const buffer = await file.arrayBuffer();
+            const workbook = XLSX.read(buffer,{type:'array'});
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(sheet,{defval:''});
+            if (!rows.length) throw new Error('В Excel нет строк с ценами');
+
+            const inputRows=[...document.querySelectorAll('#pricing-list-editor-rows [data-price-row]')];
+            const map=new Map(inputRows.map(row=>[String(row.dataset.sku||'').trim().toLowerCase(),row]));
+            let matched=0;
+            rows.forEach(source=>{
+                const skuKey=Object.keys(source).find(raw=>['артикул','sku','код','article'].includes(normalizeImportHeader(raw)));
+                const sku=skuKey ? String(source[skuKey]||'').trim() : '';
+                const target=map.get(sku.toLowerCase());
+                if(!target) return;
+                const opt=importPriceValue(source,h=>h==='опт'||h.includes('оптов'));
+                const rrp=importPriceValue(source,h=>h==='ррц'||h.includes('рознич')||h==='rrp');
+                const maxRrp=importPriceValue(source,h=>(h.includes('макс')&&h.includes('ррц'))||h==='maxrrp'||h==='maxretail');
+                if(opt) target.querySelector('[data-price-opt]').value=opt;
+                if(rrp) target.querySelector('[data-price-rrp]').value=rrp;
+                if(maxRrp) target.querySelector('[data-price-max-rrp]').value=maxRrp;
+                matched++;
+            });
+            toast(`Из Excel сопоставлено позиций: ${matched}`);
+        } catch(error) {
+            toast(error.message || 'Не удалось прочитать Excel','error');
+        } finally {
+            $('pricing-list-import-input').value='';
+        }
+    }
+
+    function copyOptToRrp() {
+        document.querySelectorAll('#pricing-list-editor-rows [data-price-row]').forEach(row => {
+            const opt=row.querySelector('[data-price-opt]');
+            const rrp=row.querySelector('[data-price-rrp]');
+            if (opt && rrp && n(opt.value)>0 && !n(rrp.value)) rrp.value=opt.value;
+        });
+        toast('ОПТ скопирован в пустые РРЦ');
+    }
+
+    function safeFilename(value) {
+        return String(value || 'price').replace(/[\\/:*?"<>|]+/g,'_').replace(/\s+/g,'_').slice(0,90);
+    }
+
+    async function openDealerPriceSheet(dealerId) {
+        try {
+            const response=await fetch(API+'/dealers/'+encodeURIComponent(dealerId)+'/price-sheet');
+            const data=await response.json().catch(()=>({}));
+            if(!response.ok) throw new Error(data.error || 'Не удалось сформировать прайс');
+            state.currentSheet=data;
+            renderDealerPriceSheet();
+            bootstrap.Modal.getOrCreateInstance($('pricing-sheet-modal')).show();
+        } catch(error) {
+            toast(error.message,'error');
+        }
+    }
+
+    function renderDealerPriceSheet() {
+        const data=state.currentSheet;
+        if(!data) return;
+        $('pricing-sheet-title').textContent=data.dealer?.name || 'Прайс';
+        $('pricing-sheet-subtitle').textContent=[data.dealer?.city,data.dealer?.sector].filter(Boolean).join(' · ');
+        const list=data.priceList;
+        $('pricing-sheet-summary').innerHTML=`
+            <div><small>Прайс</small><strong>${esc(list?.name || 'Не назначен')}</strong><span>${list?.versionDate ? 'от '+dateText(list.versionDate) : ''}</span></div>
+            <div><small>Тип цены</small><strong>${esc(data.priceType?.label || data.dealer?.priceType || 'ОПТ')}</strong><span>из карточки дилера</span></div>
+            <div><small>Скидка</small><strong>${data.totalDiscountPercent ? '−'+fmt(data.totalDiscountPercent,2)+'%' : '0%'}</strong><span>${(data.activeDiscounts||[]).length ? (data.activeDiscounts||[]).map(x=>x.name).join(' + ') : 'без активных скидок'}</span></div>`;
+
+        const rows=Array.isArray(data.rows)?data.rows:[];
+        $('pricing-sheet-empty').classList.toggle('d-none',Boolean(list && rows.length));
+        $('pricing-sheet-table-wrap').classList.toggle('d-none',!(list && rows.length));
+        $('pricing-sheet-rows').innerHTML=rows.map(row=>`
+            <tr data-sheet-row data-product-id="${esc(row.productId)}">
+                <td><strong>${esc(row.sku || '—')}</strong></td>
+                <td>${esc(row.name || '')}</td>
+                <td>${row.basePrice ? fmt(row.basePrice,2)+' ₸' : '—'}</td>
+                <td>${data.totalDiscountPercent ? '−'+fmt(data.totalDiscountPercent,2)+'%' : '0%'}</td>
+                <td><strong>${row.finalPrice ? fmt(row.finalPrice,2)+' ₸' : '—'}</strong></td>
+                <td>${manage ? `<input type="number" min="0" step="0.01" inputmode="decimal" class="form-control pricing-display-price" value="${row.displayPrice || ''}" placeholder="Не указана">` : (row.displayPrice ? fmt(row.displayPrice,2)+' ₸' : '—')}</td>
+            </tr>`).join('');
+        $('pricing-sheet-save-display').style.display=manage && rows.length ? '' : 'none';
+        $('pricing-sheet-excel').disabled=!rows.length;
+        $('pricing-sheet-pdf').disabled=!rows.length;
+        $('pricing-sheet-share').disabled=!rows.length;
+    }
+
+    async function saveDisplayPrices() {
+        const data=state.currentSheet;
+        if(!data || !manage) return;
+        const prices=[...document.querySelectorAll('#pricing-sheet-rows [data-sheet-row]')].map(row=>({
+            productId:row.dataset.productId,
+            price:n(row.querySelector('.pricing-display-price')?.value)
+        }));
+        try {
+            await send(API+'/dealers/'+encodeURIComponent(data.dealer.id)+'/display-prices','PUT',{prices});
+            toast('Витринные цены сохранены');
+            await openDealerPriceSheet(data.dealer.id);
+        } catch(error) {
+            toast(error.message,'error');
+        }
+    }
+
+    function dealerExportRows() {
+        const data=state.currentSheet;
+        return (data?.rows || []).filter(row=>n(row.finalPrice)>0).map(row=>({
+            'Артикул':row.sku || '',
+            'Наименование':row.name || '',
+            'Цена, тг':n(row.finalPrice)
+        }));
+    }
+
+    async function createExcelBlob() {
+        const XLSX=await ensureXlsxLoaded();
+        const data=state.currentSheet;
+        const aoa=[
+            ['IDEAL FLOOR'],
+            ['Дилер',data.dealer?.name || ''],
+            ['Прайс',data.priceList?.name || ''],
+            ['Тип цены',data.priceType?.label || data.dealer?.priceType || ''],
+            ['Скидка',data.totalDiscountPercent ? '-'+fmt(data.totalDiscountPercent,2)+'%' : '0%'],
+            [],
+            ['Артикул','Наименование','Цена, тг']
+        ];
+        dealerExportRows().forEach(row=>aoa.push([row['Артикул'],row['Наименование'],row['Цена, тг']]));
+        const ws=XLSX.utils.aoa_to_sheet(aoa);
+        ws['!cols']=[{wch:18},{wch:42},{wch:15}];
+        const wb=XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb,ws,'Прайс');
+        const output=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+        return new Blob([output],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    }
+
+    async function createPdfBlob() {
+        const pdfMake=await ensurePdfMakeLoaded();
+        const data=state.currentSheet;
+        const body=[
+            [{text:'Артикул',style:'th'},{text:'Наименование',style:'th'},{text:'Цена, тг',style:'th',alignment:'right'}],
+            ...dealerExportRows().map(row=>[
+                row['Артикул'],
+                row['Наименование'],
+                {text:fmt(row['Цена, тг'],2),alignment:'right'}
+            ])
+        ];
+        const doc={
+            pageSize:'A4',
+            pageMargins:[32,34,32,34],
+            content:[
+                {text:'IDEAL FLOOR',fontSize:19,bold:true,color:'#b9040a',margin:[0,0,0,4]},
+                {text:'Прайс для '+(data.dealer?.name || ''),fontSize:14,bold:true,margin:[0,0,0,3]},
+                {text:[data.priceList?.name || '',data.priceList?.versionDate ? 'от '+dateText(data.priceList.versionDate):'',data.priceType?.label || ''].filter(Boolean).join(' · '),fontSize:9,color:'#666666',margin:[0,0,0,3]},
+                {text:'Итоговая скидка: '+(data.totalDiscountPercent ? '−'+fmt(data.totalDiscountPercent,2)+'%' : '0%'),fontSize:9,color:'#666666',margin:[0,0,0,14]},
+                {table:{headerRows:1,widths:[85,'*',85],body},layout:'lightHorizontalLines'},
+                {text:'Цены указаны в тенге. Актуальность прайса уточняйте у менеджера IDEAL FLOOR.',fontSize:8,color:'#888888',margin:[0,14,0,0]}
+            ],
+            styles:{th:{bold:true,color:'#555555',fillColor:'#f3f1ee',fontSize:9}},
+            defaultStyle:{fontSize:9}
+        };
+        return new Promise(resolve=>pdfMake.createPdf(doc).getBlob(resolve));
+    }
+
+    function downloadBlob(blob, filename) {
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a');
+        a.href=url;
+        a.download=filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(()=>URL.revokeObjectURL(url),1500);
+    }
+
+    async function exportDealerExcel() {
+        try {
+            const blob=await createExcelBlob();
+            downloadBlob(blob,safeFilename('Прайс_IDEAL_FLOOR_'+(state.currentSheet?.dealer?.name||''))+'.xlsx');
+        } catch(error) { toast(error.message,'error'); }
+    }
+
+    async function exportDealerPdf() {
+        try {
+            const blob=await createPdfBlob();
+            downloadBlob(blob,safeFilename('Прайс_IDEAL_FLOOR_'+(state.currentSheet?.dealer?.name||''))+'.pdf');
+        } catch(error) { toast(error.message,'error'); }
+    }
+
+    async function shareDealerPrice() {
+        const data=state.currentSheet;
+        if(!data) return;
+        try {
+            const blob=await createPdfBlob();
+            const file=new File([blob],safeFilename('Прайс_IDEAL_FLOOR_'+(data.dealer?.name||''))+'.pdf',{type:'application/pdf'});
+            if(navigator.share && navigator.canShare?.({files:[file]})){
+                await navigator.share({
+                    title:'Прайс IDEAL FLOOR',
+                    text:'Актуальный прайс IDEAL FLOOR для '+(data.dealer?.name||'дилера'),
+                    files:[file]
+                });
+                return;
+            }
+            downloadBlob(blob,file.name);
+            const text=encodeURIComponent('Прайс IDEAL FLOOR для '+(data.dealer?.name||'')+'. PDF скачан — прикрепите его к этому сообщению.');
+            const phone=String(data.dealer?.phone||'').replace(/\D/g,'');
+            window.open(phone ? 'https://wa.me/'+phone+'?text='+text : 'https://wa.me/?text='+text,'_blank','noopener');
+            toast('PDF скачан. WhatsApp открыт для отправки файла.');
+        } catch(error) {
+            if(error?.name !== 'AbortError') toast(error.message || 'Не удалось поделиться прайсом','error');
+        }
+    }
+
     function renderConditions() {
         const host = $('pricing-condition-list');
         if (!host) return;
