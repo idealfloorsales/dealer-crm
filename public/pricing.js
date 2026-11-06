@@ -561,33 +561,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 </tr>`;
             }).join('');
 
-        const nonLiquidProducts = state.catalog
-            .filter(product => product.isLiquid === false)
-            .slice()
-            .sort((a,b) =>
-                String(a.collection || '').localeCompare(String(b.collection || ''),'ru') ||
-                String(a.sku || '').localeCompare(String(b.sku || ''),'ru')
-            );
-
-        const nonLiquidHtml = nonLiquidProducts.map(product => {
-            const collection = String(product.collection || 'ДРУГИЕ КОЛЛЕКЦИИ').trim().toUpperCase();
-            const existing = productRows.get(String(product.id)) || skuRows.get(String(product.sku || '').trim().toLowerCase()) || {};
-            const inherited = collectionRows.get(collection) || legacyByCollection.get(collection) || {};
-            const placeholder = key => n(inherited[key]) ? String(n(inherited[key])) : '0';
-            return `<tr class="pricing-list-product-row is-illiquid" data-price-row data-scope-type="product" data-product-id="${esc(product.id)}" data-sku="${esc(product.sku || '')}" data-name="${esc(product.name || '')}" data-collection="${esc(collection)}" data-is-liquid="false">
-                <td><span class="pricing-list-kind is-illiquid">Неликвид</span></td>
-                <td><strong>${esc(product.sku || '—')} · ${esc(product.name || 'Без названия')}</strong><small>${esc(collection)} · пустое поле = цена коллекции</small></td>
-                <td><input type="number" min="0" step="0.01" inputmode="decimal" class="form-control" data-price-opt value="${n(existing.opt) || ''}" placeholder="${esc(placeholder('opt'))}"></td>
-                <td><input type="number" min="0" step="0.01" inputmode="decimal" class="form-control" data-price-rrp value="${n(existing.rrp) || ''}" placeholder="${esc(placeholder('rrp'))}"></td>
-                <td><input type="number" min="0" step="0.01" inputmode="decimal" class="form-control" data-price-display value="${n(existing.displayPrice) || ''}" placeholder="${esc(placeholder('displayPrice'))}"></td>
-            </tr>`;
-        }).join('');
-
         host.innerHTML =
             `<tr class="pricing-list-section-row"><td colspan="5"><strong>Ликвид</strong><span>цена задаётся один раз на всю коллекцию</span></td></tr>` +
-            (liquidHtml || '<tr><td colspan="5" class="pricing-empty">Ликвидных коллекций нет</td></tr>') +
-            `<tr class="pricing-list-section-row is-illiquid"><td colspan="5"><strong>Неликвид</strong><span>только отдельные позиции со специальной ценой</span></td></tr>` +
-            (nonLiquidHtml || '<tr><td colspan="5" class="pricing-empty">Неликвидных позиций нет</td></tr>');
+            (liquidHtml || '<tr><td colspan="5" class="pricing-empty">Коллекций для прайса пока нет</td></tr>');
     }
 
     function collectPriceListRows() {
@@ -845,7 +821,6 @@ document.addEventListener('DOMContentLoaded', () => {
         $('pricing-sheet-table-wrap').classList.toggle('d-none',!(list && rows.length));
 
         const liquid=rows.filter(row=>row.isLiquid !== false);
-        const illiquid=rows.filter(row=>row.isLiquid === false);
         const renderRows=(items,isIlliquid=false)=>items.map(row=>`
             <tr data-sheet-row
                 data-row-type="${esc(row.rowType || (isIlliquid?'product':'collection'))}"
@@ -861,8 +836,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </tr>`).join('');
 
         $('pricing-sheet-rows').innerHTML=
-            (liquid.length ? `<tr class="pricing-list-section-row"><td colspan="4"><strong>Ликвид</strong><span>цены по коллекциям</span></td></tr>${renderRows(liquid,false)}` : '') +
-            (illiquid.length ? `<tr class="pricing-list-section-row is-illiquid"><td colspan="4"><strong>Неликвид</strong><span>индивидуальные сниженные цены</span></td></tr>${renderRows(illiquid,true)}` : '');
+            (liquid.length ? `<tr class="pricing-list-section-row"><td colspan="4"><strong>Коллекции</strong><span>актуальный ассортимент</span></td></tr>${renderRows(liquid,false)}` : '');
 
         $('pricing-sheet-save-display').style.display=manage && rows.length ? '' : 'none';
         $('pricing-sheet-excel').disabled=!rows.length;
@@ -891,11 +865,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function dealerExportRows() {
         const data=state.currentSheet;
         return (data?.rows || [])
+            .filter(row=>row.isLiquid !== false)
             .filter(row=>n(row.finalPrice)>0 || n(row.rrp)>0 || n(row.displayPrice)>0)
             .map(row=>({
-                'Номенклатура':row.isLiquid === false
-                    ? [row.sku,row.name].filter(Boolean).join(' · ')
-                    : (row.collection || row.name || ''),
+                'Номенклатура':row.collection || row.name || '',
                 'Спец.цена':n(row.finalPrice),
                 'Рекомендуемая розница':n(row.rrp),
                 'Цена на витрине':n(row.displayPrice)
@@ -956,7 +929,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 {text:'Прайс-Лист IDEALfloor для дилера',fontSize:16,bold:true,alignment:'center',margin:[0,0,0,4]},
                 {text:data.dealer?.name || '',fontSize:10,alignment:'center',color:'#666666',margin:[0,0,0,14]},
                 {table:{headerRows:1,widths:['*',74,105,88],body},layout:'lightHorizontalLines'},
-                {text:'Цены указаны в тенге. Неликвидные позиции при наличии отображаются отдельными строками.',fontSize:8,color:'#888888',margin:[0,12,0,0]}
+                {text:'Цены указаны в тенге. В прайс включён только актуальный ликвидный ассортимент.',fontSize:8,color:'#888888',margin:[0,12,0,0]}
             ],
             styles:{th:{bold:true,color:'#444444',fillColor:'#f3f1ee',fontSize:8}},
             defaultStyle:{fontSize:9}
