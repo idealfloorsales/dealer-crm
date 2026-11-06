@@ -534,12 +534,15 @@
                                     <section class="dealer-form-section">
                                         <div class="dealer-section-title">
                                             <span class="dealer-section-icon"><i class="bi bi-receipt"></i></span>
-                                            <div><strong>Условия работы</strong><small>Тип цен, договор, сайт и доставка</small></div>
+                                            <div><strong>Условия работы</strong><small>Прайс, договор, сайт и доставка</small></div>
                                         </div>
                                         <div class="row g-3">
                                             <div class="col-md-4">
-                                                <label class="dealer-field-label">Тип цен</label>
-                                                <input type="text" id="price_type" class="form-control" placeholder="Например: Дилер">
+                                                <label class="dealer-field-label">Прайс</label>
+                                                <select id="price_list" class="form-select">
+                                                    <option value="">Не назначен</option>
+                                                </select>
+                                                <div class="dealer-field-hint">Выбирается из прайсов, созданных в разделе «Цены».</div>
                                             </div>
                                             <div class="col-md-4">
                                                 <label class="dealer-field-label">Доставка</label>
@@ -845,8 +848,11 @@
                                             </div>
                                             <div class="row g-3">
                                                 <div class="col-md-4">
-                                                    <label class="dealer-field-label">Тип цен</label>
-                                                    <input type="text" id="edit_price_type" class="form-control">
+                                                    <label class="dealer-field-label">Прайс</label>
+                                                    <select id="edit_price_list" class="form-select">
+                                                        <option value="">Не назначен</option>
+                                                    </select>
+                                                    <div class="dealer-field-hint">Выбирается из действующих прайсов CRM.</div>
                                                 </div>
                                                 <div class="col-md-4">
                                                     <label class="dealer-field-label">Доставка</label>
