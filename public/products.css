@@ -183,3 +183,22 @@
   .product-package-main strong{font-size:.61rem}
   .product-stock strong{font-size:.69rem}
 }
+
+
+/* Product collection field */
+.product-collection{
+    display:block;
+    max-width:100%;
+    margin-top:4px;
+    overflow:hidden;
+    color:#6f7177;
+    font-size:.58rem;
+    font-weight:700;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+.product-collection i{color:#b9040a}
+.product-collection.is-empty{
+    color:#ad7a20;
+    font-weight:650;
+}
