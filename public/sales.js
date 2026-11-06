@@ -387,35 +387,47 @@ document.addEventListener('DOMContentLoaded', () => {
         return selected.getFullYear() === today.getFullYear() && selected.getMonth() === today.getMonth();
     }
 
-    function buildDeviationStrip(plan, fact, daysInMonth, currentDay) {
+    function buildDeviationCell(plan, fact, daysInMonth, currentDay) {
         const planValue = Number(plan) || 0;
         const factValue = Number(fact) || 0;
-        if (!(planValue > 0)) return '';
+
+        if (!(planValue > 0)) {
+            return `<div class="summary-deviation-cell">
+                <span>Отклонение</span>
+                <div class="summary-deviation-empty">Нет плана</div>
+            </div>`;
+        }
 
         const progress = calculateProgress(planValue, factValue, daysInMonth, currentDay);
         const monthlyDiff = progress.forecast - planValue;
         const monthlyPct = planValue > 0 ? (monthlyDiff / planValue) * 100 : 0;
 
-        const monthItem = `<div class="sales-deviation-item is-${deviationTone(monthlyDiff)}">
-            <span>Месяц</span>
-            <strong>${formatSigned(monthlyDiff, ' м²')}</strong>
-            <em>${formatSigned(monthlyPct, '%')}</em>
+        const row = (label, diff, pct) => `<div class="summary-deviation-row is-${deviationTone(diff)}">
+            <span>${label}</span>
+            <strong>${formatSigned(diff, ' м²')}</strong>
+            <em>${formatSigned(pct, '%')}</em>
         </div>`;
 
+        const monthRow = row('Месяц', monthlyDiff, monthlyPct);
+
         if (!isCurrentSelectedMonth()) {
-            return `<div class="sales-deviation-strip is-single">${monthItem}</div>`;
+            return `<div class="summary-deviation-cell">
+                <span>Отклонение</span>
+                <div class="summary-deviation-lines is-single">${monthRow}</div>
+            </div>`;
         }
 
         const planToDate = planValue * (Math.max(0, Math.min(currentDay, daysInMonth)) / Math.max(1, daysInMonth));
         const todayDiff = factValue - planToDate;
         const todayPct = planToDate > 0 ? (todayDiff / planToDate) * 100 : 0;
-        const todayItem = `<div class="sales-deviation-item is-${deviationTone(todayDiff)}">
-            <span>На сегодня</span>
-            <strong>${formatSigned(todayDiff, ' м²')}</strong>
-            <em>${formatSigned(todayPct, '%')}</em>
-        </div>`;
 
-        return `<div class="sales-deviation-strip">${todayItem}${monthItem}</div>`;
+        return `<div class="summary-deviation-cell">
+            <span>Отклонение</span>
+            <div class="summary-deviation-lines">
+                ${row('На сегодня', todayDiff, todayPct)}
+                ${monthRow}
+            </div>
+        </div>`;
     }
 
     function captureState() {
@@ -843,7 +855,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const level = percent >= 90 ? 'good' : percent >= 70 ? 'mid' : 'low';
             const planVal = plan !== 0 ? plan : '';
             const width = Math.min(percent, 100);
-            const deviationStrip = buildDeviationStrip(plan, factVal, daysInMonth, currentDay);
+            const deviationCell = buildDeviationCell(plan, factVal, daysInMonth, currentDay);
 
             return `<div class="summary-item ${isSubItem ? 'is-sub' : ''}">
                 <div class="summary-header">
@@ -857,9 +869,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     </label>
                     <div><span>Факт, м²</span><strong>${fmt(factVal)}</strong></div>
                     <div><span>Прогноз, м²</span><strong>${fmt(forecast)}</strong></div>
+                    ${deviationCell}
                 </div>
                 <div class="sales-summary-progress"><span class="is-${level}" style="width:${width}%"></span></div>
-                ${deviationStrip}
             </div>`;
         };
 
