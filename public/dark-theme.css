@@ -1,0 +1,793 @@
+/* IDEAL FLOOR CRM — complete dark theme
+   Active only when html[data-crm-theme="dark"] is set by permissions.js.
+   The original light theme remains untouched. */
+
+:root[data-crm-theme="dark"]{
+  color-scheme:dark;
+  --dark-bg:#101114;
+  --dark-bg-2:#141519;
+  --dark-surface:#191a1f;
+  --dark-surface-2:#202126;
+  --dark-surface-3:#292a30;
+  --dark-surface-4:#303139;
+  --dark-line:#34363d;
+  --dark-line-soft:#292b31;
+  --dark-text:#f3f4f6;
+  --dark-text-2:#d5d7dc;
+  --dark-muted:#9ca0a9;
+  --dark-muted-2:#777b84;
+  --dark-red:#d64046;
+  --dark-red-bg:rgba(185,4,10,.16);
+  --dark-green:#74b68b;
+  --dark-green-bg:rgba(57,129,82,.16);
+  --dark-yellow:#e0b15c;
+  --dark-yellow-bg:rgba(190,133,31,.16);
+  --dark-blue:#7aaee6;
+  --dark-blue-bg:rgba(63,117,177,.18);
+  --dark-shadow:0 18px 50px rgba(0,0,0,.34);
+}
+
+:root[data-crm-theme="dark"] body,
+:root[data-crm-theme="dark"] body.bg-light{
+  background:var(--dark-bg)!important;
+  color:var(--dark-text-2)!important;
+}
+
+/* Core typography */
+:root[data-crm-theme="dark"] h1,
+:root[data-crm-theme="dark"] h2,
+:root[data-crm-theme="dark"] h3,
+:root[data-crm-theme="dark"] h4,
+:root[data-crm-theme="dark"] h5,
+:root[data-crm-theme="dark"] h6,
+:root[data-crm-theme="dark"] strong{
+  color:var(--dark-text);
+}
+:root[data-crm-theme="dark"] p,
+:root[data-crm-theme="dark"] label,
+:root[data-crm-theme="dark"] .form-label{
+  color:var(--dark-text-2);
+}
+:root[data-crm-theme="dark"] small,
+:root[data-crm-theme="dark"] .text-muted,
+:root[data-crm-theme="dark"] .text-secondary{
+  color:var(--dark-muted)!important;
+}
+:root[data-crm-theme="dark"] hr{
+  border-color:var(--dark-line)!important;
+  opacity:1;
+}
+
+/* Generic surfaces */
+:root[data-crm-theme="dark"] .card,
+:root[data-crm-theme="dark"] .modal-content,
+:root[data-crm-theme="dark"] .dropdown-menu,
+:root[data-crm-theme="dark"] .offcanvas,
+:root[data-crm-theme="dark"] .list-group-item{
+  background:var(--dark-surface)!important;
+  color:var(--dark-text-2)!important;
+  border-color:var(--dark-line)!important;
+}
+:root[data-crm-theme="dark"] .shadow-sm,
+:root[data-crm-theme="dark"] .shadow,
+:root[data-crm-theme="dark"] .shadow-lg{
+  box-shadow:var(--dark-shadow)!important;
+}
+
+/* Bootstrap inputs */
+:root[data-crm-theme="dark"] .form-control,
+:root[data-crm-theme="dark"] .form-select,
+:root[data-crm-theme="dark"] .input-group-text,
+:root[data-crm-theme="dark"] textarea,
+:root[data-crm-theme="dark"] select,
+:root[data-crm-theme="dark"] input[type="text"],
+:root[data-crm-theme="dark"] input[type="search"],
+:root[data-crm-theme="dark"] input[type="number"],
+:root[data-crm-theme="dark"] input[type="date"],
+:root[data-crm-theme="dark"] input[type="month"],
+:root[data-crm-theme="dark"] input[type="tel"],
+:root[data-crm-theme="dark"] input[type="email"],
+:root[data-crm-theme="dark"] input[type="url"]{
+  background-color:var(--dark-surface-2)!important;
+  border-color:var(--dark-line)!important;
+  color:var(--dark-text)!important;
+  box-shadow:none!important;
+}
+:root[data-crm-theme="dark"] .form-control:focus,
+:root[data-crm-theme="dark"] .form-select:focus,
+:root[data-crm-theme="dark"] textarea:focus,
+:root[data-crm-theme="dark"] input:focus{
+  background-color:#24252b!important;
+  border-color:#686b75!important;
+  color:var(--dark-text)!important;
+  box-shadow:0 0 0 3px rgba(214,64,70,.12)!important;
+}
+:root[data-crm-theme="dark"] .form-control::placeholder,
+:root[data-crm-theme="dark"] input::placeholder,
+:root[data-crm-theme="dark"] textarea::placeholder{
+  color:var(--dark-muted-2)!important;
+}
+:root[data-crm-theme="dark"] .form-control:disabled,
+:root[data-crm-theme="dark"] .form-select:disabled,
+:root[data-crm-theme="dark"] input:disabled,
+:root[data-crm-theme="dark"] textarea:disabled{
+  background:#16171b!important;
+  border-color:#272930!important;
+  color:#6f737d!important;
+  opacity:1;
+}
+:root[data-crm-theme="dark"] .form-check-input{
+  background-color:#26272d;
+  border-color:#555862;
+}
+:root[data-crm-theme="dark"] .form-check-input:checked{
+  background-color:#b9040a;
+  border-color:#b9040a;
+}
+
+/* Buttons */
+:root[data-crm-theme="dark"] .btn-light,
+:root[data-crm-theme="dark"] .btn-white,
+:root[data-crm-theme="dark"] .btn-outline-secondary,
+:root[data-crm-theme="dark"] .btn-secondary{
+  background:var(--dark-surface-2)!important;
+  border-color:var(--dark-line)!important;
+  color:var(--dark-text-2)!important;
+}
+:root[data-crm-theme="dark"] .btn-light:hover,
+:root[data-crm-theme="dark"] .btn-white:hover,
+:root[data-crm-theme="dark"] .btn-outline-secondary:hover{
+  background:var(--dark-surface-3)!important;
+  border-color:#4b4e58!important;
+  color:#fff!important;
+}
+:root[data-crm-theme="dark"] .btn-close{
+  filter:invert(1) grayscale(1) brightness(1.8);
+}
+
+/* Top bar */
+:root[data-crm-theme="dark"] nav.navbar,
+:root[data-crm-theme="dark"] .crm-topbar{
+  background:rgba(24,25,29,.96)!important;
+  border-color:var(--dark-line)!important;
+  box-shadow:0 5px 20px rgba(0,0,0,.25)!important;
+}
+:root[data-crm-theme="dark"] nav a.nav-link{
+  color:var(--dark-muted)!important;
+}
+:root[data-crm-theme="dark"] nav a.nav-link:hover{
+  background:var(--dark-surface-2)!important;
+  color:#fff!important;
+}
+:root[data-crm-theme="dark"] nav a.nav-link.active{
+  background:#b9040a!important;
+  color:#fff!important;
+}
+:root[data-crm-theme="dark"] .crm-role-badge,
+:root[data-crm-theme="dark"] .crm-connection-chip,
+:root[data-crm-theme="dark"] .crm-theme-desktop{
+  background:var(--dark-surface-2)!important;
+  border-color:var(--dark-line)!important;
+  color:var(--dark-muted)!important;
+}
+
+/* Mobile navigation & sheet */
+:root[data-crm-theme="dark"] .crm-mobile-nav{
+  background:rgba(26,27,31,.96)!important;
+  border-color:var(--dark-line)!important;
+  box-shadow:0 18px 50px rgba(0,0,0,.42)!important;
+}
+:root[data-crm-theme="dark"] .crm-mobile-nav-item,
+:root[data-crm-theme="dark"] .crm-mobile-nav-more{
+  color:#8f939d!important;
+}
+:root[data-crm-theme="dark"] .crm-mobile-nav-item.active,
+:root[data-crm-theme="dark"] .crm-mobile-nav-more.active{
+  background:rgba(185,4,10,.17)!important;
+  color:#ef6c72!important;
+}
+:root[data-crm-theme="dark"] .crm-mobile-sheet-backdrop{
+  background:rgba(0,0,0,.62)!important;
+}
+:root[data-crm-theme="dark"] .crm-mobile-sheet{
+  background:#141519!important;
+  border-color:var(--dark-line)!important;
+}
+:root[data-crm-theme="dark"] .crm-mobile-sheet-link,
+:root[data-crm-theme="dark"] .crm-mobile-sheet-account,
+:root[data-crm-theme="dark"] .crm-theme-row{
+  background:var(--dark-surface)!important;
+  border-color:var(--dark-line)!important;
+}
+:root[data-crm-theme="dark"] .crm-mobile-sheet-link{
+  color:var(--dark-text-2)!important;
+}
+:root[data-crm-theme="dark"] .crm-mobile-sheet-link i,
+:root[data-crm-theme="dark"] .crm-mobile-sheet-close{
+  background:var(--dark-surface-3)!important;
+  color:var(--dark-muted)!important;
+}
+:root[data-crm-theme="dark"] .crm-mobile-sheet-link.active{
+  background:var(--dark-red-bg)!important;
+  color:#ef777c!important;
+  border-color:rgba(214,64,70,.28)!important;
+}
+:root[data-crm-theme="dark"] .crm-theme-choice{
+  background:var(--dark-surface-2)!important;
+  border-color:var(--dark-line)!important;
+  color:var(--dark-muted)!important;
+}
+:root[data-crm-theme="dark"] .crm-theme-choice.active{
+  background:var(--dark-red-bg)!important;
+  border-color:rgba(214,64,70,.38)!important;
+  color:#ef777c!important;
+}
+
+/* Generic tables */
+:root[data-crm-theme="dark"] table,
+:root[data-crm-theme="dark"] .table{
+  color:var(--dark-text-2)!important;
+  --bs-table-color:var(--dark-text-2);
+  --bs-table-bg:transparent;
+  --bs-table-striped-bg:#1d1e23;
+  --bs-table-hover-bg:#24252a;
+  --bs-table-border-color:var(--dark-line);
+}
+:root[data-crm-theme="dark"] thead,
+:root[data-crm-theme="dark"] .table-light,
+:root[data-crm-theme="dark"] .table-secondary{
+  background:var(--dark-surface-2)!important;
+  color:var(--dark-muted)!important;
+  --bs-table-bg:var(--dark-surface-2);
+  --bs-table-color:var(--dark-muted);
+}
+:root[data-crm-theme="dark"] td,
+:root[data-crm-theme="dark"] th{
+  border-color:var(--dark-line)!important;
+}
+
+/* =========================
+   DASHBOARD / DEALERS
+   ========================= */
+:root[data-crm-theme="dark"] .cc-kpi-card,
+:root[data-crm-theme="dark"] .cc-panel,
+:root[data-crm-theme="dark"] .cc-task-row,
+:root[data-crm-theme="dark"] .cc-event-item,
+:root[data-crm-theme="dark"] .dealer-list-toolbar,
+:root[data-crm-theme="dark"] .dealer-list-v6-row,
+:root[data-crm-theme="dark"] .dealer-card,
+:root[data-crm-theme="dark"] .dealer-item,
+:root[data-crm-theme="dark"] .dealer-empty-state{
+  background:var(--dark-surface)!important;
+  border-color:var(--dark-line)!important;
+  color:var(--dark-text-2)!important;
+}
+:root[data-crm-theme="dark"] .cc-kpi-card:hover,
+:root[data-crm-theme="dark"] .dealer-list-v6-row:hover,
+:root[data-crm-theme="dark"] .dealer-item:hover{
+  background:#1e1f24!important;
+}
+:root[data-crm-theme="dark"] .cc-kpi-label,
+:root[data-crm-theme="dark"] .cc-kpi-foot,
+:root[data-crm-theme="dark"] .cc-event-meta,
+:root[data-crm-theme="dark"] .dealer-meta,
+:root[data-crm-theme="dark"] .dealer-list-v6-meta{
+  color:var(--dark-muted)!important;
+}
+:root[data-crm-theme="dark"] .dealer-name,
+:root[data-crm-theme="dark"] .cc-event-title{
+  color:var(--dark-text)!important;
+}
+:root[data-crm-theme="dark"] .dealer-quick-filter,
+:root[data-crm-theme="dark"] .dealer-filter-toggle,
+:root[data-crm-theme="dark"] .dealer-reset-filters,
+:root[data-crm-theme="dark"] .dealer-sort-select,
+:root[data-crm-theme="dark"] .dealer-route-bar{
+  background:var(--dark-surface-2)!important;
+  border-color:var(--dark-line)!important;
+  color:var(--dark-muted)!important;
+}
+
+/* Dealer add/edit full modal */
+:root[data-crm-theme="dark"] .dealer-form-content{
+  background:#15161a!important;
+  color:var(--dark-text-2)!important;
+}
+:root[data-crm-theme="dark"] .dealer-modal-body,
+:root[data-crm-theme="dark"] .dealer-edit-nav-wrap,
+:root[data-crm-theme="dark"] .dealer-field-shortcuts,
+:root[data-crm-theme="dark"] .dealer-modal-footer{
+  background:#15161a!important;
+  border-color:var(--dark-line)!important;
+}
+:root[data-crm-theme="dark"] .dealer-form-section,
+:root[data-crm-theme="dark"] .dealer-toggle-card,
+:root[data-crm-theme="dark"] .dealer-avatar-panel,
+:root[data-crm-theme="dark"] .dealer-product-checklist,
+:root[data-crm-theme="dark"] .dealer-field-product-item,
+:root[data-crm-theme="dark"] .dealer-field-product-controls,
+:root[data-crm-theme="dark"] .dealer-field-product-footer,
+:root[data-crm-theme="dark"] .dealer-legal-entity-card,
+:root[data-crm-theme="dark"] .contact-entry,
+:root[data-crm-theme="dark"] .address-entry,
+:root[data-crm-theme="dark"] .visit-entry,
+:root[data-crm-theme="dark"] .pos-entry,
+:root[data-crm-theme="dark"] .competitor-entry,
+:root[data-crm-theme="dark"] .dealer-competitor-entry{
+  background:var(--dark-surface)!important;
+  border-color:var(--dark-line)!important;
+}
+:root[data-crm-theme="dark"] .dealer-section-icon,
+:root[data-crm-theme="dark"] .dealer-field-product-check{
+  background:var(--dark-surface-3)!important;
+  border-color:#454750!important;
+  color:var(--dark-muted)!important;
+}
+:root[data-crm-theme="dark"] .dealer-field-shortcuts button,
+:root[data-crm-theme="dark"] .dealer-edit-nav .nav-link{
+  background:var(--dark-surface-2)!important;
+  border-color:var(--dark-line)!important;
+  color:var(--dark-muted)!important;
+}
+:root[data-crm-theme="dark"] .dealer-field-shortcuts button.active,
+:root[data-crm-theme="dark"] .dealer-edit-nav .nav-link.active{
+  background:#2b2c32!important;
+  color:#fff!important;
+  border-color:#4a4d56!important;
+}
+:root[data-crm-theme="dark"] .dealer-field-product-item.is-selected{
+  background:var(--dark-green-bg)!important;
+}
+:root[data-crm-theme="dark"] .dealer-add-inline,
+:root[data-crm-theme="dark"] .dealer-add-wide,
+:root[data-crm-theme="dark"] .dealer-footer-ghost{
+  background:var(--dark-surface-2)!important;
+  border-color:var(--dark-line)!important;
+  color:var(--dark-text-2)!important;
+}
+
+/* Dealer profile */
+:root[data-crm-theme="dark"] .dealer-overview-metric,
+:root[data-crm-theme="dark"] .dealer-score-card,
+:root[data-crm-theme="dark"] .dealer-profile-links,
+:root[data-crm-theme="dark"] .dealer-price-card,
+:root[data-crm-theme="dark"] .dealer-price-detail-row,
+:root[data-crm-theme="dark"] .dealer-profile-page .card{
+  background:var(--dark-surface)!important;
+  border-color:var(--dark-line)!important;
+}
+:root[data-crm-theme="dark"] .dealer-profile-page .nav-tabs{
+  border-color:var(--dark-line)!important;
+}
+:root[data-crm-theme="dark"] .dealer-profile-page .nav-tabs .nav-link{
+  color:var(--dark-muted)!important;
+}
+:root[data-crm-theme="dark"] .dealer-profile-page .nav-tabs .nav-link.active{
+  background:var(--dark-surface)!important;
+  border-color:var(--dark-line) var(--dark-line) var(--dark-surface)!important;
+  color:var(--dark-text)!important;
+}
+:root[data-crm-theme="dark"] .dealer-price-detail-values span,
+:root[data-crm-theme="dark"] .dealer-price-detail-values-expanded .is-display{
+  background:var(--dark-surface-2)!important;
+  border-color:var(--dark-line)!important;
+}
+:root[data-crm-theme="dark"] .dealer-price-detail-values-expanded .is-action{
+  background:var(--dark-yellow-bg)!important;
+  border-color:rgba(224,177,92,.25)!important;
+}
+:root[data-crm-theme="dark"] .dealer-price-detail-values-expanded .is-final{
+  background:var(--dark-red-bg)!important;
+  border-color:rgba(214,64,70,.28)!important;
+}
+
+/* =========================
+   PRICING
+   ========================= */
+:root[data-crm-theme="dark"] .pricing-page{
+  background:var(--dark-bg)!important;
+}
+:root[data-crm-theme="dark"] .pricing-kpi,
+:root[data-crm-theme="dark"] .pricing-panel,
+:root[data-crm-theme="dark"] .pricing-dealer-row,
+:root[data-crm-theme="dark"] .pricing-condition-card,
+:root[data-crm-theme="dark"] .pricing-price-list-card,
+:root[data-crm-theme="dark"] .pricing-form-section,
+:root[data-crm-theme="dark"] .pricing-inline-editor,
+:root[data-crm-theme="dark"] .pricing-inline-rule,
+:root[data-crm-theme="dark"] .pricing-sheet-summary,
+:root[data-crm-theme="dark"] .pricing-list-table-wrap,
+:root[data-crm-theme="dark"] .pricing-sheet-table{
+  background:var(--dark-surface)!important;
+  border-color:var(--dark-line)!important;
+  color:var(--dark-text-2)!important;
+}
+:root[data-crm-theme="dark"] .pricing-toolbar,
+:root[data-crm-theme="dark"] .pricing-list-toolbar,
+:root[data-crm-theme="dark"] .pricing-view-tabs,
+:root[data-crm-theme="dark"] .pricing-list-editor-toolbar{
+  background:var(--dark-surface-2)!important;
+  border-color:var(--dark-line)!important;
+}
+:root[data-crm-theme="dark"] .pricing-list-table thead,
+:root[data-crm-theme="dark"] .pricing-sheet-table thead,
+:root[data-crm-theme="dark"] .pricing-list-section-row td{
+  background:var(--dark-surface-2)!important;
+  color:var(--dark-muted)!important;
+}
+:root[data-crm-theme="dark"] .pricing-list-table tbody tr,
+:root[data-crm-theme="dark"] .pricing-sheet-table tbody tr{
+  background:var(--dark-surface)!important;
+}
+:root[data-crm-theme="dark"] .pricing-list-table tbody tr:hover,
+:root[data-crm-theme="dark"] .pricing-sheet-table tbody tr:hover{
+  background:#1f2025!important;
+}
+:root[data-crm-theme="dark"] .pricing-rule-note{
+  background:var(--dark-blue-bg)!important;
+  border-color:rgba(122,174,230,.22)!important;
+  color:#aac9eb!important;
+}
+:root[data-crm-theme="dark"] .pricing-list-action,
+:root[data-crm-theme="dark"] .pricing-quick-btn,
+:root[data-crm-theme="dark"] .pricing-settings-btn,
+:root[data-crm-theme="dark"] .pricing-icon-btn{
+  background:var(--dark-surface-2)!important;
+  border-color:var(--dark-line)!important;
+  color:var(--dark-text-2)!important;
+}
+
+/* =========================
+   SALES
+   ========================= */
+:root[data-crm-theme="dark"] .sales-page{
+  background:var(--dark-bg)!important;
+}
+:root[data-crm-theme="dark"] .sales-toolbar,
+:root[data-crm-theme="dark"] .sales-work-panel,
+:root[data-crm-theme="dark"] .sales-summary-panel,
+:root[data-crm-theme="dark"] .sales-row,
+:root[data-crm-theme="dark"] .sales-summary-group,
+:root[data-crm-theme="dark"] .sales-performance-card,
+:root[data-crm-theme="dark"] .sales-modal{
+  background:var(--dark-surface)!important;
+  border-color:var(--dark-line)!important;
+}
+:root[data-crm-theme="dark"] .sales-group-title-wrap,
+:root[data-crm-theme="dark"] .sales-column-label,
+:root[data-crm-theme="dark"] .sales-mobile-switch{
+  background:var(--dark-surface-2)!important;
+  border-color:var(--dark-line)!important;
+}
+:root[data-crm-theme="dark"] .sales-mobile-tab{
+  color:var(--dark-muted)!important;
+}
+:root[data-crm-theme="dark"] .sales-mobile-tab.active{
+  background:#2c2d33!important;
+  color:#fff!important;
+}
+:root[data-crm-theme="dark"] .sales-summary-progress,
+:root[data-crm-theme="dark"] .sales-performance-bar{
+  background:#30323a!important;
+}
+
+/* =========================
+   REPORT / EXHIBITION
+   ========================= */
+:root[data-crm-theme="dark"] .report-page,
+:root[data-crm-theme="dark"] .products-page,
+:root[data-crm-theme="dark"] .competitors-page,
+:root[data-crm-theme="dark"] .reclamations-page,
+:root[data-crm-theme="dark"] .knowledge-page,
+:root[data-crm-theme="dark"] .users-page,
+:root[data-crm-theme="dark"] .audit-page,
+:root[data-crm-theme="dark"] .workshop-page{
+  background:var(--dark-bg)!important;
+}
+:root[data-crm-theme="dark"] .exhibition-kpi,
+:root[data-crm-theme="dark"] .exhibition-toolbar,
+:root[data-crm-theme="dark"] .exhibition-matrix-panel,
+:root[data-crm-theme="dark"] .exhibition-field-dealer-panel,
+:root[data-crm-theme="dark"] .exhibition-field-content,
+:root[data-crm-theme="dark"] .exhibition-field-dealer,
+:root[data-crm-theme="dark"] .exhibition-field-product,
+:root[data-crm-theme="dark"] .exhibition-export-modal{
+  background:var(--dark-surface)!important;
+  border-color:var(--dark-line)!important;
+}
+:root[data-crm-theme="dark"] .exhibition-panel-head,
+:root[data-crm-theme="dark"] .exhibition-field-head,
+:root[data-crm-theme="dark"] .exhibition-field-controls,
+:root[data-crm-theme="dark"] .exhibition-export-section{
+  background:var(--dark-surface-2)!important;
+  border-color:var(--dark-line)!important;
+}
+:root[data-crm-theme="dark"] .multi-select-menu{
+  background:var(--dark-surface)!important;
+  border-color:var(--dark-line)!important;
+  box-shadow:var(--dark-shadow)!important;
+}
+:root[data-crm-theme="dark"] .multi-select-item:hover{
+  background:var(--dark-surface-2)!important;
+}
+:root[data-crm-theme="dark"] .matrix-sticky-col,
+:root[data-crm-theme="dark"] .matrix-dealer-head,
+:root[data-crm-theme="dark"] .matrix-summary-col{
+  background:var(--dark-surface)!important;
+}
+
+/* =========================
+   PRODUCTS
+   ========================= */
+:root[data-crm-theme="dark"] .product-kpi,
+:root[data-crm-theme="dark"] .product-toolbar,
+:root[data-crm-theme="dark"] .product-list-panel,
+:root[data-crm-theme="dark"] .product-row,
+:root[data-crm-theme="dark"] .product-editor-modal .modal-content,
+:root[data-crm-theme="dark"] .product-editor-section,
+:root[data-crm-theme="dark"] .stock-import-modal .modal-content,
+:root[data-crm-theme="dark"] .stock-import-file-box,
+:root[data-crm-theme="dark"] .stock-mapping-row,
+:root[data-crm-theme="dark"] .search-results,
+:root[data-crm-theme="dark"] .search-item{
+  background:var(--dark-surface)!important;
+  border-color:var(--dark-line)!important;
+}
+:root[data-crm-theme="dark"] .product-list-head,
+:root[data-crm-theme="dark"] .product-editor-head,
+:root[data-crm-theme="dark"] .product-editor-footer,
+:root[data-crm-theme="dark"] .product-toolbar-meta{
+  background:var(--dark-surface-2)!important;
+  border-color:var(--dark-line)!important;
+}
+:root[data-crm-theme="dark"] .product-row:hover{
+  background:#1f2025!important;
+}
+
+/* =========================
+   COMPETITORS
+   ========================= */
+:root[data-crm-theme="dark"] .competitor-kpi,
+:root[data-crm-theme="dark"] .competitors-toolbar,
+:root[data-crm-theme="dark"] .competitor-card,
+:root[data-crm-theme="dark"] .competitor-card-metric,
+:root[data-crm-theme="dark"] .competitor-analysis-box,
+:root[data-crm-theme="dark"] .competitor-monitoring,
+:root[data-crm-theme="dark"] .competitor-modal,
+:root[data-crm-theme="dark"] .competitor-small-modal,
+:root[data-crm-theme="dark"] .competitor-form-section,
+:root[data-crm-theme="dark"] .competitor-entry,
+:root[data-crm-theme="dark"] .competitor-collection-edit,
+:root[data-crm-theme="dark"] .competitor-type-row,
+:root[data-crm-theme="dark"] .competitor-dealer-row{
+  background:var(--dark-surface)!important;
+  border-color:var(--dark-line)!important;
+}
+:root[data-crm-theme="dark"] .competitor-card:hover{
+  background:#1e1f24!important;
+}
+:root[data-crm-theme="dark"] .competitors-view-switch,
+:root[data-crm-theme="dark"] .competitors-quick-filters,
+:root[data-crm-theme="dark"] .competitor-collections-preview{
+  background:var(--dark-surface-2)!important;
+  border-color:var(--dark-line)!important;
+}
+
+/* =========================
+   RECLAMATIONS
+   ========================= */
+:root[data-crm-theme="dark"] .rec-kpi,
+:root[data-crm-theme="dark"] .rec-toolbar,
+:root[data-crm-theme="dark"] .rec-card,
+:root[data-crm-theme="dark"] .rec-form-content,
+:root[data-crm-theme="dark"] .rec-modal-body,
+:root[data-crm-theme="dark"] .rec-media-preview,
+:root[data-crm-theme="dark"] .photo-preview-item{
+  background:var(--dark-surface)!important;
+  border-color:var(--dark-line)!important;
+}
+:root[data-crm-theme="dark"] .rec-modal-footer,
+:root[data-crm-theme="dark"] .rec-field-shortcuts{
+  background:var(--dark-surface-2)!important;
+  border-color:var(--dark-line)!important;
+}
+:root[data-crm-theme="dark"] .alert-warning{
+  background:var(--dark-yellow-bg)!important;
+  border-color:rgba(224,177,92,.25)!important;
+  color:#e8c985!important;
+}
+
+/* =========================
+   WORKSHOP
+   ========================= */
+:root[data-crm-theme="dark"] .workshop-kpi,
+:root[data-crm-theme="dark"] .workshop-tabs-shell,
+:root[data-crm-theme="dark"] .workshop-panel,
+:root[data-crm-theme="dark"] .workshop-feed-item,
+:root[data-crm-theme="dark"] .workshop-attention-item,
+:root[data-crm-theme="dark"] .workshop-stock-card,
+:root[data-crm-theme="dark"] .workshop-dealer-card,
+:root[data-crm-theme="dark"] .workshop-recipe-card,
+:root[data-crm-theme="dark"] .workshop-modal,
+:root[data-crm-theme="dark"] .workshop-calc-box,
+:root[data-crm-theme="dark"] .workshop-operation-box,
+:root[data-crm-theme="dark"] .workshop-bom,
+:root[data-crm-theme="dark"] .workshop-memo-card,
+:root[data-crm-theme="dark"] .workshop-memo-panel,
+:root[data-crm-theme="dark"] .workshop-receipt-line,
+:root[data-crm-theme="dark"] .workshop-memo-product-row{
+  background:var(--dark-surface)!important;
+  border-color:var(--dark-line)!important;
+}
+:root[data-crm-theme="dark"] .workshop-panel-head,
+:root[data-crm-theme="dark"] .workshop-stock-toolbar,
+:root[data-crm-theme="dark"] .workshop-filter-row,
+:root[data-crm-theme="dark"] .workshop-memo-editor-head,
+:root[data-crm-theme="dark"] .workshop-memo-table-head,
+:root[data-crm-theme="dark"] .workshop-memo-summary{
+  background:var(--dark-surface-2)!important;
+  border-color:var(--dark-line)!important;
+}
+:root[data-crm-theme="dark"] .workshop-table tbody tr:hover,
+:root[data-crm-theme="dark"] .workshop-memo-product-row:hover{
+  background:#1f2025!important;
+}
+
+/* =========================
+   MAP
+   ========================= */
+:root[data-crm-theme="dark"] .map-page{
+  background:var(--dark-bg)!important;
+}
+:root[data-crm-theme="dark"] .map-workspace-header,
+:root[data-crm-theme="dark"] .map-sidebar,
+:root[data-crm-theme="dark"] .map-list-head,
+:root[data-crm-theme="dark"] .map-dealer-card,
+:root[data-crm-theme="dark"] .map-summary-card,
+:root[data-crm-theme="dark"] .map-search-shell,
+:root[data-crm-theme="dark"] .map-search-suggestions,
+:root[data-crm-theme="dark"] .map-popup-v2,
+:root[data-crm-theme="dark"] .leaflet-popup-content-wrapper,
+:root[data-crm-theme="dark"] .leaflet-popup-tip{
+  background:var(--dark-surface)!important;
+  border-color:var(--dark-line)!important;
+  color:var(--dark-text-2)!important;
+}
+:root[data-crm-theme="dark"] .map-dealer-card:hover,
+:root[data-crm-theme="dark"] .map-search-suggestions>*:hover{
+  background:var(--dark-surface-2)!important;
+}
+:root[data-crm-theme="dark"] .leaflet-control-zoom a,
+:root[data-crm-theme="dark"] .leaflet-control-attribution{
+  background:var(--dark-surface)!important;
+  color:var(--dark-muted)!important;
+  border-color:var(--dark-line)!important;
+}
+:root[data-crm-theme="dark"] .leaflet-control-attribution a{
+  color:#8db7e6!important;
+}
+:root[data-crm-theme="dark"] .map-provider-note,
+:root[data-crm-theme="dark"] .map-counter-pill,
+:root[data-crm-theme="dark"] .map-mobile-list-btn{
+  background:rgba(26,27,31,.94)!important;
+  color:var(--dark-text-2)!important;
+  border-color:var(--dark-line)!important;
+}
+
+/* =========================
+   AUDIT
+   ========================= */
+:root[data-crm-theme="dark"] .audit-kpis>*,
+:root[data-crm-theme="dark"] .audit-toolbar,
+:root[data-crm-theme="dark"] .audit-list-shell,
+:root[data-crm-theme="dark"] .audit-row,
+:root[data-crm-theme="dark"] .audit-detail-modal .modal-content,
+:root[data-crm-theme="dark"] .audit-detail-card,
+:root[data-crm-theme="dark"] .audit-change{
+  background:var(--dark-surface)!important;
+  border-color:var(--dark-line)!important;
+}
+:root[data-crm-theme="dark"] .audit-table-head,
+:root[data-crm-theme="dark"] .audit-toolbar-foot,
+:root[data-crm-theme="dark"] .audit-changes-head{
+  background:var(--dark-surface-2)!important;
+  border-color:var(--dark-line)!important;
+}
+:root[data-crm-theme="dark"] .audit-json{
+  background:#0c0d0f!important;
+  border-color:#282a30!important;
+  color:#c9ccd3!important;
+}
+
+/* =========================
+   KNOWLEDGE / USERS
+   ========================= */
+:root[data-crm-theme="dark"] .knowledge-page .accordion-item,
+:root[data-crm-theme="dark"] .knowledge-page .accordion-button,
+:root[data-crm-theme="dark"] .knowledge-page .accordion-body,
+:root[data-crm-theme="dark"] .knowledge-item,
+:root[data-crm-theme="dark"] .users-page .card,
+:root[data-crm-theme="dark"] .users-page .table-responsive{
+  background:var(--dark-surface)!important;
+  border-color:var(--dark-line)!important;
+  color:var(--dark-text-2)!important;
+}
+:root[data-crm-theme="dark"] .knowledge-page .accordion-button:not(.collapsed){
+  background:var(--dark-red-bg)!important;
+  color:#ef777c!important;
+}
+
+/* Pills and neutral badges */
+:root[data-crm-theme="dark"] .badge.bg-light,
+:root[data-crm-theme="dark"] .badge.text-bg-light,
+:root[data-crm-theme="dark"] .dealer-status-standard,
+:root[data-crm-theme="dark"] .pricing-badge,
+:root[data-crm-theme="dark"] .product-tag,
+:root[data-crm-theme="dark"] .competitor-tag{
+  background:var(--dark-surface-3)!important;
+  color:var(--dark-text-2)!important;
+  border-color:#454750!important;
+}
+
+/* Toasts / loading */
+:root[data-crm-theme="dark"] .crm-toast,
+:root[data-crm-theme="dark"] .crm-loading-pill{
+  background:var(--dark-surface)!important;
+  border-color:var(--dark-line)!important;
+  color:var(--dark-text-2)!important;
+  box-shadow:var(--dark-shadow)!important;
+}
+
+/* Scrollbars */
+:root[data-crm-theme="dark"] *{
+  scrollbar-color:#484a53 #1a1b1f;
+}
+:root[data-crm-theme="dark"] *::-webkit-scrollbar{
+  width:10px;
+  height:10px;
+}
+:root[data-crm-theme="dark"] *::-webkit-scrollbar-track{
+  background:#1a1b1f;
+}
+:root[data-crm-theme="dark"] *::-webkit-scrollbar-thumb{
+  background:#484a53;
+  border:2px solid #1a1b1f;
+  border-radius:99px;
+}
+
+/* Mobile-specific dark polish */
+@media (max-width:991.98px){
+  :root[data-crm-theme="dark"] .app-page-shell,
+  :root[data-crm-theme="dark"] .sales-shell,
+  :root[data-crm-theme="dark"] .pricing-shell,
+  :root[data-crm-theme="dark"] .workshop-shell,
+  :root[data-crm-theme="dark"] .dealer-profile-shell,
+  :root[data-crm-theme="dark"] .command-center-shell{
+    background:transparent!important;
+  }
+  :root[data-crm-theme="dark"] .dealer-form-modal .modal-content{
+    background:#131418!important;
+  }
+  :root[data-crm-theme="dark"] .dealer-modal-body{
+    background:#131418!important;
+  }
+  :root[data-crm-theme="dark"] .dealer-modal-footer{
+    background:rgba(21,22,26,.98)!important;
+    box-shadow:0 -10px 30px rgba(0,0,0,.28)!important;
+  }
+  :root[data-crm-theme="dark"] .crm-topbar-mobile-context strong{
+    color:var(--dark-text)!important;
+  }
+}
+
+/* Keep branded red/dark hero sections intentionally branded, not recolored gray. */
+:root[data-crm-theme="dark"] .cc-hero,
+:root[data-crm-theme="dark"] .dealer-profile-hero,
+:root[data-crm-theme="dark"] .pricing-hero,
+:root[data-crm-theme="dark"] .sales-hero,
+:root[data-crm-theme="dark"] .app-page-hero,
+:root[data-crm-theme="dark"] .workshop-hero,
+:root[data-crm-theme="dark"] .audit-hero,
+:root[data-crm-theme="dark"] .map-workspace-header{
+  color:#fff;
+}

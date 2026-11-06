@@ -60,6 +60,13 @@
     }
 
     function ensureThemeStyles() {
+        if (!document.getElementById('crm-dark-theme-file')) {
+            const darkThemeLink = document.createElement('link');
+            darkThemeLink.id = 'crm-dark-theme-file';
+            darkThemeLink.rel = 'stylesheet';
+            darkThemeLink.href = '/dark-theme.css?v={{VER}}';
+            document.head.appendChild(darkThemeLink);
+        }
         if (document.getElementById('crm-theme-styles')) return;
         const style = document.createElement('style');
         style.id = 'crm-theme-styles';
