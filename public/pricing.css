@@ -510,3 +510,336 @@ html,body.pricing-page{max-width:100%;overflow-x:hidden}
     padding:8px 10px max(8px,env(safe-area-inset-bottom))!important;
   }
 }
+
+
+/* =========================================================
+   2026-11-06 — PRICE LISTS / DEALER PRICE SHEETS
+   ========================================================= */
+.pricing-view-tabs{
+  display:flex;
+  gap:7px;
+  margin:0 0 14px;
+  padding:5px;
+  width:max-content;
+  max-width:100%;
+  overflow-x:auto;
+  border:1px solid rgba(23,24,27,.075);
+  border-radius:14px;
+  background:rgba(255,255,255,.88);
+  box-shadow:0 8px 24px rgba(29,24,24,.035);
+}
+.pricing-view-tabs button{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  min-height:38px;
+  padding:0 13px;
+  border:0;
+  border-radius:10px;
+  background:transparent;
+  color:#777980;
+  font:700 .7rem 'Onest',sans-serif;
+  white-space:nowrap;
+}
+.pricing-view-tabs button.active{
+  background:#242529;
+  color:#fff;
+}
+.pricing-secondary-action{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  min-height:40px;
+  padding:0 13px;
+  border:1px solid rgba(23,24,27,.09);
+  border-radius:11px;
+  background:#242529;
+  color:#fff;
+  font:750 .7rem 'Onest',sans-serif;
+}
+.pricing-list-toolbar{
+  display:grid;
+  grid-template-columns:minmax(260px,1fr) 210px;
+  gap:10px;
+  margin-bottom:13px;
+}
+.pricing-price-list-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+}
+.pricing-price-list-card{
+  min-width:0;
+  padding:15px;
+  border:1px solid rgba(23,24,27,.075);
+  border-radius:16px;
+  background:#fbfaf8;
+}
+.pricing-price-list-card.is-archive{opacity:.68}
+.pricing-price-list-card-top{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+}
+.pricing-price-list-card-top>div{min-width:0}
+.pricing-price-list-card-top>div>span{
+  display:block;
+  margin-bottom:3px;
+  color:#a0a2a7;
+  font-size:.58rem;
+  font-weight:750;
+  letter-spacing:.08em;
+}
+.pricing-price-list-card-top strong{
+  display:block;
+  overflow:hidden;
+  color:#2f3034;
+  font-size:.9rem;
+  font-weight:750;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.pricing-price-list-card-top small{
+  display:block;
+  margin-top:3px;
+  color:#919399;
+  font-size:.62rem;
+}
+.pricing-list-state{
+  flex:0 0 auto;
+  padding:5px 8px;
+  border-radius:999px;
+  font-size:.58rem;
+  font-weight:750;
+}
+.pricing-list-state.is-active{background:#e7f4ed;color:#197450}
+.pricing-list-state.is-archive{background:#efede9;color:#777980}
+.pricing-price-list-stats{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:6px;
+  margin:12px 0 9px;
+}
+.pricing-price-list-stats>div{
+  min-width:0;
+  padding:8px;
+  border-radius:10px;
+  background:#f3f1ee;
+}
+.pricing-price-list-stats small{
+  display:block;
+  color:#999ba0;
+  font-size:.55rem;
+}
+.pricing-price-list-stats strong{
+  display:block;
+  margin-top:2px;
+  overflow:hidden;
+  color:#393a3f;
+  font-size:.72rem;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.pricing-price-list-card p{
+  margin:0 0 10px;
+  color:#74767c;
+  font-size:.64rem;
+  line-height:1.4;
+}
+.pricing-price-list-actions{
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+}
+.pricing-list-action{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  min-height:34px;
+  padding:0 10px;
+  border:1px solid rgba(23,24,27,.08);
+  border-radius:9px;
+  background:#fff;
+  color:#55575c;
+  font:700 .62rem 'Onest',sans-serif;
+}
+.pricing-list-action.is-primary{background:#242529;color:#fff;border-color:#242529}
+.pricing-list-action.is-danger{color:#b9040a;background:#fff4f4}
+
+.pricing-sheet-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  min-height:32px;
+  padding:0 9px;
+  border:1px solid rgba(23,24,27,.09);
+  border-radius:9px;
+  background:#fff;
+  color:#4f5157;
+  font:750 .62rem 'Onest',sans-serif;
+  white-space:nowrap;
+}
+.pricing-sheet-btn i{color:#b9040a}
+.pricing-row-actions{min-width:205px}
+
+.pricing-price-list-modal-shell .modal-dialog,
+.pricing-sheet-modal-shell .modal-dialog{
+  width:min(1240px,calc(100% - 28px));
+  max-width:1240px;
+}
+.pricing-list-form-head{
+  display:grid;
+  grid-template-columns:1.4fr .8fr .8fr .7fr;
+  gap:10px;
+  margin-bottom:14px;
+}
+.pricing-list-form-head label>span,
+.pricing-list-note>span{
+  display:block;
+  margin:0 0 5px 2px;
+  color:#77797e;
+  font-size:.64rem;
+  font-weight:750;
+}
+.pricing-list-editor-toolbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  margin:0 0 10px;
+  padding:11px 12px;
+  border:1px solid rgba(23,24,27,.07);
+  border-radius:12px;
+  background:#f8f6f3;
+}
+.pricing-list-editor-toolbar strong{
+  display:block;
+  color:#3d3e42;
+  font-size:.75rem;
+}
+.pricing-list-editor-toolbar small{
+  display:block;
+  margin-top:2px;
+  color:#909298;
+  font-size:.61rem;
+}
+.pricing-list-editor-actions{
+  display:flex;
+  gap:7px;
+  flex-wrap:wrap;
+}
+.pricing-list-table-wrap{
+  width:100%;
+  max-height:58vh;
+  overflow:auto;
+  border:1px solid rgba(23,24,27,.075);
+  border-radius:13px;
+  background:#fff;
+}
+.pricing-list-table{
+  width:100%;
+  min-width:760px;
+  border-collapse:separate;
+  border-spacing:0;
+}
+.pricing-list-table thead th{
+  position:sticky;
+  top:0;
+  z-index:2;
+  padding:9px 10px;
+  border-bottom:1px solid rgba(23,24,27,.08);
+  background:#f5f3f0;
+  color:#77797e;
+  font-size:.61rem;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+}
+.pricing-list-table tbody td{
+  padding:7px 10px;
+  border-bottom:1px solid rgba(23,24,27,.055);
+  color:#4d4f54;
+  font-size:.68rem;
+}
+.pricing-list-table tbody tr:last-child td{border-bottom:0}
+.pricing-list-table td:nth-child(1){width:135px}
+.pricing-list-table td:nth-child(2){min-width:250px}
+.pricing-list-table td:nth-child(n+3){width:145px}
+.pricing-list-table td strong{color:#303136}
+.pricing-list-table td small{display:block;color:#a0a2a7;font-size:.55rem}
+.pricing-list-table .form-control{
+  min-width:105px;
+  height:34px;
+  padding:5px 8px;
+  border:1px solid #ddd8d4;
+  border-radius:8px;
+  font-size:.68rem;
+  box-shadow:none!important;
+}
+.pricing-list-note{display:block;margin-top:12px}
+
+.pricing-sheet-summary{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;
+  margin-bottom:12px;
+}
+.pricing-sheet-summary>div{
+  min-width:0;
+  padding:11px 12px;
+  border-radius:12px;
+  background:#f8f6f3;
+}
+.pricing-sheet-summary small{
+  display:block;
+  color:#999ba0;
+  font-size:.58rem;
+}
+.pricing-sheet-summary strong{
+  display:block;
+  margin-top:3px;
+  overflow:hidden;
+  color:#313237;
+  font-size:.8rem;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.pricing-sheet-summary span{
+  display:block;
+  margin-top:2px;
+  overflow:hidden;
+  color:#8b8d93;
+  font-size:.58rem;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.pricing-sheet-table td:nth-child(1){width:120px}
+.pricing-sheet-table td:nth-child(2){min-width:260px}
+.pricing-sheet-table td:nth-child(n+3){width:130px}
+.pricing-display-price{width:120px}
+.pricing-sheet-footer{align-items:center}
+
+@media(max-width:1320px){
+  .pricing-price-list-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .pricing-dealer-row{grid-template-columns:minmax(220px,1.25fr) minmax(140px,.7fr) minmax(160px,.8fr) minmax(190px,1fr) 90px 110px 220px}
+}
+@media(max-width:900px){
+  .pricing-price-list-grid{grid-template-columns:1fr}
+  .pricing-list-form-head{grid-template-columns:1fr 1fr}
+  .pricing-list-editor-toolbar{align-items:stretch;flex-direction:column}
+  .pricing-row-actions{min-width:0}
+}
+@media(max-width:600px){
+  .pricing-view-tabs{width:100%}
+  .pricing-view-tabs button{flex:1 0 auto}
+  .pricing-list-toolbar{grid-template-columns:1fr}
+  .pricing-list-form-head{grid-template-columns:1fr}
+  .pricing-sheet-summary{grid-template-columns:1fr}
+  .pricing-sheet-footer{align-items:stretch;flex-direction:column}
+  .pricing-sheet-footer>div{width:100%;margin-left:0!important}
+  .pricing-sheet-footer button{flex:1}
+  .pricing-sheet-btn span{display:none}
+}
