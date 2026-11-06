@@ -765,22 +765,37 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!rows.length) throw new Error('В Excel нет строк с ценами');
 
             const inputRows=[...document.querySelectorAll('#pricing-list-editor-rows [data-price-row]')];
-            const map=new Map(inputRows.map(row=>[String(row.dataset.sku||'').trim().toLowerCase(),row]));
+            const skuMap=new Map(
+                inputRows
+                    .filter(row=>row.dataset.scopeType==='product')
+                    .map(row=>[String(row.dataset.sku||'').trim().toLowerCase(),row])
+            );
+            const collectionMap=new Map(
+                inputRows
+                    .filter(row=>row.dataset.scopeType==='collection')
+                    .map(row=>[String(row.dataset.collection||'').trim().toUpperCase(),row])
+            );
+
             let matched=0;
             rows.forEach(source=>{
-                const skuKey=Object.keys(source).find(raw=>['артикул','sku','код','article'].includes(normalizeImportHeader(raw)));
+                const keys=Object.keys(source);
+                const skuKey=keys.find(raw=>['артикул','sku','код','article'].includes(normalizeImportHeader(raw)));
+                const collectionKey=keys.find(raw=>['коллекция','collection','серия'].includes(normalizeImportHeader(raw)));
                 const sku=skuKey ? String(source[skuKey]||'').trim() : '';
-                const target=map.get(sku.toLowerCase());
+                const collection=collectionKey ? String(source[collectionKey]||'').trim().toUpperCase() : '';
+                const target=(collection && collectionMap.get(collection)) || (sku && skuMap.get(sku.toLowerCase()));
                 if(!target) return;
+
                 const opt=importPriceValue(source,h=>h==='опт'||h.includes('оптов'));
                 const rrp=importPriceValue(source,h=>h==='ррц'||h.includes('рознич')||h==='rrp');
                 const maxRrp=importPriceValue(source,h=>(h.includes('макс')&&h.includes('ррц'))||h==='maxrrp'||h==='maxretail');
+
                 if(opt) target.querySelector('[data-price-opt]').value=opt;
                 if(rrp) target.querySelector('[data-price-rrp]').value=rrp;
                 if(maxRrp) target.querySelector('[data-price-max-rrp]').value=maxRrp;
                 matched++;
             });
-            toast(`Из Excel сопоставлено позиций: ${matched}`);
+            toast(`Из Excel сопоставлено строк: ${matched}`);
         } catch(error) {
             toast(error.message || 'Не удалось прочитать Excel','error');
         } finally {
@@ -828,15 +843,33 @@ document.addEventListener('DOMContentLoaded', () => {
         const rows=Array.isArray(data.rows)?data.rows:[];
         $('pricing-sheet-empty').classList.toggle('d-none',Boolean(list && rows.length));
         $('pricing-sheet-table-wrap').classList.toggle('d-none',!(list && rows.length));
-        $('pricing-sheet-rows').innerHTML=rows.map(row=>`
-            <tr data-sheet-row data-product-id="${esc(row.productId)}">
-                <td><strong>${esc(row.sku || '—')}</strong></td>
-                <td>${esc(row.name || '')}</td>
+
+        const liquid=rows.filter(row=>row.isLiquid !== false);
+        const illiquid=rows.filter(row=>row.isLiquid === false);
+        const renderRows=(items,isIlliquid=false)=>items.map(row=>`
+            <tr data-sheet-row
+                data-row-type="${esc(row.rowType || (isIlliquid?'product':'collection'))}"
+                data-product-id="${esc(row.productId || '')}"
+                data-collection="${esc(row.collection || '')}">
+                <td>
+                    ${isIlliquid
+                        ? `<span class="pricing-list-kind is-illiquid">Неликвид</span>`
+                        : `<span class="pricing-list-kind is-liquid">Ликвид</span>`}
+                </td>
+                <td>
+                    <strong>${esc(isIlliquid ? ([row.sku,row.name].filter(Boolean).join(' · ')) : (row.collection || row.name || ''))}</strong>
+                    <small>${esc(isIlliquid ? ((row.collection||'') + (row.inherited ? ' · цена коллекции' : ' · отдельная цена')) : ((row.members||0)+' поз. в коллекции'))}</small>
+                </td>
                 <td>${row.basePrice ? fmt(row.basePrice,2)+' ₸' : '—'}</td>
                 <td>${data.totalDiscountPercent ? '−'+fmt(data.totalDiscountPercent,2)+'%' : '0%'}</td>
                 <td><strong>${row.finalPrice ? fmt(row.finalPrice,2)+' ₸' : '—'}</strong></td>
                 <td>${manage ? `<input type="number" min="0" step="0.01" inputmode="decimal" class="form-control pricing-display-price" value="${row.displayPrice || ''}" placeholder="Не указана">` : (row.displayPrice ? fmt(row.displayPrice,2)+' ₸' : '—')}</td>
             </tr>`).join('');
+
+        $('pricing-sheet-rows').innerHTML=
+            (liquid.length ? `<tr class="pricing-list-section-row"><td colspan="6"><strong>Ликвид</strong><span>цены по коллекциям</span></td></tr>${renderRows(liquid,false)}` : '') +
+            (illiquid.length ? `<tr class="pricing-list-section-row is-illiquid"><td colspan="6"><strong>Неликвид</strong><span>индивидуальные сниженные цены</span></td></tr>${renderRows(illiquid,true)}` : '');
+
         $('pricing-sheet-save-display').style.display=manage && rows.length ? '' : 'none';
         $('pricing-sheet-excel').disabled=!rows.length;
         $('pricing-sheet-pdf').disabled=!rows.length;
@@ -847,7 +880,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const data=state.currentSheet;
         if(!data || !manage) return;
         const prices=[...document.querySelectorAll('#pricing-sheet-rows [data-sheet-row]')].map(row=>({
-            productId:row.dataset.productId,
+            rowType:row.dataset.rowType || 'product',
+            collection:row.dataset.collection || '',
+            productId:row.dataset.productId || '',
             price:n(row.querySelector('.pricing-display-price')?.value)
         }));
         try {
@@ -861,11 +896,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function dealerExportRows() {
         const data=state.currentSheet;
-        return (data?.rows || []).filter(row=>n(row.finalPrice)>0).map(row=>({
-            'Артикул':row.sku || '',
-            'Наименование':row.name || '',
-            'Цена, тг':n(row.finalPrice)
-        }));
+        return (data?.rows || [])
+            .filter(row=>n(row.finalPrice)>0)
+            .map(row=>({
+                'Раздел':row.isLiquid === false ? 'Неликвид' : 'Ликвид',
+                'Коллекция / позиция':row.isLiquid === false
+                    ? [row.sku,row.name].filter(Boolean).join(' · ')
+                    : (row.collection || row.name || ''),
+                'Цена, тг':n(row.finalPrice)
+            }));
     }
 
     async function createExcelBlob() {
@@ -878,11 +917,11 @@ document.addEventListener('DOMContentLoaded', () => {
             ['Тип цены',data.priceType?.label || data.dealer?.priceType || ''],
             ['Скидка',data.totalDiscountPercent ? '-'+fmt(data.totalDiscountPercent,2)+'%' : '0%'],
             [],
-            ['Артикул','Наименование','Цена, тг']
+            ['Раздел','Коллекция / позиция','Цена, тг']
         ];
-        dealerExportRows().forEach(row=>aoa.push([row['Артикул'],row['Наименование'],row['Цена, тг']]));
+        dealerExportRows().forEach(row=>aoa.push([row['Раздел'],row['Коллекция / позиция'],row['Цена, тг']]));
         const ws=XLSX.utils.aoa_to_sheet(aoa);
-        ws['!cols']=[{wch:18},{wch:42},{wch:15}];
+        ws['!cols']=[{wch:14},{wch:48},{wch:15}];
         const wb=XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb,ws,'Прайс');
         const output=XLSX.write(wb,{bookType:'xlsx',type:'array'});
@@ -893,10 +932,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const pdfMake=await ensurePdfMakeLoaded();
         const data=state.currentSheet;
         const body=[
-            [{text:'Артикул',style:'th'},{text:'Наименование',style:'th'},{text:'Цена, тг',style:'th',alignment:'right'}],
+            [{text:'Раздел',style:'th'},{text:'Коллекция / позиция',style:'th'},{text:'Цена, тг',style:'th',alignment:'right'}],
             ...dealerExportRows().map(row=>[
-                row['Артикул'],
-                row['Наименование'],
+                row['Раздел'],
+                row['Коллекция / позиция'],
                 {text:fmt(row['Цена, тг'],2),alignment:'right'}
             ])
         ];
@@ -908,8 +947,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 {text:'Прайс для '+(data.dealer?.name || ''),fontSize:14,bold:true,margin:[0,0,0,3]},
                 {text:[data.priceList?.name || '',data.priceList?.versionDate ? 'от '+dateText(data.priceList.versionDate):'',data.priceType?.label || ''].filter(Boolean).join(' · '),fontSize:9,color:'#666666',margin:[0,0,0,3]},
                 {text:'Итоговая скидка: '+(data.totalDiscountPercent ? '−'+fmt(data.totalDiscountPercent,2)+'%' : '0%'),fontSize:9,color:'#666666',margin:[0,0,0,14]},
-                {table:{headerRows:1,widths:[85,'*',85],body},layout:'lightHorizontalLines'},
-                {text:'Цены указаны в тенге. Актуальность прайса уточняйте у менеджера IDEAL FLOOR.',fontSize:8,color:'#888888',margin:[0,14,0,0]}
+                {table:{headerRows:1,widths:[70,'*',80],body},layout:'lightHorizontalLines'},
+                {text:'Ликвидные позиции указаны по коллекциям. Неликвидные позиции выделены отдельно. Цены указаны в тенге.',fontSize:8,color:'#888888',margin:[0,14,0,0]}
             ],
             styles:{th:{bold:true,color:'#555555',fillColor:'#f3f1ee',fontSize:9}},
             defaultStyle:{fontSize:9}
