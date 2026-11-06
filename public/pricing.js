@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let manage = false;
     let xlsxLoadPromise = null;
     let pdfMakeLoadPromise = null;
+    let selectedTargets = new Set();
 
     const esc = value => String(value ?? '')
         .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
@@ -53,10 +54,32 @@ document.addEventListener('DOMContentLoaded', () => {
         })[reason] || 'Другое';
     }
 
+    function compactTargetNames(values, prefix='') {
+        const clean = [...new Set((values || []).map(value => String(value || '').trim()).filter(Boolean))];
+        if (!clean.length) return prefix ? prefix + ': —' : '—';
+        if (clean.length <= 2) return (prefix ? prefix + ': ' : '') + clean.join(', ');
+        return (prefix ? prefix + ': ' : '') + clean.slice(0,2).join(', ') + ` +${clean.length-2}`;
+    }
+
     function scopeLabel(condition) {
-        if (condition.scopeType === 'dealer') return condition.dealer?.name || 'Дилер';
-        if (condition.scopeType === 'sector') return `Сектор: ${condition.scopeValue || '—'}`;
-        if (condition.scopeType === 'city') return `Город: ${condition.scopeValue || '—'}`;
+        if (condition.scopeType === 'dealer') {
+            const names = Array.isArray(condition.dealers) && condition.dealers.length
+                ? condition.dealers.map(item => item?.name || '')
+                : [condition.dealer?.name || ''];
+            return compactTargetNames(names, 'Дилеры');
+        }
+        if (condition.scopeType === 'sector') {
+            const values = Array.isArray(condition.scopeValues) && condition.scopeValues.length
+                ? condition.scopeValues
+                : [condition.scopeValue || ''];
+            return compactTargetNames(values, 'Сектора');
+        }
+        if (condition.scopeType === 'city') {
+            const values = Array.isArray(condition.scopeValues) && condition.scopeValues.length
+                ? condition.scopeValues
+                : [condition.scopeValue || ''];
+            return compactTargetNames(values, 'Города');
+        }
         return 'Вся дилерская сеть';
     }
 
@@ -1040,24 +1063,145 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function fillDealerOptions() {
-        const select = $('pricing-dealer-id');
-        if (!select) return;
-        const current = select.value;
-        select.innerHTML = '<option value="">Выберите дилера</option>' + state.rows
-            .slice()
-            .sort((a,b)=>String(a.dealerName).localeCompare(String(b.dealerName),'ru'))
-            .map(row => `<option value="${esc(row.dealerId)}">${esc(row.dealerName)} · ${esc(row.city || '')}</option>`)
-            .join('');
-        if (state.rows.some(row=>row.dealerId===current)) select.value=current;
+    function scopeChoices(type) {
+        if (type === 'dealer') {
+            return state.rows
+                .slice()
+                .sort((a,b)=>String(a.dealerName || '').localeCompare(String(b.dealerName || ''),'ru'))
+                .map(row => ({
+                    value:String(row.dealerId || ''),
+                    label:row.dealerName || 'Без названия',
+                    meta:[row.city,row.sector].filter(Boolean).join(' · ')
+                }))
+                .filter(item=>item.value);
+        }
+
+        const source = type === 'city'
+            ? state.rows.map(row=>row.city)
+            : type === 'sector'
+                ? state.rows.map(row=>row.sector)
+                : [];
+
+        const map = new Map();
+        source.forEach(value => {
+            const clean = String(value || '').trim();
+            if (!clean) return;
+            const key = clean.toLocaleLowerCase('ru-RU');
+            if (!map.has(key)) map.set(key, clean);
+        });
+        return [...map.values()]
+            .sort((a,b)=>a.localeCompare(b,'ru'))
+            .map(value=>({ value, label:value, meta:'' }));
     }
 
-    function syncScopeFields() {
+    function renderTargetSummary() {
+        const summary = $('pricing-target-summary');
+        if (!summary) return;
+        const type = $('pricing-scope-type')?.value || 'dealer';
+        if (type === 'all') {
+            summary.textContent = 'Вся дилерская сеть';
+            return;
+        }
+        const count = selectedTargets.size;
+        const labels = scopeChoices(type)
+            .filter(item=>selectedTargets.has(String(item.value)))
+            .map(item=>item.label);
+        if (!count) {
+            summary.textContent = 'Ничего не выбрано';
+            return;
+        }
+        const noun = type === 'dealer'
+            ? (count === 1 ? 'дилер' : 'дилеров')
+            : type === 'city'
+                ? (count === 1 ? 'город' : 'городов')
+                : (count === 1 ? 'сектор' : 'секторов');
+        summary.innerHTML = `<strong>Выбрано: ${count} ${noun}</strong><span>${esc(labels.slice(0,4).join(', '))}${labels.length>4 ? ' +' + (labels.length-4) : ''}</span>`;
+    }
+
+    function renderTargetOptions() {
+        const type = $('pricing-scope-type')?.value || 'dealer';
+        const host = $('pricing-target-options');
+        if (!host) return;
+        if (type === 'all') {
+            host.innerHTML = '';
+            renderTargetSummary();
+            return;
+        }
+
+        const term = String($('pricing-target-search')?.value || '').trim().toLowerCase();
+        const choices = scopeChoices(type).filter(item =>
+            !term || [item.label,item.meta].join(' ').toLowerCase().includes(term)
+        );
+
+        host.innerHTML = choices.length
+            ? choices.map(item => {
+                const checked = selectedTargets.has(String(item.value));
+                return `<label class="pricing-target-option ${checked ? 'is-selected':''}">
+                    <input type="checkbox" value="${esc(item.value)}" ${checked?'checked':''}>
+                    <span class="pricing-target-check"><i class="bi bi-check-lg"></i></span>
+                    <span class="pricing-target-option-copy"><strong>${esc(item.label)}</strong>${item.meta ? `<small>${esc(item.meta)}</small>` : ''}</span>
+                </label>`;
+            }).join('')
+            : '<div class="pricing-target-empty"><i class="bi bi-search"></i><span>Ничего не найдено</span></div>';
+
+        host.querySelectorAll('input[type="checkbox"]').forEach(input => {
+            input.addEventListener('change', () => {
+                const value = String(input.value || '');
+                if (input.checked) selectedTargets.add(value);
+                else selectedTargets.delete(value);
+                input.closest('.pricing-target-option')?.classList.toggle('is-selected', input.checked);
+                renderTargetSummary();
+            });
+        });
+        renderTargetSummary();
+    }
+
+    function setTargetSelections(values = []) {
+        selectedTargets = new Set((values || []).map(value=>String(value || '').trim()).filter(Boolean));
+        renderTargetOptions();
+    }
+
+    function syncScopeFields(options = {}) {
         const type = $('pricing-scope-type').value;
-        $('pricing-dealer-field').classList.toggle('d-none', type !== 'dealer');
-        $('pricing-scope-value-field').classList.toggle('d-none', !(type === 'sector' || type === 'city'));
-        $('pricing-scope-value-label').textContent = type === 'city' ? 'Город' : 'Сектор / регион';
-        $('pricing-scope-value').placeholder = type === 'city' ? 'Например: Атырау' : 'Например: Запад';
+        const clear = options.clear !== false;
+        if (clear) selectedTargets.clear();
+
+        const picker = $('pricing-target-picker');
+        const all = $('pricing-target-all');
+        picker?.classList.toggle('d-none', type === 'all');
+        all?.classList.toggle('d-none', type !== 'all');
+
+        const title = $('pricing-target-title');
+        const hint = $('pricing-target-hint');
+        const search = $('pricing-target-search');
+        if (search && clear) search.value = '';
+
+        if (title) {
+            title.textContent = type === 'dealer'
+                ? 'Выберите дилеров'
+                : type === 'city'
+                    ? 'Выберите города'
+                    : type === 'sector'
+                        ? 'Выберите сектора'
+                        : 'Вся сеть';
+        }
+        if (hint) {
+            hint.textContent = type === 'dealer'
+                ? 'Один или несколько дилеров из рабочей базы'
+                : type === 'city'
+                    ? 'Один или несколько городов, которые уже есть у дилеров'
+                    : type === 'sector'
+                        ? 'Один или несколько существующих секторов'
+                        : 'Условие применяется ко всем';
+        }
+        if (search) {
+            search.placeholder = type === 'dealer'
+                ? 'Поиск дилера, города или сектора'
+                : type === 'city'
+                    ? 'Поиск города'
+                    : 'Поиск сектора';
+        }
+        renderTargetOptions();
     }
 
     function selectedKind() {
@@ -1127,6 +1271,7 @@ document.addEventListener('DOMContentLoaded', () => {
         $('pricing-condition-id').value = '';
         $('pricing-modal-title').textContent = 'Новое условие';
         $('pricing-scope-type').value = 'dealer';
+        selectedTargets.clear();
         document.querySelector('input[name="pricing-kind"][value="discount"]').checked = true;
         $('pricing-percent').value = 5;
         $('pricing-stackable').value = 'true';
@@ -1138,7 +1283,7 @@ document.addEventListener('DOMContentLoaded', () => {
         $('pricing-requirement-unit').value = 'публикаций';
         $('pricing-requirement-verified').checked = false;
         $('pricing-paused').value = 'false';
-        syncScopeFields();
+        syncScopeFields({clear:false});
         syncKindFields();
     }
 
@@ -1153,7 +1298,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function openCreate(dealerId='') {
         if (!manage) return;
         resetForm();
-        if (dealerId) $('pricing-dealer-id').value = dealerId;
+        if (dealerId) setTargetSelections([dealerId]);
         const modalEl = $('pricing-condition-modal');
         resetPricingModalViewport();
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
@@ -1168,9 +1313,20 @@ document.addEventListener('DOMContentLoaded', () => {
         $('pricing-condition-id').value = idOf(condition);
         $('pricing-modal-title').textContent = 'Редактирование условия';
         $('pricing-scope-type').value = condition.scopeType || 'dealer';
-        syncScopeFields();
-        if (condition.scopeType === 'dealer') $('pricing-dealer-id').value = idOf(condition.dealer);
-        else $('pricing-scope-value').value = condition.scopeValue || '';
+        syncScopeFields({clear:false});
+        if (condition.scopeType === 'dealer') {
+            const values = Array.isArray(condition.dealers) && condition.dealers.length
+                ? condition.dealers.map(idOf)
+                : [idOf(condition.dealer)];
+            setTargetSelections(values);
+        } else if (condition.scopeType === 'sector' || condition.scopeType === 'city') {
+            const values = Array.isArray(condition.scopeValues) && condition.scopeValues.length
+                ? condition.scopeValues
+                : [condition.scopeValue || ''];
+            setTargetSelections(values);
+        } else {
+            setTargetSelections([]);
+        }
 
         const radio = document.querySelector(`input[name="pricing-kind"][value="${condition.kind || 'discount'}"]`);
         if (radio) radio.checked = true;
@@ -1204,8 +1360,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const scopeType = $('pricing-scope-type').value;
         return {
             scopeType,
-            dealerId: scopeType === 'dealer' ? $('pricing-dealer-id').value : null,
-            scopeValue: (scopeType === 'sector' || scopeType === 'city') ? $('pricing-scope-value').value : '',
+            dealerIds: scopeType === 'dealer' ? [...selectedTargets] : [],
+            scopeValues: (scopeType === 'sector' || scopeType === 'city') ? [...selectedTargets] : [],
             kind,
             name:$('pricing-name').value,
             code:$('pricing-code').value,
@@ -1293,7 +1449,17 @@ document.addEventListener('DOMContentLoaded', () => {
     $('pricing-sheet-pdf')?.addEventListener('click',exportDealerPdf);
     $('pricing-sheet-share')?.addEventListener('click',shareDealerPrice);
 
-    $('pricing-scope-type')?.addEventListener('change',syncScopeFields);
+    $('pricing-scope-type')?.addEventListener('change',()=>syncScopeFields());
+    $('pricing-target-search')?.addEventListener('input',renderTargetOptions);
+    $('pricing-target-clear')?.addEventListener('click',()=>setTargetSelections([]));
+    $('pricing-target-select-all')?.addEventListener('click',()=>{
+        const type = $('pricing-scope-type')?.value || 'dealer';
+        const term = String($('pricing-target-search')?.value || '').trim().toLowerCase();
+        const values = scopeChoices(type)
+            .filter(item=>!term || [item.label,item.meta].join(' ').toLowerCase().includes(term))
+            .map(item=>item.value);
+        setTargetSelections(values);
+    });
     document.querySelectorAll('input[name="pricing-kind"]').forEach(input=>input.addEventListener('change',syncKindFields));
     $('pricing-reason-type')?.addEventListener('change',()=>syncReasonDefaults(true));
     document.querySelectorAll('[data-pricing-preset]').forEach(button => {
