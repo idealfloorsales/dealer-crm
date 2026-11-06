@@ -2590,7 +2590,8 @@ app.get('/api/pricing/dealers/:id/price-sheet', requirePermission('can_view_pric
 
         const summary = buildDealerPricingSummary(dealer, conditions);
         const list = await resolveSummaryPriceList(summary);
-        const priceType = dealer.price_list ? { key: 'opt', label: 'Спец.цена' } : dealerPriceColumn(dealer.price_type);
+        const fallbackList = summary.priceOverride?.active ? await PriceList.findById(summary.profilePriceListId).lean().catch(() => null) : null;
+        const priceType = list ? { key: 'opt', label: 'Спец.цена' } : dealerPriceColumn(dealer.price_type);
         const discount = Math.min(100, Math.max(0, Number(summary.totalDiscountPercent) || 0));
 
         const products = await Product.find({})
@@ -2605,6 +2606,21 @@ app.get('/api/pricing/dealers/:id/price-sheet', requirePermission('can_view_pric
         const collectionDisplay = await DealerCollectionDisplayPrice.find({ dealer: dealer._id }).lean();
         const collectionDisplayMap = new Map(collectionDisplay.map(item => [String(item.collection || '').trim().toUpperCase(), Number(item.price) || 0]));
 
+        const fallbackRows = Array.isArray(fallbackList?.rows) ? fallbackList.rows : [];
+        const fallbackCollections = new Map();
+        const fallbackProducts = new Map();
+        const fallbackSkus = new Map();
+        fallbackRows.forEach(row => {
+            const collection = String(row.collection || legacyRowCollection(row, productMap)).trim().toUpperCase();
+            const scope = row.scopeType || (row.product ? 'product' : 'collection');
+            if (scope === 'collection' && collection) fallbackCollections.set(collection, row);
+            if (row.product) fallbackProducts.set(String(row.product), row);
+            if (row.sku) fallbackSkus.set(normalizePricingSku(row.sku), row);
+        });
+        const fallbackFor = (collection, product) => (
+            (product && (fallbackProducts.get(String(product._id)) || fallbackSkus.get(normalizePricingSku(product.sku)))) ||
+            fallbackCollections.get(collection) || null
+        );
         const listRows = Array.isArray(list?.rows) ? list.rows : [];
         const collectionRows = new Map();
         const productRows = new Map();
@@ -2637,7 +2653,7 @@ app.get('/api/pricing/dealers/:id/price-sheet', requirePermission('can_view_pric
         [...liquidGroups.entries()]
             .sort((a, b) => String(a[0]).localeCompare(String(b[0]), 'ru'))
             .forEach(([collection, members]) => {
-                const source = collectionRows.get(collection) || legacyByCollection.get(collection) || null;
+                const source = collectionRows.get(collection) || legacyByCollection.get(collection) || fallbackFor(collection) || null;
                 const basePrice = source ? Math.max(0, Number(source[priceType.key]) || 0) : 0;
                 const finalPrice = basePrice > 0 ? Math.round(basePrice * (1 - discount / 100) * 100) / 100 : 0;
                 rows.push({
@@ -2668,7 +2684,7 @@ app.get('/api/pricing/dealers/:id/price-sheet', requirePermission('can_view_pric
                 const collection = inferPricingCollection(product);
                 const override = productRows.get(String(product._id)) || skuRows.get(normalizePricingSku(product.sku)) || null;
                 const inherited = collectionRows.get(collection) || legacyByCollection.get(collection) || null;
-                const source = override || inherited;
+                const source = override || inherited || fallbackFor(collection, product);
                 const basePrice = source ? Math.max(0, Number(source[priceType.key]) || 0) : 0;
                 const finalPrice = basePrice > 0 ? Math.round(basePrice * (1 - discount / 100) * 100) / 100 : 0;
 
