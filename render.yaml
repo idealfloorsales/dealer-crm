@@ -8,4 +8,4 @@ services:
     buildCommand: yarn install
     startCommand: node server.js
     healthCheckPath: /readyz
-autoDeploy: true
+    autoDeploy: true
