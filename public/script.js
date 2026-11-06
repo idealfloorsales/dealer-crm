@@ -3524,7 +3524,7 @@ document.addEventListener('DOMContentLoaded', () => {
             qvModal.hide();
             qvForm.reset();
             window.showToast(isCompleted ? "Визит отмечен как выполненный" : "Визит добавлен в план");
-            await initApp();
+            await initApp({ preserveDealerView:true });
         } catch(e) {
             window.showToast(e.message || "Ошибка", "error");
         } finally {
