@@ -39,6 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let editPhotosData = []; 
     let newAvatarBase64 = null; 
     let currentUserRole = 'guest';
+    let addCloneMeta = null;
 
     // Для секторов
     const sectorModalEl = document.getElementById('sector-manager-modal');
@@ -2879,6 +2880,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const canViewSales = Boolean(window.CRMAuth && CRMAuth.can('can_view_sales'));
         const canEdit = Boolean(window.CRMAuth && CRMAuth.can('can_edit_dealer'));
+        const canCreate = Boolean(window.CRMAuth && CRMAuth.can('can_create_dealer'));
 
         dealerGrid.innerHTML = filtered.map(({dealer:d, metrics}) => {
             const statusObj = statusList.find(s => s.value === (d.status || 'standard')) || {
@@ -2908,6 +2910,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (canEdit) {
                 secondaryActions.push(`<button class="dealer-v3-menu-item" type="button" onclick="openEditModal('${safeAttr(d.id)}')"><i class="bi bi-pencil"></i><span>Редактировать</span></button>`);
+            }
+            if (canCreate) {
+                secondaryActions.push(`<button class="dealer-v3-menu-item" type="button" onclick="openDuplicateDealer('${safeAttr(d.id)}')"><i class="bi bi-copy"></i><span>Дублировать дилера</span></button>`);
             }
 
             const moreMenu = secondaryActions.length
@@ -3097,7 +3102,121 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if(editModalEl) { const tabMapBtn = document.querySelector('button[data-bs-target="#tab-map"]'); if(tabMapBtn) { tabMapBtn.addEventListener('shown.bs.tab', () => { if (refreshEditMap) refreshEditMap(); }); } }
+    function setAddDealerModalMode(mode, sourceName='') {
+        const title = addModalEl?.querySelector('.dealer-modal-header .modal-title');
+        const description = addModalEl?.querySelector('.dealer-modal-header p');
+        if (mode === 'duplicate') {
+            if (title) title.textContent = 'Дублирование дилера';
+            if (description) description.textContent = 'Данные скопированы из ' + sourceName + '. Проверьте ID, название, адрес и остальные поля перед сохранением.';
+        } else {
+            if (title) title.textContent = 'Новый дилер';
+            if (description) description.textContent = 'Добавьте основные данные, контакты и информацию для работы с дилером.';
+        }
+    }
+
+    window.openDuplicateDealer = async (id) => {
+        if (!window.CRMAuth || !CRMAuth.can('can_create_dealer')) {
+            window.showToast('Нет права создавать дилеров','error');
+            return;
+        }
+
+        document.querySelectorAll('.dealer-v3-menu.show').forEach(menu => {
+            bootstrap.Dropdown.getInstance(menu.previousElementSibling)?.hide();
+        });
+
+        try {
+            await Promise.all([fetchProductCatalog(), fetchCompetitorsRef()]);
+            const [dealerRes,nextIdRes] = await Promise.all([
+                fetch(`${API_DEALERS_URL}/${encodeURIComponent(id)}`),
+                fetch(`${API_DEALERS_URL}/next-id`)
+            ]);
+            if (!dealerRes.ok) throw new Error('Не удалось загрузить исходного дилера');
+            if (!nextIdRes.ok) throw new Error('Не удалось получить новый ID');
+
+            const d = await dealerRes.json();
+            const nextData = await nextIdRes.json();
+            addCloneMeta = {
+                sourceId: String(d.id || id),
+                sourceDealerId: String(d.dealer_id || ''),
+                sourceLabel: String(d.name || ''),
+                responsibleUserId: String(d.responsibleUserId || '')
+            };
+
+            if (addForm) addForm.reset();
+            populateStatusSelects(d.status || 'standard');
+
+            const setValue = (fieldId,value) => {
+                const el=document.getElementById(fieldId);
+                if (el) el.value = value ?? '';
+            };
+
+            setValue('dealer_id',nextData.dealer_id || '');
+            setValue('name',d.name || '');
+            setValue('price_type',d.price_type || '');
+            setValue('city',d.city || '');
+            setValue('address',d.address || '');
+            setValue('delivery',d.delivery || '');
+            setValue('website',d.website || '');
+            setValue('instagram',d.instagram || '');
+            setValue('add_latitude',d.latitude || '');
+            setValue('add_longitude',d.longitude || '');
+            setValue('bonuses',d.bonuses || '');
+            setValue('status',d.status || 'standard');
+
+            const addResponsible=document.getElementById('responsible');
+            if (addResponsible) {
+                addResponsible.value=d.responsible || '';
+                const sectorSelect=document.getElementById('add_region_sector');
+                if (sectorSelect) sectorSelect.setAttribute('data-selected',d.region_sector || '');
+                toggleSectorSelect('add',addResponsible.value);
+                if (sectorSelect) sectorSelect.value=d.region_sector || '';
+            }
+
+            if (addLegalEntityList) {
+                addLegalEntityList.innerHTML='';
+                const legalEntities=getDealerLegalEntities(d);
+                (legalEntities.length ? legalEntities : [{}]).forEach(entity => {
+                    addLegalEntityList.insertAdjacentHTML('beforeend',createLegalEntityHTML(entity));
+                });
+            }
+
+            renderList(addContactList,d.contacts || [],createContactEntryHTML);
+            renderList(addAddressList,d.additional_addresses || [],createAddressEntryHTML);
+            renderList(addPosList,[],createPosEntryHTML);
+            renderList(addVisitsList,[],createVisitEntryHTML);
+            renderList(addCompetitorList,d.competitors || [],createCompetitorEntryHTML);
+            renderProductChecklist(addProductChecklist,(d.products || []).map(product => product?.id || product?._id || product).filter(Boolean));
+
+            addPhotosData=[];
+            renderPhotoPreviews(addPhotoPreviewContainer,[]);
+            if (addAvatarPreview) {
+                addAvatarPreview.src='';
+                addAvatarPreview.style.display='none';
+            }
+            newAvatarBase64=null;
+
+            const contractSigned=document.getElementById('add_contract_signed');
+            const contractDate=document.getElementById('add_contract_date');
+            const personalPlan=document.getElementById('add_has_personal_plan');
+            if (contractSigned) contractSigned.checked=false;
+            if (contractDate) contractDate.value='';
+            if (personalPlan) personalPlan.checked=false;
+
+            currentStep=1;
+            showStep(1);
+            document.querySelectorAll('[data-field-shortcuts="add"] button').forEach((item,index) => item.classList.toggle('active',index===0));
+            setAddDealerModalMode('duplicate',d.name || d.dealer_id || 'исходного дилера');
+            addModal.show();
+            setTimeout(() => document.getElementById('name')?.focus({preventScroll:true}),180);
+        } catch (e) {
+            console.error('Dealer duplicate error',e);
+            window.showToast(e.message || 'Не удалось подготовить копию дилера','error');
+        }
+    };
+
     if(openAddModalBtn) openAddModalBtn.onclick = async () => {
+        addCloneMeta = null;
+        setAddDealerModalMode('new');
         if (!window.CRMAuth || !CRMAuth.can('can_create_dealer')) {
             window.showToast("Нет права создавать дилеров", "error");
             return;
@@ -3232,8 +3351,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if(addForm) addForm.addEventListener('submit', async (e) => { e.preventDefault(); if (!window.CRMAuth || !CRMAuth.can('can_create_dealer')) { window.showToast("Нет права создавать дилеров", "error"); return; } if (isSaving) return; isSaving = true; const btn = document.getElementById('btn-finish-step'); const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; 
         const legalEntities = collectLegalEntities(addLegalEntityList);
-        const data = { dealer_id: getVal('dealer_id'), name: getVal('name'), legal_entities: legalEntities, price_type: getVal('price_type'), city: getVal('city'), address: getVal('address'), delivery: getVal('delivery'), website: getVal('website'), instagram: getVal('instagram'), latitude: getVal('add_latitude'), longitude: getVal('add_longitude'), bonuses: getVal('bonuses'), status: getVal('status'), responsible: document.getElementById('responsible').value, region_sector: document.getElementById('add_region_sector').value, hasPersonalPlan: document.getElementById('add_has_personal_plan')?.checked || false, contract: { isSigned: document.getElementById('add_contract_signed').checked, date: getVal('add_contract_date') }, contacts: collectData(addContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]), additional_addresses: collectData(addAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]), pos_materials: collectData(addPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]), visits: collectData(addVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'}]), photos: addPhotosData, avatarUrl: newAvatarBase64, competitors: collectData(addCompetitorList, '.competitor-entry', [{key:'brand',class:'.competitor-brand'},{key:'collection',class:'.competitor-collection'},{key:'price_opt',class:'.competitor-price-opt'},{key:'price_retail',class:'.competitor-price-retail'}]) }; 
-        try { const res = await fetch(API_DEALERS_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); if (!res.ok) throw new Error(await res.text()); const newD = await res.json(); const pIds = getSelectedProductIds('add-product-checklist'); if(window.CRMAuth && CRMAuth.can('can_edit_matrix') && pIds.length) await saveProducts(newD.id, pIds); addModal.hide(); window.showToast("Дилер добавлен!"); initApp(); } catch (e) { window.showToast("Ошибка сохранения", "error"); } finally { isSaving = false; btn.disabled = false; btn.innerHTML = oldText; } });
+        const data = { dealer_id: getVal('dealer_id'), name: getVal('name'), legal_entities: legalEntities, price_type: getVal('price_type'), city: getVal('city'), address: getVal('address'), delivery: getVal('delivery'), website: getVal('website'), instagram: getVal('instagram'), latitude: getVal('add_latitude'), longitude: getVal('add_longitude'), bonuses: getVal('bonuses'), status: getVal('status'), responsible: document.getElementById('responsible').value, region_sector: document.getElementById('add_region_sector').value, hasPersonalPlan: document.getElementById('add_has_personal_plan')?.checked || false, contract: { isSigned: document.getElementById('add_contract_signed').checked, date: getVal('add_contract_date') }, contacts: collectData(addContactList, '.contact-entry', [{key:'name',class:'.contact-name'},{key:'position',class:'.contact-position'},{key:'contactInfo',class:'.contact-info'}]), additional_addresses: collectData(addAddressList, '.address-entry', [{key:'description',class:'.address-description'},{key:'city',class:'.address-city'},{key:'address',class:'.address-address'}]), pos_materials: collectData(addPosList, '.pos-entry', [{key:'name',class:'.pos-name'},{key:'quantity',class:'.pos-quantity'}]), visits: collectData(addVisitsList, '.visit-entry', [{key:'date',class:'.visit-date'},{key:'comment',class:'.visit-comment'}]), photos: addPhotosData, avatarUrl: newAvatarBase64, competitors: collectData(addCompetitorList, '.competitor-entry', [{key:'brand',class:'.competitor-brand'},{key:'collection',class:'.competitor-collection'},{key:'price_opt',class:'.competitor-price-opt'},{key:'price_retail',class:'.competitor-price-retail'}]) };
+        if (addCloneMeta) {
+            data._cloneSourceId = addCloneMeta.sourceId;
+            data._cloneSourceDealerId = addCloneMeta.sourceDealerId;
+            data._cloneSourceLabel = addCloneMeta.sourceLabel;
+            if (addCloneMeta.responsibleUserId) data.responsibleUserId = addCloneMeta.responsibleUserId;
+        }
+        try { const res = await fetch(API_DEALERS_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); if (!res.ok) throw new Error(await res.text()); const newD = await res.json(); const pIds = getSelectedProductIds('add-product-checklist'); if(window.CRMAuth && CRMAuth.can('can_edit_matrix') && pIds.length) await saveProducts(newD.id, pIds); const wasClone = Boolean(addCloneMeta); addCloneMeta = null; addModal.hide(); setAddDealerModalMode('new'); window.showToast(wasClone ? "Копия дилера создана" : "Дилер добавлен!"); initApp(); } catch (e) { window.showToast("Ошибка сохранения", "error"); } finally { isSaving = false; btn.disabled = false; btn.innerHTML = oldText; } });
     if(editForm) editForm.addEventListener('submit', async (e) => { e.preventDefault(); if (!window.CRMAuth || !CRMAuth.can('can_edit_dealer')) { window.showToast("Нет права редактировать дилеров", "error"); return; } if (isSaving) return; isSaving = true; const btn = document.querySelector('button[form="edit-dealer-form"]'); const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; const id = document.getElementById('edit_db_id').value; let avatarToSend = getVal('edit-current-avatar-url'); if (newAvatarBase64) avatarToSend = newAvatarBase64; 
         const legalEntities = collectLegalEntities(editLegalEntityList);
         const data = { 
