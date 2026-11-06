@@ -12577,3 +12577,140 @@ body.bg-light {
     .dealer-price-detail-values{grid-template-columns:repeat(2,1fr)}
     .dealer-price-detail-values>span{text-align:left}
 }
+
+
+/* =========================================================
+   UNIFIED CRM MODAL SYSTEM
+   One visual language for standard modals across the CRM.
+   Specialized full-screen/field modals may keep their own body layout,
+   but standard Bootstrap modal headers/frames use this system.
+   ========================================================= */
+.app-workspace-page .modal-content{
+    overflow:hidden;
+    border:0!important;
+    border-radius:22px!important;
+    background:#fff;
+    box-shadow:0 30px 80px rgba(20,18,18,.22)!important;
+}
+
+.app-workspace-page .modal-header{
+    position:relative;
+    flex:0 0 auto;
+    min-height:78px;
+    padding:18px 20px 16px!important;
+    border:0!important;
+    background:
+        radial-gradient(circle at 92% -35%, rgba(185,4,10,.52), transparent 20rem),
+        linear-gradient(120deg,#171719 0%,#292628 100%)!important;
+    color:#fff!important;
+}
+
+.app-workspace-page .modal-header::after{
+    content:"";
+    position:absolute;
+    left:0;
+    right:0;
+    bottom:0;
+    height:1px;
+    background:rgba(255,255,255,.07);
+    pointer-events:none;
+}
+
+.app-workspace-page .modal-header>div{
+    min-width:0;
+}
+
+.app-workspace-page .modal-header small,
+.app-workspace-page .modal-header .modal-kicker{
+    display:block;
+    margin:0 0 4px!important;
+    color:rgba(255,255,255,.46)!important;
+    font-size:.56rem!important;
+    font-weight:800!important;
+    letter-spacing:.105em!important;
+    text-transform:uppercase;
+}
+
+.app-workspace-page .modal-header .modal-title,
+.app-workspace-page .modal-header h5,
+.app-workspace-page .modal-header h6{
+    margin:0!important;
+    color:#fff!important;
+    font-size:1.05rem!important;
+    font-weight:780!important;
+    letter-spacing:-.018em;
+}
+
+.app-workspace-page .modal-header p{
+    margin:4px 0 0!important;
+    color:rgba(255,255,255,.58)!important;
+    font-size:.62rem!important;
+    line-height:1.4;
+}
+
+.app-workspace-page .modal-header .btn-close{
+    flex:0 0 auto;
+    width:32px;
+    height:32px;
+    margin:0!important;
+    padding:7px!important;
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:9px;
+    background-color:rgba(255,255,255,.08)!important;
+    filter:invert(1) grayscale(1) brightness(2);
+    opacity:.82!important;
+    transition:.14s ease;
+}
+
+.app-workspace-page .modal-header .btn-close:hover{
+    background-color:rgba(255,255,255,.14)!important;
+    opacity:1!important;
+}
+
+.app-workspace-page .modal-footer{
+    flex:0 0 auto;
+    margin:0;
+    padding:11px 18px!important;
+    border-top:1px solid rgba(23,24,27,.07)!important;
+    border-radius:0 0 22px 22px!important;
+    background:#fff!important;
+}
+
+.app-workspace-page .modal-footer .btn{
+    min-height:38px;
+    border-radius:10px;
+    font-size:.66rem;
+    font-weight:750;
+}
+
+.app-workspace-page .modal-footer .btn-dark{
+    border-color:#26272b!important;
+    background:#26272b!important;
+}
+
+.app-workspace-page .modal-footer .btn-dark:hover{
+    border-color:#171719!important;
+    background:#171719!important;
+}
+
+@media(max-width:700px){
+    .app-workspace-page .modal-content{
+        border-radius:18px!important;
+    }
+
+    .app-workspace-page .modal-header{
+        min-height:70px;
+        padding:15px 16px 13px!important;
+    }
+
+    .app-workspace-page .modal-header .modal-title,
+    .app-workspace-page .modal-header h5,
+    .app-workspace-page .modal-header h6{
+        font-size:.94rem!important;
+    }
+
+    .app-workspace-page .modal-footer{
+        padding:10px 12px!important;
+        border-radius:0 0 18px 18px!important;
+    }
+}
