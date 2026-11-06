@@ -662,26 +662,21 @@ document.addEventListener('DOMContentLoaded', () => {
         const shell = document.createElement('div');
         shell.innerHTML = `
             <div class="modal fade dealer-profile-edit-modal" id="dealer-profile-edit-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-                <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
+                <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
                     <div class="modal-content">
                         <div class="dealer-profile-edit-head">
                             <div>
-                                <span>КАРТОЧКА ДИЛЕРА</span>
-                                <h3>Редактирование</h3>
-                                <p id="dealer-profile-edit-subtitle">Изменения сохраняются сразу в карточку дилера.</p>
+                                <span id="dealer-profile-edit-kicker">КАРТОЧКА ДИЛЕРА</span>
+                                <h3 id="dealer-profile-edit-title">Редактирование</h3>
+                                <p id="dealer-profile-edit-subtitle">Изменения сохраняются только в выбранный блок.</p>
                             </div>
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Закрыть"></button>
-                        </div>
-                        <div class="dealer-profile-edit-tabs">
-                            <button type="button" class="active" data-profile-edit-tab="main"><i class="bi bi-shop"></i><span>Основное</span></button>
-                            <button type="button" data-profile-edit-tab="contacts"><i class="bi bi-people"></i><span>Контакты</span></button>
-                            <button type="button" data-profile-edit-tab="requisites"><i class="bi bi-file-earmark-text"></i><span>Реквизиты</span></button>
                         </div>
                         <form id="dealer-profile-edit-form">
                             <div class="modal-body dealer-profile-edit-body">
                                 <section class="dealer-profile-edit-pane active" data-profile-edit-pane="main">
                                     <div class="dealer-profile-edit-section">
-                                        <div class="dealer-profile-edit-section-title"><i class="bi bi-shop"></i><div><strong>Основная информация</strong><small>Название, статус, город и ответственный</small></div></div>
+                                        <div class="dealer-profile-edit-section-title"><i class="bi bi-shop"></i><div><strong>Основная информация</strong><small>Название, статус, город, ответственный и договор</small></div></div>
                                         <div class="row g-3">
                                             <div class="col-md-4"><label>ID дилера</label><input id="profile-edit-dealer-id" class="form-control"></div>
                                             <div class="col-md-8"><label>Название</label><input id="profile-edit-name" class="form-control" required></div>
@@ -698,24 +693,37 @@ document.addEventListener('DOMContentLoaded', () => {
                                                 </select>
                                             </div>
                                             <div class="col-md-4"><label>Сектор</label><select id="profile-edit-sector" class="form-select"><option value="">Не выбран</option></select></div>
-                                            <div class="col-md-8"><label>Условия доставки</label><input id="profile-edit-delivery" class="form-control"></div>
-                                            <div class="col-md-6"><label>Сайт</label><input id="profile-edit-website" class="form-control"></div>
-                                            <div class="col-md-6"><label>Instagram</label><input id="profile-edit-instagram" class="form-control"></div>
-                                            <div class="col-12"><label>Заметки и особые условия</label><textarea id="profile-edit-bonuses" class="form-control" rows="3"></textarea></div>
-                                        </div>
-                                    </div>
-                                    <div class="dealer-profile-edit-section">
-                                        <div class="dealer-profile-edit-section-title"><i class="bi bi-file-earmark-check"></i><div><strong>Договор</strong><small>№ договора берётся из ID дилера</small></div></div>
-                                        <div class="row g-3 align-items-end">
-                                            <div class="col-md-5"><label>№ договора</label><input class="form-control" value="${safeText(currentDealer?.dealer_id || '')}" disabled><small class="text-muted">Формируется автоматически из ID дилера.</small></div>
                                             <div class="col-md-4"><label>Дата договора</label><input id="profile-edit-contract-date" type="date" class="form-control"></div>
-                                            <div class="col-md-3">
+                                            <div class="col-md-4">
+                                                <label class="d-block">Договор</label>
                                                 <div class="dealer-profile-edit-switch">
-                                                    <span>Договор подписан</span>
+                                                    <span>Подписан</span>
                                                     <div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" id="profile-edit-contract-signed"></div>
                                                 </div>
                                             </div>
+                                            <div class="col-md-6"><label>Сайт</label><input id="profile-edit-website" class="form-control"></div>
+                                            <div class="col-md-6"><label>Instagram</label><input id="profile-edit-instagram" class="form-control"></div>
                                         </div>
+                                    </div>
+                                </section>
+
+                                <section class="dealer-profile-edit-pane" data-profile-edit-pane="logistics">
+                                    <div class="dealer-profile-edit-section">
+                                        <div class="dealer-profile-edit-section-title">
+                                            <i class="bi bi-truck"></i>
+                                            <div><strong>Логистика и адреса</strong><small>Условия доставки и дополнительные точки</small></div>
+                                            <button type="button" class="dealer-profile-edit-add" id="profile-edit-add-address"><i class="bi bi-plus-lg"></i> Адрес</button>
+                                        </div>
+                                        <div class="mb-3"><label>Условия доставки</label><input id="profile-edit-delivery" class="form-control"></div>
+                                        <div id="profile-edit-addresses" class="dealer-profile-edit-contacts"></div>
+                                    </div>
+                                </section>
+
+                                <section class="dealer-profile-edit-pane" data-profile-edit-pane="notes">
+                                    <div class="dealer-profile-edit-section">
+                                        <div class="dealer-profile-edit-section-title"><i class="bi bi-sticky"></i><div><strong>Бонусы и заметки</strong><small>Особые условия и рабочие комментарии</small></div></div>
+                                        <label>Заметки и особые условия</label>
+                                        <textarea id="profile-edit-bonuses" class="form-control" rows="7"></textarea>
                                     </div>
                                 </section>
 
@@ -748,7 +756,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </section>
                             </div>
                             <div class="modal-footer dealer-profile-edit-footer">
-                                <span><i class="bi bi-shield-check"></i> Фото, визиты, матрица и конкуренты этим сохранением не изменяются.</span>
+                                <span><i class="bi bi-shield-check"></i> Сохраняется только этот блок.</span>
                                 <div>
                                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button>
                                     <button type="submit" class="btn btn-dark" id="dealer-profile-edit-save"><i class="bi bi-check2"></i> Сохранить</button>
@@ -761,13 +769,14 @@ document.addEventListener('DOMContentLoaded', () => {
         modalEl = shell.firstElementChild;
         document.body.appendChild(modalEl);
 
-        modalEl.querySelectorAll('[data-profile-edit-tab]').forEach(button => {
-            button.addEventListener('click', () => activateProfileEditTab(button.dataset.profileEditTab));
-        });
-
         document.getElementById('profile-edit-add-contact')?.addEventListener('click', () => addProfileContactRow());
         document.getElementById('profile-edit-contacts')?.addEventListener('click', event => {
             const remove = event.target.closest('[data-remove-profile-contact]');
+            if (remove) remove.closest('.dealer-profile-contact-row')?.remove();
+        });
+        document.getElementById('profile-edit-add-address')?.addEventListener('click', () => addProfileAddressRow());
+        document.getElementById('profile-edit-addresses')?.addEventListener('click', event => {
+            const remove = event.target.closest('[data-remove-profile-address]');
             if (remove) remove.closest('.dealer-profile-contact-row')?.remove();
         });
         document.getElementById('profile-edit-responsible')?.addEventListener('change', refreshProfileSectorOptions);
@@ -777,9 +786,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function activateProfileEditTab(name) {
         const modalEl = ensureProfileEditModal();
-        modalEl.querySelectorAll('[data-profile-edit-tab]').forEach(button => {
-            button.classList.toggle('active', button.dataset.profileEditTab === name);
-        });
+        modalEl.dataset.editSection = name;
         modalEl.querySelectorAll('[data-profile-edit-pane]').forEach(pane => {
             pane.classList.toggle('active', pane.dataset.profileEditPane === name);
         });
@@ -805,6 +812,28 @@ document.addEventListener('DOMContentLoaded', () => {
             position: row.querySelector('.profile-contact-position')?.value.trim() || '',
             contactInfo: row.querySelector('.profile-contact-info')?.value.trim() || ''
         })).filter(contact => contact.name || contact.position || contact.contactInfo);
+    }
+
+    function addProfileAddressRow(address = {}) {
+        ensureProfileEditModal();
+        const container = document.getElementById('profile-edit-addresses');
+        if (!container) return;
+        const row = document.createElement('div');
+        row.className = 'dealer-profile-contact-row';
+        row.innerHTML = `
+            <input class="form-control profile-address-description" placeholder="Описание точки" value="${String(address.description || '').replace(/"/g, '&quot;')}">
+            <input class="form-control profile-address-city" placeholder="Город" value="${String(address.city || '').replace(/"/g, '&quot;')}">
+            <input class="form-control profile-address-address" placeholder="Адрес" value="${String(address.address || '').replace(/"/g, '&quot;')}">
+            <button type="button" data-remove-profile-address aria-label="Удалить адрес"><i class="bi bi-x-lg"></i></button>`;
+        container.appendChild(row);
+    }
+
+    function collectProfileAddresses() {
+        return [...document.querySelectorAll('#profile-edit-addresses .dealer-profile-contact-row')].map(row => ({
+            description: row.querySelector('.profile-address-description')?.value.trim() || '',
+            city: row.querySelector('.profile-address-city')?.value.trim() || '',
+            address: row.querySelector('.profile-address-address')?.value.trim() || ''
+        })).filter(item => item.description || item.city || item.address);
     }
 
     function primaryLegalEntity(dealer) {
@@ -846,8 +875,6 @@ document.addEventListener('DOMContentLoaded', () => {
             editorStatuses = Array.isArray(statuses) ? statuses : [];
             editorSectors = Array.isArray(sectors) ? sectors : [];
             return { statuses: editorStatuses, sectors: editorSectors };
-        }).finally(() => {
-            // Keep the resolved arrays; a new request is only needed after a full page refresh.
         });
         return editorReferencePromise;
     }
@@ -855,72 +882,99 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fillProfileEditor(section = 'main') {
         if (!currentDealer) return;
         const modalEl = ensureProfileEditModal();
+        const titles = {
+            main: ['ОСНОВНОЕ', 'Основная информация'],
+            logistics: ['ЛОГИСТИКА', 'Логистика и адреса'],
+            notes: ['ЗАМЕТКИ', 'Бонусы и заметки'],
+            contacts: ['КОНТАКТЫ', 'Контакты дилера'],
+            requisites: ['РЕКВИЗИТЫ', 'Юридические реквизиты']
+        };
+        const [kicker, title] = titles[section] || titles.main;
+        const kickerEl = document.getElementById('dealer-profile-edit-kicker');
+        const titleEl = document.getElementById('dealer-profile-edit-title');
         const subtitle = document.getElementById('dealer-profile-edit-subtitle');
+        if (kickerEl) kickerEl.textContent = kicker;
+        if (titleEl) titleEl.textContent = title;
         if (subtitle) subtitle.textContent = currentDealer.name || 'Карточка дилера';
 
         const { statuses, sectors } = await ensureEditorReferences();
 
-        const statusSelect = document.getElementById('profile-edit-status');
-        if (statusSelect) {
-            const fallback = [
-                {value:'standard',label:'Стандарт'}, {value:'active',label:'Активный'},
-                {value:'problem',label:'Проблемный'}, {value:'potential',label:'Потенциальный'}, {value:'archive',label:'Архив'}
-            ];
-            const source = statuses.length ? statuses : fallback;
-            statusSelect.innerHTML = source.map(item => `<option value="${item.value}">${safeText(item.label || item.value)}</option>`).join('');
-            statusSelect.value = currentDealer.status || 'standard';
+        if (section === 'main') {
+            const statusSelect = document.getElementById('profile-edit-status');
+            if (statusSelect) {
+                const fallback = [
+                    {value:'standard',label:'Стандарт'}, {value:'active',label:'Активный'},
+                    {value:'problem',label:'Проблемный'}, {value:'potential',label:'Потенциальный'}, {value:'archive',label:'Архив'}
+                ];
+                const source = statuses.length ? statuses : fallback;
+                statusSelect.innerHTML = source.map(item => `<option value="${item.value}">${safeText(item.label || item.value)}</option>`).join('');
+                statusSelect.value = currentDealer.status || 'standard';
+            }
+            const values = {
+                'profile-edit-dealer-id': currentDealer.dealer_id,
+                'profile-edit-name': currentDealer.name,
+                'profile-edit-city': currentDealer.city,
+                'profile-edit-price-type': currentDealer.price_type,
+                'profile-edit-address': currentDealer.address,
+                'profile-edit-website': currentDealer.website,
+                'profile-edit-instagram': currentDealer.instagram,
+                'profile-edit-contract-date': currentDealer.contract?.date
+            };
+            Object.entries(values).forEach(([id, value]) => {
+                const input = document.getElementById(id);
+                if (input) input.value = value || '';
+            });
+            const signed = document.getElementById('profile-edit-contract-signed');
+            if (signed) signed.checked = Boolean(currentDealer.contract?.isSigned);
+            const responsible = document.getElementById('profile-edit-responsible');
+            if (responsible) responsible.value = currentDealer.responsible || '';
+            const sectorSelect = document.getElementById('profile-edit-sector');
+            if (sectorSelect) {
+                sectorSelect._crmSectors = sectors;
+                sectorSelect.dataset.selected = currentDealer.region_sector || '';
+            }
+            await refreshProfileSectorOptions();
         }
 
-        const values = {
-            'profile-edit-dealer-id': currentDealer.dealer_id,
-            'profile-edit-name': currentDealer.name,
-            'profile-edit-city': currentDealer.city,
-            'profile-edit-price-type': currentDealer.price_type,
-            'profile-edit-address': currentDealer.address,
-            'profile-edit-delivery': currentDealer.delivery,
-            'profile-edit-website': currentDealer.website,
-            'profile-edit-instagram': currentDealer.instagram,
-            'profile-edit-bonuses': currentDealer.bonuses,
-            'profile-edit-contract-date': currentDealer.contract?.date
-        };
-        Object.entries(values).forEach(([id, value]) => {
-            const input = document.getElementById(id);
-            if (input) input.value = value || '';
-        });
-        const signed = document.getElementById('profile-edit-contract-signed');
-        if (signed) signed.checked = Boolean(currentDealer.contract?.isSigned);
-
-        const responsible = document.getElementById('profile-edit-responsible');
-        if (responsible) responsible.value = currentDealer.responsible || '';
-
-        const sectorSelect = document.getElementById('profile-edit-sector');
-        if (sectorSelect) {
-            sectorSelect._crmSectors = sectors;
-            sectorSelect.dataset.selected = currentDealer.region_sector || '';
+        if (section === 'logistics') {
+            const delivery = document.getElementById('profile-edit-delivery');
+            if (delivery) delivery.value = currentDealer.delivery || '';
+            const addresses = document.getElementById('profile-edit-addresses');
+            if (addresses) addresses.innerHTML = '';
+            (currentDealer.additional_addresses || []).forEach(addProfileAddressRow);
+            if (!currentDealer.additional_addresses?.length) addProfileAddressRow();
         }
-        await refreshProfileSectorOptions();
 
-        const contacts = document.getElementById('profile-edit-contacts');
-        if (contacts) contacts.innerHTML = '';
-        (currentDealer.contacts || []).forEach(addProfileContactRow);
-        if (!currentDealer.contacts?.length) addProfileContactRow();
+        if (section === 'notes') {
+            const notes = document.getElementById('profile-edit-bonuses');
+            if (notes) notes.value = currentDealer.bonuses || '';
+        }
 
-        const legal = primaryLegalEntity(currentDealer);
-        const legalValues = {
-            'profile-edit-org-name': legal.organizationName,
-            'profile-edit-director': legal.director,
-            'profile-edit-legal-address': legal.legalAddress,
-            'profile-edit-bin': legal.bin,
-            'profile-edit-iik': legal.iik,
-            'profile-edit-bank': legal.bank,
-            'profile-edit-bik': legal.bik,
-            'profile-edit-kbe': legal.kbe,
-            'profile-edit-email': legal.email
-        };
-        Object.entries(legalValues).forEach(([id, value]) => {
-            const input = document.getElementById(id);
-            if (input) input.value = value || '';
-        });
+        if (section === 'contacts') {
+            const contacts = document.getElementById('profile-edit-contacts');
+            if (contacts) contacts.innerHTML = '';
+            (currentDealer.contacts || []).forEach(addProfileContactRow);
+            if (!currentDealer.contacts?.length) addProfileContactRow();
+        }
+
+        if (section === 'requisites') {
+            const legal = primaryLegalEntity(currentDealer);
+            const legalValues = {
+                'profile-edit-org-name': legal.organizationName,
+                'profile-edit-director': legal.director,
+                'profile-edit-legal-address': legal.legalAddress,
+                'profile-edit-bin': legal.bin,
+                'profile-edit-iik': legal.iik,
+                'profile-edit-bank': legal.bank,
+                'profile-edit-bik': legal.bik,
+                'profile-edit-kbe': legal.kbe,
+                'profile-edit-email': legal.email
+            };
+            Object.entries(legalValues).forEach(([id, value]) => {
+                const input = document.getElementById(id);
+                if (input) input.value = value || '';
+            });
+        }
 
         activateProfileEditTab(section);
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
@@ -930,6 +984,8 @@ document.addEventListener('DOMContentLoaded', () => {
         event.preventDefault();
         if (!currentDealer || !window.CRMAuth?.can('can_edit_dealer')) return;
 
+        const modalEl = document.getElementById('dealer-profile-edit-modal');
+        const section = modalEl?.dataset.editSection || 'main';
         const saveButton = document.getElementById('dealer-profile-edit-save');
         const oldHtml = saveButton?.innerHTML || '';
         if (saveButton) {
@@ -937,41 +993,50 @@ document.addEventListener('DOMContentLoaded', () => {
             saveButton.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохраняем';
         }
 
-        const legal = {
-            organizationName: editValue('profile-edit-org-name'),
-            director: editValue('profile-edit-director'),
-            legalAddress: editValue('profile-edit-legal-address'),
-            bin: editValue('profile-edit-bin'),
-            iik: editValue('profile-edit-iik'),
-            bank: editValue('profile-edit-bank'),
-            bik: editValue('profile-edit-bik'),
-            kbe: editValue('profile-edit-kbe'),
-            email: editValue('profile-edit-email')
-        };
-        const legalEntities = Array.isArray(currentDealer.legal_entities) ? currentDealer.legal_entities.map(item => ({...item})) : [];
-        if (legalEntities.length) legalEntities[0] = { ...legalEntities[0], ...legal };
-        else if (Object.values(legal).some(Boolean)) legalEntities.push(legal);
-
-        const payload = {
-            dealer_id: editValue('profile-edit-dealer-id'),
-            name: editValue('profile-edit-name'),
-            status: editValue('profile-edit-status'),
-            city: editValue('profile-edit-city'),
-            price_type: editValue('profile-edit-price-type'),
-            address: editValue('profile-edit-address'),
-            responsible: editValue('profile-edit-responsible'),
-            region_sector: editValue('profile-edit-sector'),
-            delivery: editValue('profile-edit-delivery'),
-            website: editValue('profile-edit-website'),
-            instagram: editValue('profile-edit-instagram'),
-            bonuses: editValue('profile-edit-bonuses'),
-            contacts: collectProfileContacts(),
-            contract: {
-                isSigned: Boolean(document.getElementById('profile-edit-contract-signed')?.checked),
-                date: editValue('profile-edit-contract-date')
-            },
-            legal_entities: legalEntities
-        };
+        let payload = {};
+        if (section === 'main') {
+            payload = {
+                dealer_id: editValue('profile-edit-dealer-id'),
+                name: editValue('profile-edit-name'),
+                status: editValue('profile-edit-status'),
+                city: editValue('profile-edit-city'),
+                price_type: editValue('profile-edit-price-type'),
+                address: editValue('profile-edit-address'),
+                responsible: editValue('profile-edit-responsible'),
+                region_sector: editValue('profile-edit-sector'),
+                website: editValue('profile-edit-website'),
+                instagram: editValue('profile-edit-instagram'),
+                contract: {
+                    isSigned: Boolean(document.getElementById('profile-edit-contract-signed')?.checked),
+                    date: editValue('profile-edit-contract-date')
+                }
+            };
+        } else if (section === 'logistics') {
+            payload = {
+                delivery: editValue('profile-edit-delivery'),
+                additional_addresses: collectProfileAddresses()
+            };
+        } else if (section === 'notes') {
+            payload = { bonuses: editValue('profile-edit-bonuses') };
+        } else if (section === 'contacts') {
+            payload = { contacts: collectProfileContacts() };
+        } else if (section === 'requisites') {
+            const legal = {
+                organizationName: editValue('profile-edit-org-name'),
+                director: editValue('profile-edit-director'),
+                legalAddress: editValue('profile-edit-legal-address'),
+                bin: editValue('profile-edit-bin'),
+                iik: editValue('profile-edit-iik'),
+                bank: editValue('profile-edit-bank'),
+                bik: editValue('profile-edit-bik'),
+                kbe: editValue('profile-edit-kbe'),
+                email: editValue('profile-edit-email')
+            };
+            const legalEntities = Array.isArray(currentDealer.legal_entities) ? currentDealer.legal_entities.map(item => ({...item})) : [];
+            if (legalEntities.length) legalEntities[0] = { ...legalEntities[0], ...legal };
+            else if (Object.values(legal).some(Boolean)) legalEntities.push(legal);
+            payload = { legal_entities: legalEntities };
+        }
 
         try {
             const response = await fetch(`${API_DEALERS_URL}/${dealerId}`, {
@@ -986,8 +1051,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             currentDealer = { ...currentDealer, ...payload };
             cacheDealerProfile(currentDealer);
-            bootstrap.Modal.getOrCreateInstance(document.getElementById('dealer-profile-edit-modal')).hide();
-            window.showToast?.('Изменения сохранены', 'success');
+            bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+            window.showToast?.('Блок обновлён', 'success');
             await fetchDealerDetails(true);
         } catch (error) {
             window.showToast?.(error.message || 'Ошибка сохранения', 'error');
