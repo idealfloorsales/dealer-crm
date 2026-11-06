@@ -2935,7 +2935,7 @@ app.get('/api/matrix', requireAnyPermission('can_view_products', 'can_view_repor
     try {
         const [prods, dealers] = await Promise.all([
             Product.find({}).select('sku name product_type collection is_liquid').sort({sku:1}).lean(),
-            Dealer.find(await getPricingWorkingDealerFilter(getDealerFilter(req))).select('_id name city responsible products pos_materials status').lean()
+            Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id name city responsible products pos_materials status').lean()
         ]);
         const dealerIds = dealers.map(d => d._id);
         const assets = dealerIds.length
@@ -3005,7 +3005,7 @@ app.get('/api/sales', requirePermission('can_view_sales'), async (req, res) => {
         const companySalesView = req.query.context === 'sales' && hasPermission(req, 'can_view_sales');
 
         if (!companySalesView && !isGlobalViewer(req) && req.user.role === 'manager') {
-            const dealers = await Dealer.find(await getPricingWorkingDealerFilter(getDealerFilter(req))).select('_id').lean();
+            const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id').lean();
             const dealerIds = dealers.map(d => String(d._id));
             const zonePlanId = scope === 'astana'
                 ? 'PLAN_astana_all'
@@ -3028,7 +3028,7 @@ app.get('/api/sales', requirePermission('can_view_sales'), async (req, res) => {
                 ]
             };
         } else if (!companySalesView && !isGlobalViewer(req) && scope !== 'all') {
-            const dealers = await Dealer.find(await getPricingWorkingDealerFilter(getDealerFilter(req))).select('_id').lean();
+            const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id').lean();
             const dealerIds = dealers.map(d => String(d._id));
             const personalPlanIds = dealerIds.map(id => `PLAN_vip_${id}`);
 
@@ -3111,7 +3111,7 @@ app.post('/api/sales', async (req, res) => {
     const managerRestricted = Boolean(req.user && req.user.role === 'manager' && !isGlobalViewer(req) && !companySalesView);
     let managerDealerIds = null;
     if (managerRestricted) {
-        const dealers = await Dealer.find(await getPricingWorkingDealerFilter(getDealerFilter(req))).select('_id').lean();
+        const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id').lean();
         managerDealerIds = new Set(dealers.map(d => String(d._id)));
     }
 
@@ -3232,7 +3232,7 @@ app.get('/api/knowledge/:id', requirePermission('can_view_knowledge'), async (re
 app.post('/api/knowledge', requirePermission('can_manage_knowledge'), async (req, res) => { const a = new Knowledge(req.body); await a.save(); res.json(convertToClient(a)); });
 app.put('/api/knowledge/:id', requirePermission('can_manage_knowledge'), async (req, res) => { const a = await Knowledge.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(a)); });
 app.delete('/api/knowledge/:id', requirePermission('can_manage_knowledge'), async (req, res) => { await Knowledge.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
-app.get('/api/tasks', requirePermission('can_view_dashboard'), async (req, res) => { try { const data = await Dealer.find(await getPricingWorkingDealerFilter(getDealerFilter(req))).select('name visits status responsible').lean(); res.json(data.map(d => ({ id: d._id, name: d.name, status: d.status, visits: d.visits || [], responsible: d.responsible }))); } catch (e) { res.status(500).json([]); } });
+app.get('/api/tasks', requirePermission('can_view_dashboard'), async (req, res) => { try { const data = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('name visits status responsible').lean(); res.json(data.map(d => ({ id: d._id, name: d.name, status: d.status, visits: d.visits || [], responsible: d.responsible }))); } catch (e) { res.status(500).json([]); } });
 
 async function getScopedDealerIds(req) {
     const baseFilter = isGlobalViewer(req) ? {} : getDealerFilter(req);
@@ -3322,7 +3322,7 @@ app.get('/api/workshop/bootstrap', requirePermission('can_view_workshop'), async
     try {
         const [products, dealers, materials, recipes, laminateStocks, assets, productions, movements, memos] = await Promise.all([
             Product.find().select('sku name is_liquid characteristics.package_qty characteristics.size characteristics.class characteristics.thickness').sort({ sku: 1 }).lean(),
-            Dealer.find(await getPricingWorkingDealerFilter(getDealerFilter(req))).select('_id dealer_id name city status').sort({ name: 1 }).lean(),
+            Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id dealer_id name city status').sort({ name: 1 }).lean(),
             WorkshopMaterial.find({ active: { $ne: false } }).sort({ category: 1, name: 1 }).lean(),
             WorkshopRecipe.find({ active: { $ne: false } })
                 .populate('product', 'sku name is_liquid characteristics.package_qty')
