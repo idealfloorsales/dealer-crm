@@ -1,56 +1,193 @@
 (function () {
-    const CRM_LIGHT_THEMES = {
-        clean: { label:'Белая', icon:'circle-fill' },
-        warm: { label:'Тёплая', icon:'sun' },
-        cool: { label:'Холодная', icon:'snow' },
-        pearl: { label:'Жемчужная', icon:'gem' }
+    const CRM_THEME_MODES = {
+        system: { label:'Системная', icon:'circle-half' },
+        light: { label:'Светлая', icon:'sun' },
+        dark: { label:'Тёмная', icon:'moon-stars' }
     };
 
-    function currentLightTheme() {
-        const saved = localStorage.getItem('crm_light_theme') || 'clean';
-        return CRM_LIGHT_THEMES[saved] ? saved : 'clean';
+    const crmSystemThemeQuery = window.matchMedia?.('(prefers-color-scheme: dark)');
+
+    function currentThemeMode() {
+        const saved = localStorage.getItem('crm_theme_mode');
+        return CRM_THEME_MODES[saved] ? saved : 'system';
     }
 
-    function applyLightTheme(theme) {
-        const key = CRM_LIGHT_THEMES[theme] ? theme : 'clean';
-        document.documentElement.dataset.crmTheme = key;
-        localStorage.setItem('crm_light_theme', key);
+    function effectiveTheme(mode = currentThemeMode()) {
+        if (mode === 'dark') return 'dark';
+        if (mode === 'light') return 'light';
+        return crmSystemThemeQuery?.matches ? 'dark' : 'light';
+    }
+
+    function updateThemeColor(effective) {
+        const meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.content = effective === 'dark' ? '#151619' : '#ffffff';
+    }
+
+    function applyThemeMode(mode, { persist = true } = {}) {
+        const key = CRM_THEME_MODES[mode] ? mode : 'system';
+        const effective = effectiveTheme(key);
+        document.documentElement.dataset.crmThemeMode = key;
+        document.documentElement.dataset.crmTheme = effective;
+        document.documentElement.style.colorScheme = effective;
+
+        if (persist) {
+            localStorage.setItem('crm_theme_mode', key);
+            localStorage.removeItem('crm_light_theme');
+        }
+
         document.querySelectorAll('[data-crm-theme-choice]').forEach(button => {
-            button.classList.toggle('active', button.dataset.crmThemeChoice === key);
-            button.setAttribute('aria-pressed', button.dataset.crmThemeChoice === key ? 'true' : 'false');
+            const active = button.dataset.crmThemeChoice === key;
+            button.classList.toggle('active', active);
+            button.setAttribute('aria-pressed', active ? 'true' : 'false');
         });
+
         const label = document.querySelector('[data-crm-theme-label]');
-        if (label) label.textContent = CRM_LIGHT_THEMES[key].label;
+        if (label) label.textContent = CRM_THEME_MODES[key].label;
+        updateThemeColor(effective);
     }
 
-    applyLightTheme(currentLightTheme());
+    applyThemeMode(currentThemeMode(), { persist:false });
+
+    if (crmSystemThemeQuery) {
+        const handleSystemThemeChange = () => {
+            if (currentThemeMode() === 'system') applyThemeMode('system', { persist:false });
+        };
+        if (typeof crmSystemThemeQuery.addEventListener === 'function') {
+            crmSystemThemeQuery.addEventListener('change', handleSystemThemeChange);
+        } else if (typeof crmSystemThemeQuery.addListener === 'function') {
+            crmSystemThemeQuery.addListener(handleSystemThemeChange);
+        }
+    }
 
     function ensureThemeStyles() {
-        if (document.getElementById('crm-light-theme-styles')) return;
+        if (document.getElementById('crm-theme-styles')) return;
         const style = document.createElement('style');
-        style.id = 'crm-light-theme-styles';
+        style.id = 'crm-theme-styles';
         style.textContent = `
-          :root[data-crm-theme="clean"]{--crm-theme-bg:#f3f4f6;--crm-theme-surface:#fff;--crm-theme-soft:#f8f8f9;--crm-theme-border:#e6e7e9}
-          :root[data-crm-theme="warm"]{--crm-theme-bg:#f4f0eb;--crm-theme-surface:#fffdf9;--crm-theme-soft:#f7f1ea;--crm-theme-border:#e7ddd2}
-          :root[data-crm-theme="cool"]{--crm-theme-bg:#eef3f7;--crm-theme-surface:#fbfdff;--crm-theme-soft:#f1f6fa;--crm-theme-border:#dce6ed}
-          :root[data-crm-theme="pearl"]{--crm-theme-bg:#f0f0f2;--crm-theme-surface:#fdfdfd;--crm-theme-soft:#f5f5f6;--crm-theme-border:#dedfe2}
-          body{background-color:var(--crm-theme-bg,var(--bg-light))!important}
-          .crm-topbar{background:color-mix(in srgb,var(--crm-theme-surface,#fff) 96%,transparent)!important}
-          .crm-mobile-nav,.crm-mobile-sheet,.dealer-form-content,.app-workspace-card,.cc-card,.card{
-            border-color:var(--crm-theme-border,#e6e7e9)!important;
+          :root[data-crm-theme="light"]{
+            --crm-theme-bg:#f3f4f6;--crm-theme-surface:#fff;--crm-theme-surface-2:#f8f8f9;
+            --crm-theme-surface-3:#f1f2f4;--crm-theme-border:#e3e5e8;--crm-theme-text:#1f2937;
+            --crm-theme-muted:#71747b;--crm-theme-input:#fff;--crm-theme-shadow:rgba(20,20,24,.12)
           }
-          .crm-mobile-nav{background:color-mix(in srgb,var(--crm-theme-surface,#fff) 96%,transparent)!important}
-          .crm-mobile-sheet{background:var(--crm-theme-bg,#f7f5f2)!important}
-          .crm-mobile-sheet-link,.crm-mobile-sheet-account{background:var(--crm-theme-surface,#fff)!important}
-          .crm-theme-row{margin-top:10px;padding:11px 12px;border:1px solid var(--crm-theme-border,#e5e5e5);border-radius:15px;background:var(--crm-theme-surface,#fff)}
+          :root[data-crm-theme="dark"]{
+            --crm-theme-bg:#111214;--crm-theme-surface:#1a1b1f;--crm-theme-surface-2:#202126;
+            --crm-theme-surface-3:#292a30;--crm-theme-border:#34363d;--crm-theme-text:#f2f3f5;
+            --crm-theme-muted:#a6a9b1;--crm-theme-input:#222328;--crm-theme-shadow:rgba(0,0,0,.42);
+            --text-dark:#f2f3f5;--text-gray:#a6a9b1;--bg-light:#111214;--card-bg:#1a1b1f
+          }
+
+          body{background-color:var(--crm-theme-bg,var(--bg-light))!important;color:var(--crm-theme-text,var(--text-dark))!important}
+          .crm-topbar{background:color-mix(in srgb,var(--crm-theme-surface) 96%,transparent)!important;border-color:var(--crm-theme-border)!important}
+          .crm-mobile-nav{background:color-mix(in srgb,var(--crm-theme-surface) 96%,transparent)!important;border-color:var(--crm-theme-border)!important;box-shadow:0 14px 40px var(--crm-theme-shadow)!important}
+          .crm-mobile-sheet{background:var(--crm-theme-bg)!important}
+          .crm-mobile-sheet-link,.crm-mobile-sheet-account,.crm-theme-row{background:var(--crm-theme-surface)!important;border-color:var(--crm-theme-border)!important}
+          .crm-mobile-sheet-head strong,.crm-mobile-sheet-link,.crm-mobile-sheet-user strong,.crm-theme-row-head strong{color:var(--crm-theme-text)!important}
+          .crm-mobile-sheet-head small,.crm-mobile-sheet-user small,.crm-theme-row-head small{color:var(--crm-theme-muted)!important}
+
+          .crm-theme-row{margin-top:10px;padding:11px 12px;border:1px solid var(--crm-theme-border);border-radius:15px}
           .crm-theme-row-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
-          .crm-theme-row-head strong{font-size:.68rem;color:#4b4d52}
-          .crm-theme-row-head small{font-size:.55rem;color:#9a9ca1}
-          .crm-theme-options{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
-          .crm-theme-choice{min-height:48px;padding:5px;border:1px solid var(--crm-theme-border,#dedede);border-radius:11px;background:var(--crm-theme-soft,#f7f7f7);color:#73757a;font-size:.52rem;font-weight:700}
-          .crm-theme-choice i{display:block;margin-bottom:3px;font-size:.8rem}
-          .crm-theme-choice.active{border-color:#b9040a;background:#fff1f1;color:#a20a10}
-          .crm-theme-desktop{display:grid;place-items:center;width:36px;height:36px;border:1px solid rgba(23,24,27,.08);border-radius:11px;background:var(--crm-theme-surface,#fff);color:#77797e}
+          .crm-theme-row-head strong{font-size:.68rem}.crm-theme-row-head small{font-size:.55rem}
+          .crm-theme-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+          .crm-theme-choice{min-height:50px;padding:5px;border:1px solid var(--crm-theme-border);border-radius:11px;background:var(--crm-theme-surface-2);color:var(--crm-theme-muted);font-size:.52rem;font-weight:700}
+          .crm-theme-choice i{display:block;margin-bottom:3px;font-size:.82rem}
+          .crm-theme-choice.active{border-color:#b9040a;background:rgba(185,4,10,.12);color:#d64147}
+          .crm-theme-desktop{display:grid;place-items:center;width:36px;height:36px;border:1px solid var(--crm-theme-border);border-radius:11px;background:var(--crm-theme-surface);color:var(--crm-theme-muted)}
+
+          :root[data-crm-theme="dark"] h1,
+          :root[data-crm-theme="dark"] h2,
+          :root[data-crm-theme="dark"] h3,
+          :root[data-crm-theme="dark"] h4,
+          :root[data-crm-theme="dark"] h5,
+          :root[data-crm-theme="dark"] h6,
+          :root[data-crm-theme="dark"] .modal-title,
+          :root[data-crm-theme="dark"] .card-title{color:var(--crm-theme-text)!important}
+
+          :root[data-crm-theme="dark"] .card,
+          :root[data-crm-theme="dark"] .modal-content,
+          :root[data-crm-theme="dark"] .dealer-form-content,
+          :root[data-crm-theme="dark"] .dealer-form-section,
+          :root[data-crm-theme="dark"] .app-workspace-card,
+          :root[data-crm-theme="dark"] .cc-card,
+          :root[data-crm-theme="dark"] .pricing-modal,
+          :root[data-crm-theme="dark"] .pricing-price-list-card,
+          :root[data-crm-theme="dark"] .dealer-list-toolbar,
+          :root[data-crm-theme="dark"] .dealer-card,
+          :root[data-crm-theme="dark"] .dealer-list-v6-row,
+          :root[data-crm-theme="dark"] .list-container,
+          :root[data-crm-theme="dark"] .quick-visit-card,
+          :root[data-crm-theme="dark"] .status-manager-content,
+          :root[data-crm-theme="dark"] .export-builder-content,
+          :root[data-crm-theme="dark"] .map-floating-panel,
+          :root[data-crm-theme="dark"] .knowledge-page .accordion-item{
+            background:var(--crm-theme-surface)!important;border-color:var(--crm-theme-border)!important;color:var(--crm-theme-text)!important
+          }
+
+          :root[data-crm-theme="dark"] .form-control,
+          :root[data-crm-theme="dark"] .form-select,
+          :root[data-crm-theme="dark"] textarea,
+          :root[data-crm-theme="dark"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+          :root[data-crm-theme="dark"] select{
+            background-color:var(--crm-theme-input)!important;border-color:var(--crm-theme-border)!important;color:var(--crm-theme-text)!important
+          }
+          :root[data-crm-theme="dark"] .form-control::placeholder,
+          :root[data-crm-theme="dark"] input::placeholder,
+          :root[data-crm-theme="dark"] textarea::placeholder{color:#777b84!important}
+
+          :root[data-crm-theme="dark"] table,
+          :root[data-crm-theme="dark"] .table{
+            --bs-table-bg:transparent;--bs-table-color:var(--crm-theme-text);--bs-table-border-color:var(--crm-theme-border);color:var(--crm-theme-text)!important
+          }
+          :root[data-crm-theme="dark"] thead,
+          :root[data-crm-theme="dark"] .table-light,
+          :root[data-crm-theme="dark"] .pricing-list-table thead{
+            background:var(--crm-theme-surface-2)!important;color:var(--crm-theme-muted)!important
+          }
+          :root[data-crm-theme="dark"] td,
+          :root[data-crm-theme="dark"] th{border-color:var(--crm-theme-border)!important}
+
+          :root[data-crm-theme="dark"] .btn-light,
+          :root[data-crm-theme="dark"] .btn-white,
+          :root[data-crm-theme="dark"] .dealer-footer-ghost,
+          :root[data-crm-theme="dark"] .dealer-add-inline,
+          :root[data-crm-theme="dark"] .dealer-add-wide{
+            background:var(--crm-theme-surface-2)!important;border-color:var(--crm-theme-border)!important;color:var(--crm-theme-text)!important
+          }
+
+          :root[data-crm-theme="dark"] .dealer-field-shortcuts,
+          :root[data-crm-theme="dark"] .dealer-edit-nav-wrap,
+          :root[data-crm-theme="dark"] .dealer-modal-footer,
+          :root[data-crm-theme="dark"] .dealer-field-product-controls,
+          :root[data-crm-theme="dark"] .dealer-field-product-item,
+          :root[data-crm-theme="dark"] .dealer-field-product-footer,
+          :root[data-crm-theme="dark"] .contact-entry,
+          :root[data-crm-theme="dark"] .address-entry,
+          :root[data-crm-theme="dark"] .visit-entry,
+          :root[data-crm-theme="dark"] .pos-entry,
+          :root[data-crm-theme="dark"] .dealer-competitor-entry{
+            background:var(--crm-theme-surface)!important;border-color:var(--crm-theme-border)!important
+          }
+
+          :root[data-crm-theme="dark"] .dealer-field-shortcuts button,
+          :root[data-crm-theme="dark"] .dealer-quick-filter,
+          :root[data-crm-theme="dark"] .pricing-list-action,
+          :root[data-crm-theme="dark"] .crm-mobile-sheet-close{
+            background:var(--crm-theme-surface-2)!important;border-color:var(--crm-theme-border)!important;color:var(--crm-theme-muted)!important
+          }
+
+          :root[data-crm-theme="dark"] .text-muted,
+          :root[data-crm-theme="dark"] small,
+          :root[data-crm-theme="dark"] .dealer-field-hint,
+          :root[data-crm-theme="dark"] .dealer-field-label,
+          :root[data-crm-theme="dark"] .dealer-list-meta{color:var(--crm-theme-muted)!important}
+
+          :root[data-crm-theme="dark"] .accordion-button,
+          :root[data-crm-theme="dark"] .accordion-body,
+          :root[data-crm-theme="dark"] .dropdown-menu{
+            background:var(--crm-theme-surface)!important;color:var(--crm-theme-text)!important;border-color:var(--crm-theme-border)!important
+          }
+          :root[data-crm-theme="dark"] .dropdown-item{color:var(--crm-theme-text)!important}
+          :root[data-crm-theme="dark"] .dropdown-item:hover{background:var(--crm-theme-surface-2)!important}
+          :root[data-crm-theme="dark"] .modal-backdrop{--bs-backdrop-opacity:.68}
         `;
         document.head.appendChild(style);
     }
@@ -180,7 +317,7 @@
                         ${itemsHtml}
                     </ul>
                     <div class="crm-topbar-account">
-                        <button type="button" class="crm-theme-desktop" id="crm-theme-cycle" title="Сменить светлую тему"><i class="bi bi-palette"></i></button>
+                        <button type="button" class="crm-theme-desktop" id="crm-theme-cycle" title="Тема интерфейса"><i class="bi bi-circle-half"></i></button>
                         <button type="button" class="crm-connection-chip" data-crm-network-status title="Состояние соединения">
                             <span class="crm-topbar-live-dot"></span><span data-crm-network-label>Связь</span>
                         </button>
@@ -201,11 +338,11 @@
         if (logoutButton) logoutButton.addEventListener('click', logout);
         const themeCycle = document.getElementById('crm-theme-cycle');
         if (themeCycle) themeCycle.addEventListener('click', () => {
-            const keys = Object.keys(CRM_LIGHT_THEMES);
-            const current = currentLightTheme();
+            const keys = Object.keys(CRM_THEME_MODES);
+            const current = currentThemeMode();
             const next = keys[(keys.indexOf(current) + 1) % keys.length];
-            applyLightTheme(next);
-            showToast('Тема: ' + CRM_LIGHT_THEMES[next].label, 'info', { duration:1800 });
+            applyThemeMode(next);
+            showToast('Тема: ' + CRM_THEME_MODES[next].label, 'info', { duration:1800 });
         });
     }
 
@@ -638,9 +775,9 @@
                         }).join('')}
                     </div>
                     <div class="crm-theme-row">
-                        <div class="crm-theme-row-head"><strong>Светлая тема</strong><small data-crm-theme-label>${CRM_LIGHT_THEMES[currentLightTheme()].label}</small></div>
+                        <div class="crm-theme-row-head"><strong>Тема интерфейса</strong><small data-crm-theme-label>${CRM_THEME_MODES[currentThemeMode()].label}</small></div>
                         <div class="crm-theme-options">
-                            ${Object.entries(CRM_LIGHT_THEMES).map(([key,item]) => `<button type="button" class="crm-theme-choice${currentLightTheme()===key ? ' active' : ''}" data-crm-theme-choice="${key}"><i class="bi bi-${item.icon}"></i>${item.label}</button>`).join('')}
+                            ${Object.entries(CRM_THEME_MODES).map(([key,item]) => `<button type="button" class="crm-theme-choice${currentThemeMode()===key ? ' active' : ''}" data-crm-theme-choice="${key}"><i class="bi bi-${item.icon}"></i>${item.label}</button>`).join('')}
                         </div>
                     </div>
                     <div class="crm-mobile-sheet-account">
@@ -673,7 +810,7 @@
         closeButton?.addEventListener('click', closeSheet);
         logoutButton?.addEventListener('click', logout);
         backdrop.querySelectorAll('[data-crm-theme-choice]').forEach(button => {
-            button.addEventListener('click', () => applyLightTheme(button.dataset.crmThemeChoice));
+            button.addEventListener('click', () => applyThemeMode(button.dataset.crmThemeChoice));
         });
         backdrop.addEventListener('click', e => {
             if (e.target === backdrop) closeSheet();
