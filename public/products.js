@@ -665,100 +665,210 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    if(btnImport) btnImport.onclick = () => { if(canManageProducts && fileInput) fileInput.click(); };
+    function normalizeExcelText(value) {
+        return normalize(String(value ?? '').replace(/ё/g,'е'));
+    }
+
+    function normalizeExcelSku(value) {
+        return String(value ?? '').trim().toLowerCase().replace(/\s+/g,'');
+    }
+
+    function parseStockNumber(value) {
+        const clean = String(value ?? '').replace(/\s+/g,'').replace(',','.');
+        const number = Number(clean);
+        return Number.isFinite(number) ? number : null;
+    }
+
+    function showStockImportResult({updated=0, matched=0, unmapped=0, total=0, error=''}) {
+        if (!stockImportResult) return;
+        stockImportResult.classList.remove('d-none','is-error','is-success');
+        stockImportResult.classList.add(error ? 'is-error' : 'is-success');
+        stockImportResult.innerHTML = error
+            ? `<i class="bi bi-exclamation-circle"></i><div><strong>Не удалось загрузить остатки</strong><span>${esc(error)}</span></div>`
+            : `<i class="bi bi-check2-circle"></i><div><strong>Файл обработан</strong><span>Строк: ${total} · найдено: ${matched} · обновлено: ${updated}${unmapped ? ' · требуют привязки: '+unmapped : ''}</span></div>`;
+    }
+
+    if(btnImport) btnImport.onclick = () => {
+        if (!canManageProducts || !stockImportModal) return;
+        if (stockImportFileName) stockImportFileName.textContent = 'Выберите Excel-файл';
+        if (stockImportResult) stockImportResult.classList.add('d-none');
+        stockImportModal.show();
+    };
+
+    stockImportChoose?.addEventListener('click', () => {
+        if (canManageProducts && fileInput) fileInput.click();
+    });
+
     if(fileInput) fileInput.onchange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
+        if (stockImportFileName) stockImportFileName.textContent = file.name;
+
         try {
             await ensureXlsxLoaded();
+            const buffer = await file.arrayBuffer();
+            const wb = XLSX.read(new Uint8Array(buffer), {type:'array'});
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+            await processExcel(rows);
         } catch (err) {
-            alert(err.message);
+            showStockImportResult({error:err.message || 'Ошибка чтения Excel'});
+        } finally {
             fileInput.value = '';
-            return;
         }
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-            try {
-                const data = new Uint8Array(evt.target.result);
-                const wb = XLSX.read(data, {type: 'array'});
-                const ws = wb.Sheets[wb.SheetNames[0]];
-                const json = XLSX.utils.sheet_to_json(ws, {header: 1});
-                processExcel(json);
-            } catch (err) { alert("Ошибка чтения: " + err.message); }
-            fileInput.value = '';
-        };
-        reader.readAsArrayBuffer(file);
     };
 
     async function processExcel(rows) {
-        let hIdx = -1, cName = -1, cStock = -1;
-        for(let i=0; i<Math.min(rows.length, 25); i++) {
-            const r = rows[i];
-            for(let j=0; j<r.length; j++) {
-                const v = String(r[j]).toLowerCase();
-                if(v.includes('номенклатура') || v.includes('наименование')) cName = j;
-                if(v === 'остаток' || v.includes('свободный')) cStock = j;
-            }
-            if(cName > -1 && cStock > -1) { hIdx = i; break; }
+        let hIdx = -1, cSku = -1, cName = -1, cStock = -1;
+
+        for(let i=0; i<Math.min(rows.length, 30); i++) {
+            const row = Array.isArray(rows[i]) ? rows[i] : [];
+            row.forEach((cell,j) => {
+                const v = normalizeExcelText(cell).replace(/[^a-zа-я0-9]+/g,'');
+                if (cSku < 0 && (v === 'артикул' || v === 'sku' || v === 'кодтовара' || v === 'кодноменклатуры')) cSku = j;
+                if (cName < 0 && (v.includes('номенклатур') || v.includes('наименован') || v === 'товар')) cName = j;
+                if (cStock < 0 && (v === 'остаток' || v.includes('свободныйостаток') || v.includes('остатокнаскладе'))) cStock = j;
+            });
+            if (cStock >= 0 && (cSku >= 0 || cName >= 0)) { hIdx = i; break; }
         }
 
-        if(hIdx === -1) return alert('Не найдены колонки "Номенклатура" и "Остаток"');
-        unmappedItems = []; let updated = 0;
-        for(let i=hIdx+1; i<rows.length; i++) {
-            const name = String(rows[i][cName] || '').trim();
-            const stock = parseFloat(rows[i][cStock]);
-            if(!name || isNaN(stock)) continue;
-            let p = allProducts.find(x => x.excel_alias === name);
-            if(!p) p = allProducts.find(x => x.name.toLowerCase() === name.toLowerCase());
-            if(!p) p = allProducts.find(x => x.sku && x.sku.length > 3 && name.includes(x.sku));
-            if(p) {
-                if(p.stock_qty !== stock) {
-                    p.stock_qty = stock;
-                    await fetch(`${API_URL}/${p.id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(p) });
-                    updated++;
-                }
-            } else { unmappedItems.push({ name, qty: stock }); }
+        if(hIdx === -1) {
+            throw new Error('Не найдены нужные колонки. Нужен «Остаток» и хотя бы «Артикул» или «Наименование».');
         }
+
+        const bySku = new Map();
+        const byAlias = new Map();
+        const byName = new Map();
+
+        allProducts.forEach(product => {
+            const sku = normalizeExcelSku(product.sku);
+            const alias = normalizeExcelText(product.excel_alias);
+            const name = normalizeExcelText(product.name);
+            if (sku && !bySku.has(sku)) bySku.set(sku, product);
+            if (alias && !byAlias.has(alias)) byAlias.set(alias, product);
+            if (name && !byName.has(name)) byName.set(name, product);
+        });
+
+        unmappedItems = [];
+        let updated = 0;
+        let matched = 0;
+        let total = 0;
+
+        for(let i=hIdx+1; i<rows.length; i++) {
+            const row = Array.isArray(rows[i]) ? rows[i] : [];
+            const skuRaw = cSku >= 0 ? String(row[cSku] || '').trim() : '';
+            const nameRaw = cName >= 0 ? String(row[cName] || '').trim() : '';
+            const stock = parseStockNumber(row[cStock]);
+
+            if (stock === null || (!skuRaw && !nameRaw)) continue;
+            total++;
+
+            const skuKey = normalizeExcelSku(skuRaw);
+            const nameKey = normalizeExcelText(nameRaw);
+            let product = skuKey ? bySku.get(skuKey) : null;
+            if (!product && nameKey) product = byAlias.get(nameKey);
+            if (!product && nameKey) product = byName.get(nameKey);
+
+            if (!product && nameRaw) {
+                product = allProducts.find(item => {
+                    const sku = String(item.sku || '').trim();
+                    return sku.length > 3 && nameRaw.toLowerCase().includes(sku.toLowerCase());
+                }) || null;
+            }
+
+            if (product) {
+                matched++;
+                if (Number(product.stock_qty) !== stock) {
+                    const response = await fetch(`${API_URL}/${product.id}`, {
+                        method:'PUT',
+                        headers:{'Content-Type':'application/json'},
+                        body:JSON.stringify({ stock_qty:stock })
+                    });
+                    if (response.ok) {
+                        product.stock_qty = stock;
+                        updated++;
+                    }
+                }
+            } else {
+                unmappedItems.push({
+                    sku:skuRaw,
+                    name:nameRaw,
+                    qty:stock,
+                    sourceLabel:nameRaw || skuRaw
+                });
+            }
+        }
+
         await loadProducts();
-        if(unmappedItems.length > 0) showMapping(); else alert(`Обновлено: ${updated} шт.`);
+        showStockImportResult({updated, matched, unmapped:unmappedItems.length, total});
+
+        if(unmappedItems.length > 0) {
+            setTimeout(() => {
+                stockImportModal?.hide();
+                showMapping();
+            }, 350);
+        }
     }
 
     function showMapping() {
         mapList.innerHTML = '';
-        const names = [...new Set(unmappedItems.map(x => x.name))].slice(0, 10);
-        if(names.length === 0) return;
-        const opts = `<option value="">-- Пропустить --</option>` + allProducts.map(p => `<option value="${p.id}">${p.sku} ${p.name}</option>`).join('');
-        names.forEach(n => {
-            const item = unmappedItems.find(x => x.name === n);
+        const items = unmappedItems.slice(0, 60);
+        if(!items.length) return;
+
+        const opts = '<option value="">-- Пропустить --</option>' + allProducts
+            .map(p => `<option value="${p.id}">${esc(p.sku || '—')} · ${esc(p.name || '')}</option>`)
+            .join('');
+
+        items.forEach((item,index) => {
             const div = document.createElement('div');
-            div.className = 'p-2 bg-light border rounded';
-            div.innerHTML = `<div class="fw-bold text-truncate" title="${n}">${n}</div>
-                <div class="d-flex gap-2 align-items-center mt-1"><span class="badge bg-secondary">${item.qty}</span>
-                <select class="form-select form-select-sm map-select" data-name="${n}">${opts}</select></div>`;
+            div.className = 'stock-mapping-row';
+            div.innerHTML = `
+                <div class="stock-mapping-source">
+                    <strong title="${esc(item.sourceLabel)}">${esc(item.sourceLabel)}</strong>
+                    <small>${item.sku ? 'Артикул в Excel: '+esc(item.sku)+' · ' : ''}остаток: ${esc(item.qty)}</small>
+                </div>
+                <select class="form-select form-select-sm map-select" data-index="${index}">${opts}</select>`;
             mapList.appendChild(div);
         });
         mapModal.show();
     }
 
     if(btnSaveMapping) btnSaveMapping.onclick = async () => {
-        const selects = document.querySelectorAll('.map-select');
+        const selects = [...document.querySelectorAll('.map-select')];
         btnSaveMapping.disabled = true;
-        for(const sel of selects) {
-            if(sel.value) {
-                const p = allProducts.find(x => String(x.id) === sel.value);
-                const n = sel.dataset.name;
-                if(p) {
-                    p.excel_alias = n;
-                    const it = unmappedItems.find(x => x.name === n);
-                    if(it) p.stock_qty = it.qty;
-                    await fetch(`${API_URL}/${p.id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(p) });
-                }
+        let saved = 0;
+
+        try {
+            for(const sel of selects) {
+                if(!sel.value) continue;
+                const item = unmappedItems[Number(sel.dataset.index)];
+                const product = allProducts.find(x => String(x.id) === String(sel.value));
+                if(!item || !product) continue;
+
+                const payload = {
+                    excel_alias: item.name || item.sku || '',
+                    stock_qty: item.qty
+                };
+                const response = await fetch(`${API_URL}/${product.id}`, {
+                    method:'PUT',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify(payload)
+                });
+                if(response.ok) saved++;
             }
+
+            mapModal.hide();
+            await loadProducts();
+            if (stockImportModal) stockImportModal.show();
+            showStockImportResult({
+                updated:saved,
+                matched:saved,
+                unmapped:Math.max(0,unmappedItems.length-saved),
+                total:unmappedItems.length
+            });
+        } finally {
+            btnSaveMapping.disabled = false;
         }
-        btnSaveMapping.disabled = false;
-        mapModal.hide();
-        await loadProducts();
-        alert('Сохранено');
     };
 
     searchInput?.addEventListener('input', applyLogic);
