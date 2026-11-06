@@ -715,22 +715,55 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     async function processExcel(rows) {
-        let hIdx = -1, cSku = -1, cName = -1, cStock = -1;
+        let cSku = -1, cName = -1, cFreeStock = -1;
+        let skuHeaderRow = -1, nameHeaderRow = -1, stockHeaderRow = -1;
 
-        for(let i=0; i<Math.min(rows.length, 30); i++) {
+        // В выгрузках 1С заголовки могут быть на разных строках.
+        // Сначала ищем их независимо, при этом остаток берём ТОЛЬКО из «Свободного остатка».
+        for(let i=0; i<Math.min(rows.length, 40); i++) {
             const row = Array.isArray(rows[i]) ? rows[i] : [];
             row.forEach((cell,j) => {
                 const v = normalizeExcelText(cell).replace(/[^a-zа-я0-9]+/g,'');
-                if (cSku < 0 && (v === 'артикул' || v === 'sku' || v === 'кодтовара' || v === 'кодноменклатуры')) cSku = j;
-                if (cName < 0 && (v.includes('номенклатур') || v.includes('наименован') || v === 'товар')) cName = j;
-                if (cStock < 0 && (v === 'остаток' || v.includes('свободныйостаток') || v.includes('остатокнаскладе'))) cStock = j;
+
+                if (cFreeStock < 0 && (
+                    v === 'свободныйостаток' ||
+                    v === 'свободно' ||
+                    v.includes('свободныйостаток')
+                )) {
+                    cFreeStock = j;
+                    stockHeaderRow = i;
+                }
+
+                if (cSku < 0 && (
+                    v === 'артикул' ||
+                    v === 'sku' ||
+                    v === 'кодтовара' ||
+                    v === 'кодноменклатуры' ||
+                    v === 'номенклатураартикул'
+                )) {
+                    cSku = j;
+                    skuHeaderRow = i;
+                }
+
+                if (cName < 0 && (
+                    v === 'номенклатура' ||
+                    v.includes('наименован') ||
+                    v === 'товар'
+                )) {
+                    cName = j;
+                    nameHeaderRow = i;
+                }
             });
-            if (cStock >= 0 && (cSku >= 0 || cName >= 0)) { hIdx = i; break; }
         }
 
-        if(hIdx === -1) {
-            throw new Error('Не найдены нужные колонки. Нужен «Остаток» и хотя бы «Артикул» или «Наименование».');
+        if (cFreeStock < 0) {
+            throw new Error('В файле не найдена колонка «Свободный остаток». Общий «Остаток» CRM намеренно не использует.');
         }
+        if (cSku < 0 && cName < 0) {
+            throw new Error('Не найдена колонка с артикулом или наименованием товара.');
+        }
+
+        const hIdx = Math.max(stockHeaderRow, skuHeaderRow, nameHeaderRow);
 
         const bySku = new Map();
         const byAlias = new Map();
@@ -754,10 +787,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const row = Array.isArray(rows[i]) ? rows[i] : [];
             const skuRaw = cSku >= 0 ? String(row[cSku] || '').trim() : '';
             const nameRaw = cName >= 0 ? String(row[cName] || '').trim() : '';
-            const stock = parseStockNumber(row[cStock]);
+            const stock = parseStockNumber(row[cFreeStock]);
 
             if (stock === null || (!skuRaw && !nameRaw)) continue;
-            total++;
 
             const skuKey = normalizeExcelSku(skuRaw);
             const nameKey = normalizeExcelText(nameRaw);
@@ -765,33 +797,43 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!product && nameKey) product = byAlias.get(nameKey);
             if (!product && nameKey) product = byName.get(nameKey);
 
-            if (!product && nameRaw) {
+            // В типовой выгрузке артикул часто находится внутри длинного наименования.
+            if (!product) {
+                const sourceText = [skuRaw,nameRaw].filter(Boolean).join(' ').toLowerCase();
                 product = allProducts.find(item => {
-                    const sku = String(item.sku || '').trim();
-                    return sku.length > 3 && nameRaw.toLowerCase().includes(sku.toLowerCase());
+                    const sku = String(item.sku || '').trim().toLowerCase();
+                    return sku.length > 3 && sourceText.includes(sku);
                 }) || null;
             }
 
-            if (product) {
-                matched++;
-                if (Number(product.stock_qty) !== stock) {
-                    const response = await fetch(`${API_URL}/${product.id}`, {
-                        method:'PUT',
-                        headers:{'Content-Type':'application/json'},
-                        body:JSON.stringify({ stock_qty:stock })
+            // Строки организации / склада / итогов / названия коллекций не считаем ошибкой сопоставления.
+            if (!product) {
+                const source = nameRaw || skuRaw;
+                const looksLikeProduct = /\d+[a-zа-я]*[-_][a-zа-я0-9-]+/i.test(source) ||
+                    /ламинат|плинтус|стенд|табличк|профил|порог/i.test(source);
+                if (looksLikeProduct) {
+                    unmappedItems.push({
+                        sku:skuRaw,
+                        name:nameRaw,
+                        qty:stock,
+                        sourceLabel:source
                     });
-                    if (response.ok) {
-                        product.stock_qty = stock;
-                        updated++;
-                    }
                 }
-            } else {
-                unmappedItems.push({
-                    sku:skuRaw,
-                    name:nameRaw,
-                    qty:stock,
-                    sourceLabel:nameRaw || skuRaw
+                continue;
+            }
+
+            total++;
+            matched++;
+            if (Number(product.stock_qty) !== stock) {
+                const response = await fetch(`${API_URL}/${product.id}`, {
+                    method:'PUT',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({ stock_qty:stock })
                 });
+                if (response.ok) {
+                    product.stock_qty = stock;
+                    updated++;
+                }
             }
         }
 
