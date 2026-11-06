@@ -103,7 +103,7 @@
                     <div>
                         <span>БАЗОВЫЕ ЦЕНЫ</span>
                         <h2>Прайсы</h2>
-                        <p>Один прайс содержит ОПТ, РРЦ и МАКС РРЦ. Его можно назначать дилеру, сектору, городу или всей сети.</p>
+                        <p>Один прайс содержит спец.цену, рекомендуемую розницу и цену на витрине. Его можно назначать дилеру, сектору, городу или всей сети.</p>
                     </div>
                     <button type="button" id="pricing-add-list-btn" class="pricing-secondary-action" data-permission="can_manage_pricing">
                         <i class="bi bi-plus-lg"></i><span>Создать прайс</span>
@@ -172,12 +172,12 @@
                             <div class="pricing-list-editor-actions">
                                 <input type="file" id="pricing-list-import-input" accept=".xlsx,.xls" hidden>
                                 <button type="button" id="pricing-list-import-btn" class="btn btn-light border"><i class="bi bi-file-earmark-spreadsheet"></i> Загрузить Excel</button>
-                                <button type="button" id="pricing-list-copy-opt-btn" class="btn btn-light border"><i class="bi bi-copy"></i> ОПТ → РРЦ</button>
+                                <button type="button" id="pricing-list-copy-opt-btn" class="btn btn-light border"><i class="bi bi-copy"></i> Спец.цена → РРЦ</button>
                             </div>
                         </div>
                         <div class="pricing-list-table-wrap">
                             <table class="pricing-list-table">
-                                <thead><tr><th>Статус</th><th>Коллекция / позиция</th><th>ОПТ</th><th>РРЦ</th><th>МАКС РРЦ</th></tr></thead>
+                                <thead><tr><th>Статус</th><th>Номенклатура / коллекция</th><th>Спец.цена</th><th>Рекомендуемая розница</th><th>Цена на витрине</th></tr></thead>
                                 <tbody id="pricing-list-editor-rows"></tbody>
                             </table>
                         </div>
@@ -204,7 +204,7 @@
                     <div id="pricing-sheet-empty" class="pricing-empty d-none">Для дилера пока не назначен заполненный прайс.</div>
                     <div id="pricing-sheet-table-wrap" class="pricing-list-table-wrap">
                         <table class="pricing-list-table pricing-sheet-table">
-                            <thead><tr><th>Статус</th><th>Коллекция / позиция</th><th>База</th><th>Скидка</th><th>Цена дилера</th><th>Цена на витрине</th></tr></thead>
+                            <thead><tr><th>Статус</th><th>Номенклатура / коллекция</th><th>Спец.цена</th><th>Рекомендуемая розница</th><th>Цена на витрине</th></tr></thead>
                             <tbody id="pricing-sheet-rows"></tbody>
                         </table>
                     </div>
