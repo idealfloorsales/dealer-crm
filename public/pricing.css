@@ -929,3 +929,30 @@ html,body.pricing-page{max-width:100%;overflow-x:hidden}
   min-width:130px;
   text-align:right;
 }
+
+
+/* Price editor now uses the same four-column commercial layout */
+.pricing-price-list-modal-shell .pricing-list-table{
+  min-width:760px;
+}
+.pricing-price-list-modal-shell .pricing-list-table th:nth-child(1),
+.pricing-price-list-modal-shell .pricing-list-table td:nth-child(1){
+  width:auto;
+  min-width:320px;
+}
+.pricing-price-list-modal-shell .pricing-list-table th:nth-child(n+2),
+.pricing-price-list-modal-shell .pricing-list-table td:nth-child(n+2){
+  width:160px;
+  min-width:150px;
+}
+.pricing-list-collection-row td:nth-child(1) strong{
+  display:block;
+  color:#35363a;
+  font-size:.68rem;
+}
+.pricing-list-collection-row td:nth-child(1) small{
+  display:block;
+  margin-top:2px;
+  color:#92949a;
+  font-size:.55rem;
+}
