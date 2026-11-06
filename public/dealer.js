@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Buttons
     const deleteBtn = document.getElementById('delete-dealer-btn'); 
     const editBtn = document.getElementById('edit-dealer-btn'); 
+    const duplicateBtn = document.getElementById('duplicate-dealer-btn');
     const navigateBtn = document.getElementById('navigate-btn'); 
     const carouselInner = document.getElementById('carousel-inner');
 
@@ -270,6 +271,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (editBtn && (!window.CRMAuth || !CRMAuth.can('can_edit_dealer'))) {
                     editBtn.style.display = 'none';
+                }
+                if (duplicateBtn && (!window.CRMAuth || !CRMAuth.can('can_create_dealer'))) {
+                    duplicateBtn.style.display = 'none';
                 }
                 if (deleteBtn && (!window.CRMAuth || !CRMAuth.can('can_delete_dealer'))) {
                     deleteBtn.style.display = 'none';
@@ -1028,6 +1032,11 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         fillProfileEditor('main');
+    });
+
+    if(duplicateBtn) duplicateBtn.addEventListener('click', () => {
+        if (!window.CRMAuth || !CRMAuth.can('can_create_dealer')) return;
+        window.location.href = '/?duplicate=' + encodeURIComponent(dealerId);
     });
 
     document.querySelector('[data-bs-target="#photos-pane"]')?.addEventListener('shown.bs.tab', () => {
