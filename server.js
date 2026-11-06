@@ -646,6 +646,7 @@ const Status = mongoose.model('Status', statusSchema);
 const productSchema = new mongoose.Schema({
     sku: String,
     name: String,
+    product_type: { type: String, enum: ['laminate', 'equipment'], default: 'laminate' },
     collection: String,
     is_liquid: { type: Boolean, default: true },
     excel_alias: String,
@@ -2024,6 +2025,7 @@ function isPricingLaminateProduct(product = {}) {
     const sku = normalizePricingSku(product.sku);
     const name = String(product.name || '').toUpperCase().replace(/Ё/g, 'Е');
     const collection = String(product.collection || '').trim();
+    if (String(product.product_type || 'laminate') === 'equipment') return false;
     if (!sku && !name) return false;
     if (!collection) return false;
     if (sku === 'POS' || sku.startsWith('POS-')) return false;
@@ -2092,7 +2094,7 @@ async function resolveSummaryPriceList(summary) {
 app.get('/api/pricing/catalog', requirePermission('can_view_pricing'), async (req, res) => {
     try {
         const products = await Product.find({})
-            .select('_id sku name collection is_liquid')
+            .select('_id sku name product_type collection is_liquid')
             .sort({ sku: 1, name: 1 })
             .lean();
 
@@ -2246,7 +2248,7 @@ app.get('/api/pricing/dealers/:id/price-sheet', requirePermission('can_view_pric
         const discount = Math.min(100, Math.max(0, Number(summary.totalDiscountPercent) || 0));
 
         const products = await Product.find({})
-            .select('_id sku name collection is_liquid')
+            .select('_id sku name product_type collection is_liquid')
             .sort({ sku: 1, name: 1 })
             .lean();
         const laminate = products.filter(isPricingLaminateProduct);
@@ -2647,7 +2649,7 @@ app.get('/api/matrix', requireAnyPermission('can_view_products', 'can_view_repor
             sku: p.sku,
             name: p.name,
             collection: p.collection || '',
-            type: 'product',
+            type: p.product_type === 'equipment' ? 'equipment' : 'product',
             is_liquid: p.is_liquid !== false,
             dealers: dealers.map(d => ({
                 value: productMap.get(d._id.toString()).has(p._id.toString()) ? 1 : 0,
