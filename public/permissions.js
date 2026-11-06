@@ -814,6 +814,40 @@
             document.body.classList.remove('crm-mobile-sheet-open');
         };
 
+        // Swipe-to-dismiss from the visible sheet handle.
+        const sheet = backdrop.querySelector('.crm-mobile-sheet');
+        const handle = backdrop.querySelector('.crm-mobile-sheet-handle');
+        let startY = 0, lastY = 0, startAt = 0, dragging = false;
+        handle?.setAttribute('role', 'button');
+        handle?.setAttribute('tabindex', '0');
+        handle?.setAttribute('aria-label', 'Свернуть меню');
+        handle?.addEventListener('keydown', e => {
+            if (['Enter', ' ', 'ArrowDown'].includes(e.key)) { e.preventDefault(); closeSheet(); }
+        });
+        handle?.addEventListener('pointerdown', e => {
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+            dragging = true; startY = lastY = e.clientY; startAt = performance.now();
+            sheet.style.transition = 'none';
+            handle.setPointerCapture?.(e.pointerId);
+        });
+        handle?.addEventListener('pointermove', e => {
+            if (!dragging) return;
+            lastY = e.clientY;
+            sheet.style.transform = 'translate3d(0,' + Math.max(0, lastY - startY) + 'px,0)';
+        });
+        const endSwipe = () => {
+            if (!dragging) return;
+            const delta = Math.max(0, lastY - startY);
+            const speed = delta / Math.max(1, performance.now() - startAt);
+            dragging = false;
+            sheet.style.transition = '';
+            sheet.style.transform = '';
+            if (delta > 110 || (delta > 35 && speed > .55)) closeSheet();
+        };
+        handle?.addEventListener('pointerup', endSwipe);
+        handle?.addEventListener('pointercancel', endSwipe);
+        handle?.style.setProperty('touch-action', 'none');
+        handle?.style.setProperty('cursor', 'grab');
         openButton?.addEventListener('click', openSheet);
         closeButton?.addEventListener('click', closeSheet);
         logoutButton?.addEventListener('click', logout);
