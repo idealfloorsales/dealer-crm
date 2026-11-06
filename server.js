@@ -1799,9 +1799,13 @@ function buildDealerPricingSummary(dealer, allConditions, today = pricingTodayKe
             !condition.priceList || typeof condition.priceList !== 'object' || priceListIsEffective(condition.priceList, today)
         ))
         .sort((a, b) =>
-            pricingScopeSpecificity(b) - pricingScopeSpecificity(a) ||
+            // Explicit priority wins across dealer/city/sector scopes.
+            // Scope specificity only breaks ties, preventing a dealer-level
+            // assignment from silently defeating a higher-priority regional list.
             (Number(b.priority) || 0) - (Number(a.priority) || 0) ||
-            String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''))
+            pricingScopeSpecificity(b) - pricingScopeSpecificity(a) ||
+            String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')) ||
+            String(b._id || '').localeCompare(String(a._id || ''))
         );
 
     const selectedPriceList = priceLists[0] || null;
@@ -1874,6 +1878,21 @@ function buildDealerPricingSummary(dealer, allConditions, today = pricingTodayKe
         effectivePriceList: selectedPriceList?.priceList?.name || selectedPriceList?.priceListName || selectedPriceList?.name || fallbackPriceListName,
         effectivePriceListId: String(selectedPriceList?.priceList?._id || selectedPriceList?.priceList || effectiveDealerPriceListId || ''),
         priceListCondition: selectedPriceList,
+        priceResolution: {
+            source: selectedPriceList ? 'priority_condition' : (dealerPriceListEffective ? 'dealer_profile' : 'default'),
+            selectedConditionId: String(selectedPriceList?._id || ''),
+            selectedPriority: selectedPriceList ? (Number(selectedPriceList.priority) || 0) : null,
+            selectedScope: selectedPriceList?.scopeType || '',
+            matchingPriceLists: priceLists.map(condition => ({
+                id: String(condition._id || ''),
+                name: condition.priceList?.name || condition.priceListName || condition.name || '',
+                priority: Number(condition.priority) || 0,
+                scopeType: condition.scopeType || '',
+                selected: String(condition._id || '') === String(selectedPriceList?._id || '')
+            })),
+            discountsSuspended: Boolean(selectedPriceList),
+            suspendedDiscountCount: selectedPriceList ? activeDiscounts.length : 0
+        },
         priceOverride: selectedPriceList ? {
             active: true,
             conditionId: String(selectedPriceList._id || ''),
