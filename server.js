@@ -2623,7 +2623,7 @@ app.post('/api/admin/import-catalog', requirePermission('can_manage_products'), 
 app.get('/api/matrix', requireAnyPermission('can_view_products', 'can_view_report'), async (req, res) => {
     try {
         const [prods, dealers] = await Promise.all([
-            Product.find({}).select('sku name collection is_liquid').sort({sku:1}).lean(),
+            Product.find({}).select('sku name product_type collection is_liquid').sort({sku:1}).lean(),
             Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id name city responsible products pos_materials status').lean()
         ]);
         const dealerIds = dealers.map(d => d._id);
