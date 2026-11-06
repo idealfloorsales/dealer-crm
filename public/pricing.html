@@ -29,6 +29,13 @@
             </button>
         </section>
 
+        <nav class="pricing-view-tabs" aria-label="Разделы цен">
+            <button type="button" class="active" data-pricing-view="dealers"><i class="bi bi-people"></i><span>Дилеры</span></button>
+            <button type="button" data-pricing-view="lists"><i class="bi bi-receipt-cutoff"></i><span>Прайсы</span></button>
+            <button type="button" data-pricing-view="conditions"><i class="bi bi-percent"></i><span>Условия и скидки</span></button>
+        </nav>
+
+        <div data-pricing-view-panel="dealers">
         <section class="pricing-kpi-grid">
             <article class="pricing-kpi">
                 <span class="pricing-kpi-icon"><i class="bi bi-percent"></i></span>
@@ -88,6 +95,38 @@
             </div>
         </section>
 
+        </div>
+
+        <div data-pricing-view-panel="lists" hidden>
+            <section class="pricing-panel">
+                <div class="pricing-panel-head">
+                    <div>
+                        <span>БАЗОВЫЕ ЦЕНЫ</span>
+                        <h2>Прайсы</h2>
+                        <p>Один прайс содержит ОПТ, РРЦ и МАКС РРЦ. Его можно назначать дилеру, сектору, городу или всей сети.</p>
+                    </div>
+                    <button type="button" id="pricing-add-list-btn" class="pricing-secondary-action" data-permission="can_manage_pricing">
+                        <i class="bi bi-plus-lg"></i><span>Создать прайс</span>
+                    </button>
+                </div>
+                <div class="pricing-list-toolbar">
+                    <div class="pricing-search">
+                        <i class="bi bi-search"></i>
+                        <input id="pricing-list-search" type="search" placeholder="Название, код или версия прайса">
+                    </div>
+                    <select id="pricing-list-filter" class="form-select">
+                        <option value="active">Действующие</option>
+                        <option value="all">Все версии</option>
+                        <option value="archive">Архив</option>
+                    </select>
+                </div>
+                <div id="pricing-price-list-grid" class="pricing-price-list-grid">
+                    <div class="pricing-empty"><span class="spinner-border spinner-border-sm"></span> Загрузка прайсов...</div>
+                </div>
+            </section>
+        </div>
+
+        <div data-pricing-view-panel="conditions" hidden>
         <section class="pricing-panel">
             <div class="pricing-panel-head">
                 <div>
@@ -106,7 +145,81 @@
             </div>
             <div id="pricing-condition-list" class="pricing-condition-list"></div>
         </section>
+        </div>
     </main>
+
+    <div class="modal fade pricing-price-list-modal-shell" id="pricing-price-list-modal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content pricing-modal">
+                <div class="modal-header">
+                    <div><small>ПРАЙС IDEAL FLOOR</small><h5 id="pricing-list-modal-title">Новый прайс</h5></div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="pricing-price-list-form">
+                    <input type="hidden" id="pricing-list-id">
+                    <div class="modal-body">
+                        <div class="pricing-list-form-head">
+                            <label><span>Название прайса</span><input id="pricing-list-name" class="form-control" placeholder="Например: Запад" required></label>
+                            <label><span>Код</span><input id="pricing-list-code" class="form-control" placeholder="WEST"></label>
+                            <label><span>Версия / дата</span><input id="pricing-list-version" type="date" class="form-control"></label>
+                            <label><span>Состояние</span><select id="pricing-list-active" class="form-select"><option value="true">Действует</option><option value="false">Архив</option></select></label>
+                        </div>
+                        <div class="pricing-list-editor-toolbar">
+                            <div>
+                                <strong>Цены по ассортименту</strong>
+                                <small>Заполните вручную или загрузите Excel: Артикул / ОПТ / РРЦ / МАКС РРЦ.</small>
+                            </div>
+                            <div class="pricing-list-editor-actions">
+                                <input type="file" id="pricing-list-import-input" accept=".xlsx,.xls" hidden>
+                                <button type="button" id="pricing-list-import-btn" class="btn btn-light border"><i class="bi bi-file-earmark-spreadsheet"></i> Загрузить Excel</button>
+                                <button type="button" id="pricing-list-copy-opt-btn" class="btn btn-light border"><i class="bi bi-copy"></i> ОПТ → РРЦ</button>
+                            </div>
+                        </div>
+                        <div class="pricing-list-table-wrap">
+                            <table class="pricing-list-table">
+                                <thead><tr><th>Артикул</th><th>Наименование</th><th>ОПТ</th><th>РРЦ</th><th>МАКС РРЦ</th></tr></thead>
+                                <tbody id="pricing-list-editor-rows"></tbody>
+                            </table>
+                        </div>
+                        <label class="pricing-list-note"><span>Комментарий</span><textarea id="pricing-list-note" class="form-control" rows="2" placeholder="Для каких регионов, особенности версии..."></textarea></label>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-dark" id="pricing-list-save-btn">Сохранить прайс</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade pricing-sheet-modal-shell" id="pricing-sheet-modal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content pricing-modal">
+                <div class="modal-header">
+                    <div><small>ПРАЙС ДИЛЕРА</small><h5 id="pricing-sheet-title">Прайс</h5><p id="pricing-sheet-subtitle" class="mb-0"></p></div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="pricing-sheet-summary" class="pricing-sheet-summary"></div>
+                    <div id="pricing-sheet-empty" class="pricing-empty d-none">Для дилера пока не назначен заполненный прайс.</div>
+                    <div id="pricing-sheet-table-wrap" class="pricing-list-table-wrap">
+                        <table class="pricing-list-table pricing-sheet-table">
+                            <thead><tr><th>Артикул</th><th>Наименование</th><th>База</th><th>Скидка</th><th>Цена дилера</th><th>Цена на витрине</th></tr></thead>
+                            <tbody id="pricing-sheet-rows"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer pricing-sheet-footer">
+                    <button type="button" id="pricing-sheet-save-display" class="btn btn-light border" data-permission="can_manage_pricing"><i class="bi bi-shop-window"></i> Сохранить витрину</button>
+                    <div class="ms-auto d-flex gap-2 flex-wrap">
+                        <button type="button" id="pricing-sheet-excel" class="btn btn-light border"><i class="bi bi-file-earmark-excel"></i> Excel</button>
+                        <button type="button" id="pricing-sheet-pdf" class="btn btn-light border"><i class="bi bi-file-earmark-pdf"></i> PDF</button>
+                        <button type="button" id="pricing-sheet-share" class="btn btn-success"><i class="bi bi-whatsapp"></i> Поделиться</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div class="modal fade pricing-condition-modal-shell" id="pricing-condition-modal" tabindex="-1" data-bs-backdrop="static">
         <div class="modal-dialog modal-xl pricing-condition-dialog">
@@ -149,7 +262,7 @@
                                 <label class="wide"><span>Название</span><input id="pricing-name" class="form-control" placeholder="−5% за публикации в соцсетях" required></label>
                                 <label><span>Код / метка</span><input id="pricing-code" class="form-control" placeholder="SOCIAL-5"></label>
                                 <label id="pricing-percent-field"><span>Скидка, %</span><input id="pricing-percent" type="number" min="0.01" max="100" step="0.01" class="form-control" value="5"></label>
-                                <label id="pricing-price-list-field" class="wide d-none"><span>Название базового прайса</span><input id="pricing-price-list" class="form-control" placeholder="Западный прайс"></label>
+                                <label id="pricing-price-list-field" class="wide d-none"><span>Базовый прайс</span><select id="pricing-price-list" class="form-select"><option value="">Выберите прайс</option></select></label>
                                 <label id="pricing-stack-field"><span>Можно суммировать</span>
                                     <select id="pricing-stackable" class="form-select"><option value="true">Да</option><option value="false">Нет, условие исключающее</option></select>
                                 </label>
