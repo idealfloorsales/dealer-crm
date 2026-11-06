@@ -198,7 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
         {id:'status',group:'Работа',label:'Статус дилера',width:18,checked:true,getValue:d=>exportStatusLabel(d)},
         {id:'responsible',group:'Работа',label:'Зона ответственности',width:20,checked:true,getValue:d=>responsibleLabel(d.responsible)},
         {id:'sector',group:'Работа',label:'Сектор',width:20,checked:true,getValue:d=>d.region_sector||''},
-        {id:'price_type',group:'Коммерция',label:'Тип цен',width:18,checked:true,getValue:d=>d.price_type||''},
+        {id:'price_type',group:'Коммерция',label:'Прайс',width:22,checked:true,getValue:d=>d.price_list?.name || d.price_type || ''},
         {id:'contacts',group:'Контакты',label:'Контакты',width:42,checked:true,getValue:d=>exportContactValues(d)},
         {id:'website',group:'Контакты',label:'Сайт',width:28,checked:false,getValue:d=>d.website||''},
         {id:'instagram',group:'Контакты',label:'Instagram',width:24,checked:false,getValue:d=>d.instagram||''},
@@ -834,6 +834,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const jobs = [];
                 if (window.CRMAuth && CRMAuth.can('can_view_dealers')) jobs.push(fetchProductCatalog());
                 if (window.CRMAuth && CRMAuth.can('can_view_competitors')) jobs.push(fetchCompetitorsRef());
+                if (window.CRMAuth && CRMAuth.can('can_view_dealers')) jobs.push(fetchDealerPriceLists());
                 Promise.allSettled(jobs);
             };
             if ('requestIdleCallback' in window) {
@@ -1524,7 +1525,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const normalizedCity = normalizeDisplayValue(dealer.city);
-            const normalizedType = normalizeDisplayValue(dealer.price_type);
+            const normalizedType = dealerPriceListName(dealer);
             const normalizedSector = normalizeDisplayValue(dealer.region_sector);
             const searchable = [
                 dealer.name,dealer.dealer_id,normalizedCity,dealer.address,normalizedSector,normalizedType,
@@ -2382,14 +2383,14 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const cities = uniqueNormalized(dealers.map(d => d.city));
-        const types = uniqueNormalized(dealers.map(d => d.price_type));
+        const types = uniqueNormalized(dealers.map(dealerPriceListName));
         const sectors = uniqueNormalized(dealers.map(d => d.region_sector));
 
         const sc = normalizeDisplayValue(filterCity.value);
         const st = normalizeDisplayValue(filterPriceType.value);
 
         filterCity.innerHTML = '<option value="">Все города</option>';
-        filterPriceType.innerHTML = '<option value="">Все типы цен</option>';
+        filterPriceType.innerHTML = '<option value="">Все прайсы</option>';
         cities.forEach(c => filterCity.add(new Option(c, c)));
         types.forEach(t => filterPriceType.add(new Option(t, t)));
         if (cities.includes(sc)) filterCity.value = sc;
@@ -2526,6 +2527,10 @@ document.addEventListener('DOMContentLoaded', () => {
             value:`${metrics.daysSinceVisit} дн.`,
             foot:metrics.latestVisit._date.toLocaleDateString('ru-RU', {day:'numeric', month:'short'})
         };
+    }
+
+    function dealerPriceListName(dealer) {
+        return normalizeDisplayValue(dealer?.price_list?.name || dealer?.price_type || '');
     }
 
     function responsibleLabel(value) {
@@ -2788,7 +2793,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         add('Город', dealer.city, 'geo-alt');
         add('Сектор', dealer.region_sector, 'diagram-3');
-        add('Тип цен', dealer.price_type, 'tag');
+        add('Прайс', dealerPriceListName(dealer), 'receipt');
         add('Ответственный', responsibleLabel(dealer.responsible), 'person');
 
         return items;
@@ -2853,7 +2858,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const normalizedCity = normalizeDisplayValue(d.city);
-            const normalizedType = normalizeDisplayValue(d.price_type);
+            const normalizedType = dealerPriceListName(d);
             const normalizedSector = normalizeDisplayValue(d.region_sector);
             const searchable = [
                 d.name, d.dealer_id, normalizedCity, d.address, normalizedSector, normalizedType,
@@ -3013,7 +3018,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const initial = safeText((d.name || 'Д').trim().charAt(0).toUpperCase());
 
             const metaHtml = infoChips
-                .filter(item => ['Город','Сектор','Тип цен'].includes(item.label))
+                .filter(item => ['Город','Сектор','Прайс'].includes(item.label))
                 .slice(0,3)
                 .map(item => `<span><i class="bi bi-${item.icon}"></i>${safeText(item.value)}</span>`)
                 .join('');
@@ -3110,7 +3115,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function searchableText(d) {
             return [
-                d.dealer_id,d.name,d.city,d.address,d.region_sector,d.price_type,
+                d.dealer_id,d.name,d.city,d.address,d.region_sector,dealerPriceListName(d),
                 ...(d.contacts || []).flatMap(x => [x.name,x.position,x.contactInfo])
             ].filter(Boolean).join(' ').toLowerCase();
         }
