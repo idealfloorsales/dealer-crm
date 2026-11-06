@@ -557,7 +557,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td><strong>${esc(collection)}</strong><small>${members.length} поз.</small></td>
                     <td><input type="number" min="0" step="0.01" inputmode="decimal" class="form-control" data-price-opt value="${n(existing.opt) || ''}" placeholder="0"></td>
                     <td><input type="number" min="0" step="0.01" inputmode="decimal" class="form-control" data-price-rrp value="${n(existing.rrp) || ''}" placeholder="0"></td>
-                    <td><input type="number" min="0" step="0.01" inputmode="decimal" class="form-control" data-price-max-rrp value="${n(existing.maxRrp) || ''}" placeholder="0"></td>
+                    <td><input type="number" min="0" step="0.01" inputmode="decimal" class="form-control" data-price-display value="${n(existing.displayPrice) || ''}" placeholder="0"></td>
                 </tr>`;
             }).join('');
 
@@ -579,7 +579,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td><strong>${esc(product.sku || '—')} · ${esc(product.name || 'Без названия')}</strong><small>${esc(collection)} · пустое поле = цена коллекции</small></td>
                 <td><input type="number" min="0" step="0.01" inputmode="decimal" class="form-control" data-price-opt value="${n(existing.opt) || ''}" placeholder="${esc(placeholder('opt'))}"></td>
                 <td><input type="number" min="0" step="0.01" inputmode="decimal" class="form-control" data-price-rrp value="${n(existing.rrp) || ''}" placeholder="${esc(placeholder('rrp'))}"></td>
-                <td><input type="number" min="0" step="0.01" inputmode="decimal" class="form-control" data-price-max-rrp value="${n(existing.maxRrp) || ''}" placeholder="${esc(placeholder('maxRrp'))}"></td>
+                <td><input type="number" min="0" step="0.01" inputmode="decimal" class="form-control" data-price-display value="${n(existing.displayPrice) || ''}" placeholder="${esc(placeholder('displayPrice'))}"></td>
             </tr>`;
         }).join('');
 
@@ -601,10 +601,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 isLiquid: row.dataset.scopeType === 'collection' ? true : row.dataset.isLiquid !== 'false',
                 opt: n(row.querySelector('[data-price-opt]')?.value),
                 rrp: n(row.querySelector('[data-price-rrp]')?.value),
-                maxRrp: n(row.querySelector('[data-price-max-rrp]')?.value),
+                displayPrice: n(row.querySelector('[data-price-display]')?.value),
                 currency:'KZT'
             }))
-            .filter(row => row.opt > 0 || row.rrp > 0 || row.maxRrp > 0);
+            .filter(row => row.opt > 0 || row.rrp > 0 || row.displayPrice > 0);
     }
 
     async function openPriceListEditor(priceListId = '') {
@@ -786,13 +786,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 const target=(collection && collectionMap.get(collection)) || (sku && skuMap.get(sku.toLowerCase()));
                 if(!target) return;
 
-                const opt=importPriceValue(source,h=>h==='опт'||h.includes('оптов'));
-                const rrp=importPriceValue(source,h=>h==='ррц'||h.includes('рознич')||h==='rrp');
-                const maxRrp=importPriceValue(source,h=>(h.includes('макс')&&h.includes('ррц'))||h==='maxrrp'||h==='maxretail');
+                const opt=importPriceValue(source,h=>h==='опт'||h.includes('оптов')||h.includes('спеццен')||h.includes('спеццена'));
+                const rrp=importPriceValue(source,h=>h==='ррц'||h.includes('рекомендуем')||h.includes('рознич')||h==='rrp');
+                const displayPrice=importPriceValue(source,h=>h.includes('ценанавитрин')||h.includes('витрин'));
 
                 if(opt) target.querySelector('[data-price-opt]').value=opt;
                 if(rrp) target.querySelector('[data-price-rrp]').value=rrp;
-                if(maxRrp) target.querySelector('[data-price-max-rrp]').value=maxRrp;
+                if(displayPrice) target.querySelector('[data-price-display]').value=displayPrice;
                 matched++;
             });
             toast(`Из Excel сопоставлено строк: ${matched}`);
@@ -809,7 +809,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const rrp=row.querySelector('[data-price-rrp]');
             if (opt && rrp && n(opt.value)>0 && !n(rrp.value)) rrp.value=opt.value;
         });
-        toast('ОПТ скопирован в пустые РРЦ');
+        toast('Спец.цена скопирована в пустые РРЦ');
     }
 
     function safeFilename(value) {
@@ -837,8 +837,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const list=data.priceList;
         $('pricing-sheet-summary').innerHTML=`
             <div><small>Прайс</small><strong>${esc(list?.name || 'Не назначен')}</strong><span>${list?.versionDate ? 'от '+dateText(list.versionDate) : ''}</span></div>
-            <div><small>Тип цены</small><strong>${esc(data.priceType?.label || data.dealer?.priceType || 'ОПТ')}</strong><span>из карточки дилера</span></div>
-            <div><small>Скидка</small><strong>${data.totalDiscountPercent ? '−'+fmt(data.totalDiscountPercent,2)+'%' : '0%'}</strong><span>${(data.activeDiscounts||[]).length ? (data.activeDiscounts||[]).map(x=>x.name).join(' + ') : 'без активных скидок'}</span></div>`;
+            <div><small>Базовая цена</small><strong>${esc(data.priceType?.label || data.dealer?.priceType || 'Спец.цена')}</strong><span>из карточки дилера</span></div>
+            <div><small>Доп. скидка</small><strong>${data.totalDiscountPercent ? '−'+fmt(data.totalDiscountPercent,2)+'%' : '0%'}</strong><span>${(data.activeDiscounts||[]).length ? (data.activeDiscounts||[]).map(x=>x.name).join(' + ') : 'без активных скидок'}</span></div>`;
 
         const rows=Array.isArray(data.rows)?data.rows:[];
         $('pricing-sheet-empty').classList.toggle('d-none',Boolean(list && rows.length));
@@ -852,23 +852,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 data-product-id="${esc(row.productId || '')}"
                 data-collection="${esc(row.collection || '')}">
                 <td>
-                    ${isIlliquid
-                        ? `<span class="pricing-list-kind is-illiquid">Неликвид</span>`
-                        : `<span class="pricing-list-kind is-liquid">Ликвид</span>`}
-                </td>
-                <td>
                     <strong>${esc(isIlliquid ? ([row.sku,row.name].filter(Boolean).join(' · ')) : (row.collection || row.name || ''))}</strong>
-                    <small>${esc(isIlliquid ? ((row.collection||'') + (row.inherited ? ' · цена коллекции' : ' · отдельная цена')) : ((row.members||0)+' поз. в коллекции'))}</small>
+                    <small>${esc(isIlliquid ? (row.collection || '') : ((row.members||0)+' поз. в коллекции'))}</small>
                 </td>
-                <td>${row.basePrice ? fmt(row.basePrice,2)+' ₸' : '—'}</td>
-                <td>${data.totalDiscountPercent ? '−'+fmt(data.totalDiscountPercent,2)+'%' : '0%'}</td>
                 <td><strong>${row.finalPrice ? fmt(row.finalPrice,2)+' ₸' : '—'}</strong></td>
+                <td>${row.rrp ? fmt(row.rrp,2)+' ₸' : '—'}</td>
                 <td>${manage ? `<input type="number" min="0" step="0.01" inputmode="decimal" class="form-control pricing-display-price" value="${row.displayPrice || ''}" placeholder="Не указана">` : (row.displayPrice ? fmt(row.displayPrice,2)+' ₸' : '—')}</td>
             </tr>`).join('');
 
         $('pricing-sheet-rows').innerHTML=
-            (liquid.length ? `<tr class="pricing-list-section-row"><td colspan="6"><strong>Ликвид</strong><span>цены по коллекциям</span></td></tr>${renderRows(liquid,false)}` : '') +
-            (illiquid.length ? `<tr class="pricing-list-section-row is-illiquid"><td colspan="6"><strong>Неликвид</strong><span>индивидуальные сниженные цены</span></td></tr>${renderRows(illiquid,true)}` : '');
+            (liquid.length ? `<tr class="pricing-list-section-row"><td colspan="4"><strong>Ликвид</strong><span>цены по коллекциям</span></td></tr>${renderRows(liquid,false)}` : '') +
+            (illiquid.length ? `<tr class="pricing-list-section-row is-illiquid"><td colspan="4"><strong>Неликвид</strong><span>индивидуальные сниженные цены</span></td></tr>${renderRows(illiquid,true)}` : '');
 
         $('pricing-sheet-save-display').style.display=manage && rows.length ? '' : 'none';
         $('pricing-sheet-excel').disabled=!rows.length;
@@ -897,34 +891,44 @@ document.addEventListener('DOMContentLoaded', () => {
     function dealerExportRows() {
         const data=state.currentSheet;
         return (data?.rows || [])
-            .filter(row=>n(row.finalPrice)>0)
+            .filter(row=>n(row.finalPrice)>0 || n(row.rrp)>0 || n(row.displayPrice)>0)
             .map(row=>({
-                'Раздел':row.isLiquid === false ? 'Неликвид' : 'Ликвид',
-                'Коллекция / позиция':row.isLiquid === false
+                'Номенклатура':row.isLiquid === false
                     ? [row.sku,row.name].filter(Boolean).join(' · ')
                     : (row.collection || row.name || ''),
-                'Цена, тг':n(row.finalPrice)
+                'Спец.цена':n(row.finalPrice),
+                'Рекомендуемая розница':n(row.rrp),
+                'Цена на витрине':n(row.displayPrice)
             }));
     }
 
     async function createExcelBlob() {
         const XLSX=await ensureXlsxLoaded();
         const data=state.currentSheet;
+        const rows=dealerExportRows();
         const aoa=[
-            ['IDEAL FLOOR'],
-            ['Дилер',data.dealer?.name || ''],
-            ['Прайс',data.priceList?.name || ''],
-            ['Тип цены',data.priceType?.label || data.dealer?.priceType || ''],
-            ['Скидка',data.totalDiscountPercent ? '-'+fmt(data.totalDiscountPercent,2)+'%' : '0%'],
+            ['Прайс-Лист IDEALfloor для дилера'],
+            [data.dealer?.name || ''],
             [],
-            ['Раздел','Коллекция / позиция','Цена, тг']
+            ['Номенклатура','Спец.цена','Рекомендуемая розница','Цена на витрине']
         ];
-        dealerExportRows().forEach(row=>aoa.push([row['Раздел'],row['Коллекция / позиция'],row['Цена, тг']]));
+        rows.forEach(row=>aoa.push([
+            row['Номенклатура'],
+            row['Спец.цена'] || '',
+            row['Рекомендуемая розница'] || '',
+            row['Цена на витрине'] || ''
+        ]));
         const ws=XLSX.utils.aoa_to_sheet(aoa);
-        ws['!cols']=[{wch:14},{wch:48},{wch:15}];
+        ws['!merges']=[XLSX.utils.decode_range('A1:D1')];
+        ws['!cols']=[{wch:44},{wch:18},{wch:26},{wch:22}];
+        ws['!rows']=[{hpt:24},{hpt:18},{hpt:8},{hpt:32}];
+        ['A1','A2','A4','B4','C4','D4'].forEach(ref=>{
+            if(!ws[ref]) return;
+            ws[ref].s = ws[ref].s || {};
+        });
         const wb=XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb,ws,'Прайс');
-        const output=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+        const output=XLSX.write(wb,{bookType:'xlsx',type:'array',cellStyles:true});
         return new Blob([output],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     }
 
@@ -932,25 +936,29 @@ document.addEventListener('DOMContentLoaded', () => {
         const pdfMake=await ensurePdfMakeLoaded();
         const data=state.currentSheet;
         const body=[
-            [{text:'Раздел',style:'th'},{text:'Коллекция / позиция',style:'th'},{text:'Цена, тг',style:'th',alignment:'right'}],
+            [
+                {text:'Номенклатура',style:'th'},
+                {text:'Спец.цена',style:'th',alignment:'right'},
+                {text:'Рекомендуемая розница',style:'th',alignment:'right'},
+                {text:'Цена на витрине',style:'th',alignment:'right'}
+            ],
             ...dealerExportRows().map(row=>[
-                row['Раздел'],
-                row['Коллекция / позиция'],
-                {text:fmt(row['Цена, тг'],2),alignment:'right'}
+                row['Номенклатура'],
+                {text:row['Спец.цена'] ? fmt(row['Спец.цена'],2) : '—',alignment:'right'},
+                {text:row['Рекомендуемая розница'] ? fmt(row['Рекомендуемая розница'],2) : '—',alignment:'right'},
+                {text:row['Цена на витрине'] ? fmt(row['Цена на витрине'],2) : '—',alignment:'right'}
             ])
         ];
         const doc={
             pageSize:'A4',
-            pageMargins:[32,34,32,34],
+            pageMargins:[30,32,30,32],
             content:[
-                {text:'IDEAL FLOOR',fontSize:19,bold:true,color:'#b9040a',margin:[0,0,0,4]},
-                {text:'Прайс для '+(data.dealer?.name || ''),fontSize:14,bold:true,margin:[0,0,0,3]},
-                {text:[data.priceList?.name || '',data.priceList?.versionDate ? 'от '+dateText(data.priceList.versionDate):'',data.priceType?.label || ''].filter(Boolean).join(' · '),fontSize:9,color:'#666666',margin:[0,0,0,3]},
-                {text:'Итоговая скидка: '+(data.totalDiscountPercent ? '−'+fmt(data.totalDiscountPercent,2)+'%' : '0%'),fontSize:9,color:'#666666',margin:[0,0,0,14]},
-                {table:{headerRows:1,widths:[70,'*',80],body},layout:'lightHorizontalLines'},
-                {text:'Ликвидные позиции указаны по коллекциям. Неликвидные позиции выделены отдельно. Цены указаны в тенге.',fontSize:8,color:'#888888',margin:[0,14,0,0]}
+                {text:'Прайс-Лист IDEALfloor для дилера',fontSize:16,bold:true,alignment:'center',margin:[0,0,0,4]},
+                {text:data.dealer?.name || '',fontSize:10,alignment:'center',color:'#666666',margin:[0,0,0,14]},
+                {table:{headerRows:1,widths:['*',74,105,88],body},layout:'lightHorizontalLines'},
+                {text:'Цены указаны в тенге. Неликвидные позиции при наличии отображаются отдельными строками.',fontSize:8,color:'#888888',margin:[0,12,0,0]}
             ],
-            styles:{th:{bold:true,color:'#555555',fillColor:'#f3f1ee',fontSize:9}},
+            styles:{th:{bold:true,color:'#444444',fillColor:'#f3f1ee',fontSize:8}},
             defaultStyle:{fontSize:9}
         };
         return new Promise(resolve=>pdfMake.createPdf(doc).getBlob(resolve));
