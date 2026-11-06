@@ -514,47 +514,97 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderPriceListEditorRows(existingRows = []) {
         const host = $('pricing-list-editor-rows');
         if (!host) return;
-        const byProduct = new Map((existingRows || []).filter(row => row.productId).map(row => [String(row.productId), row]));
-        const bySku = new Map((existingRows || []).filter(row => row.sku).map(row => [String(row.sku).trim().toLowerCase(), row]));
-        const base = state.catalog.map(product => {
-            const existing = byProduct.get(String(product.id)) || bySku.get(String(product.sku || '').trim().toLowerCase()) || {};
-            return {
-                productId: product.id,
-                sku: product.sku || existing.sku || '',
-                name: product.name || existing.name || '',
-                active: product.active !== false,
-                opt: n(existing.opt),
-                rrp: n(existing.rrp),
-                maxRrp: n(existing.maxRrp)
-            };
+
+        const rows = Array.isArray(existingRows) ? existingRows : [];
+        const collectionRows = new Map(
+            rows
+                .filter(row => row.scopeType === 'collection' && row.collection)
+                .map(row => [String(row.collection).trim().toUpperCase(), row])
+        );
+        const productRows = new Map(
+            rows
+                .filter(row => row.productId)
+                .map(row => [String(row.productId), row])
+        );
+        const skuRows = new Map(
+            rows
+                .filter(row => row.sku)
+                .map(row => [String(row.sku).trim().toLowerCase(), row])
+        );
+
+        const catalogById = new Map(state.catalog.map(product => [String(product.id), product]));
+        const legacyByCollection = new Map();
+        rows.forEach(row => {
+            if (row.scopeType === 'collection') return;
+            const product = row.productId ? catalogById.get(String(row.productId)) : state.catalog.find(item => String(item.sku || '').trim().toLowerCase() === String(row.sku || '').trim().toLowerCase());
+            const collection = String(row.collection || product?.collection || '').trim().toUpperCase();
+            if (collection && !legacyByCollection.has(collection)) legacyByCollection.set(collection, row);
         });
 
-        const catalogIds = new Set(base.map(row => String(row.productId)));
-        (existingRows || []).forEach(row => {
-            if (row.productId && catalogIds.has(String(row.productId))) return;
-            base.push({ ...row, active:false });
+        const collectionMembers = new Map();
+        state.catalog.filter(product => product.isLiquid !== false).forEach(product => {
+            const collection = String(product.collection || 'ДРУГИЕ КОЛЛЕКЦИИ').trim().toUpperCase();
+            if (!collectionMembers.has(collection)) collectionMembers.set(collection, []);
+            collectionMembers.get(collection).push(product);
         });
 
-        host.innerHTML = base.map(row => `
-            <tr data-price-row data-product-id="${esc(row.productId || '')}" data-sku="${esc(row.sku || '')}" data-name="${esc(row.name || '')}">
-                <td><strong>${esc(row.sku || '—')}</strong></td>
-                <td><span>${esc(row.name || 'Без названия')}</span>${row.active === false ? '<small>Неактивная позиция</small>' : ''}</td>
-                <td><input type="number" min="0" step="0.01" inputmode="decimal" class="form-control" data-price-opt value="${row.opt || ''}" placeholder="0"></td>
-                <td><input type="number" min="0" step="0.01" inputmode="decimal" class="form-control" data-price-rrp value="${row.rrp || ''}" placeholder="0"></td>
-                <td><input type="number" min="0" step="0.01" inputmode="decimal" class="form-control" data-price-max-rrp value="${row.maxRrp || ''}" placeholder="0"></td>
-            </tr>`).join('');
+        const liquidHtml = [...collectionMembers.entries()]
+            .sort((a,b)=>String(a[0]).localeCompare(String(b[0]),'ru'))
+            .map(([collection,members]) => {
+                const existing = collectionRows.get(collection) || legacyByCollection.get(collection) || {};
+                return `<tr class="pricing-list-collection-row" data-price-row data-scope-type="collection" data-collection="${esc(collection)}" data-name="${esc(collection)}">
+                    <td><span class="pricing-list-kind is-liquid">Ликвид</span></td>
+                    <td><strong>${esc(collection)}</strong><small>${members.length} поз.</small></td>
+                    <td><input type="number" min="0" step="0.01" inputmode="decimal" class="form-control" data-price-opt value="${n(existing.opt) || ''}" placeholder="0"></td>
+                    <td><input type="number" min="0" step="0.01" inputmode="decimal" class="form-control" data-price-rrp value="${n(existing.rrp) || ''}" placeholder="0"></td>
+                    <td><input type="number" min="0" step="0.01" inputmode="decimal" class="form-control" data-price-max-rrp value="${n(existing.maxRrp) || ''}" placeholder="0"></td>
+                </tr>`;
+            }).join('');
+
+        const nonLiquidProducts = state.catalog
+            .filter(product => product.isLiquid === false)
+            .slice()
+            .sort((a,b) =>
+                String(a.collection || '').localeCompare(String(b.collection || ''),'ru') ||
+                String(a.sku || '').localeCompare(String(b.sku || ''),'ru')
+            );
+
+        const nonLiquidHtml = nonLiquidProducts.map(product => {
+            const collection = String(product.collection || 'ДРУГИЕ КОЛЛЕКЦИИ').trim().toUpperCase();
+            const existing = productRows.get(String(product.id)) || skuRows.get(String(product.sku || '').trim().toLowerCase()) || {};
+            const inherited = collectionRows.get(collection) || legacyByCollection.get(collection) || {};
+            const placeholder = key => n(inherited[key]) ? String(n(inherited[key])) : '0';
+            return `<tr class="pricing-list-product-row is-illiquid" data-price-row data-scope-type="product" data-product-id="${esc(product.id)}" data-sku="${esc(product.sku || '')}" data-name="${esc(product.name || '')}" data-collection="${esc(collection)}" data-is-liquid="false">
+                <td><span class="pricing-list-kind is-illiquid">Неликвид</span></td>
+                <td><strong>${esc(product.sku || '—')} · ${esc(product.name || 'Без названия')}</strong><small>${esc(collection)} · пустое поле = цена коллекции</small></td>
+                <td><input type="number" min="0" step="0.01" inputmode="decimal" class="form-control" data-price-opt value="${n(existing.opt) || ''}" placeholder="${esc(placeholder('opt'))}"></td>
+                <td><input type="number" min="0" step="0.01" inputmode="decimal" class="form-control" data-price-rrp value="${n(existing.rrp) || ''}" placeholder="${esc(placeholder('rrp'))}"></td>
+                <td><input type="number" min="0" step="0.01" inputmode="decimal" class="form-control" data-price-max-rrp value="${n(existing.maxRrp) || ''}" placeholder="${esc(placeholder('maxRrp'))}"></td>
+            </tr>`;
+        }).join('');
+
+        host.innerHTML =
+            `<tr class="pricing-list-section-row"><td colspan="5"><strong>Ликвид</strong><span>цена задаётся один раз на всю коллекцию</span></td></tr>` +
+            (liquidHtml || '<tr><td colspan="5" class="pricing-empty">Ликвидных коллекций нет</td></tr>') +
+            `<tr class="pricing-list-section-row is-illiquid"><td colspan="5"><strong>Неликвид</strong><span>только отдельные позиции со специальной ценой</span></td></tr>` +
+            (nonLiquidHtml || '<tr><td colspan="5" class="pricing-empty">Неликвидных позиций нет</td></tr>');
     }
 
     function collectPriceListRows() {
-        return [...document.querySelectorAll('#pricing-list-editor-rows [data-price-row]')].map(row => ({
-            productId: row.dataset.productId || '',
-            sku: row.dataset.sku || '',
-            name: row.dataset.name || '',
-            opt: n(row.querySelector('[data-price-opt]')?.value),
-            rrp: n(row.querySelector('[data-price-rrp]')?.value),
-            maxRrp: n(row.querySelector('[data-price-max-rrp]')?.value),
-            currency:'KZT'
-        }));
+        return [...document.querySelectorAll('#pricing-list-editor-rows [data-price-row]')]
+            .map(row => ({
+                scopeType: row.dataset.scopeType === 'collection' ? 'collection' : 'product',
+                collection: row.dataset.collection || '',
+                productId: row.dataset.scopeType === 'collection' ? '' : (row.dataset.productId || ''),
+                sku: row.dataset.scopeType === 'collection' ? '' : (row.dataset.sku || ''),
+                name: row.dataset.name || '',
+                isLiquid: row.dataset.scopeType === 'collection' ? true : row.dataset.isLiquid !== 'false',
+                opt: n(row.querySelector('[data-price-opt]')?.value),
+                rrp: n(row.querySelector('[data-price-rrp]')?.value),
+                maxRrp: n(row.querySelector('[data-price-max-rrp]')?.value),
+                currency:'KZT'
+            }))
+            .filter(row => row.opt > 0 || row.rrp > 0 || row.maxRrp > 0);
     }
 
     async function openPriceListEditor(priceListId = '') {
