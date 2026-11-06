@@ -550,6 +550,69 @@ document.addEventListener('DOMContentLoaded', () => {
     window.openLightbox = function(index) { const modalEl = document.getElementById('imageModal'); const carouselEl = document.querySelector('#photoCarousel'); if (modalEl && carouselEl && carouselInner) { carouselInner.innerHTML = galleryCarouselContent; const myModal = new bootstrap.Modal(modalEl); const carousel = new bootstrap.Carousel(carouselEl); carousel.to(index); myModal.show(); } }
     function openAvatarModal(url) { const modalEl = document.getElementById('imageModal'); if (modalEl && carouselInner) { carouselInner.innerHTML = `<div class="carousel-item active" style="height: 100%;"><div class="d-flex justify-content-center align-items-center h-100"><img src="${url}" style="max-height: 100%; max-width: 100%; object-fit: contain;"></div></div>`; const myModal = new bootstrap.Modal(modalEl); myModal.show(); } }
 
+    function formatDealerPrice(value) {
+        const number = Number(value) || 0;
+        return number > 0
+            ? number.toLocaleString('ru-RU',{maximumFractionDigits:2}) + ' ₸'
+            : '—';
+    }
+
+    async function toggleDealerPriceDetails(button) {
+        const details = document.getElementById('dealer-price-details');
+        if (!details) return;
+
+        if (!details.hidden) {
+            details.hidden = true;
+            button?.classList.remove('is-open');
+            if (button) button.innerHTML = '<i class="bi bi-chevron-down"></i> Развернуть прайс';
+            return;
+        }
+
+        details.hidden = false;
+        button?.classList.add('is-open');
+        if (button) button.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Загружаем';
+
+        try {
+            const response = await fetch(`/api/pricing/dealers/${dealerId}/price-sheet`, { crmTrackLoading:false });
+            const sheet = await response.json().catch(()=>({}));
+            if (!response.ok) throw new Error(sheet.error || 'Не удалось загрузить прайс');
+
+            const rows = Array.isArray(sheet.rows) ? sheet.rows : [];
+            const liquid = rows.filter(row => row.isLiquid !== false);
+            const illiquid = rows.filter(row => row.isLiquid === false);
+
+            const rowHtml = (row, isIlliquid = false) => `
+                <div class="dealer-price-detail-row ${isIlliquid ? 'is-illiquid':''}">
+                    <div>
+                        <span class="dealer-price-detail-status ${isIlliquid ? 'is-illiquid':'is-liquid'}">${isIlliquid ? 'Неликвид' : 'Ликвид'}</span>
+                        <strong>${safeText(isIlliquid ? [row.sku,row.name].filter(Boolean).join(' · ') : (row.collection || row.name || 'Коллекция'))}</strong>
+                        <small>${safeText(isIlliquid ? (row.collection || '') : ((row.members || 0) + ' поз. в коллекции'))}</small>
+                    </div>
+                    <div class="dealer-price-detail-values">
+                        <span><small>База</small><strong>${formatDealerPrice(row.basePrice)}</strong></span>
+                        <span><small>Итог</small><strong>${formatDealerPrice(row.finalPrice)}</strong></span>
+                    </div>
+                </div>`;
+
+            details.innerHTML =
+                `<div class="dealer-price-details-head">
+                    <div>
+                        <strong>${safeText(sheet.priceList?.name || 'Прайс')}</strong>
+                        <small>${sheet.priceList?.versionDate ? 'Версия от '+new Date(sheet.priceList.versionDate+'T00:00:00').toLocaleDateString('ru-RU') : 'Без даты версии'}</small>
+                    </div>
+                    <span>${safeText(sheet.priceType?.label || sheet.dealer?.priceType || 'ОПТ')}</span>
+                </div>` +
+                (liquid.length ? `<div class="dealer-price-detail-section-title">Ликвид · по коллекциям</div>${liquid.map(row=>rowHtml(row,false)).join('')}` : '') +
+                (illiquid.length ? `<div class="dealer-price-detail-section-title is-illiquid">Неликвид · отдельные позиции</div>${illiquid.map(row=>rowHtml(row,true)).join('')}` : '') +
+                (!rows.length ? '<div class="dealer-price-empty"><i class="bi bi-receipt"></i><span>В прайсе пока нет заполненных цен</span></div>' : '');
+
+            if (button) button.innerHTML = '<i class="bi bi-chevron-up"></i> Свернуть прайс';
+        } catch (error) {
+            details.innerHTML = '<div class="dealer-price-empty is-error"><i class="bi bi-exclamation-circle"></i><span>Не удалось загрузить содержимое прайса</span></div>';
+            if (button) button.innerHTML = '<i class="bi bi-chevron-up"></i> Свернуть прайс';
+        }
+    }
+
     async function loadDealerPricing() {
         if (!dealerPricingSummary || !can('can_view_pricing')) return;
         try {
@@ -603,7 +666,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
                 <div class="dealer-price-chips">${discountBadges}</div>
-                <div class="dealer-price-conditions">${conditionsHtml}</div>`;
+                <div class="dealer-price-conditions">${conditionsHtml}</div>
+                <div class="dealer-price-expand-wrap">
+                    <button type="button" class="dealer-price-expand-btn" id="dealer-price-expand-btn">
+                        <i class="bi bi-chevron-down"></i> Развернуть прайс
+                    </button>
+                </div>
+                <div id="dealer-price-details" class="dealer-price-details" hidden></div>`;
+
+            const expandButton = document.getElementById('dealer-price-expand-btn');
+            if (expandButton) {
+                expandButton.addEventListener('click', () => toggleDealerPriceDetails(expandButton));
+            }
         } catch (e) {
             dealerPricingSummary.innerHTML = '<div class="dealer-price-empty is-error"><i class="bi bi-exclamation-circle"></i><span>Не удалось загрузить ценовые условия</span></div>';
         }
