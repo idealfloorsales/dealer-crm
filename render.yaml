@@ -8,5 +8,4 @@ services:
     buildCommand: yarn install
     startCommand: node server.js
     healthCheckPath: /readyz
-    maxShutdownDelaySeconds: 15
-    autoDeploy: true
+autoDeploy: true
