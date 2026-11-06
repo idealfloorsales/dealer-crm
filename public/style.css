@@ -12293,3 +12293,94 @@ body.bg-light {
         min-height:44px;
     }
 }
+
+
+/* Sales summary compact deviation layout */
+.sales-page .summary-values {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.sales-page .summary-deviation-cell {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    padding: 7px 10px;
+    background: #f8f6f3;
+}
+
+.sales-page .summary-values > .summary-deviation-cell > span {
+    margin: 0;
+    color: #8d8f95;
+    font-size: .56rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.sales-page .summary-deviation-lines {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin: 0;
+}
+
+.sales-page .summary-deviation-row {
+    display: grid;
+    grid-template-columns: minmax(62px, auto) minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+    padding-left: 9px;
+    border-left: 1px solid rgba(23,24,27,.08);
+    line-height: 1.2;
+}
+
+.sales-page .summary-values .summary-deviation-row > span {
+    margin: 0;
+    color: #74767c;
+    font-size: .56rem;
+    font-weight: 650;
+}
+
+.sales-page .summary-deviation-row strong {
+    overflow: visible;
+    font-size: .68rem;
+    font-weight: 760;
+    text-align: right;
+    text-overflow: clip;
+}
+
+.sales-page .summary-deviation-row em {
+    font-size: .61rem;
+    font-weight: 760;
+}
+
+@media (max-width: 520px) {
+    .sales-page .summary-values {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+    }
+
+    .sales-page .summary-values > div,
+    .sales-page .summary-values > label {
+        padding: 7px 7px;
+    }
+
+    .sales-page .summary-deviation-cell {
+        grid-template-columns: 1fr;
+        gap: 5px;
+    }
+
+    .sales-page .summary-deviation-lines {
+        grid-template-columns: 1fr;
+        gap: 4px;
+    }
+
+    .sales-page .summary-deviation-row {
+        grid-template-columns: 72px minmax(0, 1fr) auto;
+        padding-left: 0;
+        border-left: 0;
+    }
+}
