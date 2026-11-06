@@ -12420,3 +12420,160 @@ body.bg-light {
 .cc-event-title {
     cursor: help;
 }
+
+
+/* Dealer profile: expandable active price list */
+.dealer-price-expand-wrap{
+    display:flex;
+    justify-content:flex-end;
+    margin-top:9px;
+}
+.dealer-price-expand-btn{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    min-height:32px;
+    padding:0 10px;
+    border:1px solid #e3ded9;
+    border-radius:9px;
+    background:#fff;
+    color:#55575d;
+    font-size:.56rem;
+    font-weight:800;
+}
+.dealer-price-expand-btn:hover{
+    background:#f7f5f2;
+}
+.dealer-price-expand-btn.is-open{
+    background:#242529;
+    border-color:#242529;
+    color:#fff;
+}
+.dealer-price-details{
+    margin-top:9px;
+    overflow:hidden;
+    border:1px solid #e8e3df;
+    border-radius:13px;
+    background:#fff;
+}
+.dealer-price-details-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    padding:10px 11px;
+    background:#f7f5f2;
+    border-bottom:1px solid #e8e3df;
+}
+.dealer-price-details-head>div{min-width:0}
+.dealer-price-details-head strong{
+    display:block;
+    overflow:hidden;
+    color:#36373b;
+    font-size:.66rem;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+.dealer-price-details-head small{
+    display:block;
+    margin-top:2px;
+    color:#95979c;
+    font-size:.49rem;
+}
+.dealer-price-details-head>span{
+    flex:0 0 auto;
+    display:inline-flex;
+    align-items:center;
+    min-height:22px;
+    padding:0 7px;
+    border-radius:999px;
+    background:#242529;
+    color:#fff;
+    font-size:.46rem;
+    font-weight:800;
+}
+.dealer-price-detail-section-title{
+    padding:7px 10px;
+    background:#eef7f2;
+    color:#347852;
+    font-size:.5rem;
+    font-weight:800;
+    text-transform:uppercase;
+    letter-spacing:.04em;
+}
+.dealer-price-detail-section-title.is-illiquid{
+    background:#fff2f2;
+    color:#ad2b31;
+}
+.dealer-price-detail-row{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    gap:10px;
+    align-items:center;
+    padding:9px 10px;
+    border-top:1px solid #f0ece8;
+}
+.dealer-price-detail-row>div:first-child{
+    min-width:0;
+}
+.dealer-price-detail-row>div:first-child strong{
+    display:block;
+    margin-top:3px;
+    overflow:hidden;
+    color:#424348;
+    font-size:.58rem;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+.dealer-price-detail-row>div:first-child small{
+    display:block;
+    margin-top:2px;
+    color:#97999e;
+    font-size:.47rem;
+}
+.dealer-price-detail-status{
+    display:inline-flex;
+    align-items:center;
+    min-height:20px;
+    padding:0 6px;
+    border-radius:999px;
+    font-size:.43rem;
+    font-weight:800;
+}
+.dealer-price-detail-status.is-liquid{
+    background:#e7f4ed;
+    color:#197450;
+}
+.dealer-price-detail-status.is-illiquid{
+    background:#fff0f0;
+    color:#ad2b31;
+}
+.dealer-price-detail-values{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(70px,auto));
+    gap:6px;
+}
+.dealer-price-detail-values>span{
+    padding:6px 8px;
+    border-radius:8px;
+    background:#f8f6f3;
+    text-align:right;
+}
+.dealer-price-detail-values small{
+    display:block;
+    color:#989a9f;
+    font-size:.43rem;
+}
+.dealer-price-detail-values strong{
+    display:block;
+    margin-top:1px;
+    color:#36373b;
+    font-size:.58rem;
+}
+@media(max-width:767.98px){
+    .dealer-price-expand-wrap{justify-content:stretch}
+    .dealer-price-expand-btn{width:100%;justify-content:center;min-height:38px}
+    .dealer-price-detail-row{grid-template-columns:1fr}
+    .dealer-price-detail-values{grid-template-columns:repeat(2,1fr)}
+    .dealer-price-detail-values>span{text-align:left}
+}
