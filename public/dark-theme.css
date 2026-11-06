@@ -1154,3 +1154,364 @@ html:root[data-crm-theme="dark"] .dealer-directory-head-v2 h2{
     background:#202126!important;
   }
 }
+
+
+/* =========================================================
+   DARK THEME QA PASS 2 — page-specific CSS overrides
+   ========================================================= */
+
+/* Shared secondary controls */
+html:root[data-crm-theme="dark"] .cc-secondary-btn,
+html:root[data-crm-theme="dark"] .dealer-export-trigger,
+html:root[data-crm-theme="dark"] .dealer-filter-settings,
+html:root[data-crm-theme="dark"] .dealer-reset-filters,
+html:root[data-crm-theme="dark"] .app-hero-secondary,
+html:root[data-crm-theme="dark"] .app-hero-primary.is-secondary{
+  background:#202126!important;
+  border-color:#36383f!important;
+  color:#d7d9de!important;
+}
+html:root[data-crm-theme="dark"] .cc-secondary-btn:hover,
+html:root[data-crm-theme="dark"] .dealer-export-trigger:hover,
+html:root[data-crm-theme="dark"] .dealer-filter-settings:hover{
+  background:#292a30!important;
+  border-color:#4a4c55!important;
+  color:#fff!important;
+}
+
+/* Expanded dealer filter area */
+html:root[data-crm-theme="dark"] .dealer-toolbar-filters{
+  background:#18191d!important;
+  border-color:#34363d!important;
+}
+html:root[data-crm-theme="dark"] .dealer-filter-field{
+  background:transparent!important;
+}
+html:root[data-crm-theme="dark"] .dealer-filter-settings{
+  color:#aeb2ba!important;
+}
+
+/* Global search */
+html:root[data-crm-theme="dark"] .global-search-overlay{
+  background:rgba(0,0,0,.68)!important;
+}
+html:root[data-crm-theme="dark"] .global-search-dialog,
+html:root[data-crm-theme="dark"] .global-search-input-wrap,
+html:root[data-crm-theme="dark"] .global-search-results,
+html:root[data-crm-theme="dark"] .global-search-item{
+  background:#191a1f!important;
+  border-color:#35373e!important;
+  color:#e9eaed!important;
+}
+html:root[data-crm-theme="dark"] .global-search-item:hover,
+html:root[data-crm-theme="dark"] .global-search-item.active{
+  background:#24252a!important;
+}
+html:root[data-crm-theme="dark"] .global-search-input-wrap input{
+  color:#f3f4f6!important;
+  -webkit-text-fill-color:#f3f4f6!important;
+}
+html:root[data-crm-theme="dark"] .global-search-hint,
+html:root[data-crm-theme="dark"] .global-search-item small{
+  color:#9da1aa!important;
+}
+html:root[data-crm-theme="dark"] .global-search-input-wrap kbd{
+  background:#2d2e34!important;
+  border-color:#41434b!important;
+  color:#b9bdc5!important;
+}
+
+/* Status manager and export builder */
+html:root[data-crm-theme="dark"] .status-manager-content,
+html:root[data-crm-theme="dark"] .status-manager-body,
+html:root[data-crm-theme="dark"] .status-manager-row,
+html:root[data-crm-theme="dark"] .export-builder-content,
+html:root[data-crm-theme="dark"] .export-builder-body,
+html:root[data-crm-theme="dark"] .export-builder-section{
+  background:#191a1f!important;
+  border-color:#35373e!important;
+  color:#e7e8eb!important;
+}
+html:root[data-crm-theme="dark"] .status-manager-header,
+html:root[data-crm-theme="dark"] .status-manager-footer,
+html:root[data-crm-theme="dark"] .export-builder-header,
+html:root[data-crm-theme="dark"] .export-builder-footer{
+  background:#15161a!important;
+  border-color:#34363d!important;
+}
+
+/* ---------- Pricing page ---------- */
+html:root[data-crm-theme="dark"] .pricing-kpi,
+html:root[data-crm-theme="dark"] .pricing-panel,
+html:root[data-crm-theme="dark"] .pricing-dealer-block,
+html:root[data-crm-theme="dark"] .pricing-dealer-row,
+html:root[data-crm-theme="dark"] .pricing-condition-card,
+html:root[data-crm-theme="dark"] .pricing-condition-details>div,
+html:root[data-crm-theme="dark"] .pricing-inline-rule,
+html:root[data-crm-theme="dark"] .pricing-price-list-card,
+html:root[data-crm-theme="dark"] .pricing-price-list-modal-shell .modal-content,
+html:root[data-crm-theme="dark"] .pricing-sheet-modal-shell .modal-content,
+html:root[data-crm-theme="dark"] .pricing-condition-modal-shell .modal-content{
+  background:#191a1f!important;
+  border-color:#35373e!important;
+  color:#e7e8eb!important;
+}
+html:root[data-crm-theme="dark"] .pricing-condition-details>div,
+html:root[data-crm-theme="dark"] .pricing-price-list-stats>div,
+html:root[data-crm-theme="dark"] .pricing-target-option,
+html:root[data-crm-theme="dark"] .pricing-price-choice,
+html:root[data-crm-theme="dark"] .pricing-discount-choice,
+html:root[data-crm-theme="dark"] .pricing-list-note,
+html:root[data-crm-theme="dark"] .pricing-sheet-summary>div{
+  background:#202126!important;
+  border-color:#34363d!important;
+}
+html:root[data-crm-theme="dark"] .pricing-modal .modal-body{
+  background:#15161a!important;
+}
+html:root[data-crm-theme="dark"] .pricing-modal .modal-footer{
+  background:#18191d!important;
+  border-color:#34363d!important;
+}
+html:root[data-crm-theme="dark"] .pricing-inline-close,
+html:root[data-crm-theme="dark"] .pricing-checkbox-label,
+html:root[data-crm-theme="dark"] .pricing-kind-switch,
+html:root[data-crm-theme="dark"] .pricing-presets button{
+  background:#202126!important;
+  border-color:#36383f!important;
+  color:#d4d6db!important;
+}
+html:root[data-crm-theme="dark"] .pricing-inline-inherited{
+  background:rgba(217,166,77,.11)!important;
+  border-color:rgba(217,166,77,.22)!important;
+}
+html:root[data-crm-theme="dark"] .pricing-search input:focus,
+html:root[data-crm-theme="dark"] .pricing-form-grid .form-control:focus,
+html:root[data-crm-theme="dark"] .pricing-form-grid .form-select:focus{
+  background:#24252a!important;
+}
+
+/* ---------- Exhibition / report ---------- */
+html:root[data-crm-theme="dark"] .exhibition-kpi,
+html:root[data-crm-theme="dark"] .exhibition-loading,
+html:root[data-crm-theme="dark"] .exhibition-toolbar,
+html:root[data-crm-theme="dark"] .exhibition-matrix-panel,
+html:root[data-crm-theme="dark"] .exhibition-field-dealer-panel,
+html:root[data-crm-theme="dark"] .exhibition-field-content,
+html:root[data-crm-theme="dark"] .exhibition-field-dealer,
+html:root[data-crm-theme="dark"] .exhibition-field-product,
+html:root[data-crm-theme="dark"] .exhibition-export-modal .modal-content{
+  background:#191a1f!important;
+  border-color:#35373e!important;
+  color:#e8e9ec!important;
+}
+html:root[data-crm-theme="dark"] .exhibition-panel-head,
+html:root[data-crm-theme="dark"] .exhibition-field-head,
+html:root[data-crm-theme="dark"] .exhibition-field-controls,
+html:root[data-crm-theme="dark"] .exhibition-export-section,
+html:root[data-crm-theme="dark"] .exhibition-legend{
+  background:#202126!important;
+  border-color:#34363d!important;
+}
+html:root[data-crm-theme="dark"] #matrix-table th,
+html:root[data-crm-theme="dark"] #matrix-table td,
+html:root[data-crm-theme="dark"] #matrix-table tbody .matrix-sticky-col{
+  background:#191a1f!important;
+  border-color:#30323a!important;
+  color:#e1e3e7!important;
+}
+html:root[data-crm-theme="dark"] #matrix-table thead th{
+  background:#202126!important;
+  color:#a8acb4!important;
+}
+html:root[data-crm-theme="dark"] .multi-select-menu{
+  background:#191a1f!important;
+  border-color:#36383f!important;
+}
+html:root[data-crm-theme="dark"] .multi-select-item{
+  color:#d8dae0!important;
+}
+html:root[data-crm-theme="dark"] .multi-select-item:hover{
+  background:#26272d!important;
+}
+html:root[data-crm-theme="dark"] .exhibition-view-switch button.active{
+  background:#e8e8e9!important;
+  color:#25262b!important;
+}
+
+/* ---------- Workshop ---------- */
+html:root[data-crm-theme="dark"] .workshop-kpi,
+html:root[data-crm-theme="dark"] .workshop-quick-actions button,
+html:root[data-crm-theme="dark"] .workshop-panel,
+html:root[data-crm-theme="dark"] .workshop-search,
+html:root[data-crm-theme="dark"] .workshop-stock-card,
+html:root[data-crm-theme="dark"] .workshop-dealer-card,
+html:root[data-crm-theme="dark"] .workshop-recipe-card,
+html:root[data-crm-theme="dark"] .workshop-modal .modal-content,
+html:root[data-crm-theme="dark"] .workshop-calc-box,
+html:root[data-crm-theme="dark"] .workshop-operation-box,
+html:root[data-crm-theme="dark"] .workshop-bom,
+html:root[data-crm-theme="dark"] .workshop-memo-card,
+html:root[data-crm-theme="dark"] .workshop-memo-line-summary,
+html:root[data-crm-theme="dark"] .workshop-receipt-line,
+html:root[data-crm-theme="dark"] .workshop-memo-product-row,
+html:root[data-crm-theme="dark"] .workshop-more-actions,
+html:root[data-crm-theme="dark"] .workshop-print-grid>button{
+  background:#191a1f!important;
+  border-color:#35373e!important;
+  color:#e6e7ea!important;
+}
+html:root[data-crm-theme="dark"] .workshop-tabs,
+html:root[data-crm-theme="dark"] .workshop-stock-toolbar,
+html:root[data-crm-theme="dark"] .workshop-filter-row,
+html:root[data-crm-theme="dark"] .workshop-memo-card-foot,
+html:root[data-crm-theme="dark"] .workshop-memo-editor-head,
+html:root[data-crm-theme="dark"] .workshop-memo-summary,
+html:root[data-crm-theme="dark"] .workshop-more-actions[open]>summary{
+  background:#202126!important;
+  border-color:#34363d!important;
+}
+html:root[data-crm-theme="dark"] .workshop-modal .modal-body{
+  background:#15161a!important;
+}
+html:root[data-crm-theme="dark"] .workshop-modal .modal-footer{
+  background:#18191d!important;
+  border-color:#34363d!important;
+}
+html:root[data-crm-theme="dark"] .workshop-primary-action{
+  background:#f2f0ed!important;
+  color:#222328!important;
+}
+
+/* ---------- Competitors ---------- */
+html:root[data-crm-theme="dark"] .competitor-kpi,
+html:root[data-crm-theme="dark"] .competitors-loading,
+html:root[data-crm-theme="dark"] .competitors-toolbar,
+html:root[data-crm-theme="dark"] .competitor-card,
+html:root[data-crm-theme="dark"] .competitors-empty,
+html:root[data-crm-theme="dark"] .competitor-modal,
+html:root[data-crm-theme="dark"] .competitor-small-modal,
+html:root[data-crm-theme="dark"] .competitor-form-section,
+html:root[data-crm-theme="dark"] .competitor-entry,
+html:root[data-crm-theme="dark"] .competitor-collection-edit{
+  background:#191a1f!important;
+  border-color:#35373e!important;
+  color:#e7e8eb!important;
+}
+html:root[data-crm-theme="dark"] .competitor-card-metric,
+html:root[data-crm-theme="dark"] .competitor-analysis-box,
+html:root[data-crm-theme="dark"] .competitor-monitoring,
+html:root[data-crm-theme="dark"] .competitor-collections-preview{
+  background:#202126!important;
+  border-color:#34363d!important;
+}
+html:root[data-crm-theme="dark"] .competitor-card-logo{
+  background:#26272d!important;
+  border-color:#3a3c44!important;
+}
+html:root[data-crm-theme="dark"] .competitor-modal .modal-footer{
+  background:#18191d!important;
+  border-color:#34363d!important;
+}
+
+/* ---------- Products ---------- */
+html:root[data-crm-theme="dark"] .product-kpi,
+html:root[data-crm-theme="dark"] .product-toolbar,
+html:root[data-crm-theme="dark"] .product-list-panel,
+html:root[data-crm-theme="dark"] .product-row,
+html:root[data-crm-theme="dark"] .product-editor-modal .modal-content,
+html:root[data-crm-theme="dark"] .product-editor-section,
+html:root[data-crm-theme="dark"] .stock-import-modal .modal-content,
+html:root[data-crm-theme="dark"] .stock-import-file-box,
+html:root[data-crm-theme="dark"] .stock-mapping-row,
+html:root[data-crm-theme="dark"] .search-results,
+html:root[data-crm-theme="dark"] .search-item{
+  background:#191a1f!important;
+  border-color:#35373e!important;
+  color:#e7e8eb!important;
+}
+html:root[data-crm-theme="dark"] .product-list-head,
+html:root[data-crm-theme="dark"] .product-editor-head,
+html:root[data-crm-theme="dark"] .product-editor-footer,
+html:root[data-crm-theme="dark"] .product-toolbar-meta{
+  background:#202126!important;
+  border-color:#34363d!important;
+}
+html:root[data-crm-theme="dark"] .product-row:hover{
+  background:#202126!important;
+}
+html:root[data-crm-theme="dark"] .product-edit-btn{
+  background:#24252a!important;
+  border-color:#3a3c44!important;
+  color:#b8bbc3!important;
+}
+
+/* ---------- Reclamations ---------- */
+html:root[data-crm-theme="dark"] .rec-kpi,
+html:root[data-crm-theme="dark"] .rec-toolbar,
+html:root[data-crm-theme="dark"] .rec-card,
+html:root[data-crm-theme="dark"] .rec-form-content,
+html:root[data-crm-theme="dark"] .rec-modal-body,
+html:root[data-crm-theme="dark"] .photo-preview-item{
+  background:#191a1f!important;
+  border-color:#35373e!important;
+  color:#e7e8eb!important;
+}
+html:root[data-crm-theme="dark"] .rec-field-shortcuts,
+html:root[data-crm-theme="dark"] .rec-modal-footer,
+html:root[data-crm-theme="dark"] #view-modal .modal-header{
+  background:#18191d!important;
+  border-color:#34363d!important;
+}
+html:root[data-crm-theme="dark"] .rec-form-modal .form-control:focus,
+html:root[data-crm-theme="dark"] .rec-form-modal .form-select:focus{
+  background:#24252a!important;
+}
+
+/* ---------- Audit ---------- */
+html:root[data-crm-theme="dark"] .audit-kpis article,
+html:root[data-crm-theme="dark"] .audit-toolbar,
+html:root[data-crm-theme="dark"] .audit-list-shell,
+html:root[data-crm-theme="dark"] .audit-row,
+html:root[data-crm-theme="dark"] .audit-detail-card,
+html:root[data-crm-theme="dark"] .audit-changes,
+html:root[data-crm-theme="dark"] .audit-json details{
+  background:#191a1f!important;
+  border-color:#35373e!important;
+  color:#e7e8eb!important;
+}
+html:root[data-crm-theme="dark"] .audit-table-head,
+html:root[data-crm-theme="dark"] .audit-toolbar-foot,
+html:root[data-crm-theme="dark"] .audit-changes-head{
+  background:#202126!important;
+  border-color:#34363d!important;
+}
+html:root[data-crm-theme="dark"] .audit-pagination button{
+  background:#202126!important;
+  border-color:#36383f!important;
+  color:#d2d4da!important;
+}
+
+/* ---------- Common app-page text ---------- */
+html:root[data-crm-theme="dark"] .app-page-shell,
+html:root[data-crm-theme="dark"] .pricing-shell,
+html:root[data-crm-theme="dark"] .sales-shell,
+html:root[data-crm-theme="dark"] .workshop-shell,
+html:root[data-crm-theme="dark"] .audit-shell{
+  color:#e5e6e9!important;
+}
+html:root[data-crm-theme="dark"] .app-page-shell p,
+html:root[data-crm-theme="dark"] .pricing-shell p,
+html:root[data-crm-theme="dark"] .sales-shell p,
+html:root[data-crm-theme="dark"] .workshop-shell p,
+html:root[data-crm-theme="dark"] .audit-shell p{
+  color:#a5a9b2;
+}
+
+/* No accidental light text field fills on focus anywhere inside dark mode */
+html:root[data-crm-theme="dark"] .app-workspace-page .form-control:focus,
+html:root[data-crm-theme="dark"] .app-workspace-page .form-select:focus{
+  background:#24252a!important;
+  color:#f3f4f6!important;
+  border-color:#5b5e68!important;
+}
