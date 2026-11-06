@@ -12802,3 +12802,44 @@ body:not(.app-workspace-page) .modal-header .btn-close{
         right:16px!important;
     }
 }
+
+
+/* Dealer profile — display price and promotional retail calculation */
+.dealer-price-detail-values-expanded{
+  grid-template-columns:repeat(6,minmax(118px,1fr));
+}
+.dealer-price-detail-values-expanded span{
+  position:relative;
+}
+.dealer-price-detail-values-expanded .is-display{
+  background:#f7f7f8;
+}
+.dealer-price-detail-values-expanded .is-action{
+  background:#fff8f0;
+  border-color:#f1dcc2;
+}
+.dealer-price-detail-values-expanded .is-final{
+  background:#fff2f2;
+  border-color:rgba(185,4,10,.22);
+}
+.dealer-price-detail-values-expanded .is-final strong{
+  color:#b9040a;
+}
+.dealer-price-detail-values-expanded .is-final em{
+  display:block;
+  margin-top:2px;
+  color:#b9040a;
+  font-style:normal;
+  font-size:.48rem;
+  font-weight:800;
+}
+@media(max-width:1200px){
+  .dealer-price-detail-values-expanded{
+    grid-template-columns:repeat(3,minmax(118px,1fr));
+  }
+}
+@media(max-width:700px){
+  .dealer-price-detail-values-expanded{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
