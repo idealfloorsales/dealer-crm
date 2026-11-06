@@ -969,7 +969,7 @@ const compRefSchema = new mongoose.Schema({
 }, { timestamps: true });
 const CompRef = mongoose.model('CompRef', compRefSchema);
 
-const dealerSchema = new mongoose.Schema({ dealer_id: String, name: String, price_type: String, city: String, address: String, contacts: [contactSchema], bonuses: String, photos: [photoSchema], legal_entities: [dealerLegalEntitySchema], contract: { isSigned: Boolean, date: String }, region_sector: String, hasPersonalPlan: { type: Boolean, default: false }, delivery: String, website: String, instagram: String, additional_addresses: [additionalAddressSchema], pos_materials: [posMaterialSchema], visits: [visitSchema], products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }], latitude: Number, longitude: Number, status: { type: String, default: 'standard' }, avatarUrl: String, competitors: [competitorSchema], responsible: String, responsibleUserId: String, responsibleAssignmentSource: String }, { timestamps: true });
+const dealerSchema = new mongoose.Schema({ dealer_id: String, name: String, price_type: String, price_list: { type: mongoose.Schema.Types.ObjectId, ref: 'PriceList', default: null }, city: String, address: String, contacts: [contactSchema], bonuses: String, photos: [photoSchema], legal_entities: [dealerLegalEntitySchema], contract: { isSigned: Boolean, date: String }, region_sector: String, hasPersonalPlan: { type: Boolean, default: false }, delivery: String, website: String, instagram: String, additional_addresses: [additionalAddressSchema], pos_materials: [posMaterialSchema], visits: [visitSchema], products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }], latitude: Number, longitude: Number, status: { type: String, default: 'standard' }, avatarUrl: String, competitors: [competitorSchema], responsible: String, responsibleUserId: String, responsibleAssignmentSource: String }, { timestamps: true });
 const Dealer = mongoose.model('Dealer', dealerSchema);
 
 const priceListRowSchema = new mongoose.Schema({
@@ -1081,6 +1081,11 @@ function canonicalDealerPayload(input = {}) {
     delete payload.organization;
     delete payload.organizations;
     delete payload.requisites;
+
+    if (Object.prototype.hasOwnProperty.call(payload, 'price_list')) {
+        const priceListId = String(payload.price_list?._id || payload.price_list?.id || payload.price_list || '').trim();
+        payload.price_list = priceListId && mongoose.Types.ObjectId.isValid(priceListId) ? priceListId : null;
+    }
 
     if (Object.prototype.hasOwnProperty.call(payload, 'contract')) {
         const source = payload.contract && typeof payload.contract === 'object' ? payload.contract : {};
@@ -1478,6 +1483,21 @@ function convertToClient(doc) {
         });
     }
 
+    if (obj.price_list && typeof obj.price_list === 'object') {
+        const priceList = obj.price_list.toObject ? obj.price_list.toObject() : { ...obj.price_list };
+        obj.price_list = {
+            id: String(priceList._id || priceList.id || ''),
+            name: priceList.name || '',
+            code: priceList.code || '',
+            versionDate: priceList.versionDate || '',
+            active: priceList.active !== false
+        };
+    } else if (obj.price_list) {
+        obj.price_list = { id: String(obj.price_list), name: '' };
+    } else {
+        obj.price_list = null;
+    }
+
     if (!Array.isArray(obj.legal_entities)) obj.legal_entities = [];
     if (obj.contract && typeof obj.contract === 'object') {
         obj.contract = {
@@ -1605,6 +1625,11 @@ function buildDealerPricingSummary(dealer, allConditions, today = pricingTodayKe
         );
 
     const selectedPriceList = priceLists[0] || null;
+    const dealerPriceList = dealer?.price_list && typeof dealer.price_list === 'object'
+        ? dealer.price_list
+        : null;
+    const dealerPriceListId = String(dealerPriceList?._id || dealerPriceList?.id || dealer?.price_list || '');
+    const dealerPriceListName = dealerPriceList?.name || '';
     const activeDiscounts = active.filter(condition => condition.kind === 'discount');
 
     const exclusive = activeDiscounts
@@ -1642,8 +1667,10 @@ function buildDealerPricingSummary(dealer, allConditions, today = pricingTodayKe
         sector: dealer.region_sector || '',
         responsible: dealer.responsible || '',
         defaultPriceType: dealer.price_type || '',
-        effectivePriceList: selectedPriceList?.priceList?.name || selectedPriceList?.priceListName || selectedPriceList?.name || dealer.price_type || 'Оптовая цена',
-        effectivePriceListId: String(selectedPriceList?.priceList?._id || selectedPriceList?.priceList || ''),
+        assignedPriceList: dealerPriceListName || '',
+        assignedPriceListId: dealerPriceListId,
+        effectivePriceList: selectedPriceList?.priceList?.name || selectedPriceList?.priceListName || selectedPriceList?.name || dealerPriceListName || dealer.price_type || 'Спец.цена',
+        effectivePriceListId: String(selectedPriceList?.priceList?._id || selectedPriceList?.priceList || dealerPriceListId || ''),
         priceListCondition: selectedPriceList,
         priceListConflicts: Math.max(0, priceLists.length - 1),
         activeDiscounts: appliedDiscounts,
@@ -1873,7 +1900,8 @@ app.get('/api/dealers/:id/avatar', requirePermission('can_view_dealers'), async 
 });
 app.get('/api/dealers/:id', requirePermission('can_view_dealers'), async (req, res) => {
     try {
-        let query = Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) });
+        let query = Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) })
+            .populate('price_list', 'name code versionDate active');
         if (req.query.view === 'profile') {
             query = query.select('-photos').populate('products', 'sku name');
         } else {
@@ -2100,7 +2128,7 @@ app.get('/api/pricing/catalog', requirePermission('can_view_pricing'), async (re
             .lean();
 
         res.json(products
-            .filter(isPricingLaminateProduct)
+            .filter(product => isPricingLaminateProduct(product) && product.is_liquid !== false)
             .map(product => ({
                 id: String(product._id),
                 sku: product.sku || '',
@@ -2118,7 +2146,7 @@ app.get('/api/pricing/catalog', requirePermission('can_view_pricing'), async (re
     }
 });
 
-app.get('/api/pricing/price-lists', requirePermission('can_view_pricing'), async (req, res) => {
+app.get('/api/pricing/price-lists', requireAnyPermission('can_view_pricing', 'can_view_dealers'), async (req, res) => {
     try {
         const lists = await PriceList.find({})
             .select('_id name code versionDate active archivedAt note rows createdAt updatedAt')
@@ -2234,7 +2262,9 @@ app.get('/api/pricing/dealers/:id/price-sheet', requirePermission('can_view_pric
                 { _id: req.params.id },
                 getWorkingDealerFilter(getDealerFilter(req))
             ]
-        }).select('_id dealer_id name city region_sector price_type responsible contacts').lean();
+        }).select('_id dealer_id name city region_sector price_type price_list responsible contacts')
+            .populate('price_list', 'name code versionDate active')
+            .lean();
         if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
 
         const conditions = await PricingCondition.find({})
@@ -2252,7 +2282,7 @@ app.get('/api/pricing/dealers/:id/price-sheet', requirePermission('can_view_pric
             .select('_id sku name product_type collection is_liquid')
             .sort({ sku: 1, name: 1 })
             .lean();
-        const laminate = products.filter(isPricingLaminateProduct);
+        const laminate = products.filter(product => isPricingLaminateProduct(product) && product.is_liquid !== false);
         const productMap = new Map(laminate.map(product => [String(product._id), product]));
 
         const productDisplay = await DealerDisplayPrice.find({ dealer: dealer._id }).lean();
@@ -2427,7 +2457,8 @@ app.put('/api/pricing/dealers/:id/display-prices', requirePermission('can_manage
 app.get('/api/pricing/overview', requirePermission('can_view_pricing'), async (req, res) => {
     try {
         const dealers = await Dealer.find(getWorkingDealerFilter(getDealerFilter(req)))
-            .select('_id dealer_id name city region_sector price_type responsible')
+            .select('_id dealer_id name city region_sector price_type price_list responsible')
+            .populate('price_list', 'name code versionDate active')
             .sort({ name: 1 })
             .lean();
         const conditions = await PricingCondition.find({})
@@ -2491,7 +2522,8 @@ app.get('/api/pricing/dealers/:id', requirePermission('can_view_pricing'), async
                 { _id: req.params.id },
                 getWorkingDealerFilter(getDealerFilter(req))
             ]
-        }).select('_id dealer_id name city region_sector price_type responsible')
+        }).select('_id dealer_id name city region_sector price_type price_list responsible')
+            .populate('price_list', 'name code versionDate active')
             .lean();
         if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
 
