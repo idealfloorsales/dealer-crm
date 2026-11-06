@@ -3,7 +3,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const API_DEALERS = '/api/dealers';
     const API_SALES = '/api/sales';
     const API_SECTORS = '/api/sectors';
-    const API_MANAGERS = '/api/managers';
     
     // Элементы
     const monthPicker = document.getElementById('month-picker');
@@ -49,7 +48,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let allDealers = [];
     let currentSales = [];
     let allSectors = [];
-    let managerUsers = [];
     let canEditFact = false;
     let canEditPlan = false;
     let isDirty = false;
@@ -79,18 +77,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (e) { console.error(e); }
 
-        await Promise.all([loadSectors(), loadManagers()]);
+        await loadSectors();
         loadData();
         setupMobileTabs();
-    }
-
-    async function loadManagers() {
-        try {
-            const res = await fetch(API_MANAGERS);
-            if (res.ok) managerUsers = await res.json();
-        } catch (e) {
-            console.warn('Не удалось загрузить менеджеров', e);
-        }
     }
 
     async function loadSectors() {
@@ -243,7 +232,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!dealersRes.ok || !salesRes.ok) throw new Error("Ошибка доступа");
 
             allDealers = await dealersRes.json();
-            currentSales = await salesRes.json();
+            currentSales = (await salesRes.json()).filter(row => !String(row.dealerId || '').startsWith('PLAN_manager_'));
             loadedMonth = monthPicker.value;
             clearDirty();
             renderAll();
@@ -424,7 +413,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const revisionAtStart = autoSaveRevision;
         const monthAtStart = monthPicker.value;
-        const payload = JSON.parse(JSON.stringify(currentSales));
+        const payload = JSON.parse(JSON.stringify(currentSales.filter(row => !String(row.dealerId || '').startsWith('PLAN_manager_'))));
 
         autoSaveInFlight = true;
         autoSaveQueued = false;
@@ -512,17 +501,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const cards = [];
         const totalFactAll = totalRegionsFact + totalAstanaFact + totalVipFact + totalOtherFact;
-        const authUser = window.CRMAuth?.user;
-        const personalManagerView = false;
-
-        if (personalManagerView) {
-            cards.push({
-                title: authUser.fullName || authUser.username || 'Мой план',
-                fact: totalFactAll,
-                plan: plans[`manager_${authUser.id}`] || 0,
-                meta: 'Личный результат'
-            });
-        } else if (currentScope === 'all') {
+        if (currentScope === 'all') {
             cards.push({ title: 'Вся компания', fact: totalFactAll, plan: plans.total_all || 0, meta: 'Общий результат' });
             cards.push({ title: 'Астана', fact: totalAstanaFact, plan: plans.astana_all || 0, meta: 'Итого по Астане' });
             cards.push({ title: 'Регионы', fact: totalRegionsFact, plan: plans.regions_all || 0, meta: 'Итого по регионам' });
@@ -566,10 +545,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         const totalFactAll = totalRegionsFact + totalAstanaFact + totalVipFact + totalOtherFact;
-        const authUser = window.CRMAuth?.user;
-        const personalManagerView = false;
-        const managerPlanKey = '';
-
         const levelFor = (fact, plan) => {
             if (!(Number(plan) > 0)) return 'none';
             const pct = Number(fact) / Number(plan) * 100;
@@ -579,13 +554,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const overview = [];
-        if (personalManagerView) {
-            overview.push([
-                authUser.fullName || authUser.username || 'Мой план',
-                totalFactAll,
-                plans[managerPlanKey] || 0
-            ]);
-        } else if (currentScope === 'all') {
+        if (currentScope === 'all') {
             overview.push(['Вся компания', totalFactAll, plans.total_all || 0]);
             overview.push(['Астана', totalAstanaFact, plans.astana_all || 0]);
             overview.push(['Регионы', totalRegionsFact, plans.regions_all || 0]);
@@ -784,7 +753,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const allPlanKeys = ['total_all', 'astana_all', 'regions_all'];
         groupsConfig.forEach(g => allPlanKeys.push(g.key));
         facts.vip.forEach(v => allPlanKeys.push(`vip_${v.id}`));
-        managerUsers.forEach(manager => allPlanKeys.push(`manager_${manager.id}`));
 
         allPlanKeys.forEach(k => {
             const p = currentSales.find(s => s.dealerId === `PLAN_${k}`) || {};
@@ -848,59 +816,31 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>`;
         };
 
-        const authUser = window.CRMAuth?.user;
-        const personalManagerView = false;
-        const rootPlanKey = personalManagerView
-            ? `manager_${authUser.id}`
-            : currentScope === 'astana'
-                ? 'astana_all'
-                : currentScope === 'regions'
-                    ? 'regions_all'
-                    : 'total_all';
-        const rootTitle = personalManagerView
-            ? (authUser.fullName || authUser.username || 'Мой план')
-            : currentScope === 'astana'
-                ? 'Астана'
-                : currentScope === 'regions'
-                    ? 'Регионы'
-                    : 'Вся компания';
-        const rootFact = personalManagerView
-            ? totalFactAll
-            : currentScope === 'astana'
-                ? totalAstanaFact
-                : currentScope === 'regions'
-                    ? totalRegionsFact
-                    : totalFactAll;
-
-        const managerFactById = (managerId) => {
-            const ownedIds = new Set(
-                allDealers
-                    .filter(dealer => String(dealer.responsibleUserId || '') === String(managerId))
-                    .map(dealer => String(dealer.id))
-            );
-            return currentSales
-                .filter(row => !row.isCustom && ownedIds.has(String(row.dealerId || '')))
-                .reduce((sum, row) => sum + (Number(row.fact) || 0), 0);
-        };
+        const rootPlanKey = currentScope === 'astana'
+            ? 'astana_all'
+            : currentScope === 'regions'
+                ? 'regions_all'
+                : 'total_all';
+        const rootTitle = currentScope === 'astana'
+            ? 'Астана'
+            : currentScope === 'regions'
+                ? 'Регионы'
+                : 'Вся компания';
+        const rootFact = currentScope === 'astana'
+            ? totalAstanaFact
+            : currentScope === 'regions'
+                ? totalRegionsFact
+                : totalFactAll;
 
         let summaryHtml = '';
-        summaryHtml += `<div class="sales-summary-group is-company"><div class="sales-summary-group-title">${personalManagerView ? 'Мой результат' : (currentScope === 'all' ? 'Компания' : 'Моя зона')}</div>${renderSumItem(rootTitle, rootPlanKey, rootFact, false, true)}</div>`;
-
-        if (!personalManagerView && currentScope === 'all' && managerUsers.length) {
-            summaryHtml += '<div class="sales-summary-group"><div class="sales-summary-group-title">Планы менеджеров</div>';
-            managerUsers.forEach(manager => {
-                const managerName = manager.fullName || manager.username || 'Менеджер';
-                summaryHtml += renderSumItem(managerName, `manager_${manager.id}`, managerFactById(manager.id), true, true);
-            });
-            summaryHtml += '</div>';
-        }
+        summaryHtml += `<div class="sales-summary-group is-company"><div class="sales-summary-group-title">${currentScope === 'all' ? 'Компания' : 'Моя зона'}</div>${renderSumItem(rootTitle, rootPlanKey, rootFact, false, true)}</div>`;
 
         if (currentScope !== 'regions') {
             summaryHtml += `<div class="sales-summary-group"><div class="sales-summary-group-title">Астана</div>`;
             summaryHtml += renderSumItem("Астана — всего", "astana_all", totalAstanaFact, false, true);
             groupsConfig.forEach(g => {
-                if (g.type === 'astana' && ((facts[g.key] || 0) !== 0 || (plans[g.key] || 0) !== 0)) {
-                    summaryHtml += renderSumItem(g.title.replace('Астана — ', ''), g.key, facts[g.key], true);
+                if (g.type === 'astana') {
+                    summaryHtml += renderSumItem(g.title.replace('Астана — ', ''), g.key, facts[g.key] || 0, true, true);
                 }
             });
             summaryHtml += '</div>';
@@ -916,8 +856,8 @@ document.addEventListener('DOMContentLoaded', () => {
             summaryHtml += '<div class="sales-summary-group"><div class="sales-summary-group-title">Регионы</div>';
             summaryHtml += renderSumItem("Регионы — всего", "regions_all", totalRegionsFact, false, true);
             groupsConfig.forEach(g => {
-                if (g.type === 'region' && ((facts[g.key] || 0) !== 0 || (plans[g.key] || 0) !== 0)) {
-                    summaryHtml += renderSumItem(g.title.replace('Регион ', ''), g.key, facts[g.key], true);
+                if (g.type === 'region') {
+                    summaryHtml += renderSumItem(g.title.replace('Регион ', ''), g.key, facts[g.key] || 0, true, true);
                 }
             });
             summaryHtml += '</div>';
