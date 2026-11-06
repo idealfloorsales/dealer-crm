@@ -2633,6 +2633,105 @@ app.get('/api/pricing/dealers/:id', requirePermission('can_view_pricing'), async
     }
 });
 
+app.post('/api/pricing/setup', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const scopeType = ['dealer','sector','city','all'].includes(req.body?.scopeType) ? req.body.scopeType : 'dealer';
+        const targetPayload = cleanPricingPayload({
+            scopeType,
+            dealerIds:req.body?.dealerIds,
+            scopeValues:req.body?.scopeValues,
+            kind:'discount',
+            name:'Проверка цели',
+            discountPercent:5
+        });
+        const targetError = validatePricingPayload(targetPayload) || (scopeType !== 'all' ? await validatePricingTargets(req, targetPayload) : '');
+        if (targetError) return res.status(400).json({ error: targetError });
+        if (!isGlobalViewer(req) && scopeType !== 'dealer') {
+            return res.status(403).json({ error: 'Региональные и общие ценовые условия может создавать только пользователь с доступом ко всей компании' });
+        }
+
+        const priceListId = String(req.body?.priceListId || '').trim();
+        const discounts = [...new Set((Array.isArray(req.body?.discounts) ? req.body.discounts : [])
+            .map(Number).filter(value => value === 5 || value === 10))];
+        if (!priceListId && !discounts.length) return res.status(400).json({ error:'Выберите прайс или хотя бы одну скидку' });
+
+        let priceList = null;
+        if (priceListId) {
+            if (!mongoose.Types.ObjectId.isValid(priceListId)) return res.status(400).json({ error:'Некорректный прайс' });
+            priceList = await PriceList.findOne({ _id:priceListId, active:{ $ne:false } }).lean();
+            if (!priceList) return res.status(404).json({ error:'Прайс не найден или находится в архиве' });
+        }
+
+        const startDate = String(req.body?.startDate || '').trim();
+        const endDate = String(req.body?.endDate || '').trim();
+        const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+        if (discounts.length && startDate && !dateRe.test(startDate)) return res.status(400).json({ error:'Некорректная дата начала акции' });
+        if (discounts.length && endDate && !dateRe.test(endDate)) return res.status(400).json({ error:'Некорректная дата окончания акции' });
+        if (discounts.length && startDate && endDate && endDate < startDate) return res.status(400).json({ error:'Дата окончания акции не может быть раньше даты начала' });
+
+        const user = pricingUserMeta(req);
+        const note = String(req.body?.note || '').trim();
+        const base = {
+            scopeType,
+            dealer:targetPayload.dealer,
+            dealers:targetPayload.dealers,
+            scopeValue:targetPayload.scopeValue,
+            scopeValues:targetPayload.scopeValues
+        };
+        const created = [];
+
+        if (priceList) {
+            const item = await PricingCondition.create({
+                ...base,
+                kind:'price_list',
+                name:priceList.name,
+                code:'BASE-PRICE',
+                priceList:priceList._id,
+                priceListName:priceList.name,
+                stackable:false,
+                priority:100,
+                startDate:'',
+                endDate:'',
+                reasonType:'other',
+                requirementTarget:0,
+                requirementCurrent:0,
+                note,
+                createdBy:user,
+                updatedBy:user,
+                audit:[{ action:'created', userId:user.id, userName:user.name, note:'Прайс назначен через настройку цен' }]
+            });
+            created.push(item._id);
+        }
+
+        for (const discount of discounts) {
+            const code = discount === 5 ? 'SOCIAL-5' : 'SUPPORT-10';
+            const item = await PricingCondition.create({
+                ...base,
+                kind:'discount',
+                name:`Скидка −${discount}%`,
+                code,
+                discountPercent:discount,
+                stackable:true,
+                priority:discount,
+                startDate,
+                endDate,
+                reasonType:'other',
+                requirementTarget:0,
+                requirementCurrent:0,
+                note,
+                createdBy:user,
+                updatedBy:user,
+                audit:[{ action:'created', userId:user.id, userName:user.name, note:`Скидка −${discount}% назначена через настройку цен` }]
+            });
+            created.push(item._id);
+        }
+
+        res.status(201).json({ status:'ok', created:created.map(String) });
+    } catch (e) {
+        res.status(400).json({ error:e.message });
+    }
+});
+
 app.post('/api/pricing/conditions', requirePermission('can_manage_pricing'), async (req, res) => {
     try {
         const payload = cleanPricingPayload(req.body);

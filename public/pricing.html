@@ -245,18 +245,9 @@
                             <div class="pricing-target-layout">
                                 <label class="pricing-target-type"><span>Уровень</span>
                                     <select id="pricing-scope-type" class="form-select">
-                                        <optgroup label="Дилеры">
-                                            <option value="dealer_one">Один дилер</option>
-                                            <option value="dealer_many">Несколько дилеров</option>
-                                        </optgroup>
-                                        <optgroup label="Города">
-                                            <option value="city_one">Один город</option>
-                                            <option value="city_many">Несколько городов</option>
-                                        </optgroup>
-                                        <optgroup label="Сектора">
-                                            <option value="sector_one">Один сектор</option>
-                                            <option value="sector_many">Несколько секторов</option>
-                                        </optgroup>
+                                        <option value="dealer">Дилеры</option>
+                                        <option value="city">Города</option>
+                                        <option value="sector">Сектора</option>
                                         <option value="all">Вся дилерская сеть</option>
                                     </select>
                                 </label>
@@ -286,67 +277,49 @@
                         </div>
 
                         <div class="pricing-form-section">
-                            <div class="pricing-form-section-title"><span>2</span><div><strong>Что меняем</strong><small>Процент или сам базовый прайс</small></div></div>
-                            <div class="pricing-presets">
-                                <button type="button" data-pricing-preset="social5"><i class="bi bi-instagram"></i><span><strong>−5%</strong><small>8 публикаций</small></span></button>
-                                <button type="button" data-pricing-preset="support10"><i class="bi bi-megaphone"></i><span><strong>−10%</strong><small>поддержка продаж</small></span></button>
-                                <button type="button" data-pricing-preset="regional"><i class="bi bi-geo-alt"></i><span><strong>Региональный прайс</strong><small>без процента</small></span></button>
-                            </div>
-                            <div class="pricing-kind-switch">
-                                <label><input type="radio" name="pricing-kind" value="discount" checked><span><i class="bi bi-percent"></i><strong>Скидка</strong><small>Например −5% или −10%</small></span></label>
-                                <label><input type="radio" name="pricing-kind" value="price_list"><span><i class="bi bi-receipt"></i><strong>Базовый прайс</strong><small>Например отдельный прайс Запад</small></span></label>
-                            </div>
-                            <div class="pricing-form-grid mt-3">
-                                <label class="wide"><span>Название</span><input id="pricing-name" class="form-control" placeholder="−5% за публикации в соцсетях" required></label>
-                                <label><span>Код / метка</span><input id="pricing-code" class="form-control" placeholder="SOCIAL-5"></label>
-                                <label id="pricing-percent-field"><span>Скидка, %</span><input id="pricing-percent" type="number" min="0.01" max="100" step="0.01" class="form-control" value="5"></label>
-                                <label id="pricing-price-list-field" class="wide d-none"><span>Базовый прайс</span><select id="pricing-price-list" class="form-select"><option value="">Выберите прайс</option></select></label>
-                                <label id="pricing-stack-field"><span>Можно суммировать</span>
-                                    <select id="pricing-stackable" class="form-select"><option value="true">Да</option><option value="false">Нет, условие исключающее</option></select>
+                            <div class="pricing-form-section-title"><span>2</span><div><strong>Прайс и скидки</strong><small>Выберите готовый прайс и скидки для выбранных дилеров, городов или секторов</small></div></div>
+                            <div class="pricing-commercial-grid">
+                                <label class="pricing-price-choice">
+                                    <span>Прайс</span>
+                                    <select id="pricing-price-list" class="form-select">
+                                        <option value="">Не менять действующий прайс</option>
+                                    </select>
+                                    <small>Название и цены берутся из уже созданных прайсов.</small>
                                 </label>
-                                <label><span>Приоритет</span><input id="pricing-priority" type="number" step="1" class="form-control" value="0"></label>
+                                <div class="pricing-discount-choice">
+                                    <span>Скидки</span>
+                                    <div class="pricing-discount-options">
+                                        <label>
+                                            <input type="checkbox" id="pricing-discount-5" value="5">
+                                            <span><strong>−5%</strong><small>Добавить скидку</small></span>
+                                        </label>
+                                        <label>
+                                            <input type="checkbox" id="pricing-discount-10" value="10">
+                                            <span><strong>−10%</strong><small>Добавить скидку</small></span>
+                                        </label>
+                                    </div>
+                                    <small>Можно выбрать обе скидки — тогда они суммируются.</small>
+                                </div>
                             </div>
                             <div class="pricing-rule-note">
                                 <i class="bi bi-diagram-3"></i>
-                                <span><strong>Порядок:</strong> сначала CRM выбирает базовый прайс, затем применяет суммируемые скидки. Поэтому «Западный прайс + −5% + −10%» считается корректно.</span>
+                                <span>Сначала применяется выбранный базовый прайс, затем выбранные скидки. Например: прайс «Запад» + −5% + −10%.</span>
                             </div>
                         </div>
 
-                        <div class="pricing-form-section">
-                            <div class="pricing-form-section-title"><span>3</span><div><strong>Период</strong><small>Срок включается и выключается автоматически</small></div></div>
-                            <div class="pricing-form-grid">
+                        <div class="pricing-form-section" id="pricing-promo-period-section">
+                            <div class="pricing-form-section-title"><span>3</span><div><strong>Период акции</strong><small>Этот период относится только к скидкам −5% и −10%; срок действия прайса здесь не меняется</small></div></div>
+                            <div class="pricing-form-grid pricing-promo-period-grid">
                                 <label><span>С</span><input id="pricing-start-date" type="date" class="form-control"></label>
                                 <label><span>По</span><input id="pricing-end-date" type="date" class="form-control"></label>
-                                <label><span>Состояние</span><select id="pricing-paused" class="form-select"><option value="false">Работает по датам</option><option value="true">Временно приостановлено</option></select></label>
                             </div>
-                        </div>
-
-                        <div class="pricing-form-section">
-                            <div class="pricing-form-section-title"><span>4</span><div><strong>Основание и обязательство</strong><small>Можно контролировать выполнение договорённости</small></div></div>
-                            <div class="pricing-form-grid">
-                                <label><span>Основание</span>
-                                    <select id="pricing-reason-type" class="form-select">
-                                        <option value="social_posts">Публикации в соцсетях</option>
-                                        <option value="support_promo">Акция для поддержки продаж</option>
-                                        <option value="regional_price">Региональный прайс</option>
-                                        <option value="individual">Индивидуальное условие</option>
-                                        <option value="other">Другое</option>
-                                    </select>
-                                </label>
-                                <label><span>Нужно выполнить</span><input id="pricing-requirement-target" type="number" min="0" step="1" class="form-control" value="8"></label>
-                                <label><span>Выполнено</span><input id="pricing-requirement-current" type="number" min="0" step="1" class="form-control" value="0"></label>
-                                <label><span>Единица</span><input id="pricing-requirement-unit" class="form-control" value="публикаций"></label>
-                                <label><span>Срок обязательства</span><input id="pricing-requirement-due" type="date" class="form-control"></label>
-                                <label class="pricing-checkbox-label"><input id="pricing-requirement-verified" type="checkbox" class="form-check-input"><span><strong>Подтверждено</strong><small>Менеджер проверил выполнение</small></span></label>
-                                <label class="wide"><span>Подтверждение / ссылки / комментарий</span><textarea id="pricing-proof-note" class="form-control" rows="2" placeholder="Ссылки на публикации или комментарий менеджера"></textarea></label>
-                            </div>
+                            <div id="pricing-promo-period-hint" class="pricing-promo-period-hint">Выберите хотя бы одну скидку, чтобы задать период акции.</div>
                         </div>
 
                         <div class="pricing-form-section mb-0">
-                            <div class="pricing-form-section-title"><span>5</span><div><strong>Комментарий</strong><small>Почему и на каких условиях дали цену</small></div></div>
-                            <textarea id="pricing-note" class="form-control" rows="3" placeholder="Дополнительные условия, согласование, ограничения..."></textarea>
+                            <div class="pricing-form-section-title"><span>4</span><div><strong>Комментарий</strong><small>Дополнительные условия или пояснение</small></div></div>
+                            <textarea id="pricing-note" class="form-control" rows="3" placeholder="Комментарий..."></textarea>
                         </div>
-                    </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button>
                         <button type="submit" class="btn btn-dark" id="pricing-save-btn">Сохранить условие</button>

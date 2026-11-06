@@ -1062,22 +1062,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function selectedScopeMode() {
-        const raw = $('pricing-scope-type')?.value || 'dealer_one';
-        if (raw === 'all') return { value:'all', type:'all', multiple:false };
-        const match = raw.match(/^(dealer|city|sector)_(one|many)$/);
-        if (match) return { value:raw, type:match[1], multiple:match[2] === 'many' };
-        const legacyType = ['dealer','city','sector'].includes(raw) ? raw : 'dealer';
-        return { value:legacyType + '_many', type:legacyType, multiple:true };
-    }
-
-    function scopeModeValue(type, count = 1) {
-        if (type === 'all') return 'all';
-        const safeType = ['dealer','city','sector'].includes(type) ? type : 'dealer';
-        return safeType + '_' + (Number(count) > 1 ? 'many' : 'one');
-    }
-
-    function scopeChoices(type) {
+    function scopeChoices(type) {    function scopeChoices(type) {
         if (type === 'dealer') {
             return state.rows
                 .slice()
@@ -1111,8 +1096,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderTargetSummary() {
         const summary = $('pricing-target-summary');
         if (!summary) return;
-        const mode = selectedScopeMode();
-        const type = mode.type;
+        const type = $('pricing-scope-type')?.value || 'dealer';
         if (type === 'all') {
             summary.textContent = 'Вся дилерская сеть';
             return;
@@ -1122,7 +1106,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .filter(item=>selectedTargets.has(String(item.value)))
             .map(item=>item.label);
         if (!count) {
-            summary.textContent = mode.multiple ? 'Ничего не выбрано' : 'Ничего не выбрано — выберите один вариант';
+            summary.textContent = 'Ничего не выбрано';
             return;
         }
         const noun = type === 'dealer'
@@ -1134,8 +1118,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderTargetOptions() {
-        const mode = selectedScopeMode();
-        const type = mode.type;
+        const type = $('pricing-scope-type')?.value || 'dealer';
         const host = $('pricing-target-options');
         if (!host) return;
         if (type === 'all') {
@@ -1143,41 +1126,27 @@ document.addEventListener('DOMContentLoaded', () => {
             renderTargetSummary();
             return;
         }
-
-        if (!mode.multiple && selectedTargets.size > 1) {
-            selectedTargets = new Set([...selectedTargets].slice(0,1));
-        }
-
         const term = String($('pricing-target-search')?.value || '').trim().toLowerCase();
         const choices = scopeChoices(type).filter(item =>
             !term || [item.label,item.meta].join(' ').toLowerCase().includes(term)
         );
-
         host.innerHTML = choices.length
             ? choices.map(item => {
                 const checked = selectedTargets.has(String(item.value));
                 return `<label class="pricing-target-option ${checked ? 'is-selected':''}">
-                    <input type="${mode.multiple ? 'checkbox' : 'radio'}" name="pricing-target-choice" value="${esc(item.value)}" ${checked?'checked':''}>
+                    <input type="checkbox" name="pricing-target-choice" value="${esc(item.value)}" ${checked?'checked':''}>
                     <span class="pricing-target-check"><i class="bi bi-check-lg"></i></span>
                     <span class="pricing-target-option-copy"><strong>${esc(item.label)}</strong>${item.meta ? `<small>${esc(item.meta)}</small>` : ''}</span>
                 </label>`;
             }).join('')
             : '<div class="pricing-target-empty"><i class="bi bi-search"></i><span>Ничего не найдено</span></div>';
-
         host.querySelectorAll('input[name="pricing-target-choice"]').forEach(input => {
             input.addEventListener('change', () => {
                 const value = String(input.value || '');
-                if (mode.multiple) {
-                    if (input.checked) selectedTargets.add(value);
-                    else selectedTargets.delete(value);
-                    input.closest('.pricing-target-option')?.classList.toggle('is-selected', input.checked);
-                    renderTargetSummary();
-                    return;
-                }
-                if (input.checked) {
-                    selectedTargets = new Set([value]);
-                    renderTargetOptions();
-                }
+                if (input.checked) selectedTargets.add(value);
+                else selectedTargets.delete(value);
+                input.closest('.pricing-target-option')?.classList.toggle('is-selected', input.checked);
+                renderTargetSummary();
             });
         });
         renderTargetSummary();
@@ -1189,15 +1158,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function syncScopeFields(options = {}) {
-        const mode = selectedScopeMode();
-        const type = mode.type;
+        const type = $('pricing-scope-type')?.value || 'dealer';
         const clear = options.clear !== false;
         if (clear) selectedTargets.clear();
 
         const picker = $('pricing-target-picker');
         const all = $('pricing-target-all');
         picker?.classList.toggle('d-none', type === 'all');
-        picker?.classList.toggle('is-single', type !== 'all' && !mode.multiple);
         all?.classList.toggle('d-none', type !== 'all');
 
         const title = $('pricing-target-title');
@@ -1205,25 +1172,25 @@ document.addEventListener('DOMContentLoaded', () => {
         const search = $('pricing-target-search');
         const selectAll = $('pricing-target-select-all');
         if (search && clear) search.value = '';
-        selectAll?.classList.toggle('d-none', !mode.multiple || type === 'all');
+        selectAll?.classList.toggle('d-none', type === 'all');
 
         if (title) {
-            if (type === 'dealer') title.textContent = mode.multiple ? 'Выберите дилеров' : 'Выберите дилера';
-            else if (type === 'city') title.textContent = mode.multiple ? 'Выберите города' : 'Выберите город';
-            else if (type === 'sector') title.textContent = mode.multiple ? 'Выберите сектора' : 'Выберите сектор';
-            else title.textContent = 'Вся сеть';
+            title.textContent = type === 'dealer'
+                ? 'Выберите дилеров'
+                : type === 'city'
+                    ? 'Выберите города'
+                    : type === 'sector'
+                        ? 'Выберите сектора'
+                        : 'Вся сеть';
         }
         if (hint) {
-            if (type === 'dealer') hint.textContent = mode.multiple
-                ? 'Выберите несколько дилеров из рабочей базы'
-                : 'Выберите одного дилера из рабочей базы';
-            else if (type === 'city') hint.textContent = mode.multiple
-                ? 'Выберите несколько городов, которые уже есть у дилеров'
-                : 'Выберите один город, который уже есть у дилеров';
-            else if (type === 'sector') hint.textContent = mode.multiple
-                ? 'Выберите несколько существующих секторов'
-                : 'Выберите один существующий сектор';
-            else hint.textContent = 'Условие применяется ко всем';
+            hint.textContent = type === 'dealer'
+                ? 'Можно выбрать одного или несколько дилеров из рабочей базы'
+                : type === 'city'
+                    ? 'Можно выбрать один или несколько существующих городов'
+                    : type === 'sector'
+                        ? 'Можно выбрать один или несколько существующих секторов'
+                        : 'Условие применяется ко всем';
         }
         if (search) {
             search.placeholder = type === 'dealer'
@@ -1235,87 +1202,33 @@ document.addEventListener('DOMContentLoaded', () => {
         renderTargetOptions();
     }
 
-    function selectedKind() {
-        return document.querySelector('input[name="pricing-kind"]:checked')?.value || 'discount';
+    function syncPromotionPeriod() {
+        const enabled = Boolean($('pricing-discount-5')?.checked || $('pricing-discount-10')?.checked);
+        const section = $('pricing-promo-period-section');
+        const hint = $('pricing-promo-period-hint');
+        ['pricing-start-date','pricing-end-date'].forEach(id => {
+            if ($(id)) $(id).disabled = !enabled;
+        });
+        section?.classList.toggle('is-disabled', !enabled);
+        if (hint) hint.textContent = enabled
+            ? 'Период будет применён только к выбранным скидкам.'
+            : 'Выберите хотя бы одну скидку, чтобы задать период акции.';
     }
 
-    function syncKindFields() {
-        const kind = selectedKind();
-        $('pricing-percent-field').classList.toggle('d-none', kind !== 'discount');
-        $('pricing-stack-field').classList.toggle('d-none', kind !== 'discount');
-        $('pricing-price-list-field').classList.toggle('d-none', kind !== 'price_list');
-    }
-
-    function syncReasonDefaults(force=false) {
-        const reason = $('pricing-reason-type').value;
-        const target = $('pricing-requirement-target');
-        if (reason === 'social_posts') {
-            if (force || n(target.value) === 0) target.value = 8;
-            if (!$('pricing-requirement-unit').value) $('pricing-requirement-unit').value = 'публикаций';
-        } else if (force) {
-            target.value = 0;
-            $('pricing-requirement-current').value = 0;
-            $('pricing-requirement-verified').checked = false;
-        }
-    }
-
-    function applyPreset(name) {
-        if (!manage) return;
-        if (name === 'social5') {
-            document.querySelector('input[name="pricing-kind"][value="discount"]').checked = true;
-            $('pricing-name').value = '−5% за публикации в соцсетях';
-            $('pricing-code').value = 'SOCIAL-5';
-            $('pricing-percent').value = 5;
-            $('pricing-stackable').value = 'true';
-            $('pricing-reason-type').value = 'social_posts';
-            $('pricing-requirement-target').value = 8;
-            $('pricing-requirement-current').value = 0;
-            $('pricing-requirement-unit').value = 'публикаций';
-            $('pricing-requirement-verified').checked = false;
-        } else if (name === 'support10') {
-            document.querySelector('input[name="pricing-kind"][value="discount"]').checked = true;
-            $('pricing-name').value = '−10% акция для поддержки продаж';
-            $('pricing-code').value = 'SUPPORT-10';
-            $('pricing-percent').value = 10;
-            $('pricing-stackable').value = 'true';
-            $('pricing-reason-type').value = 'support_promo';
-            $('pricing-requirement-target').value = 0;
-            $('pricing-requirement-current').value = 0;
-            $('pricing-requirement-verified').checked = false;
-        } else if (name === 'regional') {
-            document.querySelector('input[name="pricing-kind"][value="price_list"]').checked = true;
-            $('pricing-name').value = 'Региональный базовый прайс';
-            $('pricing-code').value = 'REGIONAL-PRICE';
-            $('pricing-price-list').value = '';
-            $('pricing-reason-type').value = 'regional_price';
-            $('pricing-requirement-target').value = 0;
-            $('pricing-requirement-current').value = 0;
-            $('pricing-requirement-verified').checked = false;
-            if (selectedScopeMode().type === 'dealer') $('pricing-scope-type').value = 'sector_one';
-        }
-        syncScopeFields();
-        syncKindFields();
-    }
-
-        function resetForm() {
+    function resetForm() {
         $('pricing-condition-form').reset();
         $('pricing-condition-id').value = '';
-        $('pricing-modal-title').textContent = 'Новое условие';
-        $('pricing-scope-type').value = 'dealer_one';
+        $('pricing-modal-title').textContent = 'Настройка цен';
+        $('pricing-scope-type').value = 'dealer';
         selectedTargets.clear();
-        document.querySelector('input[name="pricing-kind"][value="discount"]').checked = true;
-        $('pricing-percent').value = 5;
-        $('pricing-stackable').value = 'true';
-        $('pricing-priority').value = 0;
         $('pricing-start-date').value = state.today || todayValue();
-        $('pricing-reason-type').value = 'social_posts';
-        $('pricing-requirement-target').value = 8;
-        $('pricing-requirement-current').value = 0;
-        $('pricing-requirement-unit').value = 'публикаций';
-        $('pricing-requirement-verified').checked = false;
-        $('pricing-paused').value = 'false';
+        $('pricing-end-date').value = '';
+        $('pricing-price-list').value = '';
+        $('pricing-discount-5').checked = false;
+        $('pricing-discount-10').checked = false;
+        $('pricing-note').value = '';
         syncScopeFields({clear:false});
-        syncKindFields();
+        syncPromotionPeriod();
     }
 
     function resetPricingModalViewport() {
@@ -1336,80 +1249,86 @@ document.addEventListener('DOMContentLoaded', () => {
         requestAnimationFrame(resetPricingModalViewport);
     }
 
+    function sameTarget(condition, scopeType, targets) {
+        if (condition.scopeType !== scopeType) return false;
+        if (scopeType === 'all') return true;
+        const normalize = value => String(value?.id || value?._id || value || '').trim().toLocaleLowerCase('ru-RU');
+        const wanted = new Set((targets || []).map(normalize).filter(Boolean));
+        let actual = [];
+        if (scopeType === 'dealer') {
+            actual = Array.isArray(condition.dealers) && condition.dealers.length
+                ? condition.dealers.map(idOf)
+                : [idOf(condition.dealer)];
+        } else {
+            actual = Array.isArray(condition.scopeValues) && condition.scopeValues.length
+                ? condition.scopeValues
+                : [condition.scopeValue || ''];
+        }
+        const got = new Set(actual.map(normalize).filter(Boolean));
+        return wanted.size === got.size && [...wanted].every(value => got.has(value));
+    }
+
     function openEdit(conditionId) {
         if (!manage) return;
         const condition = state.conditions.find(item => idOf(item) === String(conditionId));
         if (!condition) return;
         resetForm();
         $('pricing-condition-id').value = idOf(condition);
-        $('pricing-modal-title').textContent = 'Редактирование условия';
+        $('pricing-modal-title').textContent = 'Редактирование цен';
+
+        const scopeType = condition.scopeType || 'dealer';
+        $('pricing-scope-type').value = scopeType;
         let editTargets = [];
-        if (condition.scopeType === 'dealer') {
+        if (scopeType === 'dealer') {
             editTargets = Array.isArray(condition.dealers) && condition.dealers.length
                 ? condition.dealers.map(idOf)
                 : [idOf(condition.dealer)];
-        } else if (condition.scopeType === 'sector' || condition.scopeType === 'city') {
+        } else if (scopeType === 'sector' || scopeType === 'city') {
             editTargets = Array.isArray(condition.scopeValues) && condition.scopeValues.length
                 ? condition.scopeValues
                 : [condition.scopeValue || ''];
         }
         editTargets = editTargets.map(value=>String(value || '').trim()).filter(Boolean);
-        $('pricing-scope-type').value = scopeModeValue(condition.scopeType || 'dealer', editTargets.length);
         syncScopeFields({clear:false});
         setTargetSelections(editTargets);
 
-        const radio = document.querySelector(`input[name="pricing-kind"][value="${condition.kind || 'discount'}"]`);
-        if (radio) radio.checked = true;
-        syncKindFields();
+        const related = state.conditions.filter(item =>
+            !item.cancelledAt &&
+            ['active','planned','paused'].includes(item.computedStatus || '') &&
+            sameTarget(item, scopeType, editTargets)
+        );
+        const price = related.find(item => item.kind === 'price_list');
+        const d5 = related.find(item => item.kind === 'discount' && Math.abs(n(item.discountPercent)-5) < 0.001);
+        const d10 = related.find(item => item.kind === 'discount' && Math.abs(n(item.discountPercent)-10) < 0.001);
 
-        $('pricing-name').value = condition.name || '';
-        $('pricing-code').value = condition.code || '';
-        $('pricing-percent').value = n(condition.discountPercent) || 5;
-        $('pricing-price-list').value = idOf(condition.priceList) || state.priceLists.find(item => item.name === condition.priceListName)?.id || '';
-        $('pricing-stackable').value = condition.stackable === false ? 'false' : 'true';
-        $('pricing-priority').value = n(condition.priority);
-        $('pricing-start-date').value = condition.startDate || '';
-        $('pricing-end-date').value = condition.endDate || '';
-        $('pricing-paused').value = condition.paused ? 'true' : 'false';
-        $('pricing-reason-type').value = condition.reasonType || 'other';
-        $('pricing-requirement-target').value = n(condition.requirementTarget);
-        $('pricing-requirement-current').value = n(condition.requirementCurrent);
-        $('pricing-requirement-unit').value = condition.requirementUnit || 'публикаций';
-        $('pricing-requirement-due').value = condition.requirementDueDate || '';
-        $('pricing-requirement-verified').checked = condition.requirementVerified === true;
-        $('pricing-proof-note').value = condition.proofNote || '';
-        $('pricing-note').value = condition.note || '';
+        if (price) $('pricing-price-list').value = idOf(price.priceList) || state.priceLists.find(item => item.name === price.priceListName)?.id || '';
+        $('pricing-discount-5').checked = Boolean(d5);
+        $('pricing-discount-10').checked = Boolean(d10);
+        const promo = d5 || d10;
+        $('pricing-start-date').value = promo?.startDate || state.today || todayValue();
+        $('pricing-end-date').value = promo?.endDate || '';
+        $('pricing-note').value = condition.note || promo?.note || price?.note || '';
+        syncPromotionPeriod();
+
         const modalEl = $('pricing-condition-modal');
         resetPricingModalViewport();
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
         requestAnimationFrame(resetPricingModalViewport);
     }
 
-    function formPayload() {
-        const kind = selectedKind();
-        const scopeType = selectedScopeMode().type;
+    function pricingSetupPayload() {
+        const scopeType = $('pricing-scope-type')?.value || 'dealer';
+        const discounts = [];
+        if ($('pricing-discount-5')?.checked) discounts.push(5);
+        if ($('pricing-discount-10')?.checked) discounts.push(10);
         return {
             scopeType,
             dealerIds: scopeType === 'dealer' ? [...selectedTargets] : [],
             scopeValues: (scopeType === 'sector' || scopeType === 'city') ? [...selectedTargets] : [],
-            kind,
-            name:$('pricing-name').value,
-            code:$('pricing-code').value,
-            discountPercent:kind === 'discount' ? n($('pricing-percent').value) : 0,
-            priceListId:kind === 'price_list' ? $('pricing-price-list').value : '',
-            priceListName:kind === 'price_list' ? (state.priceLists.find(item => String(item.id) === String($('pricing-price-list').value))?.name || '') : '',
-            stackable:kind === 'discount' ? $('pricing-stackable').value === 'true' : false,
-            priority:n($('pricing-priority').value),
-            startDate:$('pricing-start-date').value,
-            endDate:$('pricing-end-date').value,
-            paused:$('pricing-paused').value === 'true',
-            reasonType:$('pricing-reason-type').value,
-            requirementTarget:n($('pricing-requirement-target').value),
-            requirementCurrent:n($('pricing-requirement-current').value),
-            requirementUnit:$('pricing-requirement-unit').value,
-            requirementDueDate:$('pricing-requirement-due').value,
-            requirementVerified:$('pricing-requirement-verified').checked,
-            proofNote:$('pricing-proof-note').value,
+            priceListId:$('pricing-price-list')?.value || '',
+            discounts,
+            startDate:discounts.length ? $('pricing-start-date').value : '',
+            endDate:discounts.length ? $('pricing-end-date').value : '',
             note:$('pricing-note').value
         };
     }
@@ -1428,12 +1347,18 @@ document.addEventListener('DOMContentLoaded', () => {
     async function saveCondition(event) {
         event.preventDefault();
         if (!manage) return;
-        const id = $('pricing-condition-id').value;
         try {
             $('pricing-save-btn').disabled = true;
-            await send(id ? API+'/conditions/'+encodeURIComponent(id) : API+'/conditions', id ? 'PUT' : 'POST', formPayload());
+            const payload = pricingSetupPayload();
+            if (payload.scopeType !== 'all' && !selectedTargets.size) {
+                throw new Error('Выберите, на кого действует настройка');
+            }
+            if (!payload.priceListId && !payload.discounts.length) {
+                throw new Error('Выберите прайс или хотя бы одну скидку');
+            }
+            await send(API+'/setup','POST',payload);
             bootstrap.Modal.getOrCreateInstance($('pricing-condition-modal')).hide();
-            toast(id ? 'Ценовое условие обновлено' : 'Ценовое условие добавлено');
+            toast('Ценовые условия сохранены');
             await load();
         } catch (error) {
             toast(error.message,'error');
@@ -1483,19 +1408,16 @@ document.addEventListener('DOMContentLoaded', () => {
     $('pricing-target-search')?.addEventListener('input',renderTargetOptions);
     $('pricing-target-clear')?.addEventListener('click',()=>setTargetSelections([]));
     $('pricing-target-select-all')?.addEventListener('click',()=>{
-        const mode = selectedScopeMode();
-        if (!mode.multiple || mode.type === 'all') return;
+        const type = $('pricing-scope-type')?.value || 'dealer';
+        if (type === 'all') return;
         const term = String($('pricing-target-search')?.value || '').trim().toLowerCase();
-        const values = scopeChoices(mode.type)
+        const values = scopeChoices(type)
             .filter(item=>!term || [item.label,item.meta].join(' ').toLowerCase().includes(term))
             .map(item=>item.value);
         setTargetSelections(values);
     });
-    document.querySelectorAll('input[name="pricing-kind"]').forEach(input=>input.addEventListener('change',syncKindFields));
-    $('pricing-reason-type')?.addEventListener('change',()=>syncReasonDefaults(true));
-    document.querySelectorAll('[data-pricing-preset]').forEach(button => {
-        button.addEventListener('click', () => applyPreset(button.dataset.pricingPreset));
-    });
+    $('pricing-discount-5')?.addEventListener('change',syncPromotionPeriod);
+    $('pricing-discount-10')?.addEventListener('change',syncPromotionPeriod);
     $('pricing-condition-form')?.addEventListener('submit',saveCondition);
     $('pricing-condition-modal')?.addEventListener('shown.bs.modal',resetPricingModalViewport);
 
