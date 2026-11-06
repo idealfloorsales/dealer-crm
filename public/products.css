@@ -318,3 +318,186 @@
   .stock-import-file-box .btn{width:100%}
   .stock-mapping-row{grid-template-columns:1fr}
 }
+
+
+/* Matrix modals — align with the rest of CRM and keep body scrollable */
+.product-editor-modal .modal-dialog,
+.stock-import-modal .modal-dialog,
+.stock-mapping-modal .modal-dialog{
+  margin-top:16px;
+  margin-bottom:16px;
+}
+
+.product-editor-modal .modal-content,
+.stock-import-modal .modal-content,
+.stock-mapping-modal .modal-content{
+  max-height:calc(100vh - 32px);
+  max-height:calc(100dvh - 32px);
+  overflow:hidden;
+  border:1px solid rgba(23,24,27,.075);
+  border-radius:22px!important;
+  background:#fff;
+  box-shadow:0 28px 80px rgba(29,20,20,.20)!important;
+}
+
+.product-editor-modal .modal-header,
+.stock-import-modal .modal-header,
+.stock-mapping-modal .modal-header{
+  flex:0 0 auto;
+  padding:18px 20px 12px;
+  border-bottom:1px solid #eee9e5;
+  background:#fff;
+}
+
+.product-editor-modal .modal-header small,
+.stock-import-modal .modal-header small,
+.stock-mapping-modal .modal-header small{
+  display:block;
+  margin-bottom:3px;
+  color:#9a9ca1;
+  font-size:.57rem;
+  font-weight:800;
+  letter-spacing:.055em;
+}
+
+.product-editor-modal .modal-header .modal-title,
+.stock-import-modal .modal-header .modal-title,
+.stock-mapping-modal .modal-header .modal-title{
+  margin:0;
+  color:#303136;
+  font-size:.96rem;
+  font-weight:800;
+}
+
+.product-editor-modal #product-form{
+  display:flex;
+  flex:1 1 auto;
+  min-height:0;
+  overflow:hidden;
+  flex-direction:column;
+}
+
+.product-editor-modal .product-editor-body{
+  flex:1 1 auto;
+  min-height:0;
+  overflow-y:auto!important;
+  overflow-x:hidden;
+  overscroll-behavior:contain;
+  padding:14px 18px 16px;
+  background:#f7f5f2;
+}
+
+.product-editor-modal .product-editor-footer{
+  flex:0 0 auto;
+  margin:0;
+  padding:11px 18px;
+  border-top:1px solid #eee9e5;
+  border-radius:0 0 22px 22px;
+  background:#fff;
+}
+
+.product-editor-modal .product-editor-section{
+  padding:13px;
+  border:1px solid rgba(23,24,27,.065);
+  border-radius:14px;
+  background:#fff;
+  box-shadow:none;
+}
+
+.product-editor-modal .product-editor-section + .product-editor-section{
+  margin-top:10px;
+}
+
+.product-editor-modal .product-type-switch label>span{
+  background:#fbfaf8;
+}
+
+.product-editor-modal .product-type-switch input:checked+span{
+  border-color:#d8d1cc;
+  background:#f0eeeb;
+}
+
+.product-editor-modal .product-type-switch input:checked+span>i{
+  background:#fff;
+  color:#b9040a;
+}
+
+.product-editor-modal .product-type-switch input:checked+span b{
+  color:#35363a;
+}
+
+.product-editor-modal .product-type-switch input:checked+span small{
+  color:#85878d;
+}
+
+.product-editor-modal .modal-body::-webkit-scrollbar,
+.stock-import-modal .modal-body::-webkit-scrollbar,
+.stock-mapping-modal .modal-body::-webkit-scrollbar{
+  width:8px;
+}
+.product-editor-modal .modal-body::-webkit-scrollbar-thumb,
+.stock-import-modal .modal-body::-webkit-scrollbar-thumb,
+.stock-mapping-modal .modal-body::-webkit-scrollbar-thumb{
+  border:2px solid transparent;
+  border-radius:999px;
+  background:#c9c3be;
+  background-clip:padding-box;
+}
+
+.stock-import-modal .modal-body,
+.stock-mapping-modal .modal-body{
+  overflow-y:auto;
+  overscroll-behavior:contain;
+}
+
+.stock-import-modal .modal-content,
+.stock-mapping-modal .modal-content{
+  display:flex;
+  flex-direction:column;
+}
+
+.stock-import-modal .modal-body,
+.stock-mapping-modal .modal-body{
+  flex:1 1 auto;
+  min-height:0;
+}
+
+.stock-mapping-modal .product-editor-footer{
+  flex:0 0 auto;
+  margin:0;
+  padding:11px 18px;
+  border-top:1px solid #eee9e5;
+  background:#fff;
+}
+
+@media(max-width:700px){
+  .product-editor-modal .modal-dialog,
+  .stock-import-modal .modal-dialog,
+  .stock-mapping-modal .modal-dialog{
+    width:calc(100% - 14px);
+    margin:7px auto;
+  }
+
+  .product-editor-modal .modal-content,
+  .stock-import-modal .modal-content,
+  .stock-mapping-modal .modal-content{
+    max-height:calc(100vh - 14px);
+    max-height:calc(100dvh - 14px);
+    border-radius:18px!important;
+  }
+
+  .product-editor-modal .modal-header,
+  .stock-import-modal .modal-header,
+  .stock-mapping-modal .modal-header{
+    padding:15px 16px 10px;
+  }
+
+  .product-editor-modal .product-editor-body{
+    padding:11px 12px 14px;
+  }
+
+  .product-editor-modal .product-editor-footer,
+  .stock-mapping-modal .product-editor-footer{
+    padding:10px 12px;
+  }
+}
