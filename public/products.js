@@ -281,6 +281,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const term = normalize(searchInput?.value);
         if (searchClear) searchClear.hidden = !term;
 
+        typeMode = typeFilter?.value || typeMode || 'laminate';
         filterMode = filterSelect?.value || filterMode || 'liquid';
         stockMode = stockFilter?.value || stockMode || 'all';
         completenessMode = completenessFilter?.value || completenessMode || 'all';
@@ -296,8 +297,9 @@ document.addEventListener('DOMContentLoaded', () => {
             ].filter(Boolean).join(' '));
 
             if (term && !searchBlob.includes(term)) return false;
-            if (filterMode === 'liquid' && product.is_liquid === false) return false;
-            if (filterMode === 'illiquid' && product.is_liquid !== false) return false;
+            if (typeMode !== 'all' && productType(product) !== typeMode) return false;
+            if (filterMode === 'liquid' && productType(product) === 'laminate' && product.is_liquid === false) return false;
+            if (filterMode === 'illiquid' && (productType(product) !== 'laminate' || product.is_liquid !== false)) return false;
             if (classValue && String(c.class || '') !== classValue) return false;
             if (thicknessValue && String(c.thickness || '') !== thicknessValue) return false;
 
@@ -337,9 +339,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderFilterMeta(products) {
         const labels = [];
-        labels.push(filterMode === 'liquid' ? 'Ликвидные' : filterMode === 'illiquid' ? 'Неликвидные' : 'Все позиции');
+        labels.push(typeMode === 'laminate' ? 'Ламинат' : typeMode === 'equipment' ? 'Торговое оборудование' : 'Все типы');
+        if (typeMode !== 'equipment') {
+            labels.push(filterMode === 'liquid' ? 'ликвидные' : filterMode === 'illiquid' ? 'неликвидные' : 'все по актуальности');
+        }
         if (stockMode !== 'all') {
-            labels.push(({positive:'есть на складе',low:'остаток до 20 м²',zero:'без остатка',unknown:'остаток не загружен'})[stockMode] || stockMode);
+            labels.push(({positive:'есть на складе',low:'низкий остаток',zero:'без остатка',unknown:'остаток не загружен'})[stockMode] || stockMode);
         }
         if (classFilter?.value) labels.push(`${classFilter.value} класс`);
         if (thicknessFilter?.value) labels.push(`${thicknessFilter.value} мм`);
@@ -347,20 +352,34 @@ document.addEventListener('DOMContentLoaded', () => {
         if (completenessMode === 'incomplete') labels.push('нужно заполнить');
         if (normalize(searchInput?.value)) labels.push(`поиск: «${searchInput.value.trim()}»`);
 
-        const stockTotal = products.reduce((sum,p)=>sum + Math.max(0,stockValue(p) ?? 0),0);
         const knownStock = products.filter(p=>stockValue(p)!==null).length;
+        const laminate = products.filter(p=>productType(p)==='laminate');
+        const equipment = products.filter(p=>productType(p)==='equipment');
+        let stockText = `остаток загружен у ${knownStock}`;
+        if (typeMode === 'laminate') {
+            const total = laminate.reduce((sum,p)=>sum + Math.max(0,stockValue(p) ?? 0),0);
+            stockText = `${total.toLocaleString('ru-RU',{maximumFractionDigits:2})} м² · ${stockText}`;
+        } else if (typeMode === 'equipment') {
+            const total = equipment.reduce((sum,p)=>sum + Math.max(0,stockValue(p) ?? 0),0);
+            stockText = `${total.toLocaleString('ru-RU',{maximumFractionDigits:2})} шт · ${stockText}`;
+        }
+
         if (activeFilterSummary) activeFilterSummary.textContent = labels.join(' · ');
-        if (filteredSummary) filteredSummary.textContent =
-            `${products.length} позиций · ${stockTotal.toLocaleString('ru-RU',{maximumFractionDigits:2})} м² · остаток загружен у ${knownStock}`;
+        if (filteredSummary) filteredSummary.textContent = `${products.length} позиций · ${stockText}`;
     }
 
     function renderList(products) {
-        const totalStock = products.reduce((sum,p)=>sum + Math.max(0,stockValue(p) ?? 0),0);
-
         if (totalLabel) {
-            totalLabel.textContent = products.length
-                ? `Показано ${products.length} из ${allProducts.length} · ${totalStock.toLocaleString('ru-RU',{maximumFractionDigits:2})} м²`
-                : 'По текущим фильтрам позиций нет';
+            if (!products.length) totalLabel.textContent = 'По текущим фильтрам позиций нет';
+            else if (typeMode === 'laminate') {
+                const total = products.reduce((sum,p)=>sum + Math.max(0,stockValue(p) ?? 0),0);
+                totalLabel.textContent = `Показано ${products.length} из ${allProducts.length} · ${total.toLocaleString('ru-RU',{maximumFractionDigits:2})} м²`;
+            } else if (typeMode === 'equipment') {
+                const total = products.reduce((sum,p)=>sum + Math.max(0,stockValue(p) ?? 0),0);
+                totalLabel.textContent = `Показано ${products.length} из ${allProducts.length} · ${total.toLocaleString('ru-RU',{maximumFractionDigits:2})} шт`;
+            } else {
+                totalLabel.textContent = `Показано ${products.length} из ${allProducts.length}`;
+            }
         }
 
         if (!products.length) {
@@ -374,39 +393,44 @@ document.addEventListener('DOMContentLoaded', () => {
 
         listContainer.innerHTML = products.map(product => {
             const c = product.characteristics || {};
+            const type = productType(product);
+            const isEquipment = type === 'equipment';
             const isLiquid = product.is_liquid !== false;
             const missing = missingProductFields(product);
             const stock = stockValue(product);
             const stockClass = stock === null ? 'is-unknown' : stock <= 0 ? 'is-zero' : stock <= 20 ? 'is-low' : 'is-good';
-            const stockText = stock === null ? 'Не загружен' : `${stock.toLocaleString('ru-RU',{minimumFractionDigits:0,maximumFractionDigits:2})} м²`;
+            const unit = isEquipment ? 'шт' : 'м²';
+            const stockText = stock === null ? 'Не загружен' : `${stock.toLocaleString('ru-RU',{minimumFractionDigits:0,maximumFractionDigits:2})} ${unit}`;
             const stockFoot = stock === null ? 'нет данных' : stock <= 0 ? 'нет на складе' : stock <= 20 ? 'низкий остаток' : 'в наличии';
 
-            const chars = [
+            const chars = isEquipment ? [
+                '<span class="product-tag is-equipment"><i class="bi bi-display"></i> Торговое оборудование</span>'
+            ] : [
                 c.class ? `${esc(c.class)} класс` : '',
                 c.thickness ? `${esc(c.thickness)} мм` : '',
                 c.size ? esc(c.size) : '',
                 c.bevel ? esc(c.bevel) : ''
-            ].filter(Boolean);
+            ].filter(Boolean).map(value=>`<span class="product-tag">${value}</span>`);
 
-            const packageMain = [
+            const packageMain = isEquipment ? 'Не требуется' : [
                 c.package_area ? `${esc(c.package_area)} м²/уп` : '',
                 c.package_qty ? `${esc(c.package_qty)} шт/уп` : ''
             ].filter(Boolean).join(' · ');
-            const packageFoot = c.weight ? `Вес упаковки: ${esc(c.weight)} кг` : 'Вес упаковки не указан';
+            const packageFoot = isEquipment ? 'учёт ведётся поштучно' : (c.weight ? `Вес упаковки: ${esc(c.weight)} кг` : 'Вес упаковки не указан');
 
             return `
-                <article class="product-row ${isLiquid?'':'is-illiquid'}" ${canManageProducts?`data-edit-product="${esc(product.id)}"`:''}>
+                <article class="product-row ${!isEquipment && !isLiquid?'is-illiquid':''} ${isEquipment?'is-equipment':''}" ${canManageProducts?`data-edit-product="${esc(product.id)}"`:''}>
                     <div class="product-position">
                         <div class="product-position-top">
                             <span class="product-sku">${esc(product.sku || '—')}</span>
                             <span class="product-name" title="${esc(product.name || 'Без названия')}">${esc(product.name || 'Без названия')}</span>
                         </div>
-                        ${product.collection ? `<small class="product-collection" title="${esc(product.collection)}"><i class="bi bi-collection me-1"></i>${esc(product.collection)}</small>` : '<small class="product-collection is-empty"><i class="bi bi-collection me-1"></i>Коллекция не указана</small>'}
+                        ${!isEquipment ? (product.collection ? `<small class="product-collection" title="${esc(product.collection)}"><i class="bi bi-collection me-1"></i>${esc(product.collection)}</small>` : '<small class="product-collection is-empty"><i class="bi bi-collection me-1"></i>Коллекция не указана</small>') : '<small class="product-collection is-equipment"><i class="bi bi-display me-1"></i>Торговое оборудование</small>'}
                         ${product.excel_alias ? `<small class="product-alias" title="${esc(product.excel_alias)}">Excel: ${esc(product.excel_alias)}</small>` : ''}
                         ${missing.length ? `<span class="product-alert"><i class="bi bi-exclamation-circle"></i>Не заполнено: ${esc(missing.slice(0,3).join(', '))}${missing.length>3?'…':''}</span>` : ''}
                     </div>
                     <div class="product-characteristics">
-                        ${chars.length ? chars.map(value=>`<span class="product-tag">${value}</span>`).join('') : '<span class="product-tag is-empty">Характеристики не заполнены</span>'}
+                        ${chars.length ? chars.join('') : '<span class="product-tag is-empty">Характеристики не заполнены</span>'}
                     </div>
                     <div class="product-package">
                         <div class="product-package-main">
@@ -418,8 +442,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         <strong>${esc(stockText)}</strong>
                         <small>${esc(stockFoot)}</small>
                     </div>
-                    <div>
-                        <span class="product-status ${isLiquid?'':'is-illiquid'}">${isLiquid?'Ликвид':'Неликвид'}</span>
+                    <div class="product-status-stack">
+                        <span class="product-type-badge ${isEquipment?'is-equipment':'is-laminate'}">${isEquipment?'Оборудование':'Ламинат'}</span>
+                        ${!isEquipment ? `<span class="product-status ${isLiquid?'':'is-illiquid'}">${isLiquid?'Ликвид':'Неликвид'}</span>` : ''}
                     </div>
                     <div>
                         ${canManageProducts?'<button type="button" class="product-edit-btn" title="Редактировать"><i class="bi bi-pencil"></i></button>':''}
