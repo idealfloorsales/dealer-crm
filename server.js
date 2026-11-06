@@ -2276,7 +2276,7 @@ app.get('/api/pricing/dealers/:id/price-sheet', requirePermission('can_view_pric
 
         const summary = buildDealerPricingSummary(dealer, conditions);
         const list = await resolveSummaryPriceList(summary);
-        const priceType = dealerPriceColumn(dealer.price_type);
+        const priceType = dealer.price_list ? { key: 'opt', label: 'Спец.цена' } : dealerPriceColumn(dealer.price_type);
         const discount = Math.min(100, Math.max(0, Number(summary.totalDiscountPercent) || 0));
 
         const products = await Product.find({})
