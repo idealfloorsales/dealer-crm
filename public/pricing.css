@@ -1345,3 +1345,53 @@ html,body.pricing-page{max-width:100%;overflow-x:hidden}
   .pricing-target-actions{width:100%}
   .pricing-target-actions button{flex:1}
 }
+
+
+/* 2026-11-06 — explicit one/many target modes + reinforced premium modal header */
+.pricing-condition-hero::before{
+  content:"";
+  position:absolute;
+  inset:0 auto 0 0;
+  width:4px;
+  background:linear-gradient(180deg,#ef2028 0%,#8f0005 100%);
+  box-shadow:0 0 24px rgba(185,4,10,.42);
+}
+.pricing-condition-hero-badges{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin-top:11px;
+}
+.pricing-condition-hero-badges span{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  min-height:26px;
+  padding:0 9px;
+  border:1px solid rgba(255,255,255,.11);
+  border-radius:999px;
+  background:rgba(255,255,255,.055);
+  color:rgba(255,255,255,.78);
+  font-size:.53rem;
+  font-weight:700;
+}
+.pricing-condition-hero-badges i{
+  color:#ff7b80;
+  font-size:.62rem;
+}
+.pricing-target-type .form-select optgroup{
+  color:#6f7176;
+  font-weight:800;
+}
+.pricing-target-picker.is-single .pricing-target-check{
+  border-radius:999px;
+}
+.pricing-target-picker.is-single .pricing-target-option.is-selected .pricing-target-check{
+  box-shadow:inset 0 0 0 4px #fff;
+  background:#b9040a;
+  color:transparent;
+}
+@media(max-width:760px){
+  .pricing-condition-hero-badges{margin-top:9px}
+  .pricing-condition-hero-badges span{min-height:24px;padding:0 8px;font-size:.49rem}
+}

@@ -1062,6 +1062,21 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function selectedScopeMode() {
+        const raw = $('pricing-scope-type')?.value || 'dealer_one';
+        if (raw === 'all') return { value:'all', type:'all', multiple:false };
+        const match = raw.match(/^(dealer|city|sector)_(one|many)$/);
+        if (match) return { value:raw, type:match[1], multiple:match[2] === 'many' };
+        const legacyType = ['dealer','city','sector'].includes(raw) ? raw : 'dealer';
+        return { value:legacyType + '_many', type:legacyType, multiple:true };
+    }
+
+    function scopeModeValue(type, count = 1) {
+        if (type === 'all') return 'all';
+        const safeType = ['dealer','city','sector'].includes(type) ? type : 'dealer';
+        return safeType + '_' + (Number(count) > 1 ? 'many' : 'one');
+    }
+
     function scopeChoices(type) {
         if (type === 'dealer') {
             return state.rows
@@ -1096,7 +1111,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderTargetSummary() {
         const summary = $('pricing-target-summary');
         if (!summary) return;
-        const type = $('pricing-scope-type')?.value || 'dealer';
+        const mode = selectedScopeMode();
+        const type = mode.type;
         if (type === 'all') {
             summary.textContent = 'Вся дилерская сеть';
             return;
@@ -1106,7 +1122,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .filter(item=>selectedTargets.has(String(item.value)))
             .map(item=>item.label);
         if (!count) {
-            summary.textContent = 'Ничего не выбрано';
+            summary.textContent = mode.multiple ? 'Ничего не выбрано' : 'Ничего не выбрано — выберите один вариант';
             return;
         }
         const noun = type === 'dealer'
@@ -1118,13 +1134,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderTargetOptions() {
-        const type = $('pricing-scope-type')?.value || 'dealer';
+        const mode = selectedScopeMode();
+        const type = mode.type;
         const host = $('pricing-target-options');
         if (!host) return;
         if (type === 'all') {
             host.innerHTML = '';
             renderTargetSummary();
             return;
+        }
+
+        if (!mode.multiple && selectedTargets.size > 1) {
+            selectedTargets = new Set([...selectedTargets].slice(0,1));
         }
 
         const term = String($('pricing-target-search')?.value || '').trim().toLowerCase();
@@ -1136,20 +1157,27 @@ document.addEventListener('DOMContentLoaded', () => {
             ? choices.map(item => {
                 const checked = selectedTargets.has(String(item.value));
                 return `<label class="pricing-target-option ${checked ? 'is-selected':''}">
-                    <input type="checkbox" value="${esc(item.value)}" ${checked?'checked':''}>
+                    <input type="${mode.multiple ? 'checkbox' : 'radio'}" name="pricing-target-choice" value="${esc(item.value)}" ${checked?'checked':''}>
                     <span class="pricing-target-check"><i class="bi bi-check-lg"></i></span>
                     <span class="pricing-target-option-copy"><strong>${esc(item.label)}</strong>${item.meta ? `<small>${esc(item.meta)}</small>` : ''}</span>
                 </label>`;
             }).join('')
             : '<div class="pricing-target-empty"><i class="bi bi-search"></i><span>Ничего не найдено</span></div>';
 
-        host.querySelectorAll('input[type="checkbox"]').forEach(input => {
+        host.querySelectorAll('input[name="pricing-target-choice"]').forEach(input => {
             input.addEventListener('change', () => {
                 const value = String(input.value || '');
-                if (input.checked) selectedTargets.add(value);
-                else selectedTargets.delete(value);
-                input.closest('.pricing-target-option')?.classList.toggle('is-selected', input.checked);
-                renderTargetSummary();
+                if (mode.multiple) {
+                    if (input.checked) selectedTargets.add(value);
+                    else selectedTargets.delete(value);
+                    input.closest('.pricing-target-option')?.classList.toggle('is-selected', input.checked);
+                    renderTargetSummary();
+                    return;
+                }
+                if (input.checked) {
+                    selectedTargets = new Set([value]);
+                    renderTargetOptions();
+                }
             });
         });
         renderTargetSummary();
@@ -1161,37 +1189,41 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function syncScopeFields(options = {}) {
-        const type = $('pricing-scope-type').value;
+        const mode = selectedScopeMode();
+        const type = mode.type;
         const clear = options.clear !== false;
         if (clear) selectedTargets.clear();
 
         const picker = $('pricing-target-picker');
         const all = $('pricing-target-all');
         picker?.classList.toggle('d-none', type === 'all');
+        picker?.classList.toggle('is-single', type !== 'all' && !mode.multiple);
         all?.classList.toggle('d-none', type !== 'all');
 
         const title = $('pricing-target-title');
         const hint = $('pricing-target-hint');
         const search = $('pricing-target-search');
+        const selectAll = $('pricing-target-select-all');
         if (search && clear) search.value = '';
+        selectAll?.classList.toggle('d-none', !mode.multiple || type === 'all');
 
         if (title) {
-            title.textContent = type === 'dealer'
-                ? 'Выберите дилеров'
-                : type === 'city'
-                    ? 'Выберите города'
-                    : type === 'sector'
-                        ? 'Выберите сектора'
-                        : 'Вся сеть';
+            if (type === 'dealer') title.textContent = mode.multiple ? 'Выберите дилеров' : 'Выберите дилера';
+            else if (type === 'city') title.textContent = mode.multiple ? 'Выберите города' : 'Выберите город';
+            else if (type === 'sector') title.textContent = mode.multiple ? 'Выберите сектора' : 'Выберите сектор';
+            else title.textContent = 'Вся сеть';
         }
         if (hint) {
-            hint.textContent = type === 'dealer'
-                ? 'Один или несколько дилеров из рабочей базы'
-                : type === 'city'
-                    ? 'Один или несколько городов, которые уже есть у дилеров'
-                    : type === 'sector'
-                        ? 'Один или несколько существующих секторов'
-                        : 'Условие применяется ко всем';
+            if (type === 'dealer') hint.textContent = mode.multiple
+                ? 'Выберите несколько дилеров из рабочей базы'
+                : 'Выберите одного дилера из рабочей базы';
+            else if (type === 'city') hint.textContent = mode.multiple
+                ? 'Выберите несколько городов, которые уже есть у дилеров'
+                : 'Выберите один город, который уже есть у дилеров';
+            else if (type === 'sector') hint.textContent = mode.multiple
+                ? 'Выберите несколько существующих секторов'
+                : 'Выберите один существующий сектор';
+            else hint.textContent = 'Условие применяется ко всем';
         }
         if (search) {
             search.placeholder = type === 'dealer'
@@ -1259,7 +1291,7 @@ document.addEventListener('DOMContentLoaded', () => {
             $('pricing-requirement-target').value = 0;
             $('pricing-requirement-current').value = 0;
             $('pricing-requirement-verified').checked = false;
-            if ($('pricing-scope-type').value === 'dealer') $('pricing-scope-type').value = 'sector';
+            if (selectedScopeMode().type === 'dealer') $('pricing-scope-type').value = 'sector_one';
         }
         syncScopeFields();
         syncKindFields();
@@ -1269,7 +1301,7 @@ document.addEventListener('DOMContentLoaded', () => {
         $('pricing-condition-form').reset();
         $('pricing-condition-id').value = '';
         $('pricing-modal-title').textContent = 'Новое условие';
-        $('pricing-scope-type').value = 'dealer';
+        $('pricing-scope-type').value = 'dealer_one';
         selectedTargets.clear();
         document.querySelector('input[name="pricing-kind"][value="discount"]').checked = true;
         $('pricing-percent').value = 5;
@@ -1311,21 +1343,20 @@ document.addEventListener('DOMContentLoaded', () => {
         resetForm();
         $('pricing-condition-id').value = idOf(condition);
         $('pricing-modal-title').textContent = 'Редактирование условия';
-        $('pricing-scope-type').value = condition.scopeType || 'dealer';
-        syncScopeFields({clear:false});
+        let editTargets = [];
         if (condition.scopeType === 'dealer') {
-            const values = Array.isArray(condition.dealers) && condition.dealers.length
+            editTargets = Array.isArray(condition.dealers) && condition.dealers.length
                 ? condition.dealers.map(idOf)
                 : [idOf(condition.dealer)];
-            setTargetSelections(values);
         } else if (condition.scopeType === 'sector' || condition.scopeType === 'city') {
-            const values = Array.isArray(condition.scopeValues) && condition.scopeValues.length
+            editTargets = Array.isArray(condition.scopeValues) && condition.scopeValues.length
                 ? condition.scopeValues
                 : [condition.scopeValue || ''];
-            setTargetSelections(values);
-        } else {
-            setTargetSelections([]);
         }
+        editTargets = editTargets.map(value=>String(value || '').trim()).filter(Boolean);
+        $('pricing-scope-type').value = scopeModeValue(condition.scopeType || 'dealer', editTargets.length);
+        syncScopeFields({clear:false});
+        setTargetSelections(editTargets);
 
         const radio = document.querySelector(`input[name="pricing-kind"][value="${condition.kind || 'discount'}"]`);
         if (radio) radio.checked = true;
@@ -1356,7 +1387,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function formPayload() {
         const kind = selectedKind();
-        const scopeType = $('pricing-scope-type').value;
+        const scopeType = selectedScopeMode().type;
         return {
             scopeType,
             dealerIds: scopeType === 'dealer' ? [...selectedTargets] : [],
@@ -1452,9 +1483,10 @@ document.addEventListener('DOMContentLoaded', () => {
     $('pricing-target-search')?.addEventListener('input',renderTargetOptions);
     $('pricing-target-clear')?.addEventListener('click',()=>setTargetSelections([]));
     $('pricing-target-select-all')?.addEventListener('click',()=>{
-        const type = $('pricing-scope-type')?.value || 'dealer';
+        const mode = selectedScopeMode();
+        if (!mode.multiple || mode.type === 'all') return;
         const term = String($('pricing-target-search')?.value || '').trim().toLowerCase();
-        const values = scopeChoices(type)
+        const values = scopeChoices(mode.type)
             .filter(item=>!term || [item.label,item.meta].join(' ').toLowerCase().includes(term))
             .map(item=>item.value);
         setTargetSelections(values);

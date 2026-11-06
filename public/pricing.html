@@ -229,6 +229,10 @@
                         <span class="pricing-condition-hero-kicker">IDEAL FLOOR · ЦЕНОВЫЕ УСЛОВИЯ</span>
                         <h5 id="pricing-modal-title">Новое условие</h5>
                         <p>Настройте, на кого действует условие, выберите скидку или прайс и задайте срок действия.</p>
+                        <div class="pricing-condition-hero-badges">
+                            <span><i class="bi bi-diagram-3"></i> Гибкий уровень</span>
+                            <span><i class="bi bi-database-check"></i> Только данные CRM</span>
+                        </div>
                     </div>
                     <div class="pricing-condition-hero-icon"><i class="bi bi-tags"></i></div>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Закрыть"></button>
@@ -241,9 +245,18 @@
                             <div class="pricing-target-layout">
                                 <label class="pricing-target-type"><span>Уровень</span>
                                     <select id="pricing-scope-type" class="form-select">
-                                        <option value="dealer">Дилеры</option>
-                                        <option value="city">Города</option>
-                                        <option value="sector">Сектора</option>
+                                        <optgroup label="Дилеры">
+                                            <option value="dealer_one">Один дилер</option>
+                                            <option value="dealer_many">Несколько дилеров</option>
+                                        </optgroup>
+                                        <optgroup label="Города">
+                                            <option value="city_one">Один город</option>
+                                            <option value="city_many">Несколько городов</option>
+                                        </optgroup>
+                                        <optgroup label="Сектора">
+                                            <option value="sector_one">Один сектор</option>
+                                            <option value="sector_many">Несколько секторов</option>
+                                        </optgroup>
                                         <option value="all">Вся дилерская сеть</option>
                                     </select>
                                 </label>
