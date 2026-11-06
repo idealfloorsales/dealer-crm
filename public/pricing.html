@@ -167,7 +167,7 @@
                         <div class="pricing-list-editor-toolbar">
                             <div>
                                 <strong>Цены по ассортименту</strong>
-                                <small>Заполните вручную или загрузите Excel: Артикул / ОПТ / РРЦ / МАКС РРЦ.</small>
+                                <small>Ликвид — цена на коллекцию. Неликвид — отдельная позиция. Excel можно загрузить по колонке «Коллекция» или «Артикул».</small>
                             </div>
                             <div class="pricing-list-editor-actions">
                                 <input type="file" id="pricing-list-import-input" accept=".xlsx,.xls" hidden>
@@ -177,7 +177,7 @@
                         </div>
                         <div class="pricing-list-table-wrap">
                             <table class="pricing-list-table">
-                                <thead><tr><th>Артикул</th><th>Наименование</th><th>ОПТ</th><th>РРЦ</th><th>МАКС РРЦ</th></tr></thead>
+                                <thead><tr><th>Статус</th><th>Коллекция / позиция</th><th>ОПТ</th><th>РРЦ</th><th>МАКС РРЦ</th></tr></thead>
                                 <tbody id="pricing-list-editor-rows"></tbody>
                             </table>
                         </div>
@@ -204,7 +204,7 @@
                     <div id="pricing-sheet-empty" class="pricing-empty d-none">Для дилера пока не назначен заполненный прайс.</div>
                     <div id="pricing-sheet-table-wrap" class="pricing-list-table-wrap">
                         <table class="pricing-list-table pricing-sheet-table">
-                            <thead><tr><th>Артикул</th><th>Наименование</th><th>База</th><th>Скидка</th><th>Цена дилера</th><th>Цена на витрине</th></tr></thead>
+                            <thead><tr><th>Статус</th><th>Коллекция / позиция</th><th>База</th><th>Скидка</th><th>Цена дилера</th><th>Цена на витрине</th></tr></thead>
                             <tbody id="pricing-sheet-rows"></tbody>
                         </table>
                     </div>
