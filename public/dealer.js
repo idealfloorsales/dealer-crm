@@ -372,7 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     ${sectorRow}
                     <div class="info-row"><span class="info-label">Договор</span><span class="info-val">${contractHtml}</span></div>
                     <div class="info-row"><span class="info-label">Организации</span><span class="info-val text-dark">${orgsHtml}</span></div>
-                    <div class="info-row"><span class="info-label">Тип цен</span><span class="info-val">${safeText(dealer.price_type)}</span></div>
+                    <div class="info-row"><span class="info-label">Прайс</span><span class="info-val">${safeText(dealer.price_list?.name || dealer.price_type || 'Не назначен')}</span></div>
                     <div class="info-row"><span class="info-label">Адрес (Факт)</span><span class="info-val">${safeText(dealer.address)}</span></div>
                 `;
             }
@@ -579,14 +579,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const rows = Array.isArray(sheet.rows) ? sheet.rows : [];
             const liquid = rows.filter(row => row.isLiquid !== false);
-            const illiquid = rows.filter(row => row.isLiquid === false);
 
-            const rowHtml = (row, isIlliquid = false) => `
-                <div class="dealer-price-detail-row ${isIlliquid ? 'is-illiquid':''}">
+            const rowHtml = row => `
+                <div class="dealer-price-detail-row">
                     <div>
-                        <span class="dealer-price-detail-status ${isIlliquid ? 'is-illiquid':'is-liquid'}">${isIlliquid ? 'Неликвид' : 'Ликвид'}</span>
-                        <strong>${safeText(isIlliquid ? [row.sku,row.name].filter(Boolean).join(' · ') : (row.collection || row.name || 'Коллекция'))}</strong>
-                        <small>${safeText(isIlliquid ? (row.collection || '') : ((row.members || 0) + ' поз. в коллекции'))}</small>
+                        <strong>${safeText(row.collection || row.name || 'Коллекция')}</strong>
+                        <small>${safeText((row.members || 0) + ' поз. в коллекции')}</small>
                     </div>
                     <div class="dealer-price-detail-values">
                         <span><small>Спец.цена</small><strong>${formatDealerPrice(row.finalPrice)}</strong></span>
@@ -603,9 +601,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                     <span>${safeText(sheet.priceType?.label || sheet.dealer?.priceType || 'Спец.цена')}</span>
                 </div>` +
-                (liquid.length ? `<div class="dealer-price-detail-section-title">Ликвид · по коллекциям</div>${liquid.map(row=>rowHtml(row,false)).join('')}` : '') +
-                (illiquid.length ? `<div class="dealer-price-detail-section-title is-illiquid">Неликвид · отдельные позиции</div>${illiquid.map(row=>rowHtml(row,true)).join('')}` : '') +
-                (!rows.length ? '<div class="dealer-price-empty"><i class="bi bi-receipt"></i><span>В прайсе пока нет заполненных цен</span></div>' : '');
+                (liquid.length ? `<div class="dealer-price-detail-section-title">Коллекции</div>${liquid.map(row=>rowHtml(row)).join('')}` : '') +
+                (!liquid.length ? '<div class="dealer-price-empty"><i class="bi bi-receipt"></i><span>В прайсе пока нет заполненных цен</span></div>' : '');
 
             if (button) button.innerHTML = '<i class="bi bi-chevron-up"></i> Свернуть прайс';
         } catch (error) {
@@ -735,6 +732,30 @@ document.addEventListener('DOMContentLoaded', () => {
         return document.getElementById(id)?.value?.trim() || '';
     }
 
+    let profilePriceLists = [];
+
+    async function loadProfilePriceLists(selectedId = '') {
+        const select = document.getElementById('profile-edit-price-list');
+        if (!select) return;
+        try {
+            const response = await fetch('/api/pricing/price-lists', { crmTrackLoading:false });
+            if (!response.ok) throw new Error('price lists');
+            const data = await response.json();
+            profilePriceLists = Array.isArray(data) ? data.filter(item => item.active !== false) : [];
+            select.innerHTML = '<option value="">Не назначен</option>';
+            profilePriceLists
+                .sort((a,b)=>String(a.name || '').localeCompare(String(b.name || ''),'ru'))
+                .forEach(item => {
+                    const label = [item.name, item.versionDate ? 'от '+item.versionDate.split('-').reverse().join('.') : ''].filter(Boolean).join(' · ');
+                    select.add(new Option(label, item.id));
+                });
+            const wanted = String(selectedId || '');
+            if ([...select.options].some(option => option.value === wanted)) select.value = wanted;
+        } catch (_) {
+            select.innerHTML = '<option value="">Не удалось загрузить прайсы</option>';
+        }
+    }
+
     function ensureProfileEditModal() {
         let modalEl = document.getElementById('dealer-profile-edit-modal');
         if (modalEl) return modalEl;
@@ -762,7 +783,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                             <div class="col-md-8"><label>Название</label><input id="profile-edit-name" class="form-control" required></div>
                                             <div class="col-md-4"><label>Статус</label><select id="profile-edit-status" class="form-select"></select></div>
                                             <div class="col-md-4"><label>Город</label><input id="profile-edit-city" class="form-control"></div>
-                                            <div class="col-md-4"><label>Тип цен</label><input id="profile-edit-price-type" class="form-control"></div>
+                                            <div class="col-md-4"><label>Прайс</label><select id="profile-edit-price-list" class="form-select"><option value="">Не назначен</option></select></div>
                                             <div class="col-md-8"><label>Адрес</label><input id="profile-edit-address" class="form-control"></div>
                                             <div class="col-md-4"><label>Ответственный</label>
                                                 <select id="profile-edit-responsible" class="form-select">
@@ -994,7 +1015,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 'profile-edit-dealer-id': currentDealer.dealer_id,
                 'profile-edit-name': currentDealer.name,
                 'profile-edit-city': currentDealer.city,
-                'profile-edit-price-type': currentDealer.price_type,
                 'profile-edit-address': currentDealer.address,
                 'profile-edit-website': currentDealer.website,
                 'profile-edit-instagram': currentDealer.instagram,
@@ -1004,6 +1024,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const input = document.getElementById(id);
                 if (input) input.value = value || '';
             });
+            await loadProfilePriceLists(currentDealer.price_list?.id || currentDealer.price_list || '');
             const signed = document.getElementById('profile-edit-contract-signed');
             if (signed) signed.checked = Boolean(currentDealer.contract?.isSigned);
             const responsible = document.getElementById('profile-edit-responsible');
@@ -1080,7 +1101,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 name: editValue('profile-edit-name'),
                 status: editValue('profile-edit-status'),
                 city: editValue('profile-edit-city'),
-                price_type: editValue('profile-edit-price-type'),
+                price_list: editValue('profile-edit-price-list') || null,
                 address: editValue('profile-edit-address'),
                 responsible: editValue('profile-edit-responsible'),
                 region_sector: editValue('profile-edit-sector'),
