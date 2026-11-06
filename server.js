@@ -981,6 +981,7 @@ const priceListRowSchema = new mongoose.Schema({
     isLiquid: { type: Boolean, default: true },
     opt: { type: Number, default: 0 },
     rrp: { type: Number, default: 0 },
+    displayPrice: { type: Number, default: 0 },
     maxRrp: { type: Number, default: 0 },
     currency: { type: String, default: 'KZT' }
 }, { _id: false });
@@ -2047,6 +2048,7 @@ function cleanPriceListRows(rows = []) {
                 isLiquid: scopeType === 'collection' ? true : row.isLiquid !== false,
                 opt: Math.max(0, Number(row.opt) || 0),
                 rrp: Math.max(0, Number(row.rrp) || 0),
+                displayPrice: Math.max(0, Number(row.displayPrice ?? row.maxRrp) || 0),
                 maxRrp: Math.max(0, Number(row.maxRrp) || 0),
                 currency: String(row.currency || 'KZT').trim() || 'KZT'
             };
@@ -2061,9 +2063,8 @@ function legacyRowCollection(row, productMap) {
 
 function dealerPriceColumn(priceType = '') {
     const value = String(priceType || '').trim().toLowerCase();
-    if (value.includes('макс')) return { key: 'maxRrp', label: 'МАКС РРЦ' };
-    if (value.includes('ррц') || value.includes('рознич')) return { key: 'rrp', label: 'РРЦ' };
-    return { key: 'opt', label: 'ОПТ' };
+    if (value.includes('ррц') || value.includes('рознич') || value.includes('макс')) return { key: 'rrp', label: 'РРЦ' };
+    return { key: 'opt', label: 'Спец.цена' };
 }
 
 function firstDealerPhone(contacts = []) {
@@ -2132,7 +2133,7 @@ app.get('/api/pricing/price-lists', requirePermission('can_view_pricing'), async
             archivedAt: item.archivedAt || null,
             note: item.note || '',
             rowsCount: Array.isArray(item.rows) ? item.rows.length : 0,
-            pricedCount: Array.isArray(item.rows) ? item.rows.filter(row => Number(row.opt) > 0 || Number(row.rrp) > 0 || Number(row.maxRrp) > 0).length : 0,
+            pricedCount: Array.isArray(item.rows) ? item.rows.filter(row => Number(row.opt) > 0 || Number(row.rrp) > 0 || Number(row.displayPrice) > 0 || Number(row.maxRrp) > 0).length : 0,
             createdAt: item.createdAt,
             updatedAt: item.updatedAt
         })));
@@ -2161,7 +2162,7 @@ app.get('/api/pricing/price-lists/:id', requirePermission('can_view_pricing'), a
                 isLiquid: row.isLiquid !== false,
                 opt: Number(row.opt) || 0,
                 rrp: Number(row.rrp) || 0,
-                maxRrp: Number(row.maxRrp) || 0,
+                displayPrice: Number(row.displayPrice ?? row.maxRrp) || 0,
                 currency: row.currency || 'KZT'
             }))
         });
@@ -2306,10 +2307,9 @@ app.get('/api/pricing/dealers/:id/price-sheet', requirePermission('can_view_pric
                     inherited: false,
                     opt: Number(source?.opt) || 0,
                     rrp: Number(source?.rrp) || 0,
-                    maxRrp: Number(source?.maxRrp) || 0,
                     basePrice,
                     finalPrice,
-                    displayPrice: collectionDisplayMap.get(collection) || 0,
+                    displayPrice: collectionDisplayMap.get(collection) || Number(source?.displayPrice ?? source?.maxRrp) || 0,
                     currency: source?.currency || 'KZT'
                 });
             });
@@ -2339,10 +2339,9 @@ app.get('/api/pricing/dealers/:id/price-sheet', requirePermission('can_view_pric
                     inherited: !override && Boolean(inherited),
                     opt: Number(source?.opt) || 0,
                     rrp: Number(source?.rrp) || 0,
-                    maxRrp: Number(source?.maxRrp) || 0,
                     basePrice,
                     finalPrice,
-                    displayPrice: productDisplayMap.get(String(product._id)) || 0,
+                    displayPrice: productDisplayMap.get(String(product._id)) || Number(source?.displayPrice ?? source?.maxRrp) || 0,
                     currency: source?.currency || 'KZT'
                 });
             });
