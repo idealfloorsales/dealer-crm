@@ -3117,7 +3117,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const description = addModalEl?.querySelector('.dealer-modal-header p');
         if (mode === 'duplicate') {
             if (title) title.textContent = 'Дублирование дилера';
-            if (description) description.textContent = 'Данные скопированы из ' + sourceName + '. Проверьте ID, название, адрес и остальные поля перед сохранением.';
+            if (description) description.textContent = 'Данные скопированы из ' + sourceName + '. При необходимости измените только данные конкретного салона.';
         } else {
             if (title) title.textContent = 'Новый дилер';
             if (description) description.textContent = 'Добавьте основные данные, контакты и информацию для работы с дилером.';
@@ -3136,15 +3136,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             await Promise.allSettled([fetchProductCatalog(), fetchCompetitorsRef()]);
-            const [dealerRes,nextIdRes] = await Promise.all([
-                fetch(`${API_DEALERS_URL}/${encodeURIComponent(id)}`),
-                fetch(`${API_DEALERS_URL}/next-id`)
-            ]);
+            const dealerRes = await fetch(`${API_DEALERS_URL}/${encodeURIComponent(id)}`);
             if (!dealerRes.ok) throw new Error('Не удалось загрузить исходного дилера');
-            if (!nextIdRes.ok) throw new Error('Не удалось получить новый ID');
 
             const d = await dealerRes.json();
-            const nextData = await nextIdRes.json();
             addCloneMeta = {
                 sourceId: String(d.id || id),
                 sourceDealerId: String(d.dealer_id || ''),
@@ -3160,7 +3155,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (el) el.value = value ?? '';
             };
 
-            setValue('dealer_id',nextData.dealer_id || '');
+            setValue('dealer_id',d.dealer_id || '');
             setValue('name',d.name || '');
             setValue('price_type',d.price_type || '');
             setValue('city',d.city || '');
