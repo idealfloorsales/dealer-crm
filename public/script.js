@@ -3135,7 +3135,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         try {
-            await Promise.all([fetchProductCatalog(), fetchCompetitorsRef()]);
+            await Promise.allSettled([fetchProductCatalog(), fetchCompetitorsRef()]);
             const [dealerRes,nextIdRes] = await Promise.all([
                 fetch(`${API_DEALERS_URL}/${encodeURIComponent(id)}`),
                 fetch(`${API_DEALERS_URL}/next-id`)
@@ -3368,7 +3368,7 @@ document.addEventListener('DOMContentLoaded', () => {
             data._cloneSourceLabel = addCloneMeta.sourceLabel;
             if (addCloneMeta.responsibleUserId) data.responsibleUserId = addCloneMeta.responsibleUserId;
         }
-        try { const res = await fetch(API_DEALERS_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); if (!res.ok) throw new Error(await res.text()); const newD = await res.json(); const pIds = getSelectedProductIds('add-product-checklist'); if(window.CRMAuth && CRMAuth.can('can_edit_matrix') && pIds.length) await saveProducts(newD.id, pIds); const wasClone = Boolean(addCloneMeta); addCloneMeta = null; addModal.hide(); setAddDealerModalMode('new'); window.showToast(wasClone ? "Копия дилера создана" : "Дилер добавлен!"); initApp(); } catch (e) { window.showToast("Ошибка сохранения", "error"); } finally { isSaving = false; btn.disabled = false; btn.innerHTML = oldText; } });
+        try { const res = await fetch(API_DEALERS_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)}); if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Не удалось сохранить дилера'); } const newD = await res.json(); const pIds = getSelectedProductIds('add-product-checklist'); if(window.CRMAuth && CRMAuth.can('can_edit_matrix') && pIds.length) await saveProducts(newD.id, pIds); const wasClone = Boolean(addCloneMeta); addCloneMeta = null; addModal.hide(); setAddDealerModalMode('new'); window.showToast(wasClone ? "Копия дилера создана" : "Дилер добавлен!"); initApp(); } catch (e) { window.showToast(e.message || "Ошибка сохранения", "error"); } finally { isSaving = false; btn.disabled = false; btn.innerHTML = oldText; } });
     if(editForm) editForm.addEventListener('submit', async (e) => { e.preventDefault(); if (!window.CRMAuth || !CRMAuth.can('can_edit_dealer')) { window.showToast("Нет права редактировать дилеров", "error"); return; } if (isSaving) return; isSaving = true; const btn = document.querySelector('button[form="edit-dealer-form"]'); const oldText = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; const id = document.getElementById('edit_db_id').value; let avatarToSend = getVal('edit-current-avatar-url'); if (newAvatarBase64) avatarToSend = newAvatarBase64; 
         const legalEntities = collectLegalEntities(editLegalEntityList);
         const data = { 
