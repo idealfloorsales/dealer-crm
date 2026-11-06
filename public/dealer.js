@@ -272,6 +272,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (editBtn && (!window.CRMAuth || !CRMAuth.can('can_edit_dealer'))) {
                     editBtn.style.display = 'none';
                 }
+                if (!window.CRMAuth || !CRMAuth.can('can_edit_dealer')) {
+                    document.querySelectorAll('[data-profile-edit-open], #dealer-docs-edit-requisites').forEach(button => {
+                        button.style.display = 'none';
+                    });
+                }
                 if (duplicateBtn && (!window.CRMAuth || !CRMAuth.can('can_create_dealer'))) {
                     duplicateBtn.style.display = 'none';
                 }
@@ -1083,6 +1088,17 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     }
+
+    document.querySelectorAll('[data-profile-edit-open]').forEach(button => {
+        button.addEventListener('click', () => {
+            if (!window.CRMAuth || !CRMAuth.can('can_edit_dealer')) return;
+            if (!currentDealer) {
+                window.showToast?.('Карточка ещё загружается', 'info');
+                return;
+            }
+            fillProfileEditor(button.dataset.profileEditOpen || 'main');
+        });
+    });
 
     const docsEditBtn = document.getElementById('dealer-docs-edit-requisites');
     if (docsEditBtn) docsEditBtn.addEventListener('click', () => {
