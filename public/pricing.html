@@ -224,26 +224,51 @@
     <div class="modal fade pricing-condition-modal-shell" id="pricing-condition-modal" tabindex="-1" data-bs-backdrop="static">
         <div class="modal-dialog modal-xl pricing-condition-dialog">
             <div class="modal-content pricing-modal">
-                <div class="modal-header">
-                    <div><small>ЦЕНОВОЕ УСЛОВИЕ</small><h5 id="pricing-modal-title">Новое условие</h5></div>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <div class="pricing-condition-hero">
+                    <div class="pricing-condition-hero-copy">
+                        <span class="pricing-condition-hero-kicker">IDEAL FLOOR · ЦЕНОВЫЕ УСЛОВИЯ</span>
+                        <h5 id="pricing-modal-title">Новое условие</h5>
+                        <p>Настройте, на кого действует условие, выберите скидку или прайс и задайте срок действия.</p>
+                    </div>
+                    <div class="pricing-condition-hero-icon"><i class="bi bi-tags"></i></div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Закрыть"></button>
                 </div>
                 <form id="pricing-condition-form">
                     <input type="hidden" id="pricing-condition-id">
                     <div class="modal-body">
                         <div class="pricing-form-section">
-                            <div class="pricing-form-section-title"><span>1</span><div><strong>На кого действует</strong><small>Один дилер или сразу группа</small></div></div>
-                            <div class="pricing-form-grid">
-                                <label><span>Уровень</span>
+                            <div class="pricing-form-section-title"><span>1</span><div><strong>На кого действует</strong><small>Можно выбрать одну или несколько целей из уже существующих в CRM</small></div></div>
+                            <div class="pricing-target-layout">
+                                <label class="pricing-target-type"><span>Уровень</span>
                                     <select id="pricing-scope-type" class="form-select">
-                                        <option value="dealer">Один дилер</option>
-                                        <option value="sector">Сектор / регион</option>
-                                        <option value="city">Город</option>
+                                        <option value="dealer">Дилеры</option>
+                                        <option value="city">Города</option>
+                                        <option value="sector">Сектора</option>
                                         <option value="all">Вся дилерская сеть</option>
                                     </select>
                                 </label>
-                                <label class="wide" id="pricing-dealer-field"><span>Дилер</span><select id="pricing-dealer-id" class="form-select"></select></label>
-                                <label class="wide d-none" id="pricing-scope-value-field"><span id="pricing-scope-value-label">Сектор / регион</span><input id="pricing-scope-value" class="form-control"></label>
+                                <div class="pricing-target-picker" id="pricing-target-picker">
+                                    <div class="pricing-target-picker-head">
+                                        <div>
+                                            <strong id="pricing-target-title">Выберите дилеров</strong>
+                                            <small id="pricing-target-hint">Можно выбрать одного или несколько</small>
+                                        </div>
+                                        <div class="pricing-target-actions">
+                                            <button type="button" id="pricing-target-select-all">Выбрать все</button>
+                                            <button type="button" id="pricing-target-clear">Очистить</button>
+                                        </div>
+                                    </div>
+                                    <div class="pricing-target-search">
+                                        <i class="bi bi-search"></i>
+                                        <input type="search" id="pricing-target-search" placeholder="Поиск по списку">
+                                    </div>
+                                    <div id="pricing-target-options" class="pricing-target-options"></div>
+                                    <div id="pricing-target-summary" class="pricing-target-summary">Ничего не выбрано</div>
+                                </div>
+                                <div class="pricing-target-all d-none" id="pricing-target-all">
+                                    <span><i class="bi bi-globe2"></i></span>
+                                    <div><strong>Вся дилерская сеть</strong><small>Условие будет применяться ко всем рабочим дилерам, доступным в CRM.</small></div>
+                                </div>
                             </div>
                         </div>
 
