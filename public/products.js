@@ -31,6 +31,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const inpId = document.getElementById('prod_id');
     const inpSku = document.getElementById('prod_sku');
     const inpName = document.getElementById('prod_name');
+    const inpCollection = document.getElementById('prod_collection');
+    const collectionOptions = document.getElementById('product-collection-options');
     const btnDelete = document.getElementById('btn-delete-prod');
     const inpLiquid = document.getElementById('prod_is_liquid');
     const inpAlias = document.getElementById('prod_alias');
@@ -112,6 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const fields = [
             ['артикул', product?.sku],
             ['название', product?.name],
+            ['коллекция', product?.collection],
             ['класс', c.class],
             ['толщина', c.thickness],
             ['размер', c.size],
@@ -133,6 +136,12 @@ document.addEventListener('DOMContentLoaded', () => {
             .sort((a,b)=>a.localeCompare(b,'ru',{numeric:true}));
         const thicknesses = [...new Set(allProducts.map(p => String(p.characteristics?.thickness || '').trim()).filter(Boolean))]
             .sort((a,b)=>a.localeCompare(b,'ru',{numeric:true}));
+        const collections = [...new Set(allProducts.map(p => String(p.collection || '').trim()).filter(Boolean))]
+            .sort((a,b)=>a.localeCompare(b,'ru',{numeric:true}));
+
+        if (collectionOptions) {
+            collectionOptions.innerHTML = collections.map(value => '<option value="' + esc(value) + '"></option>').join('');
+        }
 
         if (classFilter) {
             classFilter.innerHTML = '<option value="">Все классы</option>' +
@@ -242,7 +251,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let filtered = allProducts.filter(product => {
             const c = product.characteristics || {};
             const searchBlob = normalize([
-                product.sku, product.name, product.excel_alias,
+                product.sku, product.name, product.collection, product.excel_alias,
                 c.class, c.thickness, c.bevel, c.size, c.package_area, c.package_qty
             ].filter(Boolean).join(' '));
 
@@ -352,6 +361,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <span class="product-sku">${esc(product.sku || '—')}</span>
                             <span class="product-name" title="${esc(product.name || 'Без названия')}">${esc(product.name || 'Без названия')}</span>
                         </div>
+                        ${product.collection ? `<small class="product-collection" title="${esc(product.collection)}"><i class="bi bi-collection me-1"></i>${esc(product.collection)}</small>` : '<small class="product-collection is-empty"><i class="bi bi-collection me-1"></i>Коллекция не указана</small>'}
                         ${product.excel_alias ? `<small class="product-alias" title="${esc(product.excel_alias)}">Excel: ${esc(product.excel_alias)}</small>` : ''}
                         ${missing.length ? `<span class="product-alert"><i class="bi bi-exclamation-circle"></i>Не заполнено: ${esc(missing.slice(0,3).join(', '))}${missing.length>3?'…':''}</span>` : ''}
                     </div>
@@ -507,6 +517,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 inpId.value = p.id;
                 inpSku.value = p.sku || '';
                 inpName.value = p.name || '';
+                if(inpCollection) inpCollection.value = p.collection || '';
                 if(inpLiquid) inpLiquid.checked = p.is_liquid !== false;
                 if(inpAlias) inpAlias.value = p.excel_alias || '';
 
@@ -556,7 +567,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 weight: pkgWeight ? pkgWeight.value.trim() : ''
             };
             const data = { 
-                sku: inpSku.value.trim(), name: inpName.value.trim(),
+                sku: inpSku.value.trim(),
+                name: inpName.value.trim(),
+                collection: inpCollection ? inpCollection.value.trim() : '',
                 is_liquid: inpLiquid ? inpLiquid.checked : true,
                 excel_alias: inpAlias ? inpAlias.value.trim() : '',
                 characteristics: chars
