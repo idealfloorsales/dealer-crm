@@ -12714,3 +12714,57 @@ body.bg-light {
         border-radius:0 0 18px 18px!important;
     }
 }
+
+
+/* Legacy CRM pages (dashboard, audit): use the same modal shell */
+body:not(.app-workspace-page) .modal-content{
+    overflow:hidden;
+    border:0!important;
+    border-radius:22px!important;
+    background:#fff;
+    box-shadow:0 30px 80px rgba(20,18,18,.22)!important;
+}
+body:not(.app-workspace-page) .modal-header{
+    position:relative;
+    min-height:78px;
+    padding:18px 20px 16px!important;
+    border:0!important;
+    background:
+        radial-gradient(circle at 92% -35%, rgba(185,4,10,.52), transparent 20rem),
+        linear-gradient(120deg,#171719 0%,#292628 100%)!important;
+    color:#fff!important;
+}
+body:not(.app-workspace-page) .modal-header small{
+    display:block;
+    margin:0 0 4px!important;
+    color:rgba(255,255,255,.46)!important;
+    font-size:.56rem!important;
+    font-weight:800!important;
+    letter-spacing:.105em!important;
+    text-transform:uppercase;
+}
+body:not(.app-workspace-page) .modal-header .modal-title,
+body:not(.app-workspace-page) .modal-header h5,
+body:not(.app-workspace-page) .modal-header h6{
+    margin:0!important;
+    color:#fff!important;
+    font-size:1.05rem!important;
+    font-weight:780!important;
+}
+body:not(.app-workspace-page) .modal-header .btn-close{
+    width:32px;
+    height:32px;
+    margin:0!important;
+    padding:7px!important;
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:9px;
+    background-color:rgba(255,255,255,.08)!important;
+    filter:invert(1) grayscale(1) brightness(2);
+    opacity:.82!important;
+}
+body:not(.app-workspace-page) .modal-footer{
+    padding:11px 18px!important;
+    border-top:1px solid rgba(23,24,27,.07)!important;
+    border-radius:0 0 22px 22px!important;
+    background:#fff!important;
+}
