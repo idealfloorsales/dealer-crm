@@ -724,14 +724,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
     }
 
-    function renderAll() {
+    function renderAll(options = {}) {
+        const summaryOnly = Boolean(options.summaryOnly);
+        const summaryScrollTop = Number.isFinite(options.summaryScrollTop)
+            ? options.summaryScrollTop
+            : (summaryList?.scrollTop || 0);
         const date = new Date(monthPicker.value);
         const daysInMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
         const today = new Date();
         let currentDay = daysInMonth; 
         if (today.getFullYear() === date.getFullYear() && today.getMonth() === date.getMonth()) { currentDay = today.getDate(); }
 
-        container.innerHTML = '';
+        if (!summaryOnly) container.innerHTML = '';
         summaryList.innerHTML = '';
 
         const facts = {};
@@ -792,21 +796,23 @@ document.addEventListener('DOMContentLoaded', () => {
                     ${isPlanVisible ? 'План включён' : 'Без плана'}
                    </button>`;
 
-            container.innerHTML += `
-                <div class="region-card" data-group="${grp.key}" data-area="${getGroupArea(grp)}">
-                    <div class="region-header">
-                        <button class="sales-group-toggle" type="button" aria-label="Свернуть группу"><i class="bi bi-chevron-down"></i></button>
-                        <div class="sales-group-title-wrap">
-                            <span class="region-title">${grp.title}</span>
-                            <span class="sales-group-meta">${items.length} дил. · ${fmt(groupFact)} м²</span>
+            if (!summaryOnly) {
+                container.innerHTML += `
+                    <div class="region-card" data-group="${grp.key}" data-area="${getGroupArea(grp)}">
+                        <div class="region-header">
+                            <button class="sales-group-toggle" type="button" aria-label="Свернуть группу"><i class="bi bi-chevron-down"></i></button>
+                            <div class="sales-group-title-wrap">
+                                <span class="region-title">${grp.title}</span>
+                                <span class="sales-group-meta">${items.length} дил. · ${fmt(groupFact)} м²</span>
+                            </div>
+                            <div class="sales-group-actions">
+                                ${planControl}
+                                ${canEditFact && grp.key !== 'vip' ? `<button class="sales-add-row btn-add-custom" type="button" data-group="${grp.key}" data-title="${escapeAttr(grp.title)}"><i class="bi bi-plus-lg"></i> Добавить</button>` : ''}
+                            </div>
                         </div>
-                        <div class="sales-group-actions">
-                            ${planControl}
-                            ${canEditFact && grp.key !== 'vip' ? `<button class="sales-add-row btn-add-custom" type="button" data-group="${grp.key}" data-title="${escapeAttr(grp.title)}"><i class="bi bi-plus-lg"></i> Добавить</button>` : ''}
-                        </div>
-                    </div>
-                    <div class="region-body">${rowsHtml || '<div class="cc-empty">Нет записей</div>'}</div>
-                </div>`;
+                        <div class="region-body">${rowsHtml || '<div class="cc-empty">Нет записей</div>'}</div>
+                    </div>`;
+            }
         });
 
         // --- СВОДКА ---
@@ -929,9 +935,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         summaryList.innerHTML = summaryHtml;
-        setupEventListeners();
-        applyViewFilters();
-        if (groupsCollapsed) setGroupsCollapsed(true);
+        summaryList.scrollTop = summaryScrollTop;
+        if (!summaryOnly) {
+            setupEventListeners();
+            applyViewFilters();
+            if (groupsCollapsed) setGroupsCollapsed(true);
+        }
     }
 
     function setupEventListeners() {
@@ -1032,8 +1041,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.addEventListener('change', e => {
         if (!e.target.matches('.sales-input, .plan-input')) return;
+
+        const isPlanInput = e.target.matches('.plan-input');
+        const planKey = isPlanInput ? e.target.dataset.planKey : '';
+        const summaryScrollTop = summaryList?.scrollTop || 0;
+
         captureState();
-        renderAll();
+        renderAll({ summaryOnly: true, summaryScrollTop });
+
+        if (isPlanInput && planKey) {
+            const replacement = document.querySelector(`.plan-input[data-plan-key="${CSS.escape(planKey)}"]`);
+            if (replacement && document.activeElement === document.body) {
+                replacement.focus({ preventScroll: true });
+            }
+        }
+
         scheduleAutoSave(180);
     });
 
