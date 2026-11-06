@@ -1545,3 +1545,37 @@ html:root[data-crm-theme="dark"] .dealer-price-detail-values-expanded .is-final{
 html:root[data-crm-theme="dark"] .dealer-price-detail-values-expanded .is-final strong{
   color:#f07d82!important;
 }
+
+
+/* Dealer/pricing temporary price override — dark theme */
+html:root[data-crm-theme="dark"] .dealer-price-metric.is-override{
+  background:rgba(74,92,125,.16)!important;
+  border-color:rgba(122,174,230,.24)!important;
+}
+html:root[data-crm-theme="dark"] .dealer-price-metric.is-override strong{
+  color:#a9c9eb!important;
+}
+html:root[data-crm-theme="dark"] .dealer-price-metric.is-return{
+  background:rgba(174,123,34,.14)!important;
+  border-color:rgba(224,177,92,.24)!important;
+}
+html:root[data-crm-theme="dark"] .dealer-price-metric.is-return strong{
+  color:#e4bd74!important;
+}
+html:root[data-crm-theme="dark"] .pricing-price-override-hint.is-ok{
+  background:rgba(57,129,82,.14)!important;
+  border-color:rgba(116,182,139,.24)!important;
+  color:#9bcaaa!important;
+}
+html:root[data-crm-theme="dark"] .pricing-price-override-hint.is-warning{
+  background:rgba(174,123,34,.14)!important;
+  border-color:rgba(224,177,92,.24)!important;
+  color:#e0bd7c!important;
+}
+html:root[data-crm-theme="dark"] .pricing-price-override-hint strong{
+  color:inherit!important;
+}
+html:root[data-crm-theme="dark"] .pricing-badge.is-fallback{
+  background:#292a30!important;
+  color:#b9bdc5!important;
+}

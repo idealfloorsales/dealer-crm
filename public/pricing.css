@@ -1518,3 +1518,32 @@ html,body.pricing-page{max-width:100%;overflow-x:hidden}
     grid-column:1!important;
   }
 }
+
+
+/* Temporary priority price list guidance */
+.pricing-price-override-hint{
+  display:block;
+  margin:6px 2px 0;
+  color:#8b8d93;
+  font-size:.5rem;
+  line-height:1.4;
+}
+.pricing-price-override-hint strong{color:#595b61}
+.pricing-price-override-hint.is-ok{
+  padding:7px 8px;
+  border:1px solid #dce8df;
+  border-radius:9px;
+  background:#f5faf6;
+  color:#5f7566;
+}
+.pricing-price-override-hint.is-warning{
+  padding:7px 8px;
+  border:1px solid #eadfca;
+  border-radius:9px;
+  background:#fffaf1;
+  color:#8a6c36;
+}
+.pricing-badge.is-fallback{
+  background:#f3f5f8;
+  color:#656b74;
+}

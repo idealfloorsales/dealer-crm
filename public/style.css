@@ -13052,3 +13052,29 @@ body:not(.app-workspace-page) .modal-header .btn-close{
 @media(max-width:700px){
   .dealer-price-detail-values-expanded{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+
+/* Dealer profile — base price vs temporary priority override */
+.dealer-price-overview{
+  grid-template-columns:repeat(4,minmax(0,1fr));
+}
+.dealer-price-metric.is-override{
+  border-color:#d9dce5;
+  background:#f8f9fb;
+}
+.dealer-price-metric.is-override strong{
+  color:#292b31;
+}
+.dealer-price-metric.is-return{
+  border-color:#e7ddd2;
+  background:#fffaf4;
+}
+.dealer-price-metric.is-return strong{
+  color:#7b5b2e;
+}
+@media(max-width:1100px){
+  .dealer-price-overview{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:700px){
+  .dealer-price-overview{grid-template-columns:1fr}
+}

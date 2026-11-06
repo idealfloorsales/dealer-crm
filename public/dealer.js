@@ -638,6 +638,24 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function dealerPricingScopeText(condition) {
+        if (!condition) return 'из профиля дилера';
+        if (condition.scopeType === 'dealer') return 'для дилера';
+        const values = Array.isArray(condition.scopeValues) && condition.scopeValues.length
+            ? condition.scopeValues
+            : (condition.scopeValue ? [condition.scopeValue] : []);
+        if (condition.scopeType === 'sector') return values.length ? 'сектор: ' + values.join(', ') : 'сектор';
+        if (condition.scopeType === 'city') return values.length ? 'город: ' + values.join(', ') : 'город';
+        if (condition.scopeType === 'all') return 'вся дилерская сеть';
+        return 'специальное условие';
+    }
+
+    function dealerDateText(value, fallback = 'без срока') {
+        if (!value) return fallback;
+        const date = new Date(String(value).slice(0,10) + 'T00:00:00');
+        return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleDateString('ru-RU');
+    }
+
     async function loadDealerPricing() {
         if (!dealerPricingSummary || !can('can_view_pricing')) return;
         try {
@@ -663,35 +681,51 @@ document.addEventListener('DOMContentLoaded', () => {
                     const title = isDiscount
                         ? `−${Number(item.discountPercent || 0).toLocaleString('ru-RU',{maximumFractionDigits:2})}% · ${safeText(item.name)}`
                         : safeText(item.priceListName || item.name);
-                    const dates = `${item.startDate ? new Date(item.startDate+'T00:00:00').toLocaleDateString('ru-RU') : 'сразу'} — ${item.endDate ? new Date(item.endDate+'T00:00:00').toLocaleDateString('ru-RU') : 'без срока'}`;
+                    const conditionStart = item.startDate || item.priceList?.validFrom || '';
+                    const conditionEnd = item.endDate || item.priceList?.validTo || '';
+                    const dates = `${dealerDateText(conditionStart,'сразу')} — ${dealerDateText(conditionEnd,'без срока')}`;
+                    const scopeText = dealerPricingScopeText(item);
                     const req = Number(item.requirementTarget) > 0
                         ? `<small class="dealer-price-requirement ${Number(item.requirementCurrent)>=Number(item.requirementTarget) && item.requirementVerified ? 'is-ok':''}">
                             <i class="bi bi-instagram"></i> ${Number(item.requirementCurrent)||0}/${Number(item.requirementTarget)||0} ${safeText(item.requirementUnit || 'публикаций')}${item.requirementVerified ? ' · подтверждено' : ''}
                           </small>`
                         : '';
                     return `<article class="dealer-price-condition">
-                        <div><strong>${title}</strong><small>${dates}</small>${req}</div>
+                        <div><strong>${title}</strong><small>${scopeText} · ${dates}</small>${req}</div>
                         <span class="dealer-price-kind">${isDiscount ? 'скидка' : 'прайс'}</span>
                     </article>`;
                 }).join('')
                 : '<div class="dealer-price-empty"><i class="bi bi-check2-circle"></i><span>Активных специальных условий нет</span></div>';
 
+            const override = pricing.priceOverride?.active ? pricing.priceOverride : null;
+            const profilePrice = pricing.profilePriceList || pricing.assignedPriceList || pricing.defaultPriceType || 'Спец.цена';
+            const currentPrice = pricing.effectivePriceList || profilePrice;
+            const overridePeriod = override
+                ? `${dealerDateText(override.startDate,'сразу')} — ${dealerDateText(override.endDate,'без срока')}`
+                : 'Нет временной подмены';
+            const overrideSource = pricing.priceListCondition ? dealerPricingScopeText(pricing.priceListCondition) : 'прайс из профиля';
+
             dealerPricingSummary.innerHTML = `
                 <div class="dealer-price-overview">
                     <div class="dealer-price-metric">
-                        <small>Базовый прайс</small>
-                        <strong>${safeText(pricing.effectivePriceList || pricing.defaultPriceType || 'Спец.цена')}</strong>
-                        <span>${pricing.priceListCondition ? 'специальный / региональный' : 'из карточки дилера'}</span>
+                        <small>Прайс из профиля</small>
+                        <strong>${safeText(profilePrice)}</strong>
+                        <span>постоянная база дилера</span>
+                    </div>
+                    <div class="dealer-price-metric ${override ? 'is-override':''}">
+                        <small>Сейчас действует</small>
+                        <strong>${safeText(currentPrice)}</strong>
+                        <span>${safeText(overrideSource)}</span>
                     </div>
                     <div class="dealer-price-metric is-accent">
                         <small>Итоговая скидка</small>
                         <strong>${pricing.totalDiscountPercent ? '−'+Number(pricing.totalDiscountPercent).toLocaleString('ru-RU',{maximumFractionDigits:2})+'%' : '0%'}</strong>
-                        <span>${discounts.length ? 'сумма активных условий' : 'без дополнительной скидки'}</span>
+                        <span>${discounts.length ? 'от действующей оптовой цены' : 'без дополнительной скидки'}</span>
                     </div>
-                    <div class="dealer-price-metric">
-                        <small>Ближайший срок</small>
-                        <strong>${pricing.nearestEndDate ? new Date(pricing.nearestEndDate+'T00:00:00').toLocaleDateString('ru-RU') : 'Без срока'}</strong>
-                        <span>${pending.length ? 'есть незакрытые обязательства' : 'обязательства в порядке'}</span>
+                    <div class="dealer-price-metric ${override ? 'is-return':''}">
+                        <small>${override ? 'Период приоритетного прайса' : 'Приоритетный прайс'}</small>
+                        <strong>${safeText(overridePeriod)}</strong>
+                        <span>${override ? 'после окончания → '+safeText(override.fallbackPriceList || profilePrice) : 'используется прайс из профиля'}</span>
                     </div>
                 </div>
                 <div class="dealer-price-chips">${discountBadges}</div>

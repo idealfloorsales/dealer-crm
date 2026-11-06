@@ -1727,8 +1727,20 @@ function normalizePricingText(value) {
 function pricingConditionStatus(condition, today = pricingTodayKey()) {
     if (condition.cancelledAt) return 'cancelled';
     if (condition.paused) return 'paused';
-    if (condition.startDate && condition.startDate > today) return 'planned';
-    if (condition.endDate && condition.endDate < today) return 'expired';
+
+    const linkedPriceList = condition?.kind === 'price_list' &&
+        condition?.priceList &&
+        typeof condition.priceList === 'object'
+            ? condition.priceList
+            : null;
+
+    if (linkedPriceList?.active === false) return 'expired';
+
+    const startDate = String(condition?.startDate || linkedPriceList?.validFrom || '').trim();
+    const endDate = String(condition?.endDate || linkedPriceList?.validTo || '').trim();
+
+    if (startDate && startDate > today) return 'planned';
+    if (endDate && endDate < today) return 'expired';
     return 'active';
 }
 
@@ -1778,8 +1790,8 @@ function buildDealerPricingSummary(dealer, allConditions, today = pricingTodayKe
             !condition.priceList || typeof condition.priceList !== 'object' || priceListIsEffective(condition.priceList, today)
         ))
         .sort((a, b) =>
-            (Number(b.priority) || 0) - (Number(a.priority) || 0) ||
             pricingScopeSpecificity(b) - pricingScopeSpecificity(a) ||
+            (Number(b.priority) || 0) - (Number(a.priority) || 0) ||
             String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''))
         );
 
@@ -1788,9 +1800,11 @@ function buildDealerPricingSummary(dealer, allConditions, today = pricingTodayKe
         ? dealer.price_list
         : null;
     const dealerPriceListId = String(dealerPriceList?._id || dealerPriceList?.id || dealer?.price_list || '');
+    const dealerProfilePriceListName = dealerPriceList?.name || '';
     const dealerPriceListEffective = dealerPriceList ? priceListIsEffective(dealerPriceList, today) : Boolean(dealer?.price_list);
-    const dealerPriceListName = dealerPriceListEffective ? (dealerPriceList?.name || '') : '';
+    const dealerPriceListName = dealerPriceListEffective ? dealerProfilePriceListName : '';
     const effectiveDealerPriceListId = dealerPriceListEffective ? dealerPriceListId : '';
+    const fallbackPriceListName = dealerPriceListName || dealer.price_type || 'Спец.цена';
     const activeDiscounts = active.filter(condition => condition.kind === 'discount');
 
     const exclusive = activeDiscounts
@@ -1812,7 +1826,17 @@ function buildDealerPricingSummary(dealer, allConditions, today = pricingTodayKe
     const ignoredDiscounts = activeDiscounts.filter(condition =>
         !appliedDiscounts.some(applied => String(applied._id) === String(condition._id))
     );
-    const activeEndDates = active.map(condition => condition.endDate).filter(Boolean).sort();
+    const activeEndDates = active
+        .flatMap(condition => {
+            const dates = [condition.endDate];
+            if (condition.kind === 'price_list' && condition.priceList && typeof condition.priceList === 'object') {
+                dates.push(condition.priceList.validTo);
+            }
+            return dates;
+        })
+        .map(value => String(value || '').trim())
+        .filter(Boolean)
+        .sort();
     const pendingRequirements = active.filter(condition =>
         Number(condition.requirementTarget) > 0 &&
         (
@@ -1828,12 +1852,32 @@ function buildDealerPricingSummary(dealer, allConditions, today = pricingTodayKe
         sector: dealer.region_sector || '',
         responsible: dealer.responsible || '',
         defaultPriceType: dealer.price_type || '',
-        assignedPriceList: dealerPriceListName || '',
+        assignedPriceList: dealerProfilePriceListName || '',
         assignedPriceListId: dealerPriceListId,
-        effectivePriceList: selectedPriceList?.priceList?.name || selectedPriceList?.priceListName || selectedPriceList?.name || dealerPriceListName || dealer.price_type || 'Спец.цена',
+        profilePriceList: dealerProfilePriceListName || dealer.price_type || 'Спец.цена',
+        profilePriceListId: dealerPriceListId,
+        profilePriceListEffective: dealerPriceListEffective,
+        fallbackPriceList: fallbackPriceListName,
+        effectivePriceList: selectedPriceList?.priceList?.name || selectedPriceList?.priceListName || selectedPriceList?.name || fallbackPriceListName,
         effectivePriceListId: String(selectedPriceList?.priceList?._id || selectedPriceList?.priceList || effectiveDealerPriceListId || ''),
         priceListCondition: selectedPriceList,
-        priceListConflicts: Math.max(0, priceLists.length - 1),
+        priceOverride: selectedPriceList ? {
+            active: true,
+            conditionId: String(selectedPriceList._id || ''),
+            scopeType: selectedPriceList.scopeType || '',
+            scopeValues: Array.isArray(selectedPriceList.scopeValues) && selectedPriceList.scopeValues.length
+                ? selectedPriceList.scopeValues
+                : (selectedPriceList.scopeValue ? [selectedPriceList.scopeValue] : []),
+            startDate: selectedPriceList.startDate || selectedPriceList?.priceList?.validFrom || '',
+            endDate: selectedPriceList.endDate || selectedPriceList?.priceList?.validTo || '',
+            priority: Number(selectedPriceList.priority) || 0,
+            fallbackPriceList: fallbackPriceListName
+        } : null,
+        priceListConflicts: selectedPriceList
+            ? Math.max(0, priceLists.filter(condition =>
+                pricingScopeSpecificity(condition) === pricingScopeSpecificity(selectedPriceList)
+              ).length - 1)
+            : 0,
         activeDiscounts: appliedDiscounts,
         ignoredDiscounts,
         totalDiscountPercent,
@@ -2909,6 +2953,7 @@ app.post('/api/pricing/setup', requirePermission('can_manage_pricing'), async (r
         }
 
         const saved = [];
+        const overridePriority = ({ all:100, city:200, sector:300, dealer:400 })[scopeType] || 100;
         saved.push(await upsertStandard('BASE-PRICE', {
             kind:'price_list',
             name:priceList.name,
@@ -2916,9 +2961,9 @@ app.post('/api/pricing/setup', requirePermission('can_manage_pricing'), async (r
             priceListName:priceList.name,
             discountPercent:0,
             stackable:false,
-            priority:100,
-            startDate:'',
-            endDate:'',
+            priority:overridePriority,
+            startDate:String(priceList.validFrom || '').trim(),
+            endDate:String(priceList.validTo || '').trim(),
             paused:false,
             reasonType:'other',
             requirementTarget:0,

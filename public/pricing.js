@@ -139,6 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderPriceLists();
         renderConditions();
         fillPriceListOptions();
+        syncPriceOverrideHint();
         if ($('pricing-today')) $('pricing-today').textContent = `На ${dateText(state.today)}`;
         switchPricingView(state.activeView || 'dealers');
     }
@@ -203,6 +204,36 @@ document.addEventListener('DOMContentLoaded', () => {
         const current = select.value;
         select.innerHTML = priceListOptionsHtml(current, true);
         if (state.priceLists.some(item => String(item.id) === String(current))) select.value = current;
+        syncPriceOverrideHint();
+    }
+
+    function syncPriceOverrideHint() {
+        const host = $('pricing-price-override-hint');
+        const select = $('pricing-price-list');
+        if (!host || !select) return;
+
+        const item = state.priceLists.find(list => String(list.id) === String(select.value));
+        if (!item) {
+            host.classList.remove('is-warning','is-ok');
+            host.textContent = 'Название, цены и период действия берутся из выбранного прайса.';
+            return;
+        }
+
+        const scopeType = $('pricing-scope-type')?.value || 'dealer';
+        const scopeText = scopeType === 'dealer' ? 'выбранных дилеров'
+            : scopeType === 'sector' ? 'выбранного сектора'
+            : scopeType === 'city' ? 'выбранных городов'
+            : 'всей дилерской сети';
+
+        const from = item.validFrom ? dateText(item.validFrom) : 'сразу';
+        const to = item.validTo ? dateText(item.validTo) : 'без даты окончания';
+
+        host.classList.toggle('is-warning', !item.validTo);
+        host.classList.toggle('is-ok', Boolean(item.validTo));
+
+        host.innerHTML = item.validTo
+            ? `Приоритетный прайс для ${esc(scopeText)}: <strong>${from} — ${to}</strong>. После окончания CRM автоматически вернёт каждому дилеру прайс из его профиля.`
+            : `Прайс будет приоритетным для ${esc(scopeText)} <strong>без срока</strong>. Для автоматического возврата задайте в самом прайсе поле «Действует по».`;
     }
 
     function quickEditorHtml(row) {
@@ -287,7 +318,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         host.innerHTML = rows.map(row => {
             const badges = [];
-            if (row.priceListCondition) badges.push(`<span class="pricing-badge is-base"><i class="bi bi-receipt"></i>${esc(row.effectivePriceList)}</span>`);
+            if (row.priceListCondition) {
+                badges.push(`<span class="pricing-badge is-base"><i class="bi bi-receipt"></i>${esc(row.effectivePriceList)}</span>`);
+                if (row.priceOverride?.endDate) {
+                    badges.push(`<span class="pricing-badge is-fallback"><i class="bi bi-arrow-counterclockwise"></i>до ${dateText(row.priceOverride.endDate)} → ${esc(row.priceOverride.fallbackPriceList || row.profilePriceList || 'прайс из профиля')}</span>`);
+                }
+            }
             (row.activeDiscounts || []).forEach(condition => {
                 const inherited = condition.scopeType !== 'dealer';
                 badges.push(`<span class="pricing-badge is-discount ${inherited?'is-inherited':''}">−${fmt(condition.discountPercent,2)}% · ${esc(condition.name)}${inherited?' · '+esc(condition.scopeType):''}</span>`);
@@ -298,8 +334,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!badges.length) badges.push('<span class="pricing-badge">Стандартные условия</span>');
 
             const baseNote = row.priceListCondition
-                ? `переопределяет «${esc(row.defaultPriceType || 'Оптовая цена')}»`
-                : 'базовый тип дилера';
+                ? `${esc(scopeLabel(row.priceListCondition))} · временно вместо «${esc(row.fallbackPriceList || row.profilePriceList || row.defaultPriceType || 'прайса из профиля')}»`
+                : `из профиля дилера`;
             const end = row.nearestEndDate
                 ? `<strong>${dateText(row.nearestEndDate)}</strong><small>${isExpiring(row) ? 'скоро заканчивается' : 'ближайший срок'}</small>`
                 : '<strong>Без срока</strong><small>активные условия</small>';
@@ -1250,6 +1286,7 @@ document.addEventListener('DOMContentLoaded', () => {
         $('pricing-note').value = '';
         syncScopeFields({clear:false});
         syncPromotionPeriod();
+        syncPriceOverrideHint();
     }
 
     function resetPricingModalViewport() {
@@ -1323,6 +1360,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const d10 = related.find(item => item.kind === 'discount' && Math.abs(n(item.discountPercent)-10) < 0.001);
 
         if (price) $('pricing-price-list').value = idOf(price.priceList) || state.priceLists.find(item => item.name === price.priceListName)?.id || '';
+        syncPriceOverrideHint();
         $('pricing-discount-5').checked = Boolean(d5);
         $('pricing-discount-10').checked = Boolean(d10);
         const promo = d5 || d10;
@@ -1425,7 +1463,10 @@ document.addEventListener('DOMContentLoaded', () => {
     $('pricing-sheet-pdf')?.addEventListener('click',exportDealerPdf);
     $('pricing-sheet-share')?.addEventListener('click',shareDealerPrice);
 
-    $('pricing-scope-type')?.addEventListener('change',()=>syncScopeFields());
+    $('pricing-scope-type')?.addEventListener('change',()=>{
+        syncScopeFields();
+        syncPriceOverrideHint();
+    });
     $('pricing-target-search')?.addEventListener('input',renderTargetOptions);
     $('pricing-target-clear')?.addEventListener('click',()=>setTargetSelections([]));
     $('pricing-target-select-all')?.addEventListener('click',()=>{
@@ -1437,6 +1478,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .map(item=>item.value);
         setTargetSelections(values);
     });
+    $('pricing-price-list')?.addEventListener('change',syncPriceOverrideHint);
     $('pricing-discount-5')?.addEventListener('change',syncPromotionPeriod);
     $('pricing-discount-10')?.addEventListener('change',syncPromotionPeriod);
     $('pricing-condition-form')?.addEventListener('submit',saveCondition);
