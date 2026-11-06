@@ -3884,7 +3884,7 @@ body.bg-light {
 
 .summary-values {
     display: grid;
-    grid-template-columns: minmax(92px,1.15fr) repeat(2,minmax(72px,1fr));
+    grid-template-columns: minmax(92px,1.05fr) repeat(2,minmax(72px,.9fr)) minmax(180px,1.55fr);
     gap: 7px;
 }
 .summary-values.single { grid-template-columns: 1fr; }
@@ -4270,74 +4270,88 @@ body.bg-light {
     font-weight: 550;
 }
 
-.sales-deviation-strip {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0,1fr));
-    gap: 6px;
-    margin-top: 8px;
+.summary-deviation-cell {
+    min-width: 0;
 }
 
-.sales-deviation-strip.is-single {
-    grid-template-columns: minmax(0,1fr);
+.summary-deviation-lines {
+    display: grid;
+    gap: 3px;
+    margin-top: 1px;
 }
 
-.sales-deviation-item {
+.summary-deviation-row {
     display: grid;
-    grid-template-columns: auto 1fr auto;
-    align-items: center;
+    grid-template-columns: minmax(62px,auto) minmax(70px,1fr) auto;
+    align-items: baseline;
     gap: 6px;
     min-width: 0;
-    padding: 6px 8px;
-    border-radius: 9px;
-    border: 1px solid rgba(34,35,39,.07);
-    background: #f7f6f3;
+    line-height: 1.15;
 }
 
-.sales-deviation-item span {
-    color: #8e9095;
-    font-size: .56rem;
+.summary-values .summary-deviation-row > span {
+    margin: 0;
+    color: #777980;
+    font-size: .54rem;
     font-weight: 650;
     white-space: nowrap;
 }
 
-.sales-deviation-item strong {
+.summary-deviation-row strong {
     overflow: hidden;
-    font-size: .64rem;
+    font-size: .65rem;
     font-weight: 750;
     text-align: right;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.sales-deviation-item em {
+.summary-deviation-row em {
     font-style: normal;
     font-size: .58rem;
     font-weight: 750;
     white-space: nowrap;
 }
 
-.sales-deviation-item.is-positive strong,
-.sales-deviation-item.is-positive em {
+.summary-deviation-row.is-positive strong,
+.summary-deviation-row.is-positive em {
     color: #197450;
 }
 
-.sales-deviation-item.is-negative strong,
-.sales-deviation-item.is-negative em {
+.summary-deviation-row.is-negative strong,
+.summary-deviation-row.is-negative em {
     color: #b9040a;
 }
 
-.sales-deviation-item.is-neutral strong,
-.sales-deviation-item.is-neutral em {
+.summary-deviation-row.is-neutral strong,
+.summary-deviation-row.is-neutral em {
     color: #74767b;
 }
 
-@media (max-width: 767px) {
-    .sales-deviation-strip {
-        grid-template-columns: 1fr;
+.summary-deviation-empty {
+    margin-top: 4px;
+    color: #9a9ca1;
+    font-size: .58rem;
+    font-weight: 600;
+}
+
+@media (max-width: 1199px) {
+    .summary-values {
+        grid-template-columns: repeat(2,minmax(0,1fr));
     }
 
-    .sales-deviation-item {
-        grid-template-columns: auto 1fr auto;
+    .summary-deviation-cell {
+        grid-column: span 2;
+    }
+}
+
+@media (max-width: 767px) {
+    .summary-values {
+        grid-template-columns: repeat(2,minmax(0,1fr));
+    }
+
+    .summary-deviation-cell {
+        grid-column: span 2;
     }
 }
 
