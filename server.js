@@ -3221,7 +3221,7 @@ app.get('/api/public/price-share/:token.xlsx', async (req, res) => {
             ['ID', dealer.dealer_id || share.dealerId || ''],
             ['Город', dealer.city || share.dealerCity || ''],
             ['Действующий прайс', priceList.name || snapshot.priceType?.label || 'Спец.цена'],
-            ['Скидка IDEAL FLOOR', discount ? '-' + discount.toLocaleString('ru-RU',{maximumFractionDigits:2}) + '%' : '0%'],
+            ...(discount > 0 ? [['Скидка IDEAL FLOOR', '-' + discount.toLocaleString('ru-RU',{maximumFractionDigits:2}) + '%']] : []),
             ['Сформирован', new Date(share.createdAt).toLocaleString('ru-RU')],
             ['Ссылка действует до', new Date(share.expiresAt).toLocaleString('ru-RU')]
         ];
