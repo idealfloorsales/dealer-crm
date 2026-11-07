@@ -8,6 +8,8 @@ const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const path = require('path');
+const ExcelJS = require('exceljs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -2811,6 +2813,7 @@ app.post('/api/pricing/dealers/:id/share', requirePermission('can_view_pricing')
 
         res.status(201).json({
             url:`${APP_ORIGIN}/price/${token}`,
+            xlsxUrl:`${APP_ORIGIN}/api/public/price-share/${token}.xlsx`,
             expiresAt:expiresAt.toISOString(),
             dealer:snapshot.dealer,
             priceList:snapshot.priceList,
@@ -2818,6 +2821,142 @@ app.post('/api/pricing/dealers/:id/share', requirePermission('can_view_pricing')
         });
     } catch (e) {
         res.status(e.statusCode || 500).json({ error:e.message });
+    }
+});
+
+app.get('/api/public/price-share/:token.xlsx', async (req, res) => {
+    try {
+        const token = String(req.params.token || '').trim();
+        if (!/^[a-f0-9]{64}$/i.test(token)) return res.status(404).send('Ссылка недействительна');
+
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        const share = await PriceShare.findOne({ tokenHash, revokedAt:null, expiresAt:{ $gt:new Date() } }).lean();
+        if (!share) return res.status(410).send('Срок действия ссылки истёк или она была отозвана');
+
+        const snapshot = share.snapshot || {};
+        const rows = Array.isArray(snapshot.rows) ? snapshot.rows.filter(row => row.isLiquid !== false) : [];
+        const dealer = snapshot.dealer || {};
+        const priceList = snapshot.priceList || {};
+        const discount = Math.max(0, Number(snapshot.totalDiscountPercent) || 0);
+
+        const workbook = new ExcelJS.Workbook();
+        workbook.creator = 'IDEAL FLOOR CRM';
+        workbook.created = new Date();
+        workbook.modified = new Date();
+
+        const ws = workbook.addWorksheet('Прайс', {
+            pageSetup:{ paperSize:9, orientation:'landscape', fitToPage:true, fitToWidth:1, fitToHeight:0, margins:{left:0.25,right:0.25,top:0.3,bottom:0.3,header:0,footer:0} },
+            views:[{showGridLines:false}]
+        });
+
+        ws.columns = [
+            { key:'collection', width:34 },
+            { key:'wholesale', width:18 },
+            { key:'final', width:20 },
+            { key:'rrp', width:18 },
+            { key:'display', width:18 }
+        ];
+
+        const headerPath = path.join(__dirname,'public','price-header.jpg');
+        if (fs.existsSync(headerPath)) {
+            const imageId = workbook.addImage({ filename:headerPath, extension:'jpeg' });
+            ws.addImage(imageId,{ tl:{col:0,row:0}, br:{col:5,row:7} });
+            for(let r=1;r<=7;r++) ws.getRow(r).height=26;
+        } else {
+            ws.mergeCells('A1:E5');
+            ws.getCell('A1').value='IDEAL FLOOR';
+            ws.getCell('A1').font={bold:true,size:28,color:{argb:'FFFFFFFF'}};
+            ws.getCell('A1').fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF9F0710'}};
+            ws.getCell('A1').alignment={vertical:'middle',horizontal:'left'};
+        }
+
+        ws.mergeCells('A9:E9');
+        ws.getCell('A9').value = 'ПЕРСОНАЛЬНЫЙ ПРАЙС';
+        ws.getCell('A9').font = { bold:true, size:18, color:{argb:'FF1F2024'} };
+        ws.getCell('A9').alignment = { vertical:'middle', horizontal:'left' };
+        ws.getRow(9).height=28;
+
+        const info = [
+            ['Дилер', dealer.name || share.dealerName || ''],
+            ['ID', dealer.dealer_id || share.dealerId || ''],
+            ['Город', dealer.city || share.dealerCity || ''],
+            ['Действующий прайс', priceList.name || snapshot.priceType?.label || 'Спец.цена'],
+            ['Скидка IDEAL FLOOR', discount ? '-' + discount.toLocaleString('ru-RU',{maximumFractionDigits:2}) + '%' : '0%'],
+            ['Сформирован', new Date(share.createdAt).toLocaleString('ru-RU')],
+            ['Ссылка действует до', new Date(share.expiresAt).toLocaleString('ru-RU')]
+        ];
+
+        let infoRow=11;
+        info.forEach(([label,value])=>{
+            ws.mergeCells(`A${infoRow}:B${infoRow}`);
+            ws.mergeCells(`C${infoRow}:E${infoRow}`);
+            ws.getCell(`A${infoRow}`).value=label;
+            ws.getCell(`C${infoRow}`).value=value;
+            ws.getCell(`A${infoRow}`).font={bold:true,color:{argb:'FF777A81'}};
+            ws.getCell(`C${infoRow}`).font={bold:true,color:{argb:label==='Скидка IDEAL FLOOR'?'FF9F0710':'FF25262A'}};
+            ws.getCell(`A${infoRow}`).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF5F3F1'}};
+            ws.getCell(`C${infoRow}`).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFBFAF9'}};
+            [`A${infoRow}`,`C${infoRow}`].forEach(addr=>ws.getCell(addr).alignment={vertical:'middle'});
+            ws.getRow(infoRow).height=22;
+            infoRow++;
+        });
+
+        const tableRow=infoRow+2;
+        const headers=['Коллекция','Оптовая цена','Итоговая оптовая','РРЦ','Цена на витрине'];
+        headers.forEach((value,index)=>{
+            const cell=ws.getCell(tableRow,index+1);
+            cell.value=value;
+            cell.font={bold:true,color:{argb:'FFFFFFFF'}};
+            cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF991119'}};
+            cell.alignment={vertical:'middle',horizontal:index===0?'left':'center',wrapText:true};
+        });
+        ws.getRow(tableRow).height=30;
+
+        rows.forEach((row,index)=>{
+            const r=tableRow+1+index;
+            const wholesale=Number(row.basePrice ?? row.opt) || 0;
+            const finalPrice=Number.isFinite(Number(row.finalPrice)) ? Number(row.finalPrice) : wholesale;
+            ws.getCell(r,1).value=row.collection || row.name || '';
+            ws.getCell(r,2).value=wholesale || null;
+            ws.getCell(r,3).value=finalPrice || null;
+            ws.getCell(r,4).value=Number(row.rrp) || null;
+            ws.getCell(r,5).value=Number(row.displayPrice) || null;
+            ws.getCell(r,1).font={bold:true,color:{argb:'FF292A2F'}};
+            ws.getCell(r,3).font={bold:true,color:{argb:'FF9F0710'}};
+            for(let c=2;c<=5;c++) {
+                ws.getCell(r,c).numFmt='#,##0.00 [$₸-ru-RU]';
+                ws.getCell(r,c).alignment={horizontal:'right',vertical:'middle'};
+            }
+            for(let c=1;c<=5;c++) {
+                ws.getCell(r,c).border={bottom:{style:'hair',color:{argb:'FFDCD8D4'}}};
+                ws.getCell(r,c).fill={type:'pattern',pattern:'solid',fgColor:{argb:index%2===0?'FFFFFFFF':'FFFBFAF9'}};
+            }
+            ws.getRow(r).height=23;
+        });
+
+        const footRow=tableRow+rows.length+2;
+        ws.mergeCells(`A${footRow}:E${footRow}`);
+        ws.getCell(`A${footRow}`).value='Персональный прайс IDEAL FLOOR. Предназначен только для указанного дилера.';
+        ws.getCell(`A${footRow}`).font={italic:true,size:9,color:{argb:'FF888B91'}};
+        ws.getCell(`A${footRow}`).alignment={horizontal:'center'};
+
+        ws.autoFilter = { from:{row:tableRow,column:1}, to:{row:tableRow+rows.length,column:5} };
+        ws.views=[{showGridLines:false,state:'frozen',ySplit:tableRow}];
+
+        const safeDealer = String(dealer.name || share.dealerName || share.dealerId || 'dealer')
+            .replace(/[\\/:*?"<>|]+/g,' ')
+            .replace(/\s+/g,' ')
+            .trim()
+            .slice(0,80) || 'dealer';
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        res.setHeader('Content-Type','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent('Прайс IDEAL FLOOR - ' + safeDealer + '.xlsx')}`);
+        res.setHeader('Cache-Control','no-store');
+        res.send(Buffer.from(buffer));
+    } catch (e) {
+        console.error('Price share XLSX error:', e);
+        res.status(500).send('Не удалось сформировать Excel');
     }
 });
 
