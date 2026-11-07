@@ -2671,7 +2671,9 @@ async function buildDealerPriceSheetSnapshot(req, dealerId, options = {}) {
         const priceType = list ? { key: 'opt', label: 'Спец.цена' } : dealerPriceColumn(dealer.price_type);
 
         let appliedDiscounts = Array.isArray(summary.activeDiscounts) ? summary.activeDiscounts : [];
-        if (forcedList && options.applyAllDiscounts) {
+        if (options.ignoreDiscounts) {
+            appliedDiscounts = [];
+        } else if (forcedList && options.applyAllDiscounts) {
             const activeDiscounts = (summary.matchedConditions || []).filter(condition =>
                 condition.kind === 'discount' && condition.computedStatus === 'active'
             );
@@ -2837,7 +2839,8 @@ app.get('/api/pricing/dealers/:id/price-sheet', requirePermission('can_view_pric
         const forOffer = String(req.query?.forOffer || '') === '1';
         res.json(await buildDealerPriceSheetSnapshot(req, req.params.id, {
             priceListId,
-            applyAllDiscounts:Boolean(priceListId),
+            applyAllDiscounts:Boolean(priceListId) && !forOffer,
+            ignoreDiscounts:forOffer,
             allowPotential:forOffer
         }));
     } catch (e) {
@@ -2864,7 +2867,7 @@ app.post('/api/pricing/dealers/:id/share', requirePermission('can_view_pricing')
         await PriceShare.create({
             tokenHash,
             dealer:req.params.id,
-            dealerId:expectedDealerId,
+            dealerId:snapshot.dealer?.dealer_id || '',
             dealerName:snapshot?.dealer?.name || '',
             dealerCity:snapshot?.dealer?.city || '',
             createdBy:user,
@@ -2953,24 +2956,19 @@ app.get('/api/pricing/offers', requirePermission('can_view_pricing'), async (req
 app.post('/api/pricing/offers', requirePermission('can_view_pricing'), async (req, res) => {
     try {
         const dealerId = String(req.body?.dealerId || '').trim();
-        if (!mongoose.Types.ObjectId.isValid(dealerId)) return res.status(400).json({ error:'Выберите дилера' });
+        if (!mongoose.Types.ObjectId.isValid(dealerId)) return res.status(400).json({ error:'Выберите потенциального клиента' });
 
         const priceListId = String(req.body?.priceListId || '').trim();
         if (!priceListId) return res.status(400).json({ error:'Для потенциального клиента выберите прайс' });
 
         const snapshot = await buildDealerPriceSheetSnapshot(req, dealerId, {
             priceListId,
-            applyAllDiscounts:true,
+            applyAllDiscounts:false,
+            ignoreDiscounts:true,
             allowPotential:true
         });
         if (!/^(potential|prospect|потенц)/i.test(String(snapshot?.dealer?.status || ''))) {
             return res.status(400).json({ error:'КП предназначено для потенциальных клиентов' });
-        }
-
-        const expectedDealerId = String(snapshot?.dealer?.dealer_id || '').trim();
-        const confirmation = String(req.body?.confirmDealerId || '').trim();
-        if (!expectedDealerId || confirmation.toLowerCase() !== expectedDealerId.toLowerCase()) {
-            return res.status(400).json({ error:'ID дилера не совпадает. КП не создано.' });
         }
 
         const selectedIds = [...new Set((Array.isArray(req.body?.productIds) ? req.body.productIds : [])
