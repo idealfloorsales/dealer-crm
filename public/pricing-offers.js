@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const select=$('pricing-offer-price-list');
         if(!select) return;
         const current=select.value;
-        select.innerHTML='<option value="">Действующие цены дилера</option>' + activeLists().map(item =>
+        select.innerHTML='<option value="">Выберите прайс</option>' + activeLists().map(item =>
             '<option value="' + esc(item.id) + '">' + esc(item.name) + (item.versionDate ? ' · ' + esc(String(item.versionDate).slice(0,10)) : '') + '</option>'
         ).join('');
         if(activeLists().some(item=>String(item.id)===String(current))) select.value=current;
@@ -63,12 +63,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const hint=$('pricing-offer-confirm-hint');
         if(!dealer){
             host.className='pricing-offer-dealer-card is-empty';
-            host.textContent='Сначала выберите дилера';
-            hint.textContent='Защита от отправки КП не тому дилеру.';
+            host.textContent='Сначала выберите потенциального клиента';
+            hint.textContent='Защита от отправки КП не тому клиенту.';
             return;
         }
         host.className='pricing-offer-dealer-card';
-        host.innerHTML='<strong>' + esc(dealer.dealerName) + '</strong><span>' + esc([dealer.city,dealer.sector].filter(Boolean).join(' · ')) + '</span><small>Текущий прайс: ' + esc(dealer.effectivePriceList || dealer.profilePriceList || dealer.defaultPriceType || '—') + '</small>';
+        host.innerHTML='<strong>' + esc(dealer.dealerName) + '</strong><span>' + esc([dealer.city,dealer.sector].filter(Boolean).join(' · ')) + '</span><small>Статус: ' + esc(dealer.statusLabel || 'Потенциальный') + '</small>';
         hint.innerHTML='Для создания введите <strong>' + esc(dealer.dealerCode || 'ID дилера') + '</strong>.';
     }
 
@@ -76,7 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const host=$('pricing-offer-price-summary');
         if(!state.sheet){
             host.className='pricing-offer-price-summary is-empty';
-            host.textContent='После выбора дилера здесь появится действующий прайс и скидки.';
+            host.textContent='Выберите потенциального клиента и прайс для КП.';
             return;
         }
         const list=state.sheet.priceList?.name || state.sheet.priceType?.label || 'Спец.цена';
@@ -129,9 +129,13 @@ document.addEventListener('DOMContentLoaded', () => {
         renderPriceSummary();
         renderProducts();
         if(!dealer) return;
+        const priceListId=$('pricing-offer-price-list')?.value || '';
+        if(!priceListId){
+            syncCreateState();
+            return;
+        }
         try{
-            const priceListId=$('pricing-offer-price-list')?.value || '';
-            const url=API+'/dealers/'+encodeURIComponent(dealer.dealerId)+'/price-sheet' + (priceListId ? '?priceListId='+encodeURIComponent(priceListId) : '');
+            const url=API+'/dealers/'+encodeURIComponent(dealer.dealerId)+'/price-sheet?forOffer=1&priceListId='+encodeURIComponent(priceListId);
             const response=await fetch(url,{crmTrackLoading:false});
             const data=await response.json().catch(()=>({}));
             if(!response.ok) throw new Error(data.error || 'Не удалось рассчитать цены');
@@ -148,12 +152,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const confirmation=String($('pricing-offer-confirm')?.value || '').trim();
         const expected=String(dealer?.dealerCode || '').trim();
         const confirmed=Boolean(expected && confirmation.toLowerCase()===expected.toLowerCase());
-        const ready=Boolean(dealer && confirmed && state.sheet && state.selected.size);
+        const priceSelected=Boolean($('pricing-offer-price-list')?.value);
+        const ready=Boolean(dealer && confirmed && priceSelected && state.sheet && state.selected.size);
         const btn=$('pricing-offer-create-btn');
         if(btn) btn.disabled=!ready;
         const summary=$('pricing-offer-create-summary');
-        if(!dealer) summary.textContent='Выберите дилера и продукцию';
-        else if(!confirmed) summary.textContent='Подтвердите ID дилера: ' + (expected || '—');
+        if(!dealer) summary.textContent='Выберите потенциального клиента';
+        else if(!priceSelected) summary.textContent='Выберите прайс для КП';
+        else if(!confirmed) summary.textContent='Подтвердите ID клиента: ' + (expected || '—');
         else if(!state.selected.size) summary.textContent='Выберите коллекции или декоры';
         else summary.textContent=dealer.dealerName + ' · ' + state.selected.size + ' декоров · ' + (state.sheet?.priceList?.name || state.sheet?.priceType?.label || 'Спец.цена');
     }
@@ -243,20 +249,20 @@ document.addEventListener('DOMContentLoaded', () => {
         try{
             if(window.CRMAuth?.ready) await CRMAuth.ready;
             if(window.CRMAuth && !CRMAuth.can('can_view_pricing')) return;
-            const [overviewRes,listsRes,catalogRes,offersRes]=await Promise.all([
-                fetch(API+'/overview',{crmTrackLoading:false}),
+            const [recipientsRes,listsRes,catalogRes,offersRes]=await Promise.all([
+                fetch(API+'/offer-recipients',{crmTrackLoading:false}),
                 fetch(API+'/price-lists',{crmTrackLoading:false}),
                 fetch(API+'/catalog',{crmTrackLoading:false}),
                 fetch(API+'/offers',{crmTrackLoading:false})
             ]);
-            const overview=await overviewRes.json().catch(()=>({}));
+            const recipients=await recipientsRes.json().catch(()=>[]);
             const lists=await listsRes.json().catch(()=>[]);
             const catalog=await catalogRes.json().catch(()=>[]);
             const offers=await offersRes.json().catch(()=>[]);
-            if(!overviewRes.ok) throw new Error(overview.error || 'Не удалось загрузить дилеров');
+            if(!recipientsRes.ok) throw new Error(recipients.error || 'Не удалось загрузить потенциальных клиентов');
             if(!listsRes.ok) throw new Error(lists.error || 'Не удалось загрузить прайсы');
             if(!catalogRes.ok) throw new Error(catalog.error || 'Не удалось загрузить ассортимент');
-            state.dealers=Array.isArray(overview.rows)?overview.rows:[];
+            state.dealers=Array.isArray(recipients)?recipients:[];
             state.lists=Array.isArray(lists)?lists:[];
             state.catalog=Array.isArray(catalog)?catalog:[];
             state.offers=Array.isArray(offers)?offers:[];
@@ -274,7 +280,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(()=>$('pricing-offer-dealer')?.focus(),80);
     });
     $('pricing-offer-reset-btn')?.addEventListener('click',resetBuilder);
-    $('pricing-offer-dealer')?.addEventListener('change',()=>{ $('pricing-offer-confirm').value=''; renderDealer(); refreshSheet(); syncCreateState(); });
+    $('pricing-offer-dealer')?.addEventListener('change',()=>{ $('pricing-offer-confirm').value=''; $('pricing-offer-price-list').value=''; state.sheet=null; renderDealer(); renderPriceSummary(); renderProducts(); syncCreateState(); });
     $('pricing-offer-price-list')?.addEventListener('change',refreshSheet);
     $('pricing-offer-confirm')?.addEventListener('input',syncCreateState);
     $('pricing-offer-search')?.addEventListener('input',renderProducts);

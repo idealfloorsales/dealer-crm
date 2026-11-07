@@ -245,7 +245,7 @@ async function seedUsers() {
 // ==========================================
 const authMiddleware = (req, res, next) => {
     if (req.method === 'OPTIONS') return next(); 
-    if (req.path === '/api/auth/login' || req.path.startsWith('/api/public/price-share/') || !req.path.startsWith('/api')) return next();
+    if (req.path === '/api/auth/login' || req.path.startsWith('/api/public/price-share/') || req.path.startsWith('/api/public/offers/') || !req.path.startsWith('/api')) return next();
 
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; 
@@ -2636,12 +2636,15 @@ app.delete('/api/pricing/price-lists/:id', requirePermission('can_manage_pricing
 
 async function buildDealerPriceSheetSnapshot(req, dealerId, options = {}) {
     try {
+        const dealerVisibilityFilter = options.allowPotential
+            ? getDealerFilter(req)
+            : await getPricingWorkingDealerFilter(getDealerFilter(req));
         const dealer = await Dealer.findOne({
             $and: [
                 { _id: dealerId },
-                await getPricingWorkingDealerFilter(getDealerFilter(req))
+                dealerVisibilityFilter
             ]
-        }).select('_id dealer_id name city region_sector price_type price_list responsible contacts')
+        }).select('_id dealer_id name city region_sector price_type price_list responsible contacts status')
             .populate('price_list', 'name code versionDate validFrom validTo active')
             .lean();
         if (!dealer) { const err = new Error('Дилер не найден'); err.statusCode = 404; throw err; }
@@ -2804,6 +2807,7 @@ async function buildDealerPriceSheetSnapshot(req, dealerId, options = {}) {
                 name: dealer.name || '',
                 city: dealer.city || '',
                 sector: dealer.region_sector || '',
+                status: dealer.status || '',
                 priceType: dealer.price_type || '',
                 phone: firstDealerPhone(dealer.contacts)
             },
@@ -2830,9 +2834,11 @@ async function buildDealerPriceSheetSnapshot(req, dealerId, options = {}) {
 app.get('/api/pricing/dealers/:id/price-sheet', requirePermission('can_view_pricing'), async (req, res) => {
     try {
         const priceListId = String(req.query?.priceListId || '').trim();
+        const forOffer = String(req.query?.forOffer || '') === '1';
         res.json(await buildDealerPriceSheetSnapshot(req, req.params.id, {
             priceListId,
-            applyAllDiscounts:Boolean(priceListId)
+            applyAllDiscounts:Boolean(priceListId),
+            allowPotential:forOffer
         }));
     } catch (e) {
         res.status(e.statusCode || 500).json({ error:e.message });
@@ -2880,9 +2886,37 @@ app.post('/api/pricing/dealers/:id/share', requirePermission('can_view_pricing')
 });
 
 
+
+app.get('/api/pricing/offer-recipients', requirePermission('can_view_pricing'), async (req, res) => {
+    try {
+        const visibility = getDealerFilter(req);
+        const dealers = await Dealer.find({
+            $and: [
+                visibility,
+                { status: { $regex:/^(potential|prospect|потенц)/i } }
+            ]
+        })
+            .select('_id dealer_id name city region_sector status responsible')
+            .sort({ city:1, name:1 })
+            .lean();
+
+        res.json(dealers.map(dealer => ({
+            dealerId:String(dealer._id),
+            dealerCode:dealer.dealer_id || '',
+            dealerName:dealer.name || '',
+            city:dealer.city || '',
+            sector:dealer.region_sector || '',
+            status:dealer.status || 'potential',
+            statusLabel:'Потенциальный'
+        })));
+    } catch (e) {
+        res.status(500).json({ error:e.message });
+    }
+});
+
 app.get('/api/pricing/offers', requirePermission('can_view_pricing'), async (req, res) => {
     try {
-        const dealers = await Dealer.find(await getPricingWorkingDealerFilter(getDealerFilter(req))).select('_id').lean();
+        const dealers = await Dealer.find(getDealerFilter(req)).select('_id').lean();
         const dealerIds = dealers.map(item => item._id);
         const offers = await CommercialOffer.find({ dealer:{ $in:dealerIds } })
             .sort({ createdAt:-1 })
@@ -2922,10 +2956,16 @@ app.post('/api/pricing/offers', requirePermission('can_view_pricing'), async (re
         if (!mongoose.Types.ObjectId.isValid(dealerId)) return res.status(400).json({ error:'Выберите дилера' });
 
         const priceListId = String(req.body?.priceListId || '').trim();
+        if (!priceListId) return res.status(400).json({ error:'Для потенциального клиента выберите прайс' });
+
         const snapshot = await buildDealerPriceSheetSnapshot(req, dealerId, {
             priceListId,
-            applyAllDiscounts:Boolean(priceListId)
+            applyAllDiscounts:true,
+            allowPotential:true
         });
+        if (!/^(potential|prospect|потенц)/i.test(String(snapshot?.dealer?.status || ''))) {
+            return res.status(400).json({ error:'КП предназначено для потенциальных клиентов' });
+        }
 
         const expectedDealerId = String(snapshot?.dealer?.dealer_id || '').trim();
         const confirmation = String(req.body?.confirmDealerId || '').trim();
@@ -3093,11 +3133,11 @@ app.get('/api/public/price-share/:token.xlsx', async (req, res) => {
         const softGrayFill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFF5F6F7'} };
         const whiteFill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFFFFFFF'} };
 
-        const headerPath = path.join(__dirname,'public','price-header.jpg');
+        const headerPath = path.join(__dirname,'public','ideal-floor-commercial-header.png');
         if (fs.existsSync(headerPath)) {
             const imageId = workbook.addImage({
                 buffer:fs.readFileSync(headerPath),
-                extension:'jpeg'
+                extension:'png'
             });
             ws.addImage(imageId,{
                 tl:{col:0,row:0},
