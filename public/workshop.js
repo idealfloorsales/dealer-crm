@@ -1764,33 +1764,71 @@ document.addEventListener('DOMContentLoaded', () => {
     function resetDealerMovement() {
         $('ws-dealer-form')?.reset();
         $('ws-dealer-date').value=todayValue();
-        $('ws-dealer-qty').value=1;
-        const extra = $('ws-dealer-extra');
-        if (extra) extra.open = false;
+        const lines=$('ws-dealer-recipe-lines');
+        if(lines) lines.innerHTML='<div class="ws-dealer-recipe-line d-flex gap-2 align-items-center"><select id="ws-dealer-recipe" class="form-select" required></select><input type="number" class="form-control ws-dealer-line-qty" min="1" step="1" value="1" aria-label="Количество" style="width:85px;flex:0 0 85px"></div>';
+        const extra=$('ws-dealer-extra');
+        if(extra) extra.open=false;
         populateFormSelects();
         updateDealerCurrent();
     }
-    function updateDealerCurrent() {
-        const dealerId=$('ws-dealer-id')?.value, recipeId=$('ws-dealer-recipe')?.value;
-        const action=$('ws-dealer-action')?.value || 'issue';
-        const asset=state.dealerAssets.find(x=>idOf(x.dealer)===dealerId && idOf(x.recipe)===recipeId);
-        const recipe=recipeById(recipeId);
-        const conditionWrap=$('ws-dealer-condition-wrap');
-        if (conditionWrap) conditionWrap.hidden = action === 'issue';
-        const extra=$('ws-dealer-extra');
-        if (extra && action !== 'issue') extra.open = true;
-        $('ws-dealer-current').innerHTML = recipe
-            ? `В цехе: <strong>${fmt(recipe.stockQty)} шт</strong> · У дилера: <strong>${fmt(asset?.qty || 0)} шт</strong>.`
-            : 'Выберите дилера и изделие.';
+    function dealerMovementLines(){
+        return [...document.querySelectorAll('#ws-dealer-recipe-lines .ws-dealer-recipe-line')].map(line=>({
+            recipeId:line.querySelector('select')?.value,
+            qty:Number(line.querySelector('.ws-dealer-line-qty')?.value)
+        }));
     }
-    ['ws-dealer-id','ws-dealer-recipe','ws-dealer-action'].forEach(id=>$(id)?.addEventListener('change',updateDealerCurrent));
-    $('ws-dealer-form')?.addEventListener('submit', async event => {
+    function updateDealerCurrent() {
+        const dealerId=$('ws-dealer-id')?.value;
+        const action=$('ws-dealer-action')?.value||'issue';
+        const conditionWrap=$('ws-dealer-condition-wrap');
+        if(conditionWrap)conditionWrap.hidden=action==='issue';
+        const extra=$('ws-dealer-extra');
+        if(extra&&action!=='issue')extra.open=true;
+        const lines=dealerMovementLines().filter(line=>line.recipeId);
+        $('ws-dealer-current').innerHTML=lines.length
+            ? lines.map(line=>{
+                const recipe=recipeById(line.recipeId);
+                const asset=state.dealerAssets.find(x=>idOf(x.dealer)===dealerId&&idOf(x.recipe)===line.recipeId);
+                return '<div class="py-1">'+esc(recipe?.name||'Изделие')+': в цехе <strong>'+fmt(recipe?.stockQty||0)+' шт</strong> · у дилера <strong>'+fmt(asset?.qty||0)+' шт</strong></div>';
+            }).join('')
+            : 'Выберите дилера и изделия.';
+    }
+    $('ws-dealer-add-recipe')?.addEventListener('click',()=>{
+        const container=$('ws-dealer-recipe-lines');
+        const line=document.createElement('div');
+        line.className='ws-dealer-recipe-line d-flex gap-2 align-items-center';
+        line.innerHTML='<select class="form-select" required>'+recipeOptions()+'</select><input type="number" class="form-control ws-dealer-line-qty" min="1" step="1" value="1" aria-label="Количество" style="width:85px;flex:0 0 85px"><button type="button" class="btn btn-outline-secondary" aria-label="Удалить позицию"><i class="bi bi-x-lg"></i></button>';
+        line.querySelector('button').addEventListener('click',()=>{line.remove();updateDealerCurrent();});
+        container.appendChild(line);
+    });
+    ['ws-dealer-id','ws-dealer-action'].forEach(id=>$(id)?.addEventListener('change',updateDealerCurrent));
+    $('ws-dealer-recipe-lines')?.addEventListener('change',updateDealerCurrent);
+    $('ws-dealer-form')?.addEventListener('submit',async event=>{
         event.preventDefault();
-        await post(API+'/dealer-movement', {
-            dealerId:$('ws-dealer-id').value, recipeId:$('ws-dealer-recipe').value, action:$('ws-dealer-action').value,
-            qty:n($('ws-dealer-qty').value), returnCondition:$('ws-dealer-condition').value, date:$('ws-dealer-date').value,
-            reason:$('ws-dealer-reason').value, note:$('ws-dealer-note').value
-        }, 'Движение по дилеру проведено', 'dealer');
+        const lines=dealerMovementLines();
+        if(!lines.length||lines.some(line=>!line.recipeId||!Number.isInteger(line.qty)||line.qty<1)){toast('Укажите изделия и количество','error');return;}
+        if(new Set(lines.map(line=>line.recipeId)).size!==lines.length){toast('Одинаковые изделия объедините в одну строку','error');return;}
+        const button=event.currentTarget.querySelector('[type="submit"]');
+        if(button)button.disabled=true;
+        let completed=0;
+        try{
+            for(const line of lines){
+                const response=await fetch(API+'/dealer-movement',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+                    dealerId:$('ws-dealer-id').value,recipeId:line.recipeId,action:$('ws-dealer-action').value,
+                    qty:line.qty,returnCondition:$('ws-dealer-condition').value,date:$('ws-dealer-date').value,
+                    reason:$('ws-dealer-reason').value,note:$('ws-dealer-note').value
+                })});
+                const data=await response.json().catch(()=>({}));
+                if(!response.ok)throw new Error(data.error||'Не удалось провести позицию');
+                completed++;
+            }
+            hideModal('dealer');
+            toast('Проведено позиций: '+completed,'success');
+            await load();
+        }catch(error){
+            toast('Проведено '+completed+' из '+lines.length+'. '+(error.message||'Ошибка')+'. Проверьте историю перед повтором.','error');
+            await load();
+        }finally{if(button)button.disabled=false;}
     });
 
     function resetMaterialMovement(){
