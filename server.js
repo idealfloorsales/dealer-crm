@@ -3089,7 +3089,7 @@ app.post('/api/pricing/offers', requirePermission('can_view_pricing'), async (re
             publicId,
             offerNumber,
             dealer:dealerId,
-            dealerId:expectedDealerId,
+            dealerId:snapshot.dealer?.dealer_id || '',
             dealerName:snapshot.dealer?.name || '',
             dealerCity:snapshot.dealer?.city || '',
             createdBy:user,
