@@ -1016,7 +1016,20 @@ const compRefSchema = new mongoose.Schema({
 }, { timestamps: true });
 const CompRef = mongoose.model('CompRef', compRefSchema);
 
-const dealerSchema = new mongoose.Schema({ dealer_id: String, name: String, price_type: String, price_list: { type: mongoose.Schema.Types.ObjectId, ref: 'PriceList', default: null }, city: String, address: String, contacts: [contactSchema], bonuses: String, photos: [photoSchema], legal_entities: [dealerLegalEntitySchema], contract: { isSigned: Boolean, date: String }, region_sector: String, hasPersonalPlan: { type: Boolean, default: false }, delivery: String, website: String, instagram: String, additional_addresses: [additionalAddressSchema], pos_materials: [posMaterialSchema], visits: [visitSchema], products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }], latitude: Number, longitude: Number, status: { type: String, default: 'standard' }, avatarUrl: String, competitors: [competitorSchema], responsible: String, responsibleUserId: String, responsibleAssignmentSource: String }, { timestamps: true });
+const motivationSchemeSchema = new mongoose.Schema({
+    name: { type:String, required:true, trim:true },
+    ratePerM2: { type:Number, required:true, min:0 },
+    validFrom: { type:String, default:'' },
+    validTo: { type:String, default:'' },
+    active: { type:Boolean, default:true },
+    note: { type:String, default:'' },
+    createdBy: { id:String, name:String },
+    updatedBy: { id:String, name:String }
+}, { timestamps:true });
+motivationSchemeSchema.index({ active:1, validFrom:1, validTo:1, name:1 });
+const MotivationScheme = mongoose.model('MotivationScheme', motivationSchemeSchema);
+
+const dealerSchema = new mongoose.Schema({ dealer_id: String, name: String, price_type: String, price_list: { type: mongoose.Schema.Types.ObjectId, ref: 'PriceList', default: null }, motivation_scheme: { type: mongoose.Schema.Types.ObjectId, ref: 'MotivationScheme', default: null }, city: String, address: String, contacts: [contactSchema], bonuses: String, photos: [photoSchema], legal_entities: [dealerLegalEntitySchema], contract: { isSigned: Boolean, date: String }, region_sector: String, hasPersonalPlan: { type: Boolean, default: false }, delivery: String, website: String, instagram: String, additional_addresses: [additionalAddressSchema], pos_materials: [posMaterialSchema], visits: [visitSchema], products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }], latitude: Number, longitude: Number, status: { type: String, default: 'standard' }, avatarUrl: String, competitors: [competitorSchema], responsible: String, responsibleUserId: String, responsibleAssignmentSource: String }, { timestamps: true });
 const Dealer = mongoose.model('Dealer', dealerSchema);
 
 const priceListRowSchema = new mongoose.Schema({
@@ -1153,6 +1166,31 @@ const salesSchema = new mongoose.Schema({ month: String, group: String, dealerId
 }, { timestamps: true }); 
 const Sales = mongoose.model('Sales', salesSchema);
 
+const motivationPayoutSchema = new mongoose.Schema({
+    month: { type:String, required:true, index:true },
+    dealer: { type:mongoose.Schema.Types.ObjectId, ref:'Dealer', required:true, index:true },
+    dealerId: String,
+    dealerName: String,
+    dealerCity: String,
+    scheme: { type:mongoose.Schema.Types.ObjectId, ref:'MotivationScheme' },
+    schemeName: String,
+    ratePerM2: { type:Number, default:0 },
+    salesM2: { type:Number, default:0 },
+    amount: { type:Number, default:0 },
+    validFrom: String,
+    validTo: String,
+    partialPeriod: { type:Boolean, default:false },
+    status: { type:String, enum:['pending','paid','skipped'], default:'pending', index:true },
+    paidAt: Date,
+    note: String,
+    calculatedAt: Date,
+    calculatedBy: { id:String, name:String },
+    paidBy: { id:String, name:String }
+}, { timestamps:true });
+motivationPayoutSchema.index({ month:1, dealer:1 }, { unique:true });
+const MotivationPayout = mongoose.model('MotivationPayout', motivationPayoutSchema);
+
+
 const Knowledge = mongoose.model('Knowledge', new mongoose.Schema({ title: String, content: String }, { timestamps: true }));
 
 function canonicalDealerPayload(input = {}) {
@@ -1165,6 +1203,11 @@ function canonicalDealerPayload(input = {}) {
     if (Object.prototype.hasOwnProperty.call(payload, 'price_list')) {
         const priceListId = String(payload.price_list?._id || payload.price_list?.id || payload.price_list || '').trim();
         payload.price_list = priceListId && mongoose.Types.ObjectId.isValid(priceListId) ? priceListId : null;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(payload, 'motivation_scheme')) {
+        const motivationId = String(payload.motivation_scheme?._id || payload.motivation_scheme?.id || payload.motivation_scheme || '').trim();
+        payload.motivation_scheme = motivationId && mongoose.Types.ObjectId.isValid(motivationId) ? motivationId : null;
     }
 
     if (Object.prototype.hasOwnProperty.call(payload, 'contract')) {
@@ -2233,7 +2276,7 @@ app.get('/api/dealers', requireAnyPermission('can_view_dealers', 'can_view_map',
             query = query.select('_id name city address contacts latitude longitude status responsible responsibleUserId');
         } else {
             query = query.select('-photos -visits -products -avatarUrl')
-                .populate('price_list', 'name code versionDate validFrom validTo active');
+                .populate('price_list', 'name code versionDate validFrom validTo active').populate('motivation_scheme', 'name ratePerM2 validFrom validTo active');
         }
         const dealers = await query.lean();
         res.json(dealers.map(d => ({ id: d._id, ...d })));
@@ -2257,7 +2300,7 @@ app.get('/api/dealers/:id/avatar', requirePermission('can_view_dealers'), async 
 app.get('/api/dealers/:id', requirePermission('can_view_dealers'), async (req, res) => {
     try {
         let query = Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) })
-            .populate('price_list', 'name code versionDate validFrom validTo active');
+            .populate('price_list', 'name code versionDate validFrom validTo active').populate('motivation_scheme', 'name ratePerM2 validFrom validTo active');
         if (req.query.view === 'profile') {
             query = query.select('-photos').populate('products', 'sku name');
         } else {
@@ -3672,6 +3715,250 @@ app.delete('/api/pricing/conditions/:id', requirePermission('can_manage_pricing'
     } catch (e) {
         res.status(400).json({ error: e.message });
     }
+});
+
+
+function motivationUserMeta(req) {
+    return {
+        id:String(req.user?.id || ''),
+        name:String(req.user?.fullName || req.user?.username || '')
+    };
+}
+
+function normalizeMotivationSchemePayload(input = {}) {
+    const name = String(input.name || '').trim();
+    const ratePerM2 = Math.max(0, Number(input.ratePerM2) || 0);
+    const validFrom = String(input.validFrom || '').trim();
+    const validTo = String(input.validTo || '').trim();
+    if (!name) { const err=new Error('Укажите название мотивации'); err.statusCode=400; throw err; }
+    if (!(ratePerM2 > 0)) { const err=new Error('Ставка мотивации должна быть больше 0'); err.statusCode=400; throw err; }
+    if (validFrom && !/^\d{4}-\d{2}-\d{2}$/.test(validFrom)) { const err=new Error('Некорректная дата начала'); err.statusCode=400; throw err; }
+    if (validTo && !/^\d{4}-\d{2}-\d{2}$/.test(validTo)) { const err=new Error('Некорректная дата окончания'); err.statusCode=400; throw err; }
+    if (validFrom && validTo && validFrom > validTo) { const err=new Error('Дата окончания раньше даты начала'); err.statusCode=400; throw err; }
+    return {
+        name,
+        ratePerM2,
+        validFrom,
+        validTo,
+        active: input.active !== false,
+        note:String(input.note || '').trim()
+    };
+}
+
+function motivationMonthRange(month) {
+    const value = String(month || '').trim();
+    if (!/^\d{4}-\d{2}$/.test(value)) { const err=new Error('Укажите месяц в формате ГГГГ-ММ'); err.statusCode=400; throw err; }
+    const [year, monthNumber] = value.split('-').map(Number);
+    const start = `${value}-01`;
+    const endDate = new Date(Date.UTC(year, monthNumber, 0));
+    const end = endDate.toISOString().slice(0,10);
+    return { month:value, start, end };
+}
+
+function motivationSchemeAppliesToMonth(scheme, range) {
+    if (!scheme || scheme.active === false) return false;
+    const from = String(scheme.validFrom || '');
+    const to = String(scheme.validTo || '');
+    return (!from || from <= range.end) && (!to || to >= range.start);
+}
+
+app.get('/api/motivation/schemes', requireAnyPermission('can_view_dealers','can_view_sales','can_view_pricing'), async (req,res) => {
+    try {
+        const includeArchive = String(req.query.all || '') === '1';
+        const filter = includeArchive ? {} : { active:{ $ne:false } };
+        const items = await MotivationScheme.find(filter).sort({ active:-1, validFrom:-1, name:1 }).lean();
+        res.json(items.map(item => ({
+            id:String(item._id),
+            name:item.name || '',
+            ratePerM2:Number(item.ratePerM2) || 0,
+            validFrom:item.validFrom || '',
+            validTo:item.validTo || '',
+            active:item.active !== false,
+            note:item.note || '',
+            createdAt:item.createdAt,
+            updatedAt:item.updatedAt
+        })));
+    } catch (e) { res.status(500).json({error:e.message}); }
+});
+
+app.post('/api/motivation/schemes', requireAnyPermission('can_manage_pricing','can_edit_sales_fact'), async (req,res) => {
+    try {
+        const payload = normalizeMotivationSchemePayload(req.body || {});
+        payload.createdBy = motivationUserMeta(req);
+        payload.updatedBy = motivationUserMeta(req);
+        const item = await MotivationScheme.create(payload);
+        res.status(201).json({ id:String(item._id), ...payload });
+    } catch (e) { res.status(e.statusCode || 400).json({error:e.message}); }
+});
+
+app.put('/api/motivation/schemes/:id', requireAnyPermission('can_manage_pricing','can_edit_sales_fact'), async (req,res) => {
+    try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(400).json({error:'Некорректная мотивация'});
+        const payload = normalizeMotivationSchemePayload(req.body || {});
+        payload.updatedBy = motivationUserMeta(req);
+        const item = await MotivationScheme.findByIdAndUpdate(req.params.id, { $set:payload }, {new:true}).lean();
+        if (!item) return res.status(404).json({error:'Мотивация не найдена'});
+        res.json({ id:String(item._id), name:item.name, ratePerM2:item.ratePerM2, validFrom:item.validFrom, validTo:item.validTo, active:item.active !== false, note:item.note || '' });
+    } catch (e) { res.status(e.statusCode || 400).json({error:e.message}); }
+});
+
+app.delete('/api/motivation/schemes/:id', requireAnyPermission('can_manage_pricing','can_edit_sales_fact'), async (req,res) => {
+    try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(400).json({error:'Некорректная мотивация'});
+        const assigned = await Dealer.countDocuments({ motivation_scheme:req.params.id });
+        const item = await MotivationScheme.findByIdAndUpdate(req.params.id, { $set:{ active:false, updatedBy:motivationUserMeta(req) } }, {new:true}).lean();
+        if (!item) return res.status(404).json({error:'Мотивация не найдена'});
+        res.json({status:'archived', assigned});
+    } catch (e) { res.status(400).json({error:e.message}); }
+});
+
+app.post('/api/motivation/payouts/recalculate', requireAnyPermission('can_edit_sales_fact','can_manage_pricing'), async (req,res) => {
+    try {
+        const range = motivationMonthRange(req.body?.month);
+        const visibility = getWorkingDealerFilter(getDealerFilter(req));
+        const dealers = await Dealer.find({
+            $and:[
+                visibility,
+                { motivation_scheme:{ $ne:null } }
+            ]
+        }).select('_id dealer_id name city motivation_scheme status').populate('motivation_scheme').lean();
+
+        const eligibleDealers = dealers.filter(dealer => motivationSchemeAppliesToMonth(dealer.motivation_scheme, range));
+        const ids = eligibleDealers.map(dealer => String(dealer._id));
+        const salesRows = ids.length ? await Sales.find({
+            month:range.month,
+            isCustom:{ $ne:true },
+            dealerId:{ $in:ids }
+        }).lean() : [];
+
+        const salesByDealer = new Map();
+        salesRows.forEach(row => {
+            const id = String(row.dealerId || '');
+            salesByDealer.set(id, (salesByDealer.get(id) || 0) + Math.max(0, Number(row.fact) || 0));
+        });
+
+        const existing = await MotivationPayout.find({
+            month:range.month,
+            dealer:{ $in:eligibleDealers.map(d=>d._id) }
+        }).lean();
+        const existingByDealer = new Map(existing.map(item => [String(item.dealer), item]));
+        const calculatedBy = motivationUserMeta(req);
+        const qualifyingIds = [];
+
+        for (const dealer of eligibleDealers) {
+            const dealerId = String(dealer._id);
+            const salesM2 = Math.round((salesByDealer.get(dealerId) || 0) * 100) / 100;
+            if (!(salesM2 > 0)) continue;
+            qualifyingIds.push(dealerId);
+            const scheme = dealer.motivation_scheme || {};
+            const ratePerM2 = Math.max(0, Number(scheme.ratePerM2) || 0);
+            const amount = Math.round(salesM2 * ratePerM2 * 100) / 100;
+            const partialPeriod = Boolean(
+                (scheme.validFrom && scheme.validFrom > range.start) ||
+                (scheme.validTo && scheme.validTo < range.end)
+            );
+            const prev = existingByDealer.get(dealerId);
+            if (prev && (prev.status === 'paid' || prev.status === 'skipped')) continue;
+
+            await MotivationPayout.findOneAndUpdate(
+                { month:range.month, dealer:dealer._id },
+                { $set:{
+                    dealerId:dealer.dealer_id || '',
+                    dealerName:dealer.name || '',
+                    dealerCity:dealer.city || '',
+                    scheme:scheme._id || null,
+                    schemeName:scheme.name || '',
+                    ratePerM2,
+                    salesM2,
+                    amount,
+                    validFrom:scheme.validFrom || '',
+                    validTo:scheme.validTo || '',
+                    partialPeriod,
+                    status:'pending',
+                    calculatedAt:new Date(),
+                    calculatedBy
+                }},
+                { upsert:true, new:true, setDefaultsOnInsert:true }
+            );
+        }
+
+        const stalePending = existing.filter(item => item.status === 'pending' && !qualifyingIds.includes(String(item.dealer)));
+        if (stalePending.length) await MotivationPayout.deleteMany({ _id:{ $in:stalePending.map(item=>item._id) } });
+
+        const rows = await MotivationPayout.find({
+            month:range.month,
+            dealer:{ $in:dealers.map(d=>d._id) }
+        }).sort({ status:1, dealerCity:1, dealerName:1 }).lean();
+
+        res.json({
+            month:range.month,
+            count:rows.length,
+            pendingAmount:rows.filter(x=>x.status==='pending').reduce((sum,x)=>sum+(Number(x.amount)||0),0)
+        });
+    } catch (e) { res.status(e.statusCode || 500).json({error:e.message}); }
+});
+
+app.get('/api/motivation/payouts', requirePermission('can_view_sales'), async (req,res) => {
+    try {
+        const range = motivationMonthRange(req.query.month);
+        const dealerFilter = getDealerFilter(req);
+        const dealers = await Dealer.find(dealerFilter).select('_id').lean();
+        const dealerIds = dealers.map(item=>item._id);
+        const rows = await MotivationPayout.find({ month:range.month, dealer:{ $in:dealerIds } })
+            .sort({ status:1, dealerCity:1, dealerName:1 }).lean();
+        const summary = rows.reduce((acc,row)=>{
+            acc.salesM2 += Number(row.salesM2)||0;
+            acc.amount += Number(row.amount)||0;
+            acc[row.status] = (acc[row.status]||0) + 1;
+            if(row.status==='pending') acc.pendingAmount += Number(row.amount)||0;
+            if(row.status==='paid') acc.paidAmount += Number(row.amount)||0;
+            return acc;
+        }, {salesM2:0,amount:0,pending:0,paid:0,skipped:0,pendingAmount:0,paidAmount:0});
+        res.json({
+            month:range.month,
+            summary,
+            rows:rows.map(row=>({
+                id:String(row._id),
+                dealerId:row.dealerId || '',
+                dealerName:row.dealerName || '',
+                dealerCity:row.dealerCity || '',
+                schemeName:row.schemeName || '',
+                ratePerM2:Number(row.ratePerM2)||0,
+                salesM2:Number(row.salesM2)||0,
+                amount:Number(row.amount)||0,
+                validFrom:row.validFrom || '',
+                validTo:row.validTo || '',
+                partialPeriod:Boolean(row.partialPeriod),
+                status:row.status || 'pending',
+                paidAt:row.paidAt,
+                note:row.note || '',
+                calculatedAt:row.calculatedAt,
+                updatedAt:row.updatedAt
+            }))
+        });
+    } catch (e) { res.status(e.statusCode || 500).json({error:e.message}); }
+});
+
+app.patch('/api/motivation/payouts/:id', requireAnyPermission('can_edit_sales_fact','can_manage_pricing'), async (req,res) => {
+    try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(400).json({error:'Некорректная выплата'});
+        const status = String(req.body?.status || '').trim();
+        if (!['pending','paid','skipped'].includes(status)) return res.status(400).json({error:'Некорректный статус выплаты'});
+        const update = {
+            status,
+            note:String(req.body?.note || '').trim()
+        };
+        if (status === 'paid') {
+            update.paidAt = new Date();
+            update.paidBy = motivationUserMeta(req);
+        } else {
+            update.paidAt = null;
+            update.paidBy = {id:'',name:''};
+        }
+        const item = await MotivationPayout.findByIdAndUpdate(req.params.id, {$set:update}, {new:true}).lean();
+        if (!item) return res.status(404).json({error:'Выплата не найдена'});
+        res.json({status:'ok'});
+    } catch (e) { res.status(400).json({error:e.message}); }
 });
 
 app.get('/api/products/count', requireAnyPermission('can_view_products', 'can_view_report', 'can_view_reclamations', 'can_view_dealers'), async (req, res) => {
