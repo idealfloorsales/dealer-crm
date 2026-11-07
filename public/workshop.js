@@ -998,7 +998,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if ($('ws-recipe-product')) $('ws-recipe-product').innerHTML = productOptions('Без ламината');
         ['ws-production-recipe','ws-dealer-recipe'].forEach(id => { if ($(id)) $(id).innerHTML = recipeOptions(); });
         if ($('ws-material-id')) $('ws-material-id').innerHTML = materialOptions();
-        if ($('ws-dealer-id')) $('ws-dealer-id').innerHTML = dealerOptions();
+        
         if ($('ws-receipt-memo')) {
             const open = state.memos.filter(item => item.status === 'created' || item.status === 'mismatch');
             $('ws-receipt-memo').innerHTML = option('', 'Выберите служебную записку') + open.map(item => option(idOf(item), `№${item.number} · ${dateText(item.date)} · ${(item.lines || []).length} поз.`)).join('');
@@ -1768,13 +1768,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const filtered=state.recipes.filter(r=>(r.name+' '+(r.product?.sku||'')).toLowerCase().includes(q));
         grid.innerHTML=filtered.map(r=>{
             const id=idOf(r),qty=dealerSelectedRecipes.get(id)||0;
-            return '<label class="ws-dealer-choice"><input type="checkbox" data-recipe="'+esc(id)+'" '+(qty?'checked':'')+'><span class="ws-dealer-choice-name">'+esc(r.name)+(r.product?.sku?' <small>'+esc(r.product.sku)+'</small>':'')+'</span><input type="number" data-qty="'+esc(id)+'" min="1" step="1" value="'+(qty||1)+'" '+(qty?'':'disabled')+' aria-label="Количество" class="form-control"></label>';
+            return '<article class="ws-dealer-choice '+(qty?'is-selected':'')+'"><button type="button" data-recipe="'+esc(id)+'" aria-pressed="'+Boolean(qty)+'"><span class="ws-choice-check"><i class="bi bi-'+(qty?'check-lg':'plus-lg')+'"></i></span><span class="ws-dealer-choice-name"><small>'+esc(r.product?.sku||'')+'</small><strong>'+esc(r.name)+'</strong><small>В цехе: '+fmt(r.stockQty||0)+' шт</small></span></button>'+(qty?'<label class="ws-choice-quantity">Количество, шт<input type="number" data-qty="'+esc(id)+'" min="1" step="1" value="'+qty+'" required aria-label="Количество '+esc(r.name)+'" class="form-control"></label>':'')+'</article>';
+
         }).join('')||'<div class="text-muted small p-2">Ничего не найдено</div>';
         $('ws-dealer-selected-count').textContent=dealerSelectedRecipes.size+' выбрано';
     }
     function resetDealerMovement(){
         $('ws-dealer-form')?.reset();$('ws-dealer-date').value=todayValue();
         dealerSelectedRecipes.clear();
+        $('ws-dealer-id').value='';
+        closeDealerResults();
         if($('ws-dealer-recipe-search'))$('ws-dealer-recipe-search').value='';
         if($('ws-dealer-search-input'))$('ws-dealer-search-input').value='';
         populateFormSelects();renderDealerChoices();updateDealerCurrent();
@@ -1791,20 +1794,51 @@ document.addEventListener('DOMContentLoaded', () => {
             }).join(''):'Выберите изделия для движения.';
     }
     $('ws-dealer-recipe-search')?.addEventListener('input',renderDealerChoices);
-    $('ws-dealer-recipe-grid')?.addEventListener('change',e=>{
-        const t=e.target,id=t.dataset.recipe||t.dataset.qty;if(!id)return;
-        const label=t.closest('.ws-dealer-choice'),check=label.querySelector('[data-recipe]'),input=label.querySelector('[data-qty]');
-        if(t.dataset.recipe){input.disabled=!check.checked;}
-        if(check.checked)dealerSelectedRecipes.set(id,Math.max(1,Math.floor(Number(input.value)||1)));
-        else dealerSelectedRecipes.delete(id);
-        $('ws-dealer-selected-count').textContent=dealerSelectedRecipes.size+' выбрано';updateDealerCurrent();
+    $('ws-dealer-recipe-grid')?.addEventListener('click',e=>{
+        const button=e.target.closest('[data-recipe]');if(!button)return;
+        const id=button.dataset.recipe;
+        if(dealerSelectedRecipes.has(id))dealerSelectedRecipes.delete(id);
+        else dealerSelectedRecipes.set(id,1);
+        renderDealerChoices();updateDealerCurrent();
     });
-    $('ws-dealer-search-input')?.addEventListener('input',e=>{
-        const q=e.target.value.toLowerCase().trim(),select=$('ws-dealer-id'),previous=select.value;
-        select.innerHTML=option('','Выберите дилера')+state.dealers.filter(d=>(d.name+' '+(d.city||'')).toLowerCase().includes(q)).map(d=>option(idOf(d),d.name+' · '+(d.city||''))).join('');
-        if([...select.options].some(o=>o.value===previous))select.value=previous;
+    $('ws-dealer-recipe-grid')?.addEventListener('input',e=>{
+        const id=e.target.dataset.qty;if(!id)return;
+        dealerSelectedRecipes.set(id,Math.max(1,Math.floor(Number(e.target.value)||1)));
         updateDealerCurrent();
     });
+    function closeDealerResults(){
+        $('ws-dealer-results').hidden=true;
+        $('ws-dealer-search-input').setAttribute('aria-expanded','false');
+    }
+    function renderDealerResults(){
+        const q=$('ws-dealer-search-input').value.toLowerCase().trim();
+        const list=state.dealers.filter(d=>[d.name,d.city,d.dealerId,d.dealerCode,d.code].join(' ').toLowerCase().includes(q));
+        $('ws-dealer-results').innerHTML=list.map(d=>'<button type="button" role="option" data-dealer-choice="'+esc(idOf(d))+'"><strong>'+esc(d.name)+'</strong><small>'+esc([d.dealerId||d.dealerCode||d.code,d.city].filter(Boolean).join(' · '))+'</small></button>').join('')||'<div class="p-3 text-muted">Дилер не найден</div>';
+        $('ws-dealer-results').hidden=false;
+        $('ws-dealer-search-input').setAttribute('aria-expanded','true');
+    }
+    $('ws-dealer-search-input')?.addEventListener('focus',renderDealerResults);
+    $('ws-dealer-search-input')?.addEventListener('input',()=>{
+        $('ws-dealer-id').value='';renderDealerResults();updateDealerCurrent();
+    });
+    $('ws-dealer-results')?.addEventListener('click',e=>{
+        const button=e.target.closest('[data-dealer-choice]');if(!button)return;
+        const d=state.dealers.find(d=>idOf(d)===button.dataset.dealerChoice);if(!d)return;
+        $('ws-dealer-id').value=idOf(d);
+        $('ws-dealer-search-input').value=[d.name,d.city].filter(Boolean).join(' · ');
+        closeDealerResults();updateDealerCurrent();
+    });
+    $('ws-dealer-search-input')?.addEventListener('keydown',e=>{
+        if(e.key==='Escape'){closeDealerResults();return;}
+        if(e.key==='ArrowDown'){e.preventDefault();renderDealerResults();$('ws-dealer-results').querySelector('button')?.focus();}
+        if(e.key==='Enter'){e.preventDefault();if(!$('ws-dealer-results').hidden)$('ws-dealer-results').querySelector('button')?.click();}
+    });
+    $('ws-dealer-results')?.addEventListener('keydown',e=>{
+        const buttons=[...$('ws-dealer-results').querySelectorAll('button')],i=buttons.indexOf(document.activeElement);
+        if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();buttons[(i+(e.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length]?.focus();}
+        if(e.key==='Escape'){closeDealerResults();$('ws-dealer-search-input').focus();closeDealerResults();}
+    });
+    document.addEventListener('click',e=>{if(!e.target.closest('.ws-dealer-combobox'))closeDealerResults();});
     ['ws-dealer-id','ws-dealer-action'].forEach(id=>$(id)?.addEventListener('change',updateDealerCurrent));
     $('ws-dealer-form')?.addEventListener('submit',async event=>{
         event.preventDefault();
