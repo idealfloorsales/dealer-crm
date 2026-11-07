@@ -256,7 +256,7 @@
         try {
             if(btn){btn.disabled=true;btn.innerHTML='<span class="spinner-border spinner-border-sm"></span> Считаем';}
             await request(API+'/payouts/recalculate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({month})});
-            if(!silent) toast('Выплаты пересчитаны по продажам '+month);
+            if(!silent) toast('Выплаты пересчитаны за предыдущий месяц продаж');
         } catch(e){if(!silent)toast(e.message,'error');}
         finally{if(btn){btn.disabled=false;btn.innerHTML=old;}}
     }
@@ -270,7 +270,7 @@
         const host=document.getElementById('motivation-payout-list');
         if(host) host.innerHTML='<div class="motivation-payout-empty"><span class="spinner-border spinner-border-sm"></span> Загрузка…</div>';
         try {
-            if(autoRecalc) await recalculatePayouts(month,true);
+            if(canManage()) await recalculatePayouts(month,true);
             const data=await request(API+'/payouts?month='+encodeURIComponent(month));
             state.payoutData=data;
             renderPayouts(data);
@@ -335,14 +335,6 @@
         if(!panel) return;
         const picker=document.getElementById('motivation-payout-month');
         if(picker && !picker.value) picker.value=currentMonth();
-        const day=new Date().getDate();
-        const banner=document.getElementById('motivation-payout-window');
-        if(banner){
-            banner.classList.toggle('is-open',day<=10);
-            banner.innerHTML=day<=10
-              ? '<i class="bi bi-calendar-check"></i><div><strong>Окно выплат открыто: 1–10 число</strong><span>Проверьте расчёт за прошлый месяц и отмечайте фактические выплаты.</span></div>'
-              : '<i class="bi bi-calendar3"></i><div><strong>Обычный период</strong><span>Основное окно выплат — с 1 по 10 число каждого месяца. История доступна всегда.</span></div>';
-        }
         picker?.addEventListener('change',()=>loadPayouts(canManage()));
         document.getElementById('motivation-payout-recalc')?.addEventListener('click',()=>loadPayouts(true));
         document.getElementById('motivation-payout-settings')?.addEventListener('click',openManager);
@@ -350,7 +342,7 @@
             const btn=event.target.closest('[data-payout-status]');
             if(btn) setPayoutStatus(btn.dataset.payoutId,btn.dataset.payoutStatus);
         });
-        loadPayouts(day<=10);
+        loadPayouts(true);
     }
 
     function observeDynamicSelects() {
