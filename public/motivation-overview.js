@@ -30,16 +30,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     const day=new Date().getDate();
     const inReminderWindow=settings.enabled&&day>=settings.startDay&&day<=settings.endDay;
     if(!inReminderWindow) {
-      dashboard.innerHTML='<div class="cc-panel p-3"><div class="d-flex justify-content-between align-items-center gap-2"><strong>Мотивация и выплаты</strong><button type="button" id="mr-open-anytime" class="btn btn-sm btn-outline-primary">Показать список</button></div><div id="mr-anytime-content" hidden></div></div>';
+      dashboard.innerHTML='<div class="cc-panel cc-motivation-panel"><div class="cc-panel-head"><div><div class="cc-panel-kicker">Финансы дилеров</div><h2><i class="bi bi-wallet2"></i> Мотивация и выплаты</h2><p class="cc-motivation-subtitle">Продажи за '+salesLabel+' · начисления текущего месяца</p></div><button type="button" id="mr-open-anytime" class="cc-motivation-action"><span>Показать список</span><i class="bi bi-chevron-down"></i></button></div><div id="mr-anytime-content" hidden></div></div>';
       dashboard.querySelector('#mr-open-anytime').addEventListener('click',async event=>{
         const host=dashboard.querySelector('#mr-anytime-content');
-        if(!host.hidden){host.hidden=true;event.currentTarget.textContent='Показать список';return;}
-        host.hidden=false;event.currentTarget.textContent='Скрыть список';host.innerHTML='<p class="small text-muted mt-2">Загрузка…</p>';
-        try {await refresh(month);const data=await get(month);const pending=(data.rows||[]).filter(r=>r.status==='pending');host.innerHTML='<p class="small text-muted mt-2">Продажи за '+salesLabel+' · к выплате: '+pending.length+'</p>'+(pending.length?'<div class="table-responsive"><table class="table table-sm"><thead><tr><th>Дилер</th><th class="text-end">Продажи, м²</th><th class="text-end">К выплате</th></tr></thead><tbody>'+pending.map(r=>'<tr><td>'+escape(r.dealerName)+'</td><td class="text-end">'+fmt(r.salesM2)+'</td><td class="text-end">'+money(r.amount)+'</td></tr>').join('')+'</tbody><tfoot><tr><th>Итого</th><th class="text-end">'+fmt(pending.reduce((v,r)=>v+Number(r.salesM2||0),0))+'</th><th class="text-end">'+money(pending.reduce((v,r)=>v+Number(r.amount||0),0))+'</th></tr></tfoot></table></div>':'<p class="small text-muted">Невыплаченных мотиваций нет.</p>')+'<a href="/sales.html#motivation-payouts-panel" class="btn btn-sm btn-outline-secondary">Открыть выплаты</a>';}catch(e){host.textContent='Не удалось загрузить выплаты';}
+        if(!host.hidden){host.hidden=true;event.currentTarget.querySelector('span').textContent='Показать список';return;}
+        host.hidden=false;event.currentTarget.querySelector('span').textContent='Скрыть список';host.innerHTML='<p class="small text-muted mt-2">Загрузка…</p>';
+        try {await refresh(month);const data=await get(month);const pending=(data.rows||[]).filter(r=>r.status==='pending');host.innerHTML='<p class="small text-muted mt-2">Продажи за '+salesLabel+' · к выплате: '+pending.length+'</p>'+(pending.length?'<div class="table-responsive"><table class="table table-sm cc-motivation-table"><thead><tr><th>Дилер</th><th class="text-end">Продажи, м²</th><th class="text-end">К выплате</th></tr></thead><tbody>'+pending.map(r=>'<tr><td>'+escape(r.dealerName)+'</td><td class="text-end">'+fmt(r.salesM2)+'</td><td class="text-end">'+money(r.amount)+'</td></tr>').join('')+'</tbody><tfoot><tr><th>Итого</th><th class="text-end">'+fmt(pending.reduce((v,r)=>v+Number(r.salesM2||0),0))+'</th><th class="text-end">'+money(pending.reduce((v,r)=>v+Number(r.amount||0),0))+'</th></tr></tfoot></table></div>':'<p class="small text-muted">Невыплаченных мотиваций нет.</p>')+'<a href="/sales.html#motivation-payouts-panel" class="btn btn-sm btn-outline-secondary">Открыть выплаты</a>';}catch(e){host.textContent='Не удалось загрузить выплаты';}
       });
     }
     if(inReminderWindow) {
-      dashboard.innerHTML='<div class="cc-panel p-3"><h3 class="h5 mb-2">Мотивация к выплате</h3><p class="text-muted small">Загрузка…</p></div>';
+      dashboard.innerHTML='<div class="cc-panel cc-motivation-panel"><div class="cc-panel-kicker">Финансы дилеров</div><h2>Мотивация к выплате</h2><p class="cc-motivation-subtitle">Загрузка начислений…</p></div>';
       try {
         await refresh(month);
         const data=await get(month);
@@ -48,11 +48,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         else {
           const total=pending.reduce((s,r)=>s+Number(r.amount||0),0);
           const sqm=pending.reduce((s,r)=>s+Number(r.salesM2||0),0);
-          dashboard.innerHTML='<div class="cc-panel p-3"><div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2"><div><h3 class="h5 mb-1">Мотивация к выплате</h3><small class="text-muted">Продажи за '+salesLabel+' · выплата в текущем месяце</small></div><a href="/sales.html#motivation-payouts-panel" class="btn btn-sm btn-outline-primary">Все выплаты</a></div><div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Дилер</th><th class="text-end">Продажи, м²</th><th class="text-end">К выплате</th></tr></thead><tbody>'+pending.map(r=>'<tr><td><strong>'+escape(r.dealerName)+'</strong><small class="d-block text-muted">'+escape(r.dealerId)+'</small></td><td class="text-end">'+fmt(r.salesM2)+'</td><td class="text-end">'+money(r.amount)+'</td></tr>').join('')+'</tbody><tfoot><tr><th>Итого ('+pending.length+')</th><th class="text-end">'+fmt(sqm)+' м²</th><th class="text-end">'+money(total)+'</th></tr></tfoot></table></div></div>';
+          dashboard.innerHTML='<div class="cc-panel cc-motivation-panel"><div class="cc-panel-head"><div><div class="cc-panel-kicker">Финансы дилеров</div><h2><i class="bi bi-wallet2"></i> Мотивация к выплате</h2><p class="cc-motivation-subtitle">Продажи за '+salesLabel+' · выплата в текущем месяце</p></div><a href="/sales.html#motivation-payouts-panel" class="cc-panel-link">Все выплаты <i class="bi bi-arrow-up-right"></i></a></div><div class="table-responsive"><table class="table table-sm align-middle cc-motivation-table"><thead><tr><th>Дилер</th><th class="text-end">Продажи, м²</th><th class="text-end">К выплате</th></tr></thead><tbody>'+pending.map(r=>'<tr><td><strong>'+escape(r.dealerName)+'</strong><small class="d-block text-muted">'+escape(r.dealerId)+'</small></td><td class="text-end">'+fmt(r.salesM2)+'</td><td class="text-end">'+money(r.amount)+'</td></tr>').join('')+'</tbody><tfoot><tr><th>Итого ('+pending.length+')</th><th class="text-end">'+fmt(sqm)+' м²</th><th class="text-end">'+money(total)+'</th></tr></tfoot></table></div></div>';
           if(canConfigure) {
             const panel=dashboard.querySelector('.cc-panel');
             const button=document.createElement('button');
-            button.className='btn btn-sm btn-outline-secondary mt-2';
+            button.className='cc-motivation-action mt-2';
             button.textContent='Настроить напоминание';
             panel.appendChild(button);
             const form=document.createElement('div');
@@ -86,7 +86,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const rows=data.flatMap((d,i)=>(d.rows||[]).filter(r=>String(r.dealerId)===String(profile.dataset.dealerCode || '')).map(r=>({...r,month:periods[i]})));
       if(!rows.length) {profile.innerHTML='<p class="text-muted small mb-0">Начислений и выплат за последние 12 месяцев нет.</p>';return;}
       const total=rows.reduce((s,r)=>s+Number(r.amount||0),0);
-      profile.innerHTML='<div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Месяц выплаты</th><th class="text-end">Продажи, м²</th><th class="text-end">Мотивация</th><th>Статус</th></tr></thead><tbody>'+rows.map(r=>'<tr><td>'+escape(r.month)+'</td><td class="text-end">'+fmt(r.salesM2)+'</td><td class="text-end">'+money(r.amount)+'</td><td>'+status(r.status)+'</td></tr>').join('')+'</tbody><tfoot><tr><th>Всего</th><th></th><th class="text-end">'+money(total)+'</th><th></th></tr></tfoot></table></div>';
+      profile.innerHTML='<div class="table-responsive"><table class="table table-sm align-middle cc-motivation-table"><thead><tr><th>Месяц выплаты</th><th class="text-end">Продажи, м²</th><th class="text-end">Мотивация</th><th>Статус</th></tr></thead><tbody>'+rows.map(r=>'<tr><td>'+escape(r.month)+'</td><td class="text-end">'+fmt(r.salesM2)+'</td><td class="text-end">'+money(r.amount)+'</td><td>'+status(r.status)+'</td></tr>').join('')+'</tbody><tfoot><tr><th>Всего</th><th></th><th class="text-end">'+money(total)+'</th><th></th></tr></tfoot></table></div>';
     } catch(e) {profile.innerHTML='<p class="text-muted small">История мотивации сейчас недоступна.</p>';}
   });
 });
