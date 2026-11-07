@@ -891,3 +891,31 @@ body.crm-ui-enhanced.crm-page-leaving button {
         animation: none !important;
     }
 }
+
+/* Mobile interaction polish — shared across CRM screens */
+@media (max-width: 991.98px) {
+  .crm-mobile-nav-item, .crm-mobile-nav-more, .crm-mobile-sheet-link,
+  .crm-theme-choice {
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color .18s ease, border-color .18s ease,
+                color .18s ease, transform .2s cubic-bezier(.2,.8,.2,1);
+  }
+  .crm-mobile-nav-item:active, .crm-mobile-nav-more:active,
+  .crm-mobile-sheet-link:active, .crm-theme-choice:active { transform: scale(.96); }
+  .crm-mobile-sheet-scroll { overscroll-behavior: contain; }
+  .crm-mobile-sheet-handle { touch-action: none; cursor: grab; }
+  .modal.show .modal-content { animation: crmMobileModalIn .28s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes crmMobileModalIn {
+    from { opacity: .65; transform: translateY(14px) scale(.985); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  :where(button,a,input,select,textarea):focus-visible {
+    outline: 2px solid #b9040a; outline-offset: 3px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .crm-mobile-nav-item, .crm-mobile-nav-more, .crm-mobile-sheet-link,
+  .crm-theme-choice, .modal.show .modal-content {
+    animation: none !important; transition: none !important;
+  }
+}
