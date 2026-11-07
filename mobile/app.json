@@ -20,6 +20,14 @@
         {
           "locationWhenInUsePermission": "IDEAL FLOOR CRM использует геопозицию для маршрутов и работы с дилерами в поле."
         }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FFFFFF",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 220
+        }
       ]
     ],
     "android": {
@@ -32,11 +40,6 @@
     "ios": {
       "bundleIdentifier": "kz.idealfloor.crm",
       "supportsTablet": true
-    },
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#FFFFFF"
     },
     "experiments": {
       "typedRoutes": true
