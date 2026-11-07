@@ -1,0 +1,62 @@
+name: Build IDEAL FLOOR CRM Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - mobile-app
+    paths:
+      - "mobile/**"
+      - ".github/workflows/mobile-android-debug.yml"
+
+jobs:
+  android-debug:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        working-directory: mobile
+
+    steps:
+      - name: Checkout mobile branch
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: mobile/package.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Normalize Expo dependencies
+        run: npx expo install --fix
+
+      - name: Expo Doctor
+        run: npx expo-doctor
+
+      - name: Generate Android native project
+        run: npx expo prebuild --platform android --clean --non-interactive
+
+      - name: Build debug APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ideal-floor-crm-android-debug
+          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
