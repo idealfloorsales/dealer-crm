@@ -997,6 +997,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                             <div class="col-md-4"><label>Статус</label><select id="profile-edit-status" class="form-select"></select></div>
                                             <div class="col-md-4"><label>Город</label><input id="profile-edit-city" class="form-control"></div>
                                             <div class="col-md-4"><label>Прайс</label><select id="profile-edit-price-list" class="form-select"><option value="">Не назначен</option></select></div>
+                                            <div class="col-md-8"><label>Мотивация дилера</label><div class="motivation-field-row"><select id="profile-edit-motivation-scheme" data-motivation-select class="form-select"><option value="">Без мотивации</option></select><button type="button" class="motivation-gear-btn motivation-manager-open" title="Настроить мотивации"><i class="bi bi-gear"></i></button></div></div>
                                             <div class="col-md-8"><label>Адрес</label><input id="profile-edit-address" class="form-control"></div>
                                             <div class="col-md-4"><label>Ответственный</label>
                                                 <select id="profile-edit-responsible" class="form-select">
@@ -1238,6 +1239,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (input) input.value = value || '';
             });
             await loadProfilePriceLists(currentDealer.price_list?.id || currentDealer.price_list || '');
+            const profileMotivation = document.getElementById('profile-edit-motivation-scheme');
+            if (profileMotivation) {
+                profileMotivation.dataset.selected = String(currentDealer.motivation_scheme?.id || currentDealer.motivation_scheme?._id || currentDealer.motivation_scheme || '');
+                window.CRMMotivation?.refreshSelects();
+            }
             const signed = document.getElementById('profile-edit-contract-signed');
             if (signed) signed.checked = Boolean(currentDealer.contract?.isSigned);
             const responsible = document.getElementById('profile-edit-responsible');
@@ -1315,6 +1321,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 status: editValue('profile-edit-status'),
                 city: editValue('profile-edit-city'),
                 price_list: editValue('profile-edit-price-list') || null,
+                motivation_scheme: editValue('profile-edit-motivation-scheme') || null,
                 address: editValue('profile-edit-address'),
                 responsible: editValue('profile-edit-responsible'),
                 region_sector: editValue('profile-edit-sector'),
