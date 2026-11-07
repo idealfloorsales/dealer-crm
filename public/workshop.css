@@ -924,3 +924,26 @@ html,body.workshop-page{max-width:100%;overflow-x:hidden}
 .ws-dealer-choice-toolbar .form-select{flex:1;min-width:180px}
 .ws-dealer-choice-toolbar button{min-height:42px;font-size:13px}
 @media(max-width:600px){.ws-dealer-choice-toolbar .form-select{flex-basis:100%}.ws-dealer-choice-toolbar button{flex:1}}
+
+/* Movement form owns its grid: generic label-only spans do not cover div sections. */
+#ws-dealer-modal .workshop-simple-form{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+#ws-dealer-modal .workshop-simple-form>.span-2{grid-column:1/-1;min-width:0;width:100%}
+#ws-dealer-modal .workshop-simple-form>*{min-width:0}
+#ws-dealer-modal .ws-dealer-choice>button{display:block;box-sizing:border-box;width:100%;max-width:100%;margin:0}
+#ws-dealer-modal .ws-dealer-choice-name{display:block;width:100%;min-width:0;text-align:left}
+#ws-dealer-modal .ws-dealer-choice-name strong{white-space:normal;word-break:normal;overflow-wrap:break-word;line-height:1.4}
+#ws-dealer-modal .ws-choice-quantity{display:flex!important;flex-wrap:nowrap}
+#ws-dealer-modal .ws-choice-quantity input{flex:0 0 88px}
+@media(max-width:600px){
+  #ws-dealer-modal .modal-dialog{margin:8px;max-width:calc(100% - 16px)}
+  #ws-dealer-modal .workshop-simple-form{grid-template-columns:minmax(0,1fr);gap:14px;padding:12px}
+  #ws-dealer-modal .workshop-simple-form>*{grid-column:1/-1}
+  #ws-dealer-modal .form-control,#ws-dealer-modal .form-select{width:100%;max-width:100%;font-size:16px;min-height:48px}
+  #ws-dealer-modal .ws-dealer-choice-grid{display:grid;grid-template-columns:minmax(0,1fr);max-height:none;overflow:visible}
+  #ws-dealer-modal .ws-dealer-choice-toolbar{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  #ws-dealer-modal .ws-dealer-choice-toolbar .form-select{grid-column:1/-1;min-width:0}
+  #ws-dealer-modal .ws-dealer-choice-toolbar button{font-size:13px;white-space:normal;padding:9px 8px}
+  #ws-dealer-modal .ws-choice-quantity input{width:88px;min-height:44px}
+  #ws-dealer-selected-count{white-space:nowrap;font-size:12px;flex-shrink:0}
+  #ws-dealer-recipe-search{font-size:16px}
+}
