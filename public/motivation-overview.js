@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       } catch(e) { dashboard.innerHTML='<div class="cc-panel p-3 text-muted small">Не удалось загрузить мотивацию. <a href="/sales.html">Открыть выплаты</a></div>'; }
     }
   }
-  if(profile) {
+  if(profile) document.addEventListener('crm:dealer-motivation-ready', async () => {
     const dealerId = new URLSearchParams(location.search).get('id');
     if(!dealerId) return;
     profile.innerHTML='<p class="text-muted small">Загрузка истории мотивации…</p>';
@@ -54,5 +54,5 @@ document.addEventListener('DOMContentLoaded', async () => {
       const total=rows.reduce((s,r)=>s+Number(r.amount||0),0);
       profile.innerHTML='<div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Месяц выплаты</th><th class="text-end">Продажи, м²</th><th class="text-end">Мотивация</th><th>Статус</th></tr></thead><tbody>'+rows.map(r=>'<tr><td>'+escape(r.month)+'</td><td class="text-end">'+fmt(r.salesM2)+'</td><td class="text-end">'+money(r.amount)+'</td><td>'+status(r.status)+'</td></tr>').join('')+'</tbody><tfoot><tr><th>Всего</th><th></th><th class="text-end">'+money(total)+'</th><th></th></tr></tfoot></table></div>';
     } catch(e) {profile.innerHTML='<p class="text-muted small">История мотивации сейчас недоступна.</p>';}
-  }
+  });
 });
