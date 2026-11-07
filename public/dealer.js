@@ -393,7 +393,20 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if(deliveryContainer) deliveryContainer.textContent = safeText(dealer.delivery) || 'Не указано';
-            if(bonusesContainer) bonusesContainer.textContent = safeText(dealer.bonuses) || 'Нет примечаний';
+            if(bonusesContainer) {
+                const motivation = dealer.motivation_scheme && typeof dealer.motivation_scheme === 'object' ? dealer.motivation_scheme : null;
+                const motivationPeriod = motivation
+                    ? [motivation.validFrom ? motivation.validFrom.split('-').reverse().join('.') : 'без даты начала', motivation.validTo ? motivation.validTo.split('-').reverse().join('.') : 'без даты окончания'].join(' — ')
+                    : '';
+                bonusesContainer.innerHTML =
+                    '<div class="dealer-motivation-summary ' + (motivation ? 'is-active' : 'is-empty') + '">' +
+                        '<span class="dealer-motivation-summary-icon"><i class="bi bi-cash-coin"></i></span>' +
+                        '<div><small>Мотивация</small><strong>' + (motivation ? safeText(motivation.name) : 'Не назначена') + '</strong>' +
+                        (motivation ? '<span>' + Number(motivation.ratePerM2 || 0).toLocaleString('ru-RU') + ' ₸/м² · ' + safeText(motivationPeriod) + '</span>' : '') +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="dealer-motivation-notes"><small>Заметки и особые условия</small><p>' + (dealer.bonuses ? safeText(dealer.bonuses) : 'Нет примечаний') + '</p></div>';
+            }
             
             renderDealerAddresses(dealer.additional_addresses || []); 
             renderDealerPos(dealer.pos_materials || []); 
