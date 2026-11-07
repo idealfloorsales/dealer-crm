@@ -1202,6 +1202,7 @@ const motivationPayoutSchema = new mongoose.Schema({
 }, { timestamps:true });
 motivationPayoutSchema.index({ month:1, dealer:1 }, { unique:true });
 const MotivationPayout = mongoose.model('MotivationPayout', motivationPayoutSchema);
+const MotivationReminderSetting = mongoose.model('MotivationReminderSetting', new mongoose.Schema({ key:{type:String,unique:true}, enabled:Boolean, startDay:Number, endDay:Number, hideWhenEmpty:Boolean }));
 
 
 const Knowledge = mongoose.model('Knowledge', new mongoose.Schema({ title: String, content: String }, { timestamps: true }));
@@ -3784,6 +3785,21 @@ function motivationSchemeAppliesToMonth(scheme, range) {
     const to = String(scheme.validTo || '');
     return (!from || from <= range.end) && (!to || to >= range.start);
 }
+
+app.get('/api/motivation/reminder-settings', requirePermission('can_view_sales'), async (req,res) => {
+    try {
+        const item = await MotivationReminderSetting.findOne({key:'dashboard'}).lean();
+        res.json({enabled:item?.enabled !== false,startDay:item?.startDay || 1,endDay:item?.endDay || 5,hideWhenEmpty:item?.hideWhenEmpty !== false});
+    } catch(e) { res.status(500).json({error:e.message}); }
+});
+app.put('/api/motivation/reminder-settings', requireAnyPermission('can_manage_pricing','can_edit_sales_fact'), async (req,res) => {
+    try {
+        const startDay=Number(req.body?.startDay), endDay=Number(req.body?.endDay);
+        if(!Number.isInteger(startDay)||!Number.isInteger(endDay)||startDay<1||endDay>31||startDay>endDay) return res.status(400).json({error:'Укажите дни от 1 до 31 в правильном порядке'});
+        const item=await MotivationReminderSetting.findOneAndUpdate({key:'dashboard'},{$set:{enabled:req.body.enabled!==false,startDay,endDay,hideWhenEmpty:req.body.hideWhenEmpty!==false}},{upsert:true,new:true});
+        res.json({enabled:item.enabled,startDay:item.startDay,endDay:item.endDay,hideWhenEmpty:item.hideWhenEmpty});
+    } catch(e) {res.status(500).json({error:e.message});}
+});
 
 app.get('/api/motivation/schemes', requireAnyPermission('can_view_dealers','can_create_dealer','can_edit_dealer','can_view_sales','can_view_pricing'), async (req,res) => {
     try {
