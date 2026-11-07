@@ -289,7 +289,16 @@
         const host=document.getElementById('motivation-payout-list');
         if(!host) return;
         if(!rows.length){
-            host.innerHTML='<div class="motivation-payout-empty"><i class="bi bi-check2-circle"></i><strong>Выплат за этот месяц нет</strong><span>В список попадают только дилеры с назначенной мотивацией и фактическими продажами.</span></div>';
+            const diag=data?.diagnostics || {};
+            let detail='В список попадают только дилеры с назначенной мотивацией и фактическими продажами.';
+            if(Number(diag.assigned||0)===0) {
+                detail='Ни одному доступному дилеру не назначена схема мотивации.';
+            } else if(Number(diag.eligible||0)===0 && Number(diag.outsidePeriod||0)>0) {
+                detail='Мотивации назначены, но их сроки действия не попадают в выбранный месяц.';
+            } else if(Number(diag.withSales||0)===0 && Number(diag.eligible||0)>0) {
+                detail='Мотивации действовали в этом месяце, но у этих дилеров нет фактических продаж.';
+            }
+            host.innerHTML='<div class="motivation-payout-empty"><i class="bi bi-check2-circle"></i><strong>Выплат за этот месяц нет</strong><span>'+esc(detail)+'</span><small>Назначено мотиваций: '+Number(diag.assigned||0)+' · Действовали: '+Number(diag.eligible||0)+' · С продажами: '+Number(diag.withSales||0)+'</small></div>';
             return;
         }
         host.innerHTML=rows.map(row=>`
@@ -333,7 +342,7 @@
               ? '<i class="bi bi-calendar-check"></i><div><strong>Окно выплат открыто: 1–10 число</strong><span>Проверьте расчёт за прошлый месяц и отмечайте фактические выплаты.</span></div>'
               : '<i class="bi bi-calendar3"></i><div><strong>Обычный период</strong><span>Основное окно выплат — с 1 по 10 число каждого месяца. История доступна всегда.</span></div>';
         }
-        picker?.addEventListener('change',()=>loadPayouts(false));
+        picker?.addEventListener('change',()=>loadPayouts(canManage()));
         document.getElementById('motivation-payout-recalc')?.addEventListener('click',()=>loadPayouts(true));
         document.getElementById('motivation-payout-settings')?.addEventListener('click',openManager);
         document.getElementById('motivation-payout-list')?.addEventListener('click',event=>{
