@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const detailModal = new bootstrap.Modal($('audit-detail-modal'));
   const moduleLabels = {
     dealers:'Дилеры',matrix:'Выставленность',visits:'Визиты',products:'Матрица',sales:'Продажи',
-    competitors:'Конкуренты',knowledge:'Статьи',reclamations:'Рекламации',workshop:'Цех',
+    competitors:'Конкуренты',knowledge:'Обучение',reclamations:'Рекламации',workshop:'Цех',
     pricing:'Цены',exports:'Экспорт',users:'Сотрудники',settings:'Настройки',system:'Система'
   };
   const actionLabels = {create:'Добавление',update:'Изменение',delete:'Удаление',execute:'Операция'};

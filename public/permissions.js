@@ -266,7 +266,7 @@
         { path: '/report.html', label: 'Выставленность', permission: 'can_view_report', icon: 'bar-chart' },
         { path: '/sales.html', label: 'Продажи', permission: 'can_view_sales', icon: 'graph-up-arrow' },
         { path: '/competitors.html', label: 'Конкуренты', permission: 'can_view_competitors', icon: 'globe2' },
-        { path: '/knowledge.html', label: 'Статьи', permission: 'can_view_knowledge', icon: 'journal-text' },
+        { path: '/knowledge.html', label: 'Обучение', permission: 'can_view_knowledge', icon: 'mortarboard' },
         { path: '/reclamations.html', label: 'Рекламации', permission: 'can_view_reclamations', icon: 'shield-exclamation' },
         { path: '/workshop.html', label: 'Цех', permission: 'can_view_workshop', icon: 'tools' },
         { path: '/pricing.html', label: 'Цены', permission: 'can_view_pricing', icon: 'percent' },

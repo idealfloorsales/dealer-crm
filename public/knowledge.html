@@ -3,40 +3,102 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Статьи</title>
+    <title>Обучение</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    
     <link rel="stylesheet" href="style.css?v={{VER}}">
+    <link rel="stylesheet" href="training.css?v={{VER}}">
     <link rel="icon" href="favicon.gif" type="image/gif">
-<link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#b9040a">
 </head>
-<body class="app-workspace-page knowledge-page">
+<body class="app-workspace-page knowledge-page training-page">
     <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-4"></nav>
+
     <main class="container-fluid app-page-shell">
-        <section class="app-page-hero">
-            <div class="app-page-hero-copy">
-                <div class="app-page-eyebrow">IDEAL FLOOR CRM · БАЗА ЗНАНИЙ</div>
-                <h1>Статьи</h1>
-                <p>Инструкции, памятки и рабочие материалы команды.</p>
+        <section class="training-hero">
+            <div class="training-hero-copy">
+                <div class="training-kicker">IDEAL FLOOR CRM · БАЗА ЗНАНИЙ</div>
+                <h1>Обучение</h1>
+                <p>Продукция, монтаж, коллекции и аргументы для продаж — в одном рабочем разделе.</p>
+                <div class="training-progress-wrap">
+                    <div class="training-progress-head">
+                        <strong id="training-progress-value">0%</strong>
+                        <span id="training-progress-label">0 из 10 тем пройдено</span>
+                    </div>
+                    <div class="training-progress-track"><span id="training-progress-bar"></span></div>
+                </div>
             </div>
-            <div class="app-page-actions">
-                <button id="open-add-article-btn" class="app-hero-primary"><i class="bi bi-plus-lg"></i><span>Добавить статью</span></button>
+            <div class="training-hero-stats">
+                <div><strong id="training-topics-count">10</strong><span>учебных тем</span></div>
+                <div><strong id="training-products-count">83</strong><span>позиций</span></div>
+                <div><strong id="training-collections-count">9</strong><span>коллекций</span></div>
             </div>
         </section>
-        <div class="app-toolbar-card"><div class="app-search-field"><i class="bi bi-search"></i><input type="text" id="search-bar" class="form-control" placeholder="Поиск по базе знаний..."></div></div>
-        <div class="accordion" id="article-list"></div>
-        <p id="no-data-msg" class="alert alert-info mt-3" style="display: none;"></p>
+
+        <section class="training-shell">
+            <div class="training-tabs" role="tablist" aria-label="Разделы обучения">
+                <button class="training-tab is-active" type="button" data-training-view="course"><i class="bi bi-mortarboard"></i><span>Курс</span></button>
+                <button class="training-tab" type="button" data-training-view="catalog"><i class="bi bi-grid-3x3-gap"></i><span>Номенклатура</span><small id="catalog-count-badge">83</small></button>
+                <button class="training-tab" type="button" data-training-view="materials"><i class="bi bi-journal-text"></i><span>Материалы команды</span></button>
+            </div>
+
+            <section class="training-view is-active" data-training-panel="course">
+                <div class="training-toolbar">
+                    <label class="training-search"><i class="bi bi-search"></i><input id="training-search" type="search" placeholder="Найти тему, коллекцию или характеристику…"></label>
+                    <div class="training-category-row" id="training-category-row"></div>
+                </div>
+                <div class="training-grid" id="training-grid"></div>
+            </section>
+
+            <section class="training-view" data-training-panel="catalog">
+                <div class="catalog-intro">
+                    <div>
+                        <span class="catalog-eyebrow">СПРАВОЧНИК ПРОДУКЦИИ</span>
+                        <h2>Полная номенклатура IDEAL FLOOR</h2>
+                        <p>Артикулы и технические характеристики из рабочей матрицы Excel. Включены и скрытые строки исходного файла.</p>
+                    </div>
+                    <div class="catalog-source-badge"><i class="bi bi-file-earmark-spreadsheet"></i><span>83 позиции</span></div>
+                </div>
+                <div class="catalog-toolbar">
+                    <label class="training-search"><i class="bi bi-search"></i><input id="catalog-search" type="search" placeholder="Артикул, декор, коллекция, штрихкод…"></label>
+                    <select id="catalog-collection" class="form-select"><option value="">Все коллекции</option></select>
+                </div>
+                <div class="catalog-summary" id="catalog-summary"></div>
+                <div class="catalog-grid" id="catalog-grid"></div>
+            </section>
+
+            <section class="training-view" data-training-panel="materials">
+                <div class="materials-head">
+                    <div>
+                        <span class="catalog-eyebrow">ВНУТРЕННИЕ МАТЕРИАЛЫ</span>
+                        <h2>Материалы команды</h2>
+                        <p>Ваши существующие инструкции, памятки и рабочие заметки остаются здесь.</p>
+                    </div>
+                    <button id="open-add-article-btn" class="app-hero-primary" type="button"><i class="bi bi-plus-lg"></i><span>Добавить материал</span></button>
+                </div>
+                <div class="app-toolbar-card training-material-search"><div class="app-search-field"><i class="bi bi-search"></i><input type="text" id="search-bar" class="form-control" placeholder="Поиск по материалам..."></div></div>
+                <div class="accordion" id="article-list"></div>
+                <p id="no-data-msg" class="alert alert-info mt-3" style="display:none;"></p>
+            </section>
+        </section>
     </main>
-    
+
+    <div class="training-topic-modal" id="training-topic-modal" aria-hidden="true">
+        <div class="training-topic-backdrop" data-training-close></div>
+        <article class="training-topic-panel" role="dialog" aria-modal="true" aria-labelledby="training-topic-title">
+            <button class="training-topic-close" type="button" data-training-close aria-label="Закрыть"><i class="bi bi-x-lg"></i></button>
+            <div id="training-topic-body"></div>
+        </article>
+    </div>
+
     <div class="modal fade" id="article-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content border-0 rounded-4 shadow">
                 <div class="modal-header border-0 pb-0">
-                    <h5 class="modal-title fw-bold" id="article-modal-title">Добавить статью</h5>
+                    <h5 class="modal-title fw-bold" id="article-modal-title">Добавить материал</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -44,11 +106,11 @@
                         <input type="hidden" id="article_id">
                         <div class="mb-3">
                             <label class="form-label small fw-bold text-muted">Название</label>
-                            <input type="text" id="article_title" class="form-control" required placeholder="Название статьи">
+                            <input type="text" id="article_title" class="form-control" required placeholder="Название материала">
                         </div>
                         <div class="mb-3">
                             <label class="form-label small fw-bold text-muted">Содержание</label>
-                            <textarea id="article_content" class="form-control" rows="12" required placeholder="Текст статьи, инструкция или памятка"></textarea>
+                            <textarea id="article_content" class="form-control" rows="12" required placeholder="Текст инструкции, памятки или заметки"></textarea>
                         </div>
                     </form>
                 </div>
@@ -59,9 +121,10 @@
             </div>
         </div>
     </div>
-    
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="permissions.js?v={{VER}}"></script>
+    <script src="nomenclature-data.js?v={{VER}}"></script>
     <script src="knowledge.js?v={{VER}}"></script>
 </body>
 </html>
