@@ -1,12 +1,17 @@
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import { Text } from 'react-native';
 import { colors } from '@/theme';
+import { useAuth } from '@/context/auth';
 
 const TabIcon = ({ symbol, focused }: { symbol: string; focused: boolean }) => (
   <Text style={{ fontSize: focused ? 21 : 19, opacity: focused ? 1 : 0.58 }}>{symbol}</Text>
 );
 
 export default function TabsLayout() {
+  const { ready, user } = useAuth();
+  if (!ready) return null;
+  if (!user) return <Redirect href="/login" />;
+
   return (
     <Tabs
       screenOptions={{
