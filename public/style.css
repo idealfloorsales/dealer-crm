@@ -13126,3 +13126,28 @@ body:not(.app-workspace-page) .modal-header .btn-close{
 .dealer-share-download:hover{background:#f7f6f4;color:#303238}
 .dealer-share-link{margin-top:10px}
 .dealer-share-link .form-control{font-size:.57rem}
+
+/* Motivation dashboard: same visual language as IDEAL FLOOR dashboard panels. */
+.cc-motivation-panel { padding:20px 22px; overflow:hidden; }
+.cc-motivation-panel .cc-panel-head { align-items:center; margin-bottom:0; }
+.cc-motivation-panel .cc-panel-kicker { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--if-red); margin-bottom:6px; }
+.cc-motivation-panel h2 { display:flex; align-items:center; gap:10px; margin:0; color:var(--if-ink); font-size:1.12rem; font-weight:700; letter-spacing:-.025em; }
+.cc-motivation-panel h2 i { display:grid; place-items:center; width:36px; height:36px; border-radius:12px; background:var(--if-soft-red); color:var(--if-red); font-size:1rem; }
+.cc-motivation-subtitle { margin:6px 0 0; font-size:.78rem; color:#8d8f95; }
+.cc-motivation-action { display:inline-flex; align-items:center; justify-content:center; gap:10px; padding:9px 13px; border:1px solid var(--if-line); border-radius:12px; background:transparent; color:var(--if-ink); font-size:.79rem; font-weight:650; transition:background .2s ease,transform .2s ease,border-color .2s ease; cursor:pointer; }
+.cc-motivation-action:hover { background:var(--if-soft-red); border-color:var(--if-red); transform:translateY(-1px); }
+.cc-motivation-panel .table-responsive { margin-top:15px; border:1px solid var(--if-line); border-radius:15px; overflow:auto; }
+.cc-motivation-table { margin:0; font-size:.82rem; }
+.cc-motivation-table thead th { background:rgba(125,125,125,.055); color:#8d8f95; font-size:.7rem; font-weight:700; letter-spacing:.025em; border-bottom:1px solid var(--if-line); padding:12px 14px; white-space:nowrap; }
+.cc-motivation-table tbody td { padding:12px 14px; border-bottom:1px solid var(--if-line); }
+.cc-motivation-table tfoot th { padding:13px 14px; background:var(--if-soft-red); color:var(--if-ink); border:0; }
+.cc-motivation-panel #mr-anytime-content { animation:cc-motivation-reveal .23s ease both; }
+@keyframes cc-motivation-reveal { from {opacity:0;transform:translateY(-6px)} to {opacity:1;transform:translateY(0)} }
+@media(max-width:600px) {
+ .cc-motivation-panel { padding:16px; border-radius:20px; }
+ .cc-motivation-panel .cc-panel-head { gap:12px; align-items:flex-start; flex-wrap:wrap; }
+ .cc-motivation-panel h2 { font-size:1rem; }
+ .cc-motivation-panel .cc-panel-link,.cc-motivation-action { font-size:.75rem; }
+ .cc-motivation-panel .table-responsive { margin-top:12px; }
+ .cc-motivation-table { min-width:400px; }
+}
