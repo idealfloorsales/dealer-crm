@@ -675,9 +675,16 @@ app.get('/audit.html', (req, res) => servePage(res, 'audit.html'));
 app.get('/workshop.html', (req, res) => servePage(res, 'workshop.html'));
 app.get('/pricing.html', (req, res) => servePage(res, 'pricing.html'));
 app.get('/price/:token', (req, res) => servePage(res, 'shared-price.html'));
+app.get('/offer/:token', (req, res) => servePage(res, 'shared-offer.html'));
 app.use(express.static('public'));
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
+let IDEAL_DRIVE_PHOTOS = {};
+try {
+    IDEAL_DRIVE_PHOTOS = JSON.parse(fs.readFileSync(path.join(__dirname, 'public', 'drive-photo-map.json'), 'utf8'));
+} catch (e) {
+    console.warn('Drive photo map is unavailable:', e.message);
+}
 
 // --- СХЕМЫ ---
 const statusSchema = new mongoose.Schema({ value: String, label: String, color: String, isVisible: { type: Boolean, default: true }, sortOrder: { type: Number, default: 0 } });
@@ -1125,6 +1132,22 @@ const priceShareSchema = new mongoose.Schema({
 }, { timestamps:true });
 priceShareSchema.index({ expiresAt:1 }, { expireAfterSeconds:0 });
 const PriceShare = mongoose.model('PriceShare', priceShareSchema);
+
+const commercialOfferSchema = new mongoose.Schema({
+    publicId: { type:String, required:true, unique:true, index:true },
+    offerNumber: { type:String, required:true, index:true },
+    dealer: { type:mongoose.Schema.Types.ObjectId, ref:'Dealer', index:true },
+    dealerId: String,
+    dealerName: String,
+    dealerCity: String,
+    createdBy: { id:String, name:String },
+    expiresAt: { type:Date, required:true, index:true },
+    revokedAt: Date,
+    viewCount: { type:Number, default:0 },
+    lastViewedAt: Date,
+    snapshot: mongoose.Schema.Types.Mixed
+}, { timestamps:true });
+const CommercialOffer = mongoose.model('CommercialOffer', commercialOfferSchema);
 
 const salesSchema = new mongoose.Schema({ month: String, group: String, dealerId: String, dealerName: String, plan: Number, fact: Number, isCustom: { type: Boolean, default: false }, ownerUserId: String 
 }, { timestamps: true }); 
@@ -1880,6 +1903,7 @@ function buildDealerPricingSummary(dealer, allConditions, today = pricingTodayKe
 
     return {
         dealerId: String(dealer._id || dealer.id || ''),
+        dealerCode: dealer.dealer_id || '',
         dealerName: dealer.name || '',
         city: dealer.city || '',
         sector: dealer.region_sector || '',
@@ -2456,7 +2480,7 @@ async function resolveSummaryPriceList(summary) {
 app.get('/api/pricing/catalog', requirePermission('can_view_pricing'), async (req, res) => {
     try {
         const products = await Product.find({})
-            .select('_id sku name product_type collection is_liquid')
+            .select('_id sku name product_type collection is_liquid characteristics')
             .sort({ sku: 1, name: 1 })
             .lean();
 
@@ -2467,7 +2491,9 @@ app.get('/api/pricing/catalog', requirePermission('can_view_pricing'), async (re
                 sku: product.sku || '',
                 name: product.name || '',
                 collection: inferPricingCollection(product),
-                isLiquid: product.is_liquid !== false
+                isLiquid: product.is_liquid !== false,
+                characteristics: product.characteristics || {},
+                photoId: IDEAL_DRIVE_PHOTOS[String(product.sku || '').trim().toUpperCase()] || ''
             }))
             .sort((a, b) =>
                 Number(b.isLiquid) - Number(a.isLiquid) ||
@@ -2608,7 +2634,7 @@ app.delete('/api/pricing/price-lists/:id', requirePermission('can_manage_pricing
     }
 });
 
-async function buildDealerPriceSheetSnapshot(req, dealerId) {
+async function buildDealerPriceSheetSnapshot(req, dealerId, options = {}) {
     try {
         const dealer = await Dealer.findOne({
             $and: [
@@ -2628,10 +2654,35 @@ async function buildDealerPriceSheetSnapshot(req, dealerId) {
             .lean();
 
         const summary = buildDealerPricingSummary(dealer, conditions);
-        const list = await resolveSummaryPriceList(summary);
-        const fallbackList = summary.priceOverride?.active ? await PriceList.findById(summary.profilePriceListId).lean().catch(() => null) : null;
+        const forcedPriceListId = String(options.priceListId || '').trim();
+        let forcedList = null;
+        if (forcedPriceListId) {
+            if (!mongoose.Types.ObjectId.isValid(forcedPriceListId)) {
+                const err = new Error('Некорректный прайс'); err.statusCode = 400; throw err;
+            }
+            forcedList = await PriceList.findOne({ _id:forcedPriceListId, active:{ $ne:false } }).lean();
+            if (!forcedList) { const err = new Error('Выбранный прайс не найден'); err.statusCode = 404; throw err; }
+        }
+        const list = forcedList || await resolveSummaryPriceList(summary);
+        const fallbackList = forcedList ? null : (summary.priceOverride?.active ? await PriceList.findById(summary.profilePriceListId).lean().catch(() => null) : null);
         const priceType = list ? { key: 'opt', label: 'Спец.цена' } : dealerPriceColumn(dealer.price_type);
-        const discount = Math.min(100, Math.max(0, Number(summary.totalDiscountPercent) || 0));
+
+        let appliedDiscounts = Array.isArray(summary.activeDiscounts) ? summary.activeDiscounts : [];
+        if (forcedList && options.applyAllDiscounts) {
+            const activeDiscounts = (summary.matchedConditions || []).filter(condition =>
+                condition.kind === 'discount' && condition.computedStatus === 'active'
+            );
+            const exclusive = activeDiscounts
+                .filter(condition => condition.stackable === false)
+                .sort((a,b) =>
+                    (Number(b.priority) || 0) - (Number(a.priority) || 0) ||
+                    (Number(b.discountPercent) || 0) - (Number(a.discountPercent) || 0)
+                );
+            appliedDiscounts = exclusive.length ? [exclusive[0]] : activeDiscounts.filter(condition => condition.stackable !== false);
+        }
+        const discount = Math.min(100, Math.max(0, appliedDiscounts.reduce(
+            (sum, condition) => sum + Math.max(0, Number(condition.discountPercent) || 0), 0
+        )));
 
         const products = await Product.find({})
             .select('_id sku name product_type collection is_liquid')
@@ -2767,7 +2818,7 @@ async function buildDealerPriceSheetSnapshot(req, dealerId) {
             } : null,
             priceType,
             totalDiscountPercent: discount,
-            activeDiscounts: summary.activeDiscounts || [],
+            activeDiscounts: appliedDiscounts,
             rows
         };
 
@@ -2778,7 +2829,11 @@ async function buildDealerPriceSheetSnapshot(req, dealerId) {
 
 app.get('/api/pricing/dealers/:id/price-sheet', requirePermission('can_view_pricing'), async (req, res) => {
     try {
-        res.json(await buildDealerPriceSheetSnapshot(req, req.params.id));
+        const priceListId = String(req.query?.priceListId || '').trim();
+        res.json(await buildDealerPriceSheetSnapshot(req, req.params.id, {
+            priceListId,
+            applyAllDiscounts:Boolean(priceListId)
+        }));
     } catch (e) {
         res.status(e.statusCode || 500).json({ error:e.message });
     }
@@ -2821,6 +2876,179 @@ app.post('/api/pricing/dealers/:id/share', requirePermission('can_view_pricing')
         });
     } catch (e) {
         res.status(e.statusCode || 500).json({ error:e.message });
+    }
+});
+
+
+app.get('/api/pricing/offers', requirePermission('can_view_pricing'), async (req, res) => {
+    try {
+        const dealers = await Dealer.find(await getPricingWorkingDealerFilter(getDealerFilter(req))).select('_id').lean();
+        const dealerIds = dealers.map(item => item._id);
+        const offers = await CommercialOffer.find({ dealer:{ $in:dealerIds } })
+            .sort({ createdAt:-1 })
+            .limit(250)
+            .lean();
+        const now = new Date();
+        res.json(offers.map(item => {
+            const snapshot = item.snapshot || {};
+            const expired = item.expiresAt && new Date(item.expiresAt) <= now;
+            return {
+                id:String(item._id),
+                offerNumber:item.offerNumber || '',
+                dealerId:item.dealerId || '',
+                dealerName:item.dealerName || '',
+                dealerCity:item.dealerCity || '',
+                priceListName:snapshot.priceList?.name || snapshot.priceType?.label || 'Спец.цена',
+                totalDiscountPercent:Number(snapshot.totalDiscountPercent) || 0,
+                itemsCount:Array.isArray(snapshot.items) ? snapshot.items.length : 0,
+                createdBy:item.createdBy || {},
+                createdAt:item.createdAt,
+                expiresAt:item.expiresAt,
+                revokedAt:item.revokedAt,
+                viewCount:Number(item.viewCount) || 0,
+                lastViewedAt:item.lastViewedAt || null,
+                status:item.revokedAt ? 'revoked' : (expired ? 'expired' : 'active'),
+                url:(!item.revokedAt && !expired) ? APP_ORIGIN + '/offer/' + item.publicId : ''
+            };
+        }));
+    } catch (e) {
+        res.status(500).json({ error:e.message });
+    }
+});
+
+app.post('/api/pricing/offers', requirePermission('can_view_pricing'), async (req, res) => {
+    try {
+        const dealerId = String(req.body?.dealerId || '').trim();
+        if (!mongoose.Types.ObjectId.isValid(dealerId)) return res.status(400).json({ error:'Выберите дилера' });
+
+        const priceListId = String(req.body?.priceListId || '').trim();
+        const snapshot = await buildDealerPriceSheetSnapshot(req, dealerId, {
+            priceListId,
+            applyAllDiscounts:Boolean(priceListId)
+        });
+
+        const expectedDealerId = String(snapshot?.dealer?.dealer_id || '').trim();
+        const confirmation = String(req.body?.confirmDealerId || '').trim();
+        if (!expectedDealerId || confirmation.toLowerCase() !== expectedDealerId.toLowerCase()) {
+            return res.status(400).json({ error:'ID дилера не совпадает. КП не создано.' });
+        }
+
+        const selectedIds = [...new Set((Array.isArray(req.body?.productIds) ? req.body.productIds : [])
+            .map(value => String(value || '').trim())
+            .filter(value => mongoose.Types.ObjectId.isValid(value)))];
+        if (!selectedIds.length) return res.status(400).json({ error:'Выберите хотя бы один декор' });
+
+        const products = await Product.find({
+            _id:{ $in:selectedIds },
+            product_type:'laminate',
+            is_liquid:{ $ne:false }
+        }).select('_id sku name collection characteristics is_liquid').lean();
+        if (!products.length) return res.status(400).json({ error:'Выбранные декоры не найдены' });
+
+        const rowMap = new Map((snapshot.rows || [])
+            .filter(row => row.rowType === 'collection')
+            .map(row => [String(row.collection || '').trim().toUpperCase(), row]));
+
+        const items = products.map(product => {
+            const collection = inferPricingCollection(product);
+            const price = rowMap.get(String(collection || '').trim().toUpperCase()) || {};
+            return {
+                productId:String(product._id),
+                sku:product.sku || '',
+                name:product.name || '',
+                collection,
+                characteristics:product.characteristics || {},
+                photoId:IDEAL_DRIVE_PHOTOS[String(product.sku || '').trim().toUpperCase()] || '',
+                basePrice:Number(price.basePrice ?? price.opt) || 0,
+                finalPrice:Number(price.finalPrice) || 0,
+                rrp:Number(price.rrp) || 0,
+                displayPrice:Number(price.displayPrice) || 0,
+                currency:price.currency || 'KZT'
+            };
+        }).sort((a,b) =>
+            String(a.collection).localeCompare(String(b.collection),'ru') ||
+            String(a.sku).localeCompare(String(b.sku),'ru')
+        );
+
+        const days = Math.min(60, Math.max(1, Number(req.body?.expiresDays) || 14));
+        const expiresAt = new Date(Date.now() + days * 86400000);
+        const publicId = crypto.randomBytes(24).toString('hex');
+        const now = new Date();
+        const pad = value => String(value).padStart(2,'0');
+        const offerNumber = 'КП-' + now.getFullYear() + pad(now.getMonth()+1) + pad(now.getDate()) + '-' + crypto.randomBytes(2).toString('hex').toUpperCase();
+        const user = pricingUserMeta(req);
+
+        const offerSnapshot = {
+            ...snapshot,
+            rows:undefined,
+            items,
+            offerNumber,
+            createdBy:user,
+            generatedAt:now.toISOString()
+        };
+
+        const offer = await CommercialOffer.create({
+            publicId,
+            offerNumber,
+            dealer:dealerId,
+            dealerId:expectedDealerId,
+            dealerName:snapshot.dealer?.name || '',
+            dealerCity:snapshot.dealer?.city || '',
+            createdBy:user,
+            expiresAt,
+            snapshot:offerSnapshot
+        });
+
+        res.status(201).json({
+            id:String(offer._id),
+            offerNumber,
+            url:APP_ORIGIN + '/offer/' + publicId,
+            expiresAt:expiresAt.toISOString(),
+            dealer:snapshot.dealer,
+            priceList:snapshot.priceList,
+            totalDiscountPercent:snapshot.totalDiscountPercent || 0,
+            itemsCount:items.length
+        });
+    } catch (e) {
+        res.status(e.statusCode || 500).json({ error:e.message });
+    }
+});
+
+app.delete('/api/pricing/offers/:id', requirePermission('can_view_pricing'), async (req, res) => {
+    try {
+        const offer = await CommercialOffer.findById(req.params.id);
+        if (!offer) return res.status(404).json({ error:'КП не найдено' });
+        offer.revokedAt = new Date();
+        await offer.save();
+        res.json({ status:'ok' });
+    } catch (e) {
+        res.status(400).json({ error:e.message });
+    }
+});
+
+app.get('/api/public/offers/:token', async (req, res) => {
+    try {
+        const token = String(req.params.token || '').trim();
+        if (!/^[a-f0-9]{48}$/i.test(token)) return res.status(404).json({ error:'Ссылка недействительна' });
+        const now = new Date();
+        const offer = await CommercialOffer.findOneAndUpdate(
+            { publicId:token, revokedAt:null, expiresAt:{ $gt:now } },
+            { $inc:{ viewCount:1 }, $set:{ lastViewedAt:now } },
+            { new:true }
+        ).lean();
+        if (!offer) return res.status(410).json({ error:'Срок действия КП истёк или ссылка была отозвана' });
+        res.setHeader('Cache-Control','no-store');
+        res.json({
+            offerNumber:offer.offerNumber,
+            dealerName:offer.dealerName,
+            dealerCity:offer.dealerCity,
+            createdBy:offer.createdBy || {},
+            createdAt:offer.createdAt,
+            expiresAt:offer.expiresAt,
+            snapshot:offer.snapshot || {}
+        });
+    } catch (e) {
+        res.status(500).json({ error:e.message });
     }
 });
 

@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="style.css?v={{VER}}">
     <link rel="stylesheet" href="pricing.css?v={{VER}}">
+    <link rel="stylesheet" href="pricing-offers.css?v={{VER}}">
     <link rel="icon" href="favicon.gif" type="image/gif">
     <meta name="theme-color" content="#b9040a">
 </head>
@@ -24,14 +25,20 @@
                 <h1>Ценовые условия</h1>
                 <p>Базовые прайсы, временные скидки и обязательства дилеров — с автоматическими сроками и суммированием.</p>
             </div>
-            <button type="button" id="pricing-add-btn" class="pricing-primary-action" data-permission="can_manage_pricing">
-                <i class="bi bi-plus-lg"></i><span>Добавить условие</span>
-            </button>
+            <div class="pricing-hero-actions">
+                <button type="button" id="pricing-offer-new-btn" class="pricing-offer-hero-btn">
+                    <i class="bi bi-file-earmark-richtext"></i><span>Создать КП</span>
+                </button>
+                <button type="button" id="pricing-add-btn" class="pricing-primary-action" data-permission="can_manage_pricing">
+                    <i class="bi bi-plus-lg"></i><span>Добавить условие</span>
+                </button>
+            </div>
         </section>
 
         <nav class="pricing-view-tabs" aria-label="Разделы цен">
             <button type="button" class="active" data-pricing-view="dealers"><i class="bi bi-people"></i><span>Дилеры</span></button>
             <button type="button" data-pricing-view="lists"><i class="bi bi-receipt-cutoff"></i><span>Прайсы</span></button>
+            <button type="button" data-pricing-view="offers"><i class="bi bi-file-earmark-richtext"></i><span>КП</span></button>
             <button type="button" data-pricing-view="conditions"><i class="bi bi-percent"></i><span>Условия и скидки</span></button>
         </nav>
 
@@ -123,6 +130,76 @@
                 <div id="pricing-price-list-grid" class="pricing-price-list-grid">
                     <div class="pricing-empty"><span class="spinner-border spinner-border-sm"></span> Загрузка прайсов...</div>
                 </div>
+            </section>
+        </div>
+
+
+        <div data-pricing-view-panel="offers" hidden>
+            <section class="pricing-panel pricing-offers-panel">
+                <div class="pricing-panel-head pricing-offers-head">
+                    <div>
+                        <span>ЭЛЕКТРОННОЕ КОММЕРЧЕСКОЕ ПРЕДЛОЖЕНИЕ</span>
+                        <h2>Конструктор КП</h2>
+                        <p>Выберите дилера, прайс и нужные декоры. Цены фиксируются на момент создания, фото берутся из Google Drive.</p>
+                    </div>
+                    <button type="button" id="pricing-offer-reset-btn" class="pricing-secondary-action"><i class="bi bi-plus-lg"></i><span>Новое КП</span></button>
+                </div>
+
+                <div class="pricing-offer-builder">
+                    <section class="pricing-offer-setup">
+                        <div class="pricing-offer-step">
+                            <div class="pricing-offer-step-title"><b>1</b><div><strong>Кому</strong><small>Выберите дилера из CRM</small></div></div>
+                            <label><span>Дилер</span><select id="pricing-offer-dealer" class="form-select"><option value="">Выберите дилера</option></select></label>
+                            <div id="pricing-offer-dealer-card" class="pricing-offer-dealer-card is-empty">Сначала выберите дилера</div>
+                            <label><span>Подтверждение ID дилера</span><input id="pricing-offer-confirm" class="form-control" autocomplete="off" placeholder="Например: IF001"><small id="pricing-offer-confirm-hint">Защита от отправки КП не тому дилеру.</small></label>
+                        </div>
+
+                        <div class="pricing-offer-step">
+                            <div class="pricing-offer-step-title"><b>2</b><div><strong>Какие цены</strong><small>Действующие или конкретный прайс</small></div></div>
+                            <label><span>Источник цен</span><select id="pricing-offer-price-list" class="form-select"><option value="">Действующие цены дилера</option></select></label>
+                            <label><span>Ссылка действует</span>
+                                <select id="pricing-offer-expiry" class="form-select">
+                                    <option value="7">7 дней</option>
+                                    <option value="14" selected>14 дней</option>
+                                    <option value="30">30 дней</option>
+                                    <option value="60">60 дней</option>
+                                </select>
+                            </label>
+                            <div id="pricing-offer-price-summary" class="pricing-offer-price-summary is-empty">После выбора дилера здесь появится действующий прайс и скидки.</div>
+                        </div>
+                    </section>
+
+                    <section class="pricing-offer-products">
+                        <div class="pricing-offer-products-head">
+                            <div><span>3 · ПРОДУКЦИЯ</span><h3>Коллекции и декоры</h3><p>Можно выбрать всю коллекцию или только отдельные декоры.</p></div>
+                            <div class="pricing-offer-selected"><strong id="pricing-offer-selected-count">0</strong><span>выбрано</span></div>
+                        </div>
+                        <div class="pricing-offer-toolbar">
+                            <div class="pricing-search"><i class="bi bi-search"></i><input id="pricing-offer-search" type="search" placeholder="Артикул или декор"></div>
+                            <select id="pricing-offer-collection" class="form-select"><option value="">Все коллекции</option></select>
+                            <button type="button" id="pricing-offer-select-visible" class="pricing-offer-tool-btn"><i class="bi bi-check2-square"></i> Выбрать показанные</button>
+                            <button type="button" id="pricing-offer-clear" class="pricing-offer-tool-btn"><i class="bi bi-x-lg"></i> Очистить</button>
+                        </div>
+                        <div id="pricing-offer-product-grid" class="pricing-offer-product-grid">
+                            <div class="pricing-empty"><span class="spinner-border spinner-border-sm"></span> Загрузка ассортимента...</div>
+                        </div>
+                    </section>
+                </div>
+
+                <div class="pricing-offer-createbar">
+                    <div><strong id="pricing-offer-create-summary">Выберите дилера и продукцию</strong><small>Перед созданием CRM ещё раз проверит ID дилера.</small></div>
+                    <button type="button" id="pricing-offer-create-btn" class="pricing-offer-create-btn" disabled><i class="bi bi-magic"></i> Создать электронное КП</button>
+                </div>
+
+                <section id="pricing-offer-result" class="pricing-offer-result d-none"></section>
+            </section>
+
+            <section class="pricing-panel pricing-offer-history-panel">
+                <div class="pricing-panel-head">
+                    <div><span>ИСТОРИЯ</span><h2>Созданные КП</h2><p>Сохраняются даже после окончания ссылки. Видно, открывал ли клиент предложение.</p></div>
+                    <button type="button" id="pricing-offer-refresh-btn" class="pricing-offer-tool-btn"><i class="bi bi-arrow-clockwise"></i> Обновить</button>
+                </div>
+                <div id="pricing-offer-history" class="pricing-offer-history"><div class="pricing-empty">Загрузка...</div></div>
             </section>
         </div>
 
@@ -334,5 +411,6 @@
     <script defer src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script defer src="permissions.js?v={{VER}}"></script>
     <script defer src="pricing.js?v={{VER}}"></script>
+    <script defer src="pricing-offers.js?v={{VER}}"></script>
 </body>
 </html>

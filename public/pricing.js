@@ -513,7 +513,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     function switchPricingView(view = 'dealers') {
-        const allowed = ['dealers','lists','conditions'];
+        const allowed = ['dealers','lists','offers','conditions'];
         const next = allowed.includes(view) ? view : 'dealers';
         state.activeView = next;
         document.querySelectorAll('[data-pricing-view]').forEach(button => {
@@ -523,7 +523,7 @@ document.addEventListener('DOMContentLoaded', () => {
             panel.hidden = panel.dataset.pricingViewPanel !== next;
         });
         const addCondition = $('pricing-add-btn');
-        if (addCondition) addCondition.style.display = manage && next !== 'lists' ? '' : 'none';
+        if (addCondition) addCondition.style.display = manage && (next === 'dealers' || next === 'conditions') ? '' : 'none';
     }
 
     function priceListMatches(item) {
