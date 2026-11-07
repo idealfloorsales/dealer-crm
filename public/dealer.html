@@ -311,7 +311,10 @@
                             <h5 class="card-heading mb-1"><i class="bi bi-percent me-2"></i>Ценовые условия</h5>
                             <p class="text-muted small mb-0">Действующий базовый прайс, временные скидки и обязательства дилера.</p>
                         </div>
-                        <a id="dealer-pricing-manage-link" href="/pricing.html" class="btn btn-sm btn-dark" data-permission="can_manage_pricing"><i class="bi bi-sliders me-1"></i>Управлять</a>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button type="button" class="btn btn-sm btn-light border" id="dealer-price-share-btn"><i class="bi bi-share me-1"></i>Поделиться прайсом</button>
+                            <a id="dealer-pricing-manage-link" href="/pricing.html" class="btn btn-sm btn-dark" data-permission="can_manage_pricing"><i class="bi bi-sliders me-1"></i>Управлять</a>
+                        </div>
                     </div>
                     <div id="dealer-pricing-summary" class="dealer-pricing-summary">
                         <div class="dealer-pricing-loading"><span class="spinner-border spinner-border-sm"></span> Загружаем условия…</div>
@@ -384,6 +387,25 @@
                 </div>
             </div>
 
+        </div>
+    </div>
+
+    <div class="modal fade" id="dealer-price-share-modal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content dealer-price-share-modal">
+                <div class="modal-header">
+                    <div><span class="dealer-share-kicker">ЗАЩИЩЁННАЯ ОТПРАВКА</span><h5 class="modal-title">Поделиться прайсом</h5></div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="dealer-share-identity" class="dealer-share-identity"></div>
+                    <div class="dealer-share-warning"><i class="bi bi-shield-check"></i><div><strong>Проверка получателя</strong><span>Введите ID дилера точно как показано выше. Так прайс нельзя случайно сформировать из карточки другого дилера.</span></div></div>
+                    <label class="dealer-share-confirm"><span>Введите ID дилера</span><input type="text" class="form-control" id="dealer-share-confirm-id" autocomplete="off" placeholder="Например, IF001"></label>
+                    <label class="dealer-share-expiry"><span>Срок действия ссылки</span><select id="dealer-share-expiry" class="form-select"><option value="6">6 часов</option><option value="24" selected>24 часа</option><option value="48">48 часов</option><option value="72">72 часа</option></select></label>
+                    <div id="dealer-share-result" class="dealer-share-result d-none"></div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-light border" data-bs-dismiss="modal">Отмена</button><button type="button" class="btn btn-dark" id="dealer-share-create-btn" disabled><i class="bi bi-link-45deg me-1"></i>Создать ссылку</button></div>
+            </div>
         </div>
     </div>
 

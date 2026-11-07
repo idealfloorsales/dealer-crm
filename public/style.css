@@ -13078,3 +13078,14 @@ body:not(.app-workspace-page) .modal-header .btn-close{
 @media(max-width:700px){
   .dealer-price-overview{grid-template-columns:1fr}
 }
+
+.dealer-price-share-modal{border:0;border-radius:20px;overflow:hidden}
+.dealer-share-kicker{display:block;color:#a0a2a7;font-size:.55rem;font-weight:800;letter-spacing:.12em}
+.dealer-share-identity{display:grid;grid-template-columns:1.4fr 1fr .8fr;gap:8px;margin-bottom:12px}
+.dealer-share-identity>div{padding:11px 12px;border:1px solid #e8e4e0;border-radius:12px;background:#faf9f7}
+.dealer-share-identity small{display:block;color:#999ba1;font-size:.5rem}.dealer-share-identity strong{display:block;margin-top:2px;color:#292a2f;font-size:.72rem}.dealer-share-identity .is-id{color:#9f070d;letter-spacing:.04em}
+.dealer-share-warning{display:flex;gap:10px;padding:11px 12px;border:1px solid #eadfca;border-radius:12px;background:#fffaf1}.dealer-share-warning>i{color:#a97728;font-size:1rem}.dealer-share-warning strong,.dealer-share-warning span{display:block}.dealer-share-warning strong{font-size:.65rem;color:#5f5139}.dealer-share-warning span{margin-top:2px;font-size:.54rem;color:#8b7651;line-height:1.4}
+.dealer-share-confirm,.dealer-share-expiry{display:block;margin-top:12px}.dealer-share-confirm>span,.dealer-share-expiry>span{display:block;margin:0 0 5px 2px;color:#77797e;font-size:.54rem;font-weight:800}
+.dealer-share-result{margin-top:12px;padding:12px;border:1px solid #dce8df;border-radius:13px;background:#f5faf6}.dealer-share-result-head{display:flex;align-items:flex-start;gap:8px}.dealer-share-result-head>i{color:#43805a}.dealer-share-result-head strong,.dealer-share-result-head span{display:block}.dealer-share-result-head strong{font-size:.66rem;color:#345640}.dealer-share-result-head span{margin-top:2px;font-size:.52rem;color:#6c806f}
+.dealer-share-link{display:grid;grid-template-columns:minmax(0,1fr) 42px;gap:6px;margin-top:10px}
+@media(max-width:600px){.dealer-share-identity{grid-template-columns:1fr 1fr}.dealer-share-identity>div:first-child{grid-column:1/-1}}

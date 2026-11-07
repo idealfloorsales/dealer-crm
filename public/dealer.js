@@ -15,6 +15,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const workshopAssetsContainer = document.getElementById('dealer-workshop-assets');
     const dealerPricingSummary = document.getElementById('dealer-pricing-summary');
     const dealerPricingManageLink = document.getElementById('dealer-pricing-manage-link');
+    const dealerPriceShareBtn = document.getElementById('dealer-price-share-btn');
+    const dealerPriceShareModalEl = document.getElementById('dealer-price-share-modal');
+    const dealerShareIdentity = document.getElementById('dealer-share-identity');
+    const dealerShareConfirmId = document.getElementById('dealer-share-confirm-id');
+    const dealerShareExpiry = document.getElementById('dealer-share-expiry');
+    const dealerShareCreateBtn = document.getElementById('dealer-share-create-btn');
+    const dealerShareResult = document.getElementById('dealer-share-result');
     
     const dealerNameEl = document.getElementById('dealer-name');
     const dealerIdEl = document.getElementById('dealer-id-subtitle');
@@ -58,6 +65,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let editorStatuses = [];
     let editorSectors = [];
     const profileCacheKey = `crm:dealer-profile:${dealerId}`;
+
+    dealerPriceShareBtn?.addEventListener('click', openDealerPriceShare);
+    dealerShareConfirmId?.addEventListener('input', updateDealerShareConfirmation);
+    dealerShareCreateBtn?.addEventListener('click', createDealerPriceShare);
 
     if (!dealerId) { 
         if(dealerNameEl) dealerNameEl.textContent = 'Ошибка: ID не указан'; 
@@ -654,6 +665,65 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!value) return fallback;
         const date = new Date(String(value).slice(0,10) + 'T00:00:00');
         return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleDateString('ru-RU');
+    }
+
+    function updateDealerShareConfirmation() {
+        if (!dealerShareCreateBtn || !dealerShareConfirmId || !currentDealer) return;
+        const expected = String(currentDealer.dealer_id || '').trim().toLowerCase();
+        const actual = String(dealerShareConfirmId.value || '').trim().toLowerCase();
+        dealerShareCreateBtn.disabled = !expected || actual !== expected;
+    }
+
+    function openDealerPriceShare() {
+        if (!currentDealer || !dealerPriceShareModalEl) return;
+        dealerShareIdentity.innerHTML = `
+            <div><small>Дилер</small><strong>${safeText(currentDealer.name || '')}</strong></div>
+            <div><small>Город</small><strong>${safeText(currentDealer.city || '—')}</strong></div>
+            <div><small>ID</small><strong class="is-id">${safeText(currentDealer.dealer_id || '—')}</strong></div>
+        `;
+        dealerShareConfirmId.value = '';
+        dealerShareResult.classList.add('d-none');
+        dealerShareResult.innerHTML = '';
+        updateDealerShareConfirmation();
+        bootstrap.Modal.getOrCreateInstance(dealerPriceShareModalEl).show();
+        setTimeout(()=>dealerShareConfirmId?.focus(),250);
+    }
+
+    async function createDealerPriceShare() {
+        if (!currentDealer || !dealerShareCreateBtn) return;
+        try {
+            dealerShareCreateBtn.disabled = true;
+            dealerShareCreateBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Создаём';
+            const response = await fetch(`/api/pricing/dealers/${dealerId}/share`, {
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({confirmDealerId:dealerShareConfirmId.value || '',expiresHours:Number(dealerShareExpiry.value || 24)})
+            });
+            const data = await response.json().catch(()=>({}));
+            if (!response.ok) throw new Error(data.error || 'Не удалось создать ссылку');
+
+            const url = data.url || '';
+            const expires = data.expiresAt ? new Date(data.expiresAt).toLocaleString('ru-RU') : '';
+            dealerShareResult.classList.remove('d-none');
+            dealerShareResult.innerHTML = `
+                <div class="dealer-share-result-head"><i class="bi bi-check-circle-fill"></i><div><strong>Ссылка создана</strong><span>Для ${safeText(data.dealer?.name || currentDealer.name || '')} · действует до ${safeText(expires)}</span></div></div>
+                <div class="dealer-share-link"><input class="form-control" readonly value="${safeText(url)}"><button type="button" class="btn btn-light border" data-copy-share><i class="bi bi-copy"></i></button></div>
+                <button type="button" class="btn btn-dark w-100 mt-2" data-native-share><i class="bi bi-share me-1"></i>Отправить</button>
+            `;
+            dealerShareResult.querySelector('[data-copy-share]')?.addEventListener('click', async ()=>{
+                await navigator.clipboard?.writeText(url); window.showToast?.('Ссылка скопирована');
+            });
+            dealerShareResult.querySelector('[data-native-share]')?.addEventListener('click', async ()=>{
+                const title = `Прайс IDEAL FLOOR для ${data.dealer?.name || currentDealer.name || ''}`;
+                if (navigator.share) { try { await navigator.share({title,text:title,url}); } catch(_) {} }
+                else { await navigator.clipboard?.writeText(url); window.showToast?.('Ссылка скопирована'); }
+            });
+        } catch(e) {
+            window.showToast?.(e.message || 'Ошибка создания ссылки','error');
+        } finally {
+            dealerShareCreateBtn.innerHTML = '<i class="bi bi-link-45deg me-1"></i>Создать ссылку';
+            updateDealerShareConfirmation();
+        }
     }
 
     async function loadDealerPricing() {

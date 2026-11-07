@@ -243,7 +243,7 @@ async function seedUsers() {
 // ==========================================
 const authMiddleware = (req, res, next) => {
     if (req.method === 'OPTIONS') return next(); 
-    if (req.path === '/api/auth/login' || !req.path.startsWith('/api')) return next();
+    if (req.path === '/api/auth/login' || req.path.startsWith('/api/public/price-share/') || !req.path.startsWith('/api')) return next();
 
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; 
@@ -672,6 +672,7 @@ app.get('/users.html', (req, res) => servePage(res, 'users.html'));
 app.get('/audit.html', (req, res) => servePage(res, 'audit.html'));
 app.get('/workshop.html', (req, res) => servePage(res, 'workshop.html'));
 app.get('/pricing.html', (req, res) => servePage(res, 'pricing.html'));
+app.get('/price/:token', (req, res) => servePage(res, 'shared-price.html'));
 app.use(express.static('public'));
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING;
@@ -1109,6 +1110,19 @@ pricingConditionSchema.index({ dealer: 1, startDate: 1, endDate: 1 });
 pricingConditionSchema.index({ scopeType: 1, scopeValue: 1 });
 pricingConditionSchema.index({ cancelledAt: 1 });
 const PricingCondition = mongoose.model('PricingCondition', pricingConditionSchema);
+const priceShareSchema = new mongoose.Schema({
+    tokenHash: { type:String, required:true, unique:true, index:true },
+    dealer: { type:mongoose.Schema.Types.ObjectId, ref:'Dealer', index:true },
+    dealerId: String,
+    dealerName: String,
+    dealerCity: String,
+    createdBy: { id:String, name:String },
+    expiresAt: { type:Date, required:true, index:true },
+    revokedAt: Date,
+    snapshot: mongoose.Schema.Types.Mixed
+}, { timestamps:true });
+priceShareSchema.index({ expiresAt:1 }, { expireAfterSeconds:0 });
+const PriceShare = mongoose.model('PriceShare', priceShareSchema);
 
 const salesSchema = new mongoose.Schema({ month: String, group: String, dealerId: String, dealerName: String, plan: Number, fact: Number, isCustom: { type: Boolean, default: false }, ownerUserId: String 
 }, { timestamps: true }); 
@@ -2592,17 +2606,17 @@ app.delete('/api/pricing/price-lists/:id', requirePermission('can_manage_pricing
     }
 });
 
-app.get('/api/pricing/dealers/:id/price-sheet', requirePermission('can_view_pricing'), async (req, res) => {
+async function buildDealerPriceSheetSnapshot(req, dealerId) {
     try {
         const dealer = await Dealer.findOne({
             $and: [
-                { _id: req.params.id },
+                { _id: dealerId },
                 await getPricingWorkingDealerFilter(getDealerFilter(req))
             ]
         }).select('_id dealer_id name city region_sector price_type price_list responsible contacts')
             .populate('price_list', 'name code versionDate validFrom validTo active')
             .lean();
-        if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
+        if (!dealer) { const err = new Error('Дилер не найден'); err.statusCode = 404; throw err; }
 
         const conditions = await PricingCondition.find({})
             .populate('dealer', '_id dealer_id name city region_sector price_type responsible')
@@ -2730,7 +2744,7 @@ app.get('/api/pricing/dealers/:id/price-sheet', requirePermission('can_view_pric
                 });
             });
 
-        res.json({
+        return {
             dealer: {
                 id: String(dealer._id),
                 dealer_id: dealer.dealer_id || '',
@@ -2753,9 +2767,76 @@ app.get('/api/pricing/dealers/:id/price-sheet', requirePermission('can_view_pric
             totalDiscountPercent: discount,
             activeDiscounts: summary.activeDiscounts || [],
             rows
+        };
+
+    } catch (e) {
+        throw e;
+    }
+}
+
+app.get('/api/pricing/dealers/:id/price-sheet', requirePermission('can_view_pricing'), async (req, res) => {
+    try {
+        res.json(await buildDealerPriceSheetSnapshot(req, req.params.id));
+    } catch (e) {
+        res.status(e.statusCode || 500).json({ error:e.message });
+    }
+});
+
+app.post('/api/pricing/dealers/:id/share', requirePermission('can_view_pricing'), async (req, res) => {
+    try {
+        const snapshot = await buildDealerPriceSheetSnapshot(req, req.params.id);
+        const expectedDealerId = String(snapshot?.dealer?.dealer_id || '').trim();
+        const confirmation = String(req.body?.confirmDealerId || '').trim();
+
+        if (!expectedDealerId || confirmation.toLowerCase() !== expectedDealerId.toLowerCase()) {
+            return res.status(400).json({ error:'ID дилера не совпадает. Ссылка не создана.' });
+        }
+
+        const hours = Math.min(72, Math.max(1, Number(req.body?.expiresHours) || 24));
+        const token = crypto.randomBytes(32).toString('hex');
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        const expiresAt = new Date(Date.now() + hours * 3600000);
+        const user = pricingUserMeta(req);
+
+        await PriceShare.create({
+            tokenHash,
+            dealer:req.params.id,
+            dealerId:expectedDealerId,
+            dealerName:snapshot?.dealer?.name || '',
+            dealerCity:snapshot?.dealer?.city || '',
+            createdBy:user,
+            expiresAt,
+            snapshot
+        });
+
+        res.status(201).json({
+            url:`${APP_ORIGIN}/price/${token}`,
+            expiresAt:expiresAt.toISOString(),
+            dealer:snapshot.dealer,
+            priceList:snapshot.priceList,
+            totalDiscountPercent:snapshot.totalDiscountPercent || 0
         });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        res.status(e.statusCode || 500).json({ error:e.message });
+    }
+});
+
+app.get('/api/public/price-share/:token', async (req, res) => {
+    try {
+        const token = String(req.params.token || '').trim();
+        if (!/^[a-f0-9]{64}$/i.test(token)) return res.status(404).json({ error:'Ссылка недействительна' });
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        const share = await PriceShare.findOne({ tokenHash, revokedAt:null, expiresAt:{ $gt:new Date() } }).lean();
+        if (!share) return res.status(410).json({ error:'Срок действия ссылки истёк или она была отозвана' });
+        res.set('Cache-Control','no-store');
+        res.json({
+            dealer:{ dealer_id:share.dealerId || '', name:share.dealerName || '', city:share.dealerCity || '' },
+            expiresAt:share.expiresAt,
+            createdAt:share.createdAt,
+            snapshot:share.snapshot || {}
+        });
+    } catch (e) {
+        res.status(500).json({ error:e.message });
     }
 });
 
