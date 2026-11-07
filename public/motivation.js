@@ -11,6 +11,7 @@
     const canManage = () => Boolean(window.CRMAuth && (CRMAuth.can('can_manage_pricing') || CRMAuth.can('can_edit_sales_fact')));
 
     async function request(url, options={}) {
+        if (window.CRMAuth?.ready) await CRMAuth.ready;
         const response = await fetch(url, { crmTrackLoading:false, ...options });
         const data = await response.json().catch(()=>({}));
         if (!response.ok) throw new Error(data.error || 'Ошибка запроса');
