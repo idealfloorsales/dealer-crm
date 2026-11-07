@@ -3908,7 +3908,11 @@ app.post('/api/motivation/payouts/recalculate', requireAnyPermission('can_edit_s
         }
 
         const stalePending = existing.filter(item => item.status === 'pending' && !qualifyingIds.includes(String(item.dealer)));
-        if (stalePending.length) await MotivationPayout.deleteMany({ _id:{ $in:stalePending.map(item=>item._id) } });
+        // Old pending payouts from the former same-month calculation must not survive recalculation.
+        const allPending = await MotivationPayout.find({ month:range.month, status:'pending', dealer:{ $in:dealers.map(d=>d._id) } }).lean();
+        const obsoletePending = allPending.filter(item => !qualifyingIds.includes(String(item.dealer)));
+        const obsoleteIds = [...new Set([...stalePending, ...obsoletePending].map(item=>String(item._id)))];
+        if (obsoleteIds.length) await MotivationPayout.deleteMany({ _id:{ $in:obsoleteIds } });
 
         const rows = await MotivationPayout.find({
             month:range.month,
