@@ -22,10 +22,7 @@
       ]
     ],
     "android": {
-      "package": "kz.idealfloor.crm",
-      "adaptiveIcon": {
-        "backgroundColor": "#B9040A"
-      }
+      "package": "kz.idealfloor.crm"
     },
     "ios": {
       "bundleIdentifier": "kz.idealfloor.crm",
