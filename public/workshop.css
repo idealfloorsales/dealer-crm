@@ -919,3 +919,8 @@ html,body.workshop-page{max-width:100%;overflow-x:hidden}
 .ws-choice-quantity{display:flex!important;align-items:center;justify-content:space-between;gap:10px;padding:0 12px 12px;font-size:12px}
 .ws-choice-quantity input{width:88px;min-height:42px}
 @media(max-width:600px){.ws-dealer-choice-grid{grid-template-columns:1fr;max-height:42vh}}
+
+.ws-dealer-choice-toolbar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.ws-dealer-choice-toolbar .form-select{flex:1;min-width:180px}
+.ws-dealer-choice-toolbar button{min-height:42px;font-size:13px}
+@media(max-width:600px){.ws-dealer-choice-toolbar .form-select{flex-basis:100%}.ws-dealer-choice-toolbar button{flex:1}}

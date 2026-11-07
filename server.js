@@ -4441,7 +4441,7 @@ app.post('/api/workshop/print-log', requirePermission('can_view_workshop'), asyn
 app.get('/api/workshop/bootstrap', requirePermission('can_view_workshop'), async (req, res) => {
     try {
         const [products, dealers, materials, recipes, laminateStocks, assets, productions, movements, memos] = await Promise.all([
-            Product.find().select('sku name is_liquid characteristics.package_qty characteristics.size characteristics.class characteristics.thickness').sort({ sku: 1 }).lean(),
+            Product.find().select('sku name collection is_liquid characteristics.package_qty characteristics.size characteristics.class characteristics.thickness').sort({ sku: 1 }).lean(),
             Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id dealer_id name city status').sort({ name: 1 }).lean(),
             WorkshopMaterial.find({ active: { $ne: false } }).sort({ category: 1, name: 1 }).lean(),
             WorkshopRecipe.find({ active: { $ne: false } })
@@ -5850,3 +5850,4 @@ process.on('uncaughtException', err => {
     console.error('Uncaught exception:', err);
     appReady = false;
 });
+

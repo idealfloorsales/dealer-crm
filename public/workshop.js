@@ -1762,10 +1762,26 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const dealerSelectedRecipes=new Map();
+    function dealerRecipeCollection(recipe){
+        const product=productById(idOf(recipe.product))||recipe.product;
+        return String(product?.collection||'').trim().toUpperCase();
+    }
+    function filteredDealerRecipes(){
+        const q=String($('ws-dealer-recipe-search')?.value||'').toLowerCase().trim();
+        const collection=$('ws-dealer-collection')?.value||'';
+        return state.recipes.filter(r=>(!collection||dealerRecipeCollection(r)===collection)&&
+            [r.name,r.product?.sku,dealerRecipeCollection(r)].join(' ').toLowerCase().includes(q));
+    }
+    function populateDealerCollections(){
+        const select=$('ws-dealer-collection');if(!select)return;
+        select.innerHTML=option('','Все коллекции')+[...new Set(state.recipes.map(dealerRecipeCollection).filter(Boolean))]
+            .sort((a,b)=>a.localeCompare(b,'ru')).map(c=>option(c,c)).join('');
+    }
     function renderDealerChoices(){
         const grid=$('ws-dealer-recipe-grid');if(!grid)return;
-        const q=String($('ws-dealer-recipe-search')?.value||'').toLowerCase().trim();
-        const filtered=state.recipes.filter(r=>(r.name+' '+(r.product?.sku||'')).toLowerCase().includes(q));
+        const filtered=filteredDealerRecipes();
+        $('ws-dealer-select-visible').textContent=$('ws-dealer-collection').value?'Выбрать всю коллекцию':'Выбрать все';
+        $('ws-dealer-select-visible').disabled=!filtered.length;
         grid.innerHTML=filtered.map(r=>{
             const id=idOf(r),qty=dealerSelectedRecipes.get(id)||0;
             return '<article class="ws-dealer-choice '+(qty?'is-selected':'')+'"><button type="button" data-recipe="'+esc(id)+'" aria-pressed="'+Boolean(qty)+'"><span class="ws-choice-check"><i class="bi bi-'+(qty?'check-lg':'plus-lg')+'"></i></span><span class="ws-dealer-choice-name"><small>'+esc(r.product?.sku||'')+'</small><strong>'+esc(r.name)+'</strong><small>В цехе: '+fmt(r.stockQty||0)+' шт</small></span></button>'+(qty?'<label class="ws-choice-quantity">Количество, шт<input type="number" data-qty="'+esc(id)+'" min="1" step="1" value="'+qty+'" required aria-label="Количество '+esc(r.name)+'" class="form-control"></label>':'')+'</article>';
@@ -1780,7 +1796,7 @@ document.addEventListener('DOMContentLoaded', () => {
         closeDealerResults();
         if($('ws-dealer-recipe-search'))$('ws-dealer-recipe-search').value='';
         if($('ws-dealer-search-input'))$('ws-dealer-search-input').value='';
-        populateFormSelects();renderDealerChoices();updateDealerCurrent();
+        populateFormSelects();populateDealerCollections();renderDealerChoices();updateDealerCurrent();
         if($('ws-dealer-extra'))$('ws-dealer-extra').open=false;
     }
     function updateDealerCurrent(){
@@ -1794,6 +1810,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }).join(''):'Выберите изделия для движения.';
     }
     $('ws-dealer-recipe-search')?.addEventListener('input',renderDealerChoices);
+    $('ws-dealer-collection')?.addEventListener('change',renderDealerChoices);
+    $('ws-dealer-select-visible')?.addEventListener('click',()=>{
+        filteredDealerRecipes().forEach(r=>{const id=idOf(r);if(!dealerSelectedRecipes.has(id))dealerSelectedRecipes.set(id,1);});
+        renderDealerChoices();updateDealerCurrent();
+    });
+    $('ws-dealer-clear')?.addEventListener('click',()=>{
+        dealerSelectedRecipes.clear();renderDealerChoices();updateDealerCurrent();
+    });
+
     $('ws-dealer-recipe-grid')?.addEventListener('click',e=>{
         const button=e.target.closest('[data-recipe]');if(!button)return;
         const id=button.dataset.recipe;
