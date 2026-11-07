@@ -315,7 +315,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (previousPhotos) dealer.photos = previousPhotos;
             currentDealer = dealer;
             const motivationHistory = document.getElementById('dealer-motivation-history');
-            if (motivationHistory && dealer.motivation_scheme) { motivationHistory.dataset.dealerCode = String(dealer.dealer_id || ''); motivationHistory.style.display = ''; }
+            if (motivationHistory && dealer.motivation_scheme) { motivationHistory.dataset.dealerCode = String(dealer.dealer_id || ''); motivationHistory.style.display = ''; document.dispatchEvent(new Event('crm:dealer-motivation-ready')); }
             currentDealerName = dealer.name;
             if (window.CRMAuth?.can('can_edit_dealer')) ensureEditorReferences();
             if (window.DealerDocuments) {
