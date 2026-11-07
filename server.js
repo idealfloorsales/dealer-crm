@@ -512,6 +512,19 @@ app.post('/api/auth/login', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+app.get('/api/auth/me', async (req, res) => {
+    res.json({
+        user: {
+            id: req.user.id,
+            username: req.user.username,
+            fullName: req.user.fullName,
+            role: req.user.role || 'manager',
+            scope: req.user.scope || 'all',
+            permissions: req.user.permissions || {}
+        }
+    });
+});
+
 // API УПРАВЛЕНИЯ ПОЛЬЗОВАТЕЛЯМИ
 function hasPermission(req, permission) {
     return Boolean(
