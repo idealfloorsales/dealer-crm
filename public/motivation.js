@@ -237,6 +237,7 @@
         } catch(e){toast(e.message,'error');}
     }
 
+    function currentMonth() { return new Date().toISOString().slice(0,7); }
     function previousMonth() {
         const d=new Date();
         d.setDate(1);
@@ -264,7 +265,7 @@
         const panel=document.getElementById('motivation-payouts-panel');
         if(!panel) return;
         const picker=document.getElementById('motivation-payout-month');
-        const month=picker?.value || previousMonth();
+        const month=picker?.value || currentMonth();
         state.payoutMonth=month;
         const host=document.getElementById('motivation-payout-list');
         if(host) host.innerHTML='<div class="motivation-payout-empty"><span class="spinner-border spinner-border-sm"></span> Загрузка…</div>';
@@ -333,7 +334,7 @@
         const panel=document.getElementById('motivation-payouts-panel');
         if(!panel) return;
         const picker=document.getElementById('motivation-payout-month');
-        if(picker && !picker.value) picker.value=previousMonth();
+        if(picker && !picker.value) picker.value=currentMonth();
         const day=new Date().getDate();
         const banner=document.getElementById('motivation-payout-window');
         if(banner){
