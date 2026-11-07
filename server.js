@@ -3174,7 +3174,7 @@ app.get('/api/public/price-share/:token.xlsx', async (req, res) => {
         const softGrayFill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFF5F6F7'} };
         const whiteFill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFFFFFFF'} };
 
-        const headerPath = path.join(__dirname,'public','ideal-floor-commercial-header.png');
+        const headerPath = path.join(__dirname,'public','ideal-floor-commercial-header.png.png');
         if (fs.existsSync(headerPath)) {
             const imageId = workbook.addImage({
                 buffer:fs.readFileSync(headerPath),
