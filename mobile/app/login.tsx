@@ -9,16 +9,18 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/auth';
 import { colors, radius, shadow } from '@/theme';
 
 export default function LoginScreen() {
-  const { signIn, signingIn } = useAuth();
+  const { signIn, signingIn, ready, user } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+
+  if (ready && user) return <Redirect href="/(tabs)" />;
 
   const submit = async () => {
     if (!username.trim() || !password) {
