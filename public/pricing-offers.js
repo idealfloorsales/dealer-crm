@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const select=$('pricing-offer-dealer');
         if(!select) return;
         const current=select.value;
-        select.innerHTML='<option value="">Выберите дилера</option>' + state.dealers.map(row =>
+        select.innerHTML='<option value="">Выберите потенциального клиента</option>' + state.dealers.map(row =>
             '<option value="' + esc(row.dealerId) + '">' + esc(row.dealerName) + (row.city ? ' · ' + esc(row.city) : '') + '</option>'
         ).join('');
         if(state.dealers.some(row=>String(row.dealerId)===String(current))) select.value=current;
@@ -60,16 +60,13 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderDealer(){
         const dealer=currentDealer();
         const host=$('pricing-offer-dealer-card');
-        const hint=$('pricing-offer-confirm-hint');
         if(!dealer){
             host.className='pricing-offer-dealer-card is-empty';
             host.textContent='Сначала выберите потенциального клиента';
-            hint.textContent='Защита от отправки КП не тому клиенту.';
             return;
         }
         host.className='pricing-offer-dealer-card';
         host.innerHTML='<strong>' + esc(dealer.dealerName) + '</strong><span>' + esc([dealer.city,dealer.sector].filter(Boolean).join(' · ')) + '</span><small>Статус: ' + esc(dealer.statusLabel || 'Потенциальный') + '</small>';
-        hint.innerHTML='Для создания введите <strong>' + esc(dealer.dealerCode || 'ID дилера') + '</strong>.';
     }
 
     function renderPriceSummary(){
@@ -149,17 +146,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function syncCreateState(){
         const dealer=currentDealer();
-        const confirmation=String($('pricing-offer-confirm')?.value || '').trim();
-        const expected=String(dealer?.dealerCode || '').trim();
-        const confirmed=Boolean(expected && confirmation.toLowerCase()===expected.toLowerCase());
         const priceSelected=Boolean($('pricing-offer-price-list')?.value);
-        const ready=Boolean(dealer && confirmed && priceSelected && state.sheet && state.selected.size);
+        const ready=Boolean(dealer && priceSelected && state.sheet && state.selected.size);
         const btn=$('pricing-offer-create-btn');
         if(btn) btn.disabled=!ready;
         const summary=$('pricing-offer-create-summary');
         if(!dealer) summary.textContent='Выберите потенциального клиента';
         else if(!priceSelected) summary.textContent='Выберите прайс для КП';
-        else if(!confirmed) summary.textContent='Подтвердите ID клиента: ' + (expected || '—');
         else if(!state.selected.size) summary.textContent='Выберите коллекции или декоры';
         else summary.textContent=dealer.dealerName + ' · ' + state.selected.size + ' декоров · ' + (state.sheet?.priceList?.name || state.sheet?.priceType?.label || 'Спец.цена');
     }
@@ -169,7 +162,6 @@ document.addEventListener('DOMContentLoaded', () => {
         state.sheet=null;
         if($('pricing-offer-dealer')) $('pricing-offer-dealer').value='';
         if($('pricing-offer-price-list')) $('pricing-offer-price-list').value='';
-        if($('pricing-offer-confirm')) $('pricing-offer-confirm').value='';
         if($('pricing-offer-search')) $('pricing-offer-search').value='';
         if($('pricing-offer-collection')) $('pricing-offer-collection').value='';
         $('pricing-offer-result')?.classList.add('d-none');
@@ -191,7 +183,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers:{'Content-Type':'application/json'},
                 body:JSON.stringify({
                     dealerId:dealer.dealerId,
-                    confirmDealerId:$('pricing-offer-confirm').value,
                     priceListId:$('pricing-offer-price-list').value || '',
                     expiresDays:Number($('pricing-offer-expiry').value || 14),
                     productIds:[...state.selected]
@@ -280,9 +271,8 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(()=>$('pricing-offer-dealer')?.focus(),80);
     });
     $('pricing-offer-reset-btn')?.addEventListener('click',resetBuilder);
-    $('pricing-offer-dealer')?.addEventListener('change',()=>{ $('pricing-offer-confirm').value=''; $('pricing-offer-price-list').value=''; state.sheet=null; renderDealer(); renderPriceSummary(); renderProducts(); syncCreateState(); });
+    $('pricing-offer-dealer')?.addEventListener('change',()=>{ $('pricing-offer-price-list').value=''; state.sheet=null; renderDealer(); renderPriceSummary(); renderProducts(); syncCreateState(); });
     $('pricing-offer-price-list')?.addEventListener('change',refreshSheet);
-    $('pricing-offer-confirm')?.addEventListener('input',syncCreateState);
     $('pricing-offer-search')?.addEventListener('input',renderProducts);
     $('pricing-offer-collection')?.addEventListener('change',renderProducts);
     $('pricing-offer-select-visible')?.addEventListener('click',()=>{ filteredProducts().forEach(item=>state.selected.add(String(item.id))); renderProducts(); });
