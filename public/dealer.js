@@ -684,6 +684,7 @@ document.addEventListener('DOMContentLoaded', () => {
         dealerShareConfirmId.value = '';
         dealerShareResult.classList.add('d-none');
         dealerShareResult.innerHTML = '';
+        dealerShareCreateBtn?.classList.remove('d-none');
         updateDealerShareConfirmation();
         bootstrap.Modal.getOrCreateInstance(dealerPriceShareModalEl).show();
         setTimeout(()=>dealerShareConfirmId?.focus(),250);
@@ -705,42 +706,95 @@ document.addEventListener('DOMContentLoaded', () => {
             const url = data.url || '';
             const xlsxUrl = data.xlsxUrl || (url ? url.replace('/price/','/api/public/price-share/') + '.xlsx' : '');
             const expires = data.expiresAt ? new Date(data.expiresAt).toLocaleString('ru-RU') : '';
+            const dealerName = data.dealer?.name || currentDealer.name || 'Дилер';
+            const filename = `Прайс IDEAL FLOOR - ${dealerName}.xlsx`.replace(/[\\/:*?"<>|]+/g,' ');
+
+            dealerShareCreateBtn?.classList.add('d-none');
             dealerShareResult.classList.remove('d-none');
             dealerShareResult.innerHTML = `
-                <div class="dealer-share-result-head"><i class="bi bi-check-circle-fill"></i><div><strong>Ссылка создана</strong><span>Для ${safeText(data.dealer?.name || currentDealer.name || '')} · действует до ${safeText(expires)}</span></div></div>
-                <div class="dealer-share-link"><input class="form-control" readonly value="${safeText(url)}"><button type="button" class="btn btn-light border" data-copy-share><i class="bi bi-copy"></i></button></div>
-                <div class="dealer-share-actions mt-2">
-                    <button type="button" class="btn btn-dark" data-native-share><i class="bi bi-link-45deg me-1"></i>Поделиться ссылкой</button>
-                    <a class="btn btn-light border" href="${safeText(xlsxUrl)}" download><i class="bi bi-file-earmark-excel me-1"></i>Скачать Excel</a>
-                    <button type="button" class="btn btn-success" data-share-excel><i class="bi bi-whatsapp me-1"></i>WhatsApp · Excel</button>
-                </div>
+                <div class="dealer-share-result-head"><i class="bi bi-check-circle-fill"></i><div><strong>Прайс готов</strong><span>Для ${safeText(dealerName)} · действует до ${safeText(expires)}</span></div></div>
+                <div class="dealer-share-link"><input class="form-control" readonly value="${safeText(url)}"><button type="button" class="btn btn-light border" data-copy-share title="Скопировать ссылку"><i class="bi bi-copy"></i></button></div>
+                <button type="button" class="btn btn-success dealer-share-whatsapp" data-share-excel disabled>
+                    <i class="bi bi-whatsapp"></i><span><strong>Отправить Excel в WhatsApp</strong><small data-share-excel-status>Подготавливаем файл…</small></span>
+                </button>
+                <a class="dealer-share-download" href="${safeText(xlsxUrl)}" download>
+                    <i class="bi bi-file-earmark-excel"></i><span>Скачать Excel отдельно</span>
+                </a>
             `;
             dealerShareResult.querySelector('[data-copy-share]')?.addEventListener('click', async ()=>{
-                await navigator.clipboard?.writeText(url); window.showToast?.('Ссылка скопирована');
+                await navigator.clipboard?.writeText(url);
+                window.showToast?.('Ссылка скопирована');
             });
-            dealerShareResult.querySelector('[data-native-share]')?.addEventListener('click', async ()=>{
-                const title = `Прайс IDEAL FLOOR для ${data.dealer?.name || currentDealer.name || ''}`;
-                if (navigator.share) { try { await navigator.share({title,text:title,url}); } catch(_) {} }
-                else { await navigator.clipboard?.writeText(url); window.showToast?.('Ссылка скопирована'); }
-            });
-            dealerShareResult.querySelector('[data-share-excel]')?.addEventListener('click', async ()=>{
-                const dealerName = data.dealer?.name || currentDealer.name || 'Дилер';
-                const filename = `Прайс IDEAL FLOOR - ${dealerName}.xlsx`.replace(/[\\/:*?"<>|]+/g,' ');
-                try {
-                    const xlsxResponse = await fetch(xlsxUrl,{cache:'no-store'});
-                    if (!xlsxResponse.ok) throw new Error('Не удалось сформировать Excel');
-                    const blob = await xlsxResponse.blob();
-                    const file = new File([blob], filename, {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-                    if (navigator.share && (!navigator.canShare || navigator.canShare({files:[file]}))) {
-                        await navigator.share({title:`Прайс IDEAL FLOOR для ${dealerName}`,text:`Персональный прайс IDEAL FLOOR для ${dealerName}`,files:[file]});
-                    } else {
-                        const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; document.body.appendChild(a); a.click(); a.remove();
-                        setTimeout(()=>URL.revokeObjectURL(a.href),1500);
-                        window.open(`https://wa.me/?text=${encodeURIComponent('Прайс IDEAL FLOOR для '+dealerName+' — файл Excel скачан, прикрепите его к этому сообщению.')}`,'_blank','noopener');
+
+            const shareExcelButton = dealerShareResult.querySelector('[data-share-excel]');
+            const shareExcelStatus = dealerShareResult.querySelector('[data-share-excel-status]');
+            let preparedExcelFile = null;
+            let nativeFileShareReady = false;
+
+            const downloadExcel = () => {
+                const download = document.createElement('a');
+                download.href = xlsxUrl;
+                download.download = filename;
+                document.body.appendChild(download);
+                download.click();
+                download.remove();
+            };
+
+            const openWhatsAppWithDownloadedExcel = () => {
+                downloadExcel();
+                const message = `Прайс IDEAL FLOOR для ${dealerName}. Excel-файл скачан — прикрепите его к этому сообщению.`;
+                window.open(`https://wa.me/?text=${encodeURIComponent(message)}`,'_blank','noopener');
+            };
+
+            // Prepare the file before the click. File sharing requires transient user activation,
+            // and awaiting fetch inside the click caused "Permission denied".
+            if (shareExcelButton && navigator.share && navigator.canShare) {
+                fetch(xlsxUrl,{cache:'no-store'})
+                    .then(response => {
+                        if (!response.ok) throw new Error('Не удалось сформировать Excel');
+                        return response.blob();
+                    })
+                    .then(blob => {
+                        preparedExcelFile = new File([blob], filename, {
+                            type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                        });
+                        nativeFileShareReady = navigator.canShare({files:[preparedExcelFile]});
+                        shareExcelButton.disabled = false;
+                        if (shareExcelStatus) {
+                            shareExcelStatus.textContent = nativeFileShareReady
+                                ? 'Файл готов · выберите WhatsApp'
+                                : 'Excel скачается, затем откроется WhatsApp';
+                        }
+                    })
+                    .catch(() => {
+                        shareExcelButton.disabled = false;
+                        if (shareExcelStatus) shareExcelStatus.textContent = 'Скачать Excel и открыть WhatsApp';
+                    });
+            } else {
+                if (shareExcelButton) shareExcelButton.disabled = false;
+                if (shareExcelStatus) shareExcelStatus.textContent = 'Excel скачается, затем откроется WhatsApp';
+            }
+
+            shareExcelButton?.addEventListener('click', ()=>{
+                if (nativeFileShareReady && preparedExcelFile && navigator.share) {
+                    // This call happens synchronously in the click event to keep browser permission.
+                    try {
+                        const promise = navigator.share({
+                            title:`Прайс IDEAL FLOOR для ${dealerName}`,
+                            text:`Персональный прайс IDEAL FLOOR для ${dealerName}`,
+                            files:[preparedExcelFile]
+                        });
+                        promise?.catch(error => {
+                            if (error?.name === 'AbortError') return;
+                            downloadExcel();
+                            window.showToast?.('Браузер запретил системную отправку. Excel скачан — прикрепите его в WhatsApp.','info');
+                        });
+                    } catch(error) {
+                        openWhatsAppWithDownloadedExcel();
                     }
-                } catch(error) {
-                    if (error?.name !== 'AbortError') window.showToast?.(error.message || 'Не удалось поделиться Excel','error');
+                    return;
                 }
+                openWhatsAppWithDownloadedExcel();
             });
         } catch(e) {
             window.showToast?.(e.message || 'Ошибка создания ссылки','error');

@@ -2850,31 +2850,45 @@ app.get('/api/public/price-share/:token.xlsx', async (req, res) => {
         });
 
         ws.columns = [
-            { key:'collection', width:34 },
-            { key:'wholesale', width:18 },
-            { key:'final', width:20 },
-            { key:'rrp', width:18 },
-            { key:'display', width:18 }
+            { key:'collection', width:38 },
+            { key:'wholesale', width:19 },
+            { key:'final', width:21 },
+            { key:'rrp', width:19 },
+            { key:'display', width:20 }
         ];
+
+        const thinGray = { style:'thin', color:{argb:'FFD6D8DC'} };
+        const softGrayFill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFF5F6F7'} };
+        const whiteFill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFFFFFFF'} };
 
         const headerPath = path.join(__dirname,'public','price-header.jpg');
         if (fs.existsSync(headerPath)) {
-            const imageId = workbook.addImage({ filename:headerPath, extension:'jpeg' });
-            ws.addImage(imageId,{ tl:{col:0,row:0}, br:{col:5,row:7} });
-            for(let r=1;r<=7;r++) ws.getRow(r).height=26;
+            const imageId = workbook.addImage({
+                buffer:fs.readFileSync(headerPath),
+                extension:'jpeg'
+            });
+            ws.addImage(imageId,{
+                tl:{col:0,row:0},
+                ext:{width:805,height:279},
+                editAs:'oneCell'
+            });
+            for(let r=1;r<=10;r++) ws.getRow(r).height=20.5;
         } else {
-            ws.mergeCells('A1:E5');
-            ws.getCell('A1').value='IDEAL FLOOR';
-            ws.getCell('A1').font={bold:true,size:28,color:{argb:'FFFFFFFF'}};
-            ws.getCell('A1').fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF9F0710'}};
-            ws.getCell('A1').alignment={vertical:'middle',horizontal:'left'};
+            ws.mergeCells('A1:E7');
+            const fallback=ws.getCell('A1');
+            fallback.value='IDEAL FLOOR';
+            fallback.font={bold:true,size:30,color:{argb:'FFFFFFFF'}};
+            fallback.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF991119'}};
+            fallback.alignment={vertical:'middle',horizontal:'left'};
         }
 
-        ws.mergeCells('A9:E9');
-        ws.getCell('A9').value = 'ПЕРСОНАЛЬНЫЙ ПРАЙС';
-        ws.getCell('A9').font = { bold:true, size:18, color:{argb:'FF1F2024'} };
-        ws.getCell('A9').alignment = { vertical:'middle', horizontal:'left' };
-        ws.getRow(9).height=28;
+        ws.mergeCells('A12:E12');
+        const titleCell=ws.getCell('A12');
+        titleCell.value='ПЕРСОНАЛЬНЫЙ ПРАЙС';
+        titleCell.font={bold:true,size:18,color:{argb:'FF202226'}};
+        titleCell.alignment={vertical:'middle',horizontal:'left'};
+        titleCell.border={bottom:{style:'medium',color:{argb:'FF9F0710'}}};
+        ws.getRow(12).height=30;
 
         const info = [
             ['Дилер', dealer.name || share.dealerName || ''],
@@ -2886,18 +2900,30 @@ app.get('/api/public/price-share/:token.xlsx', async (req, res) => {
             ['Ссылка действует до', new Date(share.expiresAt).toLocaleString('ru-RU')]
         ];
 
-        let infoRow=11;
-        info.forEach(([label,value])=>{
+        let infoRow=14;
+        info.forEach(([label,value],idx)=>{
             ws.mergeCells(`A${infoRow}:B${infoRow}`);
             ws.mergeCells(`C${infoRow}:E${infoRow}`);
-            ws.getCell(`A${infoRow}`).value=label;
-            ws.getCell(`C${infoRow}`).value=value;
-            ws.getCell(`A${infoRow}`).font={bold:true,color:{argb:'FF777A81'}};
-            ws.getCell(`C${infoRow}`).font={bold:true,color:{argb:label==='Скидка IDEAL FLOOR'?'FF9F0710':'FF25262A'}};
-            ws.getCell(`A${infoRow}`).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF5F3F1'}};
-            ws.getCell(`C${infoRow}`).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFBFAF9'}};
-            [`A${infoRow}`,`C${infoRow}`].forEach(addr=>ws.getCell(addr).alignment={vertical:'middle'});
-            ws.getRow(infoRow).height=22;
+            const labelCell=ws.getCell(`A${infoRow}`);
+            const valueCell=ws.getCell(`C${infoRow}`);
+            labelCell.value=label;
+            valueCell.value=value;
+            labelCell.font={bold:true,size:10,color:{argb:'FF70747B'}};
+            valueCell.font={bold:true,size:10,color:{argb:label==='Скидка IDEAL FLOOR'?'FFB10B13':'FF25272B'}};
+            labelCell.fill=softGrayFill;
+            valueCell.fill=whiteFill;
+            labelCell.alignment={vertical:'middle',horizontal:'left'};
+            valueCell.alignment={vertical:'middle',horizontal:'left'};
+            for(let c=1;c<=5;c++){
+                const cell=ws.getCell(infoRow,c);
+                cell.border={
+                    top:idx===0 ? thinGray : undefined,
+                    bottom:thinGray,
+                    left:c===1 ? thinGray : undefined,
+                    right:c===5 ? thinGray : undefined
+                };
+            }
+            ws.getRow(infoRow).height=23;
             infoRow++;
         });
 
@@ -2906,41 +2932,54 @@ app.get('/api/public/price-share/:token.xlsx', async (req, res) => {
         headers.forEach((value,index)=>{
             const cell=ws.getCell(tableRow,index+1);
             cell.value=value;
-            cell.font={bold:true,color:{argb:'FFFFFFFF'}};
-            cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF991119'}};
+            cell.font={bold:true,size:10,color:{argb:'FFFFFFFF'}};
+            cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFA70A12'}};
             cell.alignment={vertical:'middle',horizontal:index===0?'left':'center',wrapText:true};
+            cell.border={top:thinGray,bottom:thinGray,left:thinGray,right:thinGray};
         });
-        ws.getRow(tableRow).height=30;
+        ws.getRow(tableRow).height=32;
 
         rows.forEach((row,index)=>{
             const r=tableRow+1+index;
             const wholesale=Number(row.basePrice ?? row.opt) || 0;
             const finalPrice=Number.isFinite(Number(row.finalPrice)) ? Number(row.finalPrice) : wholesale;
-            ws.getCell(r,1).value=row.collection || row.name || '';
-            ws.getCell(r,2).value=wholesale || null;
-            ws.getCell(r,3).value=finalPrice || null;
-            ws.getCell(r,4).value=Number(row.rrp) || null;
-            ws.getCell(r,5).value=Number(row.displayPrice) || null;
-            ws.getCell(r,1).font={bold:true,color:{argb:'FF292A2F'}};
-            ws.getCell(r,3).font={bold:true,color:{argb:'FF9F0710'}};
-            for(let c=2;c<=5;c++) {
-                ws.getCell(r,c).numFmt='#,##0.00 [$₸-ru-RU]';
-                ws.getCell(r,c).alignment={horizontal:'right',vertical:'middle'};
-            }
-            for(let c=1;c<=5;c++) {
-                ws.getCell(r,c).border={bottom:{style:'hair',color:{argb:'FFDCD8D4'}}};
-                ws.getCell(r,c).fill={type:'pattern',pattern:'solid',fgColor:{argb:index%2===0?'FFFFFFFF':'FFFBFAF9'}};
-            }
-            ws.getRow(r).height=23;
+            const values=[
+                row.collection || row.name || '',
+                wholesale || null,
+                finalPrice || null,
+                Number(row.rrp) || null,
+                Number(row.displayPrice) || null
+            ];
+
+            values.forEach((value,colIndex)=>{
+                const cell=ws.getCell(r,colIndex+1);
+                cell.value=value;
+                cell.fill=index%2===0 ? whiteFill : softGrayFill;
+                cell.border={top:thinGray,bottom:thinGray,left:thinGray,right:thinGray};
+                cell.alignment={
+                    vertical:'middle',
+                    horizontal:colIndex===0?'left':'right',
+                    wrapText:colIndex===0
+                };
+                cell.font={
+                    bold:colIndex===0 || colIndex===2,
+                    size:10,
+                    color:{argb:colIndex===2?'FFB10B13':'FF2A2C31'}
+                };
+                if(colIndex>0) cell.numFmt='#,##0.00 "₸"';
+            });
+            ws.getRow(r).height=25;
         });
 
         const footRow=tableRow+rows.length+2;
         ws.mergeCells(`A${footRow}:E${footRow}`);
-        ws.getCell(`A${footRow}`).value='Персональный прайс IDEAL FLOOR. Предназначен только для указанного дилера.';
-        ws.getCell(`A${footRow}`).font={italic:true,size:9,color:{argb:'FF888B91'}};
-        ws.getCell(`A${footRow}`).alignment={horizontal:'center'};
+        const foot=ws.getCell(`A${footRow}`);
+        foot.value='Персональный прайс IDEAL FLOOR · предназначен только для указанного дилера.';
+        foot.font={italic:true,size:9,color:{argb:'FF888B91'}};
+        foot.alignment={horizontal:'center',vertical:'middle'};
+        foot.border={top:{style:'thin',color:{argb:'FFD6D8DC'}}};
+        ws.getRow(footRow).height=22;
 
-        ws.autoFilter = { from:{row:tableRow,column:1}, to:{row:tableRow+rows.length,column:5} };
         ws.views=[{showGridLines:false,state:'frozen',ySplit:tableRow}];
 
         const safeDealer = String(dealer.name || share.dealerName || share.dealerId || 'dealer')

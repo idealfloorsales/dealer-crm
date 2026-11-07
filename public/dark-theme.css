@@ -1599,3 +1599,13 @@ html:root[data-crm-theme="dark"] .dealer-share-warning{background:rgba(174,123,3
 html:root[data-crm-theme="dark"] .dealer-share-warning strong{color:#e1bf82!important}
 html:root[data-crm-theme="dark"] .dealer-share-warning span{color:#b8a27c!important}
 html:root[data-crm-theme="dark"] .dealer-share-result{background:rgba(57,129,82,.14)!important;border-color:rgba(116,182,139,.24)!important}
+
+html:root[data-crm-theme="dark"] .dealer-share-download{
+  background:#202126!important;
+  border-color:#34363d!important;
+  color:#c7cad0!important;
+}
+html:root[data-crm-theme="dark"] .dealer-share-download:hover{
+  background:#292a30!important;
+  color:#fff!important;
+}

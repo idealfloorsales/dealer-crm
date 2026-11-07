@@ -13089,3 +13089,40 @@ body:not(.app-workspace-page) .modal-header .btn-close{
 .dealer-share-result{margin-top:12px;padding:12px;border:1px solid #dce8df;border-radius:13px;background:#f5faf6}.dealer-share-result-head{display:flex;align-items:flex-start;gap:8px}.dealer-share-result-head>i{color:#43805a}.dealer-share-result-head strong,.dealer-share-result-head span{display:block}.dealer-share-result-head strong{font-size:.66rem;color:#345640}.dealer-share-result-head span{margin-top:2px;font-size:.52rem;color:#6c806f}
 .dealer-share-link{display:grid;grid-template-columns:minmax(0,1fr) 42px;gap:6px;margin-top:10px}
 @media(max-width:600px){.dealer-share-identity{grid-template-columns:1fr 1fr}.dealer-share-identity>div:first-child{grid-column:1/-1}}
+
+
+/* Price sharing — clean hierarchy */
+.dealer-share-whatsapp{
+  width:100%;
+  min-height:56px;
+  margin-top:10px;
+  display:flex!important;
+  align-items:center;
+  justify-content:flex-start;
+  gap:10px;
+  padding:9px 13px!important;
+  border-radius:12px!important;
+  text-align:left;
+}
+.dealer-share-whatsapp>i{font-size:1.2rem}
+.dealer-share-whatsapp>span{display:flex;flex-direction:column;line-height:1.15}
+.dealer-share-whatsapp strong{font-size:.65rem;color:inherit}
+.dealer-share-whatsapp small{margin-top:3px;font-size:.49rem;color:rgba(255,255,255,.76)}
+.dealer-share-download{
+  margin-top:7px;
+  min-height:40px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  border:1px solid #e4e1dd;
+  border-radius:10px;
+  background:#fff;
+  color:#5f6268;
+  font-size:.57rem;
+  font-weight:750;
+  text-decoration:none;
+}
+.dealer-share-download:hover{background:#f7f6f4;color:#303238}
+.dealer-share-link{margin-top:10px}
+.dealer-share-link .form-control{font-size:.57rem}
