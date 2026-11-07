@@ -1761,74 +1761,71 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 'Производство записано', 'production');
     });
 
-    function resetDealerMovement() {
-        $('ws-dealer-form')?.reset();
-        $('ws-dealer-date').value=todayValue();
-        const lines=$('ws-dealer-recipe-lines');
-        if(lines) lines.innerHTML='<div class="ws-dealer-recipe-line d-flex gap-2 align-items-center"><select id="ws-dealer-recipe" class="form-select" required></select><input type="number" class="form-control ws-dealer-line-qty" min="1" step="1" value="1" aria-label="Количество" style="width:85px;flex:0 0 85px"></div>';
-        const extra=$('ws-dealer-extra');
-        if(extra) extra.open=false;
-        populateFormSelects();
+    const dealerSelectedRecipes=new Map();
+    function renderDealerChoices(){
+        const grid=$('ws-dealer-recipe-grid');if(!grid)return;
+        const q=String($('ws-dealer-recipe-search')?.value||'').toLowerCase().trim();
+        const filtered=state.recipes.filter(r=>(r.name+' '+(r.product?.sku||'')).toLowerCase().includes(q));
+        grid.innerHTML=filtered.map(r=>{
+            const id=idOf(r),qty=dealerSelectedRecipes.get(id)||0;
+            return '<label class="ws-dealer-choice"><input type="checkbox" data-recipe="'+esc(id)+'" '+(qty?'checked':'')+'><span class="ws-dealer-choice-name">'+esc(r.name)+(r.product?.sku?' <small>'+esc(r.product.sku)+'</small>':'')+'</span><input type="number" data-qty="'+esc(id)+'" min="1" step="1" value="'+(qty||1)+'" '+(qty?'':'disabled')+' aria-label="Количество" class="form-control"></label>';
+        }).join('')||'<div class="text-muted small p-2">Ничего не найдено</div>';
+        $('ws-dealer-selected-count').textContent=dealerSelectedRecipes.size+' выбрано';
+    }
+    function resetDealerMovement(){
+        $('ws-dealer-form')?.reset();$('ws-dealer-date').value=todayValue();
+        dealerSelectedRecipes.clear();
+        if($('ws-dealer-recipe-search'))$('ws-dealer-recipe-search').value='';
+        if($('ws-dealer-search-input'))$('ws-dealer-search-input').value='';
+        populateFormSelects();renderDealerChoices();updateDealerCurrent();
+        if($('ws-dealer-extra'))$('ws-dealer-extra').open=false;
+    }
+    function updateDealerCurrent(){
+        const dealerId=$('ws-dealer-id')?.value,action=$('ws-dealer-action')?.value||'issue';
+        if($('ws-dealer-condition-wrap'))$('ws-dealer-condition-wrap').hidden=action==='issue';
+        if($('ws-dealer-extra')&&action!=='issue')$('ws-dealer-extra').open=true;
+        $('ws-dealer-current').innerHTML=dealerSelectedRecipes.size
+            ? [...dealerSelectedRecipes].map(([id,qty])=>{
+                const r=recipeById(id),asset=state.dealerAssets.find(x=>idOf(x.dealer)===dealerId&&idOf(x.recipe)===id);
+                return '<div class="py-1">'+esc(r?.name||'Изделие')+' · '+qty+' шт · в цехе '+fmt(r?.stockQty||0)+' · у дилера '+fmt(asset?.qty||0)+'</div>';
+            }).join(''):'Выберите изделия для движения.';
+    }
+    $('ws-dealer-recipe-search')?.addEventListener('input',renderDealerChoices);
+    $('ws-dealer-recipe-grid')?.addEventListener('change',e=>{
+        const t=e.target,id=t.dataset.recipe||t.dataset.qty;if(!id)return;
+        const label=t.closest('.ws-dealer-choice'),check=label.querySelector('[data-recipe]'),input=label.querySelector('[data-qty]');
+        if(t.dataset.recipe){input.disabled=!check.checked;}
+        if(check.checked)dealerSelectedRecipes.set(id,Math.max(1,Math.floor(Number(input.value)||1)));
+        else dealerSelectedRecipes.delete(id);
+        $('ws-dealer-selected-count').textContent=dealerSelectedRecipes.size+' выбрано';updateDealerCurrent();
+    });
+    $('ws-dealer-search-input')?.addEventListener('input',e=>{
+        const q=e.target.value.toLowerCase().trim(),select=$('ws-dealer-id'),previous=select.value;
+        select.innerHTML=option('','Выберите дилера')+state.dealers.filter(d=>(d.name+' '+(d.city||'')).toLowerCase().includes(q)).map(d=>option(idOf(d),d.name+' · '+(d.city||''))).join('');
+        if([...select.options].some(o=>o.value===previous))select.value=previous;
         updateDealerCurrent();
-    }
-    function dealerMovementLines(){
-        return [...document.querySelectorAll('#ws-dealer-recipe-lines .ws-dealer-recipe-line')].map(line=>({
-            recipeId:line.querySelector('select')?.value,
-            qty:Number(line.querySelector('.ws-dealer-line-qty')?.value)
-        }));
-    }
-    function updateDealerCurrent() {
-        const dealerId=$('ws-dealer-id')?.value;
-        const action=$('ws-dealer-action')?.value||'issue';
-        const conditionWrap=$('ws-dealer-condition-wrap');
-        if(conditionWrap)conditionWrap.hidden=action==='issue';
-        const extra=$('ws-dealer-extra');
-        if(extra&&action!=='issue')extra.open=true;
-        const lines=dealerMovementLines().filter(line=>line.recipeId);
-        $('ws-dealer-current').innerHTML=lines.length
-            ? lines.map(line=>{
-                const recipe=recipeById(line.recipeId);
-                const asset=state.dealerAssets.find(x=>idOf(x.dealer)===dealerId&&idOf(x.recipe)===line.recipeId);
-                return '<div class="py-1">'+esc(recipe?.name||'Изделие')+': в цехе <strong>'+fmt(recipe?.stockQty||0)+' шт</strong> · у дилера <strong>'+fmt(asset?.qty||0)+' шт</strong></div>';
-            }).join('')
-            : 'Выберите дилера и изделия.';
-    }
-    $('ws-dealer-add-recipe')?.addEventListener('click',()=>{
-        const container=$('ws-dealer-recipe-lines');
-        const line=document.createElement('div');
-        line.className='ws-dealer-recipe-line d-flex gap-2 align-items-center';
-        line.innerHTML='<select class="form-select" required>'+recipeOptions()+'</select><input type="number" class="form-control ws-dealer-line-qty" min="1" step="1" value="1" aria-label="Количество" style="width:85px;flex:0 0 85px"><button type="button" class="btn btn-outline-secondary" aria-label="Удалить позицию"><i class="bi bi-x-lg"></i></button>';
-        line.querySelector('button').addEventListener('click',()=>{line.remove();updateDealerCurrent();});
-        container.appendChild(line);
     });
     ['ws-dealer-id','ws-dealer-action'].forEach(id=>$(id)?.addEventListener('change',updateDealerCurrent));
-    $('ws-dealer-recipe-lines')?.addEventListener('change',updateDealerCurrent);
     $('ws-dealer-form')?.addEventListener('submit',async event=>{
         event.preventDefault();
-        const lines=dealerMovementLines();
-        if(!lines.length||lines.some(line=>!line.recipeId||!Number.isInteger(line.qty)||line.qty<1)){toast('Укажите изделия и количество','error');return;}
-        if(new Set(lines.map(line=>line.recipeId)).size!==lines.length){toast('Одинаковые изделия объедините в одну строку','error');return;}
-        const button=event.currentTarget.querySelector('[type="submit"]');
-        if(button)button.disabled=true;
+        const lines=[...dealerSelectedRecipes].map(([recipeId,qty])=>({recipeId,qty}));
+        if(!$('ws-dealer-id').value||!lines.length){toast('Выберите дилера и изделия','error');return;}
+        const btn=event.currentTarget.querySelector('[type="submit"]');if(btn)btn.disabled=true;
         let completed=0;
         try{
             for(const line of lines){
                 const response=await fetch(API+'/dealer-movement',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-                    dealerId:$('ws-dealer-id').value,recipeId:line.recipeId,action:$('ws-dealer-action').value,
-                    qty:line.qty,returnCondition:$('ws-dealer-condition').value,date:$('ws-dealer-date').value,
-                    reason:$('ws-dealer-reason').value,note:$('ws-dealer-note').value
+                    dealerId:$('ws-dealer-id').value,recipeId:line.recipeId,qty:line.qty,
+                    action:$('ws-dealer-action').value,returnCondition:$('ws-dealer-condition').value,
+                    date:$('ws-dealer-date').value,reason:$('ws-dealer-reason').value,note:$('ws-dealer-note').value
                 })});
                 const data=await response.json().catch(()=>({}));
-                if(!response.ok)throw new Error(data.error||'Не удалось провести позицию');
+                if(!response.ok)throw new Error(data.error||'Ошибка проведения');
                 completed++;
             }
-            hideModal('dealer');
-            toast('Проведено позиций: '+completed,'success');
-            await load();
-        }catch(error){
-            toast('Проведено '+completed+' из '+lines.length+'. '+(error.message||'Ошибка')+'. Проверьте историю перед повтором.','error');
-            await load();
-        }finally{if(button)button.disabled=false;}
+            hideModal('dealer');toast('Проведено позиций: '+completed,'success');await load();
+        }catch(error){toast('Проведено '+completed+' из '+lines.length+'. '+(error.message||'Ошибка')+'. Проверьте историю перед повтором.','error');await load();}
+        finally{if(btn)btn.disabled=false;}
     });
 
     function resetMaterialMovement(){
