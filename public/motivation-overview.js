@@ -28,8 +28,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {const response=await fetch('/api/motivation/reminder-settings',{cache:'no-store'});if(response.ok)settings=await response.json();}catch(e){console.warn(e);}
     const canConfigure=Boolean(window.CRMAuth && (CRMAuth.can('can_manage_pricing')||CRMAuth.can('can_edit_sales_fact')));
     const day=new Date().getDate();
-    if(!settings.enabled||day<settings.startDay||day>settings.endDay) { dashboard.remove(); }
-    else {
+    const inReminderWindow=settings.enabled&&day>=settings.startDay&&day<=settings.endDay;
+    if(!inReminderWindow) {
+      dashboard.innerHTML='<div class="cc-panel p-3"><div class="d-flex justify-content-between align-items-center gap-2"><strong>Мотивация и выплаты</strong><button type="button" id="mr-open-anytime" class="btn btn-sm btn-outline-primary">Показать список</button></div><div id="mr-anytime-content" hidden></div></div>';
+      dashboard.querySelector('#mr-open-anytime').addEventListener('click',async event=>{
+        const host=dashboard.querySelector('#mr-anytime-content');
+        if(!host.hidden){host.hidden=true;event.currentTarget.textContent='Показать список';return;}
+        host.hidden=false;event.currentTarget.textContent='Скрыть список';host.innerHTML='<p class="small text-muted mt-2">Загрузка…</p>';
+        try {await refresh(month);const data=await get(month);const pending=(data.rows||[]).filter(r=>r.status==='pending');host.innerHTML='<p class="small text-muted mt-2">Продажи за '+salesLabel+' · к выплате: '+pending.length+'</p>'+(pending.length?'<div class="table-responsive"><table class="table table-sm"><thead><tr><th>Дилер</th><th class="text-end">Продажи, м²</th><th class="text-end">К выплате</th></tr></thead><tbody>'+pending.map(r=>'<tr><td>'+escape(r.dealerName)+'</td><td class="text-end">'+fmt(r.salesM2)+'</td><td class="text-end">'+money(r.amount)+'</td></tr>').join('')+'</tbody><tfoot><tr><th>Итого</th><th class="text-end">'+fmt(pending.reduce((v,r)=>v+Number(r.salesM2||0),0))+'</th><th class="text-end">'+money(pending.reduce((v,r)=>v+Number(r.amount||0),0))+'</th></tr></tfoot></table></div>':'<p class="small text-muted">Невыплаченных мотиваций нет.</p>')+'<a href="/sales.html#motivation-payouts-panel" class="btn btn-sm btn-outline-secondary">Открыть выплаты</a>';}catch(e){host.textContent='Не удалось загрузить выплаты';}
+      });
+    }
+    if(inReminderWindow) {
       dashboard.innerHTML='<div class="cc-panel p-3"><h3 class="h5 mb-2">Мотивация к выплате</h3><p class="text-muted small">Загрузка…</p></div>';
       try {
         await refresh(month);
