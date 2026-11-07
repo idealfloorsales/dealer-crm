@@ -1634,3 +1634,12 @@ html,body.pricing-page{max-width:100%;overflow-x:hidden}
 .pricing-target-summary{
   overflow-anchor:none;
 }
+
+.pricing-discount-options{grid-template-columns:repeat(3,minmax(0,1fr))}
+.pricing-discount-custom{display:flex!important;flex-direction:column;justify-content:center;gap:6px;padding:8px 9px!important;cursor:default!important}
+.pricing-discount-custom-copy{display:block!important;border:0!important;padding:0!important;min-height:0!important;background:transparent!important;box-shadow:none!important}
+.pricing-discount-custom-copy strong,.pricing-discount-custom-copy small{display:block}
+.pricing-discount-custom-input{display:flex;align-items:center;height:34px;border:1px solid #ded8d3;border-radius:9px;background:#fff;overflow:hidden}
+.pricing-discount-custom-input span,.pricing-discount-custom-input b{padding:0 8px;color:#8d4b4f;font-size:.62rem;font-weight:900}
+.pricing-discount-custom-input .form-control{height:32px!important;min-height:32px!important;border:0!important;border-radius:0!important;padding:0!important;text-align:center;font-size:.67rem!important;font-weight:800;box-shadow:none!important}
+@media(max-width:760px){.pricing-discount-options{grid-template-columns:1fr 1fr}.pricing-discount-custom{grid-column:1/-1}}
