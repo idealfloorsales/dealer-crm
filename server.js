@@ -3772,6 +3772,12 @@ function motivationMonthRange(month) {
     return { month:value, start, end };
 }
 
+function motivationSalesRange(payoutRange) {
+    const [year, month] = payoutRange.month.split('-').map(Number);
+    const salesMonth = new Date(Date.UTC(year, month - 2, 1)).toISOString().slice(0, 7);
+    return motivationMonthRange(salesMonth);
+}
+
 function motivationSchemeAppliesToMonth(scheme, range) {
     if (!scheme || scheme.active === false) return false;
     const from = String(scheme.validFrom || '');
@@ -3832,6 +3838,7 @@ app.delete('/api/motivation/schemes/:id', requireAnyPermission('can_manage_prici
 app.post('/api/motivation/payouts/recalculate', requireAnyPermission('can_edit_sales_fact','can_manage_pricing'), async (req,res) => {
     try {
         const range = motivationMonthRange(req.body?.month);
+        const salesRange = motivationSalesRange(range);
         const visibility = getWorkingDealerFilter(getDealerFilter(req));
         const dealers = await Dealer.find({
             $and:[
@@ -3840,10 +3847,10 @@ app.post('/api/motivation/payouts/recalculate', requireAnyPermission('can_edit_s
             ]
         }).select('_id dealer_id name city motivation_scheme status').populate('motivation_scheme').lean();
 
-        const eligibleDealers = dealers.filter(dealer => motivationSchemeAppliesToMonth(dealer.motivation_scheme, range));
+        const eligibleDealers = dealers.filter(dealer => motivationSchemeAppliesToMonth(dealer.motivation_scheme, salesRange));
         const ids = eligibleDealers.map(dealer => String(dealer._id));
         const salesRows = ids.length ? await Sales.find({
-            month:range.month,
+            month:salesRange.month,
             isCustom:{ $ne:true },
             dealerId:{ $in:ids }
         }).lean() : [];
@@ -3872,8 +3879,8 @@ app.post('/api/motivation/payouts/recalculate', requireAnyPermission('can_edit_s
             const ratePerM2 = Math.max(0, Number(scheme.ratePerM2) || 0);
             const amount = Math.round(salesM2 * ratePerM2 * 100) / 100;
             const partialPeriod = Boolean(
-                (scheme.validFrom && scheme.validFrom > range.start) ||
-                (scheme.validTo && scheme.validTo < range.end)
+                (scheme.validFrom && scheme.validFrom > salesRange.start) ||
+                (scheme.validTo && scheme.validTo < salesRange.end)
             );
             const prev = existingByDealer.get(dealerId);
             if (prev && (prev.status === 'paid' || prev.status === 'skipped')) continue;
@@ -3910,6 +3917,7 @@ app.post('/api/motivation/payouts/recalculate', requireAnyPermission('can_edit_s
 
         res.json({
             month:range.month,
+            salesMonth:salesRange.month,
             count:rows.length,
             pendingAmount:rows.filter(x=>x.status==='pending').reduce((sum,x)=>sum+(Number(x.amount)||0),0),
             diagnostics:{
@@ -3926,15 +3934,16 @@ app.post('/api/motivation/payouts/recalculate', requireAnyPermission('can_edit_s
 app.get('/api/motivation/payouts', requirePermission('can_view_sales'), async (req,res) => {
     try {
         const range = motivationMonthRange(req.query.month);
+        const salesRange = motivationSalesRange(range);
         const dealerFilter = getDealerFilter(req);
         const dealers = await Dealer.find({
             $and:[dealerFilter,{ motivation_scheme:{ $ne:null } }]
         }).select('_id dealer_id name motivation_scheme status').populate('motivation_scheme').lean();
         const dealerIds = dealers.map(item=>item._id);
-        const eligibleDealers = dealers.filter(dealer => motivationSchemeAppliesToMonth(dealer.motivation_scheme, range));
+        const eligibleDealers = dealers.filter(dealer => motivationSchemeAppliesToMonth(dealer.motivation_scheme, salesRange));
         const eligibleIds = eligibleDealers.map(item=>String(item._id));
         const diagnosticSales = eligibleIds.length ? await Sales.find({
-            month:range.month,
+            month:salesRange.month,
             isCustom:{ $ne:true },
             dealerId:{ $in:eligibleIds }
         }).select('dealerId fact').lean() : [];
@@ -3956,6 +3965,7 @@ app.get('/api/motivation/payouts', requirePermission('can_view_sales'), async (r
         }, {salesM2:0,amount:0,pending:0,paid:0,skipped:0,pendingAmount:0,paidAmount:0});
         res.json({
             month:range.month,
+            salesMonth:salesRange.month,
             summary,
             diagnostics:{
                 assigned:dealers.length,
