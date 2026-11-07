@@ -2938,12 +2938,16 @@ app.post('/api/pricing/offers', requirePermission('can_view_pricing'), async (re
             .filter(value => mongoose.Types.ObjectId.isValid(value)))];
         if (!selectedIds.length) return res.status(400).json({ error:'Выберите хотя бы один декор' });
 
-        const products = await Product.find({
-            _id:{ $in:selectedIds },
-            product_type:'laminate',
-            is_liquid:{ $ne:false }
-        }).select('_id sku name collection characteristics is_liquid').lean();
-        if (!products.length) return res.status(400).json({ error:'Выбранные декоры не найдены' });
+        // Use the same laminate rules as the catalog. Older product records may not
+        // have product_type persisted because "laminate" is the schema default,
+        // so filtering MongoDB by product_type:"laminate" incorrectly rejects them.
+        const productCandidates = await Product.find({
+            _id:{ $in:selectedIds }
+        }).select('_id sku name product_type collection characteristics is_liquid').lean();
+        const products = productCandidates.filter(product =>
+            isPricingLaminateProduct(product) && product.is_liquid !== false
+        );
+        if (!products.length) return res.status(400).json({ error:'Выбранные декоры не найдены в актуальной номенклатуре' });
 
         const rowMap = new Map((snapshot.rows || [])
             .filter(row => row.rowType === 'collection')
