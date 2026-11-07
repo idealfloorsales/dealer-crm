@@ -36,6 +36,7 @@ const LOCAL_ASSETS = [
     '/permissions.js?v={{VER}}',
     '/dealer-score.js?v={{VER}}',
     '/motivation.js?v={{VER}}',
+    '/motivation-overview.js?v={{VER}}',
     '/dealer.js?v={{VER}}',
     '/map.js?v={{VER}}',
     '/workshop.js?v={{VER}}',
