@@ -368,14 +368,18 @@
                                     <div class="pricing-discount-options">
                                         <label>
                                             <input type="checkbox" id="pricing-discount-5" value="5">
-                                            <span><strong>−5%</strong><small>Добавить скидку</small></span>
+                                            <span><strong>−5%</strong><small>Быстрый выбор</small></span>
                                         </label>
                                         <label>
                                             <input type="checkbox" id="pricing-discount-10" value="10">
-                                            <span><strong>−10%</strong><small>Добавить скидку</small></span>
+                                            <span><strong>−10%</strong><small>Быстрый выбор</small></span>
+                                        </label>
+                                        <label class="pricing-discount-custom">
+                                            <span class="pricing-discount-custom-copy"><strong>Своя скидка</strong><small>Введите процент вручную</small></span>
+                                            <div class="pricing-discount-custom-input"><span>−</span><input type="number" id="pricing-discount-custom" class="form-control" min="0" max="100" step="0.01" inputmode="decimal" placeholder="7.5"><b>%</b></div>
                                         </label>
                                     </div>
-                                    <small>Можно выбрать обе скидки — тогда они суммируются.</small>
+                                    <small>Можно комбинировать разные скидки — они суммируются. Одинаковый процент дважды не учитывается.</small>
                                 </div>
                             </div>
                             <div class="pricing-rule-note">
@@ -385,7 +389,7 @@
                         </div>
 
                         <div class="pricing-form-section" id="pricing-promo-period-section">
-                            <div class="pricing-form-section-title"><span>3</span><div><strong>Период акции</strong><small>Этот период относится только к скидкам −5% и −10%; срок действия прайса здесь не меняется</small></div></div>
+                            <div class="pricing-form-section-title"><span>3</span><div><strong>Период акции</strong><small>Этот период относится к выбранным скидкам; срок действия прайса здесь не меняется</small></div></div>
                             <div class="pricing-form-grid pricing-promo-period-grid">
                                 <label><span>С</span><input id="pricing-start-date" type="date" class="form-control"></label>
                                 <label><span>По</span><input id="pricing-end-date" type="date" class="form-control"></label>
