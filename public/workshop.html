@@ -367,9 +367,9 @@
             <form id="ws-dealer-form"><div class="modal-body">
                 <div class="workshop-simple-form">
                     <label class="span-2"><span>Дилер</span><select id="ws-dealer-id" class="form-select" required></select></label>
-                    <label class="span-2"><span>Образец / торговое оборудование</span><select id="ws-dealer-recipe" class="form-select" required></select></label>
+                    <div class="span-2"><div class="d-flex justify-content-between align-items-center gap-2 mb-2"><strong>Образцы и торговое оборудование</strong><button type="button" id="ws-dealer-add-recipe" class="btn btn-sm btn-outline-secondary"><i class="bi bi-plus-lg"></i> Добавить позицию</button></div><div id="ws-dealer-recipe-lines" class="d-grid gap-2"><div class="ws-dealer-recipe-line d-flex gap-2 align-items-center"><select id="ws-dealer-recipe" class="form-select" required></select><input type="number" class="form-control ws-dealer-line-qty" min="1" step="1" value="1" aria-label="Количество" style="width:85px;flex:0 0 85px"></div></div><small class="text-muted">Можно добавить несколько изделий и указать количество каждого.</small></div>
                     <label><span>Что делаем</span><select id="ws-dealer-action" class="form-select"><option value="issue">Выдать</option><option value="return">Вернуть</option><option value="replacement">Заменить</option></select></label>
-                    <label><span>Количество</span><input id="ws-dealer-qty" type="number" min="1" step="1" inputmode="numeric" value="1" class="form-control"></label>
+                    
                     <label><span>Дата</span><input id="ws-dealer-date" type="date" class="form-control"></label>
                 </div>
                 <div id="ws-dealer-current" class="workshop-calc-box"></div>
