@@ -3504,7 +3504,8 @@ app.post('/api/pricing/setup', requirePermission('can_manage_pricing'), async (r
         if (!priceList) return res.status(404).json({ error:'Прайс не найден или находится в архиве' });
 
         const discounts = [...new Set((Array.isArray(req.body?.discounts) ? req.body.discounts : [])
-            .map(Number).filter(value => value === 5 || value === 10))];
+            .map(value => Math.round(Number(value) * 100) / 100)
+            .filter(value => Number.isFinite(value) && value > 0 && value <= 100))];
         const startDate = String(req.body?.startDate || '').trim();
         const endDate = String(req.body?.endDate || '').trim();
         const dateRe = /^\d{4}-\d{2}-\d{2}$/;
@@ -3535,7 +3536,7 @@ app.post('/api/pricing/setup', requirePermission('can_manage_pricing'), async (r
             return wanted.size === actual.size && [...wanted].every(value => actual.has(value));
         };
 
-        const standardCodes = ['BASE-PRICE','SOCIAL-5','SUPPORT-10'];
+        const standardCodes = ['BASE-PRICE','SOCIAL-5','SUPPORT-10','CUSTOM-DISCOUNT'];
         const candidates = (await PricingCondition.find({
             scopeType,
             code:{ $in:standardCodes },
@@ -3543,8 +3544,9 @@ app.post('/api/pricing/setup', requirePermission('can_manage_pricing'), async (r
         })).filter(exactTarget);
 
         const chosenCodes = new Set(['BASE-PRICE']);
-        if (discounts.includes(5)) chosenCodes.add('SOCIAL-5');
-        if (discounts.includes(10)) chosenCodes.add('SUPPORT-10');
+        if (discounts.some(value => Math.abs(value - 5) < 0.001)) chosenCodes.add('SOCIAL-5');
+        if (discounts.some(value => Math.abs(value - 10) < 0.001)) chosenCodes.add('SUPPORT-10');
+        if (discounts.some(value => Math.abs(value - 5) >= 0.001 && Math.abs(value - 10) >= 0.001)) chosenCodes.add('CUSTOM-DISCOUNT');
 
         for (const existing of candidates) {
             if (chosenCodes.has(existing.code)) continue;
@@ -3609,7 +3611,9 @@ app.post('/api/pricing/setup', requirePermission('can_manage_pricing'), async (r
         }, 'Прайс назначен через настройку цен'));
 
         for (const discount of discounts) {
-            const code = discount === 5 ? 'SOCIAL-5' : 'SUPPORT-10';
+            const code = Math.abs(discount - 5) < 0.001
+                ? 'SOCIAL-5'
+                : (Math.abs(discount - 10) < 0.001 ? 'SUPPORT-10' : 'CUSTOM-DISCOUNT');
             saved.push(await upsertStandard(code, {
                 kind:'discount',
                 name:`Скидка −${discount}%`,
