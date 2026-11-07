@@ -3762,7 +3762,7 @@ function motivationSchemeAppliesToMonth(scheme, range) {
     return (!from || from <= range.end) && (!to || to >= range.start);
 }
 
-app.get('/api/motivation/schemes', requireAnyPermission('can_view_dealers','can_view_sales','can_view_pricing'), async (req,res) => {
+app.get('/api/motivation/schemes', requireAnyPermission('can_view_dealers','can_create_dealer','can_edit_dealer','can_view_sales','can_view_pricing'), async (req,res) => {
     try {
         const includeArchive = String(req.query.all || '') === '1';
         const filter = includeArchive ? {} : { active:{ $ne:false } };
