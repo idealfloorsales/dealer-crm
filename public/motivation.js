@@ -1,6 +1,6 @@
 (() => {
     const API = '/api/motivation';
-    const state = { schemes: [], loaded:false, loading:null, manager:null, editingId:'', payoutMonth:'', payoutData:null };
+    const state = { schemes: [], loaded:false, loading:null, manager:null, editingId:'', payoutMonth:'', payoutData:null, suspendedModal:null };
 
     const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
     const n = value => Number(value) || 0;
@@ -105,6 +105,19 @@
             if (edit) editScheme(edit.dataset.motivationEdit);
             if (archive) archiveScheme(archive.dataset.motivationArchive);
         });
+        el.addEventListener('hidden.bs.modal', () => {
+            document.body.classList.remove('motivation-modal-open');
+            if (state.suspendedModal) {
+                const suspended = state.suspendedModal;
+                state.suspendedModal = null;
+                bootstrap.Modal.getOrCreateInstance(suspended).show();
+            }
+        });
+        el.addEventListener('shown.bs.modal', () => {
+            document.body.classList.add('motivation-modal-open');
+            const grid = el.querySelector('.motivation-manager-grid');
+            if (grid) grid.scrollTop = 0;
+        });
         return el;
     }
 
@@ -150,9 +163,22 @@
     }
 
     async function openManager() {
-        ensureManagerModal();
+        const managerEl = ensureManagerModal();
         resetEditor();
-        state.manager = bootstrap.Modal.getOrCreateInstance(document.getElementById('motivation-manager-modal'));
+
+        const visibleModal = [...document.querySelectorAll('.modal.show')]
+            .find(modal => modal !== managerEl);
+        if (visibleModal) {
+            state.suspendedModal = visibleModal;
+            const instance = bootstrap.Modal.getInstance(visibleModal) || bootstrap.Modal.getOrCreateInstance(visibleModal);
+            instance.hide();
+            await new Promise(resolve => {
+                if (!visibleModal.classList.contains('show')) return resolve();
+                visibleModal.addEventListener('hidden.bs.modal', resolve, { once:true });
+            });
+        }
+
+        state.manager = bootstrap.Modal.getOrCreateInstance(managerEl);
         state.manager.show();
         await renderManager();
     }
