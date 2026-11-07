@@ -13151,3 +13151,29 @@ body:not(.app-workspace-page) .modal-header .btn-close{
  .cc-motivation-panel .table-responsive { margin-top:12px; }
  .cc-motivation-table { min-width:400px; }
 }
+
+/* Motivation payouts: mobile-first card layout instead of a clipped scrolling table. */
+@media (max-width: 700px) {
+  .cc-motivation-panel .table-responsive { overflow:visible; border:0; border-radius:0; margin-top:12px; }
+  .cc-motivation-panel .cc-motivation-table { display:block; min-width:0; width:100%; background:transparent; }
+  .cc-motivation-panel .cc-motivation-table thead { display:none; }
+  .cc-motivation-panel .cc-motivation-table tbody { display:grid; gap:9px; }
+  .cc-motivation-panel .cc-motivation-table tbody tr { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:7px 12px; padding:13px 14px; background:rgba(125,125,125,.045); border:1px solid var(--if-line); border-radius:15px; }
+  .cc-motivation-panel .cc-motivation-table tbody td { display:block; min-width:0; padding:0; border:0; text-align:left!important; font-size:.83rem; }
+  .cc-motivation-panel .cc-motivation-table tbody td:first-child { grid-column:1/-1; overflow-wrap:anywhere; font-weight:650; color:var(--if-ink); }
+  .cc-motivation-panel .cc-motivation-table tbody td:nth-child(2) { grid-column:1; align-self:end; color:#85878c; font-variant-numeric:tabular-nums; }
+  .cc-motivation-panel .cc-motivation-table tbody td:nth-child(2)::before { content:'Продажи, м²'; display:block; font-size:.68rem; font-weight:600; margin-bottom:3px; color:#96989d; }
+  .cc-motivation-panel .cc-motivation-table tbody td:nth-child(3) { grid-column:2; align-self:end; text-align:right!important; font-weight:750; font-size:.94rem; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .cc-motivation-panel .cc-motivation-table tbody td:nth-child(3)::before { content:'К выплате'; display:block; font-size:.68rem; font-weight:600; margin-bottom:3px; color:#96989d; }
+  .cc-motivation-panel .cc-motivation-table tfoot { display:block; margin-top:12px; }
+  .cc-motivation-panel .cc-motivation-table tfoot tr { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:5px 12px; padding:14px; background:var(--if-soft-red); border-radius:15px; }
+  .cc-motivation-panel .cc-motivation-table tfoot th { display:block; padding:0; border:0; background:transparent; min-width:0; text-align:left!important; font-size:.78rem; }
+  .cc-motivation-panel .cc-motivation-table tfoot th:first-child { grid-column:1/-1; font-size:.75rem; color:var(--if-ink); }
+  .cc-motivation-panel .cc-motivation-table tfoot th:nth-child(2) { grid-column:1; align-self:end; color:#85878c; font-variant-numeric:tabular-nums; }
+  .cc-motivation-panel .cc-motivation-table tfoot th:nth-child(3) { grid-column:2; align-self:end; text-align:right!important; white-space:nowrap; font-size:1.05rem; font-weight:800; font-variant-numeric:tabular-nums; }
+  .cc-motivation-panel #mr-anytime-content > a { display:inline-flex; margin-top:12px; }
+}
+@media(max-width:360px) {
+ .cc-motivation-panel .cc-motivation-table tbody tr,.cc-motivation-panel .cc-motivation-table tfoot tr { padding:11px; gap:6px; }
+ .cc-motivation-panel .cc-motivation-table tbody td:nth-child(3),.cc-motivation-panel .cc-motivation-table tfoot th:nth-child(3) { font-size:.86rem; }
+}
