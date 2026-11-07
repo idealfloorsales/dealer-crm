@@ -13,6 +13,14 @@
     <link rel="stylesheet" href="workshop.css?v={{VER}}">
     <link rel="icon" href="favicon.gif" type="image/gif">
     <meta name="theme-color" content="#b9040a">
+<style>
+.ws-dealer-choice-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;max-height:320px;overflow:auto;padding:3px}
+.ws-dealer-choice{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--bs-border-color,#ddd);border-radius:12px;min-width:0;cursor:pointer}
+.ws-dealer-choice:has(input:checked){border-color:#c84a4a;background:rgba(195,39,39,.045)}
+.ws-dealer-choice-name{flex:1;min-width:0;overflow-wrap:anywhere;font-size:.83rem}.ws-dealer-choice-name small{display:block;color:#888}
+.ws-dealer-choice .form-control{width:68px;flex:0 0 68px}
+@media(max-width:650px){.ws-dealer-choice-grid{grid-template-columns:minmax(0,1fr);max-height:40vh}.ws-dealer-choice{padding:11px}}
+</style>
 </head>
 <body class="app-workspace-page workshop-page">
     <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm"></nav>
