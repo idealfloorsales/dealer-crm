@@ -1579,3 +1579,14 @@ html:root[data-crm-theme="dark"] .pricing-badge.is-fallback{
   background:#292a30!important;
   color:#b9bdc5!important;
 }
+
+@media(min-width:761px){
+  html:root[data-crm-theme="dark"] .pricing-condition-dialog #pricing-condition-form>.modal-footer{
+    background:#18191d!important;
+    border-color:#34363d!important;
+    box-shadow:0 -8px 22px rgba(0,0,0,.2)!important;
+  }
+  html:root[data-crm-theme="dark"] .pricing-condition-close{
+    background-color:rgba(255,255,255,.08)!important;
+  }
+}

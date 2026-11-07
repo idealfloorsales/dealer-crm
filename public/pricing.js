@@ -1202,11 +1202,24 @@ document.addEventListener('DOMContentLoaded', () => {
             : '<div class="pricing-target-empty"><i class="bi bi-search"></i><span>Ничего не найдено</span></div>';
         host.querySelectorAll('input[name="pricing-target-choice"]').forEach(input => {
             input.addEventListener('change', () => {
+                const pickerScrollTop = host.scrollTop;
+                const modalBody = input.closest('.modal-body');
+                const modalScrollTop = modalBody?.scrollTop || 0;
+
                 const value = String(input.value || '');
                 if (input.checked) selectedTargets.add(value);
                 else selectedTargets.delete(value);
+
                 input.closest('.pricing-target-option')?.classList.toggle('is-selected', input.checked);
                 renderTargetSummary();
+
+                // Selection must never move the user away from the current row.
+                host.scrollTop = pickerScrollTop;
+                if (modalBody) modalBody.scrollTop = modalScrollTop;
+                requestAnimationFrame(() => {
+                    host.scrollTop = pickerScrollTop;
+                    if (modalBody) modalBody.scrollTop = modalScrollTop;
+                });
             });
         });
         renderTargetSummary();

@@ -1547,3 +1547,90 @@ html,body.pricing-page{max-width:100%;overflow-x:hidden}
   background:#f3f5f8;
   color:#656b74;
 }
+
+
+/* 2026-11-07 — pricing modal desktop layout + stable checkbox scrolling */
+@media(min-width:761px){
+  .pricing-condition-modal-shell{
+    overflow-y:auto!important;
+    padding:20px 0!important;
+  }
+  .pricing-condition-dialog{
+    width:min(1180px,calc(100% - 40px))!important;
+    max-width:1180px!important;
+    height:auto!important;
+    min-height:0!important;
+    max-height:calc(100dvh - 40px)!important;
+    margin:0 auto!important;
+    align-items:flex-start!important;
+  }
+  .pricing-condition-dialog .pricing-modal{
+    height:auto!important;
+    min-height:0!important;
+    max-height:calc(100dvh - 40px)!important;
+    border-radius:24px!important;
+  }
+  .pricing-condition-dialog #pricing-condition-form{
+    flex:0 1 auto!important;
+    min-height:0!important;
+    max-height:calc(100dvh - 158px)!important;
+  }
+  .pricing-condition-dialog #pricing-condition-form>.modal-body{
+    flex:0 1 auto!important;
+    height:auto!important;
+    min-height:0!important;
+    max-height:calc(100dvh - 236px)!important;
+    overflow-y:auto!important;
+    padding:14px 18px 16px!important;
+    scrollbar-gutter:stable;
+  }
+  .pricing-condition-dialog #pricing-condition-form>.modal-footer{
+    position:sticky!important;
+    bottom:0;
+    z-index:5!important;
+    min-height:64px;
+    padding:10px 18px!important;
+    background:#fff!important;
+    border-top:1px solid #e8e4e0!important;
+    box-shadow:0 -8px 22px rgba(30,25,25,.045)!important;
+  }
+  .pricing-condition-hero{
+    min-height:108px!important;
+    padding:20px 24px 18px!important;
+  }
+  .pricing-condition-hero-copy{
+    padding-right:52px;
+  }
+  .pricing-condition-close{
+    position:absolute!important;
+    top:18px!important;
+    right:20px!important;
+    width:34px!important;
+    height:34px!important;
+    margin:0!important;
+    padding:9px!important;
+    border-radius:10px!important;
+    background-color:rgba(255,255,255,.08)!important;
+    opacity:.82!important;
+  }
+  .pricing-condition-close:hover{
+    background-color:rgba(255,255,255,.14)!important;
+    opacity:1!important;
+  }
+  .pricing-target-options{
+    max-height:250px;
+    overflow-anchor:none;
+  }
+  .pricing-target-option{
+    scroll-margin-block:8px;
+  }
+}
+
+/* Keep the target list itself stable while summary text changes below it. */
+.pricing-target-options{
+  overflow-anchor:none;
+  contain:layout paint;
+}
+.pricing-target-summary{
+  overflow-anchor:none;
+}
