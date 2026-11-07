@@ -3853,6 +3853,7 @@ app.post('/api/motivation/payouts/recalculate', requireAnyPermission('can_edit_s
             const id = String(row.dealerId || '');
             salesByDealer.set(id, (salesByDealer.get(id) || 0) + Math.max(0, Number(row.fact) || 0));
         });
+        const dealersWithSales = eligibleDealers.filter(dealer => (salesByDealer.get(String(dealer._id)) || 0) > 0);
 
         const existing = await MotivationPayout.find({
             month:range.month,
@@ -3910,7 +3911,14 @@ app.post('/api/motivation/payouts/recalculate', requireAnyPermission('can_edit_s
         res.json({
             month:range.month,
             count:rows.length,
-            pendingAmount:rows.filter(x=>x.status==='pending').reduce((sum,x)=>sum+(Number(x.amount)||0),0)
+            pendingAmount:rows.filter(x=>x.status==='pending').reduce((sum,x)=>sum+(Number(x.amount)||0),0),
+            diagnostics:{
+                assigned:dealers.length,
+                eligible:eligibleDealers.length,
+                outsidePeriod:Math.max(0,dealers.length-eligibleDealers.length),
+                withSales:dealersWithSales.length,
+                withoutSales:Math.max(0,eligibleDealers.length-dealersWithSales.length)
+            }
         });
     } catch (e) { res.status(e.statusCode || 500).json({error:e.message}); }
 });
@@ -3919,8 +3927,23 @@ app.get('/api/motivation/payouts', requirePermission('can_view_sales'), async (r
     try {
         const range = motivationMonthRange(req.query.month);
         const dealerFilter = getDealerFilter(req);
-        const dealers = await Dealer.find(dealerFilter).select('_id').lean();
+        const dealers = await Dealer.find({
+            $and:[dealerFilter,{ motivation_scheme:{ $ne:null } }]
+        }).select('_id dealer_id name motivation_scheme status').populate('motivation_scheme').lean();
         const dealerIds = dealers.map(item=>item._id);
+        const eligibleDealers = dealers.filter(dealer => motivationSchemeAppliesToMonth(dealer.motivation_scheme, range));
+        const eligibleIds = eligibleDealers.map(item=>String(item._id));
+        const diagnosticSales = eligibleIds.length ? await Sales.find({
+            month:range.month,
+            isCustom:{ $ne:true },
+            dealerId:{ $in:eligibleIds }
+        }).select('dealerId fact').lean() : [];
+        const salesByDealer = new Map();
+        diagnosticSales.forEach(row=>{
+            const id=String(row.dealerId||'');
+            salesByDealer.set(id,(salesByDealer.get(id)||0)+Math.max(0,Number(row.fact)||0));
+        });
+        const withSales = eligibleDealers.filter(dealer => (salesByDealer.get(String(dealer._id)) || 0) > 0).length;
         const rows = await MotivationPayout.find({ month:range.month, dealer:{ $in:dealerIds } })
             .sort({ status:1, dealerCity:1, dealerName:1 }).lean();
         const summary = rows.reduce((acc,row)=>{
@@ -3934,6 +3957,13 @@ app.get('/api/motivation/payouts', requirePermission('can_view_sales'), async (r
         res.json({
             month:range.month,
             summary,
+            diagnostics:{
+                assigned:dealers.length,
+                eligible:eligibleDealers.length,
+                outsidePeriod:Math.max(0,dealers.length-eligibleDealers.length),
+                withSales,
+                withoutSales:Math.max(0,eligibleDealers.length-withSales)
+            },
             rows:rows.map(row=>({
                 id:String(row._id),
                 dealerId:row.dealerId || '',
