@@ -3847,7 +3847,7 @@ app.post('/api/motivation/payouts/recalculate', requireAnyPermission('can_edit_s
             ]
         }).select('_id dealer_id name city motivation_scheme status').populate('motivation_scheme').lean();
 
-        const eligibleDealers = dealers.filter(dealer => motivationSchemeAppliesToMonth(dealer.motivation_scheme, salesRange));
+        const eligibleDealers = dealers.filter(dealer => motivationSchemeAppliesToMonth(dealer.motivation_scheme, range));
         const ids = eligibleDealers.map(dealer => String(dealer._id));
         const salesRows = ids.length ? await Sales.find({
             month:salesRange.month,
@@ -3879,8 +3879,8 @@ app.post('/api/motivation/payouts/recalculate', requireAnyPermission('can_edit_s
             const ratePerM2 = Math.max(0, Number(scheme.ratePerM2) || 0);
             const amount = Math.round(salesM2 * ratePerM2 * 100) / 100;
             const partialPeriod = Boolean(
-                (scheme.validFrom && scheme.validFrom > salesRange.start) ||
-                (scheme.validTo && scheme.validTo < salesRange.end)
+                (scheme.validFrom && scheme.validFrom > range.start) ||
+                (scheme.validTo && scheme.validTo < range.end)
             );
             const prev = existingByDealer.get(dealerId);
             if (prev && (prev.status === 'paid' || prev.status === 'skipped')) continue;
@@ -3944,7 +3944,7 @@ app.get('/api/motivation/payouts', requirePermission('can_view_sales'), async (r
             $and:[dealerFilter,{ motivation_scheme:{ $ne:null } }]
         }).select('_id dealer_id name motivation_scheme status').populate('motivation_scheme').lean();
         const dealerIds = dealers.map(item=>item._id);
-        const eligibleDealers = dealers.filter(dealer => motivationSchemeAppliesToMonth(dealer.motivation_scheme, salesRange));
+        const eligibleDealers = dealers.filter(dealer => motivationSchemeAppliesToMonth(dealer.motivation_scheme, range));
         const eligibleIds = eligibleDealers.map(item=>String(item._id));
         const diagnosticSales = eligibleIds.length ? await Sales.find({
             month:salesRange.month,
