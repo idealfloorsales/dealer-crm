@@ -4,6 +4,7 @@
     "slug": "ideal-floor-crm",
     "version": "0.1.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "scheme": "idealfloorcrm",
     "userInterfaceStyle": "light",
     "plugins": [
@@ -22,11 +23,20 @@
       ]
     ],
     "android": {
-      "package": "kz.idealfloor.crm"
+      "package": "kz.idealfloor.crm",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#B9040A"
+      }
     },
     "ios": {
       "bundleIdentifier": "kz.idealfloor.crm",
       "supportsTablet": true
+    },
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
     },
     "experiments": {
       "typedRoutes": true
