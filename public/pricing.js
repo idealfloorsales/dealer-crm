@@ -1275,8 +1275,14 @@ document.addEventListener('DOMContentLoaded', () => {
         renderTargetOptions();
     }
 
+    function customDiscountValue() {
+        const raw = String($('pricing-discount-custom')?.value || '').replace(',', '.').trim();
+        const value = Number(raw);
+        return Number.isFinite(value) && value > 0 ? Math.min(100, Math.round(value * 100) / 100) : 0;
+    }
+
     function syncPromotionPeriod() {
-        const enabled = Boolean($('pricing-discount-5')?.checked || $('pricing-discount-10')?.checked);
+        const enabled = Boolean($('pricing-discount-5')?.checked || $('pricing-discount-10')?.checked || customDiscountValue() > 0);
         const section = $('pricing-promo-period-section');
         const hint = $('pricing-promo-period-hint');
         ['pricing-start-date','pricing-end-date'].forEach(id => {
@@ -1299,6 +1305,7 @@ document.addEventListener('DOMContentLoaded', () => {
         $('pricing-price-list').value = '';
         $('pricing-discount-5').checked = false;
         $('pricing-discount-10').checked = false;
+        if ($('pricing-discount-custom')) $('pricing-discount-custom').value = '';
         $('pricing-note').value = '';
         syncScopeFields({clear:false});
         syncPromotionPeriod();
@@ -1374,12 +1381,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const price = related.find(item => item.kind === 'price_list');
         const d5 = related.find(item => item.kind === 'discount' && Math.abs(n(item.discountPercent)-5) < 0.001);
         const d10 = related.find(item => item.kind === 'discount' && Math.abs(n(item.discountPercent)-10) < 0.001);
+        const customDiscount = related.find(item =>
+            item.kind === 'discount' &&
+            Math.abs(n(item.discountPercent)-5) >= 0.001 &&
+            Math.abs(n(item.discountPercent)-10) >= 0.001
+        );
 
         if (price) $('pricing-price-list').value = idOf(price.priceList) || state.priceLists.find(item => item.name === price.priceListName)?.id || '';
         syncPriceOverrideHint();
         $('pricing-discount-5').checked = Boolean(d5);
         $('pricing-discount-10').checked = Boolean(d10);
-        const promo = d5 || d10;
+        if ($('pricing-discount-custom')) $('pricing-discount-custom').value = customDiscount ? String(n(customDiscount.discountPercent)) : '';
+        const promo = d5 || d10 || customDiscount;
         $('pricing-start-date').value = promo?.startDate || state.today || todayValue();
         $('pricing-end-date').value = promo?.endDate || '';
         $('pricing-note').value = condition.note || promo?.note || price?.note || '';
@@ -1396,6 +1409,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const discounts = [];
         if ($('pricing-discount-5')?.checked) discounts.push(5);
         if ($('pricing-discount-10')?.checked) discounts.push(10);
+        const custom = customDiscountValue();
+        if (custom > 0 && !discounts.some(value => Math.abs(value-custom) < 0.001)) discounts.push(custom);
         return {
             scopeType,
             dealerIds: scopeType === 'dealer' ? [...selectedTargets] : [],
@@ -1497,6 +1512,7 @@ document.addEventListener('DOMContentLoaded', () => {
     $('pricing-price-list')?.addEventListener('change',syncPriceOverrideHint);
     $('pricing-discount-5')?.addEventListener('change',syncPromotionPeriod);
     $('pricing-discount-10')?.addEventListener('change',syncPromotionPeriod);
+    $('pricing-discount-custom')?.addEventListener('input',syncPromotionPeriod);
     $('pricing-condition-form')?.addEventListener('submit',saveCondition);
     $('pricing-condition-modal')?.addEventListener('shown.bs.modal',resetPricingModalViewport);
 
