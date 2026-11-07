@@ -79,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const list=state.sheet.priceList?.name || state.sheet.priceType?.label || 'Спец.цена';
         const discount=n(state.sheet.totalDiscountPercent);
         host.className='pricing-offer-price-summary';
-        host.innerHTML='<div><small>Прайс</small><strong>' + esc(list) + '</strong></div><div><small>Скидки дилера</small><strong class="' + (discount?'is-red':'') + '">' + (discount ? '−'+discount.toLocaleString('ru-RU',{maximumFractionDigits:2})+'%' : '0%') + '</strong></div><div><small>Расчёт</small><strong>' + ( $('pricing-offer-price-list')?.value ? 'Выбранный прайс + скидки' : 'Действующие условия CRM') + '</strong></div>';
+        host.innerHTML='<div><small>Прайс</small><strong>' + esc(list) + '</strong></div><div><small>Скидки</small><strong>Не применяются</strong></div><div><small>Расчёт</small><strong>По выбранному прайсу</strong></div>';
     }
 
     function filteredProducts(){
