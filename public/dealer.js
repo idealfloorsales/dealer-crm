@@ -881,7 +881,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span>${safeText(overrideSource)}</span>
                     </div>
                     <div class="dealer-price-metric is-accent">
-                        <small>Итоговая скидка</small>
+                        <small>Итоговая скидка</small>${pricing.priceControl?.surchargePercent ? '<span class="pc-accent">Надбавка сети +'+Number(pricing.priceControl.surchargePercent).toLocaleString('ru-RU')+'% · учтена в ценах</span>':''}
                         <strong>${pricing.totalDiscountPercent ? '−'+Number(pricing.totalDiscountPercent).toLocaleString('ru-RU',{maximumFractionDigits:2})+'%' : '0%'}</strong>
                         <span>${discounts.length ? (override ? 'от действующего приоритетного прайса' : 'от действующей оптовой цены') : 'без дополнительной скидки'}</span>
                     </div>

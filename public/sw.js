@@ -20,6 +20,8 @@ const LOCAL_ASSETS = [
     '/manifest.json',
     '/style.css?v={{VER}}',
     '/motivation.css?v={{VER}}',
+    '/price-control.css?v={{VER}}',
+    '/price-control.js?v={{VER}}',
     '/ui-motion.css?v={{VER}}',
     '/script.js?v={{VER}}',
     '/sales.js?v={{VER}}',
