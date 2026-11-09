@@ -684,7 +684,7 @@ app.get('/api/admin/users/:id/profile-stats', requireAdmin, async (req, res) => 
 
 app.post('/api/admin/users', requireAdmin, async (req, res) => {
     try {
-        const { username, password, fullName, phone, email, position, department, officeCity, hireDate, employmentStatus, avatarUrl, role, scope, permissions } = req.body;
+        const { username, password, fullName, phone, email, position, department, officeCity, hireDate, employmentStatus, avatarUrl, role, scope, permissions, isBlocked } = req.body;
         if (!username || !String(username).trim()) return res.status(400).json({ error: 'Укажите логин' });
         if (!password || String(password).length < 6) return res.status(400).json({ error: 'Пароль должен быть не короче 6 символов' });
         const normalizedUsername = String(username).trim().toLowerCase();
@@ -693,7 +693,7 @@ app.post('/api/admin/users', requireAdmin, async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
         const normalizedRole = role || 'manager';
-        const normalizedScope = normalizedRole === 'marketing' ? 'all' : scope;
+        const normalizedScope = (normalizedRole === 'marketing' || normalizedRole === 'workshop') ? 'all' : scope;
         const normalizedEmploymentStatus = ['working','vacation','away','dismissed'].includes(String(employmentStatus || '')) ? String(employmentStatus) : 'working';
         const newUser = new User({
             username: normalizedUsername,
@@ -710,7 +710,7 @@ app.post('/api/admin/users', requireAdmin, async (req, res) => {
             role:normalizedRole,
             scope:normalizedScope,
             permissions,
-            isBlocked:normalizedEmploymentStatus === 'dismissed'
+            isBlocked:normalizedEmploymentStatus === 'dismissed' ? true : Boolean(isBlocked)
         });
         await newUser.save();
         res.json({ status: 'ok' });
