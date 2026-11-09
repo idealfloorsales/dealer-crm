@@ -3178,11 +3178,25 @@ document.addEventListener('DOMContentLoaded', () => {
             const score = Math.max(0, Math.min(100, Number(metrics.health.score) || 0));
             const initial = safeText((d.name || 'Д').trim().charAt(0).toUpperCase());
 
-            const metaHtml = infoChips
+            const motivationScheme = d?.motivation_scheme && typeof d.motivation_scheme === 'object'
+                ? d.motivation_scheme
+                : null;
+            const motivationName = String(motivationScheme?.name || '').trim();
+            const motivationRate = Number(motivationScheme?.ratePerM2 || 0);
+            const motivationText = motivationName
+                || (motivationRate > 0 ? motivationRate.toLocaleString('ru-RU',{maximumFractionDigits:2}) + ' ₸/м²' : '');
+
+            const baseMetaHtml = infoChips
                 .filter(item => ['Город','Сектор','Прайс'].includes(item.label))
                 .slice(0,3)
                 .map(item => `<span><i class="bi bi-${item.icon}"></i>${safeText(item.value)}</span>`)
                 .join('');
+
+            const motivationMetaHtml = motivationText
+                ? `<span class="dealer-list-v6-motivation" title="Мотивация: ${safeAttr(motivationText)}"><i class="bi bi-cash-coin"></i>${safeText(motivationText)}</span>`
+                : '<span class="dealer-list-v6-motivation is-empty" title="Мотивация не назначена"><i class="bi bi-dash-circle"></i>Без мотивации</span>';
+
+            const metaHtml = baseMetaHtml + motivationMetaHtml;
 
             const mainSignal = signals[0]
                 ? `<span class="dealer-list-v6-signal is-${signals[0].level}"><i class="bi bi-${signals[0].icon}"></i>${safeText(signals[0].text)}</span>`
