@@ -4598,7 +4598,7 @@ function motivationSchemeAppliesToMonth(scheme, range) {
 app.get('/api/motivation/reminder-settings', requirePermission('can_view_sales'), async (req,res) => {
     try {
         const item = await MotivationReminderSetting.findOne({key:'dashboard'}).lean();
-        res.json({enabled:item?.enabled !== false,startDay:item?.startDay || 1,endDay:item?.endDay || 5,hideWhenEmpty:item?.hideWhenEmpty !== false});
+        res.json({enabled:item?.enabled !== false,startDay:item?.startDay || 1,endDay:item?.endDay || 10,hideWhenEmpty:item?.hideWhenEmpty !== false});
     } catch(e) { res.status(500).json({error:e.message}); }
 });
 app.put('/api/motivation/reminder-settings', requireAnyPermission('can_manage_pricing','can_edit_sales_fact'), async (req,res) => {

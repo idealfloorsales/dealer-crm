@@ -13542,3 +13542,22 @@ body:not(.app-workspace-page) .modal-header .btn-close{
     max-height:48px!important;
   }
 }
+
+/* Dashboard motivation: compact disclosure and readable phone cards. */
+.cc-motivation-toggle { margin-top:16px; min-height:44px; }
+.cc-motivation-toggle i { transition:transform .2s ease; }
+.cc-motivation-toggle[aria-expanded="true"] i { transform:rotate(180deg); }
+.cc-motivation-panel .table-responsive[hidden] { display:none!important; }
+.cc-motivation-panel .cc-panel-head > div { min-width:0; }
+@media(max-width:640px) {
+ .cc-motivation-panel .cc-panel-head { display:flex; flex-direction:column; align-items:stretch; }
+ .cc-motivation-panel h2 { line-height:1.3; }
+ .cc-motivation-panel h2 i { flex-shrink:0; }
+ .cc-motivation-subtitle { line-height:1.5; }
+ .cc-motivation-toggle { width:100%; justify-content:space-between; }
+ .cc-motivation-panel .cc-motivation-table tbody tr,
+ .cc-motivation-panel .cc-motivation-table tfoot tr { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+ .cc-motivation-panel .cc-motivation-table tbody td:nth-child(3),
+ .cc-motivation-panel .cc-motivation-table tfoot th:nth-child(3) { white-space:normal; overflow-wrap:anywhere; }
+ .cc-motivation-panel .cc-motivation-table tbody td:first-child small { font-weight:400; margin-top:3px; }
+}
