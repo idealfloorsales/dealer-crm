@@ -733,13 +733,13 @@ document.addEventListener('DOMContentLoaded', () => {
         return Number.isFinite(number) ? number : null;
     }
 
-    function showStockImportResult({updated=0, matched=0, unmapped=0, total=0, error='', source=''}) {
+    function showStockImportResult({updated=0, matched=0, zeroedMissing=0, unmapped=0, total=0, error='', source=''}) {
         if (!stockImportResult) return;
         stockImportResult.classList.remove('d-none','is-error','is-success');
         stockImportResult.classList.add(error ? 'is-error' : 'is-success');
         stockImportResult.innerHTML = error
             ? `<i class="bi bi-exclamation-circle"></i><div><strong>Не удалось загрузить остатки</strong><span>${esc(error)}</span></div>`
-            : `<i class="bi bi-check2-circle"></i><div><strong>Файл обработан</strong><span>Источник: ${esc(source || 'Свободный остаток')} · строк: ${total} · найдено: ${matched} · обновлено: ${updated}${unmapped ? ' · требуют привязки: '+unmapped : ''}</span></div>`;
+            : `<i class="bi bi-check2-circle"></i><div><strong>Файл обработан</strong><span>Источник: ${esc(source || 'Свободный остаток')} · строк: ${total} · найдено: ${matched} · обновлено: ${updated}${zeroedMissing ? ' · отсутствовали в файле → 0: '+zeroedMissing : ''}${unmapped ? ' · требуют привязки: '+unmapped : ''}</span></div>`;
     }
 
     if(btnImport) btnImport.onclick = () => {
@@ -845,8 +845,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         unmappedItems = [];
+        const matchedProductIds = new Set();
         let updated = 0;
         let matched = 0;
+        let zeroedMissing = 0;
         let total = 0;
 
         for(let i=hIdx+1; i<rows.length; i++) {
@@ -890,6 +892,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             total++;
             matched++;
+            matchedProductIds.add(String(product.id));
             if (Number(product.stock_qty) !== stock) {
                 const response = await fetch(`${API_URL}/${product.id}`, {
                     method:'PUT',
@@ -903,7 +906,27 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        // Новый файл остатков — источник истины.
+        // Если позиция есть в Матрице, но отсутствует в свежем файле, её свободный остаток = 0.
+        // Это не позволяет старым остаткам "зависать" после следующего импорта.
         if (matched > 0) {
+            for (const product of allProducts) {
+                if (matchedProductIds.has(String(product.id))) continue;
+                const previousStock = stockValue(product);
+                if (previousStock === null || previousStock === 0) continue;
+
+                const response = await fetch(`${API_URL}/${product.id}`, {
+                    method:'PUT',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({ stock_qty:0 })
+                });
+                if (response.ok) {
+                    product.stock_qty = 0;
+                    updated++;
+                    zeroedMissing++;
+                }
+            }
+
             await saveStockImportMeta({
                 source:freeStockHeaderLabel || 'Свободный остаток',
                 fileName,
@@ -912,7 +935,14 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         await loadProducts();
-        showStockImportResult({updated, matched, unmapped:unmappedItems.length, total, source:freeStockHeaderLabel || 'Свободный остаток'});
+        showStockImportResult({
+            updated,
+            matched,
+            zeroedMissing,
+            unmapped:unmappedItems.length,
+            total,
+            source:freeStockHeaderLabel || 'Свободный остаток'
+        });
 
         if(unmappedItems.length > 0) {
             setTimeout(() => {
