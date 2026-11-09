@@ -921,22 +921,73 @@ const productSchema = new mongoose.Schema({
 
 const Product = mongoose.model('Product', productSchema);
 
+function normalizeProductPhotoSku(value) {
+    let sku = String(value || '')
+        .trim()
+        .toUpperCase()
+        .replace(/[–—−]/g,'-')
+        .replace(/[\s_./\\]+/g,'')
+        .replace(/[АВЕКМНОРСТХ]/g, ch => ({
+            'А':'A','В':'B','Е':'E','К':'K','М':'M','Н':'H','О':'O','Р':'P','С':'C','Т':'T','Х':'X'
+        }[ch] || ch));
+
+    const rules = [
+        [/^8?EH(?:34)?-?(\d{3})$/, m => 'EH-' + m[1]],
+        [/^8?MC(?:33|34)?-?(\d{3})$/, m => 'MC-' + m[1]],
+        [/^8?HP(?:33|34)?-?(\d{2})$/, m => 'HP-' + m[1]],
+        [/^FP-?(\d{2})$/, m => 'FP-' + m[1]],
+        [/^8?AS(?:33|34)?-?(\d{2})$/, m => 'AS-' + m[1]],
+        [/^8?RPL(?:33|34)?-?0?(\d{1,2})$/, m => 'RPL-' + Number(m[1])],
+        [/^8?RWN(?:33|34)?-?(\d{2})$/, m => 'RWN-' + m[1]],
+        [/^8?RWE(?:33|34)?-?(\d{2})$/, m => 'RWE-' + m[1]],
+        [/^8?RWZ(?:33|34)?-?(\d{2})$/, m => 'RWZ-' + m[1]]
+    ];
+    for (const [pattern, formatter] of rules) {
+        const match = sku.match(pattern);
+        if (match) return formatter(match);
+    }
+    return sku.replace(/-/g,'');
+}
+
 async function migrateLegacyProductPhotos() {
-    const operations = Object.entries(IDEAL_DRIVE_PHOTOS || {}).map(([sku, photoId]) => {
-        const escapedSku = String(sku).replace(/[.*+?^$(){}|[\]\\]/g, '\\$&');
-        return {
+    const legacyEntries = Object.entries(IDEAL_DRIVE_PHOTOS || {});
+    if (!legacyEntries.length) return;
+
+    const photoByCanonicalSku = new Map();
+    for (const [sku, photoId] of legacyEntries) {
+        const canonical = normalizeProductPhotoSku(sku);
+        if (canonical && photoId) photoByCanonicalSku.set(canonical, String(photoId).trim());
+    }
+
+    const products = await Product.find({})
+        .select('_id sku photo_id')
+        .lean();
+
+    const operations = [];
+    const unmatched = [];
+    for (const product of products) {
+        if (String(product.photo_id || '').trim()) continue;
+        const canonical = normalizeProductPhotoSku(product.sku);
+        const photoId = photoByCanonicalSku.get(canonical);
+        if (!photoId) {
+            if (canonical) unmatched.push(String(product.sku || ''));
+            continue;
+        }
+        operations.push({
             updateOne:{
-                filter:{
-                    sku:new RegExp('^' + escapedSku + '$','i'),
-                    photo_id:{ $exists:false }
-                },
-                update:{ $set:{ photo_id:String(photoId || '').trim() } }
+                filter:{ _id:product._id, $or:[{photo_id:{$exists:false}},{photo_id:null},{photo_id:''}] },
+                update:{ $set:{ photo_id:photoId } }
             }
-        };
-    });
-    if (!operations.length) return;
-    const result = await Product.bulkWrite(operations, { ordered:false });
-    if (result.modifiedCount) console.log('Product photos migrated:', result.modifiedCount);
+        });
+    }
+
+    if (operations.length) {
+        const result = await Product.bulkWrite(operations, { ordered:false });
+        if (result.modifiedCount) console.log('Product photos migrated:', result.modifiedCount);
+    }
+    if (unmatched.length) {
+        console.log('Products without mapped photo:', unmatched.length, unmatched.slice(0,25).join(', '));
+    }
 }
 
 const stockImportMetaSchema = new mongoose.Schema({
