@@ -215,7 +215,9 @@
                         <div class="employee-panel">
                             <div class="employee-panel-title"><i class="bi bi-person-vcard"></i>Основная информация</div>
                             <div class="employee-field-grid">
-                                <label><span>ФИО</span><input id="u_fullName" class="form-control" required placeholder="Иван Иванов"></label>
+                                <label><span>Фамилия</span><input id="u_lastName" class="form-control" required autocomplete="family-name" placeholder="Иванов"></label>
+                                <label><span>Имя</span><input id="u_firstName" class="form-control" required autocomplete="given-name" placeholder="Иван"></label>
+                                <label><span>Отчество <small>необязательно</small></span><input id="u_middleName" class="form-control" autocomplete="additional-name" placeholder="Иванович"></label>
                                 <label><span>Должность</span><input id="u_position" class="form-control" placeholder="Региональный менеджер"></label>
                                 <label><span>Отдел</span><input id="u_department" class="form-control" list="department-options" placeholder="Продажи"><datalist id="department-options"><option value="Продажи"><option value="Маркетинг"><option value="Цех"><option value="Руководство"><option value="Администрация"></datalist></label>
                                 <label><span>Город / офис</span><input id="u_officeCity" class="form-control" placeholder="Астана"></label>
@@ -354,6 +356,28 @@
         return '<div class="'+cls+'" style="background:'+avatarColor(name)+'">'+esc(initials(name))+'</div>';
     }
 
+    function profileNameFromForm(){
+        return [
+            document.getElementById('u_lastName').value.trim(),
+            document.getElementById('u_firstName').value.trim(),
+            document.getElementById('u_middleName').value.trim()
+        ].filter(Boolean).join(' ');
+    }
+
+    function legacyNameParts(user){
+        if(user.lastName || user.firstName || user.middleName){
+            return {
+                lastName:String(user.lastName || '').trim(),
+                firstName:String(user.firstName || '').trim(),
+                middleName:String(user.middleName || '').trim()
+            };
+        }
+        const parts=String(user.fullName || '').trim().split(/\s+/).filter(Boolean);
+        if(parts.length===1) return {lastName:'',firstName:parts[0],middleName:''};
+        if(parts.length===2) return {lastName:parts[1],firstName:parts[0],middleName:''};
+        return {lastName:parts[1] || '',firstName:parts[0] || '',middleName:parts.slice(2).join(' ')};
+    }
+
     function normalizePhone(value){
         let digits=String(value||'').replace(/\D/g,'');
         if(digits.length===11&&digits[0]==='8') digits='7'+digits.slice(1);
@@ -406,7 +430,7 @@
 
     function updateProfileHeader(){
         const user={
-            fullName:document.getElementById('u_fullName').value.trim(),
+            fullName:profileNameFromForm(),
             username:document.getElementById('u_username').value.trim(),
             position:document.getElementById('u_position').value.trim(),
             department:document.getElementById('u_department').value.trim(),
@@ -426,7 +450,7 @@
 
     function searchable(user){
         return [
-            user.fullName,user.username,user.phone,user.email,user.position,user.department,user.officeCity,
+            user.fullName,user.lastName,user.firstName,user.middleName,user.username,user.phone,user.email,user.position,user.department,user.officeCity,
             roleNames[user.role],employmentLabels[user.employmentStatus||'working']
         ].join(' ').toLowerCase();
     }
@@ -567,7 +591,10 @@
         const u=allUsers.find(function(item){return String(item._id)===String(id);});
         if(!u) return;
         document.getElementById('u_id').value=u._id;
-        document.getElementById('u_fullName').value=u.fullName||'';
+        const nameParts=legacyNameParts(u);
+        document.getElementById('u_lastName').value=nameParts.lastName;
+        document.getElementById('u_firstName').value=nameParts.firstName;
+        document.getElementById('u_middleName').value=nameParts.middleName;
         document.getElementById('u_position').value=u.position||'';
         document.getElementById('u_department').value=u.department||'';
         document.getElementById('u_phone').value=u.phone||'';
@@ -605,7 +632,10 @@
         const permissions={};
         document.querySelectorAll('.perm-check').forEach(function(cb){permissions[cb.id.replace('p_','')]=cb.checked;});
         const data={
-            fullName:document.getElementById('u_fullName').value.trim(),
+            lastName:document.getElementById('u_lastName').value.trim(),
+            firstName:document.getElementById('u_firstName').value.trim(),
+            middleName:document.getElementById('u_middleName').value.trim(),
+            fullName:profileNameFromForm(),
             phone:document.getElementById('u_phone').value.trim(),
             email:document.getElementById('u_email').value.trim(),
             position:document.getElementById('u_position').value.trim(),
@@ -640,7 +670,7 @@
         }
     });
 
-    ['u_fullName','u_position','u_department','u_phone','u_avatarUrl'].forEach(function(id){
+    ['u_lastName','u_firstName','u_middleName','u_position','u_department','u_phone','u_avatarUrl'].forEach(function(id){
         document.getElementById(id).addEventListener('input',updateProfileHeader);
     });
     document.getElementById('u_employmentStatus').addEventListener('change',updateProfileHeader);
