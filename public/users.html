@@ -253,6 +253,7 @@
                                 <label><span>Пароль</span><input id="u_password" class="form-control" type="password" minlength="6" autocomplete="new-password" placeholder="Оставьте пустым, если не меняете"><small class="employee-help">Для нового сотрудника — минимум 6 символов.</small></label>
                                 <label><span>Роль CRM</span>
                                     <select id="u_role" class="form-select">
+                                        <option value="admin">Администратор</option>
                                         <option value="manager">Менеджер</option>
                                         <option value="marketing">Маркетинг</option>
                                         <option value="workshop">Цех</option>
@@ -267,11 +268,6 @@
                                     </select>
                                 </label>
                             </div>
-                        </div>
-
-                        <div class="employee-admin-switch">
-                            <div><strong><i class="bi bi-star-fill text-warning me-1"></i>Администратор</strong><small>Полный доступ ко всем функциям CRM</small></div>
-                            <div class="form-check form-switch mb-0"><input class="form-check-input perm-check" type="checkbox" id="p_is_admin"></div>
                         </div>
 
                         <div id="permission-groups" class="permission-groups"></div>
@@ -306,7 +302,7 @@
     let allUsers=[];
     let profileStatsRequest=0;
 
-    const roleNames={manager:'Менеджер',marketing:'Маркетинг',workshop:'Цех',guest:'Гость'};
+    const roleNames={admin:'Администратор',manager:'Менеджер',marketing:'Маркетинг',workshop:'Цех',guest:'Гость'};
     const employmentLabels={working:'Работает',vacation:'Отпуск',away:'Временно отсутствует',dismissed:'Уволен'};
     const permissionGroups=[
         {title:'Доступ к разделам',items:[
@@ -321,7 +317,7 @@
             ['can_manage_reclamations','Управлять рекламациями'],['can_manage_workshop','Управлять цехом'],['can_manage_pricing','Управлять ценами']
         ]},
         {title:'Повышенные права',items:[
-            ['can_delete_dealer','Удалять дилеров'],['can_manage_users','Управлять сотрудниками'],['can_export_base','Экспорт базы дилеров'],['can_export_prices','Экспорт цен']
+            ['can_delete_dealer','Удалять дилеров'],['can_export_base','Экспорт базы дилеров'],['can_export_prices','Экспорт цен']
         ]}
     ];
 
@@ -416,16 +412,22 @@
 
     function syncRoleScope(){
         const role=userRoleSelect.value;
-        const companyWide=role==='marketing'||role==='workshop';
+        const companyWide=role==='admin'||role==='marketing'||role==='workshop';
         if(companyWide) userScopeSelect.value='all';
         userScopeSelect.disabled=companyWide;
     }
 
     function applyRolePreset(){
         syncRoleScope();
-        if(userRoleSelect.value!=='workshop') return;
-        document.querySelectorAll('.perm-check').forEach(function(cb){cb.checked=false;});
-        ['p_can_view_workshop','p_can_manage_workshop'].forEach(function(id){const el=document.getElementById(id);if(el)el.checked=true;});
+        const role=userRoleSelect.value;
+        if(role==='admin'){
+            document.querySelectorAll('.perm-check').forEach(function(cb){cb.checked=true;});
+            return;
+        }
+        if(role==='workshop'){
+            document.querySelectorAll('.perm-check').forEach(function(cb){cb.checked=false;});
+            ['p_can_view_workshop','p_can_manage_workshop'].forEach(function(id){const el=document.getElementById(id);if(el)el.checked=true;});
+        }
     }
 
     function updateProfileHeader(){
@@ -462,7 +464,7 @@
 
         tbody.innerHTML=filtered.map(function(user){
             const phone=normalizePhone(user.phone);
-            const role=user.permissions&&user.permissions.is_admin?'Администратор':(roleNames[user.role]||'Менеджер');
+            const role=roleNames[user.role]||'Менеджер';
             return '<tr onclick="editUser(\''+esc(user._id)+'\')">'+
                 '<td class="ps-4 py-3"><div class="d-flex align-items-center gap-3">'+avatarHtml(user,false)+'<div><div class="employee-name">'+esc(user.fullName||'Без имени')+'</div><div class="employee-sub">@'+esc(user.username||'')+'</div></div></div></td>'+
                 '<td><div class="employee-contact">'+
@@ -472,7 +474,7 @@
                 '<td><div class="employee-role"><strong>'+esc(user.officeCity||'—')+'</strong><small>'+esc(user.scope||'all')+'</small></div></td>'+
                 '<td>'+employmentBadge(user)+'</td>'+
                 '<td class="text-end pe-4"><button class="btn btn-sm btn-light border me-1" onclick="event.stopPropagation();editUser(\''+esc(user._id)+'\')"><i class="bi bi-pencil"></i></button>'+
-                (!(user.permissions&&user.permissions.is_admin)?'<button class="btn btn-sm btn-light border text-danger" onclick="event.stopPropagation();deleteUser(\''+esc(user._id)+'\')"><i class="bi bi-trash"></i></button>':'')+'</td></tr>';
+                (user.role!=='admin'?'<button class="btn btn-sm btn-light border text-danger" onclick="event.stopPropagation();deleteUser(\''+esc(user._id)+'\')"><i class="bi bi-trash"></i></button>':'')+'</td></tr>';
         }).join('');
 
         mobileList.innerHTML=filtered.map(function(user){
@@ -607,7 +609,7 @@
         document.getElementById('u_password').value='';
         document.getElementById('u_password').required=false;
         document.getElementById('u_role').value=u.role||'manager';
-        document.getElementById('u_scope').value=(u.role==='marketing'||u.role==='workshop')?'all':(u.scope||'all');
+        document.getElementById('u_scope').value=(u.role==='admin'||u.role==='marketing'||u.role==='workshop')?'all':(u.scope||'all');
         document.getElementById('u_isBlocked').checked=Boolean(u.isBlocked);
         document.querySelectorAll('.perm-check').forEach(function(cb){cb.checked=false;});
         Object.entries(u.permissions||{}).forEach(function(entry){const el=document.getElementById('p_'+entry[0]);if(el)el.checked=Boolean(entry[1]);});
