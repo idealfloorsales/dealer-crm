@@ -116,6 +116,15 @@ const userSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     fullName: String,
+    phone: String,
+    email: String,
+    position: String,
+    department: String,
+    officeCity: String,
+    hireDate: String,
+    employmentStatus: { type:String, enum:['working','vacation','away','dismissed'], default:'working' },
+    avatarUrl: String,
+    lastLoginAt: Date,
     isBlocked: { type: Boolean, default: false },
     role: { type: String, enum: ['manager', 'guest', 'marketing', 'workshop'], default: 'manager' },
     scope: { type: String, enum: ['all', 'astana', 'regions'], default: 'all' },
@@ -501,6 +510,9 @@ app.post('/api/auth/login', async (req, res) => {
             { expiresIn: '7d' }
         );
 
+        user.lastLoginAt = new Date();
+        await user.save();
+
         res.json({
             token,
             user: {
@@ -564,9 +576,115 @@ app.get('/api/admin/users', requireAdmin, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+function almatyMonthKey(date = new Date()) {
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone:'Asia/Almaty',
+        year:'numeric',
+        month:'2-digit'
+    }).formatToParts(date);
+    const year = parts.find(part => part.type === 'year')?.value || String(date.getUTCFullYear());
+    const month = parts.find(part => part.type === 'month')?.value || String(date.getUTCMonth()+1).padStart(2,'0');
+    return year + '-' + month;
+}
+
+app.get('/api/admin/users/:id/profile-stats', requireAdmin, async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id).select('-password').lean();
+        if (!user) return res.status(404).json({ error:'Сотрудник не найден' });
+
+        const userId = String(user._id);
+        const month = almatyMonthKey();
+        const monthStart = new Date(month + '-01T00:00:00+05:00');
+        const nextMonth = new Date(monthStart);
+        nextMonth.setMonth(nextMonth.getMonth()+1);
+        const since7d = new Date(Date.now() - 7*24*60*60*1000);
+
+        const dealerFilter = {
+            $or:[
+                { responsibleUserId:userId },
+                ...(user.fullName ? [{ responsible:user.fullName }] : [])
+            ]
+        };
+
+        const [dealers, salesRows, recentActions, actions7d, offersThisMonth] = await Promise.all([
+            Dealer.find(dealerFilter)
+                .select('_id dealer_id name city status visits createdAt')
+                .sort({ name:1 })
+                .lean(),
+            Sales.find({ month, ownerUserId:userId }).lean(),
+            AuditLog.find({ 'actor.id':userId }).sort({ createdAt:-1 }).limit(12).lean(),
+            AuditLog.countDocuments({ 'actor.id':userId, createdAt:{ $gte:since7d } }),
+            CommercialOffer.countDocuments({
+                'createdBy.id':userId,
+                createdAt:{ $gte:monthStart, $lt:nextMonth }
+            })
+        ]);
+
+        const isPotential = dealer => /^(potential|prospect|потенц)/i.test(String(dealer?.status || ''));
+        const currentMonthVisits = dealers.reduce((sum,dealer) => {
+            const visits = Array.isArray(dealer.visits) ? dealer.visits : [];
+            return sum + visits.filter(visit =>
+                visit?.isCompleted === true &&
+                String(visit?.date || '').startsWith(month)
+            ).length;
+        },0);
+
+        const plan = salesRows.reduce((sum,row) => sum + Math.max(0,Number(row.plan) || 0),0);
+        const fact = salesRows.reduce((sum,row) => sum + Math.max(0,Number(row.fact) || 0),0);
+        const potential = dealers.filter(isPotential);
+        const working = dealers.filter(dealer => !isPotential(dealer));
+
+        res.json({
+            month,
+            employee:{
+                id:userId,
+                fullName:user.fullName || '',
+                lastLoginAt:user.lastLoginAt || null
+            },
+            dealers:{
+                total:dealers.length,
+                working:working.length,
+                potential:potential.length,
+                recent:dealers.slice(0,10).map(dealer => ({
+                    id:String(dealer._id),
+                    dealerId:dealer.dealer_id || '',
+                    name:dealer.name || '',
+                    city:dealer.city || '',
+                    status:dealer.status || ''
+                }))
+            },
+            sales:{
+                plan,
+                fact,
+                percent:plan > 0 ? Math.round((fact/plan)*1000)/10 : 0
+            },
+            visits:{
+                completedThisMonth:currentMonthVisits
+            },
+            offers:{
+                createdThisMonth:offersThisMonth
+            },
+            activity:{
+                lastActionAt:recentActions[0]?.createdAt || null,
+                actions7d,
+                recent:recentActions.map(item => ({
+                    id:String(item._id),
+                    module:item.module || '',
+                    action:item.action || '',
+                    summary:item.summary || '',
+                    success:item.success !== false,
+                    createdAt:item.createdAt
+                }))
+            }
+        });
+    } catch (e) {
+        res.status(500).json({ error:e.message });
+    }
+});
+
 app.post('/api/admin/users', requireAdmin, async (req, res) => {
     try {
-        const { username, password, fullName, role, scope, permissions } = req.body;
+        const { username, password, fullName, phone, email, position, department, officeCity, hireDate, employmentStatus, avatarUrl, role, scope, permissions } = req.body;
         if (!username || !String(username).trim()) return res.status(400).json({ error: 'Укажите логин' });
         if (!password || String(password).length < 6) return res.status(400).json({ error: 'Пароль должен быть не короче 6 символов' });
         const normalizedUsername = String(username).trim().toLowerCase();
@@ -576,7 +694,24 @@ app.post('/api/admin/users', requireAdmin, async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, salt);
         const normalizedRole = role || 'manager';
         const normalizedScope = normalizedRole === 'marketing' ? 'all' : scope;
-        const newUser = new User({ username: normalizedUsername, password: hashedPassword, fullName, role: normalizedRole, scope: normalizedScope, permissions });
+        const normalizedEmploymentStatus = ['working','vacation','away','dismissed'].includes(String(employmentStatus || '')) ? String(employmentStatus) : 'working';
+        const newUser = new User({
+            username: normalizedUsername,
+            password: hashedPassword,
+            fullName:String(fullName || '').trim(),
+            phone:String(phone || '').trim(),
+            email:String(email || '').trim(),
+            position:String(position || '').trim(),
+            department:String(department || '').trim(),
+            officeCity:String(officeCity || '').trim(),
+            hireDate:String(hireDate || '').trim(),
+            employmentStatus:normalizedEmploymentStatus,
+            avatarUrl:String(avatarUrl || '').trim(),
+            role:normalizedRole,
+            scope:normalizedScope,
+            permissions,
+            isBlocked:normalizedEmploymentStatus === 'dismissed'
+        });
         await newUser.save();
         res.json({ status: 'ok' });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -584,10 +719,25 @@ app.post('/api/admin/users', requireAdmin, async (req, res) => {
 
 app.put('/api/admin/users/:id', requireAdmin, async (req, res) => {
     try {
-        const { username, fullName, role, scope, permissions, isBlocked, password } = req.body;
+        const { username, fullName, phone, email, position, department, officeCity, hireDate, employmentStatus, avatarUrl, role, scope, permissions, isBlocked, password } = req.body;
         const normalizedRole = role || 'manager';
-        const normalizedScope = normalizedRole === 'marketing' ? 'all' : scope;
-        const updateData = { fullName, role: normalizedRole, scope: normalizedScope, permissions, isBlocked };
+        const normalizedScope = (normalizedRole === 'marketing' || normalizedRole === 'workshop') ? 'all' : scope;
+        const normalizedEmploymentStatus = ['working','vacation','away','dismissed'].includes(String(employmentStatus || '')) ? String(employmentStatus) : 'working';
+        const updateData = {
+            fullName:String(fullName || '').trim(),
+            phone:String(phone || '').trim(),
+            email:String(email || '').trim(),
+            position:String(position || '').trim(),
+            department:String(department || '').trim(),
+            officeCity:String(officeCity || '').trim(),
+            hireDate:String(hireDate || '').trim(),
+            employmentStatus:normalizedEmploymentStatus,
+            avatarUrl:String(avatarUrl || '').trim(),
+            role:normalizedRole,
+            scope:normalizedScope,
+            permissions,
+            isBlocked:normalizedEmploymentStatus === 'dismissed' ? true : Boolean(isBlocked)
+        };
 
         if (username && String(username).trim()) {
             const normalizedUsername = String(username).trim().toLowerCase();
