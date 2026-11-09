@@ -179,17 +179,26 @@
                                 <span class="pricing-offer-stock-switch-ui"></span>
                                 <span class="pricing-offer-stock-switch-copy"><strong>Показывать остатки</strong><small>Свободный остаток будет указан рядом с товаром в КП</small></span>
                             </label>
+                            <label class="pricing-offer-description-field">
+                                <span>Описание бренда в КП</span>
+                                <textarea id="pricing-offer-description" class="form-control" rows="5" maxlength="3000">Бренд IDEALfloor с 2010 года производит высококачественный ламинат, сочетая передовые технологии и многолетний опыт. Завод, расположенный в Китае, оборудован станками фирмы Homag и использует европейские технологии, что гарантирует соответствие продукции высочайшим европейским стандартам.</textarea>
+                                <small>Текст появится сразу под шапкой готового КП. Его можно изменить для конкретного предложения.</small>
+                            </label>
                             <div id="pricing-offer-price-summary" class="pricing-offer-price-summary is-empty">После выбора клиента и прайса здесь появятся цены по выбранному прайсу.</div>
                         </div>
                     </section>
 
                     <section class="pricing-offer-products">
                         <div class="pricing-offer-products-head">
-                            <div><span>3 · ПРОДУКЦИЯ</span><h3>Коллекции и декоры</h3><p>Можно выбрать всю коллекцию или только отдельные декоры.</p></div>
+                            <div><span>3 · ПРОДУКЦИЯ</span><h3>Коллекции и позиции</h3><p>По умолчанию показан ликвидный ламинат. Неликвид и торговое оборудование подключаются отдельно.</p></div>
                             <div class="pricing-offer-selected"><strong id="pricing-offer-selected-count">0</strong><span>выбрано</span></div>
                         </div>
+                        <div class="pricing-offer-extra-filters">
+                            <label><input type="checkbox" id="pricing-offer-show-illiquid"><span><i class="bi bi-tag"></i> Неликвид</span></label>
+                            <label><input type="checkbox" id="pricing-offer-show-equipment"><span><i class="bi bi-display"></i> Торговое оборудование</span></label>
+                        </div>
                         <div class="pricing-offer-toolbar">
-                            <div class="pricing-search"><i class="bi bi-search"></i><input id="pricing-offer-search" type="search" placeholder="Артикул или декор"></div>
+                            <div class="pricing-search"><i class="bi bi-search"></i><input id="pricing-offer-search" type="search" placeholder="Артикул или название"></div>
                             <select id="pricing-offer-collection" class="form-select"><option value="">Все коллекции</option></select>
                             <button type="button" id="pricing-offer-select-visible" class="pricing-offer-tool-btn"><i class="bi bi-check2-square"></i> Выбрать показанные</button>
                             <button type="button" id="pricing-offer-clear" class="pricing-offer-tool-btn"><i class="bi bi-x-lg"></i> Очистить</button>
