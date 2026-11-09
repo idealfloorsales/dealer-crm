@@ -2537,7 +2537,7 @@ async function resolveSummaryPriceList(summary) {
 app.get('/api/pricing/catalog', requirePermission('can_view_pricing'), async (req, res) => {
     try {
         const products = await Product.find({})
-            .select('_id sku name product_type collection is_liquid characteristics')
+            .select('_id sku name product_type collection is_liquid stock_qty characteristics')
             .sort({ sku: 1, name: 1 })
             .lean();
 
@@ -2549,6 +2549,7 @@ app.get('/api/pricing/catalog', requirePermission('can_view_pricing'), async (re
                 name: product.name || '',
                 collection: inferPricingCollection(product),
                 isLiquid: product.is_liquid !== false,
+                stockQty: Math.max(0, Number(product.stock_qty) || 0),
                 characteristics: product.characteristics || {},
                 photoId: IDEAL_DRIVE_PHOTOS[String(product.sku || '').trim().toUpperCase()] || ''
             }))
@@ -2690,6 +2691,93 @@ app.delete('/api/pricing/price-lists/:id', requirePermission('can_manage_pricing
         res.status(400).json({ error: e.message });
     }
 });
+
+async function buildManualOfferPriceSheetSnapshot(priceListId, manualClient = {}) {
+    const id = String(priceListId || '').trim();
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        const err = new Error('Выберите прайс для КП'); err.statusCode = 400; throw err;
+    }
+    const list = await PriceList.findOne({ _id:id, active:{ $ne:false } }).lean();
+    if (!list) { const err = new Error('Выбранный прайс не найден'); err.statusCode = 404; throw err; }
+
+    const products = await Product.find({})
+        .select('_id sku name product_type collection is_liquid')
+        .sort({ sku:1, name:1 })
+        .lean();
+    const laminate = products.filter(product => isPricingLaminateProduct(product) && product.is_liquid !== false);
+    const productMap = new Map(laminate.map(product => [String(product._id), product]));
+
+    const listRows = Array.isArray(list.rows) ? list.rows : [];
+    const collectionRows = new Map();
+    const legacyByCollection = new Map();
+
+    listRows.forEach(row => {
+        const scope = row.scopeType || (row.product ? 'product' : 'collection');
+        const collection = String(row.collection || legacyRowCollection(row, productMap)).trim().toUpperCase();
+        if (scope === 'collection' && collection) {
+            collectionRows.set(collection, row);
+            return;
+        }
+        if (collection && !legacyByCollection.has(collection)) legacyByCollection.set(collection, row);
+    });
+
+    const liquidGroups = new Map();
+    laminate.forEach(product => {
+        const collection = inferPricingCollection(product);
+        if (!liquidGroups.has(collection)) liquidGroups.set(collection, []);
+        liquidGroups.get(collection).push(product);
+    });
+
+    const rows = [...liquidGroups.entries()]
+        .sort((a,b) => String(a[0]).localeCompare(String(b[0]), 'ru'))
+        .map(([collection,members]) => {
+            const source = collectionRows.get(collection) || legacyByCollection.get(collection) || null;
+            const basePrice = Math.max(0, Number(source?.opt) || 0);
+            return {
+                rowType:'collection',
+                collection,
+                label:collection,
+                sku:'',
+                name:collection,
+                productId:'',
+                members:members.length,
+                isLiquid:true,
+                inherited:false,
+                opt:Number(source?.opt) || 0,
+                rrp:Number(source?.rrp) || 0,
+                basePrice,
+                finalPrice:basePrice,
+                displayPrice:Number(source?.displayPrice ?? source?.maxRrp) || 0,
+                currency:source?.currency || 'KZT'
+            };
+        });
+
+    return {
+        dealer:{
+            id:'',
+            dealer_id:'',
+            name:String(manualClient.name || '').trim(),
+            city:String(manualClient.city || '').trim(),
+            sector:'',
+            status:'manual',
+            priceType:'',
+            phone:''
+        },
+        priceList:{
+            id:String(list._id),
+            name:list.name || '',
+            code:list.code || '',
+            versionDate:list.versionDate || '',
+            validFrom:list.validFrom || '',
+            validTo:list.validTo || '',
+            active:list.active !== false
+        },
+        priceType:{ key:'opt', label:'Спец.цена' },
+        totalDiscountPercent:0,
+        activeDiscounts:[],
+        rows
+    };
+}
 
 async function buildDealerPriceSheetSnapshot(req, dealerId, options = {}) {
     try {
@@ -2905,6 +2993,17 @@ app.get('/api/pricing/dealers/:id/price-sheet', requirePermission('can_view_pric
     }
 });
 
+app.get('/api/pricing/offer-price-sheet', requirePermission('can_view_pricing'), async (req, res) => {
+    try {
+        res.json(await buildManualOfferPriceSheetSnapshot(req.query?.priceListId, {
+            name:String(req.query?.clientName || '').trim(),
+            city:String(req.query?.clientCity || '').trim()
+        }));
+    } catch (e) {
+        res.status(e.statusCode || 500).json({ error:e.message });
+    }
+});
+
 app.post('/api/pricing/dealers/:id/share', requirePermission('can_view_pricing'), async (req, res) => {
     try {
         const snapshot = await buildDealerPriceSheetSnapshot(req, req.params.id);
@@ -2978,7 +3077,15 @@ app.get('/api/pricing/offers', requirePermission('can_view_pricing'), async (req
     try {
         const dealers = await Dealer.find(getDealerFilter(req)).select('_id').lean();
         const dealerIds = dealers.map(item => item._id);
-        const offers = await CommercialOffer.find({ dealer:{ $in:dealerIds } })
+        const manualFilter = isGlobalViewer(req)
+            ? { dealer:null }
+            : { dealer:null, 'createdBy.id':String(req.user?.id || '') };
+        const offers = await CommercialOffer.find({
+            $or:[
+                { dealer:{ $in:dealerIds } },
+                manualFilter
+            ]
+        })
             .sort({ createdAt:-1 })
             .limit(250)
             .lean();
@@ -3012,20 +3119,38 @@ app.get('/api/pricing/offers', requirePermission('can_view_pricing'), async (req
 
 app.post('/api/pricing/offers', requirePermission('can_view_pricing'), async (req, res) => {
     try {
+        const recipientMode = String(req.body?.recipientMode || 'crm').trim() === 'manual' ? 'manual' : 'crm';
         const dealerId = String(req.body?.dealerId || '').trim();
-        if (!mongoose.Types.ObjectId.isValid(dealerId)) return res.status(400).json({ error:'Выберите потенциального клиента' });
-
+        const manualClientName = String(req.body?.manualClientName || '').trim();
+        const manualClientCity = String(req.body?.manualClientCity || '').trim();
         const priceListId = String(req.body?.priceListId || '').trim();
-        if (!priceListId) return res.status(400).json({ error:'Для потенциального клиента выберите прайс' });
+        const showStock = req.body?.showStock === true;
 
-        const snapshot = await buildDealerPriceSheetSnapshot(req, dealerId, {
-            priceListId,
-            applyAllDiscounts:false,
-            ignoreDiscounts:true,
-            allowPotential:true
-        });
-        if (!/^(potential|prospect|потенц)/i.test(String(snapshot?.dealer?.status || ''))) {
-            return res.status(400).json({ error:'КП предназначено для потенциальных клиентов' });
+        if (!priceListId) return res.status(400).json({ error:'Выберите прайс для КП' });
+
+        let snapshot;
+        let dealerRef = null;
+
+        if (recipientMode === 'manual') {
+            if (!manualClientName) return res.status(400).json({ error:'Введите название нового клиента' });
+            snapshot = await buildManualOfferPriceSheetSnapshot(priceListId, {
+                name:manualClientName,
+                city:manualClientCity
+            });
+        } else {
+            if (!mongoose.Types.ObjectId.isValid(dealerId)) {
+                return res.status(400).json({ error:'Выберите потенциального клиента' });
+            }
+            snapshot = await buildDealerPriceSheetSnapshot(req, dealerId, {
+                priceListId,
+                applyAllDiscounts:false,
+                ignoreDiscounts:true,
+                allowPotential:true
+            });
+            if (!/^(potential|prospect|потенц)/i.test(String(snapshot?.dealer?.status || ''))) {
+                return res.status(400).json({ error:'Для КП из CRM выберите потенциального клиента' });
+            }
+            dealerRef = dealerId;
         }
 
         const selectedIds = [...new Set((Array.isArray(req.body?.productIds) ? req.body.productIds : [])
@@ -3033,12 +3158,9 @@ app.post('/api/pricing/offers', requirePermission('can_view_pricing'), async (re
             .filter(value => mongoose.Types.ObjectId.isValid(value)))];
         if (!selectedIds.length) return res.status(400).json({ error:'Выберите хотя бы один декор' });
 
-        // Use the same laminate rules as the catalog. Older product records may not
-        // have product_type persisted because "laminate" is the schema default,
-        // so filtering MongoDB by product_type:"laminate" incorrectly rejects them.
         const productCandidates = await Product.find({
             _id:{ $in:selectedIds }
-        }).select('_id sku name product_type collection characteristics is_liquid').lean();
+        }).select('_id sku name product_type collection characteristics is_liquid stock_qty').lean();
         const products = productCandidates.filter(product =>
             isPricingLaminateProduct(product) && product.is_liquid !== false
         );
@@ -3058,6 +3180,7 @@ app.post('/api/pricing/offers', requirePermission('can_view_pricing'), async (re
                 collection,
                 characteristics:product.characteristics || {},
                 photoId:IDEAL_DRIVE_PHOTOS[String(product.sku || '').trim().toUpperCase()] || '',
+                stockQty:showStock ? Math.max(0, Number(product.stock_qty) || 0) : null,
                 basePrice:Number(price.basePrice ?? price.opt) || 0,
                 finalPrice:Number(price.finalPrice) || 0,
                 rrp:Number(price.rrp) || 0,
@@ -3081,6 +3204,8 @@ app.post('/api/pricing/offers', requirePermission('can_view_pricing'), async (re
             ...snapshot,
             rows:undefined,
             items,
+            showStock,
+            recipientMode,
             offerNumber,
             createdBy:user,
             generatedAt:now.toISOString()
@@ -3089,7 +3214,7 @@ app.post('/api/pricing/offers', requirePermission('can_view_pricing'), async (re
         const offer = await CommercialOffer.create({
             publicId,
             offerNumber,
-            dealer:dealerId,
+            dealer:dealerRef,
             dealerId:snapshot.dealer?.dealer_id || '',
             dealerName:snapshot.dealer?.name || '',
             dealerCity:snapshot.dealer?.city || '',
@@ -3106,6 +3231,7 @@ app.post('/api/pricing/offers', requirePermission('can_view_pricing'), async (re
             dealer:snapshot.dealer,
             priceList:snapshot.priceList,
             totalDiscountPercent:snapshot.totalDiscountPercent || 0,
+            showStock,
             itemsCount:items.length
         });
     } catch (e) {
