@@ -3247,7 +3247,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const routeSelect = `<button class="dealer-list-v6-route ${routeActive ? 'active' : ''}" type="button" data-route-toggle="${safeAttr(d.id)}" aria-pressed="${routeActive ? 'true' : 'false'}" onclick="event.stopPropagation(); toggleDealerRoute('${safeAttr(d.id)}')" title="${routeActive ? 'Убрать из маршрута' : 'Добавить в маршрут'}"><i class="bi bi-${routeActive ? 'check2' : 'plus-lg'}"></i></button>`;
 
-            return `<article class="dealer-list-v6-card ${metrics.problem ? 'has-risk' : ''}" onclick="window.location.href='dealer.html?id=${encodeURIComponent(d.id)}'">
+            return `<article class="dealer-list-v6-card ${metrics.problem ? 'has-risk' : ''}">
                 <div class="dealer-list-v6-route-cell">${routeSelect}</div>
 
                 <div class="dealer-list-v6-main">
