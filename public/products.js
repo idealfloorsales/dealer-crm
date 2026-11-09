@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const resetFiltersBtn = document.getElementById('product-reset-filters');
     const activeFilterSummary = document.getElementById('active-filter-summary');
     const filteredSummary = document.getElementById('filtered-summary');
+    const stockLastUpdated = document.getElementById('stock-last-updated');
     
     // Модалки
     const modalEl = document.getElementById('product-modal');
@@ -116,6 +117,60 @@ document.addEventListener('DOMContentLoaded', () => {
         if (raw === undefined || raw === null || raw === '') return null;
         const value = Number(raw);
         return Number.isFinite(value) ? value : null;
+    }
+
+    function stockImportDateText(value) {
+        if (!value) return '';
+        const dateValue = new Date(value);
+        if (Number.isNaN(dateValue.getTime())) return '';
+        return dateValue.toLocaleString('ru-RU',{
+            timeZone:'Asia/Almaty',
+            day:'2-digit',
+            month:'2-digit',
+            year:'numeric',
+            hour:'2-digit',
+            minute:'2-digit'
+        });
+    }
+
+    function renderStockImportMeta(meta = {}) {
+        if (!stockLastUpdated) return;
+        const text = stockImportDateText(meta.importedAt);
+        if (!text) {
+            stockLastUpdated.classList.add('is-empty');
+            stockLastUpdated.innerHTML = '<i class="bi bi-clock-history"></i><span>Остатки ещё не загружались</span>';
+            return;
+        }
+        stockLastUpdated.classList.remove('is-empty');
+        const who = String(meta?.importedBy?.name || '').trim();
+        stockLastUpdated.innerHTML =
+            '<i class="bi bi-clock-history"></i><span><small>Остатки обновлены</small><strong>' + esc(text) + '</strong>' +
+            (who ? '<em>' + esc(who) + '</em>' : '') + '</span>';
+    }
+
+    async function loadStockImportMeta() {
+        try {
+            const response = await fetch(API_URL + '/stock-import-meta', { crmTrackLoading:false });
+            const data = await response.json().catch(()=>({}));
+            if (!response.ok) throw new Error(data.error || 'Не удалось загрузить дату остатков');
+            renderStockImportMeta(data);
+            return data;
+        } catch (error) {
+            console.warn(error);
+            return null;
+        }
+    }
+
+    async function saveStockImportMeta({source='',fileName='',matched=0,updated=0} = {}) {
+        const response = await fetch(API_URL + '/stock-import-meta', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({ source,fileName,matched,updated })
+        });
+        const data = await response.json().catch(()=>({}));
+        if (!response.ok) throw new Error(data.error || 'Не удалось сохранить дату загрузки остатков');
+        renderStockImportMeta(data);
+        return data;
     }
 
     function productType(product) {
@@ -263,7 +318,10 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadProducts() {
         try {
             listContainer.innerHTML = '<div class="text-center text-muted py-5">Загрузка...</div>';
-            const res = await fetch(API_URL);
+            const [res] = await Promise.all([
+                fetch(API_URL),
+                loadStockImportMeta()
+            ]);
             if (!res.ok) throw new Error('Ошибка');
             allProducts = await res.json();
             populateDynamicFilters();
@@ -706,7 +764,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const wb = XLSX.read(new Uint8Array(buffer), {type:'array'});
             const ws = wb.Sheets[wb.SheetNames[0]];
             const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
-            await processExcel(rows);
+            await processExcel(rows, file.name);
         } catch (err) {
             showStockImportResult({error:err.message || 'Ошибка чтения Excel'});
         } finally {
@@ -714,7 +772,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    async function processExcel(rows) {
+    async function processExcel(rows, fileName = '') {
         let cSku = -1, cName = -1, cFreeStock = -1;
         let skuHeaderRow = -1, nameHeaderRow = -1, stockHeaderRow = -1;
         let freeStockHeaderLabel = '';
@@ -845,6 +903,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        if (matched > 0) {
+            await saveStockImportMeta({
+                source:freeStockHeaderLabel || 'Свободный остаток',
+                fileName,
+                matched,
+                updated
+            });
+        }
         await loadProducts();
         showStockImportResult({updated, matched, unmapped:unmappedItems.length, total, source:freeStockHeaderLabel || 'Свободный остаток'});
 
