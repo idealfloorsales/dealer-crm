@@ -251,14 +251,10 @@ async function seedUsers() {
         console.log('Права администратора принудительно обновлены.');
     }
 
-    // Нормализуем старые аккаунты: административный флаг означает отдельную роль admin.
-    // У всех остальных ролей административные права сотрудников/журнала принудительно сняты.
+    // Least privilege: только явная роль admin сохраняет административные права.
+    // Старые менеджеры с ошибочно выставленными флагами автоматически очищаются.
     await User.updateMany(
-        { 'permissions.is_admin': true },
-        { $set:{ role:'admin', 'permissions.can_manage_users':true } }
-    );
-    await User.updateMany(
-        { role:{ $ne:'admin' } },
+        { role:{ $ne:'admin' }, username:{ $ne:'admin' } },
         { $set:{ 'permissions.is_admin':false, 'permissions.can_manage_users':false } }
     );
 }
@@ -729,8 +725,7 @@ app.post('/api/admin/users', requireAdmin, async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
         const requestedRole = ['admin','manager','guest','marketing','workshop'].includes(String(role || '')) ? String(role) : 'manager';
-        const wantsAdmin = requestedRole === 'admin' || permissions?.is_admin === true;
-        const normalizedRole = wantsAdmin ? 'admin' : requestedRole;
+        const normalizedRole = requestedRole;
         const normalizedPermissions = { ...(permissions || {}) };
         normalizedPermissions.is_admin = normalizedRole === 'admin';
         normalizedPermissions.can_manage_users = normalizedRole === 'admin';
@@ -769,8 +764,7 @@ app.put('/api/admin/users/:id', requireAdmin, async (req, res) => {
     try {
         const { username, fullName, lastName, firstName, middleName, phone, email, position, department, officeCity, hireDate, employmentStatus, avatarUrl, role, scope, permissions, isBlocked, password } = req.body;
         const requestedRole = ['admin','manager','guest','marketing','workshop'].includes(String(role || '')) ? String(role) : 'manager';
-        const wantsAdmin = requestedRole === 'admin' || permissions?.is_admin === true;
-        const normalizedRole = wantsAdmin ? 'admin' : requestedRole;
+        const normalizedRole = requestedRole;
         const normalizedPermissions = { ...(permissions || {}) };
         normalizedPermissions.is_admin = normalizedRole === 'admin';
         normalizedPermissions.can_manage_users = normalizedRole === 'admin';
@@ -2455,7 +2449,6 @@ app.get('/api/managers', requireAnyPermission('can_view_dealers', 'can_view_sale
         const managers = await User.find({
             role: 'manager',
             isBlocked: { $ne: true },
-            'permissions.is_admin': { $ne: true },
             'permissions.is_admin': { $ne: true }
         })
             .select('_id username fullName scope')
@@ -3407,7 +3400,7 @@ function commercialOfferContact(user = {}) {
 }
 
 async function resolveCommercialOfferContact(req, requestedUserId = '') {
-    const canChoose = Boolean(req.user?.permissions?.is_admin);
+    const canChoose = isAdminUser(req);
     const targetId = canChoose && mongoose.Types.ObjectId.isValid(String(requestedUserId || '').trim())
         ? String(requestedUserId).trim()
         : String(req.user?.id || '');
@@ -3431,7 +3424,7 @@ async function resolveCommercialOfferContact(req, requestedUserId = '') {
 
 app.get('/api/pricing/contact-users', requirePermission('can_view_pricing'), async (req, res) => {
     try {
-        const canChoose = Boolean(req.user?.permissions?.is_admin);
+        const canChoose = isAdminUser(req);
         const filter = canChoose
             ? { isBlocked:{ $ne:true }, employmentStatus:{ $ne:'dismissed' } }
             : { _id:req.user?.id, isBlocked:{ $ne:true }, employmentStatus:{ $ne:'dismissed' } };
