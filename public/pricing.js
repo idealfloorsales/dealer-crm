@@ -1049,7 +1049,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 {text:'Прайс-Лист IDEALfloor для дилера',fontSize:16,bold:true,alignment:'center',margin:[0,0,0,4]},
                 {text:data.dealer?.name || '',fontSize:10,alignment:'center',color:'#666666',margin:[0,0,0,14]},
                 {table:{headerRows:1,widths:['*',74,105,88],body},layout:'lightHorizontalLines'},
-                {text:'Цены указаны в тенге. В прайс включён только актуальный ликвидный ассортимент.',fontSize:8,color:'#888888',margin:[0,12,0,0]}
+                {text:data.priceList?.includeIlliquid===true?'Цены указаны в тенге. В прайс включён актуальный ассортимент и выбранные неликвидные позиции.':'Цены указаны в тенге. В прайс включён только актуальный ликвидный ассортимент.',fontSize:8,color:'#888888',margin:[0,12,0,0]}
             ],
             styles:{th:{bold:true,color:'#444444',fillColor:'#f3f1ee',fontSize:8}},
             defaultStyle:{fontSize:9}
