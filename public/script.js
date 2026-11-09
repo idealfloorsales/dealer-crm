@@ -634,6 +634,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const selected = new Set((selectedIds || []).map(String));
         const canEditMatrix = window.CRMAuth && CRMAuth.can('can_edit_matrix');
         const filteredCatalog = fullProductCatalog
+            // Выставленность товара у дилера хранит только ламинат.
+            // Торговое оборудование ведётся отдельно через pos_materials / цех.
+            .filter(p => String(p.product_type || 'laminate') !== 'equipment')
             .filter(p => !posMaterialsList.includes(p.name))
             .sort((a,b) => {
                 const aSelected = selected.has(String(a.id));
