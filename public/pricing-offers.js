@@ -39,6 +39,24 @@ document.addEventListener('DOMContentLoaded', () => {
         return Boolean($('pricing-offer-show-stock')?.checked);
     }
 
+    function includeIlliquid(){
+        return Boolean($('pricing-offer-show-illiquid')?.checked);
+    }
+
+    function includeEquipment(){
+        return Boolean($('pricing-offer-show-equipment')?.checked);
+    }
+
+    function offerDescription(){
+        return String($('pricing-offer-description')?.value || '').trim();
+    }
+
+    function productVisibleByMode(item){
+        if(item?.productType === 'equipment') return includeEquipment();
+        if(item?.isLiquid === false) return includeIlliquid();
+        return true;
+    }
+
 
     function activeLists(){
         const today = new Date().toISOString().slice(0,10);
@@ -68,16 +86,28 @@ document.addEventListener('DOMContentLoaded', () => {
     function fillCollections(){
         const select=$('pricing-offer-collection');
         if(!select) return;
-        const collections=[...new Set(state.catalog.map(item=>item.collection).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),'ru'));
+        const current=select.value;
+        const collections=[...new Set(state.catalog.filter(productVisibleByMode).map(item=>item.collection).filter(Boolean))]
+            .sort((a,b)=>String(a).localeCompare(String(b),'ru'));
         select.innerHTML='<option value="">Все коллекции</option>' + collections.map(name=>'<option value="' + esc(name) + '">' + esc(name) + '</option>').join('');
+        select.value=collections.includes(current) ? current : '';
     }
 
     function priceForProduct(product){
         if(!state.sheet) return null;
-        return (state.sheet.rows || []).find(row =>
+        const rows=state.sheet.rows || [];
+        const special=rows.find(row =>
+            row.rowType === 'product' &&
+            (
+                String(row.productId || '') === String(product.id || '') ||
+                (row.sku && String(row.sku).trim().toLowerCase() === String(product.sku || '').trim().toLowerCase())
+            )
+        );
+        if(product?.productType === 'equipment' || product?.isLiquid === false) return special || null;
+        return rows.find(row =>
             row.rowType === 'collection' &&
             String(row.collection || '').trim().toUpperCase() === String(product.collection || '').trim().toUpperCase()
-        ) || null;
+        ) || special || null;
     }
 
     function renderDealer(){
@@ -126,11 +156,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const query=String($('pricing-offer-search')?.value || '').trim().toLowerCase();
         const collection=$('pricing-offer-collection')?.value || '';
         return state.catalog.filter(item => {
-            if(item.isLiquid === false) return false;
+            if(!productVisibleByMode(item)) return false;
             if(collection && item.collection !== collection) return false;
-            if(query && ![item.sku,item.name,item.collection].join(' ').toLowerCase().includes(query)) return false;
+            if(query && ![item.sku,item.name,item.collection,item.productType==='equipment'?'торговое оборудование':''].join(' ').toLowerCase().includes(query)) return false;
             return true;
         });
+    }
+
+    function pruneHiddenSelections(){
+        const visibleIds=new Set(state.catalog.filter(productVisibleByMode).map(item=>String(item.id)));
+        [...state.selected].forEach(id=>{ if(!visibleIds.has(String(id))) state.selected.delete(String(id)); });
     }
 
     function productCard(item){
@@ -138,14 +173,21 @@ document.addEventListener('DOMContentLoaded', () => {
         const price=priceForProduct(item);
         const photo=driveThumb(item.photoId);
         const ch=item.characteristics || {};
-        const specs=[ch.class,ch.thickness ? ch.thickness+' мм' : '',ch.bevel].filter(Boolean).join(' · ');
+        const specs=item.productType==='equipment'
+            ? 'Торговое оборудование'
+            : [ch.class,ch.thickness ? ch.thickness+' мм' : '',ch.bevel].filter(Boolean).join(' · ');
+        const badges=[
+            item.productType==='equipment' ? '<span class="pricing-offer-product-kind is-equipment">Торговое оборудование</span>' : '',
+            item.productType!=='equipment' && item.isLiquid===false ? '<span class="pricing-offer-product-kind is-illiquid">Неликвид</span>' : ''
+        ].join('');
+        const stockUnit=item.productType==='equipment' ? 'шт' : 'м²';
         const stockHtml=showStock()
-            ? '<span class="pricing-offer-product-stock"><i class="bi bi-box-seam"></i> Остаток: ' + n(item.stockQty).toLocaleString('ru-RU',{maximumFractionDigits:2}) + ' м²</span>'
+            ? '<span class="pricing-offer-product-stock"><i class="bi bi-box-seam"></i> Остаток: ' + n(item.stockQty).toLocaleString('ru-RU',{maximumFractionDigits:2}) + ' ' + stockUnit + '</span>'
             : '';
         return '<button type="button" class="pricing-offer-product-card ' + (selected?'is-selected':'') + '" data-offer-product="' + esc(item.id) + '">' +
             '<span class="pricing-offer-product-check"><i class="bi bi-' + (selected?'check-lg':'plus-lg') + '"></i></span>' +
             '<div class="pricing-offer-product-photo">' + (photo ? '<img src="' + esc(photo) + '" alt="' + esc(item.name) + '" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'grid\'"><span class="pricing-offer-photo-fallback"><i class="bi bi-image"></i></span>' : '<span class="pricing-offer-photo-fallback" style="display:grid"><i class="bi bi-image"></i></span>') + '</div>' +
-            '<div class="pricing-offer-product-copy"><small>' + esc(item.sku || '') + '</small><strong>' + esc(item.name || '') + '</strong><span>' + esc(item.collection || '') + '</span><em>' + esc(specs || 'IDEAL FLOOR') + '</em>' + stockHtml + '</div>' +
+            '<div class="pricing-offer-product-copy"><small>' + esc(item.sku || '') + '</small><strong>' + esc(item.name || '') + '</strong><span>' + esc(item.collection || '') + '</span><em>' + esc(specs || 'IDEAL FLOOR') + '</em>' + badges + stockHtml + '</div>' +
             '<div class="pricing-offer-product-price"><small>Цена для КП</small><strong>' + (price ? money(price.finalPrice || price.basePrice) : '—') + '</strong>' + (price && n(state.sheet?.totalDiscountPercent) ? '<span>с учётом скидки</span>' : '') + '</div>' +
         '</button>';
     }
@@ -155,7 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(!host) return;
         const items=filteredProducts();
         if(!items.length){
-            host.innerHTML='<div class="pricing-empty"><i class="bi bi-search me-1"></i>Декоры не найдены</div>';
+            host.innerHTML='<div class="pricing-empty"><i class="bi bi-search me-1"></i>Позиции не найдены</div>';
         }else{
             host.innerHTML=items.map(productCard).join('');
         }
@@ -198,8 +240,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const summary=$('pricing-offer-create-summary');
         if(!dealer) summary.textContent=state.recipientMode==='manual' ? 'Введите название нового клиента' : 'Выберите потенциального клиента';
         else if(!priceSelected) summary.textContent='Выберите прайс для КП';
-        else if(!state.selected.size) summary.textContent='Выберите коллекции или декоры';
-        else summary.textContent=dealer.dealerName + ' · ' + state.selected.size + ' декоров · ' + (state.sheet?.priceList?.name || state.sheet?.priceType?.label || 'Спец.цена') + (showStock() ? ' · с остатками' : '');
+        else if(!state.selected.size) summary.textContent='Выберите коллекции или позиции';
+        else summary.textContent=dealer.dealerName + ' · ' + state.selected.size + ' позиций · ' + (state.sheet?.priceList?.name || state.sheet?.priceType?.label || 'Спец.цена') + (showStock() ? ' · с остатками' : '');
     }
 
     function resetBuilder(){
@@ -211,6 +253,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if($('pricing-offer-manual-city')) $('pricing-offer-manual-city').value='';
         if($('pricing-offer-price-list')) $('pricing-offer-price-list').value='';
         if($('pricing-offer-show-stock')) $('pricing-offer-show-stock').checked=false;
+        if($('pricing-offer-show-illiquid')) $('pricing-offer-show-illiquid').checked=false;
+        if($('pricing-offer-show-equipment')) $('pricing-offer-show-equipment').checked=false;
+        if($('pricing-offer-description')) $('pricing-offer-description').value=$('pricing-offer-description').defaultValue || '';
         if($('pricing-offer-search')) $('pricing-offer-search').value='';
         if($('pricing-offer-collection')) $('pricing-offer-collection').value='';
         $('pricing-offer-result')?.classList.add('d-none');
@@ -238,6 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     priceListId:$('pricing-offer-price-list').value || '',
                     expiresDays:Number($('pricing-offer-expiry').value || 14),
                     showStock:showStock(),
+                    description:offerDescription(),
                     productIds:[...state.selected]
                 })
             });
@@ -245,7 +291,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if(!response.ok) throw new Error(data.error || 'Не удалось создать КП');
             const result=$('pricing-offer-result');
             result.classList.remove('d-none');
-            result.innerHTML='<div class="pricing-offer-result-icon"><i class="bi bi-check2"></i></div><div class="pricing-offer-result-copy"><small>КП СОЗДАНО</small><strong>' + esc(data.offerNumber || 'Коммерческое предложение') + '</strong><span>' + esc(dealer.dealerName) + ' · ' + esc(String(data.itemsCount || state.selected.size)) + ' декоров · действует до ' + esc(dateText(data.expiresAt)) + '</span></div><div class="pricing-offer-result-actions"><button type="button" data-offer-copy="' + esc(data.url) + '"><i class="bi bi-copy"></i> Скопировать ссылку</button><a href="' + esc(data.url) + '" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right"></i> Открыть</a><a class="is-whatsapp" href="https://wa.me/?text=' + encodeURIComponent('Коммерческое предложение IDEAL FLOOR для ' + dealer.dealerName + ': ' + data.url) + '" target="_blank" rel="noopener"><i class="bi bi-whatsapp"></i> WhatsApp</a></div>';
+            result.innerHTML='<div class="pricing-offer-result-icon"><i class="bi bi-check2"></i></div><div class="pricing-offer-result-copy"><small>КП СОЗДАНО</small><strong>' + esc(data.offerNumber || 'Коммерческое предложение') + '</strong><span>' + esc(dealer.dealerName) + ' · ' + esc(String(data.itemsCount || state.selected.size)) + ' позиций · действует до ' + esc(dateText(data.expiresAt)) + '</span></div><div class="pricing-offer-result-actions"><button type="button" data-offer-copy="' + esc(data.url) + '"><i class="bi bi-copy"></i> Скопировать ссылку</button><a href="' + esc(data.url) + '" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right"></i> Открыть</a><a class="is-whatsapp" href="https://wa.me/?text=' + encodeURIComponent('Коммерческое предложение IDEAL FLOOR для ' + dealer.dealerName + ': ' + data.url) + '" target="_blank" rel="noopener"><i class="bi bi-whatsapp"></i> WhatsApp</a></div>';
             result.scrollIntoView({behavior:'smooth',block:'nearest'});
             toast('Электронное КП создано');
             await loadOffers();
@@ -272,7 +318,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         host.innerHTML=state.offers.map(item=>{
             const status=offerStatus(item);
-            return '<article class="pricing-offer-history-card"><div class="pricing-offer-history-main"><span class="pricing-offer-status ' + status[1] + '">' + status[0] + '</span><strong>' + esc(item.offerNumber || 'КП') + '</strong><small>' + esc(item.dealerName || '') + (item.dealerCity ? ' · ' + esc(item.dealerCity) : '') + '</small></div><div class="pricing-offer-history-meta"><div><small>Прайс</small><strong>' + esc(item.priceListName || '—') + '</strong></div><div><small>Скидка</small><strong>' + (n(item.totalDiscountPercent)?'−'+n(item.totalDiscountPercent).toLocaleString('ru-RU',{maximumFractionDigits:2})+'%':'0%') + '</strong></div><div><small>Декоров</small><strong>' + esc(item.itemsCount || 0) + '</strong></div><div><small>Просмотров</small><strong>' + esc(item.viewCount || 0) + '</strong></div><div><small>Создано</small><strong>' + esc(dateText(item.createdAt)) + '</strong></div></div><div class="pricing-offer-history-actions">' + (item.url ? '<button data-offer-copy="' + esc(item.url) + '" title="Скопировать"><i class="bi bi-copy"></i></button><a href="' + esc(item.url) + '" target="_blank" rel="noopener" title="Открыть"><i class="bi bi-box-arrow-up-right"></i></a><button class="is-danger" data-offer-revoke="' + esc(item.id) + '" title="Отозвать"><i class="bi bi-x-lg"></i></button>' : '') + '</div></article>';
+            return '<article class="pricing-offer-history-card"><div class="pricing-offer-history-main"><span class="pricing-offer-status ' + status[1] + '">' + status[0] + '</span><strong>' + esc(item.offerNumber || 'КП') + '</strong><small>' + esc(item.dealerName || '') + (item.dealerCity ? ' · ' + esc(item.dealerCity) : '') + '</small></div><div class="pricing-offer-history-meta"><div><small>Прайс</small><strong>' + esc(item.priceListName || '—') + '</strong></div><div><small>Скидка</small><strong>' + (n(item.totalDiscountPercent)?'−'+n(item.totalDiscountPercent).toLocaleString('ru-RU',{maximumFractionDigits:2})+'%':'0%') + '</strong></div><div><small>Позиций</small><strong>' + esc(item.itemsCount || 0) + '</strong></div><div><small>Просмотров</small><strong>' + esc(item.viewCount || 0) + '</strong></div><div><small>Создано</small><strong>' + esc(dateText(item.createdAt)) + '</strong></div></div><div class="pricing-offer-history-actions">' + (item.url ? '<button data-offer-copy="' + esc(item.url) + '" title="Скопировать"><i class="bi bi-copy"></i></button><a href="' + esc(item.url) + '" target="_blank" rel="noopener" title="Открыть"><i class="bi bi-box-arrow-up-right"></i></a><button class="is-danger" data-offer-revoke="' + esc(item.id) + '" title="Отозвать"><i class="bi bi-x-lg"></i></button>' : '') + '</div></article>';
         }).join('');
     }
 
@@ -343,6 +389,8 @@ document.addEventListener('DOMContentLoaded', () => {
     $('pricing-offer-manual-city')?.addEventListener('input',()=>{ renderDealer(); syncCreateState(); });
     $('pricing-offer-price-list')?.addEventListener('change',refreshSheet);
     $('pricing-offer-show-stock')?.addEventListener('change',()=>{ renderProducts(); syncCreateState(); });
+    $('pricing-offer-show-illiquid')?.addEventListener('change',()=>{ pruneHiddenSelections(); fillCollections(); renderProducts(); });
+    $('pricing-offer-show-equipment')?.addEventListener('change',()=>{ pruneHiddenSelections(); fillCollections(); renderProducts(); });
     $('pricing-offer-search')?.addEventListener('input',renderProducts);
     $('pricing-offer-collection')?.addEventListener('change',renderProducts);
     $('pricing-offer-select-visible')?.addEventListener('click',()=>{ filteredProducts().forEach(item=>state.selected.add(String(item.id))); renderProducts(); });
