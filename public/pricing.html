@@ -269,9 +269,14 @@
                         <div class="pricing-list-editor-toolbar">
                             <div>
                                 <strong>Цены по ассортименту</strong>
-                                <small>Цена задаётся на коллекцию. В прайс попадают только актуальные коллекции из Матрицы.</small>
+                                <small>Цена задаётся на коллекцию. Неликвид можно подключить отдельно и задать цены по каждой позиции.</small>
                             </div>
                             <div class="pricing-list-editor-actions">
+                                <label class="pricing-list-illiquid-toggle">
+                                    <input type="checkbox" id="pricing-list-show-illiquid">
+                                    <span class="pricing-list-illiquid-switch"></span>
+                                    <span><strong>Показывать неликвид</strong><small>Отдельные позиции и цены</small></span>
+                                </label>
                                 <input type="file" id="pricing-list-import-input" accept=".xlsx,.xls" hidden>
                                 <button type="button" id="pricing-list-import-btn" class="btn btn-light border"><i class="bi bi-file-earmark-spreadsheet"></i> Загрузить Excel</button>
                                 <button type="button" id="pricing-list-copy-opt-btn" class="btn btn-light border"><i class="bi bi-copy"></i> Спец.цена → РРЦ</button>
