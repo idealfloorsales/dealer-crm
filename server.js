@@ -716,6 +716,17 @@ const productSchema = new mongoose.Schema({
 
 const Product = mongoose.model('Product', productSchema);
 
+const stockImportMetaSchema = new mongoose.Schema({
+    key: { type:String, unique:true, index:true, default:'free_stock' },
+    importedAt: Date,
+    importedBy: { id:String, name:String },
+    source: String,
+    fileName: String,
+    matched: { type:Number, default:0 },
+    updated: { type:Number, default:0 }
+}, { timestamps:true });
+const StockImportMeta = mongoose.model('StockImportMeta', stockImportMetaSchema);
+
 // ==========================================
 // ЦЕХ: материалы, рецептуры, производство и движения
 // ==========================================
@@ -1176,6 +1187,22 @@ const commercialOfferSchema = new mongoose.Schema({
 }, { timestamps:true });
 const CommercialOffer = mongoose.model('CommercialOffer', commercialOfferSchema);
 
+let commercialOfferCleanupTimer = null;
+
+async function purgeExpiredCommercialOffers() {
+    if (mongoose.connection.readyState !== 1) return 0;
+    const result = await CommercialOffer.deleteMany({ expiresAt:{ $lte:new Date() } });
+    return Number(result?.deletedCount) || 0;
+}
+
+function ensureCommercialOfferCleanup() {
+    if (commercialOfferCleanupTimer) return;
+    commercialOfferCleanupTimer = setInterval(() => {
+        purgeExpiredCommercialOffers().catch(error => console.error('Commercial offer cleanup error:', error));
+    }, 60 * 1000);
+    commercialOfferCleanupTimer.unref?.();
+}
+
 const salesSchema = new mongoose.Schema({ month: String, group: String, dealerId: String, dealerName: String, plan: Number, fact: Number, isCustom: { type: Boolean, default: false }, ownerUserId: String 
 }, { timestamps: true }); 
 const Sales = mongoose.model('Sales', salesSchema);
@@ -1352,6 +1379,8 @@ async function connectToDB() {
             await normalizeWorkshopPosRecipes();
 
             appReady = true;
+            await purgeExpiredCommercialOffers().catch(error => console.error('Initial commercial offer cleanup error:', error));
+            ensureCommercialOfferCleanup();
             if (dbReconnectTimer) {
                 clearTimeout(dbReconnectTimer);
                 dbReconnectTimer = null;
@@ -3153,6 +3182,7 @@ app.get('/api/pricing/offer-recipients', requirePermission('can_view_pricing'), 
 
 app.get('/api/pricing/offers', requirePermission('can_view_pricing'), async (req, res) => {
     try {
+        await purgeExpiredCommercialOffers();
         const dealers = await Dealer.find(getDealerFilter(req)).select('_id').lean();
         const dealerIds = dealers.map(item => item._id);
         const manualFilter = isGlobalViewer(req)
@@ -4269,6 +4299,51 @@ app.get('/api/products/count', requireAnyPermission('can_view_products', 'can_vi
     }
 });
 app.get('/api/products', requireAnyPermission('can_view_products', 'can_view_report', 'can_view_reclamations', 'can_view_dealers'), async (req, res) => { const s = new RegExp(req.query.search||'', 'i'); const p = await Product.find({$or:[{sku:s},{name:s},{collection:s}]}).sort({sku:1}).lean(); res.json(p.map(x=>{x.id=x._id;return x;})); });
+
+app.get('/api/products/stock-import-meta', requireAnyPermission('can_view_products', 'can_view_report', 'can_view_dealers'), async (req, res) => {
+    try {
+        const meta = await StockImportMeta.findOne({ key:'free_stock' }).lean();
+        res.json(meta ? {
+            importedAt:meta.importedAt || null,
+            importedBy:meta.importedBy || {},
+            source:meta.source || 'Свободный остаток',
+            fileName:meta.fileName || '',
+            matched:Number(meta.matched) || 0,
+            updated:Number(meta.updated) || 0
+        } : { importedAt:null });
+    } catch (e) {
+        res.status(500).json({ error:e.message });
+    }
+});
+
+app.post('/api/products/stock-import-meta', requirePermission('can_manage_products'), async (req, res) => {
+    try {
+        const user = pricingUserMeta(req);
+        const importedAt = new Date();
+        const meta = await StockImportMeta.findOneAndUpdate(
+            { key:'free_stock' },
+            { $set:{
+                importedAt,
+                importedBy:user,
+                source:String(req.body?.source || 'Свободный остаток').trim(),
+                fileName:String(req.body?.fileName || '').trim().slice(0,240),
+                matched:Math.max(0,Number(req.body?.matched) || 0),
+                updated:Math.max(0,Number(req.body?.updated) || 0)
+            } },
+            { upsert:true, new:true, setDefaultsOnInsert:true }
+        ).lean();
+        res.json({
+            importedAt:meta.importedAt,
+            importedBy:meta.importedBy || {},
+            source:meta.source || 'Свободный остаток',
+            fileName:meta.fileName || '',
+            matched:Number(meta.matched) || 0,
+            updated:Number(meta.updated) || 0
+        });
+    } catch (e) {
+        res.status(400).json({ error:e.message });
+    }
+});
 app.post('/api/products', requirePermission('can_manage_products'), async (req, res) => { const p = new Product(req.body); await p.save(); res.json(convertToClient(p)); });
 app.put('/api/products/:id', requirePermission('can_manage_products'), async (req, res) => { const p = await Product.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(p)); });
 app.delete('/api/products/:id', requirePermission('can_manage_products'), async (req, res) => { await Product.findByIdAndDelete(req.params.id); res.json({}); });
