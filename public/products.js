@@ -40,6 +40,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnDelete = document.getElementById('btn-delete-prod');
     const inpLiquid = document.getElementById('prod_is_liquid');
     const inpAlias = document.getElementById('prod_alias');
+    const inpPhotoId = document.getElementById('prod_photo_id');
+    const photoPreview = document.getElementById('prod-photo-preview');
+    const photoGallery = document.getElementById('prod-photo-gallery');
+    const photoGalleryToggle = document.getElementById('prod-photo-gallery-toggle');
+    const photoFolderLink = document.getElementById('prod-photo-folder-link');
+    const photoClear = document.getElementById('prod-photo-clear');
+    const photoGalleryMeta = document.getElementById('prod-photo-gallery-meta');
     
     const charClass = document.getElementById('char_class');
     const charThick = document.getElementById('char_thick');
@@ -79,6 +86,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let completenessMode = 'all';
     let canManageProducts = false; 
     let xlsxLoadPromise = null;
+    let photoCatalog = null;
+    let photoCatalogPromise = null;
 
     function ensureXlsxLoaded() {
         if (window.XLSX) return Promise.resolve(window.XLSX);
@@ -111,6 +120,96 @@ document.addEventListener('DOMContentLoaded', () => {
         .replace(/'/g,'&#039;');
 
     const normalize = value => String(value ?? '').trim().toLowerCase().replace(/\s+/g,' ');
+
+    const driveThumb = (id,size=520) => id ? 'https://drive.google.com/thumbnail?id=' + encodeURIComponent(id) + '&sz=w' + size : '';
+
+    function extractDriveId(value) {
+        const raw=String(value || '').trim();
+        if(!raw) return '';
+        const patterns=[
+            /\/file\/d\/([a-zA-Z0-9_-]+)/,
+            /[?&]id=([a-zA-Z0-9_-]+)/,
+            /\/thumbnail\?id=([a-zA-Z0-9_-]+)/
+        ];
+        for(const pattern of patterns){
+            const match=raw.match(pattern);
+            if(match?.[1]) return match[1];
+        }
+        return /^[a-zA-Z0-9_-]{15,}$/.test(raw) ? raw : '';
+    }
+
+    async function loadPhotoCatalog() {
+        if(photoCatalog) return photoCatalog;
+        if(photoCatalogPromise) return photoCatalogPromise;
+        photoCatalogPromise=fetch('/drive-photo-catalog.json',{cache:'no-store'})
+            .then(async response=>{
+                if(!response.ok) throw new Error('Каталог фото недоступен');
+                const data=await response.json();
+                photoCatalog=data && typeof data==='object' ? data : {};
+                return photoCatalog;
+            })
+            .catch(error=>{
+                console.warn(error);
+                photoCatalog={};
+                return photoCatalog;
+            })
+            .finally(()=>{ photoCatalogPromise=null; });
+        return photoCatalogPromise;
+    }
+
+    function setPrimaryPhoto(value,{normalizeInput=true}={}) {
+        const id=extractDriveId(value);
+        if(inpPhotoId && normalizeInput) inpPhotoId.value=id;
+        if(photoPreview){
+            photoPreview.innerHTML=id
+                ? '<img src="' + esc(driveThumb(id,700)) + '" alt="Основное фото товара" referrerpolicy="no-referrer" onerror="this.parentElement.innerHTML=\'<span><i class=&quot;bi bi-image&quot;></i><small>Фото недоступно</small></span>\'">'
+                : '<span><i class="bi bi-image"></i><small>Фото не выбрано</small></span>';
+        }
+        photoGallery?.querySelectorAll('[data-product-photo]').forEach(btn=>{
+            btn.classList.toggle('is-selected',btn.dataset.productPhoto===id);
+        });
+        return id;
+    }
+
+    async function renderPhotoGallery(product={}) {
+        if(!photoGallery || !photoGalleryMeta || !photoGalleryToggle) return;
+        const sku=String(product.sku || inpSku?.value || '').trim().toUpperCase();
+        const selected=setPrimaryPhoto(product.photo_id || inpPhotoId?.value || '');
+        photoGallery.innerHTML='<div class="text-muted small py-2">Загрузка фотографий…</div>';
+        photoGallery.classList.add('d-none');
+        photoGalleryToggle.disabled=true;
+        if(photoFolderLink) photoFolderLink.classList.add('d-none');
+
+        const catalog=await loadPhotoCatalog();
+        const entry=catalog?.[sku];
+        const files=Array.isArray(entry?.files) ? entry.files : [];
+        photoGalleryToggle.disabled=false;
+
+        if(entry?.folderUrl && photoFolderLink){
+            photoFolderLink.href=entry.folderUrl;
+            photoFolderLink.classList.remove('d-none');
+        }
+
+        if(!files.length){
+            photoGallery.innerHTML='<div class="product-photo-empty"><i class="bi bi-images"></i><span>Для этого артикула галерея пока не найдена. Можно вставить ссылку Google Drive вручную.</span></div>';
+            photoGalleryMeta.textContent=selected ? 'Основное фото выбрано вручную.' : 'Галерея не найдена — вставьте ссылку Google Drive или ID файла.';
+            return;
+        }
+
+        photoGalleryMeta.textContent=files.length + ' фото в папке декора · выберите одно основным';
+        photoGallery.innerHTML=files.map(file=>{
+            const id=String(file.id || '');
+            const active=id===selected;
+            return '<button type="button" class="product-photo-option ' + (active?'is-selected':'') + '" data-product-photo="' + esc(id) + '" title="' + esc(file.name || 'Фото') + '">' +
+                '<img loading="lazy" src="' + esc(driveThumb(id,320)) + '" alt="' + esc(file.name || 'Фото') + '" referrerpolicy="no-referrer">' +
+                '<span class="product-photo-check"><i class="bi bi-check-lg"></i></span></button>';
+        }).join('');
+        photoGallery.querySelectorAll('[data-product-photo]').forEach(btn=>{
+            btn.addEventListener('click',()=>{
+                setPrimaryPhoto(btn.dataset.productPhoto);
+            });
+        });
+    }
 
     function stockValue(product) {
         const raw = product?.stock_qty;
@@ -191,7 +290,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 ['толщина', c.thickness],
                 ['размер', c.size],
                 ['м²/уп', c.package_area],
-                ['шт/уп', c.package_qty]
+                ['шт/уп', c.package_qty],
+                ['фото', product?.photo_id]
             );
         }
 
@@ -471,11 +571,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 c.package_qty ? `${esc(c.package_qty)} шт/уп` : ''
             ].filter(Boolean).join(' · ');
             const packageFoot = isEquipment ? 'учёт ведётся поштучно' : (c.weight ? `Вес упаковки: ${esc(c.weight)} кг` : 'Вес упаковки не указан');
+            const rowPhoto = product.photo_id
+                ? '<img class="product-row-photo" loading="lazy" src="' + esc(driveThumb(product.photo_id,160)) + '" alt="' + esc(product.name || '') + '" referrerpolicy="no-referrer">'
+                : '<span class="product-row-photo is-empty"><i class="bi bi-image"></i></span>';
 
             return `
                 <article class="product-row ${!isEquipment && !isLiquid?'is-illiquid':''} ${isEquipment?'is-equipment':''}" ${canManageProducts?`data-edit-product="${esc(product.id)}"`:''}>
                     <div class="product-position">
                         <div class="product-position-top">
+                            ${rowPhoto}
                             <span class="product-sku">${esc(product.sku || '—')}</span>
                             <span class="product-name" title="${esc(product.name || 'Без названия')}">${esc(product.name || 'Без названия')}</span>
                         </div>
@@ -644,6 +748,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if(inpCollection) inpCollection.value = p.collection || '';
                 if(inpLiquid) inpLiquid.checked = p.is_liquid !== false;
                 if(inpAlias) inpAlias.value = p.excel_alias || '';
+                if(inpPhotoId) inpPhotoId.value = p.photo_id || '';
+                setPrimaryPhoto(p.photo_id || '');
+                renderPhotoGallery(p);
 
                 if(p.characteristics) {
                     const c = p.characteristics;
@@ -666,6 +773,9 @@ document.addEventListener('DOMContentLoaded', () => {
             inpId.value = '';
             modalTitle.textContent = 'Новая позиция';
             if(inpLiquid) inpLiquid.checked = true;
+            if(inpPhotoId) inpPhotoId.value='';
+            setPrimaryPhoto('');
+            renderPhotoGallery({sku:inpSku?.value || '',photo_id:''});
         }
 
         syncProductTypeFields();
@@ -700,6 +810,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 collection: type === 'laminate' && inpCollection ? inpCollection.value.trim() : '',
                 is_liquid: type === 'laminate' ? (inpLiquid ? inpLiquid.checked : true) : true,
                 excel_alias: inpAlias ? inpAlias.value.trim() : '',
+                photo_id: inpPhotoId ? extractDriveId(inpPhotoId.value) : '',
                 characteristics: type === 'laminate' ? chars : {
                     class:'', thickness:'', bevel:'', size:'', package_area:'', package_qty:'', weight:''
                 }
@@ -1026,6 +1137,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     productTypeInputs.forEach(input => input.addEventListener('change', syncProductTypeFields));
+
+    photoGalleryToggle?.addEventListener('click',()=>{
+        if(!photoGallery) return;
+        photoGallery.classList.toggle('d-none');
+        photoGalleryToggle.innerHTML=photoGallery.classList.contains('d-none')
+            ? '<i class="bi bi-images"></i> Выбрать из галереи'
+            : '<i class="bi bi-chevron-up"></i> Скрыть галерею';
+    });
+    photoClear?.addEventListener('click',()=>setPrimaryPhoto(''));
+    inpPhotoId?.addEventListener('change',()=>setPrimaryPhoto(inpPhotoId.value));
+    inpPhotoId?.addEventListener('blur',()=>setPrimaryPhoto(inpPhotoId.value));
+    inpSku?.addEventListener('change',()=>{
+        renderPhotoGallery({sku:inpSku.value,photo_id:extractDriveId(inpPhotoId?.value || '')});
+    });
 
     searchInput?.addEventListener('input', applyLogic);
     searchClear?.addEventListener('click',()=>{
