@@ -13416,3 +13416,70 @@ body:not(.app-workspace-page) .modal-header .btn-close{
     flex-basis:96px!important;
   }
 }
+
+
+/* =========================================================
+   DEALER EDIT MOBILE — FIX TOP TAB RAIL
+   Five tabs must always fit the phone width without horizontal scrolling.
+   ========================================================= */
+@media (max-width:767px){
+  .dealer-form-modal .dealer-field-shortcuts-full{
+    display:grid!important;
+    grid-template-columns:repeat(5,minmax(0,1fr))!important;
+    grid-auto-flow:column!important;
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    gap:4px!important;
+    overflow:visible!important;
+    overflow-x:visible!important;
+    padding:6px!important;
+    scroll-snap-type:none!important;
+    box-sizing:border-box!important;
+  }
+  .dealer-form-modal .dealer-field-shortcuts-full button,
+  .dealer-form-modal .dealer-field-shortcuts-full button:last-child{
+    width:100%!important;
+    min-width:0!important;
+    max-width:none!important;
+    min-height:48px!important;
+    height:48px!important;
+    flex:none!important;
+    flex-basis:auto!important;
+    padding:4px 2px!important;
+    overflow:hidden!important;
+    border-radius:10px!important;
+  }
+  .dealer-form-modal .dealer-field-shortcuts-full button i{
+    flex:0 0 auto;
+    font-size:.78rem!important;
+    line-height:1!important;
+  }
+  .dealer-form-modal .dealer-field-shortcuts-full button span{
+    display:block!important;
+    width:100%!important;
+    max-width:100%!important;
+    overflow:hidden!important;
+    color:inherit;
+    font-size:.43rem!important;
+    font-weight:750!important;
+    line-height:1.05!important;
+    text-align:center!important;
+    text-overflow:ellipsis!important;
+    white-space:nowrap!important;
+  }
+}
+@media (max-width:390px){
+  .dealer-form-modal .dealer-field-shortcuts-full{
+    gap:3px!important;
+    padding:5px!important;
+  }
+  .dealer-form-modal .dealer-field-shortcuts-full button,
+  .dealer-form-modal .dealer-field-shortcuts-full button:last-child{
+    min-height:46px!important;
+    height:46px!important;
+  }
+  .dealer-form-modal .dealer-field-shortcuts-full button span{
+    font-size:.39rem!important;
+  }
+}
