@@ -3477,7 +3477,7 @@ app.get('/api/public/price-share/:token.xlsx', async (req, res) => {
         });
 
         const tableRow=infoRow+2;
-        const headers=['Коллекция','Оптовая цена','Итоговая оптовая','РРЦ','Цена на витрине'];
+        const headers=['Номенклатура','Оптовая цена','Итоговая оптовая','РРЦ','Цена на витрине'];
         headers.forEach((value,index)=>{
             const cell=ws.getCell(tableRow,index+1);
             cell.value=value;
@@ -3493,7 +3493,7 @@ app.get('/api/public/price-share/:token.xlsx', async (req, res) => {
             const wholesale=Number(row.basePrice ?? row.opt) || 0;
             const finalPrice=Number.isFinite(Number(row.finalPrice)) ? Number(row.finalPrice) : wholesale;
             const values=[
-                row.collection || row.name || '',
+                row.isLiquid === false ? [row.sku,row.name].filter(Boolean).join(' · ') : (row.collection || row.name || ''),
                 wholesale || null,
                 finalPrice || null,
                 Number(row.rrp) || null,
