@@ -675,13 +675,13 @@ document.addEventListener('DOMContentLoaded', () => {
         return Number.isFinite(number) ? number : null;
     }
 
-    function showStockImportResult({updated=0, matched=0, unmapped=0, total=0, error=''}) {
+    function showStockImportResult({updated=0, matched=0, unmapped=0, total=0, error='', source=''}) {
         if (!stockImportResult) return;
         stockImportResult.classList.remove('d-none','is-error','is-success');
         stockImportResult.classList.add(error ? 'is-error' : 'is-success');
         stockImportResult.innerHTML = error
             ? `<i class="bi bi-exclamation-circle"></i><div><strong>Не удалось загрузить остатки</strong><span>${esc(error)}</span></div>`
-            : `<i class="bi bi-check2-circle"></i><div><strong>Файл обработан</strong><span>Строк: ${total} · найдено: ${matched} · обновлено: ${updated}${unmapped ? ' · требуют привязки: '+unmapped : ''}</span></div>`;
+            : `<i class="bi bi-check2-circle"></i><div><strong>Файл обработан</strong><span>Источник: ${esc(source || 'Свободный остаток')} · строк: ${total} · найдено: ${matched} · обновлено: ${updated}${unmapped ? ' · требуют привязки: '+unmapped : ''}</span></div>`;
     }
 
     if(btnImport) btnImport.onclick = () => {
@@ -717,21 +717,21 @@ document.addEventListener('DOMContentLoaded', () => {
     async function processExcel(rows) {
         let cSku = -1, cName = -1, cFreeStock = -1;
         let skuHeaderRow = -1, nameHeaderRow = -1, stockHeaderRow = -1;
+        let freeStockHeaderLabel = '';
+        const freeStockCandidates = [];
 
         // В выгрузках 1С заголовки могут быть на разных строках.
-        // Сначала ищем их независимо, при этом остаток берём ТОЛЬКО из «Свободного остатка».
+        // Общий «Остаток» намеренно игнорируем: в CRM загружается только «Свободный остаток».
         for(let i=0; i<Math.min(rows.length, 40); i++) {
             const row = Array.isArray(rows[i]) ? rows[i] : [];
             row.forEach((cell,j) => {
+                const raw = String(cell ?? '').trim();
                 const v = normalizeExcelText(cell).replace(/[^a-zа-я0-9]+/g,'');
 
-                if (cFreeStock < 0 && (
-                    v === 'свободныйостаток' ||
-                    v === 'свободно' ||
-                    v.includes('свободныйостаток')
-                )) {
-                    cFreeStock = j;
-                    stockHeaderRow = i;
+                if (v === 'свободныйостаток' || v === 'свободно') {
+                    freeStockCandidates.push({column:j,row:i,label:raw || 'Свободный остаток',score:3});
+                } else if (v.includes('свободныйостаток') && !v.includes('общийостаток')) {
+                    freeStockCandidates.push({column:j,row:i,label:raw || 'Свободный остаток',score:2});
                 }
 
                 if (cSku < 0 && (
@@ -754,6 +754,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     nameHeaderRow = i;
                 }
             });
+        }
+
+        if (freeStockCandidates.length) {
+            freeStockCandidates.sort((a,b) => b.score-a.score || a.row-b.row || a.column-b.column);
+            const picked = freeStockCandidates[0];
+            cFreeStock = picked.column;
+            stockHeaderRow = picked.row;
+            freeStockHeaderLabel = picked.label || 'Свободный остаток';
         }
 
         if (cFreeStock < 0) {
@@ -838,7 +846,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         await loadProducts();
-        showStockImportResult({updated, matched, unmapped:unmappedItems.length, total});
+        showStockImportResult({updated, matched, unmapped:unmappedItems.length, total, source:freeStockHeaderLabel || 'Свободный остаток'});
 
         if(unmappedItems.length > 0) {
             setTimeout(() => {
