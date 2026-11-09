@@ -1565,7 +1565,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (greeting) {
             const hour = new Date().getHours();
             const hello = hour < 12 ? 'Доброе утро' : hour < 18 ? 'Добрый день' : 'Добрый вечер';
-            const firstName = (user.fullName || '').trim().split(/\s+/)[0];
+            const firstName = String(user.firstName || '').trim() || (user.fullName || '').trim().split(/\s+/)[0];
             greeting.textContent = firstName ? `${hello}, ${firstName}` : hello;
         }
         if (dateEl) dateEl.textContent = new Date().toLocaleDateString('ru-RU', { day:'numeric', month:'long', weekday:'long' });
