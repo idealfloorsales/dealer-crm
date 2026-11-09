@@ -197,6 +197,32 @@
                             </div>
                         </section>
 
+                        <section class="product-editor-section">
+                            <div class="product-editor-section-title">
+                                <i class="bi bi-image"></i>
+                                <div><strong>Основное фото товара</strong><small>Выбирается один раз здесь и автоматически используется в КП и других разделах CRM.</small></div>
+                            </div>
+                            <div class="product-photo-editor">
+                                <div class="product-photo-preview" id="prod-photo-preview">
+                                    <span><i class="bi bi-image"></i><small>Фото не выбрано</small></span>
+                                </div>
+                                <div class="product-photo-tools">
+                                    <label>
+                                        <span>Google Drive ссылка или ID файла</span>
+                                        <input type="text" class="form-control" id="prod_photo_id" placeholder="Вставьте ссылку на фото или выберите из галереи">
+                                        <small>В базе сохраняется только ID изображения. Ссылка нужна только для удобного выбора.</small>
+                                    </label>
+                                    <div class="product-photo-actions">
+                                        <button type="button" class="btn btn-dark" id="prod-photo-gallery-toggle"><i class="bi bi-images"></i> Выбрать из галереи</button>
+                                        <a class="btn btn-light border d-none" id="prod-photo-folder-link" target="_blank" rel="noopener"><i class="bi bi-google"></i> Папка на Drive</a>
+                                        <button type="button" class="btn btn-light border" id="prod-photo-clear"><i class="bi bi-x-lg"></i> Убрать</button>
+                                    </div>
+                                    <small id="prod-photo-gallery-meta" class="product-photo-meta">Галерея будет найдена по артикулу позиции.</small>
+                                </div>
+                            </div>
+                            <div id="prod-photo-gallery" class="product-photo-gallery d-none"></div>
+                        </section>
+
                         <section class="product-editor-section product-laminate-field" id="product-laminate-fields">
                             <div class="product-editor-section-title">
                                 <i class="bi bi-rulers"></i>
