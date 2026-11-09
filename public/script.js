@@ -55,6 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
             health: filterHealth?.value || '',
             sector: sector?.value || '',
             pos: filterPos?.value || '',
+            motivation: filterMotivation?.value || '',
             sort: dealerSortSelect?.value || 'dealer_id_asc',
             quickFilter: dealerQuickFilter || 'all',
             filtersOpen: Boolean(toolbar?.classList.contains('filters-open')),
@@ -81,6 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
         restoreSelect(filterHealth, state.health);
         restoreSelect(document.getElementById('filter-sector'), state.sector);
         restoreSelect(filterPos, state.pos);
+        restoreSelect(filterMotivation, state.motivation);
         restoreSelect(dealerSortSelect, state.sort || 'dealer_id_asc');
 
         dealerQuickFilter = state.quickFilter || 'all';
@@ -173,7 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const addProductChecklist = document.getElementById('add-product-checklist'); const addContactList = document.getElementById('add-contact-list'); const addAddressList = document.getElementById('add-address-list'); const addPosList = document.getElementById('add-pos-list'); const addVisitsList = document.getElementById('add-visits-list'); const addCompetitorList = document.getElementById('add-competitor-list'); const addPhotoInput = document.getElementById('add-photo-input'); const addPhotoPreviewContainer = document.getElementById('add-photo-preview-container'); const addAvatarInput = document.getElementById('add-avatar-input'); const addAvatarPreview = document.getElementById('add-avatar-preview');
     const editProductChecklist = document.getElementById('edit-product-checklist'); const editContactList = document.getElementById('edit-contact-list'); const editAddressList = document.getElementById('edit-address-list'); const editPosList = document.getElementById('edit-pos-list'); const editVisitsList = document.getElementById('edit-visits-list'); const editCompetitorList = document.getElementById('edit-competitor-list'); const editPhotoInput = document.getElementById('edit-photo-input'); const editPhotoPreviewContainer = document.getElementById('edit-photo-preview-container'); const editAvatarInput = document.getElementById('edit-avatar-input'); const editAvatarPreview = document.getElementById('edit-avatar-preview'); const editCurrentAvatarUrl = document.getElementById('edit-current-avatar-url');
     
-    const filterCity = document.getElementById('filter-city'); const filterPriceType = document.getElementById('filter-price-type'); const filterStatus = document.getElementById('filter-status'); const filterResponsible = document.getElementById('filter-responsible'); const filterPos = document.getElementById('filter-pos'); const searchBar = document.getElementById('search-bar');
+    const filterCity = document.getElementById('filter-city'); const filterPriceType = document.getElementById('filter-price-type'); const filterStatus = document.getElementById('filter-status'); const filterResponsible = document.getElementById('filter-responsible'); const filterPos = document.getElementById('filter-pos'); const filterMotivation = document.getElementById('filter-motivation'); const searchBar = document.getElementById('search-bar');
     const dealerVisibleCount = document.getElementById('dealer-visible-count');
     const dealerSortSelect = document.getElementById('dealer-sort-select');
     const dealerResetFilters = document.getElementById('dealer-reset-filters');
@@ -961,6 +963,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(filterResponsible) filterResponsible.onchange = renderDealerList;
         if(filterHealth) filterHealth.onchange = renderDealerList;
         if(filterPos) filterPos.onchange = renderDealerList;
+        if(filterMotivation) filterMotivation.onchange = renderDealerList;
         const sectorFilter = document.getElementById('filter-sector');
         if(sectorFilter) sectorFilter.onchange = renderDealerList;
         if(searchBar) searchBar.oninput = renderDealerList;
@@ -1018,6 +1021,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (filterResponsible) filterResponsible.value = '';
                 if (filterHealth) filterHealth.value = '';
                 if (filterPos) filterPos.value = '';
+                if (filterMotivation) filterMotivation.value = '';
                 if (sectorFilter) sectorFilter.value = '';
                 if (dealerSortSelect) dealerSortSelect.value = 'dealer_id_asc';
                 dealerQuickFilter = 'all';
@@ -1605,6 +1609,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const status = filterStatus?.value || '';
         const responsible = filterResponsible?.value || '';
         const healthFilter = filterHealth?.value || '';
+        const motivationFilter = filterMotivation?.value || '';
         const search = (searchBar?.value || '').trim().toLowerCase();
         const sector = document.getElementById('filter-sector')?.value || '';
         const posFilter = filterPos?.value || '';
@@ -2508,6 +2513,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const types = uniqueNormalized(dealers.map(dealerPriceListName));
         const sectors = uniqueNormalized(dealers.map(d => d.region_sector));
         const posItems = uniqueNormalized(dealers.flatMap(d => (d.pos_materials || []).map(item => item?.name)));
+        const motivationItems = new Map();
+        dealers.forEach(dealer => {
+            const scheme = dealer?.motivation_scheme;
+            if (!scheme) return;
+            const id = String(scheme?._id || scheme?.id || scheme || '').trim();
+            const name = normalizeDisplayValue(typeof scheme === 'object' ? scheme.name : '');
+            if (id && name && !motivationItems.has(id)) motivationItems.set(id, name);
+        });
 
         const sc = normalizeDisplayValue(filterCity.value);
         const st = normalizeDisplayValue(filterPriceType.value);
@@ -2524,6 +2537,17 @@ document.addEventListener('DOMContentLoaded', () => {
             filterPos.innerHTML = '<option value="">Все торговое оборудование</option>';
             posItems.forEach(item => filterPos.add(new Option(item,item)));
             if (posItems.includes(currentPos)) filterPos.value = currentPos;
+        }
+
+        if (filterMotivation) {
+            const currentMotivation = String(filterMotivation.value || '');
+            filterMotivation.innerHTML = '<option value="">Все мотивации</option><option value="__with__">С мотивацией</option><option value="__without__">Без мотивации</option>';
+            [...motivationItems.entries()]
+                .sort((a,b) => a[1].localeCompare(b[1], 'ru'))
+                .forEach(([id,name]) => filterMotivation.add(new Option(name,id)));
+            if ([...filterMotivation.options].some(option => option.value === currentMotivation)) {
+                filterMotivation.value = currentMotivation;
+            }
         }
 
         const fs = document.getElementById('filter-sector');
@@ -2997,6 +3021,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 ...(d.pos_materials || []).map(item => item?.name)
             ].filter(Boolean).join(' ').toLowerCase();
 
+            const motivationScheme = d?.motivation_scheme;
+            const motivationId = String(motivationScheme?._id || motivationScheme?.id || motivationScheme || '').trim();
+            const hasMotivation = Boolean(motivationId);
+            const motivationMatches =
+                !motivationFilter ||
+                (motivationFilter === '__with__' && hasMotivation) ||
+                (motivationFilter === '__without__' && !hasMotivation) ||
+                (motivationFilter !== '__with__' && motivationFilter !== '__without__' && motivationId === motivationFilter);
+
             return isVisible &&
                 (!city || normalizedCity === city) &&
                 (!type || normalizedType === type) &&
@@ -3005,6 +3038,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     (responsible !== '__unassigned__' && String(d.responsible || '') === String(responsible))) &&
                 (!sector || normalizedSector === sector) &&
                 (!posFilter || (d.pos_materials || []).some(item => normalizeDisplayValue(item?.name) === posFilter)) &&
+                motivationMatches &&
                 (!search || searchable.includes(search));
         });
 
