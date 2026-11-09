@@ -4426,11 +4426,13 @@ body.bg-light {
     }
 
     .sales-print-header {
-        display: flex;
+        display: flex !important;
+        height: auto !important;
+        margin: 0 !important;
         align-items: flex-end;
         justify-content: space-between;
         gap: 12mm;
-        padding: 0 0 5mm;
+        padding: 0 0 4mm !important;
         border-bottom: 1pt solid #eadadc;
     }
 
@@ -4449,11 +4451,11 @@ body.bg-light {
     }
 
     .sales-print-header h1 {
-        margin: 0 0 1.2mm;
+        margin: 0 0 1.2mm !important;
         color: #1f2024 !important;
-        font-size: 21pt;
-        line-height: 1;
-        font-weight: 750;
+        font-size: 22pt !important;
+        line-height: 1 !important;
+        font-weight: 750 !important;
         letter-spacing: -.45pt;
     }
 
@@ -4742,12 +4744,13 @@ body.bg-light {
     .sales-print-item.is-none .sales-print-item-progress span { background: #a5a7ac !important; }
 
     .sales-print-footer {
-        display: flex;
+        display: flex !important;
+        height: auto !important;
         align-items: center;
         justify-content: space-between;
         gap: 8mm;
-        margin-top: 3mm;
-        padding-top: 1.8mm;
+        margin: 3mm 0 0 !important;
+        padding: 1.8mm 0 0 !important;
         border-top: .8pt solid #eadadc;
         color: #8e9095;
         font-size: 7pt;
