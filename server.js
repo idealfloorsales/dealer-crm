@@ -1066,6 +1066,7 @@ const priceListSchema = new mongoose.Schema({
     validFrom: { type: String, default: '' },
     validTo: { type: String, default: '' },
     active: { type: Boolean, default: true },
+    includeIlliquid: { type: Boolean, default: false },
     archivedAt: Date,
     note: String,
     rows: [priceListRowSchema],
@@ -2290,7 +2291,7 @@ app.get('/api/dealers', requireAnyPermission('can_view_dealers', 'can_view_map',
             query = query.select('_id name city address contacts latitude longitude status responsible responsibleUserId');
         } else {
             query = query.select('-photos -visits -products -avatarUrl')
-                .populate('price_list', 'name code versionDate validFrom validTo active').populate('motivation_scheme', 'name ratePerM2 validFrom validTo active');
+                .populate('price_list', 'name code versionDate validFrom validTo active includeIlliquid').populate('motivation_scheme', 'name ratePerM2 validFrom validTo active');
         }
         const dealers = await query.lean();
         res.json(dealers.map(d => ({ id: d._id, ...d })));
@@ -2314,7 +2315,7 @@ app.get('/api/dealers/:id/avatar', requirePermission('can_view_dealers'), async 
 app.get('/api/dealers/:id', requirePermission('can_view_dealers'), async (req, res) => {
     try {
         let query = Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) })
-            .populate('price_list', 'name code versionDate validFrom validTo active').populate('motivation_scheme', 'name ratePerM2 validFrom validTo active');
+            .populate('price_list', 'name code versionDate validFrom validTo active includeIlliquid').populate('motivation_scheme', 'name ratePerM2 validFrom validTo active');
         if (req.query.view === 'profile') {
             query = query.select('-photos').populate('products', 'sku name');
         } else {
@@ -2570,7 +2571,7 @@ app.get('/api/pricing/catalog', requirePermission('can_view_pricing'), async (re
 app.get('/api/pricing/price-lists', requireAnyPermission('can_view_pricing', 'can_view_dealers'), async (req, res) => {
     try {
         const lists = await PriceList.find({})
-            .select('_id name code versionDate validFrom validTo active archivedAt note rows createdAt updatedAt')
+            .select('_id name code versionDate validFrom validTo active includeIlliquid archivedAt note rows createdAt updatedAt')
             .sort({ active: -1, versionDate: -1, updatedAt: -1 })
             .lean();
         res.json(lists.map(item => ({
@@ -2581,6 +2582,7 @@ app.get('/api/pricing/price-lists', requireAnyPermission('can_view_pricing', 'ca
             validFrom: item.validFrom || '',
             validTo: item.validTo || '',
             active: item.active !== false,
+            includeIlliquid: item.includeIlliquid === true,
             archivedAt: item.archivedAt || null,
             note: item.note || '',
             rowsCount: Array.isArray(item.rows) ? item.rows.length : 0,
@@ -2605,6 +2607,7 @@ app.get('/api/pricing/price-lists/:id', requirePermission('can_view_pricing'), a
             validFrom: list.validFrom || '',
             validTo: list.validTo || '',
             active: list.active !== false,
+            includeIlliquid: list.includeIlliquid === true,
             note: list.note || '',
             rows: (list.rows || []).map(row => ({
                 scopeType: row.scopeType || (row.product ? 'product' : 'collection'),
@@ -2642,6 +2645,7 @@ app.post('/api/pricing/price-lists', requirePermission('can_manage_pricing'), as
             validFrom,
             validTo,
             active: req.body?.active !== false,
+            includeIlliquid: req.body?.includeIlliquid === true,
             note: String(req.body?.note || '').trim(),
             rows: cleanPriceListRows(req.body?.rows),
             createdBy: user,
@@ -2671,6 +2675,7 @@ app.put('/api/pricing/price-lists/:id', requirePermission('can_manage_pricing'),
         list.validFrom = validFrom;
         list.validTo = validTo;
         list.active = req.body?.active !== false;
+        list.includeIlliquid = req.body?.includeIlliquid === true;
         list.archivedAt = list.active ? null : (list.archivedAt || new Date());
         list.note = String(req.body?.note || '').trim();
         list.rows = cleanPriceListRows(req.body?.rows);
@@ -2811,7 +2816,8 @@ async function buildManualOfferPriceSheetSnapshot(priceListId, manualClient = {}
             versionDate:list.versionDate || '',
             validFrom:list.validFrom || '',
             validTo:list.validTo || '',
-            active:list.active !== false
+            active:list.active !== false,
+            includeIlliquid:list.includeIlliquid === true
         },
         priceType:{ key:'opt', label:'Спец.цена' },
         totalDiscountPercent:0,
@@ -2831,14 +2837,14 @@ async function buildDealerPriceSheetSnapshot(req, dealerId, options = {}) {
                 dealerVisibilityFilter
             ]
         }).select('_id dealer_id name city region_sector price_type price_list responsible contacts status')
-            .populate('price_list', 'name code versionDate validFrom validTo active')
+            .populate('price_list', 'name code versionDate validFrom validTo active includeIlliquid')
             .lean();
         if (!dealer) { const err = new Error('Дилер не найден'); err.statusCode = 404; throw err; }
 
         const conditions = await PricingCondition.find({})
             .populate('dealer', '_id dealer_id name city region_sector price_type responsible')
             .populate('dealers', '_id dealer_id name city region_sector price_type responsible')
-            .populate('priceList', '_id name code versionDate validFrom validTo active')
+            .populate('priceList', '_id name code versionDate validFrom validTo active includeIlliquid')
             .sort({ createdAt: -1 })
             .lean();
 
@@ -3036,7 +3042,8 @@ async function buildDealerPriceSheetSnapshot(req, dealerId, options = {}) {
                 versionDate: list.versionDate || '',
                 validFrom: list.validFrom || '',
                 validTo: list.validTo || '',
-                active: list.active !== false
+                active: list.active !== false,
+                includeIlliquid: list.includeIlliquid === true
             } : null,
             priceType,
             totalDiscountPercent: discount,
@@ -3373,9 +3380,12 @@ app.get('/api/public/price-share/:token.xlsx', async (req, res) => {
         if (!share) return res.status(410).send('Срок действия ссылки истёк или она была отозвана');
 
         const snapshot = share.snapshot || {};
-        const rows = Array.isArray(snapshot.rows) ? snapshot.rows.filter(row => row.isLiquid !== false) : [];
         const dealer = snapshot.dealer || {};
         const priceList = snapshot.priceList || {};
+        const includeIlliquid = priceList.includeIlliquid === true;
+        const rows = Array.isArray(snapshot.rows)
+            ? snapshot.rows.filter(row => row.isLiquid !== false || includeIlliquid)
+            : [];
         const discount = Math.max(0, Number(snapshot.totalDiscountPercent) || 0);
 
         const workbook = new ExcelJS.Workbook();
@@ -3612,13 +3622,13 @@ app.get('/api/pricing/overview', requirePermission('can_view_pricing'), async (r
     try {
         const dealers = await Dealer.find(await getPricingWorkingDealerFilter(getDealerFilter(req)))
             .select('_id dealer_id name city region_sector price_type price_list responsible')
-            .populate('price_list', 'name code versionDate validFrom validTo active')
+            .populate('price_list', 'name code versionDate validFrom validTo active includeIlliquid')
             .sort({ name: 1 })
             .lean();
         const conditions = await PricingCondition.find({})
             .populate('dealer', '_id dealer_id name city region_sector price_type responsible')
             .populate('dealers', '_id dealer_id name city region_sector price_type responsible')
-            .populate('priceList', '_id name code versionDate validFrom validTo active')
+            .populate('priceList', '_id name code versionDate validFrom validTo active includeIlliquid')
             .sort({ createdAt: -1 })
             .lean();
 
@@ -3678,14 +3688,14 @@ app.get('/api/pricing/dealers/:id', requirePermission('can_view_pricing'), async
                 await getPricingWorkingDealerFilter(getDealerFilter(req))
             ]
         }).select('_id dealer_id name city region_sector price_type price_list responsible')
-            .populate('price_list', 'name code versionDate validFrom validTo active')
+            .populate('price_list', 'name code versionDate validFrom validTo active includeIlliquid')
             .lean();
         if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
 
         const conditions = await PricingCondition.find({})
             .populate('dealer', '_id dealer_id name city region_sector price_type responsible')
             .populate('dealers', '_id dealer_id name city region_sector price_type responsible')
-            .populate('priceList', '_id name code versionDate validFrom validTo active')
+            .populate('priceList', '_id name code versionDate validFrom validTo active includeIlliquid')
             .sort({ createdAt: -1 })
             .lean();
         res.json(buildDealerPricingSummary(dealer, conditions));
@@ -3882,7 +3892,7 @@ app.post('/api/pricing/conditions', requirePermission('can_manage_pricing'), asy
         });
         const populated = await PricingCondition.findById(condition._id).populate('dealer', '_id dealer_id name city region_sector price_type responsible')
             .populate('dealers', '_id dealer_id name city region_sector price_type responsible')
-            .populate('priceList', '_id name code versionDate validFrom validTo active').lean();
+            .populate('priceList', '_id name code versionDate validFrom validTo active includeIlliquid').lean();
         res.status(201).json({ ...populated, computedStatus: pricingConditionStatus(populated) });
     } catch (e) {
         res.status(400).json({ error: e.message });
@@ -3918,7 +3928,7 @@ app.put('/api/pricing/conditions/:id', requirePermission('can_manage_pricing'), 
 
         const populated = await PricingCondition.findById(existing._id).populate('dealer', '_id dealer_id name city region_sector price_type responsible')
             .populate('dealers', '_id dealer_id name city region_sector price_type responsible')
-            .populate('priceList', '_id name code versionDate validFrom validTo active').lean();
+            .populate('priceList', '_id name code versionDate validFrom validTo active includeIlliquid').lean();
         res.json({ ...populated, computedStatus: pricingConditionStatus(populated) });
     } catch (e) {
         res.status(400).json({ error: e.message });
