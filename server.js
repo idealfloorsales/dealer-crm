@@ -2267,9 +2267,23 @@ function buildDealerPricingSummary(dealer, allConditions, today = pricingTodayKe
 
     // The selected price list defines the base price. Active percentage discounts
     // are then applied on top of that base, matching the CRM UI and dealer rules.
+    const stackableDiscounts = activeDiscounts
+        .filter(condition => condition.stackable !== false)
+        .sort((a, b) =>
+            (Number(b.priority) || 0) - (Number(a.priority) || 0) ||
+            String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''))
+        );
+    const seenDiscountPercents = new Set();
+    const uniqueStackableDiscounts = stackableDiscounts.filter(condition => {
+        const percent = Math.max(0, Number(condition.discountPercent) || 0);
+        const key = percent.toFixed(4);
+        if (seenDiscountPercents.has(key)) return false;
+        seenDiscountPercents.add(key);
+        return true;
+    });
     const appliedDiscounts = exclusive.length
         ? [exclusive[0]]
-        : activeDiscounts.filter(condition => condition.stackable !== false);
+        : uniqueStackableDiscounts;
 
     const totalDiscountPercent = appliedDiscounts.reduce(
         (sum, condition) => sum + Math.max(0, Number(condition.discountPercent) || 0),
@@ -4216,13 +4230,19 @@ app.post('/api/pricing/setup', requirePermission('can_manage_pricing'), async (r
         }
 
         const priceListId = String(req.body?.priceListId || '').trim();
-        if (!priceListId || !mongoose.Types.ObjectId.isValid(priceListId)) return res.status(400).json({ error:'Выберите прайс' });
-        const priceList = await PriceList.findOne({ _id:priceListId, active:{ $ne:false } }).lean();
-        if (!priceList) return res.status(404).json({ error:'Прайс не найден или находится в архиве' });
+        let priceList = null;
+        if (priceListId) {
+            if (!mongoose.Types.ObjectId.isValid(priceListId)) return res.status(400).json({ error:'Некорректный прайс' });
+            priceList = await PriceList.findOne({ _id:priceListId, active:{ $ne:false } }).lean();
+            if (!priceList) return res.status(404).json({ error:'Прайс не найден или находится в архиве' });
+        }
 
         const discounts = [...new Set((Array.isArray(req.body?.discounts) ? req.body.discounts : [])
             .map(value => Math.round(Number(value) * 100) / 100)
             .filter(value => Number.isFinite(value) && value > 0 && value <= 100))];
+        if (!priceList && !discounts.length) {
+            return res.status(400).json({ error:'Выберите хотя бы одну скидку или прайс' });
+        }
         const startDate = String(req.body?.startDate || '').trim();
         const endDate = String(req.body?.endDate || '').trim();
         const dateRe = /^\d{4}-\d{2}-\d{2}$/;
@@ -4260,12 +4280,17 @@ app.post('/api/pricing/setup', requirePermission('can_manage_pricing'), async (r
             cancelledAt:null
         })).filter(exactTarget);
 
-        const chosenCodes = new Set(['BASE-PRICE']);
+        const chosenCodes = new Set();
+        if (priceList) chosenCodes.add('BASE-PRICE');
         if (discounts.some(value => Math.abs(value - 5) < 0.001)) chosenCodes.add('SOCIAL-5');
         if (discounts.some(value => Math.abs(value - 10) < 0.001)) chosenCodes.add('SUPPORT-10');
         if (discounts.some(value => Math.abs(value - 5) >= 0.001 && Math.abs(value - 10) >= 0.001)) chosenCodes.add('CUSTOM-DISCOUNT');
 
         for (const existing of candidates) {
+            const isBasePrice = existing.code === 'BASE-PRICE';
+            const isDiscount = ['SOCIAL-5','SUPPORT-10','CUSTOM-DISCOUNT'].includes(existing.code);
+            if (isBasePrice && !priceList) continue;
+            if (isDiscount && !discounts.length) continue;
             if (chosenCodes.has(existing.code)) continue;
             existing.cancelledAt = new Date();
             existing.updatedBy = user;
@@ -4306,26 +4331,28 @@ app.post('/api/pricing/setup', requirePermission('can_manage_pricing'), async (r
 
         const saved = [];
         const overridePriority = ({ all:100, city:200, sector:300, dealer:400 })[scopeType] || 100;
-        saved.push(await upsertStandard('BASE-PRICE', {
-            kind:'price_list',
-            name:priceList.name,
-            priceList:priceList._id,
-            priceListName:priceList.name,
-            discountPercent:0,
-            stackable:false,
-            priority:overridePriority,
-            startDate:String(priceList.validFrom || '').trim(),
-            endDate:String(priceList.validTo || '').trim(),
-            paused:false,
-            reasonType:'other',
-            requirementTarget:0,
-            requirementCurrent:0,
-            requirementUnit:'публикаций',
-            requirementDueDate:'',
-            requirementVerified:false,
-            proofNote:'',
-            note
-        }, 'Прайс назначен через настройку цен'));
+        if (priceList) {
+            saved.push(await upsertStandard('BASE-PRICE', {
+                kind:'price_list',
+                name:priceList.name,
+                priceList:priceList._id,
+                priceListName:priceList.name,
+                discountPercent:0,
+                stackable:false,
+                priority:overridePriority,
+                startDate:String(priceList.validFrom || '').trim(),
+                endDate:String(priceList.validTo || '').trim(),
+                paused:false,
+                reasonType:'other',
+                requirementTarget:0,
+                requirementCurrent:0,
+                requirementUnit:'публикаций',
+                requirementDueDate:'',
+                requirementVerified:false,
+                proofNote:'',
+                note
+            }, 'Прайс назначен через настройку цен'));
+        }
 
         for (const discount of discounts) {
             const code = Math.abs(discount - 5) < 0.001
