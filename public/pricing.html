@@ -140,7 +140,7 @@
                     <div>
                         <span>ЭЛЕКТРОННОЕ КОММЕРЧЕСКОЕ ПРЕДЛОЖЕНИЕ</span>
                         <h2>Конструктор КП</h2>
-                        <p>Выберите потенциального клиента, прайс и нужные декоры. Цены фиксируются на момент создания, фото привязываются к артикулу из Google Drive.</p>
+                        <p>Выберите потенциального клиента из CRM или введите нового вручную, затем прайс и нужные декоры. Цены и при необходимости остатки фиксируются на момент создания.</p>
                     </div>
                     <button type="button" id="pricing-offer-reset-btn" class="pricing-secondary-action"><i class="bi bi-plus-lg"></i><span>Новое КП</span></button>
                 </div>
@@ -148,13 +148,23 @@
                 <div class="pricing-offer-builder">
                     <section class="pricing-offer-setup">
                         <div class="pricing-offer-step">
-                            <div class="pricing-offer-step-title"><b>1</b><div><strong>Кому</strong><small>Выберите потенциального клиента из CRM</small></div></div>
-                            <label><span>Потенциальный клиент</span><select id="pricing-offer-dealer" class="form-select"><option value="">Выберите потенциального клиента</option></select></label>
-                            <div id="pricing-offer-dealer-card" class="pricing-offer-dealer-card is-empty">Сначала выберите потенциального клиента</div>
+                            <div class="pricing-offer-step-title"><b>1</b><div><strong>Кому</strong><small>Выберите клиента из CRM или введите нового</small></div></div>
+                            <div class="pricing-offer-recipient-switch" role="group" aria-label="Тип получателя">
+                                <button type="button" class="active" data-offer-recipient-mode="crm"><i class="bi bi-person-check"></i> Из CRM</button>
+                                <button type="button" data-offer-recipient-mode="manual"><i class="bi bi-pencil-square"></i> Новый клиент</button>
+                            </div>
+                            <div id="pricing-offer-recipient-crm">
+                                <label><span>Потенциальный клиент</span><select id="pricing-offer-dealer" class="form-select"><option value="">Выберите потенциального клиента</option></select></label>
+                            </div>
+                            <div id="pricing-offer-recipient-manual" hidden>
+                                <label><span>Название клиента</span><input id="pricing-offer-manual-name" class="form-control" type="text" autocomplete="off" placeholder="Например: ТОО Новый Дом"></label>
+                                <label><span>Город <small>необязательно</small></span><input id="pricing-offer-manual-city" class="form-control" type="text" autocomplete="off" placeholder="Например: Астана"></label>
+                            </div>
+                            <div id="pricing-offer-dealer-card" class="pricing-offer-dealer-card is-empty">Сначала выберите или введите клиента</div>
                         </div>
 
                         <div class="pricing-offer-step">
-                            <div class="pricing-offer-step-title"><b>2</b><div><strong>Какие цены</strong><small>Для потенциального клиента прайс выбирается вручную</small></div></div>
+                            <div class="pricing-offer-step-title"><b>2</b><div><strong>Какие цены</strong><small>Выберите прайс и параметры готового КП</small></div></div>
                             <label><span>Прайс для КП</span><select id="pricing-offer-price-list" class="form-select"><option value="">Выберите прайс</option></select></label>
                             <label><span>Ссылка действует</span>
                                 <select id="pricing-offer-expiry" class="form-select">
@@ -163,6 +173,11 @@
                                     <option value="30">30 дней</option>
                                     <option value="60">60 дней</option>
                                 </select>
+                            </label>
+                            <label class="pricing-offer-stock-switch">
+                                <input type="checkbox" id="pricing-offer-show-stock">
+                                <span class="pricing-offer-stock-switch-ui"></span>
+                                <span class="pricing-offer-stock-switch-copy"><strong>Показывать остатки</strong><small>Свободный остаток будет указан рядом с товаром в КП</small></span>
                             </label>
                             <div id="pricing-offer-price-summary" class="pricing-offer-price-summary is-empty">После выбора клиента и прайса здесь появятся цены по выбранному прайсу.</div>
                         </div>
@@ -186,7 +201,7 @@
                 </div>
 
                 <div class="pricing-offer-createbar">
-                    <div><strong id="pricing-offer-create-summary">Выберите потенциального клиента и продукцию</strong><small>Выбранный прайс и декоры фиксируются в КП на момент создания.</small></div>
+                    <div><strong id="pricing-offer-create-summary">Выберите клиента и продукцию</strong><small>Выбранный прайс, декоры и параметр остатков фиксируются в КП на момент создания.</small></div>
                     <button type="button" id="pricing-offer-create-btn" class="pricing-offer-create-btn" disabled><i class="bi bi-magic"></i> Создать электронное КП</button>
                 </div>
 
