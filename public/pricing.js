@@ -194,7 +194,7 @@ document.addEventListener('DOMContentLoaded', () => {
             String(item.id) === selected ||
             (item.active !== false && (!item.validTo || !state.today || item.validTo >= state.today))
         );
-        const empty = includeEmpty ? '<option value="">Выберите прайс</option>' : '';
+        const empty = includeEmpty ? '<option value="">Не менять действующий прайс</option>' : '';
         return empty + lists.map(item => {
             const dateState = priceListDateState(item);
             return `<option value="${esc(item.id)}" ${String(item.id) === selected ? 'selected' : ''}>${esc(item.name)}${item.versionDate ? ' · '+dateText(item.versionDate) : ''}${dateState.key !== 'active' ? ' · '+dateState.label.toLowerCase() : ''}</option>`;
@@ -217,8 +217,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const item = state.priceLists.find(list => String(list.id) === String(select.value));
         if (!item) {
-            host.classList.remove('is-warning','is-ok');
-            host.textContent = 'Название, цены и период действия берутся из выбранного прайса.';
+            host.classList.remove('is-warning');
+            host.classList.add('is-ok');
+            host.innerHTML = '<strong>Прайс не меняется.</strong> Каждый выбранный дилер сохранит свой текущий действующий прайс, а выбранная скидка применится поверх него.';
             return;
         }
 
@@ -1525,8 +1526,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (payload.scopeType !== 'all' && !selectedTargets.size) {
                 throw new Error('Выберите, на кого действует настройка');
             }
-            if (!payload.priceListId) {
-                throw new Error('Выберите прайс');
+            if (!payload.priceListId && !payload.discounts.length) {
+                throw new Error('Выберите хотя бы одну скидку или прайс');
             }
             await send(API+'/setup','POST',payload);
             bootstrap.Modal.getOrCreateInstance($('pricing-condition-modal')).hide();
