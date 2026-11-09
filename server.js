@@ -2542,18 +2542,22 @@ app.get('/api/pricing/catalog', requirePermission('can_view_pricing'), async (re
             .lean();
 
         res.json(products
-            .filter(product => isPricingLaminateProduct(product) && product.is_liquid !== false)
-            .map(product => ({
-                id: String(product._id),
-                sku: product.sku || '',
-                name: product.name || '',
-                collection: inferPricingCollection(product),
-                isLiquid: product.is_liquid !== false,
-                stockQty: Math.max(0, Number(product.stock_qty) || 0),
-                characteristics: product.characteristics || {},
-                photoId: IDEAL_DRIVE_PHOTOS[String(product.sku || '').trim().toUpperCase()] || ''
-            }))
+            .map(product => {
+                const productType = product.product_type === 'equipment' ? 'equipment' : 'laminate';
+                return {
+                    id: String(product._id),
+                    sku: product.sku || '',
+                    name: product.name || '',
+                    productType,
+                    collection: productType === 'equipment' ? 'ТОРГОВОЕ ОБОРУДОВАНИЕ' : inferPricingCollection(product),
+                    isLiquid: productType === 'equipment' ? true : product.is_liquid !== false,
+                    stockQty: Math.max(0, Number(product.stock_qty) || 0),
+                    characteristics: product.characteristics || {},
+                    photoId: IDEAL_DRIVE_PHOTOS[String(product.sku || '').trim().toUpperCase()] || ''
+                };
+            })
             .sort((a, b) =>
+                String(a.productType).localeCompare(String(b.productType), 'ru') ||
                 Number(b.isLiquid) - Number(a.isLiquid) ||
                 String(a.collection).localeCompare(String(b.collection), 'ru') ||
                 String(a.sku).localeCompare(String(b.sku), 'ru')
@@ -2704,11 +2708,14 @@ async function buildManualOfferPriceSheetSnapshot(priceListId, manualClient = {}
         .select('_id sku name product_type collection is_liquid')
         .sort({ sku:1, name:1 })
         .lean();
-    const laminate = products.filter(product => isPricingLaminateProduct(product) && product.is_liquid !== false);
-    const productMap = new Map(laminate.map(product => [String(product._id), product]));
+    const laminate = products.filter(product => isPricingLaminateProduct(product));
+    const equipment = products.filter(product => product.product_type === 'equipment');
+    const productMap = new Map(products.map(product => [String(product._id), product]));
 
     const listRows = Array.isArray(list.rows) ? list.rows : [];
     const collectionRows = new Map();
+    const productRows = new Map();
+    const skuRows = new Map();
     const legacyByCollection = new Map();
 
     listRows.forEach(row => {
@@ -2718,11 +2725,13 @@ async function buildManualOfferPriceSheetSnapshot(priceListId, manualClient = {}
             collectionRows.set(collection, row);
             return;
         }
+        if (row.product) productRows.set(String(row.product), row);
+        if (row.sku) skuRows.set(normalizePricingSku(row.sku), row);
         if (collection && !legacyByCollection.has(collection)) legacyByCollection.set(collection, row);
     });
 
     const liquidGroups = new Map();
-    laminate.forEach(product => {
+    laminate.filter(product => product.is_liquid !== false).forEach(product => {
         const collection = inferPricingCollection(product);
         if (!liquidGroups.has(collection)) liquidGroups.set(collection, []);
         liquidGroups.get(collection).push(product);
@@ -2751,6 +2760,38 @@ async function buildManualOfferPriceSheetSnapshot(priceListId, manualClient = {}
                 currency:source?.currency || 'KZT'
             };
         });
+
+    const appendExplicitProductRow = (product, productType, isLiquid, collectionLabel) => {
+        const source = productRows.get(String(product._id)) || skuRows.get(normalizePricingSku(product.sku)) || null;
+        const basePrice = Math.max(0, Number(source?.opt) || 0);
+        rows.push({
+            rowType:'product',
+            collection:collectionLabel,
+            label:[product.sku,product.name].filter(Boolean).join(' · '),
+            sku:product.sku || '',
+            name:product.name || '',
+            productId:String(product._id),
+            productType,
+            members:1,
+            isLiquid,
+            isEquipment:productType === 'equipment',
+            inherited:false,
+            opt:Number(source?.opt) || 0,
+            rrp:Number(source?.rrp) || 0,
+            basePrice,
+            finalPrice:basePrice,
+            displayPrice:Number(source?.displayPrice ?? source?.maxRrp) || 0,
+            currency:source?.currency || 'KZT'
+        });
+    };
+
+    laminate.filter(product => product.is_liquid === false)
+        .sort((a,b) => String(a.sku || '').localeCompare(String(b.sku || ''),'ru'))
+        .forEach(product => appendExplicitProductRow(product,'laminate',false,inferPricingCollection(product)));
+
+    equipment
+        .sort((a,b) => String(a.sku || '').localeCompare(String(b.sku || ''),'ru'))
+        .forEach(product => appendExplicitProductRow(product,'equipment',false,'ТОРГОВОЕ ОБОРУДОВАНИЕ'));
 
     return {
         dealer:{
@@ -2838,8 +2879,9 @@ async function buildDealerPriceSheetSnapshot(req, dealerId, options = {}) {
             .select('_id sku name product_type collection is_liquid')
             .sort({ sku: 1, name: 1 })
             .lean();
-        const laminate = products.filter(product => isPricingLaminateProduct(product) && product.is_liquid !== false);
-        const productMap = new Map(laminate.map(product => [String(product._id), product]));
+        const laminate = products.filter(product => isPricingLaminateProduct(product));
+        const equipment = products.filter(product => product.product_type === 'equipment');
+        const productMap = new Map(products.map(product => [String(product._id), product]));
 
         const productDisplay = await DealerDisplayPrice.find({ dealer: dealer._id }).lean();
         const productDisplayMap = new Map(productDisplay.map(item => [String(item.product), Number(item.price) || 0]));
@@ -2923,8 +2965,8 @@ async function buildDealerPriceSheetSnapshot(req, dealerId, options = {}) {
             .forEach(product => {
                 const collection = inferPricingCollection(product);
                 const override = productRows.get(String(product._id)) || skuRows.get(normalizePricingSku(product.sku)) || null;
-                const inherited = collectionRows.get(collection) || legacyByCollection.get(collection) || null;
-                const source = override || inherited || fallbackFor(collection, product);
+                const fallbackOverride = fallbackProducts.get(String(product._id)) || fallbackSkus.get(normalizePricingSku(product.sku)) || null;
+                const source = override || fallbackOverride;
                 const basePrice = source ? Math.max(0, Number(source[priceType.key]) || 0) : 0;
                 const finalPrice = basePrice > 0 ? Math.round(basePrice * (1 - discount / 100) * 100) / 100 : 0;
 
@@ -2937,13 +2979,42 @@ async function buildDealerPriceSheetSnapshot(req, dealerId, options = {}) {
                     productId: String(product._id),
                     members: 1,
                     isLiquid: false,
-                    inherited: !override && Boolean(inherited),
+                    productType: 'laminate',
+                    inherited: false,
                     opt: Number(source?.opt) || 0,
                     rrp: Number(source?.rrp) || 0,
                     basePrice,
                     finalPrice,
                     displayPrice: productDisplayMap.get(String(product._id)) || Number(source?.displayPrice ?? source?.maxRrp) || 0,
                     currency: source?.currency || 'KZT'
+                });
+            });
+
+        equipment
+            .sort((a,b) => String(a.sku || '').localeCompare(String(b.sku || ''),'ru'))
+            .forEach(product => {
+                const source = productRows.get(String(product._id)) || skuRows.get(normalizePricingSku(product.sku)) ||
+                    fallbackProducts.get(String(product._id)) || fallbackSkus.get(normalizePricingSku(product.sku)) || null;
+                const basePrice = source ? Math.max(0, Number(source[priceType.key]) || 0) : 0;
+                const finalPrice = basePrice > 0 ? Math.round(basePrice * (1 - discount / 100) * 100) / 100 : 0;
+                rows.push({
+                    rowType:'product',
+                    collection:'ТОРГОВОЕ ОБОРУДОВАНИЕ',
+                    label:[product.sku,product.name].filter(Boolean).join(' · '),
+                    sku:product.sku || '',
+                    name:product.name || '',
+                    productId:String(product._id),
+                    productType:'equipment',
+                    members:1,
+                    isLiquid:false,
+                    isEquipment:true,
+                    inherited:false,
+                    opt:Number(source?.opt) || 0,
+                    rrp:Number(source?.rrp) || 0,
+                    basePrice,
+                    finalPrice,
+                    displayPrice:productDisplayMap.get(String(product._id)) || Number(source?.displayPrice ?? source?.maxRrp) || 0,
+                    currency:source?.currency || 'KZT'
                 });
             });
 
@@ -3125,6 +3196,7 @@ app.post('/api/pricing/offers', requirePermission('can_view_pricing'), async (re
         const manualClientCity = String(req.body?.manualClientCity || '').trim();
         const priceListId = String(req.body?.priceListId || '').trim();
         const showStock = req.body?.showStock === true;
+        const description = String(req.body?.description || '').trim().slice(0,3000);
 
         if (!priceListId) return res.status(400).json({ error:'Выберите прайс для КП' });
 
@@ -3162,25 +3234,38 @@ app.post('/api/pricing/offers', requirePermission('can_view_pricing'), async (re
             _id:{ $in:selectedIds }
         }).select('_id sku name product_type collection characteristics is_liquid stock_qty').lean();
         const products = productCandidates.filter(product =>
-            isPricingLaminateProduct(product) && product.is_liquid !== false
+            isPricingLaminateProduct(product) || product.product_type === 'equipment'
         );
-        if (!products.length) return res.status(400).json({ error:'Выбранные декоры не найдены в актуальной номенклатуре' });
+        if (!products.length) return res.status(400).json({ error:'Выбранные позиции не найдены в актуальной номенклатуре' });
 
-        const rowMap = new Map((snapshot.rows || [])
+        const collectionRowMap = new Map((snapshot.rows || [])
             .filter(row => row.rowType === 'collection')
             .map(row => [String(row.collection || '').trim().toUpperCase(), row]));
+        const productRowMap = new Map();
+        (snapshot.rows || []).filter(row => row.rowType === 'product').forEach(row => {
+            if (row.productId) productRowMap.set('id:'+String(row.productId), row);
+            if (row.sku) productRowMap.set('sku:'+normalizePricingSku(row.sku), row);
+        });
 
         const items = products.map(product => {
-            const collection = inferPricingCollection(product);
-            const price = rowMap.get(String(collection || '').trim().toUpperCase()) || {};
+            const productType = product.product_type === 'equipment' ? 'equipment' : 'laminate';
+            const isLiquid = productType === 'laminate' ? product.is_liquid !== false : true;
+            const collection = productType === 'equipment' ? 'ТОРГОВОЕ ОБОРУДОВАНИЕ' : inferPricingCollection(product);
+            const specialPrice = productRowMap.get('id:'+String(product._id)) || productRowMap.get('sku:'+normalizePricingSku(product.sku)) || null;
+            const price = (productType === 'equipment' || !isLiquid)
+                ? (specialPrice || {})
+                : (collectionRowMap.get(String(collection || '').trim().toUpperCase()) || {});
             return {
                 productId:String(product._id),
                 sku:product.sku || '',
                 name:product.name || '',
                 collection,
+                productType,
+                isLiquid,
                 characteristics:product.characteristics || {},
                 photoId:IDEAL_DRIVE_PHOTOS[String(product.sku || '').trim().toUpperCase()] || '',
                 stockQty:showStock ? Math.max(0, Number(product.stock_qty) || 0) : null,
+                stockUnit:productType === 'equipment' ? 'шт' : 'м²',
                 basePrice:Number(price.basePrice ?? price.opt) || 0,
                 finalPrice:Number(price.finalPrice) || 0,
                 rrp:Number(price.rrp) || 0,
@@ -3205,6 +3290,7 @@ app.post('/api/pricing/offers', requirePermission('can_view_pricing'), async (re
             rows:undefined,
             items,
             showStock,
+            description,
             recipientMode,
             offerNumber,
             createdBy:user,
