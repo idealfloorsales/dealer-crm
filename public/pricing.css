@@ -245,7 +245,7 @@ html,body.pricing-page{max-width:100%;overflow-x:hidden}
 .pricing-dealer-block{border:1px solid rgba(23,24,27,.075);border-radius:16px;background:#fff;box-shadow:0 4px 16px rgba(28,24,24,.035);overflow:hidden}
 .pricing-dealer-block.is-open{border-color:rgba(185,4,10,.16);box-shadow:0 10px 28px rgba(28,24,24,.055)}
 .pricing-dealer-row{
-  grid-template-columns:minmax(230px,1.35fr) minmax(145px,.75fr) minmax(160px,.8fr) minmax(220px,1.2fr) 100px 120px minmax(150px,.75fr);
+  grid-template-columns:minmax(220px,1.25fr) minmax(125px,.65fr) minmax(150px,.78fr) minmax(190px,1.05fr) 88px 105px minmax(220px,.95fr);
   min-height:92px;padding:13px 15px;border:0;border-radius:0;background:#fff
 }
 .pricing-dealer-row:hover{background:#fdfcfb}
@@ -261,13 +261,17 @@ html,body.pricing-page{max-width:100%;overflow-x:hidden}
 .pricing-total small{font-size:.59rem}
 .pricing-end strong{font-size:.72rem}
 .pricing-end small{font-size:.59rem}
-.pricing-row-actions{display:flex;justify-content:flex-end;align-items:center;gap:5px;min-width:0}
+.pricing-row-actions{
+  display:flex;justify-content:flex-end;align-items:center;gap:5px;
+  width:100%;min-width:210px;flex-wrap:nowrap;overflow:visible
+}
 .pricing-quick-btn,.pricing-settings-btn{
   height:34px;display:inline-grid;place-items:center;border:1px solid #ded9d5;border-radius:9px;background:#faf9f7;
   color:#6c6e73;font:800 .67rem/1 Onest,Inter,sans-serif;transition:.15s ease
 }
-.pricing-quick-btn{min-width:45px;padding:0 9px}
-.pricing-settings-btn{width:34px;flex:0 0 34px}
+.pricing-quick-btn{width:45px;min-width:45px;flex:0 0 45px;padding:0 8px}
+.pricing-settings-btn{width:34px;min-width:34px;flex:0 0 34px}
+.pricing-row-actions .pricing-sheet-btn{flex:0 0 auto;min-width:68px}
 .pricing-quick-btn:hover,.pricing-settings-btn:hover{border-color:#cfc6c1;background:#f4f1ee;color:#303136}
 .pricing-quick-btn.is-active{border-color:#ecc5c7;background:#fff2f2;color:#a52228}
 
@@ -826,9 +830,17 @@ html,body.pricing-page{max-width:100%;overflow-x:hidden}
 .pricing-display-price{width:120px}
 .pricing-sheet-footer{align-items:center}
 
+@media(max-width:1480px) and (min-width:901px){
+  .pricing-dealer-row{
+    grid-template-columns:minmax(205px,1.2fr) minmax(115px,.62fr) minmax(145px,.76fr) minmax(175px,.95fr) 82px 98px 190px
+  }
+  .pricing-row-actions{min-width:180px}
+  .pricing-row-actions .pricing-sheet-btn{width:38px;min-width:38px;padding:0}
+  .pricing-row-actions .pricing-sheet-btn span{display:none}
+}
 @media(max-width:1320px){
   .pricing-price-list-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .pricing-dealer-row{grid-template-columns:minmax(220px,1.25fr) minmax(140px,.7fr) minmax(160px,.8fr) minmax(190px,1fr) 90px 110px 220px}
+  .pricing-dealer-row{grid-template-columns:minmax(190px,1.2fr) minmax(105px,.6fr) minmax(135px,.72fr) minmax(165px,.9fr) 78px 94px 184px}
 }
 @media(max-width:900px){
   .pricing-price-list-grid{grid-template-columns:1fr}
