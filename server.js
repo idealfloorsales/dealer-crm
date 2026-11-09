@@ -921,6 +921,18 @@ const productSchema = new mongoose.Schema({
 
 const Product = mongoose.model('Product', productSchema);
 
+async function cleanupDealerEquipmentProducts() {
+    const equipmentIds = await Product.find({ product_type:'equipment' }).distinct('_id');
+    if (!equipmentIds.length) return;
+    const result = await Dealer.updateMany(
+        { products:{ $in:equipmentIds } },
+        { $pull:{ products:{ $in:equipmentIds } } }
+    );
+    if (result.modifiedCount) {
+        console.log('Dealer product assignments cleaned from equipment:', result.modifiedCount);
+    }
+}
+
 function normalizeProductPhotoSku(value) {
     let sku = String(value || '')
         .trim()
@@ -1649,6 +1661,7 @@ async function connectToDB() {
             await seedUsers();
             await seedSectors();
             await migrateLegacyProductPhotos();
+            await cleanupDealerEquipmentProducts();
             await seedWorkshopMaterials();
             await seedWorkshopRecipes();
             await normalizeWorkshopPosRecipes();
