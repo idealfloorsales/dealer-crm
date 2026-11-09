@@ -41,7 +41,9 @@
         .employee-mobile-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
         .employee-chip{display:inline-flex;align-items:center;gap:4px;padding:4px 7px;border-radius:7px;background:#f4f3f1;color:#666970;font-size:.63rem;font-weight:700}
         .employee-profile-modal .modal-dialog{max-width:1120px}
-        .employee-profile-modal .modal-content{border:0;border-radius:22px;overflow:hidden}
+        .employee-profile-modal .modal-content{border:0;border-radius:22px;overflow:hidden;max-height:calc(100dvh - 2rem)}
+        .employee-profile-modal #userForm{min-height:0;overflow:hidden}
+        .employee-profile-modal .employee-profile-body{min-height:0;overflow-y:auto!important;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
         .employee-profile-top{padding:20px 22px 16px;background:linear-gradient(135deg,#fff,#f6f3f1);border-bottom:1px solid #e8e4e1}
         .employee-profile-identity{display:flex;gap:14px;align-items:center;min-width:0}
         .employee-profile-copy{min-width:0;flex:1}
@@ -99,8 +101,10 @@
             .permission-groups{grid-template-columns:1fr}
         }
         @media(max-width:700px){
-            .employee-profile-modal .modal-dialog{margin:0;max-width:none;height:100%}
-            .employee-profile-modal .modal-content{height:100%;border-radius:0}
+            .employee-profile-modal .modal-dialog{margin:0;max-width:none;height:100dvh;min-height:0}
+            .employee-profile-modal .modal-content{height:100dvh;max-height:100dvh;border-radius:0}
+            .employee-profile-modal #userForm{height:100%;min-height:0}
+            .employee-profile-modal .employee-profile-body{min-height:0;max-height:none;overflow-y:auto!important;touch-action:pan-y}
             .employee-profile-top{padding:14px}
             .employee-profile-body{padding:10px}
             .employee-field-grid{grid-template-columns:1fr}
