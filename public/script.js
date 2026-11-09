@@ -101,10 +101,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function fillDealerPriceListSelect(selectId, selectedId = '') {
+    function fillDealerPriceListSelect(selectId, selectedId = null) {
         const select = document.getElementById(selectId);
         if (!select) return;
-        const wanted = String(selectedId || select.value || '');
+        const hasExplicitSelection = selectedId !== null && selectedId !== undefined;
+        const wanted = hasExplicitSelection
+            ? String(selectedId || '')
+            : String(select.value || '');
         select.innerHTML = '';
         select.add(new Option('Не назначен', ''));
         dealerPriceLists
@@ -114,10 +117,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const label = [item.name, item.versionDate ? 'от ' + item.versionDate.split('-').reverse().join('.') : ''].filter(Boolean).join(' · ');
                 select.add(new Option(label, item.id));
             });
-        if ([...select.options].some(option => option.value === wanted)) select.value = wanted;
+        select.value = [...select.options].some(option => option.value === wanted) ? wanted : '';
     }
 
-    async function fetchDealerPriceLists(selectedAdd = '', selectedEdit = '') {
+    async function fetchDealerPriceLists(selectedAdd = null, selectedEdit = null) {
         const response = await fetch('/api/pricing/price-lists', { crmTrackLoading:false });
         if (!response.ok) throw new Error('Не удалось загрузить прайсы');
         const data = await response.json();
