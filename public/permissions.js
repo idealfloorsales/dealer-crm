@@ -867,7 +867,7 @@
         if (!user) return;
         const name = document.getElementById('crm-mobile-user-name');
         const role = document.getElementById('crm-mobile-user-role');
-        const roleNames = { manager: 'Менеджер', marketing: 'Маркетинг', workshop: 'Цех', guest: 'Гость' };
+        const roleNames = { admin: 'Администратор', manager: 'Менеджер', marketing: 'Маркетинг', workshop: 'Цех', guest: 'Гость' };
         if (name) name.textContent = user.name || user.username || user.email || 'Пользователь';
         if (role) role.textContent = roleNames[user.role] || user.role || 'CRM IDEAL FLOOR';
     }
@@ -1634,7 +1634,9 @@
     function can(permission) {
         const user = window.CRMAuth && window.CRMAuth.user;
         if (!user || !user.permissions) return false;
-        return Boolean(user.permissions.is_admin || user.permissions[permission]);
+        const isAdmin = user.role === 'admin' && user.permissions.is_admin === true;
+        if (permission === 'can_manage_users') return isAdmin;
+        return Boolean(isAdmin || user.permissions[permission]);
     }
 
     function applyNavigation() {
@@ -1657,7 +1659,7 @@
     function applyRoleBadge() {
         if (!window.CRMAuth.user) return;
         const user = window.CRMAuth.user;
-        const names = { manager: 'Менеджер', marketing: 'Маркетинг', workshop: 'Цех', guest: 'Гость' };
+        const names = { admin: 'Администратор', manager: 'Менеджер', marketing: 'Маркетинг', workshop: 'Цех', guest: 'Гость' };
         const label = names[user.role] || user.role || 'Пользователь';
         const badge = document.getElementById('user-role-badge');
         if (badge) badge.textContent = label;
