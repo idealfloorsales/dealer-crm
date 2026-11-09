@@ -4477,7 +4477,7 @@ body.bg-light {
 
     .sales-print-meta strong {
         color: #4f5157;
-        font-size: 9.5pt;
+        font-size: 8.5pt;
         font-weight: 650;
     }
 
@@ -4596,7 +4596,7 @@ body.bg-light {
     }
 
     .sales-print-section {
-        margin-bottom: 5mm;
+        margin-bottom: 3.2mm;
         break-inside: auto;
     }
 
@@ -4607,7 +4607,7 @@ body.bg-light {
         border-radius: 1.4mm;
         background: #f9eeee !important;
         color: #7f0308;
-        font-size: 8pt;
+        font-size: 9.5pt;
         font-weight: 800;
         letter-spacing: .55pt;
         text-transform: uppercase;
@@ -4723,7 +4723,7 @@ body.bg-light {
 
     .sales-print-item-progress {
         height: 2.1mm;
-        margin-top: 2.5mm;
+        margin-top: 1.8mm;
         overflow: hidden;
         border-radius: 99mm;
         background: #ece9e5 !important;
