@@ -978,13 +978,288 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function openSalesPrintWindow() {
+        if (!printReport) return;
+
+        const printWindow = window.open('', '_blank', 'width=1050,height=900');
+        if (!printWindow) {
+            alert('Браузер заблокировал окно печати. Разрешите всплывающие окна для CRM.');
+            return;
+        }
+
+        const reportHtml = printReport.innerHTML;
+        const printCss = `
+            @page { size: A4 portrait; margin: 5mm; }
+            * { box-sizing: border-box; }
+            html, body {
+                margin: 0;
+                padding: 0;
+                width: 100%;
+                background: #fff;
+                color: #25262a;
+                font-family: Arial, Helvetica, sans-serif;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            body { font-size: 9pt; line-height: 1.2; }
+            .sales-print-report {
+                width: 100%;
+                max-width: 200mm;
+                margin: 0 auto;
+                color: #25262a;
+            }
+            .sales-print-report::before {
+                content: "";
+                display: block;
+                height: 2.2mm;
+                margin-bottom: 3mm;
+                border-radius: 2mm;
+                background: linear-gradient(90deg,#b9040a,#8d0207 72%,#3a2023);
+            }
+            .sales-print-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 8mm;
+                padding: 0 0 3mm;
+                border-bottom: .7pt solid #eadadc;
+            }
+            .sales-print-header > div:first-child {
+                display: flex;
+                align-items: center;
+                gap: 4mm;
+            }
+            .sales-print-header img {
+                width: 28mm;
+                max-height: 11mm;
+                object-fit: contain;
+            }
+            .sales-print-header h1 {
+                margin: 0 0 .8mm;
+                font-size: 19pt;
+                line-height: 1;
+                font-weight: 800;
+            }
+            #print-period {
+                color: #b9040a;
+                font-size: 9pt;
+                font-weight: 700;
+            }
+            .sales-print-meta {
+                text-align: right;
+                white-space: nowrap;
+                color: #96989e;
+                font-size: 6.8pt;
+            }
+            .sales-print-meta span,
+            .sales-print-meta strong { display: block; }
+            .sales-print-meta strong {
+                margin-top: .5mm;
+                color: #55575c;
+                font-size: 8pt;
+            }
+            .sales-print-overview {
+                display: grid;
+                grid-template-columns: repeat(3,minmax(0,1fr));
+                gap: 2mm;
+                margin: 3mm 0 3.2mm;
+            }
+            .sales-print-overview-card {
+                position: relative;
+                overflow: hidden;
+                padding: 2.3mm 2.6mm 2.1mm;
+                border: .7pt solid #e2d7d8;
+                border-radius: 2.2mm;
+                background: #fffafa;
+                break-inside: avoid;
+            }
+            .sales-print-overview-card.is-good { border-color:#b7dccb; background:#f2fbf6; }
+            .sales-print-overview-card.is-mid { border-color:#ead3a7; background:#fff9ee; }
+            .sales-print-overview-card.is-low { border-color:#e6b4b7; background:#fff5f5; }
+            .sales-print-overview-card.is-none { border-color:#d9dadd; background:#f8f8f8; }
+            .sales-print-overview-top {
+                display: flex;
+                align-items: baseline;
+                justify-content: space-between;
+                gap: 2mm;
+            }
+            .sales-print-overview-top > span {
+                min-width: 0;
+                color: #44464b;
+                font-size: 8.2pt;
+                font-weight: 700;
+            }
+            .sales-print-overview-top > strong {
+                flex: 0 0 auto;
+                color: #b9040a;
+                font-size: 14pt;
+                line-height: 1;
+                font-weight: 800;
+            }
+            .sales-print-overview-card.is-good .sales-print-overview-top > strong { color:#177452; }
+            .sales-print-overview-card.is-mid .sales-print-overview-top > strong { color:#a16b0b; }
+            .sales-print-overview-card.is-none .sales-print-overview-top > strong { color:#85878c; font-size:7.5pt; }
+            .sales-print-overview-values {
+                display: flex;
+                gap: 3mm;
+                margin-top: 1.4mm;
+                color: #74767c;
+                font-size: 7pt;
+            }
+            .sales-print-overview-values b { color:#303136; font-weight:800; }
+            .sales-print-overview-bar,
+            .sales-print-item-progress {
+                overflow: hidden;
+                border-radius: 99mm;
+                background: #e9e6e2;
+            }
+            .sales-print-overview-bar { height: 1.6mm; margin-top: 1.5mm; }
+            .sales-print-overview-bar i,
+            .sales-print-item-progress span {
+                display:block;
+                height:100%;
+                border-radius:inherit;
+                background:#b9040a;
+            }
+            .is-good .sales-print-overview-bar i,
+            .sales-print-item.is-good .sales-print-item-progress span { background:#178256; }
+            .is-mid .sales-print-overview-bar i,
+            .sales-print-item.is-mid .sales-print-item-progress span { background:#d89526; }
+            .sales-print-section {
+                margin-bottom: 2.4mm;
+                break-inside: auto;
+            }
+            .sales-print-section-title {
+                margin-bottom: 1.3mm;
+                padding: 1.2mm 2mm;
+                border-left: 1.8mm solid #b9040a;
+                border-radius: 1mm;
+                background: #f9eeee;
+                color: #7f0308;
+                font-size: 8.3pt;
+                font-weight: 800;
+                letter-spacing: .35pt;
+                text-transform: uppercase;
+                break-after: avoid;
+            }
+            .sales-print-section-items {
+                display: grid;
+                grid-template-columns: repeat(2,minmax(0,1fr));
+                gap: 1.4mm;
+            }
+            .sales-print-item {
+                padding: 1.7mm 2mm 1.6mm;
+                border: .6pt solid #e3e0dc;
+                border-radius: 1.7mm;
+                background: #fff;
+                break-inside: avoid;
+            }
+            .sales-print-item.is-total {
+                grid-column: 1 / -1;
+                border-color: #d9a8aa;
+                background: #fff7f7;
+            }
+            .sales-print-item.is-good { border-top:1.7pt solid #178256; }
+            .sales-print-item.is-mid { border-top:1.7pt solid #d89526; }
+            .sales-print-item.is-low { border-top:1.7pt solid #b9040a; }
+            .sales-print-item.is-none { border-top:1.7pt solid #a5a7ac; }
+            .sales-print-item-head {
+                display:flex;
+                align-items:center;
+                justify-content:space-between;
+                gap:2mm;
+                margin-bottom:1.2mm;
+            }
+            .sales-print-item-title {
+                min-width:0;
+                color:#303136;
+                font-size:8.5pt;
+                font-weight:800;
+                line-height:1.1;
+            }
+            .sales-print-item-percent {
+                flex:0 0 auto;
+                padding:.65mm 1.3mm;
+                border-radius:99mm;
+                background:#f9eeee;
+                color:#b9040a;
+                font-size:8pt;
+                font-weight:800;
+                line-height:1;
+            }
+            .sales-print-item.is-good .sales-print-item-percent { background:#eaf6f0; color:#177452; }
+            .sales-print-item.is-mid .sales-print-item-percent { background:#fff4de; color:#95620b; }
+            .sales-print-item.is-none .sales-print-item-percent { background:#f0f0f1; color:#7d7f84; font-size:6.6pt; }
+            .sales-print-item-metrics {
+                display:grid;
+                grid-template-columns:repeat(3,minmax(0,1fr));
+                gap:1mm;
+            }
+            .sales-print-item-metrics > div {
+                min-width:0;
+                padding:1mm 1.3mm;
+                border-radius:1.2mm;
+                background:#f7f6f4;
+            }
+            .sales-print-item-metrics span {
+                display:block;
+                margin-bottom:.25mm;
+                color:#8d8f94;
+                font-size:6.1pt;
+                font-weight:700;
+            }
+            .sales-print-item-metrics strong {
+                display:block;
+                overflow:hidden;
+                color:#2f3034;
+                font-size:8.1pt;
+                font-weight:800;
+                text-overflow:ellipsis;
+                white-space:nowrap;
+            }
+            .sales-print-item-progress { height:1.55mm; margin-top:1.2mm; }
+            .sales-print-footer {
+                display:flex;
+                align-items:center;
+                justify-content:space-between;
+                gap:6mm;
+                margin-top:2.5mm;
+                padding-top:1.5mm;
+                border-top:.7pt solid #eadadc;
+                color:#8e9095;
+                font-size:6.5pt;
+            }
+            @media print {
+                html, body { width:auto; height:auto; }
+            }
+        `;
+
+        printWindow.document.open();
+        printWindow.document.write(`<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<base href="${location.origin}/">
+<title>Продажи · IDEAL FLOOR CRM</title>
+<style>${printCss}</style>
+</head>
+<body>
+<section class="sales-print-report">${reportHtml}</section>
+<script>
+window.addEventListener('load',()=>setTimeout(()=>window.print(),250));
+window.addEventListener('afterprint',()=>window.close());
+<\/script>
+</body>
+</html>`);
+        printWindow.document.close();
+    }
+
     if (printBtn) {
         printBtn.onclick = () => {
             captureState();
             renderAll();
-            if (printReport) printReport.setAttribute('aria-hidden', 'false');
-            window.print();
-            if (printReport) printReport.setAttribute('aria-hidden', 'true');
+            openSalesPrintWindow();
         };
     }
 
