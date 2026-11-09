@@ -624,7 +624,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         const collectionMembers = new Map();
-        state.catalog.filter(product => product.isLiquid !== false).forEach(product => {
+        state.catalog.filter(product => product.productType !== 'equipment' && product.isLiquid !== false).forEach(product => {
             const collection = String(product.collection || 'ДРУГИЕ КОЛЛЕКЦИИ').trim().toUpperCase();
             if (!collectionMembers.has(collection)) collectionMembers.set(collection, []);
             collectionMembers.get(collection).push(product);
