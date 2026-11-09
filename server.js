@@ -2781,8 +2781,37 @@ app.patch('/api/dealers/:id', requirePermission('can_edit_dealer'), async (req, 
     } catch (e) { res.status(500).json({ error:e.message }); }
 });
 app.delete('/api/dealers/:id', requirePermission('can_delete_dealer'), async (req, res) => { try { await Dealer.findOneAndDelete({ _id: req.params.id, ...getDealerFilter(req) }); res.json({status:'deleted'}); } catch (e) { res.status(500).json({ error: e.message }); } });
-app.get('/api/dealers/:id/products', requireAnyPermission('can_view_dealers', 'can_view_products'), async (req, res) => { const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).populate('products'); if (!d) return res.status(404).json({ error: 'Дилер не найден' }); res.json(d.products.map(convertToClient)); });
-app.put('/api/dealers/:id/products', requirePermission('can_edit_matrix'), async (req, res) => { const d = await Dealer.findOneAndUpdate({ _id: req.params.id, ...getDealerFilter(req) }, { products: req.body.productIds }); if (!d) return res.status(404).json({ error: 'Дилер не найден' }); res.json({status:'ok'}); });
+app.get('/api/dealers/:id/products', requireAnyPermission('can_view_dealers', 'can_view_products'), async (req, res) => {
+    const d = await Dealer.findOne({ _id:req.params.id, ...getDealerFilter(req) }).populate('products');
+    if (!d) return res.status(404).json({ error:'Дилер не найден' });
+    const laminateProducts = (d.products || []).filter(product => String(product?.product_type || 'laminate') !== 'equipment');
+    res.json(laminateProducts.map(convertToClient));
+});
+app.put('/api/dealers/:id/products', requirePermission('can_edit_matrix'), async (req, res) => {
+    try {
+        const requestedIds = [...new Set(
+            (Array.isArray(req.body?.productIds) ? req.body.productIds : [])
+                .map(value => String(value || '').trim())
+                .filter(value => mongoose.Types.ObjectId.isValid(value))
+        )];
+        const laminateProducts = requestedIds.length
+            ? await Product.find({
+                _id:{ $in:requestedIds },
+                product_type:{ $ne:'equipment' }
+            }).select('_id').lean()
+            : [];
+        const productIds = laminateProducts.map(item => item._id);
+        const d = await Dealer.findOneAndUpdate(
+            { _id:req.params.id, ...getDealerFilter(req) },
+            { $set:{ products:productIds } },
+            { new:true }
+        ).lean();
+        if (!d) return res.status(404).json({ error:'Дилер не найден' });
+        res.json({ status:'ok', saved:productIds.length });
+    } catch (e) {
+        res.status(400).json({ error:e.message });
+    }
+});
 // ==========================================
 // ЦЕНОВЫЕ УСЛОВИЯ ДИЛЕРОВ
 // ==========================================
