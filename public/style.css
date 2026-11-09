@@ -8766,7 +8766,7 @@ body.bg-light {
     border-radius: 16px;
     background: #fff;
     box-shadow: 0 4px 16px rgba(28,24,24,.035);
-    cursor: pointer;
+    cursor: default;
     transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
 }
 
