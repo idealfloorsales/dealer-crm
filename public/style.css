@@ -7222,7 +7222,11 @@ body.bg-light {
    DEALER DIRECTORY V3 — CLEAN CARD LAYOUT
    ========================================================= */
 .dealer-toolbar-filters {
-    grid-template-columns: repeat(6, minmax(0,1fr)) auto;
+    grid-template-columns: repeat(4, minmax(0,1fr));
+}
+
+.dealer-reset-filters {
+    grid-column: auto;
 }
 
 .dealer-v3-card {
