@@ -3073,6 +3073,49 @@ app.delete('/api/pricing/price-lists/:id', requirePermission('can_manage_pricing
     }
 });
 
+app.post('/api/pricing/price-lists/:id/restore', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const list = await PriceList.findById(req.params.id);
+        if (!list) return res.status(404).json({ error:'Прайс не найден' });
+        list.active = true;
+        list.archivedAt = null;
+        list.updatedBy = pricingUserMeta(req);
+        await list.save();
+        res.json({ status:'ok', active:true });
+    } catch (e) {
+        res.status(400).json({ error:e.message });
+    }
+});
+
+app.delete('/api/pricing/price-lists/:id/permanent', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const list = await PriceList.findById(req.params.id).lean();
+        if (!list) return res.status(404).json({ error:'Прайс не найден' });
+
+        const [dealerLinks, activeConditions] = await Promise.all([
+            Dealer.countDocuments({ price_list:list._id }),
+            PricingCondition.countDocuments({
+                priceList:list._id,
+                cancelledAt:{ $in:[null] }
+            })
+        ]);
+
+        if (dealerLinks || activeConditions) {
+            const parts = [];
+            if (dealerLinks) parts.push('назначен дилерам: ' + dealerLinks);
+            if (activeConditions) parts.push('используется в действующих условиях: ' + activeConditions);
+            return res.status(409).json({
+                error:'Прайс нельзя удалить, пока он используется (' + parts.join(', ') + '). Сначала снимите назначения или отмените условия.'
+            });
+        }
+
+        await PriceList.deleteOne({ _id:list._id });
+        res.json({ status:'deleted', id:String(list._id), name:list.name || '' });
+    } catch (e) {
+        res.status(400).json({ error:e.message });
+    }
+});
+
 async function buildManualOfferPriceSheetSnapshot(priceListId, manualClient = {}) {
     const id = String(priceListId || '').trim();
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -4405,6 +4448,72 @@ app.delete('/api/pricing/conditions/:id', requirePermission('can_manage_pricing'
         res.json({ status: 'ok' });
     } catch (e) {
         res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/api/pricing/conditions/:id/restore', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const condition = await PricingCondition.findById(req.params.id);
+        if (!condition) return res.status(404).json({ error:'Ценовое условие не найдено' });
+        if (!condition.cancelledAt) return res.status(400).json({ error:'Условие уже действует' });
+
+        if (condition.kind === 'price_list' && condition.priceList) {
+            const linkedList = await PriceList.findById(condition.priceList).select('_id name active').lean();
+            if (!linkedList) {
+                return res.status(409).json({ error:'Связанный прайс-лист удалён. Выберите другой прайс и создайте новое условие.' });
+            }
+            if (linkedList.active === false) {
+                return res.status(409).json({ error:'Сначала восстановите прайс-лист «' + (linkedList.name || condition.priceListName || '') + '» из архива.' });
+            }
+        }
+
+        const duplicate = await findPricingDuplicate({
+            code:condition.code,
+            kind:condition.kind,
+            scopeType:condition.scopeType,
+            dealer:condition.dealer,
+            dealers:condition.dealers,
+            scopeValue:condition.scopeValue,
+            scopeValues:condition.scopeValues,
+            startDate:condition.startDate,
+            endDate:condition.endDate
+        }, condition._id);
+        if (duplicate) {
+            return res.status(409).json({
+                error:'Нельзя восстановить: на эту же цель и период уже действует условие с кодом «' + (condition.code || duplicate.code || '') + '».'
+            });
+        }
+
+        const user = pricingUserMeta(req);
+        condition.cancelledAt = null;
+        condition.updatedBy = user;
+        condition.audit.push({
+            action:'restored',
+            userId:user.id,
+            userName:user.name,
+            note:String(req.body?.reason || 'Условие восстановлено').trim()
+        });
+        await condition.save();
+
+        const populated = await PricingCondition.findById(condition._id)
+            .populate('dealer', '_id dealer_id name city region_sector price_type responsible')
+            .populate('dealers', '_id dealer_id name city region_sector price_type responsible')
+            .populate('priceList', '_id name code versionDate validFrom validTo active includeIlliquid')
+            .lean();
+        res.json({ ...populated, computedStatus:pricingConditionStatus(populated) });
+    } catch (e) {
+        res.status(400).json({ error:e.message });
+    }
+});
+
+app.delete('/api/pricing/conditions/:id/permanent', requirePermission('can_manage_pricing'), async (req, res) => {
+    try {
+        const condition = await PricingCondition.findById(req.params.id).lean();
+        if (!condition) return res.status(404).json({ error:'Ценовое условие не найдено' });
+        await PricingCondition.deleteOne({ _id:condition._id });
+        res.json({ status:'deleted', id:String(condition._id), name:condition.name || '' });
+    } catch (e) {
+        res.status(400).json({ error:e.message });
     }
 });
 
