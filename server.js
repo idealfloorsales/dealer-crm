@@ -129,7 +129,7 @@ const userSchema = new mongoose.Schema({
     avatarUrl: String,
     lastLoginAt: Date,
     isBlocked: { type: Boolean, default: false },
-    role: { type: String, enum: ['manager', 'guest', 'marketing', 'workshop'], default: 'manager' },
+    role: { type: String, enum: ['admin', 'manager', 'guest', 'marketing', 'workshop'], default: 'manager' },
     scope: { type: String, enum: ['all', 'astana', 'regions'], default: 'all' },
     permissions: {
         can_view_dealers: { type: Boolean, default: true },
@@ -237,19 +237,30 @@ async function seedUsers() {
             username: 'admin',
             password: hashedPassword,
             fullName: 'Главный Администратор',
-            role: 'manager',
+            role: 'admin',
             scope: 'all',
             permissions: adminPermissions
         });
         console.log('Администратор создан из INITIAL_ADMIN_PASSWORD.');
     } else {
         admin.permissions = adminPermissions;
-        admin.role = 'manager';
+        admin.role = 'admin';
         admin.scope = 'all';
         if (admin.isBlocked === undefined) admin.isBlocked = false;
         await admin.save();
         console.log('Права администратора принудительно обновлены.');
     }
+
+    // Нормализуем старые аккаунты: административный флаг означает отдельную роль admin.
+    // У всех остальных ролей административные права сотрудников/журнала принудительно сняты.
+    await User.updateMany(
+        { 'permissions.is_admin': true },
+        { $set:{ role:'admin', 'permissions.can_manage_users':true } }
+    );
+    await User.updateMany(
+        { role:{ $ne:'admin' } },
+        { $set:{ 'permissions.is_admin':false, 'permissions.can_manage_users':false } }
+    );
 }
 
 // ==========================================
@@ -271,6 +282,12 @@ const authMiddleware = (req, res, next) => {
             if (!dbUser || dbUser.isBlocked) {
                 return res.status(403).json({ error: 'Доступ заблокирован' });
             }
+            const normalizedRole = dbUser.permissions?.is_admin === true ? 'admin' : (dbUser.role || 'manager');
+            const normalizedPermissions = { ...(dbUser.permissions || {}) };
+            if (normalizedRole !== 'admin') {
+                normalizedPermissions.is_admin = false;
+                normalizedPermissions.can_manage_users = false;
+            }
             req.user = {
                 id: dbUser._id.toString(),
                 username: dbUser.username,
@@ -281,9 +298,9 @@ const authMiddleware = (req, res, next) => {
                 phone: dbUser.phone || '',
                 email: dbUser.email || '',
                 position: dbUser.position || '',
-                role: dbUser.role || 'manager',
+                role: normalizedRole,
                 scope: dbUser.scope || 'all',
-                permissions: dbUser.permissions || {}
+                permissions: normalizedPermissions
             };
             next();
         } catch (e) {
@@ -528,8 +545,10 @@ app.post('/api/auth/login', async (req, res) => {
                 id: user._id, username: user.username, fullName: user.fullName,
                 lastName: user.lastName || '', firstName: user.firstName || '', middleName: user.middleName || '',
                 phone: user.phone || '', email: user.email || '', position: user.position || '',
-                role: user.role || 'manager', scope: user.scope || 'all',
-                permissions: user.permissions || {}
+                role: user.permissions?.is_admin === true ? 'admin' : (user.role || 'manager'), scope: user.scope || 'all',
+                permissions: user.permissions?.is_admin === true
+                    ? (user.permissions || {})
+                    : { ...(user.permissions || {}), is_admin:false, can_manage_users:false }
             }
         });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -555,12 +574,14 @@ app.get('/api/auth/me', async (req, res) => {
 });
 
 // API УПРАВЛЕНИЯ ПОЛЬЗОВАТЕЛЯМИ
+function isAdminUser(req) {
+    return Boolean(req.user && req.user.role === 'admin' && req.user.permissions?.is_admin === true);
+}
+
 function hasPermission(req, permission) {
-    return Boolean(
-        req.user &&
-        req.user.permissions &&
-        (req.user.permissions.is_admin || req.user.permissions[permission])
-    );
+    if (!req.user || !req.user.permissions) return false;
+    if (permission === 'can_manage_users') return isAdminUser(req);
+    return Boolean(isAdminUser(req) || req.user.permissions[permission]);
 }
 
 const requirePermission = (permission) => (req, res, next) => {
@@ -571,20 +592,18 @@ const requirePermission = (permission) => (req, res, next) => {
 };
 
 const requireAnyPermission = (...permissions) => (req, res, next) => {
-    if (req.user && req.user.permissions && req.user.permissions.is_admin) return next();
+    if (isAdminUser(req)) return next();
     if (!permissions.some(permission => hasPermission(req, permission))) {
         return res.status(403).json({ error: 'Недостаточно прав', permissions });
     }
     next();
 };
 
-const requireAdmin = requirePermission('can_manage_users');
-const requireIsAdmin = (req, res, next) => {
-    if (!req.user?.permissions?.is_admin) {
-        return res.status(403).json({ error: 'Удаление доступно только администратору' });
-    }
+const requireAdmin = (req, res, next) => {
+    if (!isAdminUser(req)) return res.status(403).json({ error:'Доступ только для администратора' });
     next();
 };
+const requireIsAdmin = requireAdmin;
 
 app.get('/api/admin/users', requireAdmin, async (req, res) => {
     try {
@@ -709,8 +728,13 @@ app.post('/api/admin/users', requireAdmin, async (req, res) => {
         if (exists) return res.status(400).json({ error: 'Логин уже занят' });
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
-        const normalizedRole = role || 'manager';
-        const normalizedScope = (normalizedRole === 'marketing' || normalizedRole === 'workshop') ? 'all' : scope;
+        const requestedRole = ['admin','manager','guest','marketing','workshop'].includes(String(role || '')) ? String(role) : 'manager';
+        const wantsAdmin = requestedRole === 'admin' || permissions?.is_admin === true;
+        const normalizedRole = wantsAdmin ? 'admin' : requestedRole;
+        const normalizedPermissions = { ...(permissions || {}) };
+        normalizedPermissions.is_admin = normalizedRole === 'admin';
+        normalizedPermissions.can_manage_users = normalizedRole === 'admin';
+        const normalizedScope = (normalizedRole === 'marketing' || normalizedRole === 'workshop' || normalizedRole === 'admin') ? 'all' : scope;
         const normalizedEmploymentStatus = ['working','vacation','away','dismissed'].includes(String(employmentStatus || '')) ? String(employmentStatus) : 'working';
         const normalizedLastName = String(lastName || '').trim();
         const normalizedFirstName = String(firstName || '').trim();
@@ -733,7 +757,7 @@ app.post('/api/admin/users', requireAdmin, async (req, res) => {
             avatarUrl:String(avatarUrl || '').trim(),
             role:normalizedRole,
             scope:normalizedScope,
-            permissions,
+            permissions:normalizedPermissions,
             isBlocked:normalizedEmploymentStatus === 'dismissed' ? true : Boolean(isBlocked)
         });
         await newUser.save();
@@ -744,8 +768,13 @@ app.post('/api/admin/users', requireAdmin, async (req, res) => {
 app.put('/api/admin/users/:id', requireAdmin, async (req, res) => {
     try {
         const { username, fullName, lastName, firstName, middleName, phone, email, position, department, officeCity, hireDate, employmentStatus, avatarUrl, role, scope, permissions, isBlocked, password } = req.body;
-        const normalizedRole = role || 'manager';
-        const normalizedScope = (normalizedRole === 'marketing' || normalizedRole === 'workshop') ? 'all' : scope;
+        const requestedRole = ['admin','manager','guest','marketing','workshop'].includes(String(role || '')) ? String(role) : 'manager';
+        const wantsAdmin = requestedRole === 'admin' || permissions?.is_admin === true;
+        const normalizedRole = wantsAdmin ? 'admin' : requestedRole;
+        const normalizedPermissions = { ...(permissions || {}) };
+        normalizedPermissions.is_admin = normalizedRole === 'admin';
+        normalizedPermissions.can_manage_users = normalizedRole === 'admin';
+        const normalizedScope = (normalizedRole === 'marketing' || normalizedRole === 'workshop' || normalizedRole === 'admin') ? 'all' : scope;
         const normalizedEmploymentStatus = ['working','vacation','away','dismissed'].includes(String(employmentStatus || '')) ? String(employmentStatus) : 'working';
         const normalizedLastName = String(lastName || '').trim();
         const normalizedFirstName = String(firstName || '').trim();
@@ -766,7 +795,7 @@ app.put('/api/admin/users/:id', requireAdmin, async (req, res) => {
             avatarUrl:String(avatarUrl || '').trim(),
             role:normalizedRole,
             scope:normalizedScope,
-            permissions,
+            permissions:normalizedPermissions,
             isBlocked:normalizedEmploymentStatus === 'dismissed' ? true : Boolean(isBlocked)
         };
 
@@ -2426,6 +2455,7 @@ app.get('/api/managers', requireAnyPermission('can_view_dealers', 'can_view_sale
         const managers = await User.find({
             role: 'manager',
             isBlocked: { $ne: true },
+            'permissions.is_admin': { $ne: true },
             'permissions.is_admin': { $ne: true }
         })
             .select('_id username fullName scope')
