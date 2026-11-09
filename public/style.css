@@ -13483,3 +13483,62 @@ body:not(.app-workspace-page) .modal-header .btn-close{
     font-size:.39rem!important;
   }
 }
+
+
+/* =========================================================
+   DEALER EDIT MOBILE — LOCK TAB RAIL HEIGHT
+   The shortcuts rail is a flex child and must never shrink vertically.
+   ========================================================= */
+@media (max-width:767px){
+  .dealer-form-modal .dealer-modal-header{
+    position:relative!important;
+    z-index:2!important;
+    flex-shrink:0!important;
+  }
+  .dealer-form-modal .dealer-field-shortcuts-full{
+    position:relative!important;
+    z-index:3!important;
+    flex:0 0 60px!important;
+    flex-shrink:0!important;
+    height:60px!important;
+    min-height:60px!important;
+    max-height:60px!important;
+    margin:0!important;
+    padding:6px!important;
+    align-items:stretch!important;
+    overflow:hidden!important;
+    background:#fff!important;
+    border-top:0!important;
+    border-bottom:1px solid rgba(23,24,27,.08)!important;
+    box-sizing:border-box!important;
+    transform:none!important;
+  }
+  .dealer-form-modal .dealer-field-shortcuts-full button,
+  .dealer-form-modal .dealer-field-shortcuts-full button:last-child{
+    align-self:stretch!important;
+    min-height:48px!important;
+    height:48px!important;
+    max-height:48px!important;
+    margin:0!important;
+    transform:none!important;
+  }
+  .dealer-form-modal .dealer-modal-body{
+    position:relative!important;
+    z-index:1!important;
+  }
+}
+@media (max-width:390px){
+  .dealer-form-modal .dealer-field-shortcuts-full{
+    flex-basis:58px!important;
+    height:58px!important;
+    min-height:58px!important;
+    max-height:58px!important;
+    padding:5px!important;
+  }
+  .dealer-form-modal .dealer-field-shortcuts-full button,
+  .dealer-form-modal .dealer-field-shortcuts-full button:last-child{
+    min-height:48px!important;
+    height:48px!important;
+    max-height:48px!important;
+  }
+}
