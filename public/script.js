@@ -42,6 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let addCloneMeta = null;
     let duplicateQueryHandled = false;
     let dealerPriceLists = [];
+    let motivationSchemesById = new Map();
 
     function captureDealerViewState() {
         const sector = document.getElementById('filter-sector');
@@ -875,6 +876,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 allSectors = [];
             });
             const dealersPromise = fetchDealers();
+            const motivationsPromise = fetchMotivationSchemesForHome().catch(e => {
+                console.warn('Не удалось загрузить справочник мотиваций', e);
+                motivationSchemesById = new Map();
+            });
             const tasksPromise = canDashboard
                 ? fetchTasks().catch(e => { allTasksData = []; console.warn(e); })
                 : Promise.resolve(allTasksData = []);
@@ -886,6 +891,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 statusesPromise,
                 sectorsPromise,
                 dealersPromise,
+                motivationsPromise,
                 tasksPromise,
                 currentSalesPromise
             ]);
@@ -2520,11 +2526,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const sectors = uniqueNormalized(dealers.map(d => d.region_sector));
         const motivationItems = new Map();
         dealers.forEach(dealer => {
-            const scheme = dealer?.motivation_scheme;
-            if (!scheme) return;
-            const id = String(scheme?._id || scheme?.id || scheme || '').trim();
-            const name = normalizeDisplayValue(typeof scheme === 'object' ? scheme.name : '');
-            if (id && name && !motivationItems.has(id)) motivationItems.set(id, name);
+            const motivation = dealerMotivationData(dealer);
+            if (!motivation?.id) return;
+            const name = motivation.name
+                || (motivation.ratePerM2 > 0 ? motivation.ratePerM2.toLocaleString('ru-RU',{maximumFractionDigits:2}) + ' ₸/м²' : '');
+            if (name && !motivationItems.has(motivation.id)) motivationItems.set(motivation.id, name);
         });
 
         const sc = normalizeDisplayValue(filterCity.value);
@@ -2683,6 +2689,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function dealerPriceListName(dealer) {
         return normalizeDisplayValue(dealer?.price_list?.name || dealer?.price_type || '');
+    }
+
+    function dealerMotivationData(dealer) {
+        const raw = dealer?.motivation_scheme;
+        if (!raw) return null;
+        const id = String(raw?._id || raw?.id || raw || '').trim();
+        if (!id) return null;
+        const source = raw && typeof raw === 'object'
+            ? raw
+            : (motivationSchemesById.get(id) || null);
+        return {
+            id,
+            name: normalizeDisplayValue(source?.name || ''),
+            ratePerM2: Number(source?.ratePerM2 || 0)
+        };
+    }
+
+    function dealerMotivationText(dealer) {
+        const motivation = dealerMotivationData(dealer);
+        if (!motivation) return '';
+        if (motivation.name) return motivation.name;
+        if (motivation.ratePerM2 > 0) {
+            return motivation.ratePerM2.toLocaleString('ru-RU',{maximumFractionDigits:2}) + ' ₸/м²';
+        }
+        return '';
+    }
+
+    async function fetchMotivationSchemesForHome() {
+        const response = await fetch('/api/motivation/schemes', { crmTrackLoading:false });
+        if (!response.ok) throw new Error('Не удалось загрузить мотивации');
+        const items = await response.json();
+        motivationSchemesById = new Map(
+            (Array.isArray(items) ? items : [])
+                .map(item => [String(item?.id || item?._id || '').trim(), item])
+                .filter(([id]) => Boolean(id))
+        );
+        return motivationSchemesById;
     }
 
     function responsibleLabel(value) {
@@ -3181,13 +3224,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const score = Math.max(0, Math.min(100, Number(metrics.health.score) || 0));
             const initial = safeText((d.name || 'Д').trim().charAt(0).toUpperCase());
 
-            const motivationScheme = d?.motivation_scheme && typeof d.motivation_scheme === 'object'
-                ? d.motivation_scheme
-                : null;
-            const motivationName = String(motivationScheme?.name || '').trim();
-            const motivationRate = Number(motivationScheme?.ratePerM2 || 0);
-            const motivationText = motivationName
-                || (motivationRate > 0 ? motivationRate.toLocaleString('ru-RU',{maximumFractionDigits:2}) + ' ₸/м²' : '');
+            const motivationText = dealerMotivationText(d);
 
             const baseMetaHtml = infoChips
                 .filter(item => ['Город','Сектор','Прайс'].includes(item.label))
