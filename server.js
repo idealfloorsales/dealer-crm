@@ -116,6 +116,9 @@ const userSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     fullName: String,
+    lastName: String,
+    firstName: String,
+    middleName: String,
     phone: String,
     email: String,
     position: String,
@@ -272,6 +275,12 @@ const authMiddleware = (req, res, next) => {
                 id: dbUser._id.toString(),
                 username: dbUser.username,
                 fullName: dbUser.fullName,
+                lastName: dbUser.lastName || '',
+                firstName: dbUser.firstName || '',
+                middleName: dbUser.middleName || '',
+                phone: dbUser.phone || '',
+                email: dbUser.email || '',
+                position: dbUser.position || '',
                 role: dbUser.role || 'manager',
                 scope: dbUser.scope || 'all',
                 permissions: dbUser.permissions || {}
@@ -517,6 +526,8 @@ app.post('/api/auth/login', async (req, res) => {
             token,
             user: {
                 id: user._id, username: user.username, fullName: user.fullName,
+                lastName: user.lastName || '', firstName: user.firstName || '', middleName: user.middleName || '',
+                phone: user.phone || '', email: user.email || '', position: user.position || '',
                 role: user.role || 'manager', scope: user.scope || 'all',
                 permissions: user.permissions || {}
             }
@@ -530,6 +541,12 @@ app.get('/api/auth/me', async (req, res) => {
             id: req.user.id,
             username: req.user.username,
             fullName: req.user.fullName,
+            lastName: req.user.lastName || '',
+            firstName: req.user.firstName || '',
+            middleName: req.user.middleName || '',
+            phone: req.user.phone || '',
+            email: req.user.email || '',
+            position: req.user.position || '',
             role: req.user.role || 'manager',
             scope: req.user.scope || 'all',
             permissions: req.user.permissions || {}
@@ -684,7 +701,7 @@ app.get('/api/admin/users/:id/profile-stats', requireAdmin, async (req, res) => 
 
 app.post('/api/admin/users', requireAdmin, async (req, res) => {
     try {
-        const { username, password, fullName, phone, email, position, department, officeCity, hireDate, employmentStatus, avatarUrl, role, scope, permissions, isBlocked } = req.body;
+        const { username, password, fullName, lastName, firstName, middleName, phone, email, position, department, officeCity, hireDate, employmentStatus, avatarUrl, role, scope, permissions, isBlocked } = req.body;
         if (!username || !String(username).trim()) return res.status(400).json({ error: 'Укажите логин' });
         if (!password || String(password).length < 6) return res.status(400).json({ error: 'Пароль должен быть не короче 6 символов' });
         const normalizedUsername = String(username).trim().toLowerCase();
@@ -695,10 +712,17 @@ app.post('/api/admin/users', requireAdmin, async (req, res) => {
         const normalizedRole = role || 'manager';
         const normalizedScope = (normalizedRole === 'marketing' || normalizedRole === 'workshop') ? 'all' : scope;
         const normalizedEmploymentStatus = ['working','vacation','away','dismissed'].includes(String(employmentStatus || '')) ? String(employmentStatus) : 'working';
+        const normalizedLastName = String(lastName || '').trim();
+        const normalizedFirstName = String(firstName || '').trim();
+        const normalizedMiddleName = String(middleName || '').trim();
+        const normalizedFullName = [normalizedLastName, normalizedFirstName, normalizedMiddleName].filter(Boolean).join(' ') || String(fullName || '').trim();
         const newUser = new User({
             username: normalizedUsername,
             password: hashedPassword,
-            fullName:String(fullName || '').trim(),
+            fullName:normalizedFullName,
+            lastName:normalizedLastName,
+            firstName:normalizedFirstName,
+            middleName:normalizedMiddleName,
             phone:String(phone || '').trim(),
             email:String(email || '').trim(),
             position:String(position || '').trim(),
@@ -719,12 +743,19 @@ app.post('/api/admin/users', requireAdmin, async (req, res) => {
 
 app.put('/api/admin/users/:id', requireAdmin, async (req, res) => {
     try {
-        const { username, fullName, phone, email, position, department, officeCity, hireDate, employmentStatus, avatarUrl, role, scope, permissions, isBlocked, password } = req.body;
+        const { username, fullName, lastName, firstName, middleName, phone, email, position, department, officeCity, hireDate, employmentStatus, avatarUrl, role, scope, permissions, isBlocked, password } = req.body;
         const normalizedRole = role || 'manager';
         const normalizedScope = (normalizedRole === 'marketing' || normalizedRole === 'workshop') ? 'all' : scope;
         const normalizedEmploymentStatus = ['working','vacation','away','dismissed'].includes(String(employmentStatus || '')) ? String(employmentStatus) : 'working';
+        const normalizedLastName = String(lastName || '').trim();
+        const normalizedFirstName = String(firstName || '').trim();
+        const normalizedMiddleName = String(middleName || '').trim();
+        const normalizedFullName = [normalizedLastName, normalizedFirstName, normalizedMiddleName].filter(Boolean).join(' ') || String(fullName || '').trim();
         const updateData = {
-            fullName:String(fullName || '').trim(),
+            fullName:normalizedFullName,
+            lastName:normalizedLastName,
+            firstName:normalizedFirstName,
+            middleName:normalizedMiddleName,
             phone:String(phone || '').trim(),
             email:String(email || '').trim(),
             position:String(position || '').trim(),
@@ -3330,6 +3361,64 @@ app.get('/api/pricing/offer-recipients', requirePermission('can_view_pricing'), 
     }
 });
 
+function commercialOfferContact(user = {}) {
+    const fullName = [user.lastName, user.firstName, user.middleName].map(value => String(value || '').trim()).filter(Boolean).join(' ')
+        || String(user.fullName || user.username || '').trim();
+    return {
+        userId:String(user._id || user.id || ''),
+        fullName,
+        lastName:String(user.lastName || '').trim(),
+        firstName:String(user.firstName || '').trim(),
+        middleName:String(user.middleName || '').trim(),
+        phone:String(user.phone || '').trim(),
+        email:String(user.email || '').trim(),
+        position:String(user.position || '').trim()
+    };
+}
+
+async function resolveCommercialOfferContact(req, requestedUserId = '') {
+    const canChoose = Boolean(req.user?.permissions?.is_admin);
+    const targetId = canChoose && mongoose.Types.ObjectId.isValid(String(requestedUserId || '').trim())
+        ? String(requestedUserId).trim()
+        : String(req.user?.id || '');
+    if (!mongoose.Types.ObjectId.isValid(targetId)) {
+        const error = new Error('Не удалось определить сотрудника для обратной связи');
+        error.statusCode = 400;
+        throw error;
+    }
+    const user = await User.findOne({
+        _id:targetId,
+        isBlocked:{ $ne:true },
+        employmentStatus:{ $ne:'dismissed' }
+    }).select('_id username fullName lastName firstName middleName phone email position').lean();
+    if (!user) {
+        const error = new Error('Сотрудник для обратной связи не найден или недоступен');
+        error.statusCode = 404;
+        throw error;
+    }
+    return commercialOfferContact(user);
+}
+
+app.get('/api/pricing/contact-users', requirePermission('can_view_pricing'), async (req, res) => {
+    try {
+        const canChoose = Boolean(req.user?.permissions?.is_admin);
+        const filter = canChoose
+            ? { isBlocked:{ $ne:true }, employmentStatus:{ $ne:'dismissed' } }
+            : { _id:req.user?.id, isBlocked:{ $ne:true }, employmentStatus:{ $ne:'dismissed' } };
+        const users = await User.find(filter)
+            .select('_id username fullName lastName firstName middleName phone email position')
+            .sort({ lastName:1, firstName:1, fullName:1, username:1 })
+            .lean();
+        res.json({
+            canChoose,
+            currentUserId:String(req.user?.id || ''),
+            contacts:users.map(commercialOfferContact)
+        });
+    } catch (e) {
+        res.status(500).json({ error:e.message });
+    }
+});
+
 app.get('/api/pricing/offers', requirePermission('can_view_pricing'), async (req, res) => {
     try {
         await purgeExpiredCommercialOffers();
@@ -3471,6 +3560,7 @@ app.post('/api/pricing/offers', requirePermission('can_view_pricing'), async (re
         const pad = value => String(value).padStart(2,'0');
         const offerNumber = 'КП-' + now.getFullYear() + pad(now.getMonth()+1) + pad(now.getDate()) + '-' + crypto.randomBytes(2).toString('hex').toUpperCase();
         const user = pricingUserMeta(req);
+        const contact = await resolveCommercialOfferContact(req, req.body?.contactUserId);
 
         const offerSnapshot = {
             ...snapshot,
@@ -3479,6 +3569,7 @@ app.post('/api/pricing/offers', requirePermission('can_view_pricing'), async (re
             showStock,
             description,
             recipientMode,
+            contact,
             offerNumber,
             createdBy:user,
             generatedAt:now.toISOString()
@@ -3505,6 +3596,7 @@ app.post('/api/pricing/offers', requirePermission('can_view_pricing'), async (re
             priceList:snapshot.priceList,
             totalDiscountPercent:snapshot.totalDiscountPercent || 0,
             showStock,
+            contact,
             itemsCount:items.length
         });
     } catch (e) {
