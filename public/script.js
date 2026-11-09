@@ -54,7 +54,6 @@ document.addEventListener('DOMContentLoaded', () => {
             responsible: filterResponsible?.value || '',
             health: filterHealth?.value || '',
             sector: sector?.value || '',
-            pos: filterPos?.value || '',
             motivation: filterMotivation?.value || '',
             sort: dealerSortSelect?.value || 'dealer_id_asc',
             quickFilter: dealerQuickFilter || 'all',
@@ -81,7 +80,6 @@ document.addEventListener('DOMContentLoaded', () => {
         restoreSelect(filterResponsible, state.responsible);
         restoreSelect(filterHealth, state.health);
         restoreSelect(document.getElementById('filter-sector'), state.sector);
-        restoreSelect(filterPos, state.pos);
         restoreSelect(filterMotivation, state.motivation);
         restoreSelect(dealerSortSelect, state.sort || 'dealer_id_asc');
 
@@ -175,7 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const addProductChecklist = document.getElementById('add-product-checklist'); const addContactList = document.getElementById('add-contact-list'); const addAddressList = document.getElementById('add-address-list'); const addPosList = document.getElementById('add-pos-list'); const addVisitsList = document.getElementById('add-visits-list'); const addCompetitorList = document.getElementById('add-competitor-list'); const addPhotoInput = document.getElementById('add-photo-input'); const addPhotoPreviewContainer = document.getElementById('add-photo-preview-container'); const addAvatarInput = document.getElementById('add-avatar-input'); const addAvatarPreview = document.getElementById('add-avatar-preview');
     const editProductChecklist = document.getElementById('edit-product-checklist'); const editContactList = document.getElementById('edit-contact-list'); const editAddressList = document.getElementById('edit-address-list'); const editPosList = document.getElementById('edit-pos-list'); const editVisitsList = document.getElementById('edit-visits-list'); const editCompetitorList = document.getElementById('edit-competitor-list'); const editPhotoInput = document.getElementById('edit-photo-input'); const editPhotoPreviewContainer = document.getElementById('edit-photo-preview-container'); const editAvatarInput = document.getElementById('edit-avatar-input'); const editAvatarPreview = document.getElementById('edit-avatar-preview'); const editCurrentAvatarUrl = document.getElementById('edit-current-avatar-url');
     
-    const filterCity = document.getElementById('filter-city'); const filterPriceType = document.getElementById('filter-price-type'); const filterStatus = document.getElementById('filter-status'); const filterResponsible = document.getElementById('filter-responsible'); const filterPos = document.getElementById('filter-pos'); const filterMotivation = document.getElementById('filter-motivation'); const searchBar = document.getElementById('search-bar');
+    const filterCity = document.getElementById('filter-city'); const filterPriceType = document.getElementById('filter-price-type'); const filterStatus = document.getElementById('filter-status'); const filterResponsible = document.getElementById('filter-responsible'); const filterMotivation = document.getElementById('filter-motivation'); const searchBar = document.getElementById('search-bar');
     const dealerVisibleCount = document.getElementById('dealer-visible-count');
     const dealerSortSelect = document.getElementById('dealer-sort-select');
     const dealerResetFilters = document.getElementById('dealer-reset-filters');
@@ -962,7 +960,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if(filterStatus) filterStatus.onchange = renderDealerList;
         if(filterResponsible) filterResponsible.onchange = renderDealerList;
         if(filterHealth) filterHealth.onchange = renderDealerList;
-        if(filterPos) filterPos.onchange = renderDealerList;
         if(filterMotivation) filterMotivation.onchange = renderDealerList;
         const sectorFilter = document.getElementById('filter-sector');
         if(sectorFilter) sectorFilter.onchange = renderDealerList;
@@ -1020,7 +1017,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (filterPriceType) filterPriceType.value = '';
                 if (filterResponsible) filterResponsible.value = '';
                 if (filterHealth) filterHealth.value = '';
-                if (filterPos) filterPos.value = '';
                 if (filterMotivation) filterMotivation.value = '';
                 if (sectorFilter) sectorFilter.value = '';
                 if (dealerSortSelect) dealerSortSelect.value = 'dealer_id_asc';
@@ -1612,7 +1608,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const motivationFilter = filterMotivation?.value || '';
         const search = (searchBar?.value || '').trim().toLowerCase();
         const sector = document.getElementById('filter-sector')?.value || '';
-        const posFilter = filterPos?.value || '';
 
         const baseFiltered = allDealers.filter(dealer => {
             let visible = true;
@@ -1641,7 +1636,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     (responsible === '__unassigned__' && !dealer.responsible) ||
                     (responsible !== '__unassigned__' && String(dealer.responsible || '') === String(responsible))) &&
                 (!sector || normalizedSector === sector) &&
-                (!posFilter || (dealer.pos_materials || []).some(item => normalizeDisplayValue(item?.name) === posFilter)) &&
                 (() => {
                     const scheme = dealer?.motivation_scheme;
                     const motivationId = String(scheme?._id || scheme?.id || scheme || '').trim();
@@ -2521,7 +2515,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const cities = uniqueNormalized(dealers.map(d => d.city));
         const types = uniqueNormalized(dealers.map(dealerPriceListName));
         const sectors = uniqueNormalized(dealers.map(d => d.region_sector));
-        const posItems = uniqueNormalized(dealers.flatMap(d => (d.pos_materials || []).map(item => item?.name)));
         const motivationItems = new Map();
         dealers.forEach(dealer => {
             const scheme = dealer?.motivation_scheme;
@@ -2540,13 +2533,6 @@ document.addEventListener('DOMContentLoaded', () => {
         types.forEach(t => filterPriceType.add(new Option(t, t)));
         if (cities.includes(sc)) filterCity.value = sc;
         if (types.includes(st)) filterPriceType.value = st;
-
-        if (filterPos) {
-            const currentPos = normalizeDisplayValue(filterPos.value);
-            filterPos.innerHTML = '<option value="">Все торговое оборудование</option>';
-            posItems.forEach(item => filterPos.add(new Option(item,item)));
-            if (posItems.includes(currentPos)) filterPos.value = currentPos;
-        }
 
         if (filterMotivation) {
             const currentMotivation = String(filterMotivation.value || '');
@@ -3005,7 +2991,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const motivationFilter = filterMotivation?.value || '';
         const search = (searchBar?.value || '').trim().toLowerCase();
         const sector = document.getElementById('filter-sector')?.value || '';
-        const posFilter = filterPos?.value || '';
 
         const baseFiltered = allDealers.filter(d => {
             let isVisible = true;
@@ -3047,7 +3032,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     (responsible === '__unassigned__' && !d.responsible) ||
                     (responsible !== '__unassigned__' && String(d.responsible || '') === String(responsible))) &&
                 (!sector || normalizedSector === sector) &&
-                (!posFilter || (d.pos_materials || []).some(item => normalizeDisplayValue(item?.name) === posFilter)) &&
                 motivationMatches &&
                 (!search || searchable.includes(search));
         });
@@ -3639,7 +3623,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if(filterPriceType) filterPriceType.onchange = renderDealerList; 
     if(filterStatus) filterStatus.onchange = renderDealerList; 
     if(filterResponsible) filterResponsible.onchange = renderDealerList;
-    if(filterPos) filterPos.onchange = renderDealerList;
     if(searchBar) searchBar.oninput = renderDealerList;
 
     initApp();
