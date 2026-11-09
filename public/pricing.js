@@ -642,7 +642,42 @@ document.addEventListener('DOMContentLoaded', () => {
                 </tr>`;
             }).join('');
 
-        host.innerHTML = liquidHtml || '<tr><td colspan="4" class="pricing-empty">Коллекций для прайса пока нет</td></tr>';
+        const showIlliquid = Boolean($('pricing-list-show-illiquid')?.checked);
+        const illiquidProducts = state.catalog
+            .filter(product => product.productType !== 'equipment' && product.isLiquid === false)
+            .sort((a,b) =>
+                String(a.collection || '').localeCompare(String(b.collection || ''),'ru') ||
+                String(a.sku || '').localeCompare(String(b.sku || ''),'ru')
+            );
+
+        const illiquidHtml = illiquidProducts.length
+            ? `<tr class="pricing-list-section-row is-illiquid ${showIlliquid ? '' : 'pricing-list-row-hidden'}" data-price-illiquid-row>
+                    <td colspan="4"><strong>Неликвид</strong><span>${illiquidProducts.length} поз. · цены задаются отдельно</span></td>
+               </tr>` +
+              illiquidProducts.map(product => {
+                    const existing = productRows.get(String(product.id)) ||
+                        skuRows.get(String(product.sku || '').trim().toLowerCase()) || {};
+                    const collection = String(product.collection || '').trim().toUpperCase();
+                    return `<tr class="pricing-list-product-row is-illiquid ${showIlliquid ? '' : 'pricing-list-row-hidden'}"
+                        data-price-row data-price-illiquid-row data-scope-type="product"
+                        data-product-id="${esc(product.id)}" data-sku="${esc(product.sku || '')}"
+                        data-collection="${esc(collection)}" data-name="${esc(product.name || '')}" data-is-liquid="false">
+                        <td><strong>${esc([product.sku,product.name].filter(Boolean).join(' · '))}</strong><small>${esc(collection || 'Неликвид')}</small></td>
+                        <td><input type="number" min="0" step="0.01" inputmode="decimal" class="form-control" data-price-opt value="${n(existing.opt) || ''}" placeholder="0"></td>
+                        <td><input type="number" min="0" step="0.01" inputmode="decimal" class="form-control" data-price-rrp value="${n(existing.rrp) || ''}" placeholder="0"></td>
+                        <td><input type="number" min="0" step="0.01" inputmode="decimal" class="form-control" data-price-display value="${n(existing.displayPrice) || ''}" placeholder="0"></td>
+                    </tr>`;
+                }).join('')
+            : '';
+
+        host.innerHTML = liquidHtml + illiquidHtml || '<tr><td colspan="4" class="pricing-empty">Позиций для прайса пока нет</td></tr>';
+    }
+
+    function syncPriceListIlliquidVisibility() {
+        const show = Boolean($('pricing-list-show-illiquid')?.checked);
+        document.querySelectorAll('#pricing-list-editor-rows [data-price-illiquid-row]').forEach(row => {
+            row.classList.toggle('pricing-list-row-hidden', !show);
+        });
     }
 
     function collectPriceListRows() {
@@ -674,6 +709,7 @@ document.addEventListener('DOMContentLoaded', () => {
         $('pricing-list-valid-to').value = '';
         $('pricing-list-active').value = 'true';
         $('pricing-list-note').value = '';
+        if ($('pricing-list-show-illiquid')) $('pricing-list-show-illiquid').checked = false;
         renderPriceListEditorRows([]);
 
         if (priceListId) {
@@ -688,6 +724,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 $('pricing-list-valid-to').value = data.validTo || '';
                 $('pricing-list-active').value = data.active === false ? 'false' : 'true';
                 $('pricing-list-note').value = data.note || '';
+                if ($('pricing-list-show-illiquid')) $('pricing-list-show-illiquid').checked = data.includeIlliquid === true;
                 renderPriceListEditorRows(data.rows || []);
             } catch (error) {
                 toast(error.message,'error');
@@ -720,6 +757,7 @@ document.addEventListener('DOMContentLoaded', () => {
             validFrom:$('pricing-list-valid-from').value,
             validTo:$('pricing-list-valid-to').value,
             active:$('pricing-list-active').value === 'true',
+            includeIlliquid:Boolean($('pricing-list-show-illiquid')?.checked),
             note:$('pricing-list-note').value.trim(),
             rows:collectPriceListRows()
         };
@@ -900,6 +938,7 @@ document.addEventListener('DOMContentLoaded', () => {
         $('pricing-sheet-table-wrap').classList.toggle('d-none',!(list && rows.length));
 
         const liquid=rows.filter(row=>row.isLiquid !== false);
+        const illiquid=data.priceList?.includeIlliquid === true ? rows.filter(row=>row.isLiquid === false && row.productType !== 'equipment') : [];
         const renderRows=(items,isIlliquid=false)=>items.map(row=>`
             <tr data-sheet-row
                 data-row-type="${esc(row.rowType || (isIlliquid?'product':'collection'))}"
@@ -915,7 +954,8 @@ document.addEventListener('DOMContentLoaded', () => {
             </tr>`).join('');
 
         $('pricing-sheet-rows').innerHTML=
-            (liquid.length ? `<tr class="pricing-list-section-row"><td colspan="4"><strong>Коллекции</strong><span>актуальный ассортимент</span></td></tr>${renderRows(liquid,false)}` : '');
+            (liquid.length ? `<tr class="pricing-list-section-row"><td colspan="4"><strong>Коллекции</strong><span>актуальный ассортимент</span></td></tr>${renderRows(liquid,false)}` : '') +
+            (illiquid.length ? `<tr class="pricing-list-section-row is-illiquid"><td colspan="4"><strong>Неликвид</strong><span>отдельные позиции</span></td></tr>${renderRows(illiquid,true)}` : '');
 
         $('pricing-sheet-save-display').style.display=manage && rows.length ? '' : 'none';
         $('pricing-sheet-excel').disabled=!rows.length;
@@ -943,11 +983,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function dealerExportRows() {
         const data=state.currentSheet;
+        const includeIlliquid=data?.priceList?.includeIlliquid === true;
         return (data?.rows || [])
-            .filter(row=>row.isLiquid !== false)
+            .filter(row=>row.isLiquid !== false || (includeIlliquid && row.productType !== 'equipment'))
             .filter(row=>n(row.finalPrice)>0 || n(row.rrp)>0 || n(row.displayPrice)>0)
             .map(row=>({
-                'Номенклатура':row.collection || row.name || '',
+                'Номенклатура':row.isLiquid === false ? ([row.sku,row.name].filter(Boolean).join(' · ')) : (row.collection || row.name || ''),
                 'Спец.цена':n(row.finalPrice),
                 'Рекомендуемая розница':n(row.rrp),
                 'Цена на витрине':n(row.displayPrice)
@@ -1488,6 +1529,7 @@ document.addEventListener('DOMContentLoaded', () => {
     $('pricing-list-import-btn')?.addEventListener('click',()=>$('pricing-list-import-input')?.click());
     $('pricing-list-import-input')?.addEventListener('change',event=>importPriceListExcel(event.target.files?.[0]));
     $('pricing-list-copy-opt-btn')?.addEventListener('click',copyOptToRrp);
+    $('pricing-list-show-illiquid')?.addEventListener('change',syncPriceListIlliquidVisibility);
 
     $('pricing-sheet-save-display')?.addEventListener('click',saveDisplayPrices);
     $('pricing-sheet-excel')?.addEventListener('click',exportDealerExcel);
