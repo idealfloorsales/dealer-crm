@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     const $ = id => document.getElementById(id);
     const API = '/api/pricing';
-    const state = { dealers:[], lists:[], catalog:[], offers:[], sheet:null, selected:new Set(), loaded:false };
+    const state = { dealers:[], lists:[], catalog:[], offers:[], sheet:null, selected:new Set(), loaded:false, recipientMode:'crm' };
     const esc = value => String(value ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
     const n = value => Number(value) || 0;
     const money = value => n(value) > 0 ? n(value).toLocaleString('ru-RU',{maximumFractionDigits:2}) + ' ₸' : '—';
@@ -16,6 +16,29 @@ document.addEventListener('DOMContentLoaded', () => {
     function currentDealer(){
         return state.dealers.find(item => String(item.dealerId) === String($('pricing-offer-dealer')?.value || '')) || null;
     }
+
+    function manualRecipient(){
+        const name=String($('pricing-offer-manual-name')?.value || '').trim();
+        if(!name) return null;
+        return {
+            dealerId:'',
+            dealerCode:'',
+            dealerName:name,
+            city:String($('pricing-offer-manual-city')?.value || '').trim(),
+            sector:'',
+            status:'manual',
+            statusLabel:'Новый клиент'
+        };
+    }
+
+    function currentRecipient(){
+        return state.recipientMode==='manual' ? manualRecipient() : currentDealer();
+    }
+
+    function showStock(){
+        return Boolean($('pricing-offer-show-stock')?.checked);
+    }
+
 
     function activeLists(){
         const today = new Date().toISOString().slice(0,10);
@@ -58,22 +81,39 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderDealer(){
-        const dealer=currentDealer();
+        const dealer=currentRecipient();
         const host=$('pricing-offer-dealer-card');
         if(!dealer){
             host.className='pricing-offer-dealer-card is-empty';
-            host.textContent='Сначала выберите потенциального клиента';
+            host.textContent=state.recipientMode==='manual'
+                ? 'Введите название нового клиента'
+                : 'Сначала выберите потенциального клиента';
             return;
         }
         host.className='pricing-offer-dealer-card';
-        host.innerHTML='<strong>' + esc(dealer.dealerName) + '</strong><span>' + esc([dealer.city,dealer.sector].filter(Boolean).join(' · ')) + '</span><small>Статус: ' + esc(dealer.statusLabel || 'Потенциальный') + '</small>';
+        const meta=[dealer.city,dealer.sector].filter(Boolean).join(' · ');
+        host.innerHTML='<strong>' + esc(dealer.dealerName) + '</strong>' +
+            (meta ? '<span>' + esc(meta) + '</span>' : '') +
+            '<small>' + esc(state.recipientMode==='manual' ? 'Новый клиент · не добавляется в CRM' : 'Статус: ' + (dealer.statusLabel || 'Потенциальный')) + '</small>';
+    }
+
+    function syncRecipientMode(){
+        const crm=$('pricing-offer-recipient-crm');
+        const manual=$('pricing-offer-recipient-manual');
+        if(crm) crm.hidden=state.recipientMode!=='crm';
+        if(manual) manual.hidden=state.recipientMode!=='manual';
+        document.querySelectorAll('[data-offer-recipient-mode]').forEach(btn=>{
+            btn.classList.toggle('active',btn.dataset.offerRecipientMode===state.recipientMode);
+        });
+        renderDealer();
+        syncCreateState();
     }
 
     function renderPriceSummary(){
         const host=$('pricing-offer-price-summary');
         if(!state.sheet){
             host.className='pricing-offer-price-summary is-empty';
-            host.textContent='Выберите потенциального клиента и прайс для КП.';
+            host.textContent='Выберите клиента и прайс для КП.';
             return;
         }
         const list=state.sheet.priceList?.name || state.sheet.priceType?.label || 'Спец.цена';
@@ -99,10 +139,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const photo=driveThumb(item.photoId);
         const ch=item.characteristics || {};
         const specs=[ch.class,ch.thickness ? ch.thickness+' мм' : '',ch.bevel].filter(Boolean).join(' · ');
+        const stockHtml=showStock()
+            ? '<span class="pricing-offer-product-stock"><i class="bi bi-box-seam"></i> Остаток: ' + n(item.stockQty).toLocaleString('ru-RU',{maximumFractionDigits:2}) + ' м²</span>'
+            : '';
         return '<button type="button" class="pricing-offer-product-card ' + (selected?'is-selected':'') + '" data-offer-product="' + esc(item.id) + '">' +
             '<span class="pricing-offer-product-check"><i class="bi bi-' + (selected?'check-lg':'plus-lg') + '"></i></span>' +
             '<div class="pricing-offer-product-photo">' + (photo ? '<img src="' + esc(photo) + '" alt="' + esc(item.name) + '" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'grid\'"><span class="pricing-offer-photo-fallback"><i class="bi bi-image"></i></span>' : '<span class="pricing-offer-photo-fallback" style="display:grid"><i class="bi bi-image"></i></span>') + '</div>' +
-            '<div class="pricing-offer-product-copy"><small>' + esc(item.sku || '') + '</small><strong>' + esc(item.name || '') + '</strong><span>' + esc(item.collection || '') + '</span><em>' + esc(specs || 'IDEAL FLOOR') + '</em></div>' +
+            '<div class="pricing-offer-product-copy"><small>' + esc(item.sku || '') + '</small><strong>' + esc(item.name || '') + '</strong><span>' + esc(item.collection || '') + '</span><em>' + esc(specs || 'IDEAL FLOOR') + '</em>' + stockHtml + '</div>' +
             '<div class="pricing-offer-product-price"><small>Цена для КП</small><strong>' + (price ? money(price.finalPrice || price.basePrice) : '—') + '</strong>' + (price && n(state.sheet?.totalDiscountPercent) ? '<span>с учётом скидки</span>' : '') + '</div>' +
         '</button>';
     }
@@ -121,7 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function refreshSheet(){
-        const dealer=currentDealer();
+        const dealer=currentRecipient();
         state.sheet=null;
         renderPriceSummary();
         renderProducts();
@@ -132,7 +175,9 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         try{
-            const url=API+'/dealers/'+encodeURIComponent(dealer.dealerId)+'/price-sheet?forOffer=1&priceListId='+encodeURIComponent(priceListId);
+            const url=state.recipientMode==='manual'
+                ? API+'/offer-price-sheet?priceListId='+encodeURIComponent(priceListId)+'&clientName='+encodeURIComponent(dealer.dealerName || '')+'&clientCity='+encodeURIComponent(dealer.city || '')
+                : API+'/dealers/'+encodeURIComponent(dealer.dealerId)+'/price-sheet?forOffer=1&priceListId='+encodeURIComponent(priceListId);
             const response=await fetch(url,{crmTrackLoading:false});
             const data=await response.json().catch(()=>({}));
             if(!response.ok) throw new Error(data.error || 'Не удалось рассчитать цены');
@@ -145,33 +190,37 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function syncCreateState(){
-        const dealer=currentDealer();
+        const dealer=currentRecipient();
         const priceSelected=Boolean($('pricing-offer-price-list')?.value);
         const ready=Boolean(dealer && priceSelected && state.sheet && state.selected.size);
         const btn=$('pricing-offer-create-btn');
         if(btn) btn.disabled=!ready;
         const summary=$('pricing-offer-create-summary');
-        if(!dealer) summary.textContent='Выберите потенциального клиента';
+        if(!dealer) summary.textContent=state.recipientMode==='manual' ? 'Введите название нового клиента' : 'Выберите потенциального клиента';
         else if(!priceSelected) summary.textContent='Выберите прайс для КП';
         else if(!state.selected.size) summary.textContent='Выберите коллекции или декоры';
-        else summary.textContent=dealer.dealerName + ' · ' + state.selected.size + ' декоров · ' + (state.sheet?.priceList?.name || state.sheet?.priceType?.label || 'Спец.цена');
+        else summary.textContent=dealer.dealerName + ' · ' + state.selected.size + ' декоров · ' + (state.sheet?.priceList?.name || state.sheet?.priceType?.label || 'Спец.цена') + (showStock() ? ' · с остатками' : '');
     }
 
     function resetBuilder(){
         state.selected.clear();
         state.sheet=null;
+        state.recipientMode='crm';
         if($('pricing-offer-dealer')) $('pricing-offer-dealer').value='';
+        if($('pricing-offer-manual-name')) $('pricing-offer-manual-name').value='';
+        if($('pricing-offer-manual-city')) $('pricing-offer-manual-city').value='';
         if($('pricing-offer-price-list')) $('pricing-offer-price-list').value='';
+        if($('pricing-offer-show-stock')) $('pricing-offer-show-stock').checked=false;
         if($('pricing-offer-search')) $('pricing-offer-search').value='';
         if($('pricing-offer-collection')) $('pricing-offer-collection').value='';
         $('pricing-offer-result')?.classList.add('d-none');
-        renderDealer();
+        syncRecipientMode();
         renderPriceSummary();
         renderProducts();
     }
 
     async function createOffer(){
-        const dealer=currentDealer();
+        const dealer=currentRecipient();
         if(!dealer || !state.sheet || !state.selected.size) return;
         const btn=$('pricing-offer-create-btn');
         const original=btn.innerHTML;
@@ -182,9 +231,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 method:'POST',
                 headers:{'Content-Type':'application/json'},
                 body:JSON.stringify({
-                    dealerId:dealer.dealerId,
+                    recipientMode:state.recipientMode,
+                    dealerId:state.recipientMode==='crm' ? dealer.dealerId : '',
+                    manualClientName:state.recipientMode==='manual' ? dealer.dealerName : '',
+                    manualClientCity:state.recipientMode==='manual' ? dealer.city : '',
                     priceListId:$('pricing-offer-price-list').value || '',
                     expiresDays:Number($('pricing-offer-expiry').value || 14),
+                    showStock:showStock(),
                     productIds:[...state.selected]
                 })
             });
@@ -258,7 +311,7 @@ document.addEventListener('DOMContentLoaded', () => {
             state.catalog=Array.isArray(catalog)?catalog:[];
             state.offers=Array.isArray(offers)?offers:[];
             state.loaded=true;
-            fillDealerOptions(); fillPriceOptions(); fillCollections(); renderDealer(); renderPriceSummary(); renderProducts(); renderOffers();
+            fillDealerOptions(); fillPriceOptions(); fillCollections(); syncRecipientMode(); renderDealer(); renderPriceSummary(); renderProducts(); renderOffers();
         }catch(error){
             console.error(error);
             toast(error.message,'error');
@@ -271,8 +324,22 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(()=>$('pricing-offer-dealer')?.focus(),80);
     });
     $('pricing-offer-reset-btn')?.addEventListener('click',resetBuilder);
+    document.querySelectorAll('[data-offer-recipient-mode]').forEach(btn=>btn.addEventListener('click',()=>{
+        const next=btn.dataset.offerRecipientMode==='manual' ? 'manual' : 'crm';
+        if(next===state.recipientMode) return;
+        state.recipientMode=next;
+        state.sheet=null;
+        if($('pricing-offer-price-list')) $('pricing-offer-price-list').value='';
+        syncRecipientMode();
+        renderPriceSummary();
+        renderProducts();
+        setTimeout(()=>state.recipientMode==='manual' ? $('pricing-offer-manual-name')?.focus() : $('pricing-offer-dealer')?.focus(),40);
+    }));
     $('pricing-offer-dealer')?.addEventListener('change',()=>{ $('pricing-offer-price-list').value=''; state.sheet=null; renderDealer(); renderPriceSummary(); renderProducts(); syncCreateState(); });
+    $('pricing-offer-manual-name')?.addEventListener('input',()=>{ renderDealer(); syncCreateState(); });
+    $('pricing-offer-manual-city')?.addEventListener('input',()=>{ renderDealer(); syncCreateState(); });
     $('pricing-offer-price-list')?.addEventListener('change',refreshSheet);
+    $('pricing-offer-show-stock')?.addEventListener('change',()=>{ renderProducts(); syncCreateState(); });
     $('pricing-offer-search')?.addEventListener('input',renderProducts);
     $('pricing-offer-collection')?.addEventListener('change',renderProducts);
     $('pricing-offer-select-visible')?.addEventListener('click',()=>{ filteredProducts().forEach(item=>state.selected.add(String(item.id))); renderProducts(); });
