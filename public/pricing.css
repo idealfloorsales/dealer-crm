@@ -111,6 +111,8 @@ html,body.pricing-page{max-width:100%;overflow-x:hidden}
 .pricing-icon-btn{
   width:31px;height:31px;display:grid;place-items:center;border:1px solid #e4dfda;border-radius:9px;background:#fff;color:#67696e
 }
+.pricing-icon-btn.is-warning{border-color:#ead9ae;background:#fff9ea;color:#946815}
+.pricing-icon-btn.is-success{border-color:#cbe4d6;background:#f1faf5;color:#2f7b58}
 .pricing-icon-btn.is-danger{border-color:#efd0d2;background:#fff7f7;color:#ae292f}
 .pricing-modal{display:flex;min-height:0;flex-direction:column;border:0!important;border-radius:20px!important;overflow:hidden}
 .pricing-modal>.modal-header{flex:0 0 auto;padding:15px 18px;border-bottom:1px solid #eee9e5}
@@ -666,6 +668,8 @@ html,body.pricing-page{max-width:100%;overflow-x:hidden}
   font:700 .62rem 'Onest',sans-serif;
 }
 .pricing-list-action.is-primary{background:#242529;color:#fff;border-color:#242529}
+.pricing-list-action.is-warning{color:#8a6216;background:#fff8e8;border-color:#ead9ae}
+.pricing-list-action.is-success{color:#2f7655;background:#f0faf4;border-color:#cbe4d6}
 .pricing-list-action.is-danger{color:#b9040a;background:#fff4f4}
 
 .pricing-sheet-btn{
