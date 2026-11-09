@@ -372,6 +372,7 @@ function auditRouteMeta(req) {
     else if (path.startsWith('/api/knowledge')) { module='knowledge'; entityType='article'; }
     else if (path.startsWith('/api/reclamations')) { module='reclamations'; entityType='reclamation'; }
     else if (path.startsWith('/api/workshop')) { module='workshop'; entityType='workshop'; }
+    else if (path.startsWith('/api/price-control')) { module='pricing'; entityType='price_control'; }
     else if (path.startsWith('/api/pricing')) { module='pricing'; entityType='pricing'; }
     else if (path.startsWith('/api/exports')) { module='exports'; entityType='export'; }
     else if (path.startsWith('/api/statuses') || path.startsWith('/api/sectors')) { module='settings'; entityType=path.startsWith('/api/statuses')?'status':'sector'; }
@@ -3277,6 +3278,8 @@ async function buildDealerPriceSheetSnapshot(req, dealerId, options = {}) {
             .sort({ createdAt: -1 })
             .lean();
 
+        const control = await priceControl.forDealer(dealer._id);
+        if(control.terminated){const err=new Error('Сотрудничество с сетью прекращено. Новый прайс или КП недоступен');err.statusCode=409;throw err;}
         const summary = buildDealerPricingSummary(dealer, conditions);
         const forcedPriceListId = String(options.priceListId || '').trim();
         let forcedList = null;
@@ -3372,7 +3375,7 @@ async function buildDealerPriceSheetSnapshot(req, dealerId, options = {}) {
             .forEach(([collection, members]) => {
                 const source = collectionRows.get(collection) || legacyByCollection.get(collection) || fallbackFor(collection) || null;
                 const basePrice = source ? Math.max(0, Number(source[priceType.key]) || 0) : 0;
-                const finalPrice = basePrice > 0 ? Math.round(basePrice * (1 - discount / 100) * 100) / 100 : 0;
+                const finalPrice = basePrice > 0 ? require('./server/price-control').finalPrice(basePrice, discount, control.surchargePercent) : 0;
                 rows.push({
                     rowType: 'collection',
                     collection,
@@ -3403,7 +3406,7 @@ async function buildDealerPriceSheetSnapshot(req, dealerId, options = {}) {
                 const fallbackOverride = fallbackProducts.get(String(product._id)) || fallbackSkus.get(normalizePricingSku(product.sku)) || null;
                 const source = override || fallbackOverride;
                 const basePrice = source ? Math.max(0, Number(source[priceType.key]) || 0) : 0;
-                const finalPrice = basePrice > 0 ? Math.round(basePrice * (1 - discount / 100) * 100) / 100 : 0;
+                const finalPrice = basePrice > 0 ? require('./server/price-control').finalPrice(basePrice, discount, control.surchargePercent) : 0;
 
                 rows.push({
                     rowType: 'product',
@@ -3431,7 +3434,7 @@ async function buildDealerPriceSheetSnapshot(req, dealerId, options = {}) {
                 const source = productRows.get(String(product._id)) || skuRows.get(normalizePricingSku(product.sku)) ||
                     fallbackProducts.get(String(product._id)) || fallbackSkus.get(normalizePricingSku(product.sku)) || null;
                 const basePrice = source ? Math.max(0, Number(source[priceType.key]) || 0) : 0;
-                const finalPrice = basePrice > 0 ? Math.round(basePrice * (1 - discount / 100) * 100) / 100 : 0;
+                const finalPrice = basePrice > 0 ? require('./server/price-control').finalPrice(basePrice, discount, control.surchargePercent) : 0;
                 rows.push({
                     rowType:'product',
                     collection:'ТОРГОВОЕ ОБОРУДОВАНИЕ',
@@ -3476,6 +3479,7 @@ async function buildDealerPriceSheetSnapshot(req, dealerId, options = {}) {
             } : null,
             priceType,
             totalDiscountPercent: discount,
+            surchargePercent: control.surchargePercent,
             activeDiscounts: appliedDiscounts,
             rows
         };
@@ -3852,6 +3856,14 @@ app.delete('/api/pricing/offers/:id/permanent', requirePermission('can_view_pric
     }
 });
 
+
+async function priceControlSnapshotValid(item) {
+    const id=item.dealer || item.snapshot?.dealer?.id;
+    if(!id || !mongoose.isValidObjectId(id)) return true;
+    const control=await priceControl.forDealer(id);
+    return !control.terminated && Number(item.snapshot?.surchargePercent || 0)===control.surchargePercent;
+}
+
 app.get('/api/public/offers/:token', async (req, res) => {
     try {
         const token = String(req.params.token || '').trim();
@@ -3863,6 +3875,7 @@ app.get('/api/public/offers/:token', async (req, res) => {
             { new:true }
         ).lean();
         if (!offer) return res.status(410).json({ error:'Срок действия КП истёк или ссылка была отозвана' });
+        if(!await priceControlSnapshotValid(offer)) return res.status(410).json({error:'Условия изменились. Запросите новое КП у менеджера'});
         res.setHeader('Cache-Control','no-store');
         res.json({
             offerNumber:offer.offerNumber,
@@ -3886,6 +3899,7 @@ app.get('/api/public/price-share/:token.xlsx', async (req, res) => {
         const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
         const share = await PriceShare.findOne({ tokenHash, revokedAt:null, expiresAt:{ $gt:new Date() } }).lean();
         if (!share) return res.status(410).send('Срок действия ссылки истёк или она была отозвана');
+        if(!await priceControlSnapshotValid(share)) return res.status(410).send('Условия изменились. Запросите новый прайс у менеджера');
 
         const snapshot = share.snapshot || {};
         const dealer = snapshot.dealer || {};
@@ -4063,6 +4077,7 @@ app.get('/api/public/price-share/:token', async (req, res) => {
         const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
         const share = await PriceShare.findOne({ tokenHash, revokedAt:null, expiresAt:{ $gt:new Date() } }).lean();
         if (!share) return res.status(410).json({ error:'Срок действия ссылки истёк или она была отозвана' });
+        if(!await priceControlSnapshotValid(share)) return res.status(410).json({error:'Условия изменились. Запросите новый прайс у менеджера'});
         res.set('Cache-Control','no-store');
         res.json({
             dealer:{ dealer_id:share.dealerId || '', name:share.dealerName || '', city:share.dealerCity || '' },
@@ -4140,7 +4155,9 @@ app.get('/api/pricing/overview', requirePermission('can_view_pricing'), async (r
             .sort({ createdAt: -1 })
             .lean();
 
-        const rows = dealers.map(dealer => buildDealerPricingSummary(dealer, conditions));
+        const networks = await priceControl.Network.find({members:{$in:dealers.map(d=>d._id)}}).select('-history -cases.evidence').lean();
+        const controlByDealer = new Map(networks.flatMap(n=>n.members.map(id=>[String(id),priceControl.summary(n)])));
+        const rows = dealers.map(dealer => ({...buildDealerPricingSummary(dealer, conditions),priceControl:controlByDealer.get(String(dealer._id)) || null}));
         const today = pricingTodayKey();
         const inSeven = new Date(today + 'T00:00:00Z');
         inSeven.setUTCDate(inSeven.getUTCDate() + 7);
@@ -4206,7 +4223,7 @@ app.get('/api/pricing/dealers/:id', requirePermission('can_view_pricing'), async
             .populate('priceList', '_id name code versionDate validFrom validTo active includeIlliquid')
             .sort({ createdAt: -1 })
             .lean();
-        res.json(buildDealerPricingSummary(dealer, conditions));
+        res.json({...buildDealerPricingSummary(dealer, conditions),priceControl:await priceControl.forDealer(dealer._id)});
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
@@ -6652,6 +6669,8 @@ app.delete('/api/reclamations/:id', requirePermission('can_manage_reclamations')
         res.json({status: 'deleted'}); 
     } catch(e) { res.status(500).json({error: e.message}); }
 });
+
+const priceControl = require('./server/price-control').install({app,mongoose,Dealer,requireAnyPermission,requirePermission,getDealerFilter,isGlobalViewer,hasPermission,today:pricingTodayKey});
 
 serverInstance = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server port ${PORT}`);

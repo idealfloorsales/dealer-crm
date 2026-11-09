@@ -422,7 +422,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return `<div class="pricing-dealer-block">
                 <article class="pricing-dealer-row">
                     <div class="pricing-dealer-main">
-                        <strong>${esc(row.dealerName)}</strong>
+                        <strong>${esc(row.dealerName)}</strong>${row.priceControl?.count ? '<a class="pc-inline-badge" href="/dealer.html?id='+encodeURIComponent(row.dealerId)+'#price-control-pane"><i class="bi bi-shield-exclamation"></i> '+row.priceControl.count+'</a>' : ''}
                         <small>${esc(row.city || 'Город не указан')}${row.sector ? ' · '+esc(row.sector):''}</small>
                     </div>
                     <div class="pricing-dealer-meta">
@@ -436,7 +436,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="pricing-badges">${badges.join('')}</div>
                     <div class="pricing-total">
                         <strong>${row.totalDiscountPercent ? '−'+fmt(row.totalDiscountPercent,2)+'%' : '0%'}</strong>
-                        <small>итоговая скидка</small>
+                        <small>итоговая скидка</small>${row.priceControl?.surchargePercent ? '<small class="pc-accent">Надбавка +'+fmt(row.priceControl.surchargePercent,2)+'%</small>' : ''}
                     </div>
                     <div class="pricing-end">${end}</div>
                     <div class="pricing-row-actions">
@@ -589,7 +589,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     function switchPricingView(view = 'dealers') {
-        const allowed = ['dealers','lists','offers','conditions'];
+        const allowed = ['dealers','lists','offers','conditions','control'];
         const next = allowed.includes(view) ? view : 'dealers';
         state.activeView = next;
         document.querySelectorAll('[data-pricing-view]').forEach(button => {
@@ -1042,6 +1042,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div><small>Базовая цена</small><strong>${esc(data.priceType?.label || data.dealer?.priceType || 'Спец.цена')}</strong><span>из карточки дилера</span></div>
             <div><small>Доп. скидка</small><strong>${data.totalDiscountPercent ? '−'+fmt(data.totalDiscountPercent,2)+'%' : '0%'}</strong><span>${(data.activeDiscounts||[]).length ? (data.activeDiscounts||[]).map(x=>x.name).join(' + ') : 'без активных скидок'}</span></div>`;
 
+        if(data.surchargePercent) $('pricing-sheet-summary').insertAdjacentHTML('beforeend','<div><small>Надбавка сети</small><strong>+'+fmt(data.surchargePercent,2)+'%</strong><span>учтена в итоговой цене</span></div>');
         const rows=Array.isArray(data.rows)?data.rows:[];
         $('pricing-sheet-empty').classList.toggle('d-none',Boolean(list && rows.length));
         $('pricing-sheet-table-wrap').classList.toggle('d-none',!(list && rows.length));

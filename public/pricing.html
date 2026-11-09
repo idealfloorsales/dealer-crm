@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="style.css?v={{VER}}">
     <link rel="stylesheet" href="pricing.css?v={{VER}}">
+    <link rel="stylesheet" href="price-control.css?v={{VER}}">
     <link rel="stylesheet" href="pricing-offers.css?v={{VER}}">
     <link rel="icon" href="favicon.gif" type="image/gif">
     <meta name="theme-color" content="#b9040a">
@@ -39,9 +40,11 @@
             <button type="button" class="active" data-pricing-view="dealers"><i class="bi bi-people"></i><span>Дилеры</span></button>
             <button type="button" data-pricing-view="lists"><i class="bi bi-receipt-cutoff"></i><span>Прайсы</span></button>
             <button type="button" data-pricing-view="offers"><i class="bi bi-file-earmark-richtext"></i><span>КП</span></button>
+            <button type="button" data-pricing-view="control"><i class="bi bi-shield-check"></i><span>Контроль цен</span></button>
             <button type="button" data-pricing-view="conditions"><i class="bi bi-percent"></i><span>Условия и скидки</span></button>
         </nav>
 
+        <section data-pricing-view-panel="control" hidden><div id="pricing-price-control" class="pc-root"></div></section>
         <div data-pricing-view-panel="dealers">
         <section class="pricing-kpi-grid">
             <article class="pricing-kpi">
@@ -452,5 +455,6 @@
     <script defer src="permissions.js?v={{VER}}"></script>
     <script defer src="pricing.js?v={{VER}}"></script>
     <script defer src="pricing-offers.js?v={{VER}}"></script>
+    <script src="price-control.js?v={{VER}}"></script>
 </body>
 </html>
