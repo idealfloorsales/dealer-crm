@@ -3499,7 +3499,9 @@ app.get('/api/pricing/offers', requirePermission('can_view_pricing'), async (req
                 viewCount:Number(item.viewCount) || 0,
                 lastViewedAt:item.lastViewedAt || null,
                 status:item.revokedAt ? 'revoked' : (expired ? 'expired' : 'active'),
-                url:(!item.revokedAt && !expired) ? APP_ORIGIN + '/offer/' + item.publicId : ''
+                url:(!item.revokedAt && !expired) ? APP_ORIGIN + '/offer/' + item.publicId : '',
+                canManage:isAdminUser(req) || String(item.createdBy?.id || '') === String(req.user?.id || ''),
+                canDelete:isAdminUser(req) || String(item.createdBy?.id || '') === String(req.user?.id || '')
             };
         }));
     } catch (e) {
@@ -3651,9 +3653,24 @@ app.delete('/api/pricing/offers/:id', requirePermission('can_view_pricing'), asy
     try {
         const offer = await CommercialOffer.findById(req.params.id);
         if (!offer) return res.status(404).json({ error:'КП не найдено' });
+        const canManage = isAdminUser(req) || String(offer.createdBy?.id || '') === String(req.user?.id || '');
+        if (!canManage) return res.status(403).json({ error:'Можно отзывать только свои КП' });
         offer.revokedAt = new Date();
         await offer.save();
         res.json({ status:'ok' });
+    } catch (e) {
+        res.status(400).json({ error:e.message });
+    }
+});
+
+app.delete('/api/pricing/offers/:id/permanent', requirePermission('can_view_pricing'), async (req, res) => {
+    try {
+        const offer = await CommercialOffer.findById(req.params.id).lean();
+        if (!offer) return res.status(404).json({ error:'КП не найдено' });
+        const canDelete = isAdminUser(req) || String(offer.createdBy?.id || '') === String(req.user?.id || '');
+        if (!canDelete) return res.status(403).json({ error:'Можно удалять только свои КП' });
+        await CommercialOffer.deleteOne({ _id:offer._id });
+        res.json({ status:'deleted', id:String(offer._id), offerNumber:offer.offerNumber || '' });
     } catch (e) {
         res.status(400).json({ error:e.message });
     }
