@@ -3194,7 +3194,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const motivationMetaHtml = motivationText
                 ? `<span class="dealer-list-v6-motivation" title="Мотивация: ${safeAttr(motivationText)}"><i class="bi bi-cash-coin"></i>${safeText(motivationText)}</span>`
-                : '<span class="dealer-list-v6-motivation is-empty" title="Мотивация не назначена"><i class="bi bi-dash-circle"></i>Без мотивации</span>';
+                : '';
 
             const metaHtml = baseMetaHtml + motivationMetaHtml;
 
