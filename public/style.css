@@ -8895,6 +8895,29 @@ body.bg-light {
     font-size: .64rem;
 }
 
+.dealer-list-v6-meta .dealer-list-v6-motivation {
+    max-width: 190px;
+    padding: 2px 6px;
+    border-radius: 6px;
+    background: #eef7f1;
+    color: #267052;
+    font-weight: 720;
+}
+
+.dealer-list-v6-meta .dealer-list-v6-motivation i {
+    color: #267052;
+}
+
+.dealer-list-v6-meta .dealer-list-v6-motivation.is-empty {
+    background: #f4f3f1;
+    color: #96989d;
+    font-weight: 650;
+}
+
+.dealer-list-v6-meta .dealer-list-v6-motivation.is-empty i {
+    color: #aaa6a2;
+}
+
 .dealer-list-v6-sub {
     display: flex;
     align-items: center;
