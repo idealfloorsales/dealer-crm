@@ -581,9 +581,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 ${item.note ? `<p>${esc(item.note)}</p>` : ''}
                 <div class="pricing-price-list-actions">
-                    <button type="button" class="pricing-list-action is-primary" data-assign-price-list="${esc(item.id)}"><i class="bi bi-diagram-3"></i> Назначить</button>
+                    ${item.active !== false ? `<button type="button" class="pricing-list-action is-primary" data-assign-price-list="${esc(item.id)}"><i class="bi bi-diagram-3"></i> Назначить</button>` : ''}
                     <button type="button" class="pricing-list-action" data-edit-price-list="${esc(item.id)}"><i class="bi bi-pencil"></i> Открыть</button>
-                    ${manage && item.active !== false ? `<button type="button" class="pricing-list-action is-danger" data-archive-price-list="${esc(item.id)}"><i class="bi bi-archive"></i></button>` : ''}
+                    ${manage && item.active !== false ? `<button type="button" class="pricing-list-action is-warning" data-archive-price-list="${esc(item.id)}" title="Архивировать"><i class="bi bi-archive"></i> Архив</button>` : ''}
+                    ${manage && item.active === false ? `<button type="button" class="pricing-list-action is-success" data-restore-price-list="${esc(item.id)}" title="Сделать действующим"><i class="bi bi-arrow-counterclockwise"></i> Восстановить</button>` : ''}
+                    ${manage ? `<button type="button" class="pricing-list-action is-danger" data-delete-price-list="${esc(item.id)}" title="Удалить навсегда"><i class="bi bi-trash3"></i></button>` : ''}
                 </div>
             </article>`;
         }).join('');
@@ -591,6 +593,8 @@ document.addEventListener('DOMContentLoaded', () => {
         host.querySelectorAll('[data-edit-price-list]').forEach(button => button.addEventListener('click', () => openPriceListEditor(button.dataset.editPriceList)));
         host.querySelectorAll('[data-assign-price-list]').forEach(button => button.addEventListener('click', () => assignPriceList(button.dataset.assignPriceList)));
         host.querySelectorAll('[data-archive-price-list]').forEach(button => button.addEventListener('click', () => archivePriceList(button.dataset.archivePriceList)));
+        host.querySelectorAll('[data-restore-price-list]').forEach(button => button.addEventListener('click', () => restorePriceList(button.dataset.restorePriceList)));
+        host.querySelectorAll('[data-delete-price-list]').forEach(button => button.addEventListener('click', () => deletePriceList(button.dataset.deletePriceList)));
     }
 
     function renderPriceListEditorRows(existingRows = []) {
@@ -789,6 +793,35 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             await send(API+'/price-lists/'+encodeURIComponent(id),'DELETE',{});
             toast('Прайс перенесён в архив');
+            await load();
+            switchPricingView('lists');
+        } catch (error) {
+            toast(error.message,'error');
+        }
+    }
+
+    async function restorePriceList(id) {
+        if (!manage) return;
+        const item = state.priceLists.find(list => String(list.id) === String(id));
+        if (!item || !confirm(`Сделать прайс «${item.name}» снова действующим?`)) return;
+        try {
+            await send(API+'/price-lists/'+encodeURIComponent(id)+'/restore','POST',{});
+            toast('Прайс восстановлен');
+            await load();
+            switchPricingView('lists');
+        } catch (error) {
+            toast(error.message,'error');
+        }
+    }
+
+    async function deletePriceList(id) {
+        if (!manage) return;
+        const item = state.priceLists.find(list => String(list.id) === String(id));
+        if (!item) return;
+        if (!confirm(`Удалить прайс «${item.name}» навсегда? Это действие нельзя отменить.`)) return;
+        try {
+            await send(API+'/price-lists/'+encodeURIComponent(id)+'/permanent','DELETE',{});
+            toast('Прайс удалён');
             await load();
             switchPricingView('lists');
         } catch (error) {
@@ -1150,7 +1183,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 ${condition.note ? `<small class="text-muted">${esc(condition.note)}</small>` : ''}
                 <div class="pricing-condition-actions">
                     ${manage && status !== 'cancelled' ? `<button type="button" class="pricing-icon-btn" data-edit-condition="${idOf(condition)}" title="Редактировать"><i class="bi bi-pencil"></i></button>
-                    <button type="button" class="pricing-icon-btn is-danger" data-cancel-condition="${idOf(condition)}" title="Отменить"><i class="bi bi-x-lg"></i></button>` : ''}
+                    <button type="button" class="pricing-icon-btn is-warning" data-cancel-condition="${idOf(condition)}" title="Отменить, но сохранить в истории"><i class="bi bi-slash-circle"></i></button>` : ''}
+                    ${manage && status === 'cancelled' ? `<button type="button" class="pricing-icon-btn is-success" data-restore-condition="${idOf(condition)}" title="Сделать действующим"><i class="bi bi-arrow-counterclockwise"></i></button>` : ''}
+                    ${manage ? `<button type="button" class="pricing-icon-btn is-danger" data-delete-condition="${idOf(condition)}" title="Удалить навсегда"><i class="bi bi-trash3"></i></button>` : ''}
                 </div>
             </article>`;
         }).join('');
@@ -1160,6 +1195,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         host.querySelectorAll('[data-cancel-condition]').forEach(button => {
             button.addEventListener('click', () => cancelCondition(button.dataset.cancelCondition));
+        });
+        host.querySelectorAll('[data-restore-condition]').forEach(button => {
+            button.addEventListener('click', () => restoreCondition(button.dataset.restoreCondition));
+        });
+        host.querySelectorAll('[data-delete-condition]').forEach(button => {
+            button.addEventListener('click', () => deleteCondition(button.dataset.deleteCondition));
         });
     }
 
@@ -1508,6 +1549,40 @@ document.addEventListener('DOMContentLoaded', () => {
             await send(API+'/conditions/'+encodeURIComponent(conditionId),'DELETE',{reason});
             toast('Условие отменено');
             await load();
+        } catch (error) {
+            toast(error.message,'error');
+        }
+    }
+
+    async function restoreCondition(conditionId) {
+        if (!manage) return;
+        const condition = state.conditions.find(item => idOf(item) === String(conditionId));
+        if (!condition) return;
+        if (!confirm(`Восстановить условие «${condition.name}» и снова включить его в расчёт цен?`)) return;
+        try {
+            const restored = await send(API+'/conditions/'+encodeURIComponent(conditionId)+'/restore','POST',{});
+            const nextStatus = restored?.computedStatus || 'active';
+            toast(nextStatus === 'active'
+                ? 'Условие снова действует'
+                : (nextStatus === 'planned' ? 'Условие восстановлено и ожидает даты начала' : 'Условие восстановлено'));
+            await load();
+            switchPricingView('conditions');
+        } catch (error) {
+            toast(error.message,'error');
+        }
+    }
+
+    async function deleteCondition(conditionId) {
+        if (!manage) return;
+        const condition = state.conditions.find(item => idOf(item) === String(conditionId));
+        if (!condition) return;
+        const type = condition.kind === 'price_list' ? 'прайс' : 'скидку';
+        if (!confirm(`Удалить ${type} «${condition.name}» навсегда? История этого условия будет удалена, восстановить его будет нельзя.`)) return;
+        try {
+            await send(API+'/conditions/'+encodeURIComponent(conditionId)+'/permanent','DELETE',{});
+            toast(condition.kind === 'price_list' ? 'Прайс удалён из условий' : 'Скидка удалена');
+            await load();
+            switchPricingView('conditions');
         } catch (error) {
             toast(error.message,'error');
         }
