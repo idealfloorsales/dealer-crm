@@ -363,11 +363,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const status=offerStatus(item);
             const actions=[];
             if(item.url){
-                actions.push('<button data-offer-copy="' + esc(item.url) + '" title="Скопировать ссылку"><i class="bi bi-copy"></i></button>');
-                actions.push('<a href="' + esc(item.url) + '" target="_blank" rel="noopener" title="Открыть КП"><i class="bi bi-box-arrow-up-right"></i></a>');
-                if(item.canManage) actions.push('<button class="is-warning" data-offer-revoke="' + esc(item.id) + '" title="Отозвать ссылку"><i class="bi bi-slash-circle"></i></button>');
+                actions.push('<button data-offer-copy="' + esc(item.url) + '" title="Скопировать ссылку" aria-label="Скопировать ссылку"><i class="bi bi-copy"></i></button>');
+                actions.push('<a href="' + esc(item.url) + '" target="_blank" rel="noopener" title="Открыть КП" aria-label="Открыть КП"><i class="bi bi-box-arrow-up-right"></i></a>');
+                if(item.canManage) actions.push('<button class="is-warning" data-offer-revoke="' + esc(item.id) + '" title="Отозвать ссылку" aria-label="Отозвать ссылку"><i class="bi bi-slash-circle"></i></button>');
             }
-            if(item.canDelete) actions.push('<button class="is-danger" data-offer-delete="' + esc(item.id) + '" data-offer-number="' + esc(item.offerNumber || 'КП') + '" title="Удалить КП навсегда"><i class="bi bi-trash3"></i></button>');
+            if(item.canDelete) actions.push('<button class="is-danger" data-offer-delete="' + esc(item.id) + '" data-offer-number="' + esc(item.offerNumber || 'КП') + '" title="Удалить КП навсегда" aria-label="Удалить КП навсегда"><i class="bi bi-trash3"></i></button>');
             return '<article class="pricing-offer-history-card"><div class="pricing-offer-history-main"><span class="pricing-offer-status ' + status[1] + '">' + status[0] + '</span><strong>' + esc(item.offerNumber || 'КП') + '</strong><small>' + esc(item.dealerName || '') + (item.dealerCity ? ' · ' + esc(item.dealerCity) : '') + '</small></div><div class="pricing-offer-history-meta"><div><small>Прайс</small><strong>' + esc(item.priceListName || '—') + '</strong></div><div><small>Скидка</small><strong>' + (n(item.totalDiscountPercent)?'−'+n(item.totalDiscountPercent).toLocaleString('ru-RU',{maximumFractionDigits:2})+'%':'0%') + '</strong></div><div><small>Позиций</small><strong>' + esc(item.itemsCount || 0) + '</strong></div><div><small>Просмотров</small><strong>' + esc(item.viewCount || 0) + '</strong></div><div><small>Создано</small><strong>' + esc(dateText(item.createdAt)) + '</strong></div><div><small>Действует до</small><strong>' + esc(dateText(item.expiresAt)) + '</strong></div></div><div class="pricing-offer-history-actions">' + actions.join('') + '</div></article>';
         }).join('');
     }
