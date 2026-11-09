@@ -123,6 +123,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const driveThumb = (id,size=520) => id ? 'https://drive.google.com/thumbnail?id=' + encodeURIComponent(id) + '&sz=w' + size : '';
 
+    function normalizeProductPhotoSku(value) {
+        let sku=String(value || '').trim().toUpperCase()
+            .replace(/[–—−]/g,'-')
+            .replace(/[\s_./\\]+/g,'')
+            .replace(/[АВЕКМНОРСТХ]/g,ch=>({
+                'А':'A','В':'B','Е':'E','К':'K','М':'M','Н':'H','О':'O','Р':'P','С':'C','Т':'T','Х':'X'
+            }[ch] || ch));
+        const rules=[
+            [/^8?EH(?:34)?-?(\d{3})$/,m=>'EH-'+m[1]],
+            [/^8?MC(?:33|34)?-?(\d{3})$/,m=>'MC-'+m[1]],
+            [/^8?HP(?:33|34)?-?(\d{2})$/,m=>'HP-'+m[1]],
+            [/^FP-?(\d{2})$/,m=>'FP-'+m[1]],
+            [/^8?AS(?:33|34)?-?(\d{2})$/,m=>'AS-'+m[1]],
+            [/^8?RPL(?:33|34)?-?0?(\d{1,2})$/,m=>'RPL-'+Number(m[1])],
+            [/^8?RWN(?:33|34)?-?(\d{2})$/,m=>'RWN-'+m[1]],
+            [/^8?RWE(?:33|34)?-?(\d{2})$/,m=>'RWE-'+m[1]],
+            [/^8?RWZ(?:33|34)?-?(\d{2})$/,m=>'RWZ-'+m[1]]
+        ];
+        for(const [pattern,formatter] of rules){
+            const match=sku.match(pattern);
+            if(match) return formatter(match);
+        }
+        return sku.replace(/-/g,'');
+    }
+
     function extractDriveId(value) {
         const raw=String(value || '').trim();
         if(!raw) return '';
@@ -181,7 +206,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if(photoFolderLink) photoFolderLink.classList.add('d-none');
 
         const catalog=await loadPhotoCatalog();
-        const entry=catalog?.[sku];
+        const canonical=normalizeProductPhotoSku(sku);
+        const catalogKey=Object.keys(catalog || {}).find(key=>normalizeProductPhotoSku(key)===canonical);
+        const entry=catalogKey ? catalog[catalogKey] : null;
         const files=Array.isArray(entry?.files) ? entry.files : [];
         photoGalleryToggle.disabled=false;
 
