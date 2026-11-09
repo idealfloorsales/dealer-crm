@@ -1,495 +1,656 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8"> 
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Сотрудники</title>
-    
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="style.css?v={{VER}}">
     <link rel="icon" href="favicon.gif" type="image/gif">
-
     <style>
-        body { background-color: #f8f9fa; }
-        
-        /* Карточка сотрудника (Mobile) */
-        .user-card {
-            background: white; border: none; border-radius: 16px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.03);
-            margin-bottom: 12px; transition: transform 0.2s, box-shadow 0.2s;
-            cursor: pointer;
+        body{background:#f7f7f8}
+        .users-page .app-page-hero-copy p{max-width:760px}
+        .employee-table tbody tr{cursor:pointer}
+        .employee-avatar{width:48px;height:48px;border-radius:15px;display:grid;place-items:center;overflow:hidden;flex:0 0 auto;font-weight:800;color:#fff;font-size:1rem;box-shadow:0 4px 14px rgba(31,34,40,.08)}
+        .employee-avatar img{width:100%;height:100%;object-fit:cover}
+        .employee-avatar.is-large{width:74px;height:74px;border-radius:22px;font-size:1.35rem}
+        .employee-name{font-weight:800;color:#25272b}
+        .employee-sub{font-size:.72rem;color:#90939a;margin-top:2px}
+        .employee-contact{display:flex;flex-direction:column;gap:2px}
+        .employee-contact a{color:#383b40;text-decoration:none;font-weight:700;font-size:.8rem}
+        .employee-contact small{font-size:.7rem;color:#979aa1}
+        .employee-role{display:flex;flex-direction:column;gap:2px}
+        .employee-role strong{font-size:.8rem;color:#34363a}
+        .employee-role small{font-size:.7rem;color:#94979d}
+        .employee-status{display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border-radius:99px;font-size:.67rem;font-weight:800;white-space:nowrap}
+        .employee-status.working{background:#eaf7f0;color:#267052}
+        .employee-status.vacation{background:#eef3ff;color:#4567a7}
+        .employee-status.away{background:#fff5df;color:#976916}
+        .employee-status.dismissed{background:#f2f2f3;color:#85878d}
+        .employee-status.blocked{outline:1px solid #f0b7ba;color:#aa2830}
+        .employee-mobile-card{background:#fff;border:1px solid #e7e4e1;border-radius:17px;padding:14px;margin-bottom:10px;box-shadow:0 4px 16px rgba(20,20,20,.03);cursor:pointer}
+        .employee-mobile-card:active{transform:scale(.99)}
+        .employee-mobile-head{display:flex;gap:11px;align-items:center}
+        .employee-mobile-main{min-width:0;flex:1}
+        .employee-mobile-main strong{display:block;font-size:.88rem;color:#282a2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .employee-mobile-main small{display:block;margin-top:3px;color:#92949a;font-size:.68rem}
+        .employee-mobile-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+        .employee-chip{display:inline-flex;align-items:center;gap:4px;padding:4px 7px;border-radius:7px;background:#f4f3f1;color:#666970;font-size:.63rem;font-weight:700}
+        .employee-profile-modal .modal-dialog{max-width:1120px}
+        .employee-profile-modal .modal-content{border:0;border-radius:22px;overflow:hidden}
+        .employee-profile-top{padding:20px 22px 16px;background:linear-gradient(135deg,#fff,#f6f3f1);border-bottom:1px solid #e8e4e1}
+        .employee-profile-identity{display:flex;gap:14px;align-items:center;min-width:0}
+        .employee-profile-copy{min-width:0;flex:1}
+        .employee-profile-copy small{display:block;color:#9a9ca1;font-size:.65rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+        .employee-profile-copy h4{margin:3px 0 4px;font-size:1.23rem;font-weight:850;color:#24262a}
+        .employee-profile-copy p{margin:0;color:#797c82;font-size:.75rem}
+        .employee-profile-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+        .employee-profile-actions a,.employee-profile-actions button{min-height:34px;display:inline-flex;align-items:center;gap:5px;padding:0 10px;border:1px solid #dedad7;border-radius:9px;background:#fff;color:#44474c;text-decoration:none;font-size:.69rem;font-weight:800}
+        .employee-profile-actions .wa{border-color:#cfe9dc;color:#237451;background:#eff9f4}
+        .employee-tabs{display:flex;gap:4px;padding:10px 16px;border-bottom:1px solid #ece8e5;background:#fff;overflow:auto}
+        .employee-tabs .nav-link{border:0;border-radius:9px;padding:8px 12px;color:#7a7d83;font-size:.72rem;font-weight:800;white-space:nowrap}
+        .employee-tabs .nav-link.active{background:#2d2f33;color:#fff}
+        .employee-profile-body{background:#f6f5f4;padding:16px}
+        .employee-panel{background:#fff;border:1px solid #e7e3e0;border-radius:16px;padding:16px}
+        .employee-panel-title{display:flex;align-items:center;gap:7px;margin-bottom:12px;color:#34363a;font-weight:850;font-size:.82rem}
+        .employee-field-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+        .employee-field-grid label>span{display:block;margin-bottom:5px;color:#85888e;font-size:.64rem;font-weight:800}
+        .employee-field-grid .form-control,.employee-field-grid .form-select{min-height:40px;border-color:#dedad7;border-radius:10px;font-size:.77rem}
+        .employee-field-grid .full{grid-column:1/-1}
+        .employee-help{display:block;margin-top:4px;color:#a0a2a7;font-size:.59rem}
+        .employee-metric-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+        .employee-metric{padding:12px;border:1px solid #e6e2df;border-radius:13px;background:#fff}
+        .employee-metric small{display:block;color:#95979d;font-size:.59rem;font-weight:750;text-transform:uppercase}
+        .employee-metric strong{display:block;margin-top:4px;font-size:1.05rem;color:#27292d}
+        .employee-sales-progress{height:8px;border-radius:99px;background:#eceae8;overflow:hidden;margin-top:9px}
+        .employee-sales-progress span{display:block;height:100%;border-radius:inherit;background:#a90a12;max-width:100%}
+        .employee-dealers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:12px}
+        .employee-dealer-row{padding:9px 10px;border:1px solid #e7e3e0;border-radius:10px;background:#faf9f8}
+        .employee-dealer-row strong,.employee-dealer-row small{display:block}
+        .employee-dealer-row strong{font-size:.72rem;color:#3b3d41}
+        .employee-dealer-row small{margin-top:2px;color:#92949a;font-size:.62rem}
+        .employee-activity-list{display:flex;flex-direction:column;gap:7px}
+        .employee-activity-row{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:8px;align-items:center;padding:8px 9px;border:1px solid #e8e4e1;border-radius:10px;background:#fff}
+        .employee-activity-icon{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;background:#f3f1ef;color:#787a80}
+        .employee-activity-row strong{display:block;font-size:.7rem;color:#3d3f44}
+        .employee-activity-row small{display:block;margin-top:2px;color:#999ba0;font-size:.61rem}
+        .employee-activity-row time{font-size:.6rem;color:#9a9ca1;white-space:nowrap}
+        .employee-empty{padding:22px;border:1px dashed #dad6d2;border-radius:12px;text-align:center;color:#999ba0;font-size:.72rem}
+        .permission-groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+        .permission-group{border:1px solid #e7e3e0;border-radius:13px;padding:12px;background:#fff}
+        .permission-group h6{margin:0 0 9px;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:#8d9096}
+        .permission-row{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:6px 0;border-top:1px solid #f0eeec}
+        .permission-row:first-of-type{border-top:0}
+        .permission-row label{font-size:.69rem;color:#56595e}
+        .employee-admin-switch{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px;border:1px solid #ead8a4;border-radius:12px;background:#fff8df;margin-bottom:10px}
+        .employee-admin-switch strong,.employee-admin-switch small{display:block}
+        .employee-admin-switch strong{font-size:.75rem}
+        .employee-admin-switch small{font-size:.62rem;color:#8c7d55;margin-top:2px}
+        .employee-access-block{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 12px;border:1px solid #efd5d7;border-radius:12px;background:#fff6f6;margin-top:10px}
+        .employee-savebar{position:sticky;bottom:0;z-index:3;display:flex;justify-content:flex-end;gap:7px;padding:10px 16px;border-top:1px solid #e4e0dd;background:rgba(255,255,255,.94);backdrop-filter:blur(10px)}
+        .employee-savebar button{min-height:39px;border-radius:10px;padding:0 16px;font-size:.73rem;font-weight:850}
+        .employee-loading{display:grid;place-items:center;min-height:180px;color:#999ba0}
+        @media(max-width:900px){
+            .employee-metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+            .permission-groups{grid-template-columns:1fr}
         }
-        .user-card:active { transform: scale(0.98); }
-        .user-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
-        
-        /* Аватар с инициалами */
-        .avatar-circle {
-            width: 48px; height: 48px; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-weight: 700; color: white; font-size: 1.1rem;
-            text-transform: uppercase; flex-shrink: 0;
+        @media(max-width:700px){
+            .employee-profile-modal .modal-dialog{margin:0;max-width:none;height:100%}
+            .employee-profile-modal .modal-content{height:100%;border-radius:0}
+            .employee-profile-top{padding:14px}
+            .employee-profile-body{padding:10px}
+            .employee-field-grid{grid-template-columns:1fr}
+            .employee-field-grid .full{grid-column:auto}
+            .employee-dealers{grid-template-columns:1fr}
+            .employee-metric-grid{grid-template-columns:1fr 1fr}
+            .employee-activity-row{grid-template-columns:30px minmax(0,1fr)}
+            .employee-activity-row time{grid-column:2}
         }
-
-        /* Группы прав в модалке */
-        .perm-group-header {
-            font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px;
-            font-weight: 700; color: #adb5bd; margin-bottom: 12px;
-            border-bottom: 1px solid #f0f0f0; padding-bottom: 5px;
-        }
-        
-        /* Навигация (копия из index.html) */
-        .bottom-nav {
-            position: fixed; bottom: 0; left: 0; right: 0;
-            background: rgba(255, 255, 255, 0.98);
-            backdrop-filter: blur(10px); border-top: 1px solid #eee;
-            z-index: 1050; padding-bottom: env(safe-area-inset-bottom);
-            box-shadow: 0 -5px 20px rgba(0,0,0,0.05);
-        }
-        .bottom-nav-item { text-align: center; color: #adb5bd; padding: 10px 0; text-decoration: none; flex: 1; transition: color 0.2s; }
-        .bottom-nav-item.active { color: #B9040A; }
-        .bottom-nav-item i { font-size: 1.4rem; display: block; margin-bottom: 2px; }
-        .bottom-nav-item span { font-size: 0.65rem; font-weight: 600; }
-        .desktop-nav { display: flex; }
-        @media (max-width: 991px) { .desktop-nav { display: none !important; } }
+        :root[data-crm-theme="dark"] body{background:#151515}
+        :root[data-crm-theme="dark"] .employee-mobile-card,
+        :root[data-crm-theme="dark"] .employee-panel,
+        :root[data-crm-theme="dark"] .employee-metric,
+        :root[data-crm-theme="dark"] .permission-group,
+        :root[data-crm-theme="dark"] .employee-tabs,
+        :root[data-crm-theme="dark"] .employee-profile-top,
+        :root[data-crm-theme="dark"] .employee-savebar{background:#202020;border-color:#363636;color:#ececec}
+        :root[data-crm-theme="dark"] .employee-name,
+        :root[data-crm-theme="dark"] .employee-profile-copy h4,
+        :root[data-crm-theme="dark"] .employee-panel-title,
+        :root[data-crm-theme="dark"] .employee-role strong,
+        :root[data-crm-theme="dark"] .employee-metric strong{color:#f0f0f0}
+        :root[data-crm-theme="dark"] .employee-profile-body{background:#171717}
+        :root[data-crm-theme="dark"] .employee-dealer-row,
+        :root[data-crm-theme="dark"] .employee-activity-row{background:#242424;border-color:#373737}
     </style>
 </head>
-<body class="bg-light app-workspace-page users-page">
+<body class="app-workspace-page users-page">
+<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-4"></nav>
 
-    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-4 desktop-nav"></nav>
-
-    <main class="container-fluid app-page-shell">
-        <section class="app-page-hero">
-            <div class="app-page-hero-copy">
-                <div class="app-page-eyebrow">IDEAL FLOOR CRM · АДМИНИСТРИРОВАНИЕ</div>
-                <h1>Сотрудники</h1>
-                <p>Учетные записи, роли, регионы и права доступа.</p>
-            </div>
-            <div class="app-page-actions">
-                <button class="app-hero-primary" onclick="openUserModal()"><i class="bi bi-person-plus"></i><span>Добавить</span></button>
-            </div>
-        </section>
-
-        <div class="app-toolbar-card app-toolbar-compact">
-            <div class="input-group border-0">
-                <span class="input-group-text bg-white border-0 ps-3 text-muted"><i class="bi bi-search"></i></span>
-                <input type="text" id="user-search" class="form-control border-0 shadow-none" placeholder="Поиск по имени или логину...">
-            </div>
+<main class="container-fluid app-page-shell">
+    <section class="app-page-hero">
+        <div class="app-page-hero-copy">
+            <div class="app-page-eyebrow">IDEAL FLOOR CRM · КОМАНДА</div>
+            <h1>Сотрудники</h1>
+            <p>Контакты, должности, рабочие показатели, активность и права доступа сотрудников в одном месте.</p>
         </div>
-
-        <div class="app-panel app-table-panel overflow-hidden d-none d-md-block">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="bg-light">
-                        <tr class="text-muted small text-uppercase">
-                            <th class="ps-4 py-3">Пользователь</th>
-                            <th>Роль</th>
-                            <th>Регион</th>
-                            <th>Статус</th>
-                            <th class="text-end pe-4">Действия</th>
-                        </tr>
-                    </thead>
-                    <tbody id="users-table-body">
-                        </tbody>
-                </table>
-            </div>
+        <div class="app-page-actions">
+            <button class="app-hero-primary" onclick="openUserModal()"><i class="bi bi-person-plus"></i><span>Добавить сотрудника</span></button>
         </div>
+    </section>
 
-        <div class="d-md-none" id="users-mobile-list">
-            </div>
-        
-        <div id="no-users-msg" class="text-center text-muted mt-5" style="display:none">
-            <i class="bi bi-person-x display-1 text-light"></i>
-            <p class="mt-3">Сотрудники не найдены</p>
+    <section class="app-toolbar-card app-toolbar-compact">
+        <div class="input-group border-0">
+            <span class="input-group-text bg-white border-0 ps-3 text-muted"><i class="bi bi-search"></i></span>
+            <input type="search" id="user-search" class="form-control border-0 shadow-none" placeholder="ФИО, телефон, должность, отдел, город…">
         </div>
-    </main>
+    </section>
 
-    <div class="modal fade" id="userModal" tabindex="-1" data-bs-backdrop="static">
-        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
-            <div class="modal-content border-0 rounded-4 shadow">
-                <div class="modal-header border-0 pb-0">
-                    <h5 class="modal-title fw-bold" id="modalTitle">Настройка сотрудника</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <section class="app-panel app-table-panel overflow-hidden d-none d-md-block">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 employee-table">
+                <thead class="bg-light">
+                    <tr class="text-muted small text-uppercase">
+                        <th class="ps-4 py-3">Сотрудник</th>
+                        <th>Контакты</th>
+                        <th>Должность / отдел</th>
+                        <th>Рабочая зона</th>
+                        <th>Статус</th>
+                        <th class="text-end pe-4">Действия</th>
+                    </tr>
+                </thead>
+                <tbody id="users-table-body"></tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="d-md-none" id="users-mobile-list"></section>
+    <div id="no-users-msg" class="text-center text-muted mt-5" hidden>
+        <i class="bi bi-person-x display-1 text-light"></i>
+        <p class="mt-3">Сотрудники не найдены</p>
+    </div>
+</main>
+
+<div class="modal fade employee-profile-modal" id="userModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <form id="userForm" class="d-flex flex-column h-100">
+                <input type="hidden" id="u_id">
+
+                <div class="employee-profile-top">
+                    <div class="d-flex justify-content-between gap-3 align-items-start">
+                        <div class="employee-profile-identity">
+                            <div id="profile-avatar" class="employee-avatar is-large"></div>
+                            <div class="employee-profile-copy">
+                                <small id="profile-eyebrow">КАРТОЧКА СОТРУДНИКА</small>
+                                <h4 id="profile-name">Новый сотрудник</h4>
+                                <p id="profile-subtitle">Заполните основные данные и доступы</p>
+                                <div class="employee-profile-actions">
+                                    <a id="profile-call" href="#" hidden><i class="bi bi-telephone"></i> Позвонить</a>
+                                    <a id="profile-wa" class="wa" href="#" target="_blank" rel="noopener" hidden><i class="bi bi-whatsapp"></i> WhatsApp</a>
+                                </div>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
                 </div>
-                <div class="modal-body bg-light">
-                    <form id="userForm">
-                        <input type="hidden" id="u_id">
-                        
-                        <div class="card border-0 shadow-sm rounded-4 mb-3">
-                            <div class="card-body">
-                                <h6 class="fw-bold mb-3 text-dark">Учетная запись</h6>
-                                <div class="row g-3">
-                                    <div class="col-md-6">
-                                        <label class="form-label small fw-bold text-muted">ФИО</label>
-                                        <input type="text" id="u_fullName" class="form-control" required placeholder="Иван Иванов">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label small fw-bold text-muted">Логин (для входа)</label>
-                                        <div class="input-group">
-                                            <span class="input-group-text bg-white text-muted border-end-0">@</span>
-                                            <input type="text" id="u_username" class="form-control border-start-0 ps-0" required placeholder="ivan">
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label small fw-bold text-muted">Пароль</label>
-                                        <input type="password" id="u_password" class="form-control" minlength="6" placeholder="Оставьте пустым, если не меняете">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label small fw-bold text-muted">Роль</label>
-                                        <select id="u_role" class="form-select">
-                                            <option value="manager">Менеджер</option>
-                                            <option value="marketing">Маркетинг</option>
-                                            <option value="workshop">Цех</option>
-                                            <option value="guest">Гость</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label small fw-bold text-muted">Регион доступа</label>
-                                        <select id="u_scope" class="form-select">
-                                            <option value="all">Вся компания</option>
-                                            <option value="astana">Только Астана</option>
-                                            <option value="regions">Только регионы</option>
-                                        </select>
-                                    </div>
-                                </div>
+
+                <ul class="nav employee-tabs" role="tablist">
+                    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#employee-overview" type="button"><i class="bi bi-person me-1"></i>Обзор</button></li>
+                    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#employee-results" type="button"><i class="bi bi-graph-up-arrow me-1"></i>Дилеры и продажи</button></li>
+                    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#employee-activity" type="button"><i class="bi bi-clock-history me-1"></i>Активность</button></li>
+                    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#employee-access" type="button"><i class="bi bi-shield-lock me-1"></i>Доступы</button></li>
+                </ul>
+
+                <div class="tab-content employee-profile-body flex-grow-1 overflow-auto">
+                    <div class="tab-pane fade show active" id="employee-overview">
+                        <div class="employee-panel">
+                            <div class="employee-panel-title"><i class="bi bi-person-vcard"></i>Основная информация</div>
+                            <div class="employee-field-grid">
+                                <label><span>ФИО</span><input id="u_fullName" class="form-control" required placeholder="Иван Иванов"></label>
+                                <label><span>Должность</span><input id="u_position" class="form-control" placeholder="Региональный менеджер"></label>
+                                <label><span>Отдел</span><input id="u_department" class="form-control" list="department-options" placeholder="Продажи"><datalist id="department-options"><option value="Продажи"><option value="Маркетинг"><option value="Цех"><option value="Руководство"><option value="Администрация"></datalist></label>
+                                <label><span>Город / офис</span><input id="u_officeCity" class="form-control" placeholder="Астана"></label>
+                                <label><span>Рабочий телефон</span><input id="u_phone" class="form-control" inputmode="tel" placeholder="+7 777 000 00 00"></label>
+                                <label><span>Рабочий e-mail</span><input id="u_email" class="form-control" type="email" placeholder="name@company.kz"></label>
+                                <label><span>Дата устройства</span><input id="u_hireDate" class="form-control" type="date"></label>
+                                <label><span>Рабочий статус</span>
+                                    <select id="u_employmentStatus" class="form-select">
+                                        <option value="working">Работает</option>
+                                        <option value="vacation">Отпуск</option>
+                                        <option value="away">Временно отсутствует</option>
+                                        <option value="dismissed">Уволен</option>
+                                    </select>
+                                </label>
+                                <label class="full"><span>Фото сотрудника · ссылка</span><input id="u_avatarUrl" class="form-control" type="url" placeholder="https://..."><small class="employee-help">Если фото не указано, CRM использует аккуратный аватар с инициалами.</small></label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="employee-results">
+                        <div id="employee-results-content" class="employee-loading"><span class="text-muted">Сохраните сотрудника, чтобы появились рабочие показатели.</span></div>
+                    </div>
+
+                    <div class="tab-pane fade" id="employee-activity">
+                        <div id="employee-activity-content" class="employee-loading"><span class="text-muted">Сохраните сотрудника, чтобы появилась история активности.</span></div>
+                    </div>
+
+                    <div class="tab-pane fade" id="employee-access">
+                        <div class="employee-panel mb-3">
+                            <div class="employee-panel-title"><i class="bi bi-key"></i>Учётная запись CRM</div>
+                            <div class="employee-field-grid">
+                                <label><span>Логин</span><input id="u_username" class="form-control" required autocomplete="off" placeholder="ivan"></label>
+                                <label><span>Пароль</span><input id="u_password" class="form-control" type="password" minlength="6" autocomplete="new-password" placeholder="Оставьте пустым, если не меняете"><small class="employee-help">Для нового сотрудника — минимум 6 символов.</small></label>
+                                <label><span>Роль CRM</span>
+                                    <select id="u_role" class="form-select">
+                                        <option value="manager">Менеджер</option>
+                                        <option value="marketing">Маркетинг</option>
+                                        <option value="workshop">Цех</option>
+                                        <option value="guest">Гость</option>
+                                    </select>
+                                </label>
+                                <label><span>Регион доступа</span>
+                                    <select id="u_scope" class="form-select">
+                                        <option value="all">Вся компания</option>
+                                        <option value="astana">Только Астана</option>
+                                        <option value="regions">Только регионы</option>
+                                    </select>
+                                </label>
                             </div>
                         </div>
 
-                        <div class="card border-warning border-opacity-25 bg-warning-subtle rounded-4 mb-3">
-                            <div class="card-body py-2 d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-shield-lock-fill text-warning me-2"></i>Администратор</h6>
-                                    <small class="text-dark opacity-75" style="font-size: 0.75rem">Полный доступ ко всем функциям без ограничений</small>
-                                </div>
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input perm-check" type="checkbox" id="p_is_admin" style="transform: scale(1.3);">
-                                </div>
-                            </div>
+                        <div class="employee-admin-switch">
+                            <div><strong><i class="bi bi-star-fill text-warning me-1"></i>Администратор</strong><small>Полный доступ ко всем функциям CRM</small></div>
+                            <div class="form-check form-switch mb-0"><input class="form-check-input perm-check" type="checkbox" id="p_is_admin"></div>
                         </div>
 
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <div class="card h-100 border-0 shadow-sm rounded-4">
-                                    <div class="card-body">
-                                        <div class="perm-group-header">Доступ к меню</div>
-                                        
-                                        <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_view_dealers"><label class="form-check-label" for="p_can_view_dealers">Список дилеров (Главная)</label></div>
-                                        <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_view_map"><label class="form-check-label" for="p_can_view_map">Карта дилеров</label></div>
-                                        <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_view_products"><label class="form-check-label" for="p_can_view_products">Каталог (Матрица)</label></div>
-                                        <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_view_report"><label class="form-check-label" for="p_can_view_report">Отчет (Выставленность)</label></div>
-                                        <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_view_sales"><label class="form-check-label" for="p_can_view_sales">Продажи (Таблица)</label></div>
-                                        <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_view_competitors"><label class="form-check-label" for="p_can_view_competitors">Конкуренты</label></div>
-                                        <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_view_knowledge"><label class="form-check-label" for="p_can_view_knowledge">База знаний</label></div>
-                                        <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_view_reclamations"><label class="form-check-label" for="p_can_view_reclamations">Рекламации</label></div>
-                                        <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_view_workshop"><label class="form-check-label fw-bold text-danger" for="p_can_view_workshop"><i class="bi bi-tools me-1"></i>Цех</label></div>
-                                        <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_view_pricing"><label class="form-check-label fw-bold" for="p_can_view_pricing"><i class="bi bi-percent me-1"></i>Ценовые условия</label></div>
-                                        <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_view_dashboard"><label class="form-check-label" for="p_can_view_dashboard">Дашборд (Статистика)</label></div>
-                                    </div>
-                                </div>
-                            </div>
+                        <div id="permission-groups" class="permission-groups"></div>
 
-                            <div class="col-md-6">
-                                <div class="card h-100 border-0 shadow-sm rounded-4">
-                                    <div class="card-body">
-                                        <div class="perm-group-header text-primary">Редактирование</div>
-                                        
-                                        <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_create_dealer"><label class="form-check-label" for="p_can_create_dealer">Создавать дилера</label></div>
-                                        <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_edit_dealer"><label class="form-check-label" for="p_can_edit_dealer">Редактировать дилера</label></div>
-                                        <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_manage_visits"><label class="form-check-label" for="p_can_manage_visits">Добавлять визиты</label></div>
-                                        <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_edit_matrix"><label class="form-check-label" for="p_can_edit_matrix">Редактировать матрицу дилера</label></div>
-                                        <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_edit_sales_fact"><label class="form-check-label" for="p_can_edit_sales_fact">Вносить Факт продаж</label></div>
-                                        <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_manage_workshop"><label class="form-check-label fw-bold text-danger" for="p_can_manage_workshop">Вносить операции цеха</label></div>
-                                        <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_manage_pricing"><label class="form-check-label fw-bold" for="p_can_manage_pricing">Управлять ценовыми условиями</label></div>
-                                        
-                                        <div class="perm-group-header text-success mt-3">Справочники</div>
-                                        <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_manage_products"><label class="form-check-label" for="p_can_manage_products">Управлять товарами (SKU)</label></div>
-                                        <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_manage_competitors"><label class="form-check-label" for="p_can_manage_competitors">Управлять брендами</label></div>
-                                        <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_manage_knowledge"><label class="form-check-label" for="p_can_manage_knowledge">Управлять базой знаний</label></div>
-                                        <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_manage_reclamations"><label class="form-check-label" for="p_can_manage_reclamations">Управлять рекламациями</label></div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="col-12">
-                                <div class="card border-danger border-opacity-25 bg-white shadow-sm rounded-4">
-                                    <div class="card-body">
-                                        <div class="perm-group-header text-danger"><i class="bi bi-exclamation-triangle me-1"></i>Зона риска</div>
-                                        <div class="row">
-                                            <div class="col-md-4">
-                                                <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_delete_dealer"><label class="form-check-label text-danger fw-bold" for="p_can_delete_dealer">Удалять дилера</label></div>
-                                                <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_manage_users"><label class="form-check-label text-danger fw-bold" for="p_can_manage_users">Управлять сотрудниками</label></div>
-                                            </div>
-                                            <div class="col-md-4">
-                                                <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_export_base"><label class="form-check-label text-danger" for="p_can_export_base">Экспорт базы дилеров (Excel)</label></div>
-                                                <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_export_prices"><label class="form-check-label text-danger" for="p_can_export_prices">Экспорт цен конкурентов (Excel)</label></div>
-                                            </div>
-                                            <div class="col-md-4">
-                                                <div class="form-check form-switch"><input class="form-check-input perm-check" type="checkbox" id="p_can_edit_sales_plan"><label class="form-check-label text-danger fw-bold" for="p_can_edit_sales_plan">Менять ПЛАН продаж</label></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="col-12 text-end">
-                                <div class="d-inline-block bg-white border rounded-3 p-2 shadow-sm">
-                                    <div class="form-check form-check-inline mb-0">
-                                        <input class="form-check-input" type="checkbox" id="u_isBlocked">
-                                        <label class="form-check-label text-danger fw-bold" for="u_isBlocked">⛔ ЗАБЛОКИРОВАТЬ ДОСТУП</label>
-                                    </div>
-                                </div>
-                            </div>
+                        <div class="employee-access-block">
+                            <div><strong class="d-block" style="font-size:.74rem">Заблокировать вход в CRM</strong><small class="text-muted" style="font-size:.62rem">Не удаляет сотрудника и его историю.</small></div>
+                            <div class="form-check form-switch mb-0"><input class="form-check-input" type="checkbox" id="u_isBlocked"></div>
                         </div>
-
-                        <div class="d-grid mt-4">
-                            <button type="submit" class="btn btn-primary rounded-pill py-2 shadow fw-bold">Сохранить изменения</button>
-                        </div>
-                    </form>
+                    </div>
                 </div>
-            </div>
+
+                <div class="employee-savebar">
+                    <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Закрыть</button>
+                    <button type="submit" class="btn btn-dark"><i class="bi bi-check2 me-1"></i>Сохранить сотрудника</button>
+                </div>
+            </form>
         </div>
     </div>
+</div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="permissions.js?v={{VER}}"></script>
-    <script>
-        const modal = new bootstrap.Modal(document.getElementById('userModal'));
-        const tbody = document.getElementById('users-table-body');
-        const mobileList = document.getElementById('users-mobile-list');
-        const searchInput = document.getElementById('user-search');
-        const userRoleSelect = document.getElementById('u_role');
-        const userScopeSelect = document.getElementById('u_scope');
-        let allUsers = [];
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="permissions.js?v={{VER}}"></script>
+<script>
+(function(){
+    const modalEl=document.getElementById('userModal');
+    const modal=new bootstrap.Modal(modalEl);
+    const tbody=document.getElementById('users-table-body');
+    const mobileList=document.getElementById('users-mobile-list');
+    const searchInput=document.getElementById('user-search');
+    const userRoleSelect=document.getElementById('u_role');
+    const userScopeSelect=document.getElementById('u_scope');
+    let allUsers=[];
+    let profileStatsRequest=0;
 
-        function syncRoleScope() {
-            if (!userRoleSelect || !userScopeSelect) return;
-            const role = userRoleSelect.value;
-            const isCompanyWide = role === 'marketing' || role === 'workshop';
-            if (isCompanyWide) userScopeSelect.value = 'all';
-            userScopeSelect.disabled = isCompanyWide;
-            userScopeSelect.title = role === 'marketing'
-                ? 'Маркетинг всегда видит всю дилерскую сеть'
-                : role === 'workshop'
-                    ? 'Цех работает с общим производственным учетом'
-                    : '';
+    const roleNames={manager:'Менеджер',marketing:'Маркетинг',workshop:'Цех',guest:'Гость'};
+    const employmentLabels={working:'Работает',vacation:'Отпуск',away:'Временно отсутствует',dismissed:'Уволен'};
+    const permissionGroups=[
+        {title:'Доступ к разделам',items:[
+            ['can_view_dealers','Дилеры'],['can_view_map','Карта'],['can_view_products','Матрица товаров'],['can_view_report','Выставленность'],
+            ['can_view_sales','Продажи'],['can_view_competitors','Конкуренты'],['can_view_knowledge','База знаний'],['can_view_reclamations','Рекламации'],
+            ['can_view_workshop','Цех'],['can_view_pricing','Цены и КП'],['can_view_dashboard','Дашборд']
+        ]},
+        {title:'Работа и редактирование',items:[
+            ['can_create_dealer','Создавать дилеров'],['can_edit_dealer','Редактировать дилеров'],['can_manage_visits','Добавлять визиты'],
+            ['can_edit_matrix','Редактировать матрицу дилера'],['can_edit_sales_fact','Вносить факт продаж'],['can_edit_sales_plan','Менять план продаж'],
+            ['can_manage_products','Управлять товарами'],['can_manage_competitors','Управлять конкурентами'],['can_manage_knowledge','Управлять базой знаний'],
+            ['can_manage_reclamations','Управлять рекламациями'],['can_manage_workshop','Управлять цехом'],['can_manage_pricing','Управлять ценами']
+        ]},
+        {title:'Повышенные права',items:[
+            ['can_delete_dealer','Удалять дилеров'],['can_manage_users','Управлять сотрудниками'],['can_export_base','Экспорт базы дилеров'],['can_export_prices','Экспорт цен']
+        ]}
+    ];
+
+    function esc(value){
+        return String(value==null?'':value)
+            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+            .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+    }
+
+    function safeAvatarUrl(value){
+        const url=String(value||'').trim();
+        return /^https?:\/\//i.test(url)?url:'';
+    }
+
+    function initials(name){
+        const parts=String(name||'').trim().split(/\s+/).filter(Boolean);
+        if(parts.length>=2) return (parts[0][0]+parts[1][0]).toUpperCase();
+        return parts[0]?parts[0].slice(0,2).toUpperCase():'IF';
+    }
+
+    function avatarColor(name){
+        const palette=['#475569','#7c3aed','#9f1239','#b45309','#166534','#0369a1','#6b21a8','#0f766e'];
+        let hash=0; String(name||'').split('').forEach(function(ch){hash=((hash<<5)-hash)+ch.charCodeAt(0);hash|=0;});
+        return palette[Math.abs(hash)%palette.length];
+    }
+
+    function avatarHtml(user,large){
+        const name=user.fullName||user.username||'IDEAL FLOOR';
+        const url=safeAvatarUrl(user.avatarUrl);
+        const cls='employee-avatar'+(large?' is-large':'');
+        if(url) return '<div class="'+cls+'"><img src="'+esc(url)+'" alt="'+esc(name)+'" onerror="this.parentElement.innerHTML=\''+esc(initials(name))+'\'"></div>';
+        return '<div class="'+cls+'" style="background:'+avatarColor(name)+'">'+esc(initials(name))+'</div>';
+    }
+
+    function normalizePhone(value){
+        let digits=String(value||'').replace(/\D/g,'');
+        if(digits.length===11&&digits[0]==='8') digits='7'+digits.slice(1);
+        if(digits.length===10) digits='7'+digits;
+        return digits;
+    }
+
+    function dateText(value,dateOnly){
+        if(!value) return '—';
+        const d=new Date(value);
+        if(Number.isNaN(d.getTime())) return String(value);
+        const opts={day:'2-digit',month:'2-digit',year:'numeric'};
+        if(!dateOnly){opts.hour='2-digit';opts.minute='2-digit';}
+        return d.toLocaleString('ru-RU',opts);
+    }
+
+    function numberText(value){
+        return (Number(value)||0).toLocaleString('ru-RU',{maximumFractionDigits:2});
+    }
+
+    function employmentBadge(user){
+        const status=user.employmentStatus||'working';
+        const blocked=user.isBlocked?' blocked':'';
+        return '<span class="employee-status '+esc(status)+blocked+'"><i class="bi bi-circle-fill" style="font-size:.42rem"></i>'+esc(employmentLabels[status]||'Работает')+(user.isBlocked?' · доступ закрыт':'')+'</span>';
+    }
+
+    function renderPermissions(){
+        document.getElementById('permission-groups').innerHTML=permissionGroups.map(function(group){
+            return '<section class="permission-group"><h6>'+esc(group.title)+'</h6>'+
+                group.items.map(function(item){
+                    return '<div class="permission-row"><label for="p_'+esc(item[0])+'">'+esc(item[1])+'</label>'+
+                        '<div class="form-check form-switch mb-0"><input class="form-check-input perm-check" type="checkbox" id="p_'+esc(item[0])+'"></div></div>';
+                }).join('')+'</section>';
+        }).join('');
+    }
+
+    function syncRoleScope(){
+        const role=userRoleSelect.value;
+        const companyWide=role==='marketing'||role==='workshop';
+        if(companyWide) userScopeSelect.value='all';
+        userScopeSelect.disabled=companyWide;
+    }
+
+    function applyRolePreset(){
+        syncRoleScope();
+        if(userRoleSelect.value!=='workshop') return;
+        document.querySelectorAll('.perm-check').forEach(function(cb){cb.checked=false;});
+        ['p_can_view_workshop','p_can_manage_workshop'].forEach(function(id){const el=document.getElementById(id);if(el)el.checked=true;});
+    }
+
+    function updateProfileHeader(){
+        const user={
+            fullName:document.getElementById('u_fullName').value.trim(),
+            username:document.getElementById('u_username').value.trim(),
+            position:document.getElementById('u_position').value.trim(),
+            department:document.getElementById('u_department').value.trim(),
+            phone:document.getElementById('u_phone').value.trim(),
+            avatarUrl:document.getElementById('u_avatarUrl').value.trim(),
+            employmentStatus:document.getElementById('u_employmentStatus').value
+        };
+        document.getElementById('profile-avatar').outerHTML=avatarHtml(user,true).replace('employee-avatar is-large','employee-avatar is-large').replace('<div ','<div id="profile-avatar" ');
+        document.getElementById('profile-name').textContent=user.fullName||'Новый сотрудник';
+        document.getElementById('profile-subtitle').textContent=[user.position,user.department].filter(Boolean).join(' · ')||'Заполните основные данные и доступы';
+        const phone=normalizePhone(user.phone);
+        const call=document.getElementById('profile-call');
+        const wa=document.getElementById('profile-wa');
+        call.hidden=!phone; wa.hidden=!phone;
+        if(phone){call.href='tel:+'+phone;wa.href='https://wa.me/'+phone;}
+    }
+
+    function searchable(user){
+        return [
+            user.fullName,user.username,user.phone,user.email,user.position,user.department,user.officeCity,
+            roleNames[user.role],employmentLabels[user.employmentStatus||'working']
+        ].join(' ').toLowerCase();
+    }
+
+    function render(){
+        const term=String(searchInput.value||'').trim().toLowerCase();
+        const filtered=allUsers.filter(function(user){return !term||searchable(user).includes(term);});
+        document.getElementById('no-users-msg').hidden=filtered.length>0;
+
+        tbody.innerHTML=filtered.map(function(user){
+            const phone=normalizePhone(user.phone);
+            const role=user.permissions&&user.permissions.is_admin?'Администратор':(roleNames[user.role]||'Менеджер');
+            return '<tr onclick="editUser(\''+esc(user._id)+'\')">'+
+                '<td class="ps-4 py-3"><div class="d-flex align-items-center gap-3">'+avatarHtml(user,false)+'<div><div class="employee-name">'+esc(user.fullName||'Без имени')+'</div><div class="employee-sub">@'+esc(user.username||'')+'</div></div></div></td>'+
+                '<td><div class="employee-contact">'+
+                    (phone?'<a href="tel:+'+esc(phone)+'" onclick="event.stopPropagation()"><i class="bi bi-telephone me-1"></i>'+esc(user.phone)+'</a>':'<small>Телефон не указан</small>')+
+                    (user.email?'<small>'+esc(user.email)+'</small>':'')+'</div></td>'+
+                '<td><div class="employee-role"><strong>'+esc(user.position||role)+'</strong><small>'+esc(user.department||role)+'</small></div></td>'+
+                '<td><div class="employee-role"><strong>'+esc(user.officeCity||'—')+'</strong><small>'+esc(user.scope||'all')+'</small></div></td>'+
+                '<td>'+employmentBadge(user)+'</td>'+
+                '<td class="text-end pe-4"><button class="btn btn-sm btn-light border me-1" onclick="event.stopPropagation();editUser(\''+esc(user._id)+'\')"><i class="bi bi-pencil"></i></button>'+
+                (!(user.permissions&&user.permissions.is_admin)?'<button class="btn btn-sm btn-light border text-danger" onclick="event.stopPropagation();deleteUser(\''+esc(user._id)+'\')"><i class="bi bi-trash"></i></button>':'')+'</td></tr>';
+        }).join('');
+
+        mobileList.innerHTML=filtered.map(function(user){
+            const phone=normalizePhone(user.phone);
+            return '<article class="employee-mobile-card" onclick="editUser(\''+esc(user._id)+'\')">'+
+                '<div class="employee-mobile-head">'+avatarHtml(user,false)+'<div class="employee-mobile-main"><strong>'+esc(user.fullName||'Без имени')+'</strong>'+
+                '<small>'+esc([user.position,user.department].filter(Boolean).join(' · ')||roleNames[user.role]||'Сотрудник')+'</small></div>'+
+                '<i class="bi bi-chevron-right text-muted"></i></div>'+
+                '<div class="employee-mobile-meta">'+
+                (phone?'<a class="employee-chip" href="tel:+'+esc(phone)+'" onclick="event.stopPropagation()"><i class="bi bi-telephone"></i>'+esc(user.phone)+'</a>':'')+
+                (user.officeCity?'<span class="employee-chip"><i class="bi bi-geo-alt"></i>'+esc(user.officeCity)+'</span>':'')+
+                employmentBadge(user)+'</div></article>';
+        }).join('');
+    }
+
+    async function loadUsers(){
+        try{
+            const res=await fetch('/api/admin/users');
+            const data=await res.json().catch(function(){return [];});
+            if(!res.ok) throw new Error(data.error||'Ошибка доступа');
+            allUsers=Array.isArray(data)?data:[];
+            render();
+        }catch(error){
+            console.error(error);
+            window.location.href='/';
         }
+    }
 
-        function applyRolePreset() {
-            syncRoleScope();
-            if (userRoleSelect?.value !== 'workshop') return;
-            document.querySelectorAll('.perm-check').forEach(cb => cb.checked = false);
-            ['p_can_view_workshop', 'p_can_manage_workshop'].forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.checked = true;
+    function resetStats(){
+        document.getElementById('employee-results-content').innerHTML='<div class="employee-empty">Сохраните сотрудника, чтобы появились рабочие показатели.</div>';
+        document.getElementById('employee-activity-content').innerHTML='<div class="employee-empty">Сохраните сотрудника, чтобы появилась история активности.</div>';
+    }
+
+    function renderResults(stats){
+        const sales=stats.sales||{};
+        const dealers=stats.dealers||{};
+        const visits=stats.visits||{};
+        const offers=stats.offers||{};
+        const percent=Math.max(0,Number(sales.percent)||0);
+        const dealerRows=(dealers.recent||[]).map(function(item){
+            return '<div class="employee-dealer-row"><strong>'+esc(item.name||'Дилер')+'</strong><small>'+esc([item.dealerId,item.city].filter(Boolean).join(' · '))+'</small></div>';
+        }).join('');
+        document.getElementById('employee-results-content').innerHTML=
+            '<div class="employee-metric-grid">'+
+                '<div class="employee-metric"><small>Дилеров в работе</small><strong>'+esc(dealers.working||0)+'</strong></div>'+
+                '<div class="employee-metric"><small>Потенциальных</small><strong>'+esc(dealers.potential||0)+'</strong></div>'+
+                '<div class="employee-metric"><small>Визитов за месяц</small><strong>'+esc(visits.completedThisMonth||0)+'</strong></div>'+
+                '<div class="employee-metric"><small>КП за месяц</small><strong>'+esc(offers.createdThisMonth||0)+'</strong></div>'+
+            '</div>'+
+            '<section class="employee-panel mt-2"><div class="employee-panel-title"><i class="bi bi-graph-up-arrow"></i>Продажи · '+esc(stats.month||'')+'</div>'+
+                '<div class="d-flex justify-content-between gap-3"><div><small class="text-muted">План</small><strong class="d-block">'+numberText(sales.plan)+' м²</strong></div>'+
+                '<div class="text-end"><small class="text-muted">Факт</small><strong class="d-block">'+numberText(sales.fact)+' м² · '+numberText(percent)+'%</strong></div></div>'+
+                '<div class="employee-sales-progress"><span style="width:'+Math.min(100,percent)+'%"></span></div>'+
+            '</section>'+
+            '<section class="employee-panel mt-2"><div class="employee-panel-title"><i class="bi bi-shop"></i>Закреплённые дилеры</div>'+
+                (dealerRows?'<div class="employee-dealers">'+dealerRows+'</div>':'<div class="employee-empty">Закреплённых дилеров пока нет.</div>')+
+            '</section>';
+    }
+
+    function renderActivity(stats){
+        const activity=stats.activity||{};
+        const employee=stats.employee||{};
+        const rows=(activity.recent||[]).map(function(item){
+            return '<div class="employee-activity-row"><div class="employee-activity-icon"><i class="bi bi-activity"></i></div>'+
+                '<div><strong>'+esc(item.summary||item.action||'Действие в CRM')+'</strong><small>'+esc(item.module||'CRM')+(item.success===false?' · ошибка':'')+'</small></div>'+
+                '<time>'+esc(dateText(item.createdAt,false))+'</time></div>';
+        }).join('');
+        document.getElementById('employee-activity-content').innerHTML=
+            '<div class="employee-metric-grid mb-2">'+
+                '<div class="employee-metric"><small>Последний вход</small><strong style="font-size:.8rem">'+esc(dateText(employee.lastLoginAt,false))+'</strong></div>'+
+                '<div class="employee-metric"><small>Последнее действие</small><strong style="font-size:.8rem">'+esc(dateText(activity.lastActionAt,false))+'</strong></div>'+
+                '<div class="employee-metric"><small>Действий за 7 дней</small><strong>'+esc(activity.actions7d||0)+'</strong></div>'+
+                '<div class="employee-metric"><small>Всего дилеров</small><strong>'+esc((stats.dealers||{}).total||0)+'</strong></div>'+
+            '</div>'+
+            '<section class="employee-panel"><div class="employee-panel-title"><i class="bi bi-clock-history"></i>Последние действия</div>'+
+                (rows?'<div class="employee-activity-list">'+rows+'</div>':'<div class="employee-empty">Действий пока нет.</div>')+'</section>';
+    }
+
+    async function loadProfileStats(id){
+        const request=++profileStatsRequest;
+        document.getElementById('employee-results-content').innerHTML='<div class="employee-loading"><span class="spinner-border spinner-border-sm me-2"></span>Загрузка показателей…</div>';
+        document.getElementById('employee-activity-content').innerHTML='<div class="employee-loading"><span class="spinner-border spinner-border-sm me-2"></span>Загрузка активности…</div>';
+        try{
+            const res=await fetch('/api/admin/users/'+encodeURIComponent(id)+'/profile-stats',{crmTrackLoading:false});
+            const data=await res.json().catch(function(){return {};});
+            if(!res.ok) throw new Error(data.error||'Не удалось загрузить карточку');
+            if(request!==profileStatsRequest) return;
+            renderResults(data);
+            renderActivity(data);
+        }catch(error){
+            if(request!==profileStatsRequest) return;
+            const html='<div class="employee-empty text-danger">'+esc(error.message)+'</div>';
+            document.getElementById('employee-results-content').innerHTML=html;
+            document.getElementById('employee-activity-content').innerHTML=html;
+        }
+    }
+
+    window.openUserModal=function(){
+        profileStatsRequest++;
+        document.getElementById('userForm').reset();
+        document.getElementById('u_id').value='';
+        document.getElementById('u_password').required=true;
+        document.getElementById('u_role').value='manager';
+        document.getElementById('u_scope').value='all';
+        document.getElementById('u_employmentStatus').value='working';
+        document.querySelectorAll('.perm-check').forEach(function(cb){cb.checked=false;});
+        ['p_can_view_map','p_can_view_dealers','p_can_view_products','p_can_view_sales','p_can_view_knowledge','p_can_view_reclamations','p_can_view_dashboard','p_can_view_pricing'].forEach(function(id){const el=document.getElementById(id);if(el)el.checked=true;});
+        syncRoleScope();
+        resetStats();
+        updateProfileHeader();
+        bootstrap.Tab.getOrCreateInstance(document.querySelector('[data-bs-target="#employee-overview"]')).show();
+        modal.show();
+    };
+
+    window.editUser=function(id){
+        const u=allUsers.find(function(item){return String(item._id)===String(id);});
+        if(!u) return;
+        document.getElementById('u_id').value=u._id;
+        document.getElementById('u_fullName').value=u.fullName||'';
+        document.getElementById('u_position').value=u.position||'';
+        document.getElementById('u_department').value=u.department||'';
+        document.getElementById('u_phone').value=u.phone||'';
+        document.getElementById('u_email').value=u.email||'';
+        document.getElementById('u_officeCity').value=u.officeCity||'';
+        document.getElementById('u_hireDate').value=u.hireDate||'';
+        document.getElementById('u_employmentStatus').value=u.employmentStatus||'working';
+        document.getElementById('u_avatarUrl').value=u.avatarUrl||'';
+        document.getElementById('u_username').value=u.username||'';
+        document.getElementById('u_password').value='';
+        document.getElementById('u_password').required=false;
+        document.getElementById('u_role').value=u.role||'manager';
+        document.getElementById('u_scope').value=(u.role==='marketing'||u.role==='workshop')?'all':(u.scope||'all');
+        document.getElementById('u_isBlocked').checked=Boolean(u.isBlocked);
+        document.querySelectorAll('.perm-check').forEach(function(cb){cb.checked=false;});
+        Object.entries(u.permissions||{}).forEach(function(entry){const el=document.getElementById('p_'+entry[0]);if(el)el.checked=Boolean(entry[1]);});
+        syncRoleScope();
+        updateProfileHeader();
+        bootstrap.Tab.getOrCreateInstance(document.querySelector('[data-bs-target="#employee-overview"]')).show();
+        modal.show();
+        loadProfileStats(u._id);
+    };
+
+    window.deleteUser=async function(id){
+        if(!confirm('Удалить сотрудника безвозвратно? История действий в журнале останется.')) return;
+        const res=await fetch('/api/admin/users/'+encodeURIComponent(id),{method:'DELETE'});
+        const data=await res.json().catch(function(){return {};});
+        if(!res.ok){alert(data.error||'Не удалось удалить сотрудника');return;}
+        loadUsers();
+    };
+
+    document.getElementById('userForm').addEventListener('submit',async function(event){
+        event.preventDefault();
+        const id=document.getElementById('u_id').value;
+        const permissions={};
+        document.querySelectorAll('.perm-check').forEach(function(cb){permissions[cb.id.replace('p_','')]=cb.checked;});
+        const data={
+            fullName:document.getElementById('u_fullName').value.trim(),
+            phone:document.getElementById('u_phone').value.trim(),
+            email:document.getElementById('u_email').value.trim(),
+            position:document.getElementById('u_position').value.trim(),
+            department:document.getElementById('u_department').value.trim(),
+            officeCity:document.getElementById('u_officeCity').value.trim(),
+            hireDate:document.getElementById('u_hireDate').value,
+            employmentStatus:document.getElementById('u_employmentStatus').value,
+            avatarUrl:document.getElementById('u_avatarUrl').value.trim(),
+            username:document.getElementById('u_username').value.trim(),
+            password:document.getElementById('u_password').value,
+            role:document.getElementById('u_role').value,
+            scope:document.getElementById('u_scope').value,
+            isBlocked:document.getElementById('u_isBlocked').checked,
+            permissions:permissions
+        };
+        const button=event.submitter;
+        if(button) button.disabled=true;
+        try{
+            const res=await fetch(id?'/api/admin/users/'+encodeURIComponent(id):'/api/admin/users',{
+                method:id?'PUT':'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify(data)
             });
+            const result=await res.json().catch(function(){return {};});
+            if(!res.ok) throw new Error(result.error||'Ошибка сохранения');
+            modal.hide();
+            await loadUsers();
+        }catch(error){
+            alert(error.message);
+        }finally{
+            if(button) button.disabled=false;
         }
+    });
 
-        userRoleSelect?.addEventListener('change', applyRolePreset);
+    ['u_fullName','u_position','u_department','u_phone','u_avatarUrl'].forEach(function(id){
+        document.getElementById(id).addEventListener('input',updateProfileHeader);
+    });
+    document.getElementById('u_employmentStatus').addEventListener('change',updateProfileHeader);
+    userRoleSelect.addEventListener('change',applyRolePreset);
+    searchInput.addEventListener('input',render);
 
-        async function loadUsers() {
-            try {
-                const res = await fetch('/api/admin/users');
-                if (!res.ok) throw new Error('Ошибка доступа');
-                allUsers = await res.json();
-                render();
-            } catch (e) {
-                // Если ошибка - выкидываем на главную, т.к. сюда нельзя без прав
-                window.location.href = '/'; 
-            }
-        }
+    renderPermissions();
 
-        function getAvatarColor(name) {
-            const colors = ['#0d6efd', '#6610f2', '#6f42c1', '#d63384', '#dc3545', '#fd7e14', '#ffc107', '#198754', '#20c997', '#0dcaf0'];
-            let hash = 0;
-            for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-            return colors[Math.abs(hash) % colors.length];
-        }
-
-        function getInitials(name) {
-            const parts = name.trim().split(' ');
-            if(parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-            if(parts.length === 1 && parts[0].length > 1) return parts[0].substring(0, 2).toUpperCase();
-            return name.substring(0, 1).toUpperCase();
-        }
-
-        function render() {
-            const term = searchInput.value.toLowerCase();
-            const filtered = allUsers.filter(u => 
-                (u.fullName || '').toLowerCase().includes(term) || 
-                u.username.toLowerCase().includes(term)
-            );
-
-            if(filtered.length === 0) {
-                document.getElementById('no-users-msg').style.display = 'block';
-                tbody.innerHTML = ''; mobileList.innerHTML = '';
-                return;
-            }
-            document.getElementById('no-users-msg').style.display = 'none';
-
-            // Desktop Render
-            tbody.innerHTML = filtered.map(u => {
-                const color = getAvatarColor(u.fullName || u.username);
-                const initials = getInitials(u.fullName || u.username);
-                
-                const roleNames = { manager: 'Менеджер', marketing: 'Маркетинг', workshop: 'Цех', guest: 'Гость' };
-                const roleBadge = u.permissions.is_admin
-                    ? '<span class="badge bg-warning text-dark border border-warning"><i class="bi bi-star-fill me-1"></i>Админ</span>'
-                    : '<span class="badge bg-light text-secondary border">' + (roleNames[u.role] || 'Менеджер') + '</span>';
-                
-                const statusBadge = u.isBlocked 
-                    ? '<span class="badge bg-danger-subtle text-danger"><i class="bi bi-lock-fill me-1"></i>Блок</span>' 
-                    : '<span class="badge bg-success-subtle text-success"><i class="bi bi-check-circle-fill me-1"></i>Активен</span>';
-
-                return `
-                <tr class="${u.isBlocked ? 'opacity-50' : ''}">
-                    <td class="ps-4 py-3">
-                        <div class="d-flex align-items-center">
-                            <div class="avatar-circle shadow-sm me-3" style="background:${color}">${initials}</div>
-                            <div>
-                                <div class="fw-bold text-dark">${u.fullName || 'Без имени'}</div>
-                                <div class="small text-muted">@${u.username}</div>
-                            </div>
-                        </div>
-                    </td>
-                    <td>${roleBadge}</td>
-                    <td><span class="badge bg-light text-dark border fw-normal text-uppercase">${u.scope}</span></td>
-                    <td>${statusBadge}</td>
-                    <td class="text-end pe-4">
-                        <button class="btn btn-sm btn-white border shadow-sm me-1" onclick="editUser('${u._id}')">
-                            <i class="bi bi-gear-fill text-secondary"></i>
-                        </button>
-                        ${!u.permissions.is_admin ? `<button class="btn btn-sm btn-white border shadow-sm text-danger" onclick="deleteUser('${u._id}')"><i class="bi bi-trash"></i></button>` : ''}
-                    </td>
-                </tr>`;
-            }).join('');
-
-            // Mobile Render
-            mobileList.innerHTML = filtered.map(u => {
-                const color = getAvatarColor(u.fullName || u.username);
-                const initials = getInitials(u.fullName || u.username);
-                const roleNames = { manager: 'Менеджер', marketing: 'Маркетинг', workshop: 'Цех', guest: 'Гость' };
-                const roleText = u.permissions.is_admin ? 'Администратор' : (roleNames[u.role] || 'Менеджер');
-                const roleClass = u.permissions.is_admin ? 'text-warning' : 'text-muted';
-
-                return `
-                <div class="user-card p-3 d-flex align-items-center" onclick="editUser('${u._id}')">
-                    <div class="avatar-circle shadow-sm me-3" style="background:${color}">${initials}</div>
-                    <div class="flex-grow-1">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <h6 class="fw-bold mb-0 ${u.isBlocked ? 'text-decoration-line-through text-muted':''}">${u.fullName || '@'+u.username}</h6>
-                            ${u.isBlocked ? '<span class="badge bg-danger-subtle text-danger small">Блок</span>' : ''}
-                        </div>
-                        <div class="small ${roleClass} fw-bold mt-1">${roleText} &bull; <span class="text-secondary fw-normal text-uppercase">${u.scope}</span></div>
-                    </div>
-                    <i class="bi bi-chevron-right text-muted opacity-25 ms-2"></i>
-                </div>`;
-            }).join('');
-        }
-
-        window.openUserModal = () => {
-            document.getElementById('userForm').reset();
-            document.getElementById('u_id').value = '';
-            document.getElementById('modalTitle').innerText = 'Новый сотрудник';
-            document.getElementById('u_password').required = true;
-            document.getElementById('u_role').value = 'manager';
-            document.getElementById('u_scope').value = 'all';
-            syncRoleScope();
-            document.querySelectorAll('.perm-check').forEach(cb => cb.checked = false);
-            
-            // Базовые права по умолчанию
-            ['p_can_view_map', 'p_can_view_dealers', 'p_can_view_products', 'p_can_view_sales', 'p_can_view_knowledge', 'p_can_view_reclamations', 'p_can_view_dashboard', 'p_can_view_pricing'].forEach(id => {
-                const el = document.getElementById(id); if(el) el.checked = true;
-            });
-            modal.show();
-        }
-
-        window.editUser = (id) => {
-            const u = allUsers.find(x => x._id === id);
-            if(!u) return;
-            
-            document.getElementById('u_id').value = u._id;
-            document.getElementById('u_fullName').value = u.fullName || '';
-            document.getElementById('u_username').value = u.username;
-            document.getElementById('u_password').value = '';
-            document.getElementById('u_password').required = false;
-            document.getElementById('u_role').value = u.role || 'manager';
-            document.getElementById('u_scope').value = (u.role === 'marketing' || u.role === 'workshop') ? 'all' : u.scope;
-            syncRoleScope();
-            document.getElementById('u_isBlocked').checked = u.isBlocked;
-
-            // Сброс
-            document.querySelectorAll('.perm-check').forEach(cb => cb.checked = false);
-
-            // Заполнение
-            if (u.permissions) {
-                for (const [key, val] of Object.entries(u.permissions)) {
-                    const el = document.getElementById(`p_${key}`);
-                    if(el) el.checked = val;
-                }
-            }
-
-            document.getElementById('modalTitle').innerText = 'Редактирование';
-            modal.show();
-        }
-
-        window.deleteUser = async (id) => {
-            if(!confirm('Удалить сотрудника безвозвратно?')) return;
-            await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
-            loadUsers();
-        }
-
-        document.getElementById('userForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const id = document.getElementById('u_id').value;
-            
-            const permissions = {};
-            document.querySelectorAll('.perm-check').forEach(cb => {
-                permissions[cb.id.replace('p_', '')] = cb.checked;
-            });
-
-            const data = {
-                fullName: document.getElementById('u_fullName').value,
-                username: document.getElementById('u_username').value,
-                password: document.getElementById('u_password').value,
-                role: document.getElementById('u_role').value,
-                scope: document.getElementById('u_scope').value,
-                isBlocked: document.getElementById('u_isBlocked').checked,
-                permissions
-            };
-
-            const url = id ? `/api/admin/users/${id}` : '/api/admin/users';
-            const method = id ? 'PUT' : 'POST';
-
-            try {
-                const res = await fetch(url, {
-                    method: method,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                
-                if(!res.ok) {
-                    const result = await res.json().catch(() => ({}));
-                    throw new Error(result.error || 'Ошибка сохранения');
-                }
-                
-                modal.hide();
-                loadUsers();
-            } catch (e) {
-                alert(e.message);
-            }
-        });
-
-        searchInput.addEventListener('input', render);
-
-        (async () => {
-            if (window.CRMAuth?.ready) await CRMAuth.ready;
-            if (!window.CRMAuth?.can('can_manage_users')) return;
-            loadUsers();
-        })();
-    </script>
+    (async function(){
+        if(window.CRMAuth&&CRMAuth.ready) await CRMAuth.ready;
+        if(!window.CRMAuth||!CRMAuth.can('can_manage_users')) return;
+        loadUsers();
+    })();
+})();
+</script>
 </body>
 </html>
