@@ -537,3 +537,16 @@
 .product-stock-last-updated em{font-size:.52rem;font-style:normal;color:#7f928a}
 .product-stock-last-updated.is-empty{background:#f3f1ee;color:#999ba0}
 @media(max-width:700px){.product-stock-last-updated{width:100%;justify-content:flex-start}.product-stock-last-updated>span{display:block}.product-stock-last-updated small,.product-stock-last-updated strong,.product-stock-last-updated em{display:inline}.product-stock-last-updated strong{margin-left:4px}}
+
+
+:root[data-crm-theme="dark"] .product-photo-preview,
+:root[data-crm-theme="dark"] .product-photo-option,
+:root[data-crm-theme="dark"] .product-row-photo.is-empty{
+  background:#1d1d1d;border-color:#343434;color:#777
+}
+:root[data-crm-theme="dark"] .product-photo-tools .form-control{
+  background:#1b1b1b;border-color:#383838;color:#eee
+}
+:root[data-crm-theme="dark"] .product-photo-gallery{
+  border-top-color:#333
+}
