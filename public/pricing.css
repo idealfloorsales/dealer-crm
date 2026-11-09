@@ -107,6 +107,50 @@ html,body.pricing-page{max-width:100%;overflow-x:hidden}
   display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 8px;border-radius:9px;background:#fff8e8;color:#805f1b;font-size:.49rem
 }
 .pricing-requirement.is-ok{background:#edf7f0;color:#397652}
+.pricing-condition-dealers-toggle{
+  width:100%;min-height:36px;display:flex;align-items:center;gap:8px;padding:0 10px;
+  border:1px solid #e3ded9;border-radius:10px;background:#fff;color:#55575c;
+  font-size:.58rem;font-weight:750;text-align:left
+}
+.pricing-condition-dealers-toggle span{display:inline-flex;align-items:center;gap:6px;min-width:0}
+.pricing-condition-dealers-toggle strong{
+  display:grid;place-items:center;min-width:24px;height:22px;margin-left:auto;padding:0 6px;
+  border-radius:999px;background:#f2efec;color:#6c6e73;font-size:.52rem
+}
+.pricing-condition-dealers-toggle>i{color:#9a9ca1;font-size:.62rem}
+.pricing-condition-dealers{
+  overflow:hidden;border:1px solid #e7e2de;border-radius:10px;background:#fff
+}
+.pricing-condition-dealers-head{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;
+  border-bottom:1px solid #eee9e5;background:#f8f6f4
+}
+.pricing-condition-dealers-head strong{color:#55575c;font-size:.56rem}
+.pricing-condition-dealers-head span{
+  display:grid;place-items:center;min-width:24px;height:22px;padding:0 6px;border-radius:999px;
+  background:#ece8e4;color:#6c6e73;font-size:.5rem;font-weight:800
+}
+.pricing-condition-dealers-list{max-height:280px;overflow:auto}
+.pricing-condition-dealer-row{
+  display:grid;grid-template-columns:24px minmax(0,1fr) auto;align-items:center;gap:8px;
+  min-height:42px;padding:7px 9px;border-bottom:1px solid #f0ece9
+}
+.pricing-condition-dealer-row:last-child{border-bottom:0}
+.pricing-condition-dealer-index{
+  display:grid;place-items:center;width:22px;height:22px;border-radius:7px;background:#f4f1ee;
+  color:#8a8c91;font-size:.48rem;font-weight:800
+}
+.pricing-condition-dealer-copy{min-width:0}
+.pricing-condition-dealer-copy strong{
+  display:block;overflow:hidden;color:#404247;font-size:.57rem;font-weight:750;text-overflow:ellipsis;white-space:nowrap
+}
+.pricing-condition-dealer-copy small{
+  display:block;overflow:hidden;margin-top:2px;color:#999ba0;font-size:.46rem;text-overflow:ellipsis;white-space:nowrap
+}
+.pricing-condition-dealer-price{
+  max-width:150px;overflow:hidden;padding:5px 7px;border-radius:8px;background:#f1eef8;color:#655889;
+  font-size:.48rem;font-weight:750;text-overflow:ellipsis;white-space:nowrap
+}
 .pricing-condition-actions{display:flex;align-items:center;justify-content:flex-end;gap:5px}
 .pricing-icon-btn{
   width:31px;height:31px;display:grid;place-items:center;border:1px solid #e4dfda;border-radius:9px;background:#fff;color:#67696e
@@ -318,6 +362,12 @@ html,body.pricing-page{max-width:100%;overflow-x:hidden}
 .pricing-condition-details small{font-size:.6rem}
 .pricing-condition-details strong{font-size:.72rem}
 .pricing-requirement{font-size:.66rem}
+.pricing-condition-dealers-toggle{min-height:39px;font-size:.69rem}
+.pricing-condition-dealers-head strong{font-size:.68rem}
+.pricing-condition-dealer-row{min-height:46px}
+.pricing-condition-dealer-copy strong{font-size:.7rem}
+.pricing-condition-dealer-copy small{font-size:.57rem}
+.pricing-condition-dealer-price{font-size:.58rem}
 .pricing-icon-btn{width:34px;height:34px}
 .pricing-form-section-title strong{font-size:.76rem}
 .pricing-form-section-title small{font-size:.62rem}
