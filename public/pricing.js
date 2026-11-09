@@ -83,6 +83,81 @@ document.addEventListener('DOMContentLoaded', () => {
         return 'Вся дилерская сеть';
     }
 
+    function affectedDealers(condition) {
+        const rows = Array.isArray(state.rows) ? state.rows : [];
+        const byId = new Map(rows.map(row => [String(row.dealerId || ''), row]));
+        let result = [];
+
+        if (condition.scopeType === 'dealer') {
+            const refs = Array.isArray(condition.dealers) && condition.dealers.length
+                ? condition.dealers
+                : (condition.dealer ? [condition.dealer] : []);
+            result = refs.map(item => {
+                const id = idOf(item);
+                const row = byId.get(String(id || ''));
+                return {
+                    id:String(id || ''),
+                    name:item?.name || row?.dealerName || 'Дилер',
+                    city:item?.city || row?.city || '',
+                    sector:item?.region_sector || row?.sector || '',
+                    price:row?.effectivePriceList || ''
+                };
+            });
+        } else if (condition.scopeType === 'sector') {
+            const values = new Set(
+                (Array.isArray(condition.scopeValues) && condition.scopeValues.length
+                    ? condition.scopeValues
+                    : [condition.scopeValue || ''])
+                    .map(value => String(value || '').trim().toLocaleLowerCase('ru-RU'))
+                    .filter(Boolean)
+            );
+            result = rows
+                .filter(row => values.has(String(row.sector || '').trim().toLocaleLowerCase('ru-RU')))
+                .map(row => ({
+                    id:String(row.dealerId || ''),
+                    name:row.dealerName || 'Дилер',
+                    city:row.city || '',
+                    sector:row.sector || '',
+                    price:row.effectivePriceList || ''
+                }));
+        } else if (condition.scopeType === 'city') {
+            const values = new Set(
+                (Array.isArray(condition.scopeValues) && condition.scopeValues.length
+                    ? condition.scopeValues
+                    : [condition.scopeValue || ''])
+                    .map(value => String(value || '').trim().toLocaleLowerCase('ru-RU'))
+                    .filter(Boolean)
+            );
+            result = rows
+                .filter(row => values.has(String(row.city || '').trim().toLocaleLowerCase('ru-RU')))
+                .map(row => ({
+                    id:String(row.dealerId || ''),
+                    name:row.dealerName || 'Дилер',
+                    city:row.city || '',
+                    sector:row.sector || '',
+                    price:row.effectivePriceList || ''
+                }));
+        } else {
+            result = rows.map(row => ({
+                id:String(row.dealerId || ''),
+                name:row.dealerName || 'Дилер',
+                city:row.city || '',
+                sector:row.sector || '',
+                price:row.effectivePriceList || ''
+            }));
+        }
+
+        const seen = new Set();
+        return result
+            .filter(item => {
+                const key = item.id || [item.name,item.city,item.sector].join('|').toLocaleLowerCase('ru-RU');
+                if (!key || seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            })
+            .sort((a,b) => String(a.name || '').localeCompare(String(b.name || ''),'ru'));
+    }
+
     function plusDays(dateKey, days) {
         if (!dateKey) return '';
         const d = new Date(dateKey + 'T00:00:00Z');
@@ -1166,6 +1241,26 @@ document.addEventListener('DOMContentLoaded', () => {
             const value = condition.kind === 'discount'
                 ? `−${fmt(condition.discountPercent,2)}%${condition.stackable === false ? ' · не суммируется':''}`
                 : condition.priceListName || 'Базовый прайс';
+            const affected = affectedDealers(condition);
+            const dealerListId = 'pricing-condition-dealers-' + idOf(condition);
+            const dealerList = affected.length
+                ? `<div class="pricing-condition-dealers" id="${esc(dealerListId)}" hidden>
+                    <div class="pricing-condition-dealers-head">
+                        <strong>Дилеры с этим условием</strong>
+                        <span>${affected.length}</span>
+                    </div>
+                    <div class="pricing-condition-dealers-list">
+                        ${affected.map((dealer,index) => `<div class="pricing-condition-dealer-row">
+                            <span class="pricing-condition-dealer-index">${index+1}</span>
+                            <div class="pricing-condition-dealer-copy">
+                                <strong>${esc(dealer.name)}</strong>
+                                <small>${esc([dealer.city,dealer.sector].filter(Boolean).join(' · ') || 'Локация не указана')}</small>
+                            </div>
+                            ${dealer.price ? `<span class="pricing-condition-dealer-price">${esc(dealer.price)}</span>` : ''}
+                        </div>`).join('')}
+                    </div>
+                </div>`
+                : '';
 
             return `<article class="pricing-condition-card is-${esc(status)}">
                 <div class="pricing-condition-top">
@@ -1182,6 +1277,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 ${requirement}
                 ${condition.note ? `<small class="text-muted">${esc(condition.note)}</small>` : ''}
+                ${affected.length ? `<button type="button" class="pricing-condition-dealers-toggle" data-toggle-condition-dealers="${esc(dealerListId)}" aria-expanded="false">
+                    <span><i class="bi bi-people"></i> Показать дилеров</span>
+                    <strong>${affected.length}</strong>
+                    <i class="bi bi-chevron-down"></i>
+                </button>${dealerList}` : ''}
                 <div class="pricing-condition-actions">
                     ${manage && status !== 'cancelled' ? `<button type="button" class="pricing-icon-btn" data-edit-condition="${idOf(condition)}" title="Редактировать"><i class="bi bi-pencil"></i></button>
                     <button type="button" class="pricing-icon-btn is-warning" data-cancel-condition="${idOf(condition)}" title="Отменить, но сохранить в истории"><i class="bi bi-slash-circle"></i></button>` : ''}
@@ -1202,6 +1302,22 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         host.querySelectorAll('[data-delete-condition]').forEach(button => {
             button.addEventListener('click', () => deleteCondition(button.dataset.deleteCondition));
+        });
+        host.querySelectorAll('[data-toggle-condition-dealers]').forEach(button => {
+            button.addEventListener('click', () => {
+                const target = document.getElementById(button.dataset.toggleConditionDealers || '');
+                if (!target) return;
+                const willOpen = target.hidden;
+                target.hidden = !willOpen;
+                button.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+                const label = button.querySelector('span');
+                if (label) label.innerHTML = willOpen
+                    ? '<i class="bi bi-people"></i> Скрыть дилеров'
+                    : '<i class="bi bi-people"></i> Показать дилеров';
+                button.querySelector('.bi-chevron-down,.bi-chevron-up')?.classList.toggle('bi-chevron-up', willOpen);
+                const chevron = button.querySelector('.bi-chevron-down,.bi-chevron-up');
+                if (chevron) chevron.classList.toggle('bi-chevron-down', !willOpen);
+            });
         });
     }
 
