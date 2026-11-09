@@ -337,6 +337,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }));
     $('pricing-offer-dealer')?.addEventListener('change',()=>{ $('pricing-offer-price-list').value=''; state.sheet=null; renderDealer(); renderPriceSummary(); renderProducts(); syncCreateState(); });
     $('pricing-offer-manual-name')?.addEventListener('input',()=>{ renderDealer(); syncCreateState(); });
+    $('pricing-offer-manual-name')?.addEventListener('change',()=>{
+        if(state.recipientMode==='manual' && currentRecipient() && $('pricing-offer-price-list')?.value && !state.sheet) refreshSheet();
+    });
     $('pricing-offer-manual-city')?.addEventListener('input',()=>{ renderDealer(); syncCreateState(); });
     $('pricing-offer-price-list')?.addEventListener('change',refreshSheet);
     $('pricing-offer-show-stock')?.addEventListener('change',()=>{ renderProducts(); syncCreateState(); });
