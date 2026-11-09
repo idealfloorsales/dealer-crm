@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     const $ = id => document.getElementById(id);
     const API = '/api/pricing';
-    const state = { dealers:[], lists:[], catalog:[], offers:[], sheet:null, selected:new Set(), loaded:false, recipientMode:'crm' };
+    const state = { dealers:[], lists:[], catalog:[], offers:[], contacts:[], canChooseContact:false, currentContactUserId:'', sheet:null, selected:new Set(), loaded:false, recipientMode:'crm' };
     const esc = value => String(value ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
     const n = value => Number(value) || 0;
     const money = value => n(value) > 0 ? n(value).toLocaleString('ru-RU',{maximumFractionDigits:2}) + ' ₸' : '—';
@@ -49,6 +49,44 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function offerDescription(){
         return String($('pricing-offer-description')?.value || '').trim();
+    }
+
+    function currentContact(){
+        const selected=String($('pricing-offer-contact-user')?.value || '').trim();
+        return state.contacts.find(item=>String(item.userId)===selected) || state.contacts[0] || null;
+    }
+
+    function fillContactOptions(){
+        const select=$('pricing-offer-contact-user');
+        const wrap=$('pricing-offer-contact-select-wrap');
+        if(!select) return;
+        const current=select.value;
+        select.innerHTML=state.contacts.map(item=>{
+            const phone=item.phone ? ' · ' + esc(item.phone) : ' · телефон не указан';
+            const position=item.position ? ' · ' + esc(item.position) : '';
+            return '<option value="' + esc(item.userId) + '">' + esc(item.fullName || 'Сотрудник') + position + phone + '</option>';
+        }).join('');
+        const preferred=state.contacts.some(item=>String(item.userId)===String(current))
+            ? current
+            : (state.contacts.some(item=>String(item.userId)===String(state.currentContactUserId)) ? state.currentContactUserId : (state.contacts[0]?.userId || ''));
+        select.value=preferred;
+        if(wrap) wrap.hidden=!state.canChooseContact;
+    }
+
+    function renderContact(){
+        const host=$('pricing-offer-contact-card');
+        if(!host) return;
+        const contact=currentContact();
+        if(!contact){
+            host.className='pricing-offer-dealer-card is-empty';
+            host.textContent='Контакт сотрудника не найден';
+            return;
+        }
+        host.className='pricing-offer-dealer-card';
+        const mode=state.canChooseContact ? 'Выбран администратором' : 'Подставляется автоматически';
+        host.innerHTML='<strong>' + esc(contact.fullName || 'Сотрудник') + '</strong><span>' +
+            esc([contact.position,contact.phone].filter(Boolean).join(' · ') || 'Рабочий телефон не указан') +
+            '</span><small>' + esc(mode) + '</small>';
     }
 
     function productVisibleByMode(item){
@@ -252,6 +290,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if($('pricing-offer-manual-name')) $('pricing-offer-manual-name').value='';
         if($('pricing-offer-manual-city')) $('pricing-offer-manual-city').value='';
         if($('pricing-offer-price-list')) $('pricing-offer-price-list').value='';
+        if($('pricing-offer-contact-user')) $('pricing-offer-contact-user').value=state.currentContactUserId || state.contacts[0]?.userId || '';
         if($('pricing-offer-show-stock')) $('pricing-offer-show-stock').checked=false;
         if($('pricing-offer-show-illiquid')) $('pricing-offer-show-illiquid').checked=false;
         if($('pricing-offer-show-equipment')) $('pricing-offer-show-equipment').checked=false;
@@ -261,6 +300,8 @@ document.addEventListener('DOMContentLoaded', () => {
         $('pricing-offer-result')?.classList.add('d-none');
         syncRecipientMode();
         fillCollections();
+        fillContactOptions();
+        renderContact();
         renderPriceSummary();
         renderProducts();
     }
@@ -282,6 +323,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     manualClientName:state.recipientMode==='manual' ? dealer.dealerName : '',
                     manualClientCity:state.recipientMode==='manual' ? dealer.city : '',
                     priceListId:$('pricing-offer-price-list').value || '',
+                    contactUserId:currentContact()?.userId || '',
                     expiresDays:Number($('pricing-offer-expiry').value || 14),
                     showStock:showStock(),
                     description:offerDescription(),
@@ -340,25 +382,31 @@ document.addEventListener('DOMContentLoaded', () => {
         try{
             if(window.CRMAuth?.ready) await CRMAuth.ready;
             if(window.CRMAuth && !CRMAuth.can('can_view_pricing')) return;
-            const [recipientsRes,listsRes,catalogRes,offersRes]=await Promise.all([
+            const [recipientsRes,listsRes,catalogRes,offersRes,contactsRes]=await Promise.all([
                 fetch(API+'/offer-recipients',{crmTrackLoading:false}),
                 fetch(API+'/price-lists',{crmTrackLoading:false}),
                 fetch(API+'/catalog',{crmTrackLoading:false}),
-                fetch(API+'/offers',{crmTrackLoading:false})
+                fetch(API+'/offers',{crmTrackLoading:false}),
+                fetch(API+'/contact-users',{crmTrackLoading:false})
             ]);
             const recipients=await recipientsRes.json().catch(()=>[]);
             const lists=await listsRes.json().catch(()=>[]);
             const catalog=await catalogRes.json().catch(()=>[]);
             const offers=await offersRes.json().catch(()=>[]);
+            const contactsData=await contactsRes.json().catch(()=>({}));
             if(!recipientsRes.ok) throw new Error(recipients.error || 'Не удалось загрузить потенциальных клиентов');
             if(!listsRes.ok) throw new Error(lists.error || 'Не удалось загрузить прайсы');
             if(!catalogRes.ok) throw new Error(catalog.error || 'Не удалось загрузить ассортимент');
+            if(!contactsRes.ok) throw new Error(contactsData.error || 'Не удалось загрузить контакты сотрудников');
             state.dealers=Array.isArray(recipients)?recipients:[];
             state.lists=Array.isArray(lists)?lists:[];
             state.catalog=Array.isArray(catalog)?catalog:[];
             state.offers=Array.isArray(offers)?offers:[];
+            state.contacts=Array.isArray(contactsData.contacts)?contactsData.contacts:[];
+            state.canChooseContact=Boolean(contactsData.canChoose);
+            state.currentContactUserId=String(contactsData.currentUserId || '');
             state.loaded=true;
-            fillDealerOptions(); fillPriceOptions(); fillCollections(); syncRecipientMode(); renderDealer(); renderPriceSummary(); renderProducts(); renderOffers();
+            fillDealerOptions(); fillPriceOptions(); fillCollections(); fillContactOptions(); syncRecipientMode(); renderDealer(); renderContact(); renderPriceSummary(); renderProducts(); renderOffers();
         }catch(error){
             console.error(error);
             toast(error.message,'error');
@@ -383,6 +431,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(()=>state.recipientMode==='manual' ? $('pricing-offer-manual-name')?.focus() : $('pricing-offer-dealer')?.focus(),40);
     }));
     $('pricing-offer-dealer')?.addEventListener('change',()=>{ $('pricing-offer-price-list').value=''; state.sheet=null; renderDealer(); renderPriceSummary(); renderProducts(); syncCreateState(); });
+    $('pricing-offer-contact-user')?.addEventListener('change',()=>{ renderContact(); syncCreateState(); });
     $('pricing-offer-manual-name')?.addEventListener('input',()=>{ renderDealer(); syncCreateState(); });
     $('pricing-offer-manual-name')?.addEventListener('change',()=>{
         if(state.recipientMode==='manual' && currentRecipient() && $('pricing-offer-price-list')?.value && !state.sheet) refreshSheet();
