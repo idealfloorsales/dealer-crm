@@ -1641,7 +1641,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     (responsible === '__unassigned__' && !dealer.responsible) ||
                     (responsible !== '__unassigned__' && String(dealer.responsible || '') === String(responsible))) &&
                 (!sector || normalizedSector === sector) &&
-                (!posFilter || (d.pos_materials || []).some(item => normalizeDisplayValue(item?.name) === posFilter)) &&
+                (!posFilter || (dealer.pos_materials || []).some(item => normalizeDisplayValue(item?.name) === posFilter)) &&
+                (() => {
+                    const scheme = dealer?.motivation_scheme;
+                    const motivationId = String(scheme?._id || scheme?.id || scheme || '').trim();
+                    const hasMotivation = Boolean(motivationId);
+                    return !motivationFilter ||
+                        (motivationFilter === '__with__' && hasMotivation) ||
+                        (motivationFilter === '__without__' && !hasMotivation) ||
+                        (motivationFilter !== '__with__' && motivationFilter !== '__without__' && motivationId === motivationFilter);
+                })() &&
                 (!search || searchable.includes(search));
         });
 
@@ -2993,6 +3002,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const status = filterStatus?.value || '';
         const responsible = filterResponsible?.value || '';
         const healthFilter = filterHealth?.value || '';
+        const motivationFilter = filterMotivation?.value || '';
         const search = (searchBar?.value || '').trim().toLowerCase();
         const sector = document.getElementById('filter-sector')?.value || '';
         const posFilter = filterPos?.value || '';
