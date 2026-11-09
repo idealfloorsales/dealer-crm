@@ -450,7 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
             discountPercent:0,
             priceListId,
             priceListName:list?.name || '',
-            stackable:false, priority:100,
+            stackable:false, priority:400,
             startDate:editor.querySelector('[data-inline-base-start]')?.value || state.today,
             endDate:editor.querySelector('[data-inline-base-end]')?.value || '',
             paused:false, reasonType:'individual',
