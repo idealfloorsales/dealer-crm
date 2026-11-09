@@ -13212,3 +13212,207 @@ body:not(.app-workspace-page) .modal-header .btn-close{
  .cc-motivation-panel .cc-motivation-table tbody tr,.cc-motivation-panel .cc-motivation-table tfoot tr { padding:11px; gap:6px; }
  .cc-motivation-panel .cc-motivation-table tbody td:nth-child(3),.cc-motivation-panel .cc-motivation-table tfoot th:nth-child(3) { font-size:.86rem; }
 }
+
+
+/* =========================================================
+   DEALER EDIT MOBILE — FINAL DYNAMIC FIELDS FIX
+   Keep this block last so legacy modal rules cannot collapse fields.
+   ========================================================= */
+@media (max-width:767px){
+  .dealer-form-modal .dealer-modal-body{
+    padding:9px 9px 14px!important;
+    scroll-padding-bottom:18px;
+  }
+
+  /* One scroll container only: the modal body. */
+  .dealer-form-modal #edit-contact-list,
+  .dealer-form-modal #edit-address-list,
+  .dealer-form-modal #add-contact-list,
+  .dealer-form-modal #add-address-list{
+    width:100%!important;
+    max-height:none!important;
+    overflow:visible!important;
+    padding:8px!important;
+  }
+
+  /* Contacts: three full-width fields + compact delete button. */
+  .dealer-form-modal .contact-entry{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) 40px!important;
+    grid-template-rows:auto auto auto!important;
+    column-gap:8px!important;
+    row-gap:8px!important;
+    align-items:start!important;
+    width:100%!important;
+    min-width:0!important;
+    padding:10px!important;
+    border-radius:13px!important;
+  }
+  .dealer-form-modal .contact-entry .contact-name,
+  .dealer-form-modal .contact-entry .contact-position,
+  .dealer-form-modal .contact-entry .contact-info{
+    grid-column:1!important;
+    width:100%!important;
+    min-width:0!important;
+    max-width:none!important;
+    min-height:46px!important;
+    margin:0!important;
+    font-size:.78rem!important;
+  }
+  .dealer-form-modal .contact-entry .contact-name{grid-row:1!important}
+  .dealer-form-modal .contact-entry .contact-position{grid-row:2!important}
+  .dealer-form-modal .contact-entry .contact-info{grid-row:3!important}
+  .dealer-form-modal .contact-entry>.btn-remove-entry{
+    grid-column:2!important;
+    grid-row:1!important;
+    align-self:start!important;
+    width:40px!important;
+    min-width:40px!important;
+    height:46px!important;
+    margin:0!important;
+    border-radius:11px!important;
+  }
+
+  /* Addresses: all fields remain readable; delete stays compact at top-right. */
+  .dealer-form-modal .address-entry{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) 40px!important;
+    grid-template-rows:auto auto auto!important;
+    column-gap:8px!important;
+    row-gap:8px!important;
+    align-items:start!important;
+    width:100%!important;
+    min-width:0!important;
+    padding:10px!important;
+    border-radius:13px!important;
+  }
+  .dealer-form-modal .address-entry .address-description,
+  .dealer-form-modal .address-entry .address-city,
+  .dealer-form-modal .address-entry .address-address{
+    grid-column:1!important;
+    width:100%!important;
+    min-width:0!important;
+    max-width:none!important;
+    min-height:46px!important;
+    margin:0!important;
+    font-size:.78rem!important;
+  }
+  .dealer-form-modal .address-entry .address-description{grid-row:1!important}
+  .dealer-form-modal .address-entry .address-city{grid-row:2!important}
+  .dealer-form-modal .address-entry .address-address{grid-row:3!important}
+  .dealer-form-modal .address-entry>.btn-remove-entry{
+    grid-column:2!important;
+    grid-row:1!important;
+    align-self:start!important;
+    width:40px!important;
+    min-width:40px!important;
+    height:46px!important;
+    margin:0!important;
+    border-radius:11px!important;
+  }
+
+  /* Legal entities: true single-column mobile form. */
+  .dealer-form-modal .legal-entity-entry{
+    position:relative!important;
+    width:100%!important;
+    min-width:0!important;
+    padding:11px!important;
+    border-radius:14px!important;
+  }
+  .dealer-form-modal .legal-entity-entry-head{
+    position:relative!important;
+    display:block!important;
+    min-height:42px;
+    padding-right:48px!important;
+    margin-bottom:11px!important;
+  }
+  .dealer-form-modal .legal-entity-entry-head>div{
+    width:100%!important;
+    min-width:0!important;
+  }
+  .dealer-form-modal .legal-entity-entry-head>.btn-remove-entry{
+    position:absolute!important;
+    top:0!important;
+    right:0!important;
+    width:38px!important;
+    min-width:38px!important;
+    height:38px!important;
+    margin:0!important;
+    border-radius:11px!important;
+  }
+  .dealer-form-modal .legal-entity-grid{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr)!important;
+    gap:9px!important;
+    width:100%!important;
+    min-width:0!important;
+  }
+  .dealer-form-modal .legal-entity-grid label,
+  .dealer-form-modal .legal-entity-grid .span-2,
+  .dealer-form-modal .legal-entity-grid .span-3{
+    grid-column:1!important;
+    width:100%!important;
+    min-width:0!important;
+  }
+  .dealer-form-modal .legal-entity-grid .form-control,
+  .dealer-form-modal .legal-entity-grid .form-select{
+    width:100%!important;
+    min-width:0!important;
+    max-width:none!important;
+    min-height:46px!important;
+    font-size:.76rem!important;
+  }
+
+  /* Section cards should use available phone width without nested gutters. */
+  .dealer-form-modal #tab-contacts>.row{
+    margin-left:0!important;
+    margin-right:0!important;
+  }
+  .dealer-form-modal #tab-contacts>.row>[class*="col-"]{
+    padding-left:0!important;
+    padding-right:0!important;
+  }
+  .dealer-form-modal #tab-contacts .dealer-form-section{
+    margin-bottom:10px!important;
+    padding:11px!important;
+  }
+
+  /* Footer participates in flex layout instead of covering the form. */
+  .dealer-form-modal .dealer-modal-footer{
+    position:relative!important;
+    left:auto!important;
+    right:auto!important;
+    bottom:auto!important;
+    flex:0 0 auto!important;
+    width:100%!important;
+    margin:0!important;
+    padding:8px 9px calc(8px + env(safe-area-inset-bottom))!important;
+    border-radius:0!important;
+    box-shadow:0 -8px 24px rgba(28,24,24,.07)!important;
+  }
+  .dealer-form-modal .dealer-modal-footer .ms-auto{
+    width:100%!important;
+    display:grid!important;
+    grid-template-columns:minmax(92px,.38fr) minmax(0,1fr)!important;
+    gap:8px!important;
+  }
+  .dealer-form-modal .dealer-footer-ghost,
+  .dealer-form-modal .dealer-footer-save{
+    width:100%!important;
+    min-width:0!important;
+    min-height:46px!important;
+  }
+
+  /* Slightly tighter mobile tab rail to give the form more vertical space. */
+  .dealer-form-modal .dealer-field-shortcuts-full{
+    min-height:0!important;
+    padding:6px 8px!important;
+  }
+  .dealer-form-modal .dealer-field-shortcuts-full button{
+    flex-basis:78px!important;
+    min-height:46px!important;
+  }
+  .dealer-form-modal .dealer-field-shortcuts-full button:last-child{
+    flex-basis:96px!important;
+  }
+}
