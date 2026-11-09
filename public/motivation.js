@@ -44,11 +44,22 @@
         try { schemes = await loadSchemes(); } catch (e) { console.warn(e); }
         document.querySelectorAll('[data-motivation-select], #motivation_scheme, #edit_motivation_scheme, #profile-edit-motivation-scheme').forEach(select => {
             if (!(select instanceof HTMLSelectElement)) return;
-            const current = String(select.dataset.selected || select.value || '');
+
+            if (select.dataset.motivationBound !== '1') {
+                select.addEventListener('change', () => {
+                    select.dataset.selected = select.value || '';
+                });
+                select.dataset.motivationBound = '1';
+            }
+
+            const hasExplicitSelection = select.hasAttribute('data-selected');
+            const current = String(hasExplicitSelection ? (select.dataset.selected || '') : (select.value || ''));
+
             select.innerHTML = '<option value="">Без мотивации</option>' + schemes.map(item =>
                 '<option value="' + esc(item.id) + '">' + esc(schemeLabel(item)) + '</option>'
             ).join('');
-            if ([...select.options].some(option => option.value === current)) select.value = current;
+
+            select.value = [...select.options].some(option => option.value === current) ? current : '';
             select.dataset.selected = select.value || '';
         });
     }
