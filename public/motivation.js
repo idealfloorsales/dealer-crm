@@ -329,6 +329,100 @@
         if(!canManage()) host.querySelectorAll('button').forEach(btn=>btn.disabled=true);
     }
 
+    function payoutMonthLabel(value) {
+        const match=String(value||'').match(/^(\d{4})-(\d{2})$/);
+        if(!match) return String(value||'');
+        const dateValue=new Date(Number(match[1]),Number(match[2])-1,1);
+        return dateValue.toLocaleDateString('ru-RU',{month:'long',year:'numeric'});
+    }
+
+    function printPayoutList() {
+        const data=state.payoutData || {};
+        const rows=Array.isArray(data.rows) ? data.rows : [];
+        if(!rows.length){
+            toast('За выбранный месяц нет мотиваций для печати','error');
+            return;
+        }
+
+        const summary=data.summary || {};
+        const month=state.payoutMonth || document.getElementById('motivation-payout-month')?.value || currentMonth();
+        const printedAt=new Date().toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+        const statusClass=status => status==='paid'?'paid':status==='skipped'?'skipped':'pending';
+        const rowsHtml=rows.map((row,index)=>`
+            <tr>
+                <td class="num">${index+1}</td>
+                <td><strong>${esc(row.dealerName || 'Дилер')}</strong><small>${esc([row.dealerId,row.dealerCity].filter(Boolean).join(' · '))}</small></td>
+                <td><strong>${esc(row.schemeName || '—')}</strong><small>${n(row.ratePerM2).toLocaleString('ru-RU',{maximumFractionDigits:2})} ₸/м²</small></td>
+                <td class="right">${n(row.salesM2).toLocaleString('ru-RU',{maximumFractionDigits:2})} м²</td>
+                <td class="right amount">${n(row.amount).toLocaleString('ru-RU',{maximumFractionDigits:2})} ₸</td>
+                <td><span class="status ${statusClass(row.status)}">${payoutStatusLabel(row.status)}</span>${row.paidAt?'<small>'+new Date(row.paidAt).toLocaleDateString('ru-RU')+'</small>':''}</td>
+            </tr>`).join('');
+
+        const popup=window.open('','_blank','width=1120,height=800');
+        if(!popup){
+            toast('Браузер заблокировал окно печати. Разрешите всплывающие окна для CRM.','error');
+            return;
+        }
+        popup.opener=null;
+        popup.document.open();
+        popup.document.write(`<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Список мотивации — ${esc(payoutMonthLabel(month))}</title>
+<style>
+@page{size:A4 landscape;margin:10mm}
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;color:#242529;background:#fff;font-size:10px}
+.header{display:flex;justify-content:space-between;gap:24px;align-items:flex-end;padding-bottom:12px;border-bottom:2px solid #a7070d}
+.brand{color:#a7070d;font-size:12px;font-weight:900;letter-spacing:.08em}
+h1{margin:4px 0 2px;font-size:23px;line-height:1}
+.period{color:#666;font-size:11px;font-weight:700;text-transform:capitalize}
+.meta{text-align:right;color:#777;line-height:1.5}
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
+.summary div{padding:9px 10px;border:1px solid #ddd;border-radius:8px}
+.summary small,.summary strong{display:block}
+.summary small{color:#888;font-size:8px;text-transform:uppercase;letter-spacing:.04em}
+.summary strong{margin-top:3px;font-size:14px}
+table{width:100%;border-collapse:collapse}
+thead{display:table-header-group}
+th{padding:7px 6px;background:#f2f0ee;border:1px solid #ddd;color:#555;text-align:left;font-size:8px;text-transform:uppercase;letter-spacing:.03em}
+td{padding:7px 6px;border:1px solid #ddd;vertical-align:middle}
+tr{break-inside:avoid;page-break-inside:avoid}
+td strong,td small{display:block}
+td small{margin-top:2px;color:#888;font-size:8px}
+.num{width:30px;text-align:center;color:#888}
+.right{text-align:right;white-space:nowrap}
+.amount{font-weight:800}
+.status{display:inline-block;padding:3px 6px;border-radius:99px;font-size:8px;font-weight:800;white-space:nowrap}
+.status.pending{background:#fff3d8;color:#8a6314}
+.status.paid{background:#e8f6ef;color:#20714e}
+.status.skipped{background:#f0f1f2;color:#777}
+.footer{display:flex;justify-content:space-between;margin-top:12px;padding-top:8px;border-top:1px solid #ddd;color:#888;font-size:8px}
+@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+</style>
+</head>
+<body>
+<div class="header">
+  <div><div class="brand">IDEAL FLOOR CRM</div><h1>Список мотивации дилеров</h1><div class="period">${esc(payoutMonthLabel(month))}</div></div>
+  <div class="meta">Сформировано: ${esc(printedAt)}<br>Расчёт: ставка за 1 м² × продажи</div>
+</div>
+<div class="summary">
+  <div><small>Дилеров</small><strong>${rows.length}</strong></div>
+  <div><small>Продажи</small><strong>${n(summary.salesM2).toLocaleString('ru-RU',{maximumFractionDigits:2})} м²</strong></div>
+  <div><small>К выплате</small><strong>${n(summary.pendingAmount).toLocaleString('ru-RU',{maximumFractionDigits:2})} ₸</strong></div>
+  <div><small>Выплачено</small><strong>${n(summary.paidAmount).toLocaleString('ru-RU',{maximumFractionDigits:2})} ₸</strong></div>
+</div>
+<table>
+<thead><tr><th>№</th><th>Дилер</th><th>Мотивация / ставка</th><th style="text-align:right">Продажи</th><th style="text-align:right">Сумма</th><th>Статус</th></tr></thead>
+<tbody>${rowsHtml}</tbody>
+</table>
+<div class="footer"><span>IDEAL FLOOR · Мотивация дилеров</span><span>${esc(payoutMonthLabel(month))}</span></div>
+<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),120));window.addEventListener('afterprint',()=>window.close());<\/script>
+</body></html>`);
+        popup.document.close();
+    }
+
     async function setPayoutStatus(id,status) {
         if(!canManage()) return;
         let note='';
@@ -348,6 +442,7 @@
         if(picker && !picker.value) picker.value=currentMonth();
         picker?.addEventListener('change',()=>loadPayouts(canManage()));
         document.getElementById('motivation-payout-recalc')?.addEventListener('click',()=>loadPayouts(true));
+        document.getElementById('motivation-payout-print')?.addEventListener('click',printPayoutList);
         document.getElementById('motivation-payout-settings')?.addEventListener('click',openManager);
         document.getElementById('motivation-payout-list')?.addEventListener('click',event=>{
             const btn=event.target.closest('[data-payout-status]');
