@@ -4396,7 +4396,12 @@ body.bg-light {
         background: #fff !important;
         color: #202124 !important;
         font-family: 'Onest', Arial, Helvetica, sans-serif !important;
-        font-size: 9pt !important;
+        font-size: 10pt !important;
+        /* Старый общий print-блок сжимал продажи до 52%.
+           Для нового отчёта оставляем умеренный масштаб, чтобы реально использовать A4. */
+        zoom: .62 !important;
+        transform: none !important;
+        transform-origin: top left !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
     }
@@ -4415,7 +4420,7 @@ body.bg-light {
         content: "";
         display: block;
         height: 3.2mm;
-        margin-bottom: 5mm;
+        margin-bottom: 3.2mm;
         border-radius: 2mm;
         background: linear-gradient(90deg, #b9040a 0%, #8d0207 72%, #3a2023 100%) !important;
     }
@@ -4472,20 +4477,20 @@ body.bg-light {
 
     .sales-print-meta strong {
         color: #4f5157;
-        font-size: 8pt;
+        font-size: 9.5pt;
         font-weight: 650;
     }
 
     .sales-print-overview {
         display: grid;
         grid-template-columns: repeat(2, minmax(0,1fr));
-        gap: 3mm;
-        margin: 5mm 0 6mm;
+        gap: 2.5mm;
+        margin: 3.5mm 0 4mm;
     }
 
     .sales-print-overview-card {
         position: relative;
-        padding: 3.5mm 4mm 3.2mm;
+        padding: 3mm 3.5mm 2.8mm;
         overflow: hidden;
         border: .8pt solid #e2d7d8;
         border-radius: 3mm;
@@ -4536,7 +4541,7 @@ body.bg-light {
 
     .sales-print-overview-top > span {
         color: #4b4d52;
-        font-size: 7.3pt;
+        font-size: 9pt;
         font-weight: 700;
         letter-spacing: .15pt;
     }
@@ -4544,7 +4549,7 @@ body.bg-light {
     .sales-print-overview-top > strong {
         flex: 0 0 auto;
         color: #b9040a;
-        font-size: 17pt;
+        font-size: 19pt;
         line-height: 1;
         font-weight: 800;
     }
@@ -4557,9 +4562,9 @@ body.bg-light {
     .sales-print-overview-values {
         display: flex;
         gap: 5mm;
-        margin-top: 2.4mm;
-        color: #888a90;
-        font-size: 6.4pt;
+        margin-top: 2mm;
+        color: #777980;
+        font-size: 8pt;
     }
 
     .sales-print-overview-values b {
@@ -4569,7 +4574,7 @@ body.bg-light {
 
     .sales-print-overview-bar {
         height: 2.1mm;
-        margin-top: 2.5mm;
+        margin-top: 1.8mm;
         overflow: hidden;
         border-radius: 99mm;
         background: #e9e6e2 !important;
@@ -4596,8 +4601,8 @@ body.bg-light {
     }
 
     .sales-print-section-title {
-        margin-bottom: 2.3mm;
-        padding: 2mm 3mm;
+        margin-bottom: 1.6mm;
+        padding: 1.7mm 2.6mm;
         border-left: 2.2mm solid #b9040a;
         border-radius: 1.4mm;
         background: #f9eeee !important;
@@ -4613,11 +4618,11 @@ body.bg-light {
     .sales-print-section-items {
         display: grid;
         grid-template-columns: repeat(2, minmax(0,1fr));
-        gap: 2.4mm;
+        gap: 1.8mm;
     }
 
     .sales-print-item {
-        padding: 3mm 3.2mm 2.8mm;
+        padding: 2.3mm 2.7mm 2.2mm;
         border: .65pt solid #e3e0dc;
         border-radius: 2.3mm;
         background: #fff !important;
@@ -4642,13 +4647,13 @@ body.bg-light {
         align-items: flex-start;
         justify-content: space-between;
         gap: 3mm;
-        margin-bottom: 2.4mm;
+        margin-bottom: 1.7mm;
     }
 
     .sales-print-item-title {
         min-width: 0;
         color: #303136;
-        font-size: 7.7pt;
+        font-size: 9.6pt;
         font-weight: 700;
         line-height: 1.2;
     }
@@ -4659,7 +4664,7 @@ body.bg-light {
         border-radius: 99mm;
         background: #f9eeee !important;
         color: #b9040a;
-        font-size: 7.5pt;
+        font-size: 9.2pt;
         font-weight: 800;
         line-height: 1;
     }
@@ -4682,27 +4687,27 @@ body.bg-light {
     .sales-print-item.is-none .sales-print-item-percent {
         background: #f0f0f1 !important;
         color: #7d7f84;
-        font-size: 6.3pt;
+        font-size: 7.6pt;
     }
 
     .sales-print-item-metrics {
         display: grid;
         grid-template-columns: repeat(3, minmax(0,1fr));
-        gap: 1.6mm;
+        gap: 1.2mm;
     }
 
     .sales-print-item-metrics > div {
         min-width: 0;
-        padding: 1.8mm 2mm;
+        padding: 1.35mm 1.7mm;
         border-radius: 1.6mm;
         background: #f7f6f4 !important;
     }
 
     .sales-print-item-metrics span {
         display: block;
-        margin-bottom: .6mm;
-        color: #999ba0;
-        font-size: 5.4pt;
+        margin-bottom: .45mm;
+        color: #8a8c92;
+        font-size: 6.8pt;
         font-weight: 650;
     }
 
@@ -4710,7 +4715,7 @@ body.bg-light {
         display: block;
         overflow: hidden;
         color: #34353a;
-        font-size: 6.7pt;
+        font-size: 8.8pt;
         font-weight: 750;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -4741,11 +4746,11 @@ body.bg-light {
         align-items: center;
         justify-content: space-between;
         gap: 8mm;
-        margin-top: 5mm;
-        padding-top: 2.5mm;
+        margin-top: 3mm;
+        padding-top: 1.8mm;
         border-top: .8pt solid #eadadc;
         color: #8e9095;
-        font-size: 6pt;
+        font-size: 7pt;
     }
 }
 
