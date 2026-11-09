@@ -38,3 +38,33 @@
   .motivation-manager-stats{padding:8px 10px 0}
   .motivation-manager-grid{padding:8px 10px 18px}
 }
+
+/* Dashboard payouts: quiet surfaces and consistent mobile cards. */
+#monthly-motivation-reminder .cc-motivation-panel{--payout-accent:var(--if-red,#b9040a);--payout-line:var(--if-line,#e9e5e2)}
+#monthly-motivation-reminder .cc-motivation-toggle{background:var(--if-soft-red,#fbf1f1);border-color:transparent;color:var(--payout-accent);border-radius:14px;padding:12px 15px;min-height:46px}
+#monthly-motivation-reminder .cc-motivation-toggle:hover{border-color:var(--payout-accent);transform:none}
+#monthly-motivation-reminder .cc-motivation-action:focus-visible{outline:2px solid var(--payout-accent);outline-offset:3px}
+#monthly-motivation-reminder .cc-motivation-table{--bs-table-bg:transparent;--bs-table-accent-bg:transparent;--bs-table-striped-bg:transparent;--bs-table-hover-bg:transparent}
+#monthly-motivation-reminder .cc-motivation-table>:not(caption)>*>*{box-shadow:none;background-color:transparent}
+#monthly-motivation-reminder .cc-motivation-table tbody td:last-child{color:var(--payout-accent);font-weight:750}
+#monthly-motivation-reminder .cc-motivation-panel>.cc-motivation-action:not(.cc-motivation-toggle){margin-top:14px!important;min-height:40px;font-size:.72rem;color:#85878c;border-color:transparent}
+@media(max-width:768px){
+ #monthly-motivation-reminder .cc-motivation-panel{padding:16px}
+ #monthly-motivation-reminder .cc-panel-head{gap:10px}
+ #monthly-motivation-reminder .cc-panel-link{align-self:flex-end;font-weight:600}
+ #monthly-motivation-reminder .cc-motivation-subtitle{font-size:.72rem}
+ #monthly-motivation-reminder .cc-motivation-table tbody{gap:10px}
+ #monthly-motivation-reminder .cc-motivation-table tbody tr{padding:15px;gap:12px 10px;border:1px solid var(--payout-line);border-radius:16px;background:transparent;box-shadow:0 2px 6px rgba(20,20,25,.025)}
+ #monthly-motivation-reminder .cc-motivation-table tbody td:first-child{padding-bottom:11px;border-bottom:1px solid var(--payout-line);line-height:1.4}
+ #monthly-motivation-reminder .cc-motivation-table tbody td:first-child strong{font-size:.87rem;font-weight:650}
+ #monthly-motivation-reminder .cc-motivation-table tbody td:first-child small{font-size:.66rem;letter-spacing:.025em;margin-top:4px}
+ #monthly-motivation-reminder .cc-motivation-table tbody td:nth-child(2){font-size:.85rem;font-weight:500;color:var(--if-ink,#242427)}
+ #monthly-motivation-reminder .cc-motivation-table tbody td:nth-child(3){font-size:1.02rem;font-weight:750;color:var(--payout-accent);line-height:1.4;overflow-wrap:normal}
+ #monthly-motivation-reminder .cc-motivation-table tbody td:nth-child(2)::before,#monthly-motivation-reminder .cc-motivation-table tbody td:nth-child(3)::before{font-size:.62rem;font-weight:500;color:#85878c;margin-bottom:4px}
+ #monthly-motivation-reminder .cc-motivation-table tfoot tr{padding:15px;border:1px solid var(--payout-line);background:var(--if-soft-red,#fbf1f1);border-radius:16px;gap:8px}
+ #monthly-motivation-reminder .cc-motivation-table tfoot th:nth-child(3){color:var(--payout-accent);font-size:1.05rem;overflow-wrap:normal}
+}
+@media(max-width:360px){
+ #monthly-motivation-reminder .cc-motivation-table tbody tr{padding:12px}
+ #monthly-motivation-reminder .cc-motivation-table tbody td:nth-child(3){font-size:.9rem}
+}
