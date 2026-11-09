@@ -260,6 +260,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if($('pricing-offer-collection')) $('pricing-offer-collection').value='';
         $('pricing-offer-result')?.classList.add('d-none');
         syncRecipientMode();
+        fillCollections();
         renderPriceSummary();
         renderProducts();
     }
