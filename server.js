@@ -2161,6 +2161,19 @@ function pricingScopeSpecificity(condition) {
     return 1;
 }
 
+function pricingConditionEffectiveStartDate(condition) {
+    const linkedPriceList = condition?.kind === 'price_list' &&
+        condition?.priceList &&
+        typeof condition.priceList === 'object'
+            ? condition.priceList
+            : null;
+    const dates = [condition?.startDate, linkedPriceList?.validFrom]
+        .map(value => String(value || '').trim())
+        .filter(Boolean)
+        .sort();
+    return dates.length ? dates[dates.length - 1] : '';
+}
+
 function pricingConditionMatchesDealer(condition, dealer) {
     if (!condition || !dealer) return false;
     if (condition.scopeType === 'all') return true;
@@ -2199,15 +2212,26 @@ function buildDealerPricingSummary(dealer, allConditions, today = pricingTodayKe
         .filter(condition => condition.kind === 'price_list' && (
             !condition.priceList || typeof condition.priceList !== 'object' || priceListIsEffective(condition.priceList, today)
         ))
-        .sort((a, b) =>
-            // Explicit priority wins across dealer/city/sector scopes.
-            // Scope specificity only breaks ties, preventing a dealer-level
-            // assignment from silently defeating a higher-priority regional list.
-            (Number(b.priority) || 0) - (Number(a.priority) || 0) ||
-            pricingScopeSpecificity(b) - pricingScopeSpecificity(a) ||
-            String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')) ||
-            String(b._id || '').localeCompare(String(a._id || ''))
-        );
+        .sort((a, b) => {
+            const specificityA = pricingScopeSpecificity(a);
+            const specificityB = pricingScopeSpecificity(b);
+
+            // For the same target level, the price list with the latest effective
+            // start date wins. This makes a newly scheduled dealer price override
+            // an older open-ended dealer price even if they came from different UI flows.
+            if (specificityA === specificityB) {
+                const startCompare = pricingConditionEffectiveStartDate(b)
+                    .localeCompare(pricingConditionEffectiveStartDate(a));
+                if (startCompare) return startCompare;
+            }
+
+            // Across different target levels explicit business priority still wins.
+            return (Number(b.priority) || 0) - (Number(a.priority) || 0) ||
+                specificityB - specificityA ||
+                pricingConditionEffectiveStartDate(b).localeCompare(pricingConditionEffectiveStartDate(a)) ||
+                String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')) ||
+                String(b._id || '').localeCompare(String(a._id || ''));
+        });
 
     const selectedPriceList = priceLists[0] || null;
     const dealerPriceList = dealer?.price_list && typeof dealer.price_list === 'object'
@@ -2228,13 +2252,11 @@ function buildDealerPricingSummary(dealer, allConditions, today = pricingTodayKe
             (Number(b.discountPercent) || 0) - (Number(a.discountPercent) || 0)
         );
 
-    // An active priority price list replaces the entire discount calculation.
-    // Discounts remain assigned and automatically resume after the override expires.
-    const appliedDiscounts = selectedPriceList
-        ? []
-        : (exclusive.length
-            ? [exclusive[0]]
-            : activeDiscounts.filter(condition => condition.stackable !== false));
+    // The selected price list defines the base price. Active percentage discounts
+    // are then applied on top of that base, matching the CRM UI and dealer rules.
+    const appliedDiscounts = exclusive.length
+        ? [exclusive[0]]
+        : activeDiscounts.filter(condition => condition.stackable !== false);
 
     const totalDiscountPercent = appliedDiscounts.reduce(
         (sum, condition) => sum + Math.max(0, Number(condition.discountPercent) || 0),
@@ -2292,8 +2314,8 @@ function buildDealerPricingSummary(dealer, allConditions, today = pricingTodayKe
                 scopeType: condition.scopeType || '',
                 selected: String(condition._id || '') === String(selectedPriceList?._id || '')
             })),
-            discountsSuspended: Boolean(selectedPriceList),
-            suspendedDiscountCount: selectedPriceList ? activeDiscounts.length : 0
+            discountsSuspended: false,
+            suspendedDiscountCount: 0
         },
         priceOverride: selectedPriceList ? {
             active: true,
@@ -2366,7 +2388,11 @@ function cleanPricingPayload(body = {}) {
         priceListName: kind === 'price_list' ? String(body.priceListName || '').trim() : '',
         priceList: kind === 'price_list' && body.priceListId ? body.priceListId : null,
         stackable: kind === 'discount' ? body.stackable !== false : false,
-        priority: Number(body.priority) || 0,
+        priority: kind === 'price_list'
+            ? (Number(body.priority) > 0
+                ? Number(body.priority)
+                : (({ all:100, city:200, sector:300, dealer:400 })[scopeType] || 100))
+            : (Number(body.priority) || 0),
         startDate: String(body.startDate || '').trim(),
         endDate: String(body.endDate || '').trim(),
         paused: Boolean(body.paused),
