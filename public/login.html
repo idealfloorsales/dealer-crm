@@ -338,6 +338,7 @@
             .login-mobile-logo{margin-bottom:26px}
         }
     </style>
+    <link rel="stylesheet" href="login.css?v={{VER}}">
 </head>
 <body class="login-page crm-ui-enhanced">
     <main class="login-page-wrap">
@@ -465,7 +466,7 @@
         // Если авторизация уже сохранена, возвращаем сотрудника в его основной раздел.
         if (localStorage.getItem('crm_token')) {
             window.location.replace(getHomeForUser(getCachedUser()));
-        } else {
+        } else if (window.matchMedia('(min-width: 761px) and (pointer: fine)').matches) {
             requestAnimationFrame(() => usernameInput.focus({ preventScroll: true }));
         }
 

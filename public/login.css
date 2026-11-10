@@ -1,0 +1,34 @@
+/* Login uses the same warm surfaces, charcoal text and red accent as the workspace. */
+body.login-page{font-family:Onest,Inter,sans-serif}
+.login-field-head label{font-size:.78rem;color:#62636a;font-weight:650}
+.login-subtitle{font-size:.84rem;line-height:1.6}
+.login-input-wrap input{font-size:1rem}
+.login-submit{font-size:.9rem}
+.login-footnote{font-size:.7rem;line-height:1.6}
+.login-error{font-size:.82rem;padding:12px}
+.login-caps{font-size:.68rem}
+.login-eyebrow{font-size:.67rem}
+@media(max-width:760px){
+ body.login-page{background:#f5f3f0}
+ .login-page-wrap{display:flex;align-items:center;justify-content:center;min-height:100svh;background:transparent;padding:max(24px,env(safe-area-inset-top)) 18px max(24px,env(safe-area-inset-bottom))}
+ .login-stage{width:100%;max-width:440px;min-height:0;overflow:visible;border:1px solid #e8e3de;border-radius:26px;background:#fff;box-shadow:0 14px 48px rgba(35,31,29,.06)}
+ .login-form-panel{min-height:0;padding:30px 26px;border-radius:inherit;display:block}
+ .login-form-shell{max-width:none}
+ .login-mobile-logo{width:156px;min-height:58px;margin:0 auto 30px;padding:8px;border:0;border-radius:0;box-shadow:none}
+ .login-mobile-logo img{max-height:48px}
+ .login-eyebrow,.login-form-shell h2,.login-subtitle{text-align:center}
+ .login-eyebrow{font-size:.66rem;color:#a80b14;letter-spacing:.14em}
+ .login-form-shell h2{font-size:1.65rem;margin:9px 0 8px;line-height:1.25}
+ .login-subtitle{font-size:.85rem;margin-bottom:28px;color:#83848b}
+ .login-field{margin-bottom:18px}
+ .login-field-head{margin-bottom:8px}
+ .login-field-head label{font-size:.8rem}
+ .login-input-wrap{min-height:56px;border-radius:13px;background:#faf9f7}
+ .login-input-wrap input{height:54px;font-size:16px}
+ .login-input-icon{width:44px;flex-basis:44px}
+ .login-password-toggle{width:44px;height:44px}
+ .login-submit{min-height:54px;font-size:.94rem;border-radius:13px;margin-top:24px;background:#b9040a;box-shadow:0 6px 16px rgba(185,4,10,.12)}
+ .login-footnote{font-size:.68rem;gap:6px;margin-top:24px;text-align:center}
+}
+@media(max-width:360px){.login-page-wrap{padding-left:12px;padding-right:12px}.login-form-panel{padding:26px 20px}.login-form-shell h2{font-size:1.5rem}.login-footnote{font-size:.63rem}}
+@media(max-height:570px) and (max-width:760px){.login-page-wrap{align-items:flex-start;padding-top:16px;padding-bottom:16px}.login-mobile-logo{margin-bottom:18px}.login-form-panel{padding-top:20px;padding-bottom:20px}.login-subtitle{margin-bottom:18px}}
