@@ -1013,6 +1013,10 @@ const stockImportMetaSchema = new mongoose.Schema({
     updated: { type:Number, default:0 }
 }, { timestamps:true });
 const StockImportMeta = mongoose.model('StockImportMeta', stockImportMetaSchema);
+const gmailStockSync = require('./server/gmail-stock').createGmailStockSync({
+    Product, StockImportMeta, AuditLog, connection:mongoose.connection,
+    ready:() => appReady && !shuttingDown
+});
 
 // ==========================================
 // ЦЕХ: материалы, рецептуры, производство и движения
@@ -1668,6 +1672,7 @@ async function connectToDB() {
             await normalizeWorkshopPosRecipes();
 
             appReady = true;
+            gmailStockSync.start();
             await purgeExpiredCommercialOffers().catch(error => console.error('Initial commercial offer cleanup error:', error));
             ensureCommercialOfferCleanup();
             if (dbReconnectTimer) {
@@ -4874,6 +4879,10 @@ app.get('/api/products/count', requireAnyPermission('can_view_products', 'can_vi
 });
 app.get('/api/products', requireAnyPermission('can_view_products', 'can_view_report', 'can_view_reclamations', 'can_view_dealers'), async (req, res) => { const s = new RegExp(req.query.search||'', 'i'); const p = await Product.find({$or:[{sku:s},{name:s},{collection:s}]}).sort({sku:1}).lean(); res.json(p.map(x=>{x.id=x._id;return x;})); });
 
+app.get('/api/products/gmail-stock-status', requirePermission('can_manage_products'), async (req,res) => {
+    try { res.json(await gmailStockSync.status()); }
+    catch (error) { res.status(500).json({error:'Не удалось проверить состояние автоимпорта'}); }
+});
 app.get('/api/products/stock-import-meta', requireAnyPermission('can_view_products', 'can_view_report', 'can_view_dealers'), async (req, res) => {
     try {
         const meta = await StockImportMeta.findOne({ key:'free_stock' }).lean();
@@ -6684,6 +6693,7 @@ serverInstance.requestTimeout = 120000;
 async function gracefulShutdown(signal) {
     if (shuttingDown) return;
     shuttingDown = true;
+    gmailStockSync.stop();
     appReady = false;
     console.log(`${signal} received, shutting down gracefully`);
 

@@ -280,6 +280,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json().catch(()=>({}));
             if (!response.ok) throw new Error(data.error || 'Не удалось загрузить дату остатков');
             renderStockImportMeta(data);
+            if (canManageProducts && stockLastUpdated) {
+                const statusResponse = await fetch(API_URL + '/gmail-stock-status', {crmTrackLoading:false});
+                if (statusResponse.ok) {
+                    const status = await statusResponse.json();
+                    if (status.configured) {
+                        const label = status.lastError ? 'Автоимпорт Gmail: ' + status.lastError :
+                            (status.lastCheckedAt ? 'Gmail проверен: ' + stockImportDateText(status.lastCheckedAt) : 'Автоимпорт Gmail: ожидается первая проверка');
+                        stockLastUpdated.insertAdjacentHTML('beforeend', '<span><small>' + esc(label) + '</small></span>');
+                    }
+                }
+            }
             return data;
         } catch (error) {
             console.warn(error);
