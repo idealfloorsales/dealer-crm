@@ -46,5 +46,27 @@ test('assignment, automatic dealer sales and separate manual results work end to
  const result=await call('/api/kpi?month=2026-11',null,false,'GET');assert.equal(result.data.summary.sales.fact,120);assert.equal(result.data.summary.illiquid.fact,12.5);assert.equal(result.data.summary.newDealers.fact,1);
  assert.equal((await call('/api/kpi/plan',{...payload,revision:99},true,'PUT')).status,409);
  assert.equal((await call('/api/kpi/entries/record1',null,false,'DELETE')).status,200);assert.equal(entries.length,1);assert.ok(audits.length>=4);
+ const sections=[{id:'opening',title:'Новые дилеры',kind:'opening',unit:'шт.',target:8,dealerTargets:[{dealerId}]},{id:'illiquid',title:'Неликвид',kind:'product_sales',unit:'м²',productTargets:[{productId,plan:50}]},{id:'meetings',title:'Встречи',kind:'manual',unit:'шт.',target:10}];
+ assert.equal((await call('/api/kpi/plan',{employeeId,month:'2026-11',revision:0,sections},true,'PUT')).status,200);
+ assert.equal((await call('/api/kpi/entries',{month:'2026-11',sectionId:'illiquid',date:'2026-11-10',productId:'eeeeeeeeeeeeeeeeeeeeeeee',quantity:5})).status,400);
+ assert.equal((await call('/api/kpi/entries',{month:'2026-11',sectionId:'meetings',date:'2026-11-10',quantity:2,note:'Встреча с клиентом'})).status,201);
+ const custom=await call('/api/kpi?month=2026-11',null,false,'GET');assert.equal(custom.data.sections.find(s=>s.id==='meetings').fact,2);
+ assert.equal((await call('/api/kpi/entries',{month:'2026-11',sectionId:'missing',date:'2026-11-10',quantity:100})).status,400);
  }finally{await new Promise(r=>server.close(r));}
+});
+test('custom sections validate selected dealers and product targets and preserve previous snapshots',()=>{
+ const {validateSections}=require('../server/employee-kpi');
+ const choices={dealers:[{_id:'d',name:'Dealer'}],openingDealers:[{_id:'new',name:'New dealer',status:'potential'}],products:[{_id:'p',sku:'SKU',name:'Product'}]};
+ const input=[{id:'opening',kind:'opening',title:'Открыть дилеров',unit:'шт.',target:1,dealerTargets:[{dealerId:'new'}]},{id:'stock',kind:'product_sales',title:'Распродать остатки',unit:'м²',productTargets:[{productId:'p',plan:'12,5'}]},{id:'visits',kind:'manual',title:'Встречи',unit:'шт.',target:10}];
+ const sections=validateSections(input,choices);assert.equal(sections[1].productTargets[0].plan,12.5);assert.equal(sections[0].restrictSelection,true);assert.equal(sections[2].target,10);
+ assert.throws(()=>validateSections([{...input[1],productTargets:[{productId:'unknown',plan:10}]}],choices),/недоступны/);
+ assert.throws(()=>validateSections([{...input[2],title:''}],choices),/название/);
+ assert.throws(()=>validateSections([input[2],input[2]],choices),/повторный/);
+ assert.equal(validateSections(input,{...choices,products:[]},{sections})[1].productTargets[0].sku,'SKU');
+});
+test('custom calculations separate per-position and manual facts by section',()=>{
+ const {customSummary}=require('../server/employee-kpi');
+ const plan={sections:[{id:'open',kind:'opening',target:2,restrictSelection:true,dealerTargets:[{dealerId:'a',plan:1}]},{id:'stock',kind:'product_sales',productTargets:[{productId:'p',plan:50},{productId:'q',plan:10}]},{id:'meetings',kind:'manual',target:5},{id:'calls',kind:'manual',target:20}]};
+ const entries=[{sectionId:'open',dealerId:'a',quantity:1},{sectionId:'open',dealerId:'other',quantity:1},{sectionId:'stock',productId:'p',quantity:20},{sectionId:'stock',productId:'q',quantity:10},{sectionId:'stock',productId:'unassigned',quantity:999},{sectionId:'meetings',quantity:3},{sectionId:'calls',quantity:2}];
+ const result=customSummary(plan,[],entries);assert.equal(result[0].fact,1);assert.equal(result[1].plan,60);assert.equal(result[1].fact,30);assert.equal(result[1].percent,50);assert.equal(result[2].fact,3);assert.equal(result[3].fact,2);
 });

@@ -103,7 +103,10 @@ const servePage = (res, fileName) => {
     const filePath = __dirname + '/public/' + fileName;
     fs.readFile(filePath, 'utf8', (err, data) => {
         if (err) { console.error(err); return res.status(500).send('Server Error'); }
-        const html = data.replace(/{{VER}}/g, APP_VERSION);
+        let html = data.replace(/{{VER}}/g, APP_VERSION);
+        if (data.includes('permissions.js')) {
+            html = html.replace('</body>', `<script src="/employee-presence.js?v=${APP_VERSION}"></script></body>`);
+        }
         res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.send(html);
     });
@@ -128,6 +131,7 @@ const userSchema = new mongoose.Schema({
     employmentStatus: { type:String, enum:['working','vacation','away','dismissed'], default:'working' },
     avatarUrl: String,
     lastLoginAt: Date,
+    lastSeenAt: Date,
     isBlocked: { type: Boolean, default: false },
     role: { type: String, enum: ['admin', 'manager', 'guest', 'marketing', 'workshop'], default: 'manager' },
     scope: { type: String, enum: ['all', 'astana', 'regions'], default: 'all' },
@@ -163,6 +167,7 @@ const userSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 const User = mongoose.model('User', userSchema);
+const { employeePresence } = require('./server/employee-presence');
 
 // ==========================================
 // ЕДИНЫЙ ЖУРНАЛ ДЕЙСТВИЙ CRM
@@ -485,7 +490,7 @@ function auditCompactRequest(req) {
 
 async function auditMutationMiddleware(req,res,next) {
     if (!req.path.startsWith('/api') || !AUDIT_MUTATION_METHODS.has(req.method)) return next();
-    if (req.path === '/api/auth/login' || req.path.startsWith('/api/audit')) return next();
+    if (req.path === '/api/auth/login' || req.path === '/api/auth/presence' || req.path.startsWith('/api/audit')) return next();
     const requestData=auditCompactRequest(req);
     const before=await auditLoadSnapshot(req);
     let responseBody=null;
@@ -534,6 +539,7 @@ app.post('/api/auth/login', async (req, res) => {
         );
 
         user.lastLoginAt = new Date();
+        user.lastSeenAt = user.lastLoginAt;
         await user.save();
 
         res.json({
@@ -570,6 +576,13 @@ app.get('/api/auth/me', async (req, res) => {
     });
 });
 
+app.post('/api/auth/presence', async (req,res) => {
+    try {
+        const now = new Date();
+        await User.updateOne({ _id:req.user.id, $or:[{lastSeenAt:{$lt:new Date(now.getTime()-30000)}},{lastSeenAt:{$exists:false}},{lastSeenAt:null}] }, {$max:{lastSeenAt:now}}, {timestamps:false});
+        res.json({ok:true});
+    } catch (_) { res.status(503).json({error:'Не удалось обновить статус присутствия'}); }
+});
 // API УПРАВЛЕНИЯ ПОЛЬЗОВАТЕЛЯМИ
 function isAdminUser(req) {
     return Boolean(req.user && req.user.role === 'admin' && req.user.permissions?.is_admin === true);
@@ -602,10 +615,16 @@ const requireAdmin = (req, res, next) => {
 };
 const requireIsAdmin = requireAdmin;
 
+app.get('/api/admin/users/presence', requireAdmin, async (req,res) => {
+    try {
+        const users=await User.find().select('_id lastSeenAt lastLoginAt isBlocked').lean();
+        res.json(users.map(user=>({id:String(user._id),...employeePresence(user)})));
+    } catch (_) {res.status(503).json({error:'Не удалось обновить статусы сотрудников'});}
+});
 app.get('/api/admin/users', requireAdmin, async (req, res) => {
     try {
         const users = await User.find().select('-password').sort({ createdAt: -1 });
-        res.json(users);
+        res.json(users.map(user=>({...user.toObject(),...employeePresence(user)})));
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -672,7 +691,8 @@ app.get('/api/admin/users/:id/profile-stats', requireAdmin, async (req, res) => 
             employee:{
                 id:userId,
                 fullName:user.fullName || '',
-                lastLoginAt:user.lastLoginAt || null
+                lastLoginAt:user.lastLoginAt || null,
+                ...employeePresence(user)
             },
             dealers:{
                 total:dealers.length,

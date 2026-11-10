@@ -28,6 +28,7 @@
         .employee-role strong{font-size:.8rem;color:#34363a}
         .employee-role small{font-size:.7rem;color:#94979d}
         .employee-status{display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border-radius:99px;font-size:.67rem;font-weight:800;white-space:nowrap}
+        .employee-presence{margin-top:7px;display:flex;flex-direction:column;gap:2px;font-size:.7rem}.employee-presence>span{font-weight:800;color:#858b95}.employee-presence i{font-size:.42rem;vertical-align:middle}.employee-presence.is-online>span{color:#238458}.employee-presence small{font-size:.65rem;color:#8a9099}
         .employee-status.working{background:#eaf7f0;color:#267052}
         .employee-status.vacation{background:#eef3ff;color:#4567a7}
         .employee-status.away{background:#fff5df;color:#976916}
@@ -193,7 +194,7 @@
                             <div class="employee-profile-copy">
                                 <small id="profile-eyebrow">КАРТОЧКА СОТРУДНИКА</small>
                                 <h4 id="profile-name">Новый сотрудник</h4>
-                                <p id="profile-subtitle">Заполните основные данные и доступы</p>
+                                <p id="profile-subtitle">Заполните основные данные и доступы</p><div id="profile-presence" class="mt-2"></div>
                                 <div class="employee-profile-actions">
                                     <a id="profile-call" href="#" hidden><i class="bi bi-telephone"></i> Позвонить</a>
                                     <a id="profile-wa" class="wa" href="#" target="_blank" rel="noopener" hidden><i class="bi bi-whatsapp"></i> WhatsApp</a>
@@ -398,6 +399,26 @@
         return (Number(value)||0).toLocaleString('ru-RU',{maximumFractionDigits:2});
     }
 
+    function presenceHtml(user){
+        const seen=user.lastSeenAt||user.lastLoginAt;
+        const online=user.isOnline===true && seen && Date.now()-new Date(seen).getTime()<=120000;
+        return '<div class="employee-presence '+(online?'is-online':'is-offline')+'"><span><i class="bi bi-circle-fill"></i> '+(online?'Онлайн':'Офлайн')+'</span><small>'+(online?'Сейчас в CRM':seen?'Был(а): '+esc(dateText(seen,false)):'Ещё не заходил(а)')+'</small></div>';
+    }
+    function updatePresenceProfile(){
+        const user=allUsers.find(u=>String(u._id)===document.getElementById('u_id').value);
+        document.getElementById('profile-presence').innerHTML=user?presenceHtml(user):'';
+    }
+    async function refreshPresence(){
+        if(document.visibilityState==='hidden' || !window.CRMAuth?.can('can_manage_users'))return;
+        try{
+            const res=await fetch('/api/admin/users/presence',{crmTrackLoading:false});
+            if(!res.ok)return;
+            const rows=await res.json();
+            const statuses=new Map(rows.map(row=>[String(row.id),row]));
+            allUsers.forEach(user=>{const status=statuses.get(String(user._id));if(status)Object.assign(user,{isOnline:status.isOnline,lastSeenAt:status.lastSeenAt});});
+            render();updatePresenceProfile();
+        }catch(_){}
+    }
     function employmentBadge(user){
         const status=user.employmentStatus||'working';
         const blocked=user.isBlocked?' blocked':'';
@@ -447,6 +468,7 @@
         document.getElementById('profile-avatar').outerHTML=avatarHtml(user,true).replace('employee-avatar is-large','employee-avatar is-large').replace('<div ','<div id="profile-avatar" ');
         document.getElementById('profile-name').textContent=user.fullName||'Новый сотрудник';
         document.getElementById('profile-subtitle').textContent=[user.position,user.department].filter(Boolean).join(' · ')||'Заполните основные данные и доступы';
+        updatePresenceProfile();
         const phone=normalizePhone(user.phone);
         const call=document.getElementById('profile-call');
         const wa=document.getElementById('profile-wa');
@@ -476,7 +498,7 @@
                     (user.email?'<small>'+esc(user.email)+'</small>':'')+'</div></td>'+
                 '<td><div class="employee-role"><strong>'+esc(user.position||role)+'</strong><small>'+esc(user.department||role)+'</small></div></td>'+
                 '<td><div class="employee-role"><strong>'+esc(user.officeCity||'—')+'</strong><small>'+esc(user.scope||'all')+'</small></div></td>'+
-                '<td>'+employmentBadge(user)+'</td>'+
+                '<td>'+employmentBadge(user)+presenceHtml(user)+'</td>'+
                 '<td class="text-end pe-4"><button class="btn btn-sm btn-light border me-1" onclick="event.stopPropagation();editUser(\''+esc(user._id)+'\')"><i class="bi bi-pencil"></i></button>'+
                 (user.role!=='admin'?'<button class="btn btn-sm btn-light border text-danger" onclick="event.stopPropagation();deleteUser(\''+esc(user._id)+'\')"><i class="bi bi-trash"></i></button>':'')+'</td></tr>';
         }).join('');
@@ -490,7 +512,7 @@
                 '<div class="employee-mobile-meta">'+
                 (phone?'<a class="employee-chip" href="tel:+'+esc(phone)+'" onclick="event.stopPropagation()"><i class="bi bi-telephone"></i>'+esc(user.phone)+'</a>':'')+
                 (user.officeCity?'<span class="employee-chip"><i class="bi bi-geo-alt"></i>'+esc(user.officeCity)+'</span>':'')+
-                employmentBadge(user)+'</div></article>';
+                employmentBadge(user)+'</div>'+presenceHtml(user)+'</article>';
         }).join('');
     }
 
@@ -548,7 +570,7 @@
         }).join('');
         document.getElementById('employee-activity-content').innerHTML=
             '<div class="employee-metric-grid mb-2">'+
-                '<div class="employee-metric"><small>Последний вход</small><strong style="font-size:.8rem">'+esc(dateText(employee.lastLoginAt,false))+'</strong></div>'+
+                '<div class="employee-metric"><small>Последняя активность</small><strong style="font-size:.8rem">'+esc(dateText(employee.lastSeenAt||employee.lastLoginAt,false))+'</strong></div>'+
                 '<div class="employee-metric"><small>Последнее действие</small><strong style="font-size:.8rem">'+esc(dateText(activity.lastActionAt,false))+'</strong></div>'+
                 '<div class="employee-metric"><small>Действий за 7 дней</small><strong>'+esc(activity.actions7d||0)+'</strong></div>'+
                 '<div class="employee-metric"><small>Всего дилеров</small><strong>'+esc((stats.dealers||{}).total||0)+'</strong></div>'+
@@ -688,7 +710,9 @@
     (async function(){
         if(window.CRMAuth&&CRMAuth.ready) await CRMAuth.ready;
         if(!window.CRMAuth||!CRMAuth.can('can_manage_users')) return;
-        loadUsers();
+        await loadUsers();
+        setInterval(refreshPresence,30000);
+        document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')void refreshPresence();});
     })();
 })();
 </script>
