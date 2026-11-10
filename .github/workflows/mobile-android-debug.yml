@@ -1,4 +1,4 @@
-name: Build IDEAL FLOOR CRM Android APK
+name: Build IDEAL FLOOR CRM Standalone Android APK
 
 on:
   workflow_dispatch:
@@ -41,22 +41,38 @@ jobs:
       - name: Normalize Expo dependencies
         run: npx expo install --fix
 
+      - name: Test startup networking
+        run: node --test tests/*.test.cjs
+
       - name: Expo Doctor
         run: npx expo-doctor
 
       - name: Generate Android native project
         run: npx expo prebuild --platform android --clean --non-interactive
 
-      - name: Build debug APK
+      - name: Build standalone APK
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Verify embedded JavaScript and signing
+        run: |
+          python3 - <<'PYVERIFY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          apk = Path('android/app/build/outputs/apk/release/app-release.apk')
+          with ZipFile(apk) as archive:
+              bundle = archive.getinfo('assets/index.android.bundle')
+              assert bundle.file_size > 10000, 'Standalone JavaScript bundle is missing or empty'
+          print('Standalone APK contains bundled application code')
+          PYVERIFY
+          "$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner" verify android/app/build/outputs/apk/release/app-release.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: ideal-floor-crm-android-debug
-          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          name: ideal-floor-crm-android-standalone
+          path: mobile/android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14

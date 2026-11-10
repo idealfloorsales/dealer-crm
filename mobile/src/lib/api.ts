@@ -29,8 +29,16 @@ export async function apiFetch<T>(
       ? await SecureStore.getItemAsync(SESSION_TOKEN_KEY)
       : tokenOverride;
 
+  // A sleeping backend or lost connection must not hold startup indefinitely.
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  if (options.signal?.aborted) abort();
+  options.signal?.addEventListener('abort', abort, { once: true });
+  const timeout = setTimeout(abort, 45000);
+  try {
   const response = await fetch(API_BASE_URL + path, {
     ...options,
+    signal: controller.signal,
     headers: {
       Accept: 'application/json',
       ...(options.body ? { 'Content-Type': 'application/json' } : {}),
@@ -49,4 +57,11 @@ export async function apiFetch<T>(
   }
 
   return payload as T;
+  } catch (error) {
+    if (controller.signal.aborted) throw new ApiError('Сервер не ответил вовремя. Проверьте интернет и повторите вход.', 0);
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+    options.signal?.removeEventListener('abort', abort);
+  }
 }

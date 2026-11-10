@@ -37,8 +37,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(me.user);
         await SecureStore.setItemAsync(SESSION_USER_KEY, JSON.stringify(me.user));
       } catch {
-        await SecureStore.deleteItemAsync(SESSION_TOKEN_KEY);
-        await SecureStore.deleteItemAsync(SESSION_USER_KEY);
+        // Storage cleanup errors must not prevent the login screen from opening.
+        await Promise.allSettled([
+          SecureStore.deleteItemAsync(SESSION_TOKEN_KEY),
+          SecureStore.deleteItemAsync(SESSION_USER_KEY),
+        ]);
       } finally {
         if (active) setReady(true);
       }
