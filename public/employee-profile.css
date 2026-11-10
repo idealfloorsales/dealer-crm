@@ -1,0 +1,35 @@
+/* Employee card owns its flex layout; only the content area scrolls vertically. */
+#userModal.employee-profile-modal .modal-dialog{width:calc(100% - 32px);max-width:1120px;margin:16px auto;max-height:calc(100dvh - 32px)}
+#userModal.employee-profile-modal .modal-content{height:min(860px,calc(100dvh - 32px));max-height:calc(100dvh - 32px);display:flex;flex-direction:column;overflow:hidden}
+#userModal #userForm{display:flex;flex-direction:column;align-items:stretch;flex:1 1 auto;width:100%;min-width:0;min-height:0;height:100%;overflow:hidden}
+#userModal .employee-profile-top{flex:0 0 auto;width:100%;padding:20px 24px}
+#userModal .employee-profile-copy h4{font-size:1.22rem;line-height:1.35;overflow-wrap:anywhere}
+#userModal .employee-tabs{display:flex;flex:0 0 auto;flex-wrap:nowrap;align-items:center;gap:6px;width:100%;min-height:66px;margin:0;padding:11px 20px;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;white-space:nowrap}
+#userModal .employee-tabs .nav-item{flex:0 0 auto;margin:0}
+#userModal .employee-tabs .nav-link{display:flex;align-items:center;gap:5px;min-height:42px;margin:0;padding:10px 14px;line-height:1.3;font-size:.8rem;white-space:nowrap}
+#userModal .employee-profile-body{display:block;flex:1 1 0;min-height:0;min-width:0;width:100%;padding:20px 24px;overflow-y:auto!important;overflow-x:hidden;scrollbar-gutter:stable;overscroll-behavior:contain}
+#userModal .employee-profile-body>.tab-pane{width:100%;max-width:none;min-width:0}
+#userModal .employee-content{display:block;width:100%;min-height:0;min-width:0}
+#userModal .employee-content>.employee-panel{width:100%;margin-top:14px!important;padding:20px}
+#userModal .employee-metric-grid{display:grid;width:100%;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:stretch}
+#userModal .employee-metric{min-width:0;padding:17px 18px;border-radius:14px}
+#userModal .employee-metric small{font-size:.67rem;line-height:1.45;letter-spacing:.025em}
+#userModal .employee-metric strong{font-size:1.35rem;line-height:1.35;margin-top:7px;overflow-wrap:anywhere}
+#userModal .employee-panel-title{font-size:.91rem;margin-bottom:16px}
+#userModal .employee-sales-values{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+#userModal .employee-sales-values small{font-size:.76rem;color:#868b93}
+#userModal .employee-sales-values strong{font-size:1.35rem;overflow-wrap:anywhere}
+#userModal .employee-sales-progress{height:9px;margin-top:0}
+#userModal .employee-dealers{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+#userModal .employee-dealer-row{padding:13px 15px;min-width:0}
+#userModal .employee-dealer-row strong{font-size:.81rem;overflow-wrap:anywhere}
+#userModal .employee-dealer-row small{font-size:.71rem}
+#userModal .employee-activity-row{grid-template-columns:38px minmax(0,1fr) auto;padding:12px;gap:12px}
+#userModal .employee-activity-row strong{font-size:.79rem;line-height:1.45}
+#userModal .employee-activity-row small,#userModal .employee-activity-row time{font-size:.7rem}
+#userModal .employee-savebar{position:relative;flex:0 0 auto;width:100%;padding:12px 24px}
+#userModal .employee-coverage{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px;color:#767d87;font-size:.78rem}
+#userModal .employee-coverage strong{color:#303641;background:#fff;padding:5px 10px;border:1px solid #e6e2df;border-radius:8px;font-size:.76rem}
+:root[data-crm-theme=dark] #userModal .employee-coverage strong{background:#252525;border-color:#414141;color:#eee}
+@media(max-width:800px){#userModal .employee-metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#userModal .employee-profile-body{padding:16px}#userModal .employee-activity-row{grid-template-columns:34px minmax(0,1fr)}#userModal .employee-activity-row time{grid-column:2}}
+@media(max-width:600px){#userModal.employee-profile-modal .modal-dialog{width:100%;max-width:none;height:100dvh;max-height:100dvh;margin:0}#userModal.employee-profile-modal .modal-content{height:100dvh;max-height:100dvh;border-radius:0!important}#userModal .employee-profile-top{padding:14px 16px}#userModal .employee-profile-identity{gap:10px}#userModal .employee-avatar.is-large{width:52px;height:52px;border-radius:16px;font-size:1.1rem}#userModal .employee-profile-copy h4{font-size:1rem}#userModal .employee-profile-copy p{font-size:.7rem}#userModal .employee-tabs{min-height:62px;padding:9px 12px;gap:3px}#userModal .employee-tabs .nav-link{font-size:.74rem;padding:10px;min-height:42px}#userModal .employee-profile-body{padding:12px}#userModal .employee-content>.employee-panel{padding:15px}#userModal .employee-metric{padding:13px}#userModal .employee-metric strong{font-size:1.15rem}#userModal .employee-dealers{grid-template-columns:1fr}#userModal .employee-sales-values strong{font-size:1.12rem}#userModal .employee-savebar{padding:10px 12px}#userModal .employee-profile-actions{margin-top:7px}}

@@ -133,6 +133,7 @@
         :root[data-crm-theme="dark"] .employee-dealer-row,
         :root[data-crm-theme="dark"] .employee-activity-row{background:#242424;border-color:#373737}
     </style>
+<link rel="stylesheet" href="employee-profile.css?v={{VER}}">
 </head>
 <body class="app-workspace-page users-page">
 <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-4"></nav>
@@ -241,12 +242,12 @@
                     </div>
 
                     <div class="tab-pane fade" id="employee-results">
-                        <div id="employee-results-content" class="employee-loading"><span class="text-muted">Сохраните сотрудника, чтобы появились рабочие показатели.</span></div>
+                        <div id="employee-results-content" class="employee-content"><span class="text-muted">Сохраните сотрудника, чтобы появились рабочие показатели.</span></div>
                     </div>
 
                     <div class="tab-pane fade" id="employee-kpi"><div id="employee-kpi-content"></div></div>
                     <div class="tab-pane fade" id="employee-activity">
-                        <div id="employee-activity-content" class="employee-loading"><span class="text-muted">Сохраните сотрудника, чтобы появилась история активности.</span></div>
+                        <div id="employee-activity-content" class="employee-content"><span class="text-muted">Сохраните сотрудника, чтобы появилась история активности.</span></div>
                     </div>
 
                     <div class="tab-pane fade" id="employee-access">
@@ -544,19 +545,20 @@
             return '<div class="employee-dealer-row"><strong>'+esc(item.name||'Дилер')+'</strong><small>'+esc([item.dealerId,item.city].filter(Boolean).join(' · '))+'</small></div>';
         }).join('');
         document.getElementById('employee-results-content').innerHTML=
+            '<div class="employee-coverage">Показатели рабочей зоны <strong>'+esc(stats.coverage?.label||'Не указана')+'</strong></div>'+
             '<div class="employee-metric-grid">'+
-                '<div class="employee-metric"><small>Дилеров в работе</small><strong>'+esc(dealers.working||0)+'</strong></div>'+
+                '<div class="employee-metric"><small>Дилеров зоны в работе</small><strong>'+esc(dealers.working||0)+'</strong></div>'+
                 '<div class="employee-metric"><small>Потенциальных</small><strong>'+esc(dealers.potential||0)+'</strong></div>'+
-                '<div class="employee-metric"><small>Визитов за месяц</small><strong>'+esc(visits.completedThisMonth||0)+'</strong></div>'+
-                '<div class="employee-metric"><small>КП за месяц</small><strong>'+esc(offers.createdThisMonth||0)+'</strong></div>'+
+                '<div class="employee-metric"><small>Визитов зоны за месяц</small><strong>'+esc(visits.completedThisMonth||0)+'</strong></div>'+
+                '<div class="employee-metric"><small>КП сотрудника за месяц</small><strong>'+esc(offers.createdThisMonth||0)+'</strong></div>'+
             '</div>'+
             '<section class="employee-panel mt-2"><div class="employee-panel-title"><i class="bi bi-graph-up-arrow"></i>Продажи · '+esc(stats.month||'')+'</div>'+
-                '<div class="d-flex justify-content-between gap-3"><div><small class="text-muted">План</small><strong class="d-block">'+numberText(sales.plan)+' м²</strong></div>'+
+                '<div class="employee-sales-values"><div><small>План</small><strong class="d-block">'+(sales.hasPlan===false?'Не задан':numberText(sales.plan)+' м²')+'</strong></div>'+
                 '<div class="text-end"><small class="text-muted">Факт</small><strong class="d-block">'+numberText(sales.fact)+' м² · '+numberText(percent)+'%</strong></div></div>'+
                 '<div class="employee-sales-progress"><span style="width:'+Math.min(100,percent)+'%"></span></div>'+
             '</section>'+
-            '<section class="employee-panel mt-2"><div class="employee-panel-title"><i class="bi bi-shop"></i>Закреплённые дилеры</div>'+
-                (dealerRows?'<div class="employee-dealers">'+dealerRows+'</div>':'<div class="employee-empty">Закреплённых дилеров пока нет.</div>')+
+            '<section class="employee-panel mt-2"><div class="employee-panel-title"><i class="bi bi-shop"></i>Дилеры рабочей зоны</div>'+
+                (dealerRows?'<div class="employee-dealers">'+dealerRows+'</div>':'<div class="employee-empty">В этой рабочей зоне пока нет дилеров.</div>')+
             '</section>';
     }
 
@@ -590,6 +592,8 @@
             if(request!==profileStatsRequest) return;
             renderResults(data);
             renderActivity(data);
+            const employee=allUsers.find(u=>String(u._id)===String(id));
+            if(employee&&data.employee){Object.assign(employee,{lastSeenAt:data.employee.lastSeenAt,isOnline:data.employee.isOnline});updatePresenceProfile();}
         }catch(error){
             if(request!==profileStatsRequest) return;
             const html='<div class="employee-empty text-danger">'+esc(error.message)+'</div>';

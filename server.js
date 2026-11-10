@@ -168,6 +168,7 @@ const userSchema = new mongoose.Schema({
 }, { timestamps: true });
 const User = mongoose.model('User', userSchema);
 const { employeePresence } = require('./server/employee-presence');
+const { coverageOf, latestActivity, salesForCoverage } = require('./server/employee-profile-stats');
 
 // ==========================================
 // ЕДИНЫЙ ЖУРНАЛ ДЕЙСТВИЙ CRM
@@ -615,16 +616,22 @@ const requireAdmin = (req, res, next) => {
 };
 const requireIsAdmin = requireAdmin;
 
+async function employeeStatusWithHistory(user) {
+    const presence=employeePresence(user);
+    if (user.lastSeenAt) return presence;
+    const action=await AuditLog.findOne({'actor.id':String(user._id)}).sort({createdAt:-1}).select('createdAt').lean();
+    return {...presence,lastSeenAt:latestActivity(user,action?.createdAt)};
+}
 app.get('/api/admin/users/presence', requireAdmin, async (req,res) => {
     try {
         const users=await User.find().select('_id lastSeenAt lastLoginAt isBlocked').lean();
-        res.json(users.map(user=>({id:String(user._id),...employeePresence(user)})));
+        res.json(await Promise.all(users.map(async user=>({id:String(user._id),...await employeeStatusWithHistory(user)}))));
     } catch (_) {res.status(503).json({error:'Не удалось обновить статусы сотрудников'});}
 });
 app.get('/api/admin/users', requireAdmin, async (req, res) => {
     try {
         const users = await User.find().select('-password').sort({ createdAt: -1 });
-        res.json(users.map(user=>({...user.toObject(),...employeePresence(user)})));
+        res.json(await Promise.all(users.map(async user=>({...user.toObject(),...await employeeStatusWithHistory(user.toObject())}))));
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -647,23 +654,18 @@ app.get('/api/admin/users/:id/profile-stats', requireAdmin, async (req, res) => 
         const userId = String(user._id);
         const month = almatyMonthKey();
         const monthStart = new Date(month + '-01T00:00:00+05:00');
-        const nextMonth = new Date(monthStart);
-        nextMonth.setMonth(nextMonth.getMonth()+1);
+        const nextMonth = new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5)),1)-5*60*60*1000);
         const since7d = new Date(Date.now() - 7*24*60*60*1000);
 
-        const dealerFilter = {
-            $or:[
-                { responsibleUserId:userId },
-                ...(user.fullName ? [{ responsible:user.fullName }] : [])
-            ]
-        };
+        const coverage = coverageOf(user);
+        const dealerFilter = coverage.filter;
 
         const [dealers, salesRows, recentActions, actions7d, offersThisMonth] = await Promise.all([
             Dealer.find(dealerFilter)
-                .select('_id dealer_id name city status visits createdAt')
+                .select('_id dealer_id name city status visits createdAt responsible')
                 .sort({ name:1 })
                 .lean(),
-            Sales.find({ month, ownerUserId:userId }).lean(),
+            Sales.find({ month }).lean(),
             AuditLog.find({ 'actor.id':userId }).sort({ createdAt:-1 }).limit(12).lean(),
             AuditLog.countDocuments({ 'actor.id':userId, createdAt:{ $gte:since7d } }),
             CommercialOffer.countDocuments({
@@ -681,24 +683,26 @@ app.get('/api/admin/users/:id/profile-stats', requireAdmin, async (req, res) => 
             ).length;
         },0);
 
-        const plan = salesRows.reduce((sum,row) => sum + Math.max(0,Number(row.plan) || 0),0);
-        const fact = salesRows.reduce((sum,row) => sum + Math.max(0,Number(row.fact) || 0),0);
+
         const potential = dealers.filter(isPotential);
-        const working = dealers.filter(dealer => !isPotential(dealer));
+        const working = dealers.filter(dealer => !isPotential(dealer) && !/^(archive|архив)/i.test(String(dealer.status||'')));
+        const sales = salesForCoverage(salesRows,working,coverage.scope);
 
         res.json({
             month,
+            coverage:{scope:coverage.scope,label:coverage.label},
             employee:{
                 id:userId,
                 fullName:user.fullName || '',
                 lastLoginAt:user.lastLoginAt || null,
-                ...employeePresence(user)
+                ...employeePresence(user),
+                lastSeenAt:latestActivity(user,recentActions[0]?.createdAt)
             },
             dealers:{
                 total:dealers.length,
                 working:working.length,
                 potential:potential.length,
-                recent:dealers.slice(0,10).map(dealer => ({
+                recent:[...working,...potential].map(dealer => ({
                     id:String(dealer._id),
                     dealerId:dealer.dealer_id || '',
                     name:dealer.name || '',
@@ -706,11 +710,7 @@ app.get('/api/admin/users/:id/profile-stats', requireAdmin, async (req, res) => 
                     status:dealer.status || ''
                 }))
             },
-            sales:{
-                plan,
-                fact,
-                percent:plan > 0 ? Math.round((fact/plan)*1000)/10 : 0
-            },
+            sales,
             visits:{
                 completedThisMonth:currentMonthVisits
             },
