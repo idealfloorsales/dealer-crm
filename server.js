@@ -6709,6 +6709,8 @@ app.delete('/api/reclamations/:id', requirePermission('can_manage_reclamations')
 
 const priceControl = require('./server/price-control').install({app,mongoose,Dealer,requireAnyPermission,requirePermission,getDealerFilter,isGlobalViewer,hasPermission,today:pricingTodayKey});
 
+require('./server/ideal-ai').install({ app });
+
 serverInstance = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server port ${PORT}`);
     connectToDB().catch(err => console.error('Initial DB connection error:', err));
