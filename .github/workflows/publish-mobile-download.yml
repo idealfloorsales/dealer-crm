@@ -1,0 +1,36 @@
+name: Publish Android app download
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/publish-mobile-download.yml']
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Download verified standalone build
+        run: gh run download 42826009919 --name ideal-floor-crm-android-standalone --dir package
+      - name: Verify application bundle
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          apk = Path('package/app-release.apk')
+          with ZipFile(apk) as archive:
+              assert archive.getinfo('assets/index.android.bundle').file_size > 10000
+          apk.rename('package/IDEAL-FLOOR-CRM-0.1.1.apk')
+          PY
+      - name: Publish permanent APK link
+        run: |
+          if gh release view android-v0.1.1 >/dev/null 2>&1; then
+            gh release upload android-v0.1.1 package/IDEAL-FLOOR-CRM-0.1.1.apk --clobber
+          else
+            gh release create android-v0.1.1 package/IDEAL-FLOOR-CRM-0.1.1.apk --target mobile-app --title 'IDEAL FLOOR CRM Android 0.1.1' --notes 'Самостоятельное Android-приложение. Исправлен запуск без сервера разработки и добавлено ограничение ожидания ответа CRM при входе.'
+          fi

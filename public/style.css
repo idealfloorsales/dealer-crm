@@ -13561,3 +13561,17 @@ body:not(.app-workspace-page) .modal-header .btn-close{
  .cc-motivation-panel .cc-motivation-table tfoot th:nth-child(3) { white-space:normal; overflow-wrap:anywhere; }
  .cc-motivation-panel .cc-motivation-table tbody td:first-child small { font-weight:400; margin-top:3px; }
 }
+
+/* Compact Android download entry in the shared desktop and mobile menus. */
+.crm-app-download-icon{display:inline-flex;align-items:center;justify-content:center;flex:0 0 34px;width:34px;height:34px;border:1px solid #e8e3de;border-radius:10px;background:#faf9f7;color:#777a82;text-decoration:none;font-size:.88rem}
+.crm-app-download-icon:hover{color:#b9040a;background:#fff4f4;border-color:#ebd5d5}
+.crm-app-download-card{display:flex;align-items:center;gap:12px;margin:16px 0;padding:14px;border:1px solid #e8e3de;border-radius:14px;background:#faf9f7;color:#303136;text-decoration:none}
+.crm-app-download-mark{display:grid;place-items:center;width:38px;height:38px;flex:0 0 38px;border-radius:11px;background:#fff;color:#a70b14;font-size:1.15rem}
+.crm-app-download-card>span:nth-child(2){min-width:0;flex:1}
+.crm-app-download-card strong{display:block;font-size:.8rem;font-weight:750;line-height:1.5}
+.crm-app-download-card small{display:block;margin-top:3px;font-size:.66rem;color:#8a8d94;line-height:1.5}
+.crm-app-download-card>i{font-size:.82rem;color:#9699a0}
+.crm-app-download-card:hover{color:#a70b14;border-color:#dec7c9}
+.crm-app-download-card:focus-visible,.crm-app-download-icon:focus-visible{outline:3px solid #b9040a55;outline-offset:3px}
+:root[data-crm-theme="dark"] .crm-app-download-card,:root[data-crm-theme="dark"] .crm-app-download-icon{background:#242426;border-color:#3b3b3f;color:#e9e9ec}
+:root[data-crm-theme="dark"] .crm-app-download-mark{background:#303034;color:#e78e96}
