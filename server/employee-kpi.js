@@ -120,8 +120,9 @@ function registerEmployeeKpi({app,mongoose,User,Dealer,Product,Sales,AuditLog,is
         else {if(req.body.revision!==null&&req.body.revision!==undefined)return res.status(409).json({error:'План изменился. Обновите KPI.'});await Plan.create({employeeId:id,month,...payload});}
         await log(req,'kpi_assign',`Назначил KPI: ${user.fullName||user.username}, ${month}`,{employeeId:id,month,...payload},before);res.json({ok:true});
     }catch(e){fail(res,e);}});
-    app.post('/api/kpi/entries',async(req,res)=>{try{
+    async function addEntry(req,operationId) {
         const id=employee(req),month=monthKey(req.body.month);
+        if(operationId){const existing=await Entry.findById(operationId).lean();if(existing){if(existing.employeeId!==id)throw new Error('Недоступная операция');return existing;}}
         const plan=await Plan.findOne({employeeId:id,month}).lean();
         if(!plan)throw new Error('Сначала администратор должен назначить KPI на этот месяц');
         const sectionId=String(req.body.sectionId|| (req.body.type==='opening'?'opening':'illiquid'));
@@ -137,13 +138,14 @@ function registerEmployeeKpi({app,mongoose,User,Dealer,Product,Sales,AuditLog,is
         if(type==='manual'){quantity=number(req.body.quantity,'факт');if(quantity<=0)throw new Error('Факт должен быть больше нуля');}
         if(type==='illiquid'){if(section.restrictSelection&&!(section.productTargets||[]).some(t=>t.productId===String(req.body.productId)))throw new Error('Эта позиция не назначена в данном пункте KPI');if(!mongoose.isValidObjectId(req.body.productId))throw new Error('Выберите неликвидную позицию');product=await Product.findOne({_id:req.body.productId,...(section.restrictSelection?{}:{is_liquid:false}),product_type:{$ne:'equipment'}}).select('_id sku name').lean();if(!product){const assigned=(section.productTargets||[]).find(t=>t.productId===String(req.body.productId));if(section.restrictSelection&&assigned)product={_id:assigned.productId,sku:assigned.sku,name:assigned.productName};else throw new Error('Позиция не найдена в неликвиде');}quantity=number(req.body.quantity,'продажу в м²');if(quantity<=0)throw new Error('Количество должно быть больше нуля');}
         const data={employeeId:id,month,type,sectionId,date,dealerId:dealer?String(dealer._id):undefined,dealerName:dealer?.name||'',productId:product?String(product._id):undefined,sku:product?.sku||'',productName:product?.name||'',quantity,note:String(req.body.note||'').trim().slice(0,2000),createdBy:actor(req)};
-        const record=await Entry.create(data);await log(req,'kpi_result',type==='opening'?'Отметил открытие дилера':`Внёс результат KPI: ${section.title}`,{...data,id:record._id});res.status(201).json({ok:true});
-    }catch(e){fail(res,e);}});
+        const record=await Entry.create({...data,...(operationId?{_id:operationId}:{})});await log(req,'kpi_result',type==='opening'?'Отметил открытие дилера':`Внёс результат KPI: ${section.title}`,{...data,id:record._id});return record;
+    }
+    app.post('/api/kpi/entries',async(req,res)=>{try{await addEntry(req);res.status(201).json({ok:true});}catch(e){fail(res,e);}});
     app.delete('/api/kpi/entries/:id',async(req,res)=>{try{
         const record=await Entry.findById(String(req.params.id)).lean();if(!record)return res.status(404).json({error:'Запись не найдена'});
         if(!canRead(req.user,record.employeeId,isAdminUser(req)))return res.status(403).json({error:'Нельзя менять чужой KPI'});
         await Entry.deleteOne({_id:record._id,employeeId:record.employeeId});await log(req,'kpi_correction','Удалил ошибочную запись KPI',record);res.json({ok:true});
     }catch(e){fail(res,e);}});
-    return {Plan,Entry};
+    return {Plan,Entry,addEntry,options};
 }
 module.exports={registerEmployeeKpi,monthKey,number,entryDate,canRead,summarize,sectionsOf,customSummary,validateSections};

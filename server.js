@@ -1292,7 +1292,7 @@ async function seedSectors() {
 const contactSchema = new mongoose.Schema({ name: String, position: String, contactInfo: String }, { _id: false }); 
 const photoSchema = new mongoose.Schema({ description: String, photo_url: String, date: { type: Date, default: Date.now } }, { _id: false });
 const additionalAddressSchema = new mongoose.Schema({ description: String, city: String, address: String }, { _id: false });
-const visitSchema = new mongoose.Schema({ date: String, comment: String, isCompleted: { type: Boolean, default: false } }, { _id: false });
+const visitSchema = new mongoose.Schema({ telegramEventId: String, date: String, comment: String, isCompleted: { type: Boolean, default: false } }, { _id: false });
 const posMaterialSchema = new mongoose.Schema({ name: String, quantity: Number }, { _id: false });
 const dealerLegalEntitySchema = new mongoose.Schema({
     type: { type: String, default: 'ТОО' },
@@ -1516,7 +1516,7 @@ function ensureCommercialOfferCleanup() {
 const salesSchema = new mongoose.Schema({ month: String, group: String, dealerId: String, dealerName: String, plan: Number, fact: Number, isCustom: { type: Boolean, default: false }, ownerUserId: String 
 }, { timestamps: true }); 
 const Sales = mongoose.model('Sales', salesSchema);
-require('./server/employee-kpi').registerEmployeeKpi({
+const employeeKpi = require('./server/employee-kpi').registerEmployeeKpi({
     app,mongoose,User,Dealer,Product,Sales,AuditLog,isAdminUser,getWorkingDealerFilter,almatyMonthKey
 });
 
@@ -5304,7 +5304,7 @@ const reclamationSchema = new mongoose.Schema({
 }, { timestamps: true });
 const Reclamation = mongoose.model('Reclamation', reclamationSchema);
 const telegramNotifications = require('./server/telegram-notifications').registerTelegram({
-    app,mongoose,User,Dealer,AuditLog,connection:mongoose.connection,
+    app,mongoose,User,Dealer,Product,Sales,StockImportMeta,employeeKpi,AuditLog,connection:mongoose.connection,
     ready:()=>appReady&&!shuttingDown,origin:APP_ORIGIN
 });
 

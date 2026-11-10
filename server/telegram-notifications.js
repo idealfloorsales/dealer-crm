@@ -11,7 +11,7 @@ function mayReceive(user,kind,dealer){
  if(dealer){const scope=coverageOf(user).scope;return scope==='all'||dealer.responsible===(scope==='astana'?'regional_astana':'regional_regions');}
  return kind==='kpi'||kind==='visits'||kind==='reclamations'||admin;
 }
-function registerTelegram({app,mongoose,User,Dealer,AuditLog,connection,ready,origin,env=process.env,fetcher=fetch}){
+function registerTelegram({app,mongoose,User,Dealer,Product,Sales,StockImportMeta,employeeKpi,AuditLog,connection,ready,origin,env=process.env,fetcher=fetch}){
  const Link=mongoose.model('TelegramEmployeeLink',new mongoose.Schema({userId:{type:String,unique:true,required:true},chatId:{type:String,unique:true,sparse:true},botId:String,username:String,displayName:String,enabled:{type:Boolean,default:true},preferences:{kpi:{type:Boolean,default:true},visits:{type:Boolean,default:true},reclamations:{type:Boolean,default:true},stockErrors:{type:Boolean,default:true}},tokenHash:String,tokenExpiresAt:Date},{timestamps:true}));
  const queueSchema=new mongoose.Schema({_id:String,userId:String,kind:String,text:String,path:String,dealerId:String,status:{type:String,default:'pending'},attempts:{type:Number,default:0},nextAt:{type:Date,default:Date.now},leaseUntil:Date,expiresAt:Date,lastError:String},{timestamps:true});queueSchema.index({expiresAt:1},{expireAfterSeconds:0});queueSchema.index({status:1,nextAt:1});const Queue=mongoose.model('TelegramNotification',queueSchema);
  let bot=null,secret='',timer,running=false,lastSetup=0,setupError=null;
@@ -20,10 +20,12 @@ function registerTelegram({app,mongoose,User,Dealer,AuditLog,connection,ready,or
   let response;try{response=await fetcher(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN.trim()}/${method}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(20000)});}catch(_){throw Error('Telegram временно недоступен');}
   const result=await response.json().catch(()=>({}));if(!response.ok||!result.ok){const e=Error('Telegram API: '+(result.error_code||response.status));e.code=result.error_code||response.status;e.retryAfter=Math.max(1,Number(result.parameters?.retry_after)||60);throw e;}return result.result;
  }
+ const assistant=require('./telegram-assistant').createAssistant({api,Link,User,Dealer,Product,Sales,StockImportMeta,employeeKpi,AuditLog,connection,origin,currentBot:()=>bot});
  async function setup(){if(!configured())return false;if(bot)return true;if(Date.now()-lastSetup<60000)return false;lastSetup=Date.now();try{
   const current=await api('getMe');if(!current.is_bot||!current.username)throw Error('Не удалось определить Telegram-бота');
   await config().updateOne({_id:'bot'},{$setOnInsert:{secret:crypto.randomBytes(32).toString('hex')}},{upsert:true});const stored=await config().findOne({_id:'bot'});secret=stored.secret;
-  await api('setWebhook',{url:origin+'/api/public/telegram',secret_token:secret,allowed_updates:['message']});bot=current;setupError=null;return true;
+  await connection.collection('telegram_bot_sessions').createIndex?.({expiresAt:1},{expireAfterSeconds:0});
+  await api('setWebhook',{url:origin+'/api/public/telegram',secret_token:secret,allowed_updates:['message','callback_query']});bot=current;await api('setMyCommands',{commands:require('./telegram-assistant').commands});setupError=null;return true;
  }catch(error){setupError=error.message;console.error('Telegram setup:',setupError);return false;}}
  async function queue(userId,kind,text,path,eventKey,dealer=null){if(!mongoose.isValidObjectId(userId))return;const user=await User.findById(userId).select('role scope permissions isBlocked employmentStatus').lean();if(!mayReceive(user,kind,dealer))return;const link=await Link.findOne({userId:String(userId),enabled:true}).lean();if(!link?.chatId||link.botId!==String(bot?.id)||link.preferences?.[kind]===false)return;
   await Queue.updateOne({_id:digest(userId+':'+eventKey)},{$setOnInsert:{userId:String(userId),kind,text,path,dealerId:dealer?String(dealer._id):'',status:'pending',attempts:0,nextAt:new Date(),expiresAt:new Date(Date.now()+7*86400000)}},{upsert:true});
@@ -69,6 +71,7 @@ function registerTelegram({app,mongoose,User,Dealer,AuditLog,connection,ready,or
  app.post('/api/telegram/test',async(req,res)=>{try{if(!bot)throw Error('Бот не настроен');const link=await Link.findOne({userId:String(req.user.id),enabled:true,botId:String(bot.id)}).lean();if(!link?.chatId)throw Error('Сначала подключите Telegram');await api('sendMessage',{chat_id:link.chatId,text:'IDEAL FLOOR CRM: уведомления подключены. Это проверочное сообщение.',reply_markup:{inline_keyboard:[[{text:'Открыть CRM',url:origin+'/users.html'}]]}});res.json({ok:true});}catch(e){res.status(400).json({error:e.message});}});
  app.post('/api/public/telegram',async(req,res)=>{
   if(!secretMatches(secret,req.headers['x-telegram-bot-api-secret-token']))return res.sendStatus(403);
+  if(req.body?.callback_query){try{await assistant.handle(req.body);return res.json({ok:true});}catch(_){return res.sendStatus(503);}}
   const message=req.body?.message;if(!message||message.chat?.type!=='private'||String(message.chat.id)!==String(message.from?.id))return res.json({ok:true});
   const text=String(message.text||'').trim(),chatId=String(message.chat.id);try{
    if(text==='/stop'){await Link.updateOne({chatId},{$set:{enabled:false},$unset:{tokenHash:'',tokenExpiresAt:''}});await api('sendMessage',{chat_id:chatId,text:'Уведомления отключены. Повторно подключить Telegram можно в CRM.'});}
@@ -76,8 +79,8 @@ function registerTelegram({app,mongoose,User,Dealer,AuditLog,connection,ready,or
     const token=text.split(/\s+/)[1],candidate=await Link.findOne({tokenHash:digest(token),tokenExpiresAt:{$gt:new Date()}}).lean();const user=candidate?await User.findById(candidate.userId).select('isBlocked employmentStatus').lean():null;
     if(!user||user.isBlocked||user.employmentStatus==='dismissed'){await api('sendMessage',{chat_id:chatId,text:'Ссылка недействительна или истекла. Создайте новую ссылку в своей CRM.'});return res.json({ok:true});}
     const link=await Link.findOneAndUpdate({_id:candidate._id,tokenHash:digest(token),tokenExpiresAt:{$gt:new Date()}},{$set:{chatId,botId:String(bot.id),username:message.from.username||'',displayName:[message.from.first_name,message.from.last_name].filter(Boolean).join(' '),enabled:true},$unset:{tokenHash:'',tokenExpiresAt:''}},{new:true});
-    if(link)await api('sendMessage',{chat_id:chatId,text:'Telegram подключён к вашей учётной записи IDEAL FLOOR CRM. Настройте нужные уведомления в разделе «Сотрудники → Мой Telegram». Отключение: /stop',reply_markup:{inline_keyboard:[[{text:'Открыть CRM',url:origin+'/users.html'}]]}});
-   }else if(text.startsWith('/start')||text==='/help')await api('sendMessage',{chat_id:chatId,text:'Откройте CRM → Сотрудники → Мой Telegram → Подключить. Затем перейдите по персональной ссылке. Отключение уведомлений: /stop'});
+    if(link)await api('sendMessage',{chat_id:chatId,text:'Telegram подключён к вашей учётной записи IDEAL FLOOR CRM. Откройте /menu: KPI, визиты, дилеры, остатки и настройки уведомлений. Отключение: /stop',reply_markup:{inline_keyboard:[[{text:'☰ Меню',callback_data:'menu'},{text:'Открыть CRM',url:origin+'/users.html'}]]}});
+   }else await assistant.handle(req.body);
    return res.json({ok:true});
   }catch(error){if(error.code===11000){await api('sendMessage',{chat_id:chatId,text:'Этот Telegram уже связан с другой учётной записью CRM. Сначала отключите прежнюю привязку.'}).catch(()=>{});return res.json({ok:true});}console.error('Telegram webhook:',error.message);return res.sendStatus(503);}
  });

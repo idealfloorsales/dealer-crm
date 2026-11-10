@@ -70,3 +70,13 @@ test('custom calculations separate per-position and manual facts by section',()=
  const entries=[{sectionId:'open',dealerId:'a',quantity:1},{sectionId:'open',dealerId:'other',quantity:1},{sectionId:'stock',productId:'p',quantity:20},{sectionId:'stock',productId:'q',quantity:10},{sectionId:'stock',productId:'unassigned',quantity:999},{sectionId:'meetings',quantity:3},{sectionId:'calls',quantity:2}];
  const result=customSummary(plan,[],entries);assert.equal(result[0].fact,1);assert.equal(result[1].plan,60);assert.equal(result[1].fact,30);assert.equal(result[1].percent,50);assert.equal(result[2].fact,3);assert.equal(result[3].fact,2);
 });
+test('internal Telegram operation ID is idempotent and cannot be reused for another employee',async()=>{
+ const id='aaaaaaaaaaaaaaaaaaaaaaaa';let record=null,creates=0,audits=0;
+ const q=value=>({select(){return this},sort(){return this},lean:async()=>value});
+ const Plan={findOne:()=>q({sections:[{id:'calls',kind:'manual',title:'Звонки'}]}),find:()=>q([])};
+ const Entry={findById:()=>q(record),create:async data=>{creates++;record=data;return data;}};
+ const service=registerEmployeeKpi({app:express(),mongoose:{Schema:mongoose.Schema,isValidObjectId:mongoose.isValidObjectId,model:name=>name==='EmployeeKpiPlan'?Plan:Entry},User:{findById:()=>q({fullName:'Manager'})},Dealer:{find:()=>q([])},Product:{},Sales:{},AuditLog:{create:async()=>audits++},isAdminUser:()=>false,getWorkingDealerFilter:x=>x,almatyMonthKey:()=> '2026-11'});
+ const req={user:{id},query:{},body:{month:'2026-11',sectionId:'calls',date:'2026-11-10',quantity:2}};
+ await service.addEntry(req,'tg_operation');await service.addEntry(req,'tg_operation');assert.equal(creates,1);assert.equal(audits,1);
+ await assert.rejects(()=>service.addEntry({...req,user:{id:'bbbbbbbbbbbbbbbbbbbbbbbb'}},'tg_operation'),/Недоступная/);
+});
