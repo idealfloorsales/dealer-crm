@@ -1,0 +1,51 @@
+.training-page{--learn-bg:#fff;--learn-soft:#f7f5f2;--learn-ink:#292a2e;--learn-muted:#7e8189;--learn-line:#e7e2dd}
+.training-download-card{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:24px;margin:0 0 22px;border:1px solid var(--learn-line);background:var(--learn-bg);border-radius:20px}
+.training-download-card h2,.installation-heading h2{font-size:1.25rem;font-weight:800;letter-spacing:-.025em;color:var(--learn-ink);margin:7px 0 9px}
+.training-download-card p,.installation-heading p{font-size:.82rem;line-height:1.7;color:var(--learn-muted);margin:0;max-width:650px}
+.training-download-card small{display:block;font-size:.7rem;color:var(--learn-muted);margin-top:9px}
+.training-download-actions{display:flex;gap:9px;flex-wrap:wrap;min-width:270px;max-width:340px}
+.training-download-actions button,.installation-topic-link{display:flex;gap:8px;align-items:center;justify-content:center;border:1px solid var(--learn-line);border-radius:11px;padding:12px 15px;min-height:44px;background:var(--learn-bg);color:var(--learn-ink);font-size:.78rem;font-weight:750;flex:1;white-space:nowrap}
+.training-download-actions button[data-training-download=pdf]{background:#b9040a;border-color:#b9040a;color:white}
+.training-download-actions button:disabled{opacity:.5;cursor:wait}
+.training-download-actions [role=status]{flex:1 0 100%;font-size:.72rem;color:var(--learn-muted);line-height:1.6}
+.installation-heading{display:flex;gap:24px;align-items:center;justify-content:space-between;margin:20px 0}
+.installation-heading label{min-width:240px;max-width:340px;flex:1;font-size:.75rem;color:var(--learn-muted)}
+.installation-heading label>span{display:block;margin-bottom:7px}
+.installation-heading select{width:100%;border:1px solid var(--learn-line);background:var(--learn-bg);color:var(--learn-ink);border-radius:11px;min-height:44px;padding:10px;font-size:.83rem}
+.installation-common,.installation-collection{background:var(--learn-bg);border:1px solid var(--learn-line);border-radius:20px;padding:24px;margin-bottom:20px;color:var(--learn-ink)}
+.installation-common summary{font-size:.94rem;font-weight:800;line-height:1.6;cursor:pointer}
+.installation-common summary>span{margin-left:12px;font-size:.7rem;color:var(--learn-muted);font-weight:500}
+.installation-steps{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:24px}
+.installation-steps article{display:flex;gap:12px;align-items:flex-start}
+.installation-steps article>span{display:grid;place-items:center;width:32px;min-width:32px;height:32px;border-radius:10px;background:var(--learn-soft);color:#b9040a;font-size:.7rem;font-weight:800}
+.installation-steps h3{font-size:.85rem;font-weight:800;margin:4px 0 7px}
+.installation-steps p,.installation-collection>p{font-size:.81rem;line-height:1.8;color:var(--learn-muted);margin:0}
+.installation-collection-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px}
+.installation-collection-head h3{font-size:1.18rem;line-height:1.5;font-weight:800;letter-spacing:-.02em;margin:6px 0 0;color:var(--learn-ink)}
+.installation-source{font-size:.67rem;color:var(--learn-muted);background:var(--learn-soft);padding:7px 10px;border-radius:8px;white-space:nowrap}
+.installation-specs{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin:20px 0}
+.installation-specs>div{background:var(--learn-soft);border-radius:11px;padding:12px}
+.installation-specs dt{font-size:.68rem;font-weight:500;color:var(--learn-muted);margin-bottom:5px}
+.installation-specs dd{margin:0;font-size:.8rem;color:var(--learn-ink);font-weight:750}
+.installation-note{display:flex;gap:10px;padding:16px;border-radius:12px;background:var(--learn-soft);font-size:.79rem;line-height:1.8;color:var(--learn-muted);margin-top:14px}
+.installation-note strong{font-size:.79rem;color:var(--learn-ink)}
+.installation-note p{margin:5px 0 0}
+.installation-schemes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:18px;margin-top:22px}
+.installation-schemes figure{margin:0;padding:16px;border:1px solid var(--learn-line);border-radius:14px;min-width:0}
+.installation-schemes a{display:grid;place-items:center;background:#fff;border-radius:8px;padding:12px;min-height:160px}
+.installation-schemes img{max-width:100%;max-height:420px;width:auto;height:auto;object-fit:contain}
+.installation-schemes figcaption{font-size:.74rem;color:var(--learn-muted);line-height:1.7;margin-top:12px}
+.installation-schemes figcaption span{display:block;font-size:.67rem}
+.installation-topic-link{width:100%;margin-top:20px;color:#a60811;background:var(--learn-soft)}
+.training-page .training-tab{font-size:.78rem;min-height:46px}
+.training-page .training-card h3{font-size:1.06rem;line-height:1.5}
+.training-page .training-card p{font-size:.79rem;line-height:1.7}
+.training-page .training-topic-section h3{font-size:.95rem}
+.training-page .training-topic-section li,.training-page .training-topic-lead{font-size:.85rem;line-height:1.8}
+.training-page .training-topic-panel h2{font-size:1.5rem}
+.training-page .training-topic-metrics small{font-size:.69rem}.training-page .training-topic-metrics strong{font-size:.84rem}
+.training-page .training-topic-source{font-size:.7rem;line-height:1.5}
+.training-page .training-complete-btn{font-size:.83rem;min-height:46px}
+.training-download-actions button:focus-visible,.installation-topic-link:focus-visible,.installation-heading select:focus-visible{outline:3px solid #b9040a55;outline-offset:3px}
+:root[data-crm-theme=dark] .training-page{--learn-bg:#222224;--learn-soft:#1b1b1e;--learn-ink:#efeff0;--learn-muted:#aaaab1;--learn-line:#38383c}
+@media(max-width:720px){.training-download-card{padding:18px;align-items:stretch;flex-direction:column;gap:18px}.training-download-actions{min-width:0;max-width:none;width:100%}.training-download-actions button{padding:12px 10px;font-size:.76rem}.training-page .training-tabs{grid-template-columns:1fr 1fr;gap:5px;padding:5px;border-radius:15px}.training-page .training-tab{font-size:.72rem;min-height:44px;padding:8px 5px}.training-page .training-tab i{display:inline}.installation-heading{flex-direction:column;align-items:stretch;gap:16px}.installation-heading label{min-width:0;max-width:none}.installation-heading select{font-size:16px}.installation-common,.installation-collection{padding:18px;border-radius:17px}.installation-common summary{font-size:.86rem}.installation-common summary>span{display:block;margin:5px 0 0}.installation-steps{grid-template-columns:1fr;gap:18px}.installation-collection-head{flex-wrap:wrap}.installation-collection-head h3{font-size:1.06rem}.installation-specs{grid-template-columns:1fr 1fr}.installation-schemes figure{padding:12px}.installation-schemes a{padding:5px}.installation-note{padding:13px}.training-page .training-topic-panel{top:max(10px,env(safe-area-inset-top));bottom:max(10px,env(safe-area-inset-bottom));padding:22px 18px}.training-page .training-topic-panel h2{font-size:1.25rem;padding-right:32px}}

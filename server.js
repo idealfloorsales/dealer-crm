@@ -5251,6 +5251,7 @@ app.get('/api/competitors-ref', requirePermission('can_view_competitors'), async
 app.post('/api/competitors-ref', requirePermission('can_manage_competitors'), async (req, res) => { const c = new CompRef(req.body); await c.save(); res.json(convertToClient(c)); });
 app.put('/api/competitors-ref/:id', requirePermission('can_manage_competitors'), async (req, res) => { await CompRef.findByIdAndUpdate(req.params.id, req.body); res.json({status:'ok'}); });
 app.delete('/api/competitors-ref/:id', requirePermission('can_manage_competitors'), async (req, res) => { await CompRef.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
+require('./server/training-downloads').registerTrainingDownloads({app,requirePermission});
 app.get('/api/knowledge', requirePermission('can_view_knowledge'), async (req, res) => { const l = await Knowledge.find().sort({title:1}); res.json(l.map(convertToClient)); });
 app.get('/api/knowledge/:id', requirePermission('can_view_knowledge'), async (req, res) => { res.json(convertToClient(await Knowledge.findById(req.params.id))); });
 app.post('/api/knowledge', requirePermission('can_manage_knowledge'), async (req, res) => { const a = new Knowledge(req.body); await a.save(); res.json(convertToClient(a)); });
