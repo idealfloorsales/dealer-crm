@@ -1497,6 +1497,9 @@ function ensureCommercialOfferCleanup() {
 const salesSchema = new mongoose.Schema({ month: String, group: String, dealerId: String, dealerName: String, plan: Number, fact: Number, isCustom: { type: Boolean, default: false }, ownerUserId: String 
 }, { timestamps: true }); 
 const Sales = mongoose.model('Sales', salesSchema);
+require('./server/employee-kpi').registerEmployeeKpi({
+    app,mongoose,User,Dealer,Product,Sales,AuditLog,isAdminUser,getWorkingDealerFilter,almatyMonthKey
+});
 
 const motivationPayoutSchema = new mongoose.Schema({
     month: { type:String, required:true, index:true },

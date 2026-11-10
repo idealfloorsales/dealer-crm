@@ -240,7 +240,7 @@
         '/workshop.html': 'can_view_workshop',
         '/pricing.html': 'can_view_pricing',
         '/dealer.html': 'can_view_dealers',
-        '/users.html': 'can_manage_users',
+        '/users.html': 'can_view_kpi',
         '/audit.html': 'can_manage_users'
     };
 
@@ -255,7 +255,7 @@
         '/reclamations.html': 'can_view_reclamations',
         '/workshop.html': 'can_view_workshop',
         '/pricing.html': 'can_view_pricing',
-        '/users.html': 'can_manage_users',
+        '/users.html': 'can_view_kpi',
         '/audit.html': 'can_manage_users'
     };
 
@@ -270,7 +270,7 @@
         { path: '/reclamations.html', label: 'Рекламации', permission: 'can_view_reclamations', icon: 'shield-exclamation' },
         { path: '/workshop.html', label: 'Цех', permission: 'can_view_workshop', icon: 'tools' },
         { path: '/pricing.html', label: 'Цены', permission: 'can_view_pricing', icon: 'percent' },
-        { path: '/users.html', label: 'Сотрудники', permission: 'can_manage_users', icon: 'people' },
+        { path: '/users.html', label: 'Сотрудники', permission: 'can_view_kpi', icon: 'people' },
         { path: '/audit.html', label: 'Журнал', permission: 'can_manage_users', icon: 'clock-history' }
     ];
 
@@ -1635,6 +1635,7 @@
         const user = window.CRMAuth && window.CRMAuth.user;
         if (!user || !user.permissions) return false;
         const isAdmin = user.role === 'admin' && user.permissions.is_admin === true;
+        if (permission === 'can_view_kpi') return true;
         if (permission === 'can_manage_users') return isAdmin;
         return Boolean(isAdmin || user.permissions[permission]);
     }
@@ -1697,7 +1698,7 @@
                 ['/reclamations.html', 'can_view_reclamations'],
                 ['/workshop.html', 'can_view_workshop'],
                 ['/map.html', 'can_view_map'],
-                ['/users.html', 'can_manage_users'],
+                ['/users.html', 'can_view_kpi'],
                 ['/audit.html', 'can_manage_users']
             ];
             const target = preferredRoutes.find(([, right]) => can(right));
