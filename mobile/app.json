@@ -2,7 +2,7 @@
   "expo": {
     "name": "IDEAL FLOOR CRM",
     "slug": "ideal-floor-crm",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "idealfloorcrm",
@@ -28,7 +28,8 @@
           "image": "./assets/splash-icon.png",
           "imageWidth": 220
         }
-      ]
+      ],
+      "./plugins/with-stable-release.cjs"
     ],
     "android": {
       "package": "kz.idealfloor.crm",
@@ -36,7 +37,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#B9040A"
       },
-      "versionCode": 2
+      "versionCode": 3
     },
     "ios": {
       "bundleIdentifier": "kz.idealfloor.crm",

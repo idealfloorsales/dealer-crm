@@ -50,6 +50,11 @@ jobs:
       - name: Generate Android native project
         run: npx expo prebuild --platform android --clean --non-interactive
 
+      - name: Verify release compatibility settings
+        run: |
+          grep -qx 'android.enableMinifyInReleaseBuilds=false' android/gradle.properties
+          grep -qx 'android.enableShrinkResourcesInReleaseBuilds=false' android/gradle.properties
+
       - name: Build standalone APK
         run: |
           cd android
@@ -68,6 +73,33 @@ jobs:
           print('Standalone APK contains bundled application code')
           PYVERIFY
           "$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner" verify android/app/build/outputs/apk/release/app-release.apk
+
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Verify Android 13 login startup
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          emulator-boot-timeout: 300
+          disable-animations: true
+          working-directory: mobile
+          script: bash scripts/check-startup.sh android/app/build/outputs/apk/release/app-release.apk
+
+      - name: Save startup diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-startup-diagnostics
+          path: mobile/diagnostics/
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
