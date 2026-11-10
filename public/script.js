@@ -2602,6 +2602,31 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+   const DEALER_FALLBACK_KEY = 'dealer_fallback_metric_v1';
+   const DEALER_FALLBACK_OPTIONS = {smart:'Умный показатель',profile:'Полнота профиля',updated:'Давность обновления',visit:'Последний визит'};
+   let dealerFallbackChoice = localStorage.getItem(DEALER_FALLBACK_KEY) || 'smart';
+   function dealerFallbackData(d, metrics) {
+       const fields = [d.name,d.city,d.address,d.status,d.sector,d.responsible,d.phone];
+       const profile = {label:'Профиль',value:Math.round(fields.filter(Boolean).length/fields.length*100)+'%',foot:'Заполненность основных полей'};
+       const dt = d.updatedAt || d.updated_at;
+       const days = dt ? Math.floor((Date.now()-new Date(dt).getTime())/86400000) : NaN;
+       const updated = Number.isFinite(days) && days>=0 ? {label:'Обновление',value:days===0?'Сегодня':days+' дн. назад',foot:'Последнее изменение карточки'} : null;
+       const visit = metrics.latestVisit && window.CRMAuth?.can('can_view_dashboard') ? {label:'Визит',value:formatDealerVisit(metrics).value,foot:'По записям CRM'} : null;
+       return ({profile,updated,visit,smart:updated||profile})[dealerFallbackChoice] || {label:'Данные',value:'Нет данных',foot:'Нет сведений в CRM'};
+   }
+   function setupDealerFallbackSelector() {
+       const host = document.querySelector('.dealer-directory-actions');
+       if (!host || document.getElementById('dealer-fallback-select') || String(currentUserRole).toLowerCase()!=='admin') return;
+       const select=document.createElement('select');
+       select.id='dealer-fallback-select';select.className='form-select form-select-sm';
+       select.style.cssText='max-width:190px;min-width:145px';
+       select.title='Показатель без плана (на этом устройстве)';
+       Object.entries(DEALER_FALLBACK_OPTIONS).forEach(([key,label])=>{const opt=document.createElement('option');opt.value=key;opt.textContent=label;select.appendChild(opt)});
+       select.value=DEALER_FALLBACK_OPTIONS[dealerFallbackChoice]?dealerFallbackChoice:'smart';
+       select.addEventListener('change',()=>{dealerFallbackChoice=select.value;localStorage.setItem(DEALER_FALLBACK_KEY,dealerFallbackChoice);location.reload()});
+       host.prepend(select);
+   }
+
    function getDealerListMetrics(dealer) {
         const canViewSales = Boolean(window.CRMAuth && CRMAuth.can('can_view_sales'));
         const canViewVisits = Boolean(window.CRMAuth && CRMAuth.can('can_view_dashboard'));
@@ -3195,7 +3220,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const routeActive = dealerRouteIds.includes(String(d.id));
             const routeToggleBtn = `<button class="dealer-v3-primary-action is-route ${routeActive ? 'active' : ''}" type="button" data-route-toggle="${safeAttr(d.id)}" aria-pressed="${routeActive ? 'true' : 'false'}" onclick="event.stopPropagation(); toggleDealerRoute('${safeAttr(d.id)}')"><i class="bi bi-${routeActive ? 'check2' : 'plus-lg'}"></i><span>${routeActive ? 'В маршруте' : 'В маршрут'}</span></button>`;
 
+            setupDealerFallbackSelector();
             const visit = formatDealerVisit(metrics);
+            let planLabel = 'План';
             let planValue = 'Без плана';
             let planFoot = 'Индивидуальный план не задан';
             let progressWidth = 0;
@@ -3209,9 +3236,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 planFoot = `${formatExactSqm(metrics.fact)} из ${formatExactSqm(metrics.plan)} м²`;
                 progressWidth = Math.min(metrics.achievement, 100);
                 progressLevel = metrics.achievement >= 90 ? 'good' : metrics.achievement >= 70 ? 'mid' : 'risk';
-            } else if (d.hasPersonalPlan) {
-                planValue = 'Не задан';
-                planFoot = 'Нужно заполнить план';
+            } else {
+                const fallback = dealerFallbackData(d, metrics);
+                planLabel = fallback.label;
+                planValue = fallback.value;
+                planFoot = fallback.foot;
             }
 
             const infoChips = dealerInfoChips(d);
@@ -3275,7 +3304,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
 
                 <div class="dealer-list-v6-cell">
-                    <span class="dealer-list-v6-label">План</span>
+                    <span class="dealer-list-v6-label">${planLabel}</span>
                     <strong>${planValue}</strong>
                     <small>${planFoot}</small>
                     <div class="dealer-list-v6-progress is-${progressLevel}"><i style="width:${progressWidth}%"></i></div>
