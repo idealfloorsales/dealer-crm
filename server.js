@@ -618,7 +618,6 @@ const requireIsAdmin = requireAdmin;
 
 async function employeeStatusWithHistory(user) {
     const presence=employeePresence(user);
-    if (user.lastSeenAt) return presence;
     const action=await AuditLog.findOne({'actor.id':String(user._id)}).sort({createdAt:-1}).select('createdAt').lean();
     return {...presence,lastSeenAt:latestActivity(user,action?.createdAt)};
 }
