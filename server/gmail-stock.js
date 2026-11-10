@@ -20,8 +20,11 @@ function senderOf(message) {
 async function jsonRequest(url, options = {}) {
     const response = await fetch(url, { ...options, signal:AbortSignal.timeout(30000) });
     if (!response.ok) {
-        // Never include response bodies, URLs or credentials in logs/status.
-        throw new Error(`Google API: HTTP ${response.status}. Проверьте разрешение Gmail и срок действия доступа.`);
+        // Expose only machine-readable Google error reasons, never response text or credentials.
+        const payload = await response.json().catch(() => ({}));
+        const reasons = [payload.error?.status, ...(payload.error?.errors || []).map(e => e.reason),
+            ...(payload.error?.details || []).map(e => e.reason)].filter(v => typeof v === 'string' && /^[A-Za-z_]+$/.test(v));
+        throw new Error(`Google API: HTTP ${response.status}${reasons.length ? ' (' + [...new Set(reasons)].join(', ') + ')' : ''}. Проверьте разрешение Gmail и срок действия доступа.`);
     }
     return response.json();
 }
