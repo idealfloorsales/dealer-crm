@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
+    const discountTitle = item => 'Скидка −' + Number(item.discountPercent || 0).toLocaleString('ru-RU',{maximumFractionDigits:2}) + '%';
     
     // UI Elements
     const contactsListContainer = document.getElementById('dealer-contacts-list'); 
@@ -835,14 +836,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const pending = active.filter(item => Number(item.requirementTarget) > 0 && (Number(item.requirementCurrent) < Number(item.requirementTarget) || item.requirementVerified !== true));
 
             const discountBadges = discounts.length
-                ? discounts.map(item => `<span class="dealer-price-chip is-discount">−${Number(item.discountPercent || 0).toLocaleString('ru-RU',{maximumFractionDigits:2})}% · ${safeText(item.name)}</span>`).join('')
+                ? discounts.map(item => `<span class="dealer-price-chip is-discount">${safeText(discountTitle(item))}</span>`).join('')
                 : '<span class="dealer-price-chip">Дополнительных скидок нет</span>';
 
             const conditionsHtml = active.length
                 ? active.map(item => {
                     const isDiscount = item.kind === 'discount';
                     const title = isDiscount
-                        ? `−${Number(item.discountPercent || 0).toLocaleString('ru-RU',{maximumFractionDigits:2})}% · ${safeText(item.name)}`
+                        ? `${safeText(discountTitle(item))}`
                         : safeText(item.priceListName || item.name);
                     const conditionStart = item.startDate || item.priceList?.validFrom || '';
                     const conditionEnd = item.endDate || item.priceList?.validTo || '';

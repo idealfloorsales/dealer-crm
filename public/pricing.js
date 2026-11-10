@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
+    const discountTitle = item => 'Скидка −' + Number(item.discountPercent || 0).toLocaleString('ru-RU',{maximumFractionDigits:2}) + '%';
     const $ = id => document.getElementById(id);
     const API = '/api/pricing';
     const state = { today:'', rows:[], conditions:[], stats:{}, priceLists:[], catalog:[], currentSheet:null, activeView:'dealers' };
@@ -327,9 +328,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 <strong><i class="bi bi-diagram-3"></i> Унаследовано</strong>
                 <div>${inherited.map(item => {
                     const value = item.kind === 'discount'
-                        ? '−'+fmt(item.discountPercent,2)+'%'
+                        ? esc(discountTitle(item))
                         : esc(item.priceListName || item.name);
-                    return `<span title="Это условие задано на уровне ${esc(item.scopeType)}">${value} · ${esc(item.name)}</span>`;
+                    return `<span title="Это условие задано на уровне ${esc(item.scopeType)}">${item.kind === 'discount' ? value : value + ' · ' + esc(item.name)}</span>`;
                 }).join('')}</div>
                 <small>Эти условия нельзя снять только у одного дилера из этой строки — они заданы для региона/города/сети.</small>
               </div>`
@@ -345,7 +346,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <section class="pricing-inline-rule" data-inline-rule="social">
                     <label class="pricing-rule-toggle">
                         <input type="checkbox" class="form-check-input" data-inline-social-enabled ${social && ['active','planned','paused'].includes(social.computedStatus) ? 'checked':''}>
-                        <span><strong>−5% · соцсети</strong><small>8 публикаций, суммируется с −10%</small></span>
+                        <span><strong>Скидка −5%</strong><small>8 публикаций, суммируется с −10%</small></span>
                     </label>
                     <div class="pricing-inline-fields">
                         <label><span>С</span><input type="date" class="form-control" data-inline-social-start value="${esc(social?.startDate || state.today || todayValue())}"></label>
@@ -358,7 +359,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <section class="pricing-inline-rule" data-inline-rule="support">
                     <label class="pricing-rule-toggle">
                         <input type="checkbox" class="form-check-input" data-inline-support-enabled ${support && ['active','planned','paused'].includes(support.computedStatus) ? 'checked':''}>
-                        <span><strong>−10% · поддержка продаж</strong><small>Суммируется с −5%</small></span>
+                        <span><strong>Скидка −10%</strong><small>Суммируется с −5%</small></span>
                     </label>
                     <div class="pricing-inline-fields is-short">
                         <label><span>С</span><input type="date" class="form-control" data-inline-support-start value="${esc(support?.startDate || state.today || todayValue())}"></label>
@@ -405,7 +406,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             (row.activeDiscounts || []).forEach(condition => {
                 const inherited = condition.scopeType !== 'dealer';
-                badges.push(`<span class="pricing-badge is-discount ${inherited?'is-inherited':''}">−${fmt(condition.discountPercent,2)}% · ${esc(condition.name)}${inherited?' · '+esc(condition.scopeType):''}</span>`);
+                badges.push(`<span class="pricing-badge is-discount ${inherited?'is-inherited':''}">${esc(discountTitle(condition))}</span>`);
             });
             if (row.pendingRequirements) badges.push(`<span class="pricing-badge is-warning"><i class="bi bi-exclamation-circle"></i>${row.pendingRequirements} обязательств</span>`);
             if (row.priceListConflicts) badges.push(`<span class="pricing-badge is-conflict"><i class="bi bi-exclamation-triangle"></i>${row.priceListConflicts + 1} базовых прайса</span>`);
@@ -493,7 +494,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (code === 'SOCIAL-5') {
             return {
                 scopeType:'dealer', dealerId, kind:'discount',
-                name:'−5% за публикации в соцсетях', code:'SOCIAL-5',
+                name:'Скидка −5%', code:'SOCIAL-5',
                 discountPercent:5, stackable:true, priority:0,
                 startDate:editor.querySelector('[data-inline-social-start]')?.value || state.today,
                 endDate:editor.querySelector('[data-inline-social-end]')?.value || '',
@@ -509,7 +510,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (code === 'SUPPORT-10') {
             return {
                 scopeType:'dealer', dealerId, kind:'discount',
-                name:'−10% акция для поддержки продаж', code:'SUPPORT-10',
+                name:'Скидка −10%', code:'SUPPORT-10',
                 discountPercent:10, stackable:true, priority:0,
                 startDate:editor.querySelector('[data-inline-support-start]')?.value || state.today,
                 endDate:editor.querySelector('[data-inline-support-end]')?.value || '',
@@ -1040,7 +1041,7 @@ document.addEventListener('DOMContentLoaded', () => {
         $('pricing-sheet-summary').innerHTML=`
             <div><small>Прайс</small><strong>${esc(list?.name || 'Не назначен')}</strong><span>${list?.versionDate ? 'от '+dateText(list.versionDate) : ''}</span></div>
             <div><small>Базовая цена</small><strong>${esc(data.priceType?.label || data.dealer?.priceType || 'Спец.цена')}</strong><span>из карточки дилера</span></div>
-            <div><small>Доп. скидка</small><strong>${data.totalDiscountPercent ? '−'+fmt(data.totalDiscountPercent,2)+'%' : '0%'}</strong><span>${(data.activeDiscounts||[]).length ? (data.activeDiscounts||[]).map(x=>x.name).join(' + ') : 'без активных скидок'}</span></div>`;
+            <div><small>Доп. скидка</small><strong>${data.totalDiscountPercent ? '−'+fmt(data.totalDiscountPercent,2)+'%' : '0%'}</strong><span>${(data.activeDiscounts||[]).length ? (data.activeDiscounts||[]).map(discountTitle).join(' + ') : 'без активных скидок'}</span></div>`;
 
         if(data.surchargePercent) $('pricing-sheet-summary').insertAdjacentHTML('beforeend','<div><small>Надбавка сети</small><strong>+'+fmt(data.surchargePercent,2)+'%</strong><span>учтена в итоговой цене</span></div>');
         const rows=Array.isArray(data.rows)?data.rows:[];
@@ -1266,7 +1267,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return `<article class="pricing-condition-card is-${esc(status)}">
                 <div class="pricing-condition-top">
                     <div>
-                        <strong>${esc(condition.name)}</strong>
+                        <strong>${esc(condition.kind === 'discount' ? discountTitle(condition) : condition.name)}</strong>
                         <small>${esc(scopeLabel(condition))} · ${esc(reasonLabel(condition.reasonType))}${condition.code ? ' · '+esc(condition.code):''}</small>
                     </div>
                     <span class="pricing-status is-${esc(status)}">${statusLabel(status)}</span>
@@ -1661,7 +1662,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!manage) return;
         const condition = state.conditions.find(item => idOf(item) === String(conditionId));
         if (!condition) return;
-        if (!confirm(`Отменить условие «${condition.name}»? История сохранится.`)) return;
+        if (!confirm(`Отменить условие «${condition.kind === 'discount' ? discountTitle(condition) : condition.name}»? История сохранится.`)) return;
         const reason = prompt('Причина отмены (необязательно):','') || '';
         try {
             await send(API+'/conditions/'+encodeURIComponent(conditionId),'DELETE',{reason});
@@ -1676,7 +1677,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!manage) return;
         const condition = state.conditions.find(item => idOf(item) === String(conditionId));
         if (!condition) return;
-        if (!confirm(`Восстановить условие «${condition.name}» и снова включить его в расчёт цен?`)) return;
+        if (!confirm(`Восстановить условие «${condition.kind === 'discount' ? discountTitle(condition) : condition.name}» и снова включить его в расчёт цен?`)) return;
         try {
             const restored = await send(API+'/conditions/'+encodeURIComponent(conditionId)+'/restore','POST',{});
             const nextStatus = restored?.computedStatus || 'active';
@@ -1695,7 +1696,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const condition = state.conditions.find(item => idOf(item) === String(conditionId));
         if (!condition) return;
         const type = condition.kind === 'price_list' ? 'прайс' : 'скидку';
-        if (!confirm(`Удалить ${type} «${condition.name}» навсегда? История этого условия будет удалена, восстановить его будет нельзя.`)) return;
+        if (!confirm(`Удалить ${type} «${condition.kind === 'discount' ? discountTitle(condition) : condition.name}» навсегда? История этого условия будет удалена, восстановить его будет нельзя.`)) return;
         try {
             await send(API+'/conditions/'+encodeURIComponent(conditionId)+'/permanent','DELETE',{});
             toast(condition.kind === 'price_list' ? 'Прайс удалён из условий' : 'Скидка удалена');
