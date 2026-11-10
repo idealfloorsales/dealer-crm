@@ -33,7 +33,7 @@ test('latest message chosen despite list order, checkpoint prevents repeat and s
    const isNew=url.includes('/new?');return {id:isNew?'new':'old',internalDate:isNew?'2000':'1000',payload:{headers:[{name:'From',value:'idealfloor.sales@gmail.com'}],parts:[{filename:'Остатки на 10.xlsx',body:{attachmentId:'file',size:100}}]}};
  }});
  try {
- const sync=createGmailStockSync({Product:{find:()=>({select:()=>({lean:async()=>products})}),bulkWrite:async ops=>writes.push(ops)},StockImportMeta:{findOneAndUpdate:async()=>{}},AuditLog:{create:async()=>{}},connection:{collection:()=>collection},ready:()=>true,env:{GMAIL_CLIENT_ID:'id',GMAIL_CLIENT_SECRET:'secret',GMAIL_REFRESH_TOKEN:'refresh'}});
+ const sync=createGmailStockSync({pause:async()=>{},Product:{find:()=>({select:()=>({lean:async()=>products})}),bulkWrite:async ops=>writes.push(ops)},StockImportMeta:{findOneAndUpdate:async()=>{}},AuditLog:{create:async()=>{}},connection:{collection:()=>collection},ready:()=>true,env:{GMAIL_CLIENT_ID:'id',GMAIL_CLIENT_SECRET:'secret',GMAIL_REFRESH_TOKEN:'refresh'}});
  await sync.run();await sync.run();assert.equal(downloads,1);assert.equal(writes.length,1);assert.equal(doc.lastMessageId,'new');assert.equal(writes[0][0].updateOne.update.$set.stock_qty,31);assert.ok(!JSON.stringify(await sync.status()).includes('PRIVATE'));
  }finally{global.fetch=original;}
 });

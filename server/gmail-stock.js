@@ -28,7 +28,7 @@ async function jsonRequest(url, options = {}) {
     }
     return response.json();
 }
-function createGmailStockSync({ Product, StockImportMeta, AuditLog, connection, ready, env = process.env }) {
+function createGmailStockSync({ Product, StockImportMeta, AuditLog, connection, ready, env = process.env, pause = ms => new Promise(resolve => setTimeout(resolve, ms)) }) {
     let timer, running = false;
     const configured = () => ['GMAIL_CLIENT_ID','GMAIL_CLIENT_SECRET','GMAIL_REFRESH_TOKEN'].every(k => String(env[k] || '').trim());
     const state = () => connection.collection('gmail_stock_sync');
@@ -50,13 +50,19 @@ function createGmailStockSync({ Product, StockImportMeta, AuditLog, connection, 
             if (!token.access_token) throw new Error('Google не вернул access token');
             const get = endpoint => jsonRequest('https://gmail.googleapis.com/gmail/v1/users/me/' + endpoint, {headers:{Authorization:`Bearer ${token.access_token}`}});
             const q = `{from:idealfloor.sales@gmail.com from:idealfloor.sale@mail.ru} has:attachment filename:остатки` + (previous.lastMessageAt ? ` after:${Math.max(0,Math.floor(previous.lastMessageAt/1000)-1)}` : '');
-            let pageToken = '', latest = null;
+            let latest = null;
+            // Search recent mail first; only widen the window if no stock file is found.
+            // Do not exhaust the per-user quota scanning years of duplicated reports.
+            for (const days of (previous.lastMessageAt ? [0] : [1,7,30,365,0])) {
+            const searchQuery = q + (days ? ` newer_than:${days}d` : '');
+            let pageToken = '';
             do {
                 // Renew the lease during pagination; a lost lease prevents writes.
                 const renewal = await state().updateOne({_id:'free_stock',owner}, {$set:{leaseUntil:new Date(Date.now()+10*60*1000)}});
                 if (!renewal.matchedCount) throw new Error('Проверка почты прервана: блокировка потеряна');
-                const page = await get('messages?' + new URLSearchParams({q,maxResults:'100',...(pageToken ? {pageToken} : {})}));
+                const page = await get('messages?' + new URLSearchParams({q:searchQuery,maxResults:'100',...(pageToken ? {pageToken} : {})}));
                 for (const item of page.messages || []) {
+                    await pause(800);
                     const message = await get(`messages/${encodeURIComponent(item.id)}?format=full`);
                     const timestamp = Number(message.internalDate);
                     if (!SENDERS.has(senderOf(message)) || !Number.isFinite(timestamp) || timestamp <= (previous.lastMessageAt || 0)) continue;
@@ -66,6 +72,8 @@ function createGmailStockSync({ Product, StockImportMeta, AuditLog, connection, 
                 }
                 pageToken = page.nextPageToken || '';
             } while (pageToken);
+            if (latest) break;
+            }
             if (latest) {
                 if (latest.attachments.length !== 1) throw new Error('В последнем письме несколько файлов остатков; требуется ручная проверка');
                 const part = latest.attachments[0];
