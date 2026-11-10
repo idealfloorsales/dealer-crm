@@ -270,7 +270,7 @@ async function seedUsers() {
 // ==========================================
 const authMiddleware = (req, res, next) => {
     if (req.method === 'OPTIONS') return next(); 
-    if (req.path === '/api/auth/login' || req.path.startsWith('/api/public/price-share/') || req.path.startsWith('/api/public/offers/') || !req.path.startsWith('/api')) return next();
+    if (req.path === '/api/auth/login' || req.path === '/api/public/telegram' || req.path.startsWith('/api/public/price-share/') || req.path.startsWith('/api/public/offers/') || !req.path.startsWith('/api')) return next();
 
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; 
@@ -491,7 +491,7 @@ function auditCompactRequest(req) {
 
 async function auditMutationMiddleware(req,res,next) {
     if (!req.path.startsWith('/api') || !AUDIT_MUTATION_METHODS.has(req.method)) return next();
-    if (req.path === '/api/auth/login' || req.path === '/api/auth/presence' || req.path.startsWith('/api/audit')) return next();
+    if (req.path === '/api/auth/login' || req.path === '/api/auth/presence' || req.path === '/api/public/telegram' || req.path.startsWith('/api/telegram') || req.path.startsWith('/api/audit')) return next();
     const requestData=auditCompactRequest(req);
     const before=await auditLoadSnapshot(req);
     let responseBody=null;
@@ -1695,6 +1695,7 @@ async function connectToDB() {
 
             appReady = true;
             gmailStockSync.start();
+            telegramNotifications.start();
             await purgeExpiredCommercialOffers().catch(error => console.error('Initial commercial offer cleanup error:', error));
             ensureCommercialOfferCleanup();
             if (dbReconnectTimer) {
@@ -5302,6 +5303,10 @@ const reclamationSchema = new mongoose.Schema({
     photos: [{ photo_url: String }]
 }, { timestamps: true });
 const Reclamation = mongoose.model('Reclamation', reclamationSchema);
+const telegramNotifications = require('./server/telegram-notifications').registerTelegram({
+    app,mongoose,User,Dealer,AuditLog,connection:mongoose.connection,
+    ready:()=>appReady&&!shuttingDown,origin:APP_ORIGIN
+});
 
 
 // ==========================================
@@ -6716,6 +6721,7 @@ async function gracefulShutdown(signal) {
     if (shuttingDown) return;
     shuttingDown = true;
     gmailStockSync.stop();
+    telegramNotifications.stop();
     appReady = false;
     console.log(`${signal} received, shutting down gracefully`);
 
