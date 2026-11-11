@@ -15,8 +15,12 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
     steps:
+      - name: Require verified emulator-tested build
+        run: |
+          test "$(gh api repos/$GH_REPO/actions/runs/42839594843 --jq .conclusion)" = success
+          test "$(gh api repos/$GH_REPO/actions/runs/42839594843 --jq .head_sha)" = 2198157e72d9ca4db2b66df18c8ed508ba471f04
       - name: Download verified standalone build
-        run: gh run download 42826009919 --name ideal-floor-crm-android-standalone --dir package
+        run: gh run download 42839594843 --name ideal-floor-crm-android-standalone --dir package
       - name: Verify application bundle
         run: |
           python3 - <<'PY'
@@ -25,12 +29,12 @@ jobs:
           apk = Path('package/app-release.apk')
           with ZipFile(apk) as archive:
               assert archive.getinfo('assets/index.android.bundle').file_size > 10000
-          apk.rename('package/IDEAL-FLOOR-CRM-0.1.1.apk')
+          apk.rename('package/IDEAL-FLOOR-CRM-0.1.2.apk')
           PY
       - name: Publish permanent APK link
         run: |
-          if gh release view android-v0.1.1 >/dev/null 2>&1; then
-            gh release upload android-v0.1.1 package/IDEAL-FLOOR-CRM-0.1.1.apk --clobber
+          if gh release view android-v0.1.2 >/dev/null 2>&1; then
+            gh release upload android-v0.1.2 package/IDEAL-FLOOR-CRM-0.1.2.apk --clobber
           else
-            gh release create android-v0.1.1 package/IDEAL-FLOOR-CRM-0.1.1.apk --target mobile-app --title 'IDEAL FLOOR CRM Android 0.1.1' --notes 'Самостоятельное Android-приложение. Исправлен запуск без сервера разработки и добавлено ограничение ожидания ответа CRM при входе.'
+            gh release create android-v0.1.2 package/IDEAL-FLOOR-CRM-0.1.2.apk --target mobile-app --title 'IDEAL FLOOR CRM Android 0.1.2' --notes 'Самостоятельное Android-приложение. Исправлен сбой AndroidX при запуске. Проверено открытие формы входа на Android 13.'
           fi
