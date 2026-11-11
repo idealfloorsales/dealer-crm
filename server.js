@@ -615,6 +615,11 @@ const requireAdmin = (req, res, next) => {
     next();
 };
 const requireIsAdmin = requireAdmin;
+const backups = require('./server/backups').registerBackups({
+    app, connection:mongoose.connection, EJSON:mongoose.mongo.BSON.EJSON,
+    User, AuditLog, requireAdmin, origin:APP_ORIGIN,
+    ready:() => appReady && mongoose.connection.readyState === 1 && !shuttingDown
+});
 
 async function employeeStatusWithHistory(user) {
     const presence=employeePresence(user);
@@ -6722,6 +6727,7 @@ async function gracefulShutdown(signal) {
     if (shuttingDown) return;
     shuttingDown = true;
     gmailStockSync.stop();
+    backups.stop();
     telegramNotifications.stop();
     appReady = false;
     console.log(`${signal} received, shutting down gracefully`);
