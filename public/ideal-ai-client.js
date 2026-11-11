@@ -1,0 +1,27 @@
+(async()=>{
+    if(window.CRMAuth?.ready)await CRMAuth.ready;
+    if(!window.CRMAuth?.user||window.__idealAIInstalled)return;
+    // First rollout is administrator-only. Staff access can be enabled separately on the server.
+    if(!CRMAuth.can('can_manage_users'))return;
+    window.__idealAIInstalled=true;
+    const link=document.createElement('link');link.rel='stylesheet';link.href='/ideal-ai.css';document.head.appendChild(link);
+    const launch=document.createElement('button');launch.type='button';launch.className='ideal-ai-launch';launch.innerHTML='<span aria-hidden="true">✦</span> IDEAL AI';launch.setAttribute('aria-haspopup','dialog');document.body.appendChild(launch);
+    const overlay=document.createElement('div');overlay.className='ideal-ai-overlay';overlay.hidden=true;
+    overlay.innerHTML='<section class="ideal-ai-dialog" role="dialog" aria-modal="true" aria-labelledby="ideal-ai-title"><header><div><small>IDEAL FLOOR · ПОМОЩНИК</small><h2 id="ideal-ai-title">IDEAL AI</h2></div><button type="button" data-ai-close aria-label="Закрыть">×</button></header><p class="ideal-ai-intro">Помогу составить письмо дилеру, план обучения или рабочий текст. Продажи, остатки и другие данные CRM пока не подключены.</p><div class="ideal-ai-messages" role="log" aria-live="polite"></div><div class="ideal-ai-suggestions"><button type="button">Составь план обучения дилера</button><button type="button">Помоги написать письмо дилеру</button></div><p class="ideal-ai-status" role="status"></p><form><label class="visually-hidden" for="ideal-ai-input">Сообщение</label><textarea id="ideal-ai-input" rows="3" maxlength="3000" placeholder="Напишите задачу…" required></textarea><div class="ideal-ai-form-actions"><button type="button" data-ai-clear>Новый диалог</button><button type="submit">Отправить <span aria-hidden="true">↑</span></button></div></form><footer>Текст запроса отправляется в OpenAI. Не вводите пароли и конфиденциальные данные. Ответы проверяйте перед использованием.</footer></section>';
+    document.body.appendChild(overlay);
+    const form=overlay.querySelector('form'),input=overlay.querySelector('textarea'),log=overlay.querySelector('[role=log]'),status=overlay.querySelector('.ideal-ai-status');
+    let history=[],busy=false,scrollStyle='';
+    async function api(path,body){const r=await fetch('/api/ideal-ai/'+path,{crmTrackLoading:false,...(body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});const data=await r.json().catch(()=>({}));if(!r.ok)throw Error(data.error||'Не удалось связаться с ИИ');return data;}
+    function entry(role,text){const el=document.createElement('div');el.className='ideal-ai-message '+role;const label=document.createElement('strong');label.textContent=role==='user'?'Вы':'IDEAL AI';const content=document.createElement('div');content.textContent=text;el.append(label,content);log.appendChild(el);log.scrollTop=log.scrollHeight;}
+    async function open(){scrollStyle=document.body.style.overflow;document.body.style.overflow='hidden';overlay.hidden=false;input.focus();try{const s=await api('status');status.textContent=s.connected?'Готов к работе · до '+s.dailyRequestLimit+' запросов в сутки на CRM':'Подключение ещё настраивается. Добавьте ключ OpenAI и включите IDEAL_AI_ENABLED в Render.';}catch(e){status.textContent=e.message;}}
+    function close(){overlay.hidden=true;document.body.style.overflow=scrollStyle;launch.focus();}
+    launch.addEventListener('click',open);overlay.querySelector('[data-ai-close]').addEventListener('click',close);overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
+    overlay.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();close();}if(e.key==='Tab'){const focusable=[...overlay.querySelectorAll('button,textarea')].filter(el=>!el.disabled);const first=focusable[0],last=focusable.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}});
+    overlay.querySelectorAll('.ideal-ai-suggestions button').forEach(button=>button.addEventListener('click',()=>{input.value=button.textContent;input.focus();}));
+    overlay.querySelector('[data-ai-clear]').addEventListener('click',()=>{if(busy)return;history=[];log.replaceChildren();status.textContent='Новый диалог';input.focus();});
+    form.addEventListener('submit',async e=>{e.preventDefault();if(busy||!input.value.trim())return;const message=input.value.trim();busy=true;form.querySelectorAll('button').forEach(b=>b.disabled=true);input.disabled=true;entry('user',message);status.textContent='Готовлю ответ…';
+        try{const result=await api('chat',{message,history:history.slice(-4)});entry('assistant',result.answer);history.push({role:'user',content:message},{role:'assistant',content:result.answer.slice(0,5000)});input.value='';status.textContent=result.truncated?'Ответ достиг ограничения длины. Можно попросить продолжить.':'Ответ готов';}
+        catch(error){status.textContent=error.message;}
+        finally{busy=false;form.querySelectorAll('button').forEach(b=>b.disabled=false);input.disabled=false;if(!overlay.hidden)input.focus();}
+    });
+})();

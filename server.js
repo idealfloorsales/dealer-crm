@@ -105,7 +105,7 @@ const servePage = (res, fileName) => {
         if (err) { console.error(err); return res.status(500).send('Server Error'); }
         let html = data.replace(/{{VER}}/g, APP_VERSION);
         if (data.includes('permissions.js')) {
-            html = html.replace('</body>', `<script src="/employee-presence.js?v=${APP_VERSION}"></script></body>`);
+            html = html.replace('</body>', `<script src="/employee-presence.js?v=${APP_VERSION}"></script><script src="/ideal-ai-client.js?v=${APP_VERSION}"></script></body>`);
         }
         res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.send(html);
@@ -491,7 +491,7 @@ function auditCompactRequest(req) {
 
 async function auditMutationMiddleware(req,res,next) {
     if (!req.path.startsWith('/api') || !AUDIT_MUTATION_METHODS.has(req.method)) return next();
-    if (req.path === '/api/auth/login' || req.path === '/api/auth/presence' || req.path === '/api/public/telegram' || req.path.startsWith('/api/telegram') || req.path.startsWith('/api/audit')) return next();
+    if (req.path === '/api/auth/login' || req.path === '/api/auth/presence' || req.path === '/api/public/telegram' || req.path.startsWith('/api/telegram') || req.path.startsWith('/api/audit') || req.path.startsWith('/api/ideal-ai')) return next();
     const requestData=auditCompactRequest(req);
     const before=await auditLoadSnapshot(req);
     let responseBody=null;
@@ -6713,6 +6713,7 @@ app.delete('/api/reclamations/:id', requirePermission('can_manage_reclamations')
 });
 
 const priceControl = require('./server/price-control').install({app,mongoose,Dealer,requireAnyPermission,requirePermission,getDealerFilter,isGlobalViewer,hasPermission,today:pricingTodayKey});
+require('./server/ideal-ai').install({app,connection:mongoose.connection,AuditLog});
 
 serverInstance = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server port ${PORT}`);
