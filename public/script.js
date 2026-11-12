@@ -2500,7 +2500,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updateBrandsDatalist();
             return;
         }
-        const response = await fetch(API_COMPETITORS_REF_URL);
+        const response = await fetch(API_COMPETITORS_REF_URL+'?view=summary');
         if (!response.ok) throw new Error("Ошибка справочника конкурентов");
         competitorsRef = await response.json();
         updateBrandsDatalist();
@@ -2964,7 +2964,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         img.dataset.avatarLoading = '1';
         try {
-            const response = await fetch(`${API_DEALERS_URL}/${encodeURIComponent(dealerId)}/avatar`);
+            const response = await fetch(`${API_DEALERS_URL}/${encodeURIComponent(dealerId)}/avatar?preview=1`);
             if (!response.ok) throw new Error('avatar');
             const data = await response.json();
             const url = data.avatarUrl || '';

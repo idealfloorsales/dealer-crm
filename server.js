@@ -10,6 +10,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const path = require('path');
 const ExcelJS = require('exceljs');
+const {previewDataUrl}=require('./server/image-preview');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -1520,6 +1521,8 @@ function ensureCommercialOfferCleanup() {
 
 const salesSchema = new mongoose.Schema({ month: String, group: String, dealerId: String, dealerName: String, plan: Number, fact: Number, isCustom: { type: Boolean, default: false }, ownerUserId: String 
 }, { timestamps: true }); 
+salesSchema.index({month:1,dealerId:1,isCustom:1});
+salesSchema.index({dealerId:1,month:1});
 const Sales = mongoose.model('Sales', salesSchema);
 const employeeKpi = require('./server/employee-kpi').registerEmployeeKpi({
     app,mongoose,User,Dealer,Product,Sales,AuditLog,isAdminUser,getWorkingDealerFilter,almatyMonthKey
@@ -2704,7 +2707,7 @@ app.get('/api/dealers/:id/avatar', requirePermission('can_view_dealers'), async 
         const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).select('avatarUrl').lean();
         if (!d) return res.status(404).json({ error: 'Дилер не найден' });
         res.set('Cache-Control', 'private, max-age=900');
-        res.json({ avatarUrl: d.avatarUrl || '' });
+        res.json({ avatarUrl: req.query.preview==='1' ? await previewDataUrl(d.avatarUrl||'',320) : d.avatarUrl||'' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.get('/api/dealers/:id', requirePermission('can_view_dealers'), async (req, res) => {
@@ -2718,7 +2721,12 @@ app.get('/api/dealers/:id', requirePermission('can_view_dealers'), async (req, r
         }
         const d = await query.lean();
         if (!d) return res.status(404).json({ error: 'Дилер не найден' });
-        if (req.query.view === 'profile') res.set('Cache-Control', 'private, max-age=30');
+        if (req.query.view === 'profile') {
+            const original=d.avatarUrl;
+            d.avatarUrl=await previewDataUrl(original,320);
+            d.avatarIsPreview=Boolean(original&&d.avatarUrl!==original);
+            res.set('Cache-Control', 'private, max-age=30');
+        }
         res.json(convertToClient(d));
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -2729,7 +2737,9 @@ app.get('/api/dealers/:id/photos', requirePermission('can_view_dealers'), async 
         const d = await Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) }).select('photos').lean();
         if (!d) return res.status(404).json({ error: 'Дилер не найден' });
         res.set('Cache-Control', 'private, max-age=60');
-        res.json(Array.isArray(d.photos) ? d.photos : []);
+        const rows=Array.isArray(d.photos)?d.photos:[];
+        if(req.query.preview==='1')return res.json(await require('./server/dealer-media').previewPhotoRows(rows));
+        res.json(rows);
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
@@ -5256,7 +5266,14 @@ app.post('/api/sales', async (req, res) => {
 });
 // ===================================================================
 
-app.get('/api/competitors-ref', requirePermission('can_view_competitors'), async (req, res) => { const l = await CompRef.find().sort({name:1}); res.json(l.map(convertToClient)); });
+app.get('/api/competitors-ref', requirePermission('can_view_competitors'), async (req, res) => {
+    try {
+        let query=CompRef.find().sort({name:1});
+        if(req.query.view==='summary')query=query.select('-logoUrl -info -strengths -weaknesses');
+        const list=await query.lean();
+        res.json(list.map(convertToClient));
+    } catch(_){res.status(500).json({error:'Не удалось загрузить конкурентов'});}
+});
 app.post('/api/competitors-ref', requirePermission('can_manage_competitors'), async (req, res) => { const c = new CompRef(req.body); await c.save(); res.json(convertToClient(c)); });
 app.put('/api/competitors-ref/:id', requirePermission('can_manage_competitors'), async (req, res) => { await CompRef.findByIdAndUpdate(req.params.id, req.body); res.json({status:'ok'}); });
 app.delete('/api/competitors-ref/:id', requirePermission('can_manage_competitors'), async (req, res) => { await CompRef.findByIdAndDelete(req.params.id); res.json({status:'deleted'}); });
@@ -6692,6 +6709,7 @@ app.get('/api/reclamations/:id', requirePermission('can_view_reclamations'), asy
         if (dealerIds) query.dealerId = { $in: dealerIds };
         const item = await Reclamation.findOne(query).lean();
         if (!item) return res.status(404).json({ error: 'Рекламация не найдена' });
+        if(req.query.view==='preview')item.photos=await require('./server/dealer-media').previewPhotoRows(item.photos||[],true);
         res.json(convertToClient(item));
     } catch(e) { res.status(500).json({error: e.message}); }
 });
@@ -6719,6 +6737,7 @@ app.delete('/api/reclamations/:id', requirePermission('can_manage_reclamations')
 const priceControl = require('./server/price-control').install({app,mongoose,Dealer,requireAnyPermission,requirePermission,getDealerFilter,isGlobalViewer,hasPermission,today:pricingTodayKey});
 require('./server/ideal-ai').install({app,connection:mongoose.connection,AuditLog});
 require('./server/offer-photos').registerOfferPhotos({app,CommercialOffer,validSnapshot:priceControlSnapshotValid});
+require('./server/dealer-media').registerDealerMedia({app,Dealer,Reclamation,requirePermission,getDealerFilter,getScopedDealerIds});
 
 serverInstance = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server port ${PORT}`);

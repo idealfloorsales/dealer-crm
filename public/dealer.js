@@ -54,6 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let dealerLat = null;
     let dealerLng = null;
     let galleryCarouselContent = '';
+    let galleryPhotos=[];
     let currentDealerName = '';
     let currentUserRole = 'guest';
     let currentDealerSales = [];
@@ -232,7 +233,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const container = photoGalleryContainer;
             if (container) container.innerHTML = '<div class="dealer-lazy-state"><span class="spinner-border spinner-border-sm"></span><span>Загружаем фото…</span></div>';
             try {
-                const response = await fetch(`${API_DEALERS_URL}/${dealerId}/photos`);
+                const response = await fetch(`${API_DEALERS_URL}/${dealerId}/photos?preview=1`);
                 if (!response.ok) throw new Error('Не удалось загрузить фото');
                 const photos = await response.json();
                 photosLoaded = true;
@@ -347,7 +348,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (dealerAvatarImg) {
                 if (dealer.avatarUrl) {
                     dealerAvatarImg.src = dealer.avatarUrl;
-                    dealerAvatarImg.onclick = () => { openAvatarModal(dealer.avatarUrl); };
+                    dealerAvatarImg.onclick = async () => {
+                        openAvatarModal(dealer.avatarUrl);
+                        if(!dealer.avatarIsPreview)return;
+                        try {
+                            const response=await fetch(`${API_DEALERS_URL}/${encodeURIComponent(dealerId)}/avatar`,{crmTrackLoading:false});
+                            if(response.ok){const original=await response.json();if(original.avatarUrl)openAvatarModal(original.avatarUrl);}
+                        }catch(_){}
+                    };
                 } else { 
                     dealerAvatarImg.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23f1f5f9'/%3E%3Ctext x='50' y='50' font-family='Arial' font-size='40' fill='%23cbd5e1' text-anchor='middle' dy='.3em'%3ESHOP%3C/text%3E%3C/svg%3E";
                 }
@@ -559,6 +567,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!photoGalleryContainer) return; 
         if (!photos || photos.length === 0) { photoGalleryContainer.innerHTML = '<p class="text-muted">Нет фотографий.</p>'; return; } 
         photos.sort((a, b) => new Date(b.date||0) - new Date(a.date||0)); 
+        galleryPhotos=photos.slice();
         let html = ''; let slideIndex = 0; galleryCarouselContent = ''; const groups = {}; 
         photos.forEach(p => { const d = p.date ? new Date(p.date).toLocaleDateString('ru-RU') : "Ранее"; if(!groups[d]) groups[d]=[]; groups[d].push(p); }); 
         for (const [date, group] of Object.entries(groups)) { 
@@ -574,7 +583,23 @@ document.addEventListener('DOMContentLoaded', () => {
         if (carouselInner) carouselInner.innerHTML = galleryCarouselContent; 
     }
 
-    window.openLightbox = function(index) { const modalEl = document.getElementById('imageModal'); const carouselEl = document.querySelector('#photoCarousel'); if (modalEl && carouselEl && carouselInner) { carouselInner.innerHTML = galleryCarouselContent; const myModal = new bootstrap.Modal(modalEl); const carousel = new bootstrap.Carousel(carouselEl); carousel.to(index); myModal.show(); } }
+    async function loadGalleryOriginal(index){
+        const photo=galleryPhotos[index],slide=carouselInner?.querySelectorAll('.carousel-item')[index],image=slide?.querySelector('img');
+        if(!photo||!image||photo.originalIndex===undefined||image.dataset.originalLoaded==='1')return;
+        const target=image;
+        try{
+            const response=await fetch(`${API_DEALERS_URL}/${encodeURIComponent(dealerId)}/photos/${photo.originalIndex}?v=${encodeURIComponent(photo.originalVersion||'')}`,{crmTrackLoading:false});
+            if(!response.ok)return;
+            const original=await response.json();
+            if(target.isConnected&&slide.classList.contains('active')&&original.photo_url){
+                carouselInner.querySelectorAll('img[data-original-loaded]').forEach(img=>{img.src=img.dataset.previewSource;delete img.dataset.originalLoaded;delete img.dataset.previewSource;});
+                target.dataset.previewSource=photo.photo_url;target.dataset.originalLoaded='1';target.src=original.photo_url;
+            }
+        }catch(_){}
+    }
+    const photoCarousel=document.getElementById('photoCarousel');
+    photoCarousel?.addEventListener('slid.bs.carousel',event=>{void loadGalleryOriginal(event.to);});
+    window.openLightbox = function(index) { const modalEl = document.getElementById('imageModal'); const carouselEl = document.querySelector('#photoCarousel'); if (modalEl && carouselEl && carouselInner) { carouselInner.innerHTML = galleryCarouselContent; const myModal = new bootstrap.Modal(modalEl); const carousel = bootstrap.Carousel.getOrCreateInstance(carouselEl); carousel.to(index); myModal.show();void loadGalleryOriginal(index); } }
     function openAvatarModal(url) { const modalEl = document.getElementById('imageModal'); if (modalEl && carouselInner) { carouselInner.innerHTML = `<div class="carousel-item active" style="height: 100%;"><div class="d-flex justify-content-center align-items-center h-100"><img src="${url}" style="max-height: 100%; max-width: 100%; object-fit: contain;"></div></div>`; const myModal = new bootstrap.Modal(modalEl); myModal.show(); } }
 
     function formatDealerPrice(value) {

@@ -361,8 +361,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!canManageReclamations) return;
         if (referenceDataPromise) await referenceDataPromise;
         if(!currentViewId) return;
-        const r = allReclamations.find(x => x.id === currentViewId);
-        if(!r) return;
+        let r;
+        try {
+            const response=await fetch('/api/reclamations/'+encodeURIComponent(currentViewId));
+            if(!response.ok)throw Error('Не удалось загрузить оригиналы вложений для редактирования');
+            r=await response.json();
+        }catch(error){window.CRMUI?.toast?.(error.message,'error');return;}
 
         viewModal.hide(); 
         document.getElementById('r_id').value = r.id; 
@@ -559,6 +563,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- ПРОСМОТР НА ВЕСЬ ЭКРАН ---
+    window.openReclamationMedia = async index => {
+        const id=currentViewId,details=reclamationDetailCache.get(id),photo=details?.photos?.find((p,i)=>(p.originalIndex??i)===index);
+        try {
+            const url='/api/reclamations/'+encodeURIComponent(id)+'/photos/'+index+(photo?.originalVersion?'?v='+encodeURIComponent(photo.originalVersion):'');
+            const response=await fetch(url,{crmTrackLoading:false});
+            if(!response.ok)throw Error('Не удалось открыть оригинал. Обновите рекламацию и повторите.');
+            const original=await response.json();if(id!==currentViewId)return;
+            const value=String(original.photo_url||'');
+            openFullscreen(value,/^data:video\/|\.(mp4|webm|mov)(?:\?|$)/i.test(value));
+        }catch(error){if(window.CRMUI?.toast)CRMUI.toast(error.message,'error');else alert(error.message);}
+    };
     window.openFullscreen = (url, isVideo) => {
         const viewer = document.getElementById('fullscreen-viewer');
         if (isVideo) {
@@ -585,7 +600,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let r = reclamationDetailCache.get(id);
         if (!r) {
             try {
-                const res = await fetch(`/api/reclamations/${id}`);
+                const res = await fetch(`/api/reclamations/${id}?view=preview`);
                 if (!res.ok) throw new Error('Не удалось загрузить рекламацию');
                 r = await res.json();
                 reclamationDetailCache.set(id, r);
@@ -607,13 +622,13 @@ document.addEventListener('DOMContentLoaded', () => {
         let photosHtml = '';
         if(r.photos && r.photos.length > 0) {
             const mediaItems = r.photos.map(p => {
-                const isVid = p.photo_url.startsWith('data:video');
+                const isVid = p.isVideo || p.photo_url.startsWith('data:video');
                 const inner = isVid 
-                    ? `<video src="${p.photo_url}#t=0.1" preload="metadata" style="width: 100px; height: 100px; object-fit: cover;"></video><i class="bi bi-play-circle play-icon-overlay"></i>`
+                    ? `<span style="color:white;font-size:12px">Видео</span><i class="bi bi-play-circle play-icon-overlay"></i>`
                     : `<img src="${p.photo_url}" style="width: 100px; height: 100px; object-fit: cover;">`;
                 
                 return `
-                <div class="photo-preview-item cursor-pointer" onclick="openFullscreen('${p.photo_url}', ${isVid})" style="cursor: pointer; border-radius: 8px; overflow: hidden; border: 1px solid #ccc; position: relative; width: 100px; height: 100px; display: flex; align-items: center; justify-content: center; background: #000;">
+                <div class="photo-preview-item cursor-pointer" onclick="openReclamationMedia(${p.originalIndex??r.photos.indexOf(p)})" style="cursor: pointer; border-radius: 8px; overflow: hidden; border: 1px solid #ccc; position: relative; width: 100px; height: 100px; display: flex; align-items: center; justify-content: center; background: #000;">
                     ${inner}
                 </div>`;
             }).join('');

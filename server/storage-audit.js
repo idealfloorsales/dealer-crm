@@ -28,5 +28,8 @@ async function runOnce({db,runId,root,log=console.log}){
  const training=await measureFiles(path.join(root,'server','training')).catch(()=>({}));
  const {collections,...summary}=report;
  log('CRM_STORAGE_AUDIT '+JSON.stringify({runId,kind:'summary',...summary,publicFiles:files,trainingDownloads:training}));
+ if(String(runId).startsWith('performance-')) {
+  await require('./performance-audit').runPerformanceAudit({db,runId,log});
+ }
 }
 module.exports={measureDatabase,measureFiles,runOnce};

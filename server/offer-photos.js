@@ -1,4 +1,5 @@
 'use strict';
+const {previewBuffer}=require('./image-preview');
 // Same-origin print assets, restricted to the images in the live offer snapshot.
 function registerOfferPhotos({app,CommercialOffer,validSnapshot,fetcher=(...args)=>fetch(...args)}) {
     const cache=new Map();let bytes=0;
@@ -17,8 +18,10 @@ function registerOfferPhotos({app,CommercialOffer,validSnapshot,fetcher=(...args
                 const type=String(response.headers.get('content-type')||'').split(';')[0].toLowerCase();
                 if(!response.ok||!['image/jpeg','image/png','image/webp','image/gif','image/avif'].includes(type))return res.sendStatus(502);
                 const chunks=[];let length=0;
-                for await(const chunk of response.body){length+=chunk.length;if(length>8*1024*1024)throw Error('IMAGE_TOO_LARGE');chunks.push(Buffer.from(chunk));}
-                asset={type,body:Buffer.concat(chunks),expires:Date.now()+5*60*1000};
+                for await(const chunk of response.body){length+=chunk.length;if(length>24*1024*1024)throw Error('IMAGE_TOO_LARGE');chunks.push(Buffer.from(chunk));}
+                const image=await previewBuffer(Buffer.concat(chunks),type,size);
+                asset={type:image.type,body:image.body,expires:Date.now()+5*60*1000};
+                const duplicate=cache.get(key);if(duplicate){bytes-=duplicate.body.length;cache.delete(key);}
                 while(bytes+asset.body.length>24*1024*1024&&cache.size){const oldest=cache.keys().next().value;bytes-=cache.get(oldest).body.length;cache.delete(oldest);}
                 cache.set(key,asset);bytes+=asset.body.length;
             }
