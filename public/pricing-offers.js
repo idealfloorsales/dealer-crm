@@ -98,7 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function productVisibleByMode(item){
         if(item?.productType === 'equipment') return includeEquipment();
         if(item?.isLiquid === false) return includeIlliquid();
-        return true;
+        return !includeIlliquid() && !includeEquipment();
     }
 
 
