@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
     const nomenclature = window.IDEAL_NOMENCLATURE || {products:[],collections:[],stats:{}};
     const completedKey = 'ideal_training_completed_v2';
-    let completed = new Set(JSON.parse(localStorage.getItem(completedKey) || '[]'));
+    let completed = new Set(CRMUI.readStoredJSON(completedKey, [], Array.isArray).filter(value => typeof value === 'string'));
     let trainingCategory = 'Все';
     let trainingQuery = '';
     let allArticles = [];

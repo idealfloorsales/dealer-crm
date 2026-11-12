@@ -1609,3 +1609,179 @@ html:root[data-crm-theme="dark"] .dealer-share-download:hover{
   background:#292a30!important;
   color:#fff!important;
 }
+
+/* Shared surfaces missed by older page-specific rules. Keep this screen-only. */
+html:root[data-crm-theme="dark"] .bg-light,
+html:root[data-crm-theme="dark"] .content-card,
+html:root[data-crm-theme="dark"] .profile-nav-wrapper,
+html:root[data-crm-theme="dark"] .app-toolbar-card,
+html:root[data-crm-theme="dark"] .sales-performance-section,
+html:root[data-crm-theme="dark"] .region-card,
+html:root[data-crm-theme="dark"] .motivation-payout-panel,
+html:root[data-crm-theme="dark"] .motivation-payout-row,
+html:root[data-crm-theme="dark"] .dealer-motivation-summary,
+html:root[data-crm-theme="dark"] .workshop-flow-step,
+html:root[data-crm-theme="dark"] .workshop-more-actions>div>button,
+html:root[data-crm-theme="dark"] .training-tabs,
+html:root[data-crm-theme="dark"] .training-card,
+html:root[data-crm-theme="dark"] .catalog-card,
+html:root[data-crm-theme="dark"] .catalog-intro,
+html:root[data-crm-theme="dark"] .materials-head,
+html:root[data-crm-theme="dark"] .training-topic-panel,
+html:root[data-crm-theme="dark"] .sidebar-content{
+  background:var(--dark-surface)!important;
+  border-color:var(--dark-line)!important;
+  color:var(--dark-text-2)!important;
+}
+html:root[data-crm-theme="dark"] .sales-page .region-header,
+html:root[data-crm-theme="dark"] .sales-page .summary-item.is-sub,
+html:root[data-crm-theme="dark"] .sales-page .summary-values>div,
+html:root[data-crm-theme="dark"] .sales-page .summary-values>label,
+html:root[data-crm-theme="dark"] .sales-input-group,
+html:root[data-crm-theme="dark"] .sales-summary-group.is-company,
+html:root[data-crm-theme="dark"] .motivation-payout-summary article,
+html:root[data-crm-theme="dark"] .motivation-payout-window,
+html:root[data-crm-theme="dark"] .exhibition-current-meta,
+html:root[data-crm-theme="dark"] .product-stock-last-updated.is-empty,
+html:root[data-crm-theme="dark"] .training-card-metrics span,
+html:root[data-crm-theme="dark"] .catalog-card-specs div,
+html:root[data-crm-theme="dark"] .catalog-card-class,
+html:root[data-crm-theme="dark"] .training-card-status,
+html:root[data-crm-theme="dark"] .training-topic-metrics div,
+html:root[data-crm-theme="dark"] .training-topic-source{
+  background:var(--dark-surface-2)!important;
+  border-color:var(--dark-line)!important;
+  color:var(--dark-text-2)!important;
+}
+html:root[data-crm-theme="dark"] .product-name,
+html:root[data-crm-theme="dark"] .sales-page .region-title,
+html:root[data-crm-theme="dark"] .sales-dealer-name>span,
+html:root[data-crm-theme="dark"] .sales-performance-card-title,
+html:root[data-crm-theme="dark"] .sales-page .summary-title,
+html:root[data-crm-theme="dark"] .sales-page .summary-values strong,
+html:root[data-crm-theme="dark"] .training-card h3,
+html:root[data-crm-theme="dark"] .training-card-metrics strong,
+html:root[data-crm-theme="dark"] .catalog-card-specs strong,
+html:root[data-crm-theme="dark"] .workshop-more-actions>summary,
+html:root[data-crm-theme="dark"] .motivation-payout-tools button,
+html:root[data-crm-theme="dark"] .motivation-payout-actions button{
+  color:var(--dark-text)!important;
+}
+html:root[data-crm-theme="dark"] .training-tab,
+html:root[data-crm-theme="dark"] .training-category-row button,
+html:root[data-crm-theme="dark"] .training-topic-close,
+html:root[data-crm-theme="dark"] .training-tab small,
+html:root[data-crm-theme="dark"] .sales-group-toggle,
+html:root[data-crm-theme="dark"] .sales-toolbar-btn,
+html:root[data-crm-theme="dark"] .sales-add-row,
+html:root[data-crm-theme="dark"] .sales-current-btn,
+html:root[data-crm-theme="dark"] .sales-secondary-btn,
+html:root[data-crm-theme="dark"] .workshop-secondary-action,
+html:root[data-crm-theme="dark"] .motivation-payout-tools button,
+html:root[data-crm-theme="dark"] .motivation-payout-actions button{
+  background:var(--dark-surface-2)!important;
+  border-color:var(--dark-line)!important;
+  color:var(--dark-text-2)!important;
+}
+html:root[data-crm-theme="dark"] .training-tab.is-active,
+html:root[data-crm-theme="dark"] .training-category-row button.is-active,
+html:root[data-crm-theme="dark"] .training-complete-btn,
+html:root[data-crm-theme="dark"] .motivation-payout-tools button.is-primary{
+  background:#a70a13!important;
+  border-color:#c93841!important;
+  color:#fff!important;
+}
+html:root[data-crm-theme="dark"] .training-tab.is-active small{
+  background:rgba(255,255,255,.14)!important;
+  color:#fff!important;
+}
+html:root[data-crm-theme="dark"] .training-card-icon,
+html:root[data-crm-theme="dark"] .dealer-motivation-summary-icon,
+html:root[data-crm-theme="dark"] .workshop-flow-icon{
+  background:var(--dark-red-bg)!important;
+  color:#ff9aa0!important;
+}
+html:root[data-crm-theme="dark"] .training-card-footer,
+html:root[data-crm-theme="dark"] .catalog-eyebrow,
+html:root[data-crm-theme="dark"] .catalog-card-sku,
+html:root[data-crm-theme="dark"] .training-topic-kicker,
+html:root[data-crm-theme="dark"] .installation-steps article>span{
+  color:#ff9aa0!important;
+}
+html:root[data-crm-theme="dark"] .training-card.is-complete .training-card-status,
+html:root[data-crm-theme="dark"] .training-complete-btn.is-done{
+  background:var(--dark-green-bg)!important;
+  color:#9fd7b1!important;
+}
+html:root[data-crm-theme="dark"] .training-topic-section li,
+html:root[data-crm-theme="dark"] .dealer-profile-page .content-card p{
+  color:var(--dark-text-2)!important;
+}
+html:root[data-crm-theme="dark"] .sales-page .summary-deviation-row.is-positive strong,
+html:root[data-crm-theme="dark"] .sales-page .summary-deviation-row.is-positive em,
+html:root[data-crm-theme="dark"] .sales-page .summary-percent.is-good{
+  color:#92d5a8!important;
+}
+html:root[data-crm-theme="dark"] .sales-page .summary-deviation-row.is-negative strong,
+html:root[data-crm-theme="dark"] .sales-page .summary-deviation-row.is-negative em,
+html:root[data-crm-theme="dark"] .sales-page .summary-percent.is-low{
+  color:#ff989f!important;
+}
+html:root[data-crm-theme="dark"] .sales-page .summary-deviation-row.is-neutral strong,
+html:root[data-crm-theme="dark"] .sales-page .summary-deviation-row.is-neutral em{
+  color:var(--dark-muted)!important;
+}
+html:root[data-crm-theme="dark"] .product-stock-last-updated:not(.is-empty){
+  background:var(--dark-green-bg)!important;
+  color:#a0d6b1!important;
+}
+html:root[data-crm-theme="dark"] .product-stock-last-updated span,
+html:root[data-crm-theme="dark"] .product-stock-last-updated small,
+html:root[data-crm-theme="dark"] .product-stock-last-updated em{
+  color:inherit!important;
+}
+html:root[data-crm-theme="dark"] .dealer-profile-page :is(.info-val,.text-dark){color:var(--dark-text)!important}
+html:root[data-crm-theme="dark"] .dealer-profile-page :is(.contact-card-modern,.timeline-text,#dealer-bonuses,#dealer-addresses-list>div){
+  background:var(--dark-surface-2)!important;border-color:var(--dark-line)!important;
+}
+html:root[data-crm-theme="dark"] .motivation-payout-head>div>span{color:#ff9aa0!important}
+html:root[data-crm-theme="dark"] .motivation-payout-tools button span{color:inherit!important}
+html:root[data-crm-theme="dark"] .pricing-offer-stock-switch,
+html:root[data-crm-theme="dark"] .pricing-offer-price-summary.is-empty,
+html:root[data-crm-theme="dark"] .pricing-offer-recipient-switch{
+  background:var(--dark-surface-2)!important;border-color:var(--dark-line)!important;color:var(--dark-text-2)!important;
+}
+html:root[data-crm-theme="dark"] .pricing-offer-recipient-switch button.active{
+  background:var(--dark-surface-3)!important;color:var(--dark-text)!important;
+}
+html:root[data-crm-theme="dark"] .pricing-offer-stock-switch-copy strong{color:var(--dark-text)!important}
+html:root[data-crm-theme="dark"] .pricing-offer-products-head>div:first-child>span{color:#ff9aa0!important}
+html:root[data-crm-theme="dark"] .product-editor-switch,
+html:root[data-crm-theme="dark"] .product-type-switch label>span,
+html:root[data-crm-theme="dark"] .competitor-logo-preview-wrap{
+  background:var(--dark-surface-2)!important;border-color:var(--dark-line)!important;color:var(--dark-text-2)!important;
+}
+html:root[data-crm-theme="dark"] .product-type-switch input:checked+span{
+  background:#332125!important;border-color:#bd6871!important;
+}
+html:root[data-crm-theme="dark"] .product-type-switch b,
+html:root[data-crm-theme="dark"] .product-editor-switch strong{color:var(--dark-text)!important}
+html:root[data-crm-theme="dark"] .product-type-switch label>span>i{background:var(--dark-surface-3)!important;color:#ff9aa0!important}
+html:root[data-crm-theme="dark"] .dealer-wizard-nav,
+html:root[data-crm-theme="dark"] .dealer-wizard-step-label.active,
+html:root[data-crm-theme="dark"] .rec-form-modal #reclamation-form>.row,
+html:root[data-crm-theme="dark"] .rec-media-btn,
+html:root[data-crm-theme="dark"] .rec-form-progress{
+  background:var(--dark-surface-2)!important;border-color:var(--dark-line)!important;color:var(--dark-text-2)!important;
+}
+html:root[data-crm-theme="dark"] .dealer-wizard-step-label .step-circle:not(.active):not(.completed){
+  background:var(--dark-surface-3)!important;border-color:var(--dark-line)!important;color:var(--dark-text-2)!important;
+}
+html:root[data-crm-theme="dark"] .dealer-step-number,
+html:root[data-crm-theme="dark"] .dealer-field-label em{color:#ff9aa0!important}
+html:root[data-crm-theme="dark"] .rec-form-progress>small{mix-blend-mode:normal;color:#fff!important;text-shadow:0 1px 2px #101114}
+html:root[data-crm-theme="dark"] .rec-media-btn.is-primary{background:#382125!important;color:#ffb4ba!important}
+html:root[data-crm-theme="dark"] .rec-form-modal .form-label{color:var(--dark-text-2)!important}
+html:root[data-crm-theme="dark"] .text-brand,
+html:root[data-crm-theme="dark"] .rec-form-modal .form-label.text-danger{color:#ff9aa0!important}
+html:root[data-crm-theme="dark"] .rec-form-modal .form-label.text-success{color:#9fd7b1!important}

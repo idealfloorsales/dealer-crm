@@ -32,3 +32,25 @@ body.login-page{font-family:Onest,Inter,sans-serif}
 }
 @media(max-width:360px){.login-page-wrap{padding-left:12px;padding-right:12px}.login-form-panel{padding:26px 20px}.login-form-shell h2{font-size:1.5rem}.login-footnote{font-size:.63rem}}
 @media(max-height:570px) and (max-width:760px){.login-page-wrap{align-items:flex-start;padding-top:16px;padding-bottom:16px}.login-mobile-logo{margin-bottom:18px}.login-form-panel{padding-top:20px;padding-bottom:20px}.login-subtitle{margin-bottom:18px}}
+
+/* Login follows the same saved/system appearance as the authenticated workspace. */
+@media screen {
+  :root[data-crm-theme="dark"]{color-scheme:dark}
+  :root[data-crm-theme="dark"] body.login-page{background:#101114;color:#f3f4f6}
+  :root[data-crm-theme="dark"] .login-page-wrap{background:transparent}
+  :root[data-crm-theme="dark"] .login-stage,
+  :root[data-crm-theme="dark"] .login-form-panel{background:#191a1f;border-color:#34363d;color:#f3f4f6}
+  :root[data-crm-theme="dark"] .login-form-shell h2{color:#f3f4f6}
+  :root[data-crm-theme="dark"] .login-subtitle,
+  :root[data-crm-theme="dark"] .login-footnote,
+  :root[data-crm-theme="dark"] .login-field-head label{color:#b0b3bc}
+  :root[data-crm-theme="dark"] .login-eyebrow{color:#ff9aa0}
+  :root[data-crm-theme="dark"] .login-input-wrap{background:#202126;border-color:#43464f}
+  :root[data-crm-theme="dark"] .login-input-wrap:focus-within{border-color:#e46971;box-shadow:0 0 0 3px rgba(228,105,113,.12)}
+  :root[data-crm-theme="dark"] .login-input-wrap input{background:transparent;color:#f3f4f6}
+  :root[data-crm-theme="dark"] .login-input-wrap input::placeholder{color:#a6a9b1}
+  :root[data-crm-theme="dark"] .login-input-icon,
+  :root[data-crm-theme="dark"] .login-password-toggle{color:#b0b3bc}
+  :root[data-crm-theme="dark"] .login-error{background:#391c22;border-color:#71323c;color:#ffb3ba}
+  :root[data-crm-theme="dark"] .login-caps{color:#efcc85}
+}

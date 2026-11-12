@@ -138,7 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Настройки дашборда
     const defaultDashConfig = { showPulse: true, showAttention: true, showPlan: true, showActivity: true };
-    let dashConfig = { ...defaultDashConfig, ...(JSON.parse(localStorage.getItem('dash_config') || '{}')) };
+    let dashConfig = { ...defaultDashConfig, ...CRMUI.readStoredJSON('dash_config', {}, value => value !== null && typeof value === 'object' && !Array.isArray(value)) };
 
     // Список POS-материалов
     const posMaterialsList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "РФС-1 - Расческа из фанеры СТАРАЯ", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"];
@@ -615,7 +615,11 @@ document.addEventListener('DOMContentLoaded', () => {
     window.deleteSector = async (id) => {
         if(!confirm("Удалить сектор?")) return;
         try {
-            await fetch(`${API_SECTORS_URL}/${id}`, { method: 'DELETE' });
+            const response = await fetch(`${API_SECTORS_URL}/${encodeURIComponent(id)}`, { method: 'DELETE' });
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || 'Не удалось удалить сектор');
+            }
             await fetchSectors();
             renderSectorManagerList();
              // Обновляем селекты
@@ -625,7 +629,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (document.getElementById('edit-modal').classList.contains('show')) {
                 toggleSectorSelect('edit', document.getElementById('edit_responsible').value);
             }
-        } catch(e) { alert("Ошибка удаления"); }
+        } catch(e) { alert(e.message || "Ошибка удаления"); }
     };
 
     // Полевой селектор выставленности: поиск + быстрые режимы + крупные строки для телефона.
@@ -824,7 +828,28 @@ document.addEventListener('DOMContentLoaded', () => {
             const input = document.getElementById(searchId); const query = input.value.trim(); if (!query) return;
             const coordsRegex = /^(-?\d+(\.\d+)?)[,\s]+(-?\d+(\.\d+)?)$/; const match = query.match(coordsRegex);
             if (match) { const lat = parseFloat(match[1]); const lng = parseFloat(match[3]); setMarker(lat, lng, instanceKey, latId, lngId); window.showToast("Координаты приняты!"); } 
-            else { try { const btn = document.getElementById(btnSearchId); const oldHtml = btn.innerHTML; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=kz&limit=1`); const data = await res.json(); if (data && data.length > 0) { const lat = parseFloat(data[0].lat); const lng = parseFloat(data[0].lon); setMarker(lat, lng, instanceKey, latId, lngId); } else { alert("Адрес не найден."); } btn.innerHTML = oldHtml; } catch (e) { console.error(e); } }
+            else {
+                const btn = document.getElementById(btnSearchId);
+                const oldHtml = btn.innerHTML;
+                if (btn.disabled) return;
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+                try {
+                    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=kz&limit=1`);
+                    if (!res.ok) throw new Error('Сервис поиска адреса временно недоступен');
+                    const data = await res.json();
+                    if (Array.isArray(data) && data.length) {
+                        const lat = Number(data[0].lat), lng = Number(data[0].lon);
+                        if (!Number.isFinite(lat) || !Number.isFinite(lng)) throw new Error('Сервис вернул некорректные координаты');
+                        setMarker(lat, lng, instanceKey, latId, lngId);
+                    } else { alert('Адрес не найден.'); }
+                } catch (e) {
+                    window.showToast?.(e.message || 'Не удалось найти адрес', 'error');
+                } finally {
+                    btn.innerHTML = oldHtml;
+                    btn.disabled = false;
+                }
+            }
         };
         const searchBtn = document.getElementById(btnSearchId); const searchInp = document.getElementById(searchId);
         if(searchBtn) searchBtn.onclick = handleSearch;

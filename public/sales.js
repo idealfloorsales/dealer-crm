@@ -52,6 +52,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let canEditPlan = false;
     let isDirty = false;
     let loadedMonth = '';
+    let loadRequest = 0;
+    let isLoading = false;
     let pendingCustomGroup = '';
     let groupsCollapsed = false;
     let currentScope = 'all';
@@ -61,7 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let autoSaveRevision = 0;
     
     // Загрузка настроек видимости планов
-    let planVisibility = JSON.parse(localStorage.getItem('sales_plan_config')) || {};
+    let planVisibility = CRMUI.readStoredJSON('sales_plan_config', {}, value => value !== null && typeof value === 'object' && !Array.isArray(value));
 
     async function init() {
         try {
@@ -200,6 +202,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function canLeaveCurrentMonth() {
+        if (autoSaveInFlight) {
+            window.showToast?.('Дождитесь сохранения продаж перед сменой месяца', 'warning');
+            return false;
+        }
         return !isDirty || confirm('Есть несохранённые изменения. Перейти к другому месяцу без сохранения?');
     }
 
@@ -222,23 +228,42 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function loadData() {
+        const request = ++loadRequest;
+        const month = monthPicker.value;
+        isLoading = true;
+        cancelScheduledAutoSave();
+        if (saveBtn) saveBtn.disabled = true;
+        if (printBtn) printBtn.disabled = true;
+        if (summaryList) summaryList.innerHTML = '';
+        if (performanceCards) performanceCards.innerHTML = '';
         try {
             container.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div></div>';
             const [dealersRes, salesRes] = await Promise.all([
                 fetch(API_DEALERS + '?context=sales'),
-                fetch(`${API_SALES}?month=${monthPicker.value}&context=sales`)
+                fetch(`${API_SALES}?month=${month}&context=sales`)
             ]);
-
-            if (!dealersRes.ok || !salesRes.ok) throw new Error("Ошибка доступа");
-
-            allDealers = await dealersRes.json();
-            currentSales = (await salesRes.json()).filter(row => !String(row.dealerId || '').startsWith('PLAN_manager_'));
-            loadedMonth = monthPicker.value;
+            if (!dealersRes.ok || !salesRes.ok) throw new Error('Не удалось загрузить продажи');
+            const [dealers, sales] = await Promise.all([dealersRes.json(), salesRes.json()]);
+            if (request !== loadRequest) return;
+            if (!Array.isArray(dealers) || !Array.isArray(sales)) throw new Error('Некорректный ответ сервера');
+            allDealers = dealers;
+            currentSales = sales.filter(row => !String(row.dealerId || '').startsWith('PLAN_manager_'));
+            loadedMonth = month;
+            isLoading = false;
             clearDirty();
             renderAll();
             updateLastModifiedText();
-        } catch (e) { 
-            container.innerHTML = `<div class="alert alert-danger">Ошибка: ${e.message}</div>`;
+            setSaveButtonState(canEditFact || canEditPlan ? 'saved' : 'readonly');
+        } catch (e) {
+            if (request !== loadRequest) return;
+            loadedMonth = '';
+            container.innerHTML = `<div class="alert alert-danger">Ошибка: ${escapeHtml(e.message)}</div>`;
+        } finally {
+            if (request === loadRequest) {
+                isLoading = false;
+                if (saveBtn) saveBtn.disabled = !loadedMonth || (!canEditFact && !canEditPlan);
+                if (printBtn) printBtn.disabled = !loadedMonth;
+            }
         }
     }
 
@@ -456,6 +481,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function persistSales(manual = false) {
+        if (isLoading || loadedMonth !== monthPicker.value) {
+            if (manual) window.showToast?.('Дождитесь загрузки выбранного месяца', 'warning');
+            return false;
+        }
         if (!canEditFact && !canEditPlan) return true;
 
         cancelScheduledAutoSave();
@@ -791,23 +820,23 @@ document.addEventListener('DOMContentLoaded', () => {
             const isPlanVisible = planVisibility[grp.key] !== false;
             const planControl = grp.key === 'vip'
                 ? '<span class="sales-plan-state is-personal"><i class="bi bi-person-check"></i> Индивидуально</span>'
-                : `<button class="sales-plan-state ${isPlanVisible ? 'is-on' : ''}" type="button" onclick="toggleGroupPlan('${grp.key}')">
+                : `<button class="sales-plan-state ${isPlanVisible ? 'is-on' : ''}" type="button" data-toggle-plan="${escapeAttr(grp.key)}">
                     <i class="bi bi-${isPlanVisible ? 'bullseye' : 'dash-circle'}"></i>
                     ${isPlanVisible ? 'План включён' : 'Без плана'}
                    </button>`;
 
             if (!summaryOnly) {
                 container.innerHTML += `
-                    <div class="region-card" data-group="${grp.key}" data-area="${getGroupArea(grp)}">
+                    <div class="region-card" data-group="${escapeAttr(grp.key)}" data-area="${getGroupArea(grp)}">
                         <div class="region-header">
                             <button class="sales-group-toggle" type="button" aria-label="Свернуть группу"><i class="bi bi-chevron-down"></i></button>
                             <div class="sales-group-title-wrap">
-                                <span class="region-title">${grp.title}</span>
+                                <span class="region-title">${escapeHtml(grp.title)}</span>
                                 <span class="sales-group-meta">${items.length} дил. · ${fmt(groupFact)} м²</span>
                             </div>
                             <div class="sales-group-actions">
                                 ${planControl}
-                                ${canEditFact && grp.key !== 'vip' ? `<button class="sales-add-row btn-add-custom" type="button" data-group="${grp.key}" data-title="${escapeAttr(grp.title)}"><i class="bi bi-plus-lg"></i> Добавить</button>` : ''}
+                                ${canEditFact && grp.key !== 'vip' ? `<button class="sales-add-row btn-add-custom" type="button" data-group="${escapeAttr(grp.key)}" data-title="${escapeAttr(grp.title)}"><i class="bi bi-plus-lg"></i> Добавить</button>` : ''}
                             </div>
                         </div>
                         <div class="region-body">${rowsHtml || '<div class="cc-empty">Нет записей</div>'}</div>
@@ -847,7 +876,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!isVisible) {
                 return `<div class="summary-item ${isSubItem ? 'is-sub' : ''}">
                     <div class="summary-header">
-                        <span class="summary-title">${title}</span>
+                        <span class="summary-title">${escapeHtml(title)}</span>
                         <span class="sales-no-plan">Без плана</span>
                     </div>
                     <div class="summary-values single">
@@ -865,7 +894,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             return `<div class="summary-item ${isSubItem ? 'is-sub' : ''}">
                 <div class="summary-header">
-                    <span class="summary-title">${title}</span>
+                    <span class="summary-title">${escapeHtml(title)}</span>
                     <span class="summary-percent is-${level}">${plan > 0 ? fmt(percent) + '%' : '—'}</span>
                 </div>
                 <div class="summary-values">
@@ -944,6 +973,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function setupEventListeners() {
+        document.querySelectorAll('[data-toggle-plan]').forEach(btn => {
+            btn.onclick = () => window.toggleGroupPlan(btn.dataset.togglePlan);
+        });
         document.querySelectorAll('.btn-add-custom').forEach(btn => {
             btn.onclick = () => {
                 captureState();
@@ -1257,6 +1289,7 @@ window.addEventListener('afterprint',()=>window.close());
 
     if (printBtn) {
         printBtn.onclick = () => {
+            if (isLoading || loadedMonth !== monthPicker.value) return;
             captureState();
             renderAll();
             openSalesPrintWindow();

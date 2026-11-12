@@ -717,11 +717,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if(!currentViewId) return;
         if(!confirm("Удалить эту рекламацию навсегда?")) return;
         try {
-            await fetch(`/api/reclamations/${currentViewId}`, { method: 'DELETE' });
+            const response = await fetch(`/api/reclamations/${encodeURIComponent(currentViewId)}`, { method: 'DELETE' });
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || 'Не удалось удалить рекламацию');
+            }
             viewModal.hide();
             await fetchReclamations();
             renderList();
-        } catch(e) { alert("Ошибка удаления"); }
+        } catch(e) { alert(e.message || "Ошибка удаления"); }
     };
 
     // ==========================================
@@ -730,8 +734,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function generatePrintHTML(data) {
         const d = data || {};
         
-        const val = (v) => v ? `<div class="print-value">${v}</div>` : `<div class="print-value empty"></div>`;
-        const blockVal = (v) => v ? `<div class="print-block-value">${v}</div>` : `<div class="print-block-value empty"></div>`;
+        const val = (v) => v ? `<div class="print-value">${escapeHtml(v)}</div>` : `<div class="print-value empty"></div>`;
+        const blockVal = (v) => v ? `<div class="print-block-value">${escapeHtml(v)}</div>` : `<div class="print-block-value empty"></div>`;
         
         let seqNumStr = '______';
         if (d.id && allReclamations.length > 0) {
@@ -779,7 +783,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="print-label">ФИО клиента:</div>
                     ${val(d.clientName)}
                     <div class="print-label" style="margin-left: 20px;">Телефон:</div>
-                    <div class="print-value" style="flex-grow: 0; width: 250px;">${d.clientPhone || ''}</div>
+                    <div class="print-value" style="flex-grow: 0; width: 250px;">${escapeHtml(d.clientPhone || '')}</div>
                 </div>
                 <div class="print-row">
                     <div class="print-label">Адрес объекта:</div>
@@ -787,15 +791,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="print-row">
                     <div class="print-label">Тип помещения:</div>
-                    <div class="print-value" style="flex-grow: 0; width: 250px;">${d.houseType || ''}</div>
+                    <div class="print-value" style="flex-grow: 0; width: 250px;">${escapeHtml(d.houseType || '')}</div>
                     <div class="print-label" style="margin-left: 20px;">Этаж:</div>
-                    <div class="print-value" style="flex-grow: 0; width: 100px;">${d.floor || ''}</div>
+                    <div class="print-value" style="flex-grow: 0; width: 100px;">${escapeHtml(d.floor || '')}</div>
                 </div>
                 <div class="print-row">
                     <div class="print-label">Общая площадь помещения:</div>
-                    <div class="print-value" style="flex-grow: 0; width: 150px;">${d.totalArea ? d.totalArea + ' м²' : ''}</div>
+                    <div class="print-value" style="flex-grow: 0; width: 150px;">${escapeHtml(d.totalArea ? d.totalArea + ' м²' : '')}</div>
                     <div class="print-label" style="margin-left: 20px;">Купленный объем товара:</div>
-                    <div class="print-value" style="flex-grow: 0; width: 150px;">${d.purchasedVolume || ''}</div>
+                    <div class="print-value" style="flex-grow: 0; width: 150px;">${escapeHtml(d.purchasedVolume || '')}</div>
                 </div>
                 <div class="print-row">
                     <div class="print-label">Номера партий:</div>
@@ -810,28 +814,28 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="print-label">Тип основания:</div>
                     ${val(d.baseType)}
                     <div class="print-label" style="margin-left: 20px;">Время сушки пола:</div>
-                    <div class="print-value" style="flex-grow: 0; width: 200px;">${d.dryingTime || ''}</div>
+                    <div class="print-value" style="flex-grow: 0; width: 200px;">${escapeHtml(d.dryingTime || '')}</div>
                 </div>
                 
                 <div class="print-row">
                     <div class="print-label">Ровность пола (перепад на 1м):</div>
                     ${val(d.floorFlatness)}
                     <div class="print-label" style="margin-left: 20px;">Акклиматизация:</div>
-                    <div class="print-value" style="flex-grow: 0; width: 200px;">${d.acclimatization || ''}</div>
+                    <div class="print-value" style="flex-grow: 0; width: 200px;">${escapeHtml(d.acclimatization || '')}</div>
                 </div>
                 
                 <div class="print-row">
                     <div class="print-label">Способ хранения до укладки:</div>
                     ${val(d.storageMethod)}
                     <div class="print-label" style="margin-left: 20px;">Подложка:</div>
-                    <div class="print-value" style="flex-grow: 0; width: 200px;">${d.underlayment || ''}</div>
+                    <div class="print-value" style="flex-grow: 0; width: 200px;">${escapeHtml(d.underlayment || '')}</div>
                 </div>
 
                 <div class="print-row">
                     <div class="print-label">Система "Теплый пол":</div>
                     ${val(d.warmFloor)}
                     <div class="print-label" style="margin-left: 20px;">Кто производил монтаж:</div>
-                    <div class="print-value" style="flex-grow: 0; width: 250px;">${d.installer || ''}</div>
+                    <div class="print-value" style="flex-grow: 0; width: 250px;">${escapeHtml(d.installer || '')}</div>
                 </div>
             </div>
 
@@ -841,7 +845,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="print-label">Момент выявления дефекта:</div>
                     ${val(d.defectMoment)}
                     <div class="print-label" style="margin-left: 20px;">Объем заявленного брака:</div>
-                    <div class="print-value" style="flex-grow: 0; width: 150px;">${d.defectVolume || ''}</div>
+                    <div class="print-value" style="flex-grow: 0; width: 150px;">${escapeHtml(d.defectVolume || '')}</div>
                 </div>
                 
                 <div class="print-block-label" style="margin-top: 15px;">Подробное описание проблемы:</div>

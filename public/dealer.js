@@ -1498,8 +1498,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (confirm(`Удалить дилера ${currentDealerName}?`)) {
             try {
                 const response = await fetch(`${API_DEALERS_URL}/${dealerId}`, { method: 'DELETE' });
-                if (response.ok) window.location.href = '/';
-            } catch (error) { alert('Ошибка.'); }
+                if (!response.ok) {
+                    const data = await response.json().catch(() => ({}));
+                    throw new Error(data.error || 'Не удалось удалить дилера');
+                }
+                window.location.href = '/';
+            } catch (error) { alert(error.message || 'Ошибка удаления дилера'); }
         }
     });
 

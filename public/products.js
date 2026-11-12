@@ -823,7 +823,15 @@ document.addEventListener('DOMContentLoaded', () => {
     window.deleteProduct = async (id) => {
         if (!canManageProducts) return;
         if(confirm('Удалить товар?')) {
-            try { await fetch(`${API_URL}/${id}`, { method: 'DELETE' }); loadProducts(); modal.hide(); } catch(e) { alert('Ошибка'); }
+            try {
+                const response = await fetch(`${API_URL}/${encodeURIComponent(id)}`, { method: 'DELETE' });
+                if (!response.ok) {
+                    const data = await response.json().catch(() => ({}));
+                    throw new Error(data.error || 'Не удалось удалить товар');
+                }
+                await loadProducts();
+                modal.hide();
+            } catch(e) { alert(e.message || 'Ошибка удаления товара'); }
         }
     };
 

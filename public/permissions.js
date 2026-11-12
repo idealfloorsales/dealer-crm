@@ -7,9 +7,20 @@
 
     const crmSystemThemeQuery = window.matchMedia?.('(prefers-color-scheme: dark)');
 
+    function readStoredJSON(key, fallback, validate = () => true) {
+        try {
+            const raw = localStorage.getItem(key);
+            if (raw === null) return fallback;
+            const value = JSON.parse(raw);
+            return validate(value) ? value : fallback;
+        } catch (_) { return fallback; }
+    }
+
     function currentThemeMode() {
-        const saved = localStorage.getItem('crm_theme_mode');
-        return CRM_THEME_MODES[saved] ? saved : 'system';
+        try {
+            const saved = localStorage.getItem('crm_theme_mode');
+            return CRM_THEME_MODES[saved] ? saved : 'system';
+        } catch (_) { return 'system'; }
     }
 
     function effectiveTheme(mode = currentThemeMode()) {
@@ -63,6 +74,7 @@
         if (document.getElementById('crm-theme-styles')) return;
         const style = document.createElement('style');
         style.id = 'crm-theme-styles';
+        style.media = 'screen';
         style.textContent = `
           :root[data-crm-theme="light"]{
             --crm-theme-bg:#f3f4f6;--crm-theme-surface:#fff;--crm-theme-surface-2:#f8f8f9;
@@ -195,6 +207,7 @@
             const darkThemeLink = document.createElement('link');
             darkThemeLink.id = 'crm-dark-theme-file';
             darkThemeLink.rel = 'stylesheet';
+            darkThemeLink.media = 'screen';
             darkThemeLink.href = '/dark-theme.css?v={{VER}}';
             document.head.appendChild(darkThemeLink);
         }
@@ -1605,32 +1618,34 @@
     }
 
     async function apiFetch(url, options) {
-        options = options || {};
-        options.headers = options.headers || {};
-        const token = getToken();
-        if (token) options.headers.Authorization = 'Bearer ' + token;
+        const target = new URL(typeof Request !== 'undefined' && url instanceof Request ? url.url : url, window.location.href);
+        const isCRMRequest = target.origin === window.location.origin && target.pathname.startsWith('/api/');
+        const requestOptions = { ...(options || {}) };
+        if (isCRMRequest) {
+            const headers = new Headers(requestOptions.headers || (typeof Request !== 'undefined' && url instanceof Request ? url.headers : undefined));
+            const token = getToken();
+            if (token) headers.set('Authorization', 'Bearer ' + token);
+            requestOptions.headers = headers;
+        }
 
-        const trackLoading = options.crmTrackLoading !== false;
+        const trackLoading = isCRMRequest && requestOptions.crmTrackLoading !== false;
         const startedAt = performance.now();
         if (trackLoading) startNetworkActivity();
 
         try {
-            const response = await window.__crmOriginalFetch(url, options);
+            const response = await window.__crmOriginalFetch(url, requestOptions);
             const latency = performance.now() - startedAt;
-
-            if (response.status >= 500) {
-                markNetworkFailure('server');
-            } else {
-                markNetworkSuccess(latency);
+            if (isCRMRequest) {
+                if (response.status >= 500) markNetworkFailure('server');
+                else markNetworkSuccess(latency);
             }
-
-            if (response.status === 401) {
+            if (isCRMRequest && response.status === 401) {
                 logout();
                 throw new Error('Сессия завершена');
             }
             return response;
         } catch (error) {
-            markNetworkFailure(navigator.onLine === false ? 'offline' : 'unstable');
+            if (isCRMRequest) markNetworkFailure(navigator.onLine === false ? 'offline' : 'unstable');
             throw error;
         } finally {
             if (trackLoading) stopNetworkActivity();
@@ -1757,6 +1772,7 @@
 
     window.showToast = showToast;
     window.CRMUI = {
+        readStoredJSON,
         showToast,
         setButtonLoading,
         startLoading: startNetworkActivity,

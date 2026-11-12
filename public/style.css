@@ -13575,3 +13575,19 @@ body:not(.app-workspace-page) .modal-header .btn-close{
 .crm-app-download-card:focus-visible,.crm-app-download-icon:focus-visible{outline:3px solid #b9040a55;outline-offset:3px}
 :root[data-crm-theme="dark"] .crm-app-download-card,:root[data-crm-theme="dark"] .crm-app-download-icon{background:#242426;border-color:#3b3b3f;color:#e9e9ec}
 :root[data-crm-theme="dark"] .crm-app-download-mark{background:#303034;color:#e78e96}
+
+/* Branded charcoal/red headers must retain inverse text in either theme.
+   Use concrete copy selectors; form fields and dropdowns keep their own colors. */
+@media screen {
+  html:root[data-crm-theme] body :is(.cc-hero,.dealer-profile-hero,.pricing-hero,.sales-hero,.app-page-hero,.workshop-hero,.audit-hero,.map-workspace-header,.training-hero) :is(h1,h2,h3,h4,h5,h6),
+  html:root[data-crm-theme] body .modal-header :is(.modal-title,h4,h5,h6),
+  html:root[data-crm-theme] body .dealer-modal-header :is(.modal-title,h1,h2,h3,h4,h5,h6),
+  html:root[data-crm-theme] body .status-manager-header :is(h1,h2,h3,h4,h5,h6),
+  html:root[data-crm-theme] body .export-builder-header :is(h1,h2,h3,h4,h5,h6){color:#fff!important}
+  html:root[data-crm-theme] body :is(.cc-hero-copy,.dealer-profile-hero,.pricing-hero-copy,.sales-hero-copy,.app-page-hero-copy,.workshop-hero-copy,.audit-hero-copy,.training-hero-copy)>p,
+  html:root[data-crm-theme] body .modal-header p{color:#d5d7dc!important}
+  html:root[data-crm-theme] body .training-hero :is(.training-progress-head strong,.training-hero-stats strong){color:#fff!important}
+}
+@media print {
+  :root{color-scheme:light!important}
+}
