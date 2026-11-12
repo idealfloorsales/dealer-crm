@@ -39,6 +39,12 @@ document.addEventListener('DOMContentLoaded', () => {
         return Boolean($('pricing-offer-show-stock')?.checked);
     }
 
+    function matchesRequiredArea(item){
+        const area=Number(String($('pricing-offer-area')?.value||'').replace(/\s/g,'').replace(',','.'));
+        if(!showStock()||!Number.isFinite(area)||area<=0)return true;
+        return item.productType!=='equipment' && n(item.stockQty)+1e-9>=area;
+    }
+
     function includeIlliquid(){
         return Boolean($('pricing-offer-show-illiquid')?.checked);
     }
@@ -195,6 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const collection=$('pricing-offer-collection')?.value || '';
         return state.catalog.filter(item => {
             if(!productVisibleByMode(item)) return false;
+            if(!matchesRequiredArea(item)) return false;
             if(collection && item.collection !== collection) return false;
             if(query && ![item.sku,item.name,item.collection,item.productType==='equipment'?'торговое оборудование':''].join(' ').toLowerCase().includes(query)) return false;
             return true;
@@ -202,7 +209,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function pruneHiddenSelections(){
-        const visibleIds=new Set(state.catalog.filter(productVisibleByMode).map(item=>String(item.id)));
+        const visibleIds=new Set(state.catalog.filter(item=>productVisibleByMode(item)&&matchesRequiredArea(item)).map(item=>String(item.id)));
         [...state.selected].forEach(id=>{ if(!visibleIds.has(String(id))) state.selected.delete(String(id)); });
     }
 
@@ -292,6 +299,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if($('pricing-offer-price-list')) $('pricing-offer-price-list').value='';
         if($('pricing-offer-contact-user')) $('pricing-offer-contact-user').value=state.currentContactUserId || state.contacts[0]?.userId || '';
         if($('pricing-offer-show-stock')) $('pricing-offer-show-stock').checked=false;
+        if($('pricing-offer-area')) $('pricing-offer-area').value='';
+        if($('pricing-offer-area-wrap')) $('pricing-offer-area-wrap').hidden=true;
         if($('pricing-offer-show-illiquid')) $('pricing-offer-show-illiquid').checked=false;
         if($('pricing-offer-show-equipment')) $('pricing-offer-show-equipment').checked=false;
         if($('pricing-offer-description')) $('pricing-offer-description').value=$('pricing-offer-description').defaultValue || '';
@@ -445,7 +454,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     $('pricing-offer-manual-city')?.addEventListener('input',()=>{ renderDealer(); syncCreateState(); });
     $('pricing-offer-price-list')?.addEventListener('change',refreshSheet);
-    $('pricing-offer-show-stock')?.addEventListener('change',()=>{ renderProducts(); syncCreateState(); });
+    $('pricing-offer-show-stock')?.addEventListener('change',()=>{ if($('pricing-offer-area-wrap')) $('pricing-offer-area-wrap').hidden=!showStock(); pruneHiddenSelections(); renderProducts(); syncCreateState(); });
+    $('pricing-offer-area')?.addEventListener('input',()=>{ pruneHiddenSelections(); renderProducts(); });
     $('pricing-offer-show-illiquid')?.addEventListener('change',()=>{ pruneHiddenSelections(); fillCollections(); renderProducts(); });
     $('pricing-offer-show-equipment')?.addEventListener('change',()=>{ pruneHiddenSelections(); fillCollections(); renderProducts(); });
     $('pricing-offer-search')?.addEventListener('input',renderProducts);

@@ -6714,6 +6714,7 @@ app.delete('/api/reclamations/:id', requirePermission('can_manage_reclamations')
 
 const priceControl = require('./server/price-control').install({app,mongoose,Dealer,requireAnyPermission,requirePermission,getDealerFilter,isGlobalViewer,hasPermission,today:pricingTodayKey});
 require('./server/ideal-ai').install({app,connection:mongoose.connection,AuditLog});
+require('./server/offer-photos').registerOfferPhotos({app,CommercialOffer,validSnapshot:priceControlSnapshotValid});
 
 serverInstance = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server port ${PORT}`);
