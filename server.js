@@ -1699,6 +1699,10 @@ async function connectToDB() {
             await normalizeWorkshopPosRecipes();
 
             appReady = true;
+            if(process.env.CRM_STORAGE_AUDIT_RUN) {
+                require('./server/storage-audit').runOnce({db:mongoose.connection.db,runId:process.env.CRM_STORAGE_AUDIT_RUN,root:__dirname})
+                    .catch(()=>console.error('CRM_STORAGE_AUDIT measurement_failed'));
+            }
             gmailStockSync.start();
             telegramNotifications.start();
             await purgeExpiredCommercialOffers().catch(error => console.error('Initial commercial offer cleanup error:', error));
