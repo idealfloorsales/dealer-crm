@@ -1,5 +1,15 @@
 # IDEAL AI first rollout
 
+## Optional Gemini free-quota provider (2026-11-12)
+
+For the owner's request to avoid prepaid OpenAI credits, provider switching is supported:
+- Create a Gemini API key in Google AI Studio using a project on the **Free** tier. Do not enable Billing or attach a paid project if payment is not wanted.
+- Add `GEMINI_API_KEY` and `IDEAL_AI_PROVIDER=gemini` in Render. Keep `IDEAL_AI_ENABLED=true`. An existing OpenAI key is not used in this mode, including on a Google quota failure. There is NO automatic paid-provider fallback.
+- Default model: `gemini-3.5-flash-lite`; optional `GEMINI_MODEL` override. Official pricing currently lists a Free tier for this model. Provider quotas/availability can change and the application cannot inspect a project's billing tier from an API key. A paid-project key can incur charges: the Free-project choice is an operator requirement, not something enforced by this application.
+- The text-only, admin-only, request-limited behavior remains. The UI discloses Google processing before a user submits a chat message. Google's unpaid-service terms allow use of input/output for product improvement, including human review. Do NOT submit confidential, sensitive or personal information. CRM business-data tools remain absent.
+- Google API key travels in `x-goog-api-key`, never the URL. Assistant history maps to the Gemini model role; only visible text parts are returned, not thought parts. Upstream raw errors/keys/prompts are not audited.
+- Official references: https://ai.google.dev/gemini-api/docs/pricing ; https://ai.google.dev/gemini-api/docs/terms ; https://ai.google.dev/gemini-api/docs/available-regions ; https://ai.google.dev/api/generate-content . Kazakhstan is currently listed as available. A real response requires the owner's key and available free quota; mocked tests do not establish live connectivity.
+
 The UI is an administrator-only text assistant launched with the IDEAL AI button on CRM pages. It helps draft dealer messages and training plans. It is not connected to CRM business data, has no tools and cannot mutate data or send messages. Staff UI access and role-scoped business tools are not implemented in this rollout.
 
 Configuration in Render (never in source or browser):
