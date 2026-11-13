@@ -1027,8 +1027,8 @@ html,body.pricing-page{max-width:100%;overflow-x:hidden}
 /* 2026-11-06 — pricing condition modal: premium header + flexible target picker */
 .pricing-condition-dialog .pricing-modal{
   border:0!important;
-  border-radius:26px!important;
-  background:#f5f3f0!important;
+  border-radius:var(--crm-modal-radius,24px)!important;
+  background:var(--crm-modal-canvas,#f5f3f0)!important;
   box-shadow:0 32px 90px rgba(20,18,18,.22)!important;
 }
 
@@ -1041,9 +1041,7 @@ html,body.pricing-page{max-width:100%;overflow-x:hidden}
   min-height:118px;
   padding:23px 26px 21px;
   overflow:hidden;
-  background:
-    radial-gradient(circle at 92% -20%,rgba(185,4,10,.56),transparent 23rem),
-    linear-gradient(120deg,#171719 0%,#292628 100%);
+  background:var(--crm-modal-hero,linear-gradient(120deg,#171719,#292628));
   color:#fff;
 }
 
@@ -1122,16 +1120,14 @@ html,body.pricing-page{max-width:100%;overflow-x:hidden}
 
 .pricing-condition-dialog #pricing-condition-form>.modal-body{
   padding:16px 18px 18px!important;
-  background:
-    radial-gradient(circle at 7% -10%,rgba(185,4,10,.035),transparent 20rem),
-    #f5f3f0!important;
+  background:var(--crm-modal-canvas,#f5f3f0)!important;
 }
 
 .pricing-condition-dialog .pricing-form-section{
   padding:14px;
-  border:1px solid rgba(23,24,27,.075);
+  border:1px solid var(--crm-modal-border,#e7e3df);
   border-radius:15px;
-  background:rgba(255,255,255,.86);
+  background:var(--crm-modal-panel,#fff);
 }
 
 .pricing-target-layout{
@@ -1758,3 +1754,56 @@ html:root[data-crm-theme="dark"] .pricing-discount-custom .pricing-discount-cust
 html:root[data-crm-theme="dark"] .pricing-discount-custom .pricing-discount-custom-input>input.form-control{color:#eee!important}
 html:root[data-crm-theme="dark"] .pricing-discount-custom-copy strong{color:#eee}
 html:root[data-crm-theme="dark"] .pricing-delivery-note{background:#202a24;border-color:#37483b;color:#c4dccb}
+
+
+/* Pricing form uses the same field, action and heading scale as Motivation
+   and Delivery/Payment; page-wide pricing tables are intentionally untouched. */
+.pricing-condition-dialog .pricing-condition-hero{background:var(--crm-modal-hero,linear-gradient(120deg,#171719,#292628))}
+.pricing-condition-dialog .pricing-condition-hero h5{color:#fff!important}
+.pricing-condition-dialog .pricing-condition-hero p{font-size:.75rem;line-height:1.5}
+.pricing-condition-dialog .pricing-condition-hero-kicker{font-size:.64rem;letter-spacing:.15em}
+.pricing-condition-dialog .pricing-form-section-title strong{font-size:.79rem;color:var(--crm-modal-ink,#292a2e)}
+.pricing-condition-dialog .pricing-form-section-title small{font-size:.66rem;line-height:1.4;color:var(--crm-modal-muted,#77797f)}
+.pricing-condition-dialog .pricing-form-grid label>span,
+.pricing-condition-dialog .pricing-target-type>span,
+.pricing-condition-dialog .pricing-price-choice>span,
+.pricing-condition-dialog .pricing-discount-choice>span{font-size:.7rem;color:var(--crm-modal-muted,#77797f)}
+.pricing-condition-dialog .pricing-target-picker-head strong{font-size:.77rem}
+.pricing-condition-dialog .pricing-target-picker-head small{font-size:.66rem;line-height:1.4}
+.pricing-condition-dialog .pricing-target-option-copy strong{font-size:.72rem}
+.pricing-condition-dialog .pricing-target-option-copy small{font-size:.62rem}
+.pricing-condition-dialog .pricing-target-summary,
+.pricing-condition-dialog .pricing-target-summary strong{font-size:.66rem}
+.pricing-condition-dialog .pricing-target-actions button{min-height:34px;padding:0 10px;font-size:.68rem;border-radius:9px}
+.pricing-condition-dialog .pricing-target-search input{min-height:42px;font:500 .73rem 'Onest',sans-serif}
+.pricing-condition-dialog .pricing-target-type .form-select,
+.pricing-condition-dialog #pricing-condition-form .form-select,
+.pricing-condition-dialog #pricing-condition-form .form-control{min-height:42px;border-radius:11px;font:500 .78rem 'Onest',sans-serif}
+.pricing-condition-dialog #pricing-condition-form textarea.form-control{height:auto;min-height:88px}
+.pricing-condition-dialog #pricing-condition-form .form-select:focus,
+.pricing-condition-dialog #pricing-condition-form .form-control:focus{border-color:var(--crm-modal-accent,#b9040a);box-shadow:0 0 0 3px rgba(185,4,10,.1)}
+.pricing-condition-dialog .pricing-discount-options strong{font-size:.78rem}
+.pricing-condition-dialog .pricing-discount-options small,
+.pricing-condition-dialog .pricing-discount-choice>small,
+.pricing-condition-dialog .pricing-price-choice>small{font-size:.64rem;line-height:1.35}
+.pricing-condition-dialog .pricing-rule-note,
+.pricing-condition-dialog .pricing-delivery-note{font-size:.7rem;line-height:1.5}
+.pricing-condition-dialog #pricing-condition-form>.modal-footer .btn{min-height:42px;border-radius:11px;font:750 .76rem 'Onest',sans-serif}
+.pricing-condition-dialog #pricing-save-btn{background:#26272a;border-color:#26272a;color:#fff}
+.pricing-condition-dialog #pricing-save-btn:hover{background:#111214;border-color:#111214}
+.pricing-condition-dialog .pricing-discount-custom .pricing-discount-custom-input>input.form-control{
+  min-height:36px!important;height:36px!important;padding:0 4px!important;border:0!important;border-radius:0!important;
+  background:transparent!important;pointer-events:auto!important;opacity:1!important
+}
+html:root[data-crm-theme="dark"] .pricing-condition-dialog .pricing-form-section{background:var(--crm-modal-panel,#202126)!important;border-color:var(--crm-modal-border,#3a3c43)!important}
+html:root[data-crm-theme="dark"] .pricing-condition-dialog .pricing-form-section-title strong{color:var(--crm-modal-ink,#eee)!important}
+html:root[data-crm-theme="dark"] .pricing-condition-dialog .pricing-form-section-title small,
+html:root[data-crm-theme="dark"] .pricing-condition-dialog .pricing-price-choice>span,
+html:root[data-crm-theme="dark"] .pricing-condition-dialog .pricing-discount-choice>span{color:var(--crm-modal-muted,#aaadb5)!important}
+@media(max-width:760px){
+ .pricing-condition-dialog .pricing-condition-hero{padding:16px 18px!important;min-height:0!important}
+ .pricing-condition-dialog .pricing-condition-hero h5{font-size:1.2rem}
+ .pricing-condition-dialog .pricing-form-section-title strong{font-size:.78rem}
+ .pricing-condition-dialog .pricing-target-option-copy strong{font-size:.71rem}
+ .pricing-condition-dialog .pricing-target-search input{font-size:.74rem}
+}
