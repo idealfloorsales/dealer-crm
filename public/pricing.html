@@ -10,6 +10,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="style.css?v={{VER}}">
+    <link rel="stylesheet" href="motivation.css?v={{VER}}">
     <link rel="stylesheet" href="pricing.css?v={{VER}}">
     <link rel="stylesheet" href="price-control.css?v={{VER}}">
     <link rel="stylesheet" href="pricing-offers.css?v={{VER}}">
@@ -351,7 +352,7 @@
                     <div class="pricing-condition-hero-copy">
                         <span class="pricing-condition-hero-kicker">IDEAL FLOOR · ЦЕНОВЫЕ УСЛОВИЯ</span>
                         <h5 id="pricing-modal-title">Новое условие</h5>
-                        <p>Настройте, на кого действует условие, выберите скидку или прайс и задайте срок действия.</p>
+                        <p>Настройте, на кого действует условие, выберите прайс, скидку или условия доставки и задайте срок действия.</p>
                         <div class="pricing-condition-hero-badges">
                             <span><i class="bi bi-diagram-3"></i> Гибкий уровень</span>
                             <span><i class="bi bi-database-check"></i> Только данные CRM</span>
@@ -421,7 +422,7 @@
                                         </label>
                                         <label class="pricing-discount-custom">
                                             <span class="pricing-discount-custom-copy"><strong>Своя скидка</strong><small>Введите процент вручную</small></span>
-                                            <div class="pricing-discount-custom-input"><span>−</span><input type="number" id="pricing-discount-custom" class="form-control" min="0" max="100" step="0.01" inputmode="decimal" placeholder="7.5"><b>%</b></div>
+                                            <div class="pricing-discount-custom-input"><span>−</span><input type="text" id="pricing-discount-custom" class="form-control" inputmode="decimal" autocomplete="off" placeholder="7,5" aria-label="Своя скидка в процентах"><b>%</b></div>
                                         </label>
                                     </div>
                                     <small>Можно комбинировать разные скидки — они суммируются. Одинаковый процент дважды не учитывается.</small>
@@ -433,17 +434,26 @@
                             </div>
                         </div>
 
+                        <div class="pricing-form-section" id="pricing-delivery-section">
+                            <div class="pricing-form-section-title"><span>3</span><div><strong>Условия доставки</strong><small>Выберите вариант из справочника. При отсутствии выбора условия доставки дилеров не меняются.</small></div></div>
+                            <label class="pricing-delivery-choice" for="pricing-delivery-condition">
+                                <span>Условия доставки <small>необязательно</small></span>
+                            </label>
+                            <select id="pricing-delivery-condition" class="form-select" data-delivery-empty-label="Не менять условия доставки"><option value="">Не менять условия доставки</option></select>
+                            <div class="pricing-delivery-note"><i class="bi bi-truck"></i><span>Действует на выбранных дилеров, города или сектора в указанный период. После окончания срока снова используются условия из карточек дилеров.</span></div>
+                        </div>
+
                         <div class="pricing-form-section" id="pricing-promo-period-section">
-                            <div class="pricing-form-section-title"><span>3</span><div><strong>Период акции</strong><small>Этот период относится к выбранным скидкам; срок действия прайса здесь не меняется</small></div></div>
+                            <div class="pricing-form-section-title"><span>4</span><div><strong>Период действия</strong><small>Этот период относится к выбранным скидкам и условиям доставки; срок действия прайса здесь не меняется</small></div></div>
                             <div class="pricing-form-grid pricing-promo-period-grid">
                                 <label><span>С</span><input id="pricing-start-date" type="date" class="form-control"></label>
                                 <label><span>По</span><input id="pricing-end-date" type="date" class="form-control"></label>
                             </div>
-                            <div id="pricing-promo-period-hint" class="pricing-promo-period-hint">Выберите хотя бы одну скидку, чтобы задать период акции.</div>
+                            <div id="pricing-promo-period-hint" class="pricing-promo-period-hint">Выберите скидку или условия доставки, чтобы задать период действия.</div>
                         </div>
 
                         <div class="pricing-form-section mb-0">
-                            <div class="pricing-form-section-title"><span>4</span><div><strong>Комментарий</strong><small>Дополнительные условия или пояснение</small></div></div>
+                            <div class="pricing-form-section-title"><span>5</span><div><strong>Комментарий</strong><small>Дополнительные условия или пояснение</small></div></div>
                             <textarea id="pricing-note" class="form-control" rows="3" placeholder="Комментарий..."></textarea>
                         </div>
                     </div>
