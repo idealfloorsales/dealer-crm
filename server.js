@@ -106,7 +106,7 @@ const servePage = (res, fileName) => {
         if (err) { console.error(err); return res.status(500).send('Server Error'); }
         let html = data.replace(/{{VER}}/g, APP_VERSION);
         if (data.includes('permissions.js')) {
-            html = html.replace('</body>', `<script src="/employee-presence.js?v=${APP_VERSION}"></script><script src="/ideal-ai-client.js?v=${APP_VERSION}"></script><script src="/ideal-workbench.js?v=${APP_VERSION}"></script><script src="/delivery-conditions.js?v=${APP_VERSION}"></script></body>`);
+            html = html.replace('</body>', `<script src="/employee-presence.js?v=${APP_VERSION}"></script><script src="/ideal-ai-client.js?v=${APP_VERSION}"></script><script src="/ideal-workbench.js?v=${APP_VERSION}"></script><script defer src="/delivery-conditions.js?v=${APP_VERSION}"></script></body>`);
         }
         res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.send(html);
@@ -1433,7 +1433,7 @@ const pricingAuditSchema = new mongoose.Schema({
 const pricingConditionSchema = new mongoose.Schema({
     name: { type: String, required: true, trim: true },
     code: { type: String, trim: true },
-    kind: { type: String, enum: ['discount', 'price_list'], required: true },
+    kind: { type: String, enum: ['discount', 'price_list', 'delivery'], required: true },
     scopeType: { type: String, enum: ['dealer', 'sector', 'city', 'all'], default: 'dealer' },
     dealer: { type: mongoose.Schema.Types.ObjectId, ref: 'Dealer' },
     dealers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Dealer' }],
@@ -1441,6 +1441,7 @@ const pricingConditionSchema = new mongoose.Schema({
     scopeValues: [String],
 
     discountPercent: { type: Number, default: 0 },
+    deliveryText: { type: String, default: "" },
     priceListName: String,
     priceList: { type: mongoose.Schema.Types.ObjectId, ref: 'PriceList' },
     stackable: { type: Boolean, default: true },
@@ -2255,6 +2256,33 @@ function pricingConditionMatchesDealer(condition, dealer) {
     return false;
 }
 
+function selectActiveDealerDelivery(dealer, allConditions, today = pricingTodayKey()) {
+    return (allConditions || [])
+        .filter(condition =>
+            condition.kind === 'delivery' &&
+            String(condition.deliveryText || '').trim() &&
+            pricingConditionMatchesDealer(condition, dealer) &&
+            pricingConditionStatus(condition, today) === 'active'
+        )
+        .sort((a,b) =>
+            pricingScopeSpecificity(b) - pricingScopeSpecificity(a) ||
+            pricingConditionEffectiveStartDate(b).localeCompare(pricingConditionEffectiveStartDate(a)) ||
+            String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')) ||
+            String(b._id || '').localeCompare(String(a._id || ''))
+        )[0] || null;
+}
+
+function deliveryConditionInfo(condition) {
+    if (!condition) return null;
+    return {
+        id:String(condition._id || condition.id || ''),
+        scopeType:condition.scopeType || '',
+        startDate:condition.startDate || '',
+        endDate:condition.endDate || '',
+        deliveryText:condition.deliveryText || ''
+    };
+}
+
 function buildDealerPricingSummary(dealer, allConditions, today = pricingTodayKey()) {
     const matched = (allConditions || [])
         .filter(condition => pricingConditionMatchesDealer(condition, dealer))
@@ -2298,6 +2326,7 @@ function buildDealerPricingSummary(dealer, allConditions, today = pricingTodayKe
     const effectiveDealerPriceListId = dealerPriceListEffective ? dealerPriceListId : '';
     const fallbackPriceListName = dealerPriceListName || dealer.price_type || 'Спец.цена';
     const activeDiscounts = active.filter(condition => condition.kind === 'discount');
+    const deliveryCondition = selectActiveDealerDelivery(dealer, active, today);
 
     const exclusive = activeDiscounts
         .filter(condition => condition.stackable === false)
@@ -2366,6 +2395,9 @@ function buildDealerPricingSummary(dealer, allConditions, today = pricingTodayKe
         profilePriceList: dealerProfilePriceListName || dealer.price_type || 'Спец.цена',
         profilePriceListId: dealerPriceListId,
         profilePriceListEffective: dealerPriceListEffective,
+        profileDelivery:dealer.delivery || "",
+        effectiveDelivery:deliveryCondition?.deliveryText || dealer.delivery || "",
+        deliveryOverride:deliveryConditionInfo(deliveryCondition),
         fallbackPriceList: fallbackPriceListName,
         effectivePriceList: selectedPriceList?.priceList?.name || selectedPriceList?.priceListName || selectedPriceList?.name || fallbackPriceListName,
         effectivePriceListId: String(selectedPriceList?.priceList?._id || selectedPriceList?.priceList || effectiveDealerPriceListId || ''),
@@ -2421,7 +2453,7 @@ function pricingUserMeta(req) {
 }
 
 function cleanPricingPayload(body = {}) {
-    const kind = body.kind === 'price_list' ? 'price_list' : 'discount';
+    const kind = body.kind === 'price_list' ? 'price_list' : (body.kind === 'delivery' ? 'delivery' : 'discount');
     const scopeType = ['dealer', 'sector', 'city', 'all'].includes(body.scopeType) ? body.scopeType : 'dealer';
     const reasonTypes = ['social_posts', 'support_promo', 'regional_price', 'individual', 'other'];
     const reasonType = reasonTypes.includes(body.reasonType) ? body.reasonType : 'other';
@@ -2453,6 +2485,7 @@ function cleanPricingPayload(body = {}) {
         scopeValue: scopeValues[0] || '',
         scopeValues,
         discountPercent: kind === 'discount' ? Math.max(0, Number(body.discountPercent) || 0) : 0,
+        deliveryText:kind === 'delivery' ? String(body.deliveryText || '').trim().slice(0,700) : '',
         priceListName: kind === 'price_list' ? String(body.priceListName || '').trim() : '',
         priceList: kind === 'price_list' && body.priceListId ? body.priceListId : null,
         stackable: kind === 'discount' ? body.stackable !== false : false,
@@ -2481,6 +2514,7 @@ function validatePricingPayload(payload) {
         return 'Скидка должна быть больше 0% и не больше 100%';
     }
     if (payload.kind === 'price_list' && !payload.priceListName && !payload.priceList) return 'Выберите базовый прайс';
+    if (payload.kind === 'delivery' && !payload.deliveryText) return 'Выберите условия доставки';
     if (payload.scopeType === 'dealer' && (!Array.isArray(payload.dealers) || !payload.dealers.length)) return 'Выберите хотя бы одного дилера';
     if ((payload.scopeType === 'sector' || payload.scopeType === 'city') && (!Array.isArray(payload.scopeValues) || !payload.scopeValues.length)) {
         return payload.scopeType === 'city' ? 'Выберите хотя бы один город' : 'Выберите хотя бы один сектор';
@@ -2692,7 +2726,14 @@ app.get('/api/dealers', requireAnyPermission('can_view_dealers', 'can_view_map',
                 .populate('price_list', 'name code versionDate validFrom validTo active includeIlliquid').populate('motivation_scheme', 'name ratePerM2 validFrom validTo active');
         }
         const dealers = await query.lean();
-        res.json(dealers.map(d => ({ id: d._id, ...d })));
+        const deliveryConditions = req.query.view === 'map' ? [] : await PricingCondition.find({
+            kind:'delivery', cancelledAt:null, paused:false
+        }).select('kind deliveryText scopeType dealer dealers scopeValue scopeValues startDate endDate priority updatedAt').lean();
+        res.json(dealers.map(d => {
+            if (req.query.view === 'map') return {id:d._id,...d};
+            const override = selectActiveDealerDelivery(d, deliveryConditions);
+            return {id:d._id,...d,effectiveDelivery:override?.deliveryText || d.delivery || '',deliveryOverride:deliveryConditionInfo(override)};
+        }));
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
@@ -2727,7 +2768,15 @@ app.get('/api/dealers/:id', requirePermission('can_view_dealers'), async (req, r
             d.avatarIsPreview=Boolean(original&&d.avatarUrl!==original);
             res.set('Cache-Control', 'private, max-age=30');
         }
-        res.json(convertToClient(d));
+        const deliveryConditions = await PricingCondition.find({
+            kind:'delivery', cancelledAt:null, paused:false
+        }).select('kind deliveryText scopeType dealer dealers scopeValue scopeValues startDate endDate priority updatedAt').lean();
+        const deliveryOverride = selectActiveDealerDelivery(d, deliveryConditions);
+        res.json(convertToClient({
+            ...d,
+            effectiveDelivery:deliveryOverride?.deliveryText || d.delivery || '',
+            deliveryOverride:deliveryConditionInfo(deliveryOverride)
+        }));
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
@@ -4191,7 +4240,7 @@ app.put('/api/pricing/dealers/:id/display-prices', requirePermission('can_manage
 app.get('/api/pricing/overview', requirePermission('can_view_pricing'), async (req, res) => {
     try {
         const dealers = await Dealer.find(await getPricingWorkingDealerFilter(getDealerFilter(req)))
-            .select('_id dealer_id name city region_sector price_type price_list responsible')
+            .select('_id dealer_id name city region_sector price_type price_list delivery responsible')
             .populate('price_list', 'name code versionDate validFrom validTo active includeIlliquid')
             .sort({ name: 1 })
             .lean();
@@ -4259,7 +4308,7 @@ app.get('/api/pricing/dealers/:id', requirePermission('can_view_pricing'), async
                 { _id: req.params.id },
                 await getPricingWorkingDealerFilter(getDealerFilter(req))
             ]
-        }).select('_id dealer_id name city region_sector price_type price_list responsible')
+        }).select('_id dealer_id name city region_sector price_type price_list delivery responsible')
             .populate('price_list', 'name code versionDate validFrom validTo active includeIlliquid')
             .lean();
         if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
@@ -4301,18 +4350,25 @@ app.post('/api/pricing/setup', requirePermission('can_manage_pricing'), async (r
             if (!priceList) return res.status(404).json({ error:'Прайс не найден или находится в архиве' });
         }
 
+        const deliveryText = String(req.body?.deliveryText || '').trim();
+        if (deliveryText.length > 700) return res.status(400).json({ error:'Условия доставки слишком длинные' });
+        if (deliveryText) {
+            const knownDelivery = await mongoose.model('DeliveryCondition').findOne({name:deliveryText,active:{ $ne:false }}).select('_id').lean();
+            if (!knownDelivery) return res.status(400).json({ error:'Выберите действующие условия доставки из справочника' });
+        }
+
         const discounts = [...new Set((Array.isArray(req.body?.discounts) ? req.body.discounts : [])
             .map(value => Math.round(Number(value) * 100) / 100)
             .filter(value => Number.isFinite(value) && value > 0 && value <= 100))];
-        if (!priceList && !discounts.length) {
-            return res.status(400).json({ error:'Выберите хотя бы одну скидку или прайс' });
+        if (!priceList && !discounts.length && !deliveryText) {
+            return res.status(400).json({ error:'Выберите прайс, скидку или условия доставки' });
         }
         const startDate = String(req.body?.startDate || '').trim();
         const endDate = String(req.body?.endDate || '').trim();
         const dateRe = /^\d{4}-\d{2}-\d{2}$/;
-        if (discounts.length && startDate && !dateRe.test(startDate)) return res.status(400).json({ error:'Некорректная дата начала акции' });
-        if (discounts.length && endDate && !dateRe.test(endDate)) return res.status(400).json({ error:'Некорректная дата окончания акции' });
-        if (discounts.length && startDate && endDate && endDate < startDate) return res.status(400).json({ error:'Дата окончания акции не может быть раньше даты начала' });
+        if ((discounts.length || deliveryText) && startDate && !dateRe.test(startDate)) return res.status(400).json({ error:'Некорректная дата начала периода' });
+        if ((discounts.length || deliveryText) && endDate && !dateRe.test(endDate)) return res.status(400).json({ error:'Некорректная дата окончания периода' });
+        if ((discounts.length || deliveryText) && startDate && endDate && endDate < startDate) return res.status(400).json({ error:'Дата окончания не может быть раньше даты начала' });
 
         const user = pricingUserMeta(req);
         const note = String(req.body?.note || '').trim();
@@ -4337,7 +4393,7 @@ app.post('/api/pricing/setup', requirePermission('can_manage_pricing'), async (r
             return wanted.size === actual.size && [...wanted].every(value => actual.has(value));
         };
 
-        const standardCodes = ['BASE-PRICE','SOCIAL-5','SUPPORT-10','CUSTOM-DISCOUNT'];
+        const standardCodes = ['BASE-PRICE','SOCIAL-5','SUPPORT-10','CUSTOM-DISCOUNT','DELIVERY-TERMS'];
         const candidates = (await PricingCondition.find({
             scopeType,
             code:{ $in:standardCodes },
@@ -4349,12 +4405,15 @@ app.post('/api/pricing/setup', requirePermission('can_manage_pricing'), async (r
         if (discounts.some(value => Math.abs(value - 5) < 0.001)) chosenCodes.add('SOCIAL-5');
         if (discounts.some(value => Math.abs(value - 10) < 0.001)) chosenCodes.add('SUPPORT-10');
         if (discounts.some(value => Math.abs(value - 5) >= 0.001 && Math.abs(value - 10) >= 0.001)) chosenCodes.add('CUSTOM-DISCOUNT');
+        if (deliveryText) chosenCodes.add('DELIVERY-TERMS');
 
         for (const existing of candidates) {
             const isBasePrice = existing.code === 'BASE-PRICE';
             const isDiscount = ['SOCIAL-5','SUPPORT-10','CUSTOM-DISCOUNT'].includes(existing.code);
+            const isDelivery = existing.code === 'DELIVERY-TERMS';
             if (isBasePrice && !priceList) continue;
             if (isDiscount && !discounts.length) continue;
+            if (isDelivery && !deliveryText) continue;
             if (chosenCodes.has(existing.code)) continue;
             existing.cancelledAt = new Date();
             existing.updatedBy = user;
@@ -4442,6 +4501,30 @@ app.post('/api/pricing/setup', requirePermission('can_manage_pricing'), async (r
                 proofNote:'',
                 note
             }, `Скидка −${discount}% сохранена через настройку цен`));
+        }
+
+        if (deliveryText) {
+            saved.push(await upsertStandard('DELIVERY-TERMS', {
+                kind:'delivery',
+                name:'Условия доставки',
+                deliveryText,
+                priceList:null,
+                priceListName:'',
+                discountPercent:0,
+                stackable:false,
+                priority:overridePriority,
+                startDate,
+                endDate,
+                paused:false,
+                reasonType:'other',
+                requirementTarget:0,
+                requirementCurrent:0,
+                requirementUnit:'публикаций',
+                requirementDueDate:'',
+                requirementVerified:false,
+                proofNote:'',
+                note
+            }, 'Условия доставки сохранены через настройку цен'));
         }
 
         res.json({ status:'ok', saved:saved.map(String) });
