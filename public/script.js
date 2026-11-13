@@ -998,6 +998,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(filterResponsible) filterResponsible.onchange = renderDealerList;
         if(filterHealth) filterHealth.onchange = renderDealerList;
         if(filterMotivation) filterMotivation.onchange = renderDealerList;
+        document.addEventListener('crm:delivery-filter-change', renderDealerList);
         const sectorFilter = document.getElementById('filter-sector');
         if(sectorFilter) sectorFilter.onchange = renderDealerList;
         if(searchBar) searchBar.oninput = renderDealerList;
@@ -1055,6 +1056,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (filterResponsible) filterResponsible.value = '';
                 if (filterHealth) filterHealth.value = '';
                 if (filterMotivation) filterMotivation.value = '';
+                window.CRMDelivery?.setFilter([],false);
                 if (sectorFilter) sectorFilter.value = '';
                 if (dealerSortSelect) dealerSortSelect.value = 'dealer_id_asc';
                 dealerQuickFilter = 'all';
@@ -1682,6 +1684,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         (motivationFilter === '__without__' && !hasMotivation) ||
                         (motivationFilter !== '__with__' && motivationFilter !== '__without__' && motivationId === motivationFilter);
                 })() &&
+                (!window.CRMDelivery || CRMDelivery.matches(dealer.delivery)) &&
                 (!search || searchable.includes(search));
         });
 
@@ -2061,7 +2064,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if(titleEl) titleEl.textContent = 'Редактирование дилера';
             const subtitleEl = document.getElementById('edit-modal-subtitle');
             if(subtitleEl) subtitleEl.textContent = d.name ? `${d.name} · измените только нужные данные` : 'Измените только нужные данные';
-            document.getElementById('edit_db_id').value=d.id; document.getElementById('edit_dealer_id').value=d.dealer_id; document.getElementById('edit_name').value=d.name; fillDealerPriceListSelect('edit_price_list', d.price_list?.id || d.price_list || ''); document.getElementById('edit_city').value=d.city; document.getElementById('edit_address').value=d.address; document.getElementById('edit_delivery').value=d.delivery; document.getElementById('edit_website').value=d.website; document.getElementById('edit_instagram').value=d.instagram;
+            document.getElementById('edit_db_id').value=d.id; document.getElementById('edit_dealer_id').value=d.dealer_id; document.getElementById('edit_name').value=d.name; fillDealerPriceListSelect('edit_price_list', d.price_list?.id || d.price_list || ''); document.getElementById('edit_city').value=d.city; document.getElementById('edit_address').value=d.address; document.getElementById('edit_delivery').value=d.delivery; window.CRMDelivery?.setSelected('edit_delivery',d.delivery); document.getElementById('edit_website').value=d.website; document.getElementById('edit_instagram').value=d.instagram;
             if(document.getElementById('edit_latitude')) document.getElementById('edit_latitude').value=d.latitude||''; if(document.getElementById('edit_longitude')) document.getElementById('edit_longitude').value=d.longitude||'';
             document.getElementById('edit_bonuses').value=d.bonuses; 
             const editMotivation = document.getElementById('edit_motivation_scheme');
@@ -3132,6 +3135,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     (responsible !== '__unassigned__' && String(d.responsible || '') === String(responsible))) &&
                 (!sector || normalizedSector === sector) &&
                 motivationMatches &&
+                (!window.CRMDelivery || CRMDelivery.matches(d.delivery)) &&
                 (!search || searchable.includes(search));
         });
 
@@ -3478,6 +3482,7 @@ document.addEventListener('DOMContentLoaded', () => {
             setValue('city',d.city || '');
             setValue('address',d.address || '');
             setValue('delivery',d.delivery || '');
+            window.CRMDelivery?.setSelected('delivery',d.delivery || '');
             setValue('website',d.website || '');
             setValue('instagram',d.instagram || '');
             setValue('add_latitude',d.latitude || '');

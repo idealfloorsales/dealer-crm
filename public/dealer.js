@@ -1299,7 +1299,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (section === 'logistics') {
             const delivery = document.getElementById('profile-edit-delivery');
-            if (delivery) delivery.value = currentDealer.delivery || '';
+            if (delivery) { if(window.CRMDelivery) CRMDelivery.setSelected('profile-edit-delivery',currentDealer.delivery || ''); else delivery.value = currentDealer.delivery || ''; }
             const addresses = document.getElementById('profile-edit-addresses');
             if (addresses) addresses.innerHTML = '';
             (currentDealer.additional_addresses || []).forEach(addProfileAddressRow);
