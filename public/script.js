@@ -811,7 +811,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const mapEl = document.getElementById(mapId); if (!mapEl) return;
         if (!mapInstances[instanceKey]) {
             const map = L.map(mapId).setView([51.1605, 71.4704], 12);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: 'OSM' }).addTo(map);
+            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { referrerPolicy: 'origin', attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' }).addTo(map);
             mapInstances[instanceKey] = map;
             map.on('click', (e) => { setMarker(e.latlng.lat, e.latlng.lng, instanceKey, latId, lngId); });
         }

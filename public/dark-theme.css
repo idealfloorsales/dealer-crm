@@ -1785,3 +1785,35 @@ html:root[data-crm-theme="dark"] .rec-form-modal .form-label{color:var(--dark-te
 html:root[data-crm-theme="dark"] .text-brand,
 html:root[data-crm-theme="dark"] .rec-form-modal .form-label.text-danger{color:#ff9aa0!important}
 html:root[data-crm-theme="dark"] .rec-form-modal .form-label.text-success{color:#9fd7b1!important}
+
+/* Live browser checks: employee contact links/table head and mobile connection chip. */
+html:root[data-crm-theme="dark"] .employee-contact a{color:var(--dark-text-2)!important}
+html:root[data-crm-theme="dark"] .employee-table thead,
+html:root[data-crm-theme="dark"] .employee-table thead th{
+  background:var(--dark-surface-2)!important;color:var(--dark-muted)!important;border-color:var(--dark-line)!important;
+}
+html:root[data-crm-theme="dark"] .crm-topbar-mobile-status{
+  background:var(--dark-surface-2)!important;color:var(--dark-text-2)!important;border-color:var(--dark-line)!important;
+}
+html:root[data-crm-theme="dark"] .rec-field-shortcuts button,
+html:root[data-crm-theme="dark"] .rec-cancel-btn{
+  background:var(--dark-surface-2)!important;border-color:var(--dark-line)!important;color:var(--dark-text-2)!important;
+}
+html:root[data-crm-theme="dark"] .rec-field-shortcuts button.active{
+  background:var(--dark-surface-3)!important;color:var(--dark-text)!important;border-color:#696d77!important;
+}
+html:root[data-crm-theme="dark"] .employee-tabs .nav-link{color:#b4b7bf!important}
+html:root[data-crm-theme="dark"] .employee-tabs .nav-link.active{color:#fff!important;background:var(--dark-surface-3)!important}
+html:root[data-crm-theme="dark"] .workshop-opening-banner{
+  background:#29251e!important;border-color:#61513a!important;color:#eddbb9!important;
+}
+html:root[data-crm-theme="dark"] .workshop-opening-banner.is-done{
+  background:#1c2b22!important;border-color:#36513f!important;
+}
+html:root[data-crm-theme="dark"] .workshop-opening-lines,
+html:root[data-crm-theme="dark"] .workshop-opening-row,
+html:root[data-crm-theme="dark"] .workshop-opening-filter button{
+  background:var(--dark-surface-2)!important;border-color:var(--dark-line)!important;color:var(--dark-text-2)!important;
+}
+html:root[data-crm-theme="dark"] .workshop-opening-name strong,
+html:root[data-crm-theme="dark"] .workshop-opening-current strong{color:var(--dark-text)!important}

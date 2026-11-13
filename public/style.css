@@ -13602,3 +13602,10 @@ body:not(.app-workspace-page) .modal-header .btn-close{
   .crm-topbar-brand img{max-width:180px;height:auto;max-height:42px}
   .crm-topbar-inner{gap:12px}
 }
+@media (max-width:991.98px){
+  .crm-topbar-inner{flex-wrap:nowrap!important;gap:8px}
+  .crm-topbar-brand img{max-width:132px;height:auto;max-height:32px}
+}
+@media (max-width:700px){
+  .ideal-ai-launch{left:14px!important;right:auto!important}
+}

@@ -64,8 +64,9 @@ document.addEventListener('DOMContentLoaded', () => {
         preferCanvas: true
     }).setView([DEFAULT_LAT, DEFAULT_LNG], 5);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap',
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        referrerPolicy: 'origin',
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 19
     }).addTo(map);
 
