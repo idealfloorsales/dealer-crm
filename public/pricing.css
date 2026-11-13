@@ -1414,14 +1414,7 @@ html,body.pricing-page{max-width:100%;overflow-x:hidden}
 
 
 /* 2026-11-06 — explicit one/many target modes + reinforced premium modal header */
-.pricing-condition-hero::before{
-  content:"";
-  position:absolute;
-  inset:0 auto 0 0;
-  width:4px;
-  background:linear-gradient(180deg,#ef2028 0%,#8f0005 100%);
-  box-shadow:0 0 24px rgba(185,4,10,.42);
-}
+.pricing-condition-hero::before{content:none}
 .pricing-condition-hero-badges{
   display:flex;
   flex-wrap:wrap;
@@ -1495,12 +1488,12 @@ html,body.pricing-page{max-width:100%;overflow-x:hidden}
   margin:0;
   cursor:pointer;
 }
-.pricing-discount-options input{
+.pricing-discount-options > label:not(.pricing-discount-custom) > input{
   position:absolute;
   opacity:0;
   pointer-events:none;
 }
-.pricing-discount-options span{
+.pricing-discount-options > label:not(.pricing-discount-custom) > span{
   display:flex;
   min-height:58px;
   flex-direction:column;
@@ -1511,14 +1504,14 @@ html,body.pricing-page{max-width:100%;overflow-x:hidden}
   background:#fbfaf8;
   transition:.15s ease;
 }
-.pricing-discount-options strong{color:#36373b;font-size:.77rem}
-.pricing-discount-options small{margin-top:2px;color:#96989d;font-size:.49rem}
-.pricing-discount-options input:checked+span{
+.pricing-discount-options > label:not(.pricing-discount-custom) > span strong{color:#36373b;font-size:.77rem}
+.pricing-discount-options > label:not(.pricing-discount-custom) > span small{margin-top:2px;color:#96989d;font-size:.49rem}
+.pricing-discount-options > label:not(.pricing-discount-custom) > input:checked+span{
   border-color:rgba(185,4,10,.35);
   background:#fff4f4;
   box-shadow:0 0 0 2px rgba(185,4,10,.04);
 }
-.pricing-discount-options input:checked+span strong{color:#b9040a}
+.pricing-discount-options > label:not(.pricing-discount-custom) > input:checked+span strong{color:#b9040a}
 #pricing-promo-period-section{
   transition:opacity .15s ease,filter .15s ease;
 }
@@ -1722,3 +1715,46 @@ html,body.pricing-page{max-width:100%;overflow-x:hidden}
 .pricing-list-illiquid-toggle>span:last-child small{margin-top:1px;font-size:.48rem;color:#96989d;white-space:nowrap}
 .pricing-list-row-hidden{display:none!important}
 @media(max-width:900px){.pricing-list-illiquid-toggle{width:100%}.pricing-list-illiquid-toggle>span:last-child{flex:1}}
+
+/* One consistent row of selectable discounts. The numeric input must remain interactive. */
+.pricing-discount-options{grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch}
+.pricing-discount-options>label{min-width:0}
+.pricing-discount-options>label:not(.pricing-discount-custom)>span{height:100%;min-height:92px;box-sizing:border-box}
+.pricing-discount-options>.pricing-discount-custom{display:flex!important;min-width:0;min-height:92px;padding:9px 10px!important;border:1px solid #e2ddd9;border-radius:11px;background:#fbfaf8;flex-direction:column;justify-content:center;gap:7px}
+.pricing-discount-custom .pricing-discount-custom-copy{display:block!important;min-height:0!important;margin:0!important;padding:0!important;background:transparent!important;border:0!important;color:#36373b}
+.pricing-discount-custom-copy strong{display:block;line-height:1.25;font-size:.74rem;color:#36373b}
+.pricing-discount-custom-copy small{display:block;margin-top:3px;font-size:.52rem;color:#96989d;line-height:1.25}
+.pricing-discount-custom .pricing-discount-custom-input{display:flex;min-width:0;width:100%;height:38px;padding:0;border:1px solid #ded8d3;border-radius:9px;background:#fff}
+.pricing-discount-custom .pricing-discount-custom-input>span,
+.pricing-discount-custom .pricing-discount-custom-input>b{display:inline-flex!important;min-width:0;min-height:0!important;align-items:center;justify-content:center;flex:0 0 auto;padding:0 8px!important;border:0!important;background:transparent!important;font-size:.72rem}
+.pricing-discount-custom .pricing-discount-custom-input>input.form-control{
+  position:static!important;display:block!important;flex:1 1 auto;min-width:0;width:100%;
+  height:36px!important;min-height:36px!important;padding:0 3px!important;
+  border:0!important;outline:0!important;background:transparent!important;opacity:1!important;
+  pointer-events:auto!important;user-select:text!important;text-align:center;font-size:.78rem!important;
+  color:#242529!important;-moz-appearance:textfield;appearance:textfield;
+}
+.pricing-discount-custom .pricing-discount-custom-input>input::-webkit-inner-spin-button,
+.pricing-discount-custom .pricing-discount-custom-input>input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.pricing-discount-custom .pricing-discount-custom-input:focus-within{border-color:#b9040a;box-shadow:0 0 0 3px rgba(185,4,10,.1)}
+.pricing-delivery-choice{display:block;margin:0 0 7px 2px;color:#67696e;font-size:.62rem;font-weight:750}
+.pricing-delivery-choice>span>small{color:#96989d;font-weight:500}
+#pricing-delivery-section>.delivery-field{max-width:100%;align-items:stretch}
+#pricing-delivery-section>.delivery-field .form-select{min-width:0;flex:1}
+#pricing-delivery-section>.delivery-field .delivery-gear{width:42px;min-width:42px;height:auto}
+.pricing-delivery-note{display:flex;gap:9px;align-items:flex-start;margin-top:10px;padding:11px 12px;border:1px solid #e4e8e3;border-radius:12px;background:#f4f8f5;color:#53665b;font-size:.69rem;line-height:1.55}
+.pricing-delivery-note i{flex:0 0 auto;color:#477d58}
+@media(max-width:1040px){
+ .pricing-discount-options{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .pricing-discount-options>.pricing-discount-custom{grid-column:1/-1;min-height:92px}
+}
+@media(max-width:760px){
+ .pricing-discount-options{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .pricing-discount-options>.pricing-discount-custom{grid-column:1/-1}
+}
+@media(max-width:380px){.pricing-promo-period-grid{grid-template-columns:1fr}}
+html:root[data-crm-theme="dark"] .pricing-discount-options>.pricing-discount-custom{background:#202126;border-color:#484950}
+html:root[data-crm-theme="dark"] .pricing-discount-custom .pricing-discount-custom-input{background:#292a30;border-color:#484950}
+html:root[data-crm-theme="dark"] .pricing-discount-custom .pricing-discount-custom-input>input.form-control{color:#eee!important}
+html:root[data-crm-theme="dark"] .pricing-discount-custom-copy strong{color:#eee}
+html:root[data-crm-theme="dark"] .pricing-delivery-note{background:#202a24;border-color:#37483b;color:#c4dccb}
