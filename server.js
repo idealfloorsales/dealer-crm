@@ -28,6 +28,9 @@ const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(64).toString('he
 if (!process.env.JWT_SECRET) console.warn('JWT_SECRET is not configured: sessions will reset after server restart.'); 
 
 const APP_ORIGIN = String(process.env.APP_ORIGIN || 'https://dealer-crm.onrender.com').replace(/\/+$/, '');
+const ANDROID_APK_RELEASE_URL = 'https://github.com/idealfloorsales/dealer-crm/releases/download/android-v0.1.2/IDEAL-FLOOR-CRM-0.1.2.apk';
+// GitHub release asset is 101047362 bytes; sha256:336872de8f75d04ed9ff9a6a762accb03e7b2ce2070aa92ff5cd488744d53429.
+// Keep the user-facing URL on the CRM; update this target when a new tested release is published.
 const ALLOWED_ORIGINS = new Set([
     APP_ORIGIN,
     process.env.RENDER_EXTERNAL_URL,
@@ -66,6 +69,14 @@ function healthPayload() {
 }
 
 // Liveness: process is responding. Useful for external monitoring.
+// Permanent, one-tap Android installer link from the CRM (desktop and mobile).
+// Redirect instead of proxying 101 MB through Render, which risks interrupted APK transfers.
+app.get('/download/android', (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.set('Referrer-Policy', 'no-referrer');
+    res.redirect(302, ANDROID_APK_RELEASE_URL);
+});
+
 app.get('/healthz', (req, res) => {
     const payload = healthPayload();
     res.status(payload.ok ? 200 : 503).json(payload);
