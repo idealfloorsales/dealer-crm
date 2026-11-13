@@ -106,7 +106,7 @@ const servePage = (res, fileName) => {
         if (err) { console.error(err); return res.status(500).send('Server Error'); }
         let html = data.replace(/{{VER}}/g, APP_VERSION);
         if (data.includes('permissions.js')) {
-            html = html.replace('</body>', `<script src="/employee-presence.js?v=${APP_VERSION}"></script><script src="/ideal-ai-client.js?v=${APP_VERSION}"></script></body>`);
+            html = html.replace('</body>', `<script src="/employee-presence.js?v=${APP_VERSION}"></script><script src="/ideal-ai-client.js?v=${APP_VERSION}"></script><script src="/ideal-workbench.js?v=${APP_VERSION}"></script></body>`);
         }
         res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.send(html);
@@ -6736,6 +6736,7 @@ app.delete('/api/reclamations/:id', requirePermission('can_manage_reclamations')
 
 const priceControl = require('./server/price-control').install({app,mongoose,Dealer,requireAnyPermission,requirePermission,getDealerFilter,isGlobalViewer,hasPermission,today:pricingTodayKey});
 require('./server/ideal-ai').install({app,connection:mongoose.connection,AuditLog,Dealer,Sales,User,employeeKpi});
+require('./server/ideal-workbench').install({app,mongoose,Dealer,Sales,User,Reclamation,AuditLog,employeeKpi,getDealerFilter,getWorkingDealerFilter,hasPermission});
 require('./server/offer-photos').registerOfferPhotos({app,CommercialOffer,validSnapshot:priceControlSnapshotValid});
 require('./server/dealer-media').registerDealerMedia({app,Dealer,Reclamation,requirePermission,getDealerFilter,getScopedDealerIds});
 

@@ -25,7 +25,7 @@
   const el=document.createElement('div');el.className='ideal-ai-message '+role;el.dataset.aiMode=local?'reports':'knowledge';
   const label=document.createElement('strong');label.textContent=role==='user'?'Вы':local?'CRM · точный расчёт':'IDEAL AI';const content=document.createElement('div');content.textContent=text;el.append(label,content);
   if(sources.length){const refs=document.createElement('div');refs.className='ideal-ai-sources';const heading=document.createElement('small');heading.textContent=local?'Источник данных':'Материалы для проверки ответа';refs.appendChild(heading);
-   const allowed=/^(?:\/knowledge\.html(?:\?trainingCollection=[^#]*)?|\/sales\.html|\/users\.html|\/)$/;
+   const allowed=/^(?:\/knowledge\.html(?:\?(?:trainingCollection|assistantGuide|catalogCollection)=[^#]*)?|\/sales\.html|\/users\.html|\/)$/;
    for(const source of sources){if(!allowed.test(source.url||''))continue;const a=document.createElement('a');a.href=source.url;a.target='_blank';a.rel='noopener';a.textContent=(source.number?'['+source.number+'] ':'')+source.title+(source.version?' · '+source.version:'');refs.appendChild(a);}el.appendChild(refs);
   }
   log.appendChild(el);el.hidden=(local?'reports':'knowledge')!==mode;log.scrollTop=log.scrollHeight;

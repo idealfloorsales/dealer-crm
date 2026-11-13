@@ -18,7 +18,17 @@ function loadKnowledge(){
   }
   return{id:c.id,title:c.collection+' · '+c.format,url:'/knowledge.html?trainingCollection='+encodeURIComponent(c.collection),text:c.collection+' '+c.format+'\n'+specs.map(s=>s.join(': ')).join('\n')+'\n'+c.description.slice(0,900)+'\n'+c.note+'\n'+warning+'\n'+(c.schemes||[]).map(s=>'Схема: '+s.caption).join('\n')};
  });
- return{version:data.version,source:data.source,documents:[common,...collections]};
+ const guide=JSON.parse(fs.readFileSync(path.join(__dirname,'../public/assistant-guide.json'),'utf8'));
+ const topics=guide.topics.map(t=>({id:'guide-'+t.id,title:t.title,url:'/knowledge.html?assistantGuide='+encodeURIComponent(t.id),text:t.text+'\nИсточник: '+guide.source,version:guide.version}));
+ const rawCatalog=fs.readFileSync(path.join(__dirname,'../public/nomenclature-data.js'),'utf8').trim();
+ const catalog=JSON.parse(rawCatalog.slice('window.IDEAL_NOMENCLATURE='.length).replace(/;\s*$/,''));
+ const catalogDocs=catalog.collections.map((name,i)=>{
+  const products=catalog.products.filter(p=>p.c===name);
+  const text=products.map(p=>{const dimensions=String(p.d).match(/(\d+)×(\d+)×/),count=parseFloat(p.q),area=parseFloat(String(p.p).replace(',','.'));const mismatch=dimensions&&count&&area&&Math.abs(Number(dimensions[1])*Number(dimensions[2])/1e6*count-area)/area>.03;
+   return p.s+' '+p.n+' · '+p.d+' мм · класс '+p.k+' · фаска '+p.b+' · текстура '+p.t+(mismatch?' · данные упаковки требуют сверки':' · упаковка '+p.p+'; '+p.q);}).join('\n');
+  return{id:'catalog-'+i,title:name+' · декоры и номенклатура',url:'/knowledge.html?catalogCollection='+encodeURIComponent(name),version:catalog.version,text:'Источник: номенклатура IDEAL FLOOR версии '+catalog.version+'.\n'+text+'\nУсловия монтажа и гарантия в номенклатуре не определены. Не переносить их с других коллекций.'};
+ });
+ return{version:data.version,source:data.source,documents:[common,...collections,...topics,...catalogDocs]};
 }
 const normalize=s=>String(s).toLowerCase().replace(/ё/g,'е');
 function retrieve(message,history=[]){
@@ -28,7 +38,7 @@ function retrieve(message,history=[]){
  const ranked=data.documents.map(d=>({d,score:words.reduce((n,w)=>n+(normalize(d.title).includes(w)?6:normalize(d.text).includes(w)?1:0),0)})).sort((a,b)=>b.score-a.score);
  let selected=ranked.filter(r=>r.score>0).slice(0,4).map(r=>r.d);
  if(!selected.length)selected=[data.documents[0]];
- const context='Учебный материал IDEAL FLOOR. Версия '+data.version+'. Источник: '+data.source+'.\n'+selected.map((d,i)=>'['+(i+1)+'] '+d.title+'\n'+d.text).join('\n\n')+'\nДоступные коллекции: '+data.documents.slice(1).map(d=>d.title).join('; ');
- return{context,sources:selected.map((d,i)=>({number:i+1,title:d.title,url:d.url,version:data.version}))};
+ const context='Учебный материал IDEAL FLOOR. Версия '+data.version+'. Источник: '+data.source+'.\n'+selected.map((d,i)=>'['+(i+1)+'] '+d.title+'\n'+d.text).join('\n\n')+'\nДоступные материалы: '+data.documents.slice(1).map(d=>d.title).join('; ');
+ return{context,sources:selected.map((d,i)=>({number:i+1,title:d.title,url:d.url,version:d.version||data.version}))};
 }
 module.exports={retrieve,loadKnowledge};

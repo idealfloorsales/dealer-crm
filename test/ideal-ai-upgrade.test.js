@@ -5,7 +5,7 @@ const {salesReport,visitsReport,kpiReport}=require('../server/ideal-ai-reports')
 const {install}=require('../server/ideal-ai');
 test('knowledge uses the current training source, distinguishes formats, links to fixed training routes and flags inconsistent packs',()=>{
  const k=retrieve('ENGLAND HERRINGBONE 600');assert.equal(k.sources[0].title,'ENGLAND HERRINGBONE · 600×100×8 мм');assert.match(k.context,/30 \(15 A \+ 15 B\)/);assert.match(k.context,/1,8 м²/);
- const data=loadKnowledge();assert.ok(data.documents.length>5);assert.ok(data.documents.every(d=>d.url.startsWith('/knowledge.html?trainingCollection=')));
+ const data=loadKnowledge();assert.ok(data.documents.length>5);assert.ok(data.documents.every(d=>/^\/knowledge\.html\?(trainingCollection|assistantGuide|catalogCollection)=/.test(d.url)));
  const french=retrieve('французская елочка');assert.ok(french.sources.some(s=>/FRENCH/.test(s.title)));
  const conflict=data.documents.filter(d=>d.text.includes('не согласуются'));assert.ok(conflict.length>0);for(const d of conflict){assert.ok(!d.text.includes('Планок:'));assert.ok(!d.text.includes('Упаковка:'));}
 });

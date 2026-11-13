@@ -28,3 +28,13 @@ The external chat sends the explicitly typed text, up to six supplied user/assis
 Generic mutation audit bypasses these endpoints to avoid storing prompts. Dedicated audit records include only actor, request ID, model, token counts and safe outcome codes. The API key and upstream error bodies are not logged. Responses render with textContent, not model-supplied HTML. The authenticated server guard rechecks administrator permissions after the main JWT/database account middleware.
 
 Validated with mocked provider: unauthenticated/non-admin denied; feature-disabled rejected; prompt/history validation; shared quota; no business-data or tool access; no prompt/key in audit; safe provider errors. Live provider connectivity, available model and API credits require the owner's server key and a successful request in the deployed CRM. No live connection is claimed until that test succeeds.
+
+## Daily work and dealer preparation (2026-11-13)
+
+`Мой план` is available through desktop navigation and the mobile sections menu to signed-in non-guest users with dealer access. The dealer card offers `Подготовиться к визиту`. All preparation, priorities, tasks and editable message drafts are local CRM features; they never call an AI provider. Sales and reclamation details require their respective permissions. Dealer visibility is rechecked using the existing working-dealer scope on every request.
+
+Daily priorities show due tasks, pending visits, long-unvisited dealers and (where permitted) no-sales signals, plus the current employee's KPI. These are transparent rule-based recommendations, not model judgements. Lists show bounded totals; large queries fail rather than silently omit rows.
+
+General tasks use a separate `IdealWorkTask` model so a completed phone call cannot become a completed visit. Creating/completing requires the existing visit-management permission; employees may assign only themselves, administrators may assign an eligible employee whose dealer scope covers the chosen dealer. Creation has an editable preview and explicit confirmation, idempotency key and audit. Completion rechecks current task ownership, dealer scope and permissions. No messages are sent automatically. Active task counts are shown; the first 100 are rendered in the daily plan.
+
+Knowledge additionally retrieves the existing public nomenclature for all nine collections and operational checklists from `public/assistant-guide.json`. Checklists are available as a training tab with source links; they do not establish manufacturer warranties or replace installation instructions. Conflicting pack geometry remains flagged for source verification.
