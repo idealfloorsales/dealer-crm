@@ -1159,8 +1159,13 @@ document.addEventListener('DOMContentLoaded', () => {
             .is-mid .sales-print-overview-bar i,
             .sales-print-item.is-mid .sales-print-item-progress span { background:#d89526; }
             .sales-print-section {
-                margin-bottom: 2.4mm;
-                break-inside: auto;
+                margin-bottom: 3mm;
+                padding: 2mm;
+                border: .9pt solid #c9babc;
+                border-radius: 2mm;
+                background: #fff;
+                break-inside: avoid;
+                page-break-inside: avoid;
             }
             .sales-print-section-title {
                 margin-bottom: 1.3mm;

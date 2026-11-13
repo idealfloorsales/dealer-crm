@@ -4598,8 +4598,13 @@ body.bg-light {
     }
 
     .sales-print-section {
-        margin-bottom: 3.2mm;
-        break-inside: auto;
+        margin-bottom: 3mm;
+        padding: 2mm;
+        border: .9pt solid #c9babc;
+        border-radius: 2mm;
+        background: #fff;
+        break-inside: avoid;
+        page-break-inside: avoid;
     }
 
     .sales-print-section-title {
