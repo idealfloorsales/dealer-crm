@@ -7,6 +7,41 @@
  const key='crm:delivery-filter:'+String(CRMAuth.user.id||'user');try{const saved=JSON.parse(localStorage.getItem(key)||'[]');if(Array.isArray(saved))filterKeys=new Set(saved.filter(x=>typeof x==='string'));}catch(_){}
  const make=(tag,text,cls)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e;};
  const button=(text,fn)=>{const b=make('button',text);b.type='button';b.addEventListener('click',fn);return b;};
+ function buildCombined(delivery,payment){
+  const clean=x=>String(x||'').replace(/\s+/g,' ').trim();
+  return [clean(delivery)?'Доставка: '+clean(delivery):'',clean(payment)?'Оплата: '+clean(payment):''].filter(Boolean).join(' · ');
+ }
+ function partsFor(value){
+  const text=String(value||'').trim();
+  if(!text)return {delivery:'',payment:'',combined:''};
+  const item=items.find(row=>row.name===text||row.aliases.includes(text));
+  if(item)return {delivery:item.deliveryPart||'',payment:item.paymentPart||'',combined:text};
+  const both=text.match(/^Доставка: (.*?) · Оплата: (.*)$/);
+  if(both)return {delivery:both[1],payment:both[2],combined:text};
+  if(text.startsWith('Доставка: '))return {delivery:text.slice('Доставка: '.length),payment:'',combined:text};
+  if(text.startsWith('Оплата: '))return {delivery:'',payment:text.slice('Оплата: '.length),combined:text};
+  return {delivery:text,payment:'',combined:text};
+ }
+ function showParts(container,parts){
+  container.replaceChildren();
+  for(const [part,kind] of [[parts.delivery,'delivery'],[parts.payment,'payment']]){
+   if(!part)continue;
+   const chip=make('span',part,'crm-delivery-chip is-'+kind);
+   chip.title=(kind==='delivery'?'Доставка: ':'Оплата: ')+part;
+   container.appendChild(chip);
+  }
+ }
+ function renderPreview(){
+  if(!manager)return;
+  const delivery=manager.querySelector('[data-delivery-shipping]')?.value||'';
+  const payment=manager.querySelector('[data-delivery-payment]')?.value||'';
+  const host=manager.querySelector('[data-delivery-preview]');
+  if(!host)return;
+  showParts(host,{delivery:delivery.trim(),payment:payment.trim()});
+  if(!host.children.length)host.appendChild(make('span','Заполните доставку или оплату','delivery-preview-placeholder'));
+  const line=manager.querySelector('[data-delivery-combined]');
+  if(line)line.textContent=buildCombined(delivery,payment)||'Вариант ещё не заполнен';
+ }
  async function api(path='',body,method='POST'){const r=await fetch('/api/delivery-conditions'+path,{crmTrackLoading:false,...(body?{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});const data=await r.json().catch(()=>({}));if(!r.ok)throw Error(data.error||'Справочник условий недоступен');return data;}
  function notify(){try{localStorage.setItem(key,JSON.stringify([...filterKeys]));}catch(_){}document.dispatchEvent(new CustomEvent('crm:delivery-filter-change'));}
  function matches(value){if(!filterKeys.size)return true;const text=String(value||'');for(const token of filterKeys){if(token==='empty:'&&!text.trim())return true;if(!token.startsWith('value:'))continue;const selected=token.slice(6),item=items.find(r=>r.name===selected||r.aliases.includes(selected));if(text===selected||(item&&[item.name,...item.aliases].includes(text)))return true;}return false;}
@@ -18,19 +53,25 @@
   select.replaceChildren(...options.map(o=>{const e=make('option',o.text);e.value=o.value;e.disabled=o.disabled;return e;}));select.value=before;
  }
  function bindFields(){if(!ready)return;for(const id of ['delivery','edit_delivery','profile-edit-delivery','pricing-delivery-condition']){let field=document.getElementById(id);if(!field)continue;
-  if(field.tagName!=='SELECT'){const select=make('select');select.id=id;select.className=field.className||'form-select';select.disabled=field.disabled;select.required=field.required;if(field.name)select.name=field.name;select.setAttribute('aria-label','Условия доставки');select.dataset.deliverySelect='1';if(field.value){const o=make('option',field.value);o.value=field.value;select.appendChild(o);}field.replaceWith(select);field=select;}
-  fillSelect(field);field.title=field.value;if(!field.dataset.deliveryBound){field.addEventListener('change',()=>field.title=field.value);field.dataset.deliveryBound='1';}const parent=field.parentElement;if(!parent.classList.contains('delivery-field')){const wrapper=make('div',undefined,'delivery-field');field.before(wrapper);wrapper.appendChild(field);if(canManage){const gear=button('',()=>openManager(field));gear.innerHTML='<i class="bi bi-gear"></i>';gear.className='motivation-gear-btn delivery-gear';gear.title='Настроить условия доставки';gear.setAttribute('aria-label','Настроить условия доставки');wrapper.appendChild(gear);}}
-  const label=field.closest('.col-md-4,.col-md-6,.mb-3')?.querySelector('label');if(label&&/^Доставка$/.test(label.textContent.trim()))label.textContent='Условия доставки';
+  if(field.tagName!=='SELECT'){const select=make('select');select.id=id;select.className=field.className||'form-select';select.disabled=field.disabled;select.required=field.required;if(field.name)select.name=field.name;select.setAttribute('aria-label','Условия доставки и оплаты');select.dataset.deliverySelect='1';if(field.value){const o=make('option',field.value);o.value=field.value;select.appendChild(o);}field.replaceWith(select);field=select;}
+  fillSelect(field);field.title=field.value;if(!field.dataset.deliveryBound){field.addEventListener('change',()=>field.title=field.value);field.dataset.deliveryBound='1';}const parent=field.parentElement;if(!parent.classList.contains('delivery-field')){const wrapper=make('div',undefined,'delivery-field');field.before(wrapper);wrapper.appendChild(field);if(canManage){const gear=button('',()=>openManager(field));gear.innerHTML='<i class="bi bi-gear"></i>';gear.className='motivation-gear-btn delivery-gear';gear.title='Настроить условия доставки и оплаты';gear.setAttribute('aria-label','Настроить условия доставки и оплаты');wrapper.appendChild(gear);}}
+  const label=field.closest('.col-md-4,.col-md-6,.mb-3')?.querySelector('label');if(label&&/^Доставка$/.test(label.textContent.trim()))label.textContent='Условия доставки и оплаты';
  }}
  let filterPanel=null;
  function filterUI(){const reset=document.getElementById('dealer-reset-filters');if(!reset)return;
-  if(!filterPanel){filterPanel=make('details',undefined,'delivery-filter');filterPanel.id='filter-delivery';const summary=make('summary','Все условия доставки');const popup=make('div',undefined,'delivery-filter-popup');const search=make('input');search.type='search';search.placeholder='Найти условия…';search.setAttribute('aria-label','Поиск условий доставки');const list=make('div',undefined,'delivery-filter-options');popup.append(search,list,button('Сбросить выбор',()=>{filterKeys.clear();renderFilter();notify();}));filterPanel.append(summary,popup);reset.before(filterPanel);search.addEventListener('input',()=>{const query=search.value.trim().toLowerCase();list.querySelectorAll('label').forEach(row=>row.hidden=!row.textContent.toLowerCase().includes(query));});}
+  if(!filterPanel){filterPanel=make('details',undefined,'delivery-filter');filterPanel.id='filter-delivery';const summary=make('summary','Все условия доставки и оплаты');const popup=make('div',undefined,'delivery-filter-popup');const search=make('input');search.type='search';search.placeholder='Найти доставку или оплату…';search.setAttribute('aria-label','Поиск условий доставки и оплаты');const list=make('div',undefined,'delivery-filter-options');popup.append(search,list,button('Сбросить выбор',()=>{filterKeys.clear();renderFilter();notify();}));filterPanel.append(summary,popup);reset.before(filterPanel);search.addEventListener('input',()=>{const query=search.value.trim().toLowerCase();list.querySelectorAll('label').forEach(row=>row.hidden=!row.textContent.toLowerCase().includes(query));});}
   renderFilter();
  }
  function renderFilter(){if(!filterPanel)return;const list=filterPanel.querySelector('.delivery-filter-options'),choices=[{token:'empty:',name:'Не заполнено'},...items.map(i=>({token:'value:'+i.name,name:i.name+(!i.active?' · архив':'')}))];
-  list.replaceChildren(...choices.map(c=>{const label=make('label'),check=make('input');check.type='checkbox';check.checked=filterKeys.has(c.token);check.addEventListener('change',()=>{check.checked?filterKeys.add(c.token):filterKeys.delete(c.token);filterPanel.querySelector('summary').textContent=filterKeys.size?'Условия доставки · '+filterKeys.size:'Все условия доставки';notify();});label.append(check,make('span',c.name));return label;}));filterPanel.querySelector('summary').textContent=filterKeys.size?'Условия доставки · '+filterKeys.size:'Все условия доставки';
+  list.replaceChildren(...choices.map(c=>{const label=make('label'),check=make('input');check.type='checkbox';check.checked=filterKeys.has(c.token);check.addEventListener('change',()=>{check.checked?filterKeys.add(c.token):filterKeys.delete(c.token);filterPanel.querySelector('summary').textContent=filterKeys.size?'Доставка и оплата · '+filterKeys.size:'Все условия доставки и оплаты';notify();});label.append(check,make('span',c.name));return label;}));filterPanel.querySelector('summary').textContent=filterKeys.size?'Доставка и оплата · '+filterKeys.size:'Все условия доставки и оплаты';
  }
- async function load(){if(loading)return loading;loading=api().then(data=>{items=data.items.map(i=>({...i,aliases:Array.isArray(i.aliases)?i.aliases:[]}));canManage=data.canManage;ready=true;bindFields();filterUI();notify();return data;}).finally(()=>loading=null);return loading;}
+ async function load(){if(loading)return loading;loading=api().then(data=>{items=data.items.map(i=>({...i,aliases:Array.isArray(i.aliases)?i.aliases:[]}));
+  filterKeys=new Set([...filterKeys].map(token=>{
+   if(!token.startsWith('value:'))return token;
+   const value=token.slice(6),match=items.find(item=>item.name===value||item.aliases.includes(value));
+   return match?'value:'+match.name:token;
+  }));
+  canManage=data.canManage;ready=true;bindFields();filterUI();notify();return data;}).finally(()=>loading=null);return loading;}
 
  function ensureManager(){
   if(manager)return manager;
@@ -41,7 +82,7 @@
   manager.dataset.bsBackdrop='static';
   manager.innerHTML='<div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">'+
    '<div class="modal-content motivation-manager">'+
-    '<div class="motivation-manager-head"><div><span>УСЛОВИЯ ДЛЯ ДИЛЕРОВ</span><h3>Условия доставки</h3><p>Создавайте свои варианты доставки и оплаты. Затем выбирайте их в карточке дилера.</p></div>'+
+    '<div class="motivation-manager-head"><div><span>УСЛОВИЯ ДЛЯ ДИЛЕРОВ</span><h3>Условия доставки и оплаты</h3><p>Два отдельных поля — одно условие для выбора, отображения и фильтров.</p></div>'+
      '<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Закрыть"></button></div>'+
     '<div class="motivation-manager-stats">'+
      '<article><small>Всего вариантов</small><strong data-delivery-total>0</strong></article>'+
@@ -55,9 +96,13 @@
       '<div class="motivation-scheme-list" data-delivery-rows></div>'+
      '</section>'+
      '<section class="motivation-editor-panel">'+
-      '<div class="motivation-editor-title"><span data-delivery-kicker>НОВЫЙ ВАРИАНТ</span><h4 data-delivery-editor-title>Условия доставки</h4></div>'+
+      '<div class="motivation-editor-title"><span data-delivery-kicker>НОВЫЙ ВАРИАНТ</span><h4 data-delivery-editor-title>Доставка и оплата</h4></div>'+
       '<form data-delivery-form>'+
-       '<label><span>Условия доставки и оплаты</span><textarea data-delivery-name class="form-control" rows="5" maxlength="700" required placeholder="Введите ваш вариант условий доставки"></textarea></label>'+
+       '<div class="delivery-form-parts">'+
+  '<label><span>Условия доставки</span><textarea data-delivery-shipping class="form-control" rows="3" maxlength="700" placeholder="Например: Самовывоз со склада"></textarea></label>'+
+  '<label><span>Оплата</span><textarea data-delivery-payment class="form-control" rows="3" maxlength="700" placeholder="Например: Отсрочка 14 дней"></textarea></label>'+
+  '</div>'+
+  '<div class="delivery-form-preview"><strong>Как увидят в строке дилера</strong><div class="delivery-badge-pair" data-delivery-preview></div><small data-delivery-combined>Вариант ещё не заполнен</small></div>'+
        '<label class="motivation-active-toggle"><span><strong>Активен</strong><small>Доступен для выбора в карточке дилера</small></span><input type="checkbox" data-delivery-active-toggle checked></label>'+
        '<p class="delivery-manager-hint">Уже сохранённые условия дилеров не изменяются при редактировании справочника.</p>'+
        '<div class="motivation-editor-actions"><button type="button" class="btn btn-light border" data-delivery-new>Очистить</button><button type="submit" class="btn btn-dark" data-delivery-save>Сохранить</button></div>'+
@@ -69,15 +114,18 @@
   document.body.appendChild(manager);
   manager.querySelectorAll('[data-delivery-new]').forEach(b=>b.addEventListener('click',resetEditor));
   manager.querySelector('[data-delivery-search]').addEventListener('input',renderManager);
+  manager.querySelectorAll('[data-delivery-shipping],[data-delivery-payment]').forEach(field=>field.addEventListener('input',renderPreview));
   manager.querySelector('[data-delivery-form]').addEventListener('submit',async e=>{
    e.preventDefault();if(!canManage)return;
-   const name=manager.querySelector('[data-delivery-name]').value.trim();
-   if(!name)return;
+   const deliveryPart=manager.querySelector('[data-delivery-shipping]').value.trim();
+   const paymentPart=manager.querySelector('[data-delivery-payment]').value.trim();
+   if(!deliveryPart&&!paymentPart){message('Заполните доставку или оплату.',true);return;}
+   if(buildCombined(deliveryPart,paymentPart).length>700){message('Общая длина условий не должна превышать 700 символов.',true);return;}
    const active=manager.querySelector('[data-delivery-active-toggle]').checked;
    const save=manager.querySelector('[data-delivery-save]'),before=save.innerHTML;
    save.disabled=true;save.innerHTML='<span class="spinner-border spinner-border-sm"></span> Сохраняем';
    try{
-    await api(editing?.id?'/'+editing.id:'',{name,active},editing?.id?'PATCH':'POST');
+    await api(editing?.id?'/'+editing.id:'',{deliveryPart,paymentPart,active},editing?.id?'PATCH':'POST');
     await load();resetEditor();renderManager();
     message('Вариант сохранён. Теперь его можно выбрать в карточке дилера.');
    }catch(err){message(err.message,true);}
@@ -93,7 +141,7 @@
   });
   manager.addEventListener('shown.bs.modal',()=>{
    document.body.classList.add('motivation-modal-open');
-   manager.querySelector('[data-delivery-name]')?.focus();
+   manager.querySelector('[data-delivery-shipping]')?.focus();
   });
   return manager;
  }
@@ -105,8 +153,10 @@
   editing=null;
   if(!manager)return;
   manager.querySelector('[data-delivery-kicker]').textContent='НОВЫЙ ВАРИАНТ';
-  manager.querySelector('[data-delivery-editor-title]').textContent='Условия доставки';
-  manager.querySelector('[data-delivery-name]').value='';
+  manager.querySelector('[data-delivery-editor-title]').textContent='Доставка и оплата';
+  manager.querySelector('[data-delivery-shipping]').value='';
+  manager.querySelector('[data-delivery-payment]').value='';
+  renderPreview();
   manager.querySelector('[data-delivery-active-toggle]').checked=true;
   message('');
  }
@@ -115,10 +165,12 @@
   editing=item;
   manager.querySelector('[data-delivery-kicker]').textContent='РЕДАКТИРОВАНИЕ';
   manager.querySelector('[data-delivery-editor-title]').textContent='Изменить условия';
-  manager.querySelector('[data-delivery-name]').value=item.name;
+  manager.querySelector('[data-delivery-shipping]').value=item.deliveryPart||'';
+  manager.querySelector('[data-delivery-payment]').value=item.paymentPart||'';
+  renderPreview();
   manager.querySelector('[data-delivery-active-toggle]').checked=item.active;
   message('');
-  manager.querySelector('[data-delivery-name]').focus();
+  manager.querySelector('[data-delivery-shipping]').focus();
  }
  async function toggleCondition(item){
   if(!canManage||!item.id)return;
@@ -133,7 +185,7 @@
  function renderManager(){
   if(!manager)return;
   const query=manager.querySelector('[data-delivery-search]').value.trim().toLowerCase();
-  const filtered=items.filter(i=>[i.name,...i.aliases].join(' ').toLowerCase().includes(query));
+  const filtered=items.filter(i=>[i.name,i.deliveryPart,i.paymentPart,...i.aliases].join(' ').toLowerCase().includes(query));
   const list=manager.querySelector('[data-delivery-rows]');
   list.replaceChildren();
   manager.querySelector('[data-delivery-total]').textContent=items.length;
@@ -147,10 +199,12 @@
    if(!item.active)row.classList.add('is-archive');
    const icon=make('div',undefined,'motivation-scheme-icon');icon.innerHTML='<i class="bi bi-truck"></i>';
    const copy=make('div',undefined,'motivation-scheme-copy');
-   const heading=make('div'),name=make('strong',item.name);
-   heading.appendChild(name);
+   const heading=make('div'),name=make('strong','Условия доставки и оплаты');
+   name.title=item.name;heading.appendChild(name);
    if(!item.active)heading.appendChild(make('span','архив','motivation-archive-badge'));
-   copy.appendChild(heading,make('small','Дилеров: '+item.usage));
+   const pair=make('div',undefined,'delivery-badge-pair');
+   showParts(pair,partsFor(item.name));
+   copy.appendChild(heading,pair,make('small','Дилеров: '+item.usage));
    const actions=make('div',undefined,'motivation-scheme-actions');
    if(item.active&&originSelect){
     const choose=button('',()=>{
@@ -184,6 +238,6 @@
   bootstrap.Modal.getOrCreateInstance(manager).show();
   renderManager();
  }
- window.CRMDelivery={matches,setSelected(id,value){const field=document.getElementById(id);if(!field)return;const text=String(value||'');if(field.tagName==='SELECT'&&text&&![...field.options].some(o=>o.value===text)){const option=make('option',text+' · сохранённые условия');option.value=text;option.disabled=true;field.appendChild(option);}field.value=text;field.title=text;},getFilter:()=>[...filterKeys],setFilter(values,dispatch=true){filterKeys=new Set(Array.isArray(values)?values:[]);renderFilter();if(dispatch)notify();},refresh:load};
+ window.CRMDelivery={matches,partsFor,buildCombined,setSelected(id,value){const field=document.getElementById(id);if(!field)return;const text=String(value||'');if(field.tagName==='SELECT'&&text&&![...field.options].some(o=>o.value===text)){const option=make('option',text+' · сохранённые условия');option.value=text;option.disabled=true;field.appendChild(option);}field.value=text;field.title=text;},getFilter:()=>[...filterKeys],setFilter(values,dispatch=true){filterKeys=new Set(Array.isArray(values)?values:[]);renderFilter();if(dispatch)notify();},refresh:load};
  try{await load();const observer=new MutationObserver(bindFields);observer.observe(document.body,{childList:true,subtree:true});}catch(_){console.warn('Не удалось загрузить справочник условий доставки; исходные поля сохранены.');}
 })();
