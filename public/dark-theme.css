@@ -43,6 +43,16 @@
   --dark-blue:#7aaee6;
   --dark-blue-bg:rgba(63,117,177,.18);
   --dark-shadow:0 18px 50px rgba(0,0,0,.34);
+  /* Same modal system in both themes; shared by dealer, pricing and catalog windows. */
+  --crm-modal-hero:radial-gradient(circle at 92% -20%,rgba(185,4,10,.52),transparent 23rem),linear-gradient(120deg,#171719,#292628);
+  --crm-modal-canvas:#15161a;
+  --crm-modal-panel:#202126;
+  --crm-modal-border:#3a3c43;
+  --crm-modal-control:#292a30;
+  --crm-modal-radius:24px;
+  --crm-modal-ink:#f3f4f6;
+  --crm-modal-muted:#aaadb5;
+  --crm-modal-accent:#ef555c;
 }
 
 :root[data-crm-theme="dark"] body,
