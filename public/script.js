@@ -272,7 +272,7 @@ document.addEventListener('DOMContentLoaded', () => {
         {id:'plan_percent',group:'Коммерция',label:'Выполнение плана, %',width:20,checked:true,getValue:d=>getDealerListMetrics(d).achievement ?? ''},
         {id:'health_score',group:'Контроль',label:'Оценка дилера, %',width:18,checked:false,getValue:d=>Number(getDealerListMetrics(d).health?.score||0)},
         {id:'last_visit',group:'Контроль',label:'Последний визит',width:17,checked:true,getValue:d=>exportLastVisit(d)},
-        {id:'delivery',group:'Работа',label:'Условия доставки',width:30,checked:false,getValue:d=>d.effectiveDelivery||d.delivery||''},
+        {id:'delivery',group:'Работа',label:'Условия доставки и оплаты',width:40,checked:false,getValue:d=>d.effectiveDelivery||d.delivery||''},
         {id:'notes',group:'Работа',label:'Заметки / особые условия',width:40,checked:false,getValue:d=>d.bonuses||''},
         {id:'latitude',group:'Локация',label:'Широта',width:15,checked:false,getValue:d=>d.latitude??''},
         {id:'longitude',group:'Локация',label:'Долгота',width:15,checked:false,getValue:d=>d.longitude??''}
@@ -3115,6 +3115,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const searchable = [
                 d.name, d.dealer_id, normalizedCity, d.address, normalizedSector, normalizedType,
                 responsibleLabel(d.responsible),
+                d.effectiveDelivery || d.delivery,
                 ...(d.pos_materials || []).map(item => item?.name)
             ].filter(Boolean).join(' ').toLowerCase();
 
@@ -3298,6 +3299,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 : '';
 
             const metaHtml = baseMetaHtml + motivationMetaHtml;
+            const deliveryValue = String(d.effectiveDelivery || d.delivery || '').trim();
+            const deliveryParts = window.CRMDelivery?.partsFor?.(deliveryValue) || {delivery:deliveryValue,payment:''};
+            const deliveryMetaHtml = deliveryValue
+                ? `<div class="dealer-list-v6-delivery" role="group" aria-label="Условия доставки и оплаты: ${safeAttr(deliveryValue)}" title="${safeAttr(deliveryValue)}">
+                    ${deliveryParts.delivery ? `<span class="crm-delivery-chip is-delivery" title="Доставка: ${safeAttr(deliveryParts.delivery)}">${safeText(deliveryParts.delivery)}</span>` : ''}
+                    ${deliveryParts.payment ? `<span class="crm-delivery-chip is-payment" title="Оплата: ${safeAttr(deliveryParts.payment)}">${safeText(deliveryParts.payment)}</span>` : ''}
+                </div>`
+                : '';
 
             const mainSignal = signals[0]
                 ? `<span class="dealer-list-v6-signal is-${signals[0].level}"><i class="bi bi-${signals[0].icon}"></i>${safeText(signals[0].text)}</span>`
@@ -3319,6 +3328,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <span class="dealer-list-v6-status" style="--status-color:${safeAttr(statusObj.color || '#72747a')}">${safeText(statusObj.label)}</span>
                         </div>
                         <div class="dealer-list-v6-meta">${metaHtml || '<span>Данные не заполнены</span>'}</div>
+                        ${deliveryMetaHtml}
                         <div class="dealer-list-v6-sub">
                             <span>ID ${safeText(d.dealer_id || '—')}</span>
                             ${mainSignal}
