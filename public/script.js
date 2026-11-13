@@ -272,7 +272,7 @@ document.addEventListener('DOMContentLoaded', () => {
         {id:'plan_percent',group:'Коммерция',label:'Выполнение плана, %',width:20,checked:true,getValue:d=>getDealerListMetrics(d).achievement ?? ''},
         {id:'health_score',group:'Контроль',label:'Оценка дилера, %',width:18,checked:false,getValue:d=>Number(getDealerListMetrics(d).health?.score||0)},
         {id:'last_visit',group:'Контроль',label:'Последний визит',width:17,checked:true,getValue:d=>exportLastVisit(d)},
-        {id:'delivery',group:'Работа',label:'Условия доставки',width:30,checked:false,getValue:d=>d.delivery||''},
+        {id:'delivery',group:'Работа',label:'Условия доставки',width:30,checked:false,getValue:d=>d.effectiveDelivery||d.delivery||''},
         {id:'notes',group:'Работа',label:'Заметки / особые условия',width:40,checked:false,getValue:d=>d.bonuses||''},
         {id:'latitude',group:'Локация',label:'Широта',width:15,checked:false,getValue:d=>d.latitude??''},
         {id:'longitude',group:'Локация',label:'Долгота',width:15,checked:false,getValue:d=>d.longitude??''}
@@ -1684,7 +1684,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         (motivationFilter === '__without__' && !hasMotivation) ||
                         (motivationFilter !== '__with__' && motivationFilter !== '__without__' && motivationId === motivationFilter);
                 })() &&
-                (!window.CRMDelivery || CRMDelivery.matches(dealer.delivery)) &&
+                (!window.CRMDelivery || CRMDelivery.matches(dealer.effectiveDelivery || dealer.delivery)) &&
                 (!search || searchable.includes(search));
         });
 
@@ -3135,7 +3135,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     (responsible !== '__unassigned__' && String(d.responsible || '') === String(responsible))) &&
                 (!sector || normalizedSector === sector) &&
                 motivationMatches &&
-                (!window.CRMDelivery || CRMDelivery.matches(d.delivery)) &&
+                (!window.CRMDelivery || CRMDelivery.matches(d.effectiveDelivery || d.delivery)) &&
                 (!search || searchable.includes(search));
         });
 
