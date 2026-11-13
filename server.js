@@ -6735,7 +6735,7 @@ app.delete('/api/reclamations/:id', requirePermission('can_manage_reclamations')
 });
 
 const priceControl = require('./server/price-control').install({app,mongoose,Dealer,requireAnyPermission,requirePermission,getDealerFilter,isGlobalViewer,hasPermission,today:pricingTodayKey});
-require('./server/ideal-ai').install({app,connection:mongoose.connection,AuditLog});
+require('./server/ideal-ai').install({app,connection:mongoose.connection,AuditLog,Dealer,Sales,User,employeeKpi});
 require('./server/offer-photos').registerOfferPhotos({app,CommercialOffer,validSnapshot:priceControlSnapshotValid});
 require('./server/dealer-media').registerDealerMedia({app,Dealer,Reclamation,requirePermission,getDealerFilter,getScopedDealerIds});
 

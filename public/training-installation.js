@@ -18,6 +18,8 @@
   }).join('');
  }
  panel.querySelector('select').addEventListener('change',event=>render(event.target.value));render();
+ const linkedCollection=new URLSearchParams(location.search).get('trainingCollection');
+ if(linkedCollection==='all'||options.includes(linkedCollection)){const name=linkedCollection==='all'?'':linkedCollection;panel.querySelector('select').value=name;render(name);tab.click();panel.scrollIntoView({block:'start'});}
  let downloading=false;downloads.addEventListener('click',async event=>{const button=event.target.closest('[data-training-download]');if(!button||downloading)return;downloading=true;const message=downloads.querySelector('[data-download-message]');const buttons=downloads.querySelectorAll('button');buttons.forEach(b=>b.disabled=true);message.textContent='Готовим файл…';try{
   const format=button.dataset.trainingDownload,response=await fetch(data.downloads[format]);if(!response.ok)throw Error('Не удалось скачать файл. Проверьте доступ и повторите.');const blob=await response.blob();if(!blob.size)throw Error('Файл пуст. Повторите скачивание.');const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='IDEAL-FLOOR-Обучение.'+format;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);message.textContent='Файл скачан.';
  }catch(error){message.textContent=error.message;}finally{downloading=false;buttons.forEach(b=>b.disabled=false);}});
