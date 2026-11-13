@@ -3,7 +3,8 @@ function cleanName(value){if(typeof value!=='string'||!value.trim()||value.trim(
 function combine(records,values){
  const rows=records.map(r=>({id:String(r._id),name:r.name,active:r.active!==false,aliases:r.aliases||[],usage:0,legacy:false}));
  const byValue=new Map();for(const r of rows)for(const value of [r.name,...r.aliases])byValue.set(value,r);
- for(const value of values){if(typeof value!=='string'||!value.trim())continue;const existing=byValue.get(value);if(existing){existing.usage++;continue;}const r={id:null,name:value,active:true,aliases:[],usage:1,legacy:true};rows.push(r);byValue.set(value,r);}
+ // Existing dealer text is preserved in dealer cards, not imported as catalog options.
+ for(const value of values){if(typeof value!=='string'||!value.trim())continue;const existing=byValue.get(value);if(existing)existing.usage++;}
  return rows.sort((a,b)=>Number(b.active)-Number(a.active)||a.name.localeCompare(b.name,'ru'));
 }
 function install({app,mongoose,Dealer,AuditLog,hasPermission,isAdminUser,getDealerFilter}){
