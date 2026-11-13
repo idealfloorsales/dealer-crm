@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Проверка адаптации CRM</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#101114;color:#f3f4f6;font:14px/1.5 system-ui,sans-serif}header{position:sticky;top:0;z-index:1;display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:12px 18px;background:#202126;border-bottom:1px solid #43464f}h1{margin:0;font-size:15px}label{display:flex;align-items:center;gap:8px}select,button{min-height:36px;border:1px solid #50535c;border-radius:8px;background:#292a30;color:#fff;padding:5px 10px;font:inherit}main{padding:18px;overflow:auto}iframe{display:block;width:390px;height:844px;max-width:none;margin:0 auto;border:1px solid #555962;border-radius:16px;background:#fff}p{margin:8px 18px;color:#c2c5cc;font-size:12px}
+</style>
+</head>
+<body>
+<header><h1>Проверка адаптации CRM</h1><label>Ширина <select id="viewport-width"><option value="360">360 px</option><option value="390" selected>390 px</option><option value="768">768 px</option><option value="1363">1363 px</option></select></label><label>Раздел <select id="page"><option value="/">Дилеры</option><option value="/map.html">Карта</option><option value="/products.html">Матрица</option><option value="/report.html">Выставленность</option><option value="/sales.html">Продажи</option><option value="/competitors.html">Конкуренты</option><option value="/knowledge.html">Обучение</option><option value="/reclamations.html">Рекламации</option><option value="/workshop.html">Цех</option><option value="/pricing.html">Цены</option><option value="/users.html">Сотрудники</option><option value="/audit.html">Журнал</option></select></label><button id="reload" type="button">Обновить просмотр</button></header>
+<p>Обычная CRM в окне выбранной ширины. Используется стандартный вход; действия внутри окна работают с рабочей CRM.</p>
+<main><iframe id="crm-preview" title="CRM выбранной ширины" src="/"></iframe></main>
+<script>
+const frame=document.getElementById('crm-preview'),width=document.getElementById('viewport-width'),page=document.getElementById('page');
+width.addEventListener('change',()=>{frame.style.width=width.value+'px';});
+page.addEventListener('change',()=>{frame.src=page.value;});
+document.getElementById('reload').addEventListener('click',()=>{frame.contentWindow.location.reload();});
+</script>
+</body></html>

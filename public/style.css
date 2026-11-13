@@ -13591,3 +13591,14 @@ body:not(.app-workspace-page) .modal-header .btn-close{
 @media print {
   :root{color-scheme:light!important}
 }
+
+/* Keep every desktop section reachable without running behind account controls. */
+@media (min-width:992px){
+  .crm-topbar .navbar-nav{flex:1 1 auto;flex-direction:row;flex-wrap:wrap;row-gap:3px}
+  .crm-topbar .navbar-nav>.nav-item{flex:0 0 auto}
+  .crm-topbar-account{flex:0 0 auto}
+}
+@media (min-width:992px) and (max-width:1499.98px){
+  .crm-topbar-brand img{max-width:180px;height:auto;max-height:42px}
+  .crm-topbar-inner{gap:12px}
+}
