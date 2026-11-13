@@ -1,7 +1,8 @@
 (async()=>{
+ const assetVersion=new URL(document.currentScript?.src||document.querySelector('script[src*=\"ideal-workbench.js\"]')?.src||location.href,location.href).searchParams.get('v')||'20261113-plan';
  if(window.CRMAuth?.ready)await CRMAuth.ready;
  if(!window.CRMAuth?.user||CRMAuth.user.role==='guest'||!CRMAuth.can('can_view_dealers')||window.__idealWorkbench)return;window.__idealWorkbench=true;
- const sheet=document.createElement('link');sheet.rel='stylesheet';sheet.href='/ideal-workbench.css';document.head.appendChild(sheet);
+ const sheet=document.createElement('link');sheet.rel='stylesheet';sheet.href='/ideal-workbench.css?v='+encodeURIComponent(assetVersion);document.head.appendChild(sheet);
  function el(tag,text,cls){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e;}
  const overlay=el('div',undefined,'workbench-overlay');overlay.hidden=true;
  overlay.innerHTML=`<section role="dialog" aria-modal="true" aria-labelledby="workbench-title" class="workbench-dialog"><header><div><small>IDEAL FLOOR · РАБОЧИЙ ПЛАН</small><h2 id="workbench-title">Мой план</h2></div><button type="button" data-wb-close aria-label="Закрыть рабочий план">×</button></header><nav><button type="button" data-wb-day>План на сегодня</button><span data-wb-local>Данные остаются в CRM</span></nav><p class="workbench-status" role="status"></p><div class="workbench-content"></div><footer>Звонки и задачи учитываются отдельно от визитов. Создание — после проверки и подтверждения. Сообщения автоматически не отправляются.</footer></section>`;
