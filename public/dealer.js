@@ -6,6 +6,33 @@ document.addEventListener('DOMContentLoaded', () => {
     const bonusesContainer = document.getElementById('dealer-bonuses');
     const photoGalleryContainer = document.getElementById('dealer-photo-gallery'); 
     const deliveryContainer = document.getElementById('dealer-delivery'); 
+    function renderDealerDelivery(dealer) {
+        if (!deliveryContainer || !dealer) return;
+        const value = String(dealer.effectiveDelivery || dealer.delivery || '').trim();
+        deliveryContainer.replaceChildren();
+        if (!value) { deliveryContainer.textContent = 'Не указано'; return; }
+        const parts = window.CRMDelivery?.partsFor?.(value) || {delivery:value,payment:''};
+        const pair = document.createElement('div');
+        pair.className = 'dealer-profile-delivery-pair';
+        pair.title = value;
+        for (const [label,part,kind] of [['Доставка',parts.delivery,'delivery'],['Оплата',parts.payment,'payment']]) {
+            if (!part) continue;
+            const chip=document.createElement('span');
+            chip.className='crm-delivery-chip is-'+kind;
+            chip.textContent=part;
+            chip.title=label+': '+part;
+            pair.appendChild(chip);
+        }
+        deliveryContainer.appendChild(pair);
+        if (dealer.deliveryOverride) {
+            const detail=document.createElement('small');
+            detail.className='d-block text-muted mt-1';
+            detail.textContent='По коммерческому условию'+(dealer.deliveryOverride.endDate ? ' · до '+dealerDateText(dealer.deliveryOverride.endDate) : '');
+            deliveryContainer.appendChild(detail);
+        }
+    }
+    document.addEventListener('crm:delivery-filter-change',()=>{if(currentDealer)renderDealerDelivery(currentDealer);});
+
     const linksContainer = document.getElementById('dealer-links'); 
     const addressesListContainer = document.getElementById('dealer-addresses-list'); 
     const posListContainer = document.getElementById('dealer-pos-list'); 
@@ -403,15 +430,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 productsStatsContainer.innerHTML = `<div class="p-3 bg-light rounded border"><div class="d-flex justify-content-between mb-1"><strong>Загрузка матрицы</strong><span>${dealerProductsCount} / ${totalProductsCount}</span></div><div class="progress" style="height: 8px;"><div class="progress-bar bg-success" role="progressbar" style="width: ${percent}%"></div></div></div>`;
             }
 
-            if(deliveryContainer) {
-                deliveryContainer.textContent = safeText(dealer.effectiveDelivery || dealer.delivery) || 'Не указано';
-                if (dealer.deliveryOverride) {
-                    const detail=document.createElement('small');
-                    detail.className='d-block text-muted mt-1';
-                    detail.textContent='По коммерческому условию'+(dealer.deliveryOverride.endDate ? ' · до '+dealerDateText(dealer.deliveryOverride.endDate) : '');
-                    deliveryContainer.appendChild(detail);
-                }
-            }
+            renderDealerDelivery(dealer);
             if(bonusesContainer) {
                 const motivation = dealer.motivation_scheme && typeof dealer.motivation_scheme === 'object' ? dealer.motivation_scheme : null;
                 const motivationPeriod = motivation
@@ -1080,7 +1099,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                             <div><strong>Логистика и адреса</strong><small>Условия доставки и дополнительные точки</small></div>
                                             <button type="button" class="dealer-profile-edit-add" id="profile-edit-add-address"><i class="bi bi-plus-lg"></i> Адрес</button>
                                         </div>
-                                        <div class="mb-3"><label>Условия доставки</label><input id="profile-edit-delivery" class="form-control"></div>
+                                        <div class="mb-3"><label>Условия доставки и оплаты</label><input id="profile-edit-delivery" class="form-control"></div>
                                         <div id="profile-edit-addresses" class="dealer-profile-edit-contacts"></div>
                                     </div>
                                 </section>
