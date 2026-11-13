@@ -91,3 +91,19 @@ test('sales print includes signed deviations using the same calculations as the 
  html=c.printSalesBody.innerHTML;assert.ok(!html.includes('На сегодня'));assert.match(html,/\+1500 м²/);
  c.renderPrintReport(facts,{},0,0,0,15000,30,30);assert.match(c.printSalesBody.innerHTML,/Нет плана/);
 });
+
+test('payout reload honors the recalculation flag and row status save never reloads the list',async()=>{
+ const source=read('motivation.js'),calls=[];let recalcs=0;
+ const host={innerHTML:''},picker={value:'2026-11'},panel={};
+ const c=vm.createContext({document:{getElementById:id=>id==='motivation-payouts-panel'?panel:id==='motivation-payout-month'?picker:id==='motivation-payout-list'?host:null},state:{},payoutPending:new Set(),payoutLoadRevision:0,currentMonth:()=> '2026-11',canManage:()=>true,recalculatePayouts:async()=>{recalcs++;},request:async url=>{calls.push(url);return{rows:[]};},renderPayouts(){},esc:s=>s,API:'/api/motivation'});
+ vm.runInContext(between(source,'    async function loadPayouts(', '    function renderPayouts('),c);
+ await c.loadPayouts(false);assert.equal(recalcs,0);await c.loadPayouts(true);assert.equal(recalcs,1);assert.equal(calls.length,2);
+ const controls=[{disabled:false}],element={dataset:{payoutRow:'one'},querySelectorAll:()=>controls,setAttribute(){},removeAttribute(){},replaceWith(){this.replaced=true;}};let fail=false,notifications=[];
+ c.document={getElementById:id=>id==='motivation-payout-list'?{querySelectorAll:()=>[element]}:null,createElement:()=>({innerHTML:'',firstElementChild:{}})};
+ c.state.payoutData={rows:[{id:'one',status:'pending',amount:1000,salesM2:10},{id:'two',status:'pending',amount:2000,salesM2:20}]};
+ c.request=async(url,options)=>{assert.equal(options.method,'PATCH');assert.equal(url,'/api/motivation/payouts/one');if(fail)throw Error('failed');return{row:{status:'paid',paidAt:'2026-11-13'}};};
+ c.n=v=>Number(v)||0;c.money=String;c.sqm=String;c.payoutRowHTML=()=>'<article></article>';c.confirm=()=>true;c.prompt=()=>'';c.toast=(...args)=>notifications.push(args);c.loadPayouts=()=>{throw Error('Unexpected full reload');};
+ vm.runInContext(between(source,'    function updatePayoutSummary(', '    function initPayoutPanel('),c);
+ const neighbor=c.state.payoutData.rows[1];await c.setPayoutStatus('one','paid');assert.equal(element.replaced,true);assert.equal(c.state.payoutData.rows[1],neighbor);assert.equal(c.state.payoutData.summary.pendingAmount,2000);assert.equal(c.state.payoutData.summary.paidAmount,1000);assert.equal(c.payoutPending.size,0);
+ fail=true;element.replaced=false;await c.setPayoutStatus('one','pending');assert.equal(c.state.payoutData.rows[0].status,'paid');assert.equal(element.replaced,false);assert.equal(controls[0].disabled,false);assert.equal(notifications.at(-1)[1],'error');
+});

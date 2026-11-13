@@ -68,3 +68,5 @@
  #monthly-motivation-reminder .cc-motivation-table tbody tr{padding:12px}
  #monthly-motivation-reminder .cc-motivation-table tbody td:nth-child(3){font-size:.9rem}
 }
+
+#motivation-payout-content[hidden]{display:none!important}.motivation-payout-panel.is-collapsed .motivation-payout-tools>:not(#motivation-payout-toggle){display:none!important}.motivation-payout-panel.is-collapsed .motivation-payout-head{border-bottom:0}.motivation-payout-row[aria-busy=true]{opacity:.7}.motivation-payout-row[aria-busy=true] button{cursor:wait}

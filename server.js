@@ -4907,7 +4907,7 @@ app.patch('/api/motivation/payouts/:id', requireAnyPermission('can_edit_sales_fa
         }
         const item = await MotivationPayout.findByIdAndUpdate(req.params.id, {$set:update}, {new:true}).lean();
         if (!item) return res.status(404).json({error:'Выплата не найдена'});
-        res.json({status:'ok'});
+        res.json({status:'ok',row:{id:String(item._id),status:item.status,paidAt:item.paidAt||null}});
     } catch (e) { res.status(400).json({error:e.message}); }
 });
 

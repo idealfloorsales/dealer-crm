@@ -41,7 +41,7 @@
   });box.scrollIntoView({block:'nearest',behavior:'smooth'});title.focus();
  }
  function addEntries(){
-  const nav=document.querySelector('.crm-topbar .navbar-nav');if(nav&&!nav.querySelector('[data-wb-launch]')){const li=el('li',undefined,'nav-item'),b=button('Мой план',day);b.className='nav-link';b.dataset.wbLaunch='';li.appendChild(b);nav.appendChild(li);}
+  const head=document.querySelector('#cc-plan-panel .cc-panel-head');if(head&&!head.querySelector('[data-wb-launch]')){const b=button('Открыть мой план',day);b.className='cc-panel-link';b.dataset.wbLaunch='';b.setAttribute('aria-haspopup','dialog');head.appendChild(b);}
   const grid=document.querySelector('.crm-mobile-sheet-grid');if(grid&&!grid.querySelector('[data-wb-launch]')){const b=button('Мой план',()=>{document.querySelector('#crm-mobile-sheet-close')?.click();day();});b.className='crm-mobile-sheet-link';b.dataset.wbLaunch='';grid.prepend(b);}
   const hero=document.querySelector('.dealer-profile-actions'),id=new URLSearchParams(location.search).get('id');if(hero&&/^[a-f\d]{24}$/i.test(id||'')&&!hero.querySelector('[data-wb-prepare]')){const b=button('Подготовиться к визиту',()=>prepare(id));b.className='dealer-hero-action';b.dataset.wbPrepare='';hero.prepend(b);}
  }

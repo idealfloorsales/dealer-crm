@@ -1,5 +1,7 @@
 (() => {
     const API = '/api/motivation';
+    const payoutPending = new Set();
+    let payoutLoadRevision=0;
     const state = { schemes: [], loaded:false, loading:null, manager:null, editingId:'', payoutMonth:'', payoutData:null, suspendedModal:null };
 
     const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
@@ -277,16 +279,19 @@
         if(!panel) return;
         const picker=document.getElementById('motivation-payout-month');
         const month=picker?.value || currentMonth();
+        if(payoutPending.size)return;
+        const revision=++payoutLoadRevision;
         state.payoutMonth=month;
         const host=document.getElementById('motivation-payout-list');
         if(host) host.innerHTML='<div class="motivation-payout-empty"><span class="spinner-border spinner-border-sm"></span> Загрузка…</div>';
         try {
-            if(canManage()) await recalculatePayouts(month,true);
+            if(autoRecalc && canManage()) await recalculatePayouts(month,true);
             const data=await request(API+'/payouts?month='+encodeURIComponent(month));
+            if(revision!==payoutLoadRevision)return;
             state.payoutData=data;
             renderPayouts(data);
         } catch(e){
-            if(host) host.innerHTML='<div class="motivation-payout-empty text-danger">'+esc(e.message)+'</div>';
+            if(revision===payoutLoadRevision && host) host.innerHTML='<div class="motivation-payout-empty text-danger">'+esc(e.message)+'</div>';
         }
     }
 
@@ -313,8 +318,13 @@
             host.innerHTML='<div class="motivation-payout-empty"><i class="bi bi-check2-circle"></i><strong>Выплат за этот месяц нет</strong><span>'+esc(detail)+'</span><small>Назначено мотиваций: '+Number(diag.assigned||0)+' · Действовали: '+Number(diag.eligible||0)+' · С продажами: '+Number(diag.withSales||0)+'</small></div>';
             return;
         }
-        host.innerHTML=rows.map(row=>`
-          <article class="motivation-payout-row status-${esc(row.status)}">
+        host.innerHTML=rows.map(payoutRowHTML).join('');
+        if(!canManage()) host.querySelectorAll('button').forEach(btn=>btn.disabled=true);
+    }
+
+    function payoutRowHTML(row) {
+        return `
+          <article data-payout-row="${esc(row.id)}" class="motivation-payout-row status-${esc(row.status)}">
             <div class="motivation-payout-dealer"><span class="motivation-payout-status-dot"></span><div><strong>${esc(row.dealerName || 'Дилер')}</strong><small>${esc([row.dealerId,row.dealerCity].filter(Boolean).join(' · '))}</small></div></div>
             <div class="motivation-payout-cell"><small>Продажи</small><strong>${sqm(row.salesM2)}</strong></div>
             <div class="motivation-payout-cell"><small>Ставка</small><strong>${n(row.ratePerM2).toLocaleString('ru-RU')} ₸/м²</strong><span>${esc(row.schemeName||'')}</span></div>
@@ -325,8 +335,7 @@
               ${row.status!=='skipped'?'<button type="button" data-payout-status="skipped" data-payout-id="'+esc(row.id)+'" title="Пропустить"><i class="bi bi-dash-circle"></i></button>':''}
               ${row.status!=='pending'?'<button type="button" data-payout-status="pending" data-payout-id="'+esc(row.id)+'" title="Вернуть к выплате"><i class="bi bi-arrow-counterclockwise"></i></button>':''}
             </div>
-          </article>`).join('');
-        if(!canManage()) host.querySelectorAll('button').forEach(btn=>btn.disabled=true);
+          </article>`;
     }
 
     function payoutMonthLabel(value) {
@@ -423,21 +432,45 @@ td small{margin-top:2px;color:#888;font-size:8px}
         popup.document.close();
     }
 
+    function updatePayoutSummary() {
+        const rows=state.payoutData?.rows||[];
+        state.payoutData.summary=rows.reduce((s,r)=>{s.salesM2+=n(r.salesM2);s.amount+=n(r.amount);s[r.status]=(s[r.status]||0)+1;if(r.status==='pending')s.pendingAmount+=n(r.amount);if(r.status==='paid')s.paidAmount+=n(r.amount);return s;},{salesM2:0,amount:0,pending:0,paid:0,skipped:0,pendingAmount:0,paidAmount:0});
+        const s=state.payoutData.summary;
+        const set=(id,value)=>{const e=document.getElementById(id);if(e)e.textContent=value;};
+        set('motivation-payout-count',String(rows.length));set('motivation-payout-sales',sqm(s.salesM2));set('motivation-payout-pending',money(s.pendingAmount));set('motivation-payout-paid',money(s.paidAmount));
+    }
+    function payoutControls() {
+        for(const id of ['motivation-payout-month','motivation-payout-recalc','motivation-payout-print','motivation-payout-settings']){const e=document.getElementById(id);if(e)e.disabled=payoutPending.size>0;}
+    }
     async function setPayoutStatus(id,status) {
-        if(!canManage()) return;
+        if(!canManage()||payoutPending.has(String(id))) return;
+        const data=state.payoutData,row=data?.rows?.find(r=>String(r.id)===String(id));
+        if(!row)return;
         let note='';
-        if(status==='skipped') note=prompt('Причина, почему выплату пропускаем:','') || '';
+        if(status==='skipped'){const reason=prompt('Причина, почему выплату пропускаем:','');if(reason===null)return;note=reason;}
         if(status==='paid' && !confirm('Отметить выплату как выплаченную? Сумма будет зафиксирована в истории.')) return;
+        const host=document.getElementById('motivation-payout-list');
+        const element=[...host.querySelectorAll('[data-payout-row]')].find(e=>e.dataset.payoutRow===String(id));
+        payoutPending.add(String(id));payoutControls();element?.querySelectorAll('button').forEach(b=>b.disabled=true);element?.setAttribute('aria-busy','true');
         try {
-            await request(API+'/payouts/'+encodeURIComponent(id),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status,note})});
+            const result=await request(API+'/payouts/'+encodeURIComponent(id),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status,note})});
+            if(state.payoutData!==data)return;
+            Object.assign(row,{status:result.row?.status||status,note,paidAt:result.row?.paidAt||null});
+            const wrapper=document.createElement('div');wrapper.innerHTML=payoutRowHTML(row);element?.replaceWith(wrapper.firstElementChild);
+            updatePayoutSummary();
             toast(status==='paid'?'Выплата отмечена как выплаченная':status==='skipped'?'Выплата пропущена':'Выплата возвращена в список');
-            await loadPayouts(false);
         } catch(e){toast(e.message,'error');}
+        finally{payoutPending.delete(String(id));payoutControls();element?.removeAttribute('aria-busy');element?.querySelectorAll('button').forEach(b=>b.disabled=false);}
     }
 
     function initPayoutPanel() {
         const panel=document.getElementById('motivation-payouts-panel');
         if(!panel) return;
+        const toggle=document.getElementById('motivation-payout-toggle'),body=document.getElementById('motivation-payout-content');
+        const collapsedKey='crm:motivation:collapsed:'+String(window.CRMAuth?.user?.id||'user');
+        const collapse=hidden=>{if(body)body.hidden=hidden;panel.classList.toggle('is-collapsed',hidden);if(toggle){toggle.textContent=hidden?'Показать мотивацию':'Скрыть мотивацию';toggle.setAttribute('aria-expanded',String(!hidden));}};
+        try{collapse(localStorage.getItem(collapsedKey)==='true' && location.hash!=='#motivation-payouts-panel');}catch(_){collapse(false);}
+        toggle?.addEventListener('click',()=>{const hidden=!body.hidden;collapse(hidden);try{localStorage.setItem(collapsedKey,String(hidden));}catch(_){} });
         const picker=document.getElementById('motivation-payout-month');
         if(picker && !picker.value) picker.value=currentMonth();
         picker?.addEventListener('change',()=>loadPayouts(canManage()));
