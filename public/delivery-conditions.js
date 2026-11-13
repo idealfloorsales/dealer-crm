@@ -1,7 +1,7 @@
 (async()=>{
  const assetVersion=new URL(document.currentScript?.src||location.href,location.href).searchParams.get('v')||'20261113';
  if(window.CRMAuth?.ready)await CRMAuth.ready;
- if(!window.CRMAuth?.user||!['can_view_dealers','can_create_dealer','can_edit_dealer'].some(p=>CRMAuth.can(p))||window.CRMDelivery)return;
+ if(!window.CRMAuth?.user||!['can_view_dealers','can_create_dealer','can_edit_dealer','can_view_pricing','can_manage_pricing'].some(p=>CRMAuth.can(p))||window.CRMDelivery)return;
  const style=document.createElement('link');style.rel='stylesheet';style.href='/delivery-conditions.css?v='+encodeURIComponent(assetVersion);document.head.appendChild(style);
  let items=[],canManage=false,ready=false,filterKeys=new Set(),manager=null,editing=null,originSelect=null,suspended=null,oldOverflow='',focusBefore=null,loading=null;
  const key='crm:delivery-filter:'+String(CRMAuth.user.id||'user');try{const saved=JSON.parse(localStorage.getItem(key)||'[]');if(Array.isArray(saved))filterKeys=new Set(saved.filter(x=>typeof x==='string'));}catch(_){}
@@ -10,14 +10,14 @@
  async function api(path='',body,method='POST'){const r=await fetch('/api/delivery-conditions'+path,{crmTrackLoading:false,...(body?{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});const data=await r.json().catch(()=>({}));if(!r.ok)throw Error(data.error||'Справочник условий недоступен');return data;}
  function notify(){try{localStorage.setItem(key,JSON.stringify([...filterKeys]));}catch(_){}document.dispatchEvent(new CustomEvent('crm:delivery-filter-change'));}
  function matches(value){if(!filterKeys.size)return true;const text=String(value||'');for(const token of filterKeys){if(token==='empty:'&&!text.trim())return true;if(!token.startsWith('value:'))continue;const selected=token.slice(6),item=items.find(r=>r.name===selected||r.aliases.includes(selected));if(text===selected||(item&&[item.name,...item.aliases].includes(text)))return true;}return false;}
- function fillSelect(select){const before=select.value,old=[...select.options].map(o=>({value:o.value,text:o.textContent,disabled:o.disabled}));const options=[{value:'',text:'Не указаны',disabled:false}];const seen=new Set(['']);
+ function fillSelect(select){const before=select.value,old=[...select.options].map(o=>({value:o.value,text:o.textContent,disabled:o.disabled}));const options=[{value:'',text:select.dataset.deliveryEmptyLabel || 'Не указаны',disabled:false}];const seen=new Set(['']);
   for(const item of items){for(const value of [item.name,...item.aliases]){if(seen.has(value))continue;seen.add(value);const alias=value!==item.name;options.push({value,text:value+(alias?' · прежнее название':!item.active?' · архив':''),disabled:alias||!item.active});}}
   for(const o of old){if(o.value&&!seen.has(o.value)){options.push({...o,disabled:true});seen.add(o.value);}}
   if(before&&!seen.has(before))options.push({value:before,text:before+' · сохранённые условия',disabled:true});
   if(JSON.stringify(old)===JSON.stringify(options))return;
   select.replaceChildren(...options.map(o=>{const e=make('option',o.text);e.value=o.value;e.disabled=o.disabled;return e;}));select.value=before;
  }
- function bindFields(){if(!ready)return;for(const id of ['delivery','edit_delivery','profile-edit-delivery']){let field=document.getElementById(id);if(!field)continue;
+ function bindFields(){if(!ready)return;for(const id of ['delivery','edit_delivery','profile-edit-delivery','pricing-delivery-condition']){let field=document.getElementById(id);if(!field)continue;
   if(field.tagName!=='SELECT'){const select=make('select');select.id=id;select.className=field.className||'form-select';select.disabled=field.disabled;select.required=field.required;if(field.name)select.name=field.name;select.setAttribute('aria-label','Условия доставки');select.dataset.deliverySelect='1';if(field.value){const o=make('option',field.value);o.value=field.value;select.appendChild(o);}field.replaceWith(select);field=select;}
   fillSelect(field);field.title=field.value;if(!field.dataset.deliveryBound){field.addEventListener('change',()=>field.title=field.value);field.dataset.deliveryBound='1';}const parent=field.parentElement;if(!parent.classList.contains('delivery-field')){const wrapper=make('div',undefined,'delivery-field');field.before(wrapper);wrapper.appendChild(field);if(canManage){const gear=button('',()=>openManager(field));gear.innerHTML='<i class="bi bi-gear"></i>';gear.className='motivation-gear-btn delivery-gear';gear.title='Настроить условия доставки';gear.setAttribute('aria-label','Настроить условия доставки');wrapper.appendChild(gear);}}
   const label=field.closest('.col-md-4,.col-md-6,.mb-3')?.querySelector('label');if(label&&/^Доставка$/.test(label.textContent.trim()))label.textContent='Условия доставки';
