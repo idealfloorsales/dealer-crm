@@ -13609,3 +13609,18 @@ body:not(.app-workspace-page) .modal-header .btn-close{
 @media (max-width:700px){
   .ideal-ai-launch{left:14px!important;right:auto!important}
 }
+
+/* Deviation values in the direct browser print view match the dedicated print window. */
+@media print {
+
+            .sales-print-item .summary-deviation-cell { margin-top:1.5mm; padding-top:1.2mm; border-top:.5pt solid #ddd; }
+            .sales-print-item .summary-deviation-cell > span { display:block; margin-bottom:.8mm; color:#64666c; font-size:6.5pt; font-weight:700; }
+            .sales-print-item .summary-deviation-row { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:1.5mm; align-items:baseline; margin-top:.6mm; font-size:7.2pt; }
+            .sales-print-item .summary-deviation-row > span { color:#55575d; }
+            .sales-print-item .summary-deviation-row strong,
+            .sales-print-item .summary-deviation-row em { white-space:nowrap; font-weight:700; font-style:normal; }
+            .sales-print-item .summary-deviation-row.is-positive { color:#177452; }
+            .sales-print-item .summary-deviation-row.is-negative { color:#b9040a; }
+            .sales-print-item .summary-deviation-row.is-neutral,
+            .sales-print-item .summary-deviation-empty { color:#64666c; font-size:7.2pt; }
+}

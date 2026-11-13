@@ -71,3 +71,23 @@ test('rejected dealer and sector deletes neither navigate away nor refresh as if
  vm.runInContext(between(read('dealer.js'),"    if(deleteBtn) deleteBtn.addEventListener('click'", '    window.printDiv'),c);await c.handler();assert.equal(window.location.href,'/dealer.html?id=d1');assert.deepEqual(events,['Удаление запрещено']);
  const script=read('script.js'),a=script.indexOf('    window.deleteSector ='),b=script.indexOf('\n    };',a)+7;vm.runInContext(script.slice(a,b),c);await window.deleteSector('s1');assert.deepEqual(events,['Удаление запрещено','Удаление запрещено']);
 });
+
+test('sales print includes signed deviations using the same calculations as the summary',()=>{
+ const source=read('sales.js');
+ const c=vm.createContext({monthPicker:{value:'2026-11'},printSalesBody:{innerHTML:''},printOverview:{innerHTML:''},printPeriod:{},printGenerated:{},currentScope:'all',groupsConfig:[],getProgressLevel:()=> 'good',escapeHtml:s=>String(s)});
+ vm.runInContext(between(source,'    function fmt(', '    function captureState()'),c);
+ vm.runInContext('isCurrentSelectedMonth = () => true;',c);
+ vm.runInContext(between(source,'    function renderPrintReport(', '    function renderAll('),c);
+ const facts={vip:[]};
+ c.renderPrintReport(facts,{total_all:13500},0,0,0,5341.7,30,10);
+ let html=c.printSalesBody.innerHTML;
+ assert.match(html,/Отклонение/);assert.match(html,/На сегодня/);assert.match(html,/Месяц/);
+ assert.match(html,/\+841\.7 м²/);assert.match(html,/\+2525\.1 м²/);assert.match(html,/\+18\.7%/);
+ assert.ok(!html.includes('&#xB2;'));assert.ok(html.includes('is-positive'));
+ c.renderPrintReport(facts,{total_all:13500},0,0,0,3000,30,10);
+ html=c.printSalesBody.innerHTML;assert.match(html,/−1500 м²/);assert.match(html,/−4500 м²/);assert.ok(html.includes('is-negative'));
+ vm.runInContext('isCurrentSelectedMonth = () => false;',c);
+ c.renderPrintReport(facts,{total_all:13500},0,0,0,15000,30,30);
+ html=c.printSalesBody.innerHTML;assert.ok(!html.includes('На сегодня'));assert.match(html,/\+1500 м²/);
+ c.renderPrintReport(facts,{},0,0,0,15000,30,30);assert.match(c.printSalesBody.innerHTML,/Нет плана/);
+});

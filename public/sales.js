@@ -742,6 +742,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div><span>Факт</span><strong>${fmt(row.fact)} м²</strong></div>
                         <div><span>Прогноз</span><strong>${fmt(row.forecast)} м²</strong></div>
                     </div>
+                    ${buildDeviationCell(row.plan, row.fact, daysInMonth, currentDay)}
                     <div class="sales-print-item-progress"><span style="width:${barWidth}%"></span></div>
                 </article>`;
             }).join('');
@@ -1249,6 +1250,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 text-overflow:ellipsis;
                 white-space:nowrap;
             }
+
+            .sales-print-item .summary-deviation-cell { margin-top:1.5mm; padding-top:1.2mm; border-top:.5pt solid #ddd; }
+            .sales-print-item .summary-deviation-cell > span { display:block; margin-bottom:.8mm; color:#64666c; font-size:6.5pt; font-weight:700; }
+            .sales-print-item .summary-deviation-row { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:1.5mm; align-items:baseline; margin-top:.6mm; font-size:7.2pt; }
+            .sales-print-item .summary-deviation-row > span { color:#55575d; }
+            .sales-print-item .summary-deviation-row strong,
+            .sales-print-item .summary-deviation-row em { white-space:nowrap; font-weight:700; font-style:normal; }
+            .sales-print-item .summary-deviation-row.is-positive { color:#177452; }
+            .sales-print-item .summary-deviation-row.is-negative { color:#b9040a; }
+            .sales-print-item .summary-deviation-row.is-neutral,
+            .sales-print-item .summary-deviation-empty { color:#64666c; font-size:7.2pt; }
             .sales-print-item-progress { height:1.55mm; margin-top:1.2mm; }
             .sales-print-footer {
                 display:flex;
