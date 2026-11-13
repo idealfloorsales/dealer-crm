@@ -403,7 +403,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 productsStatsContainer.innerHTML = `<div class="p-3 bg-light rounded border"><div class="d-flex justify-content-between mb-1"><strong>Загрузка матрицы</strong><span>${dealerProductsCount} / ${totalProductsCount}</span></div><div class="progress" style="height: 8px;"><div class="progress-bar bg-success" role="progressbar" style="width: ${percent}%"></div></div></div>`;
             }
 
-            if(deliveryContainer) deliveryContainer.textContent = safeText(dealer.delivery) || 'Не указано';
+            if(deliveryContainer) {
+                deliveryContainer.textContent = safeText(dealer.effectiveDelivery || dealer.delivery) || 'Не указано';
+                if (dealer.deliveryOverride) {
+                    const detail=document.createElement('small');
+                    detail.className='d-block text-muted mt-1';
+                    detail.textContent='По коммерческому условию'+(dealer.deliveryOverride.endDate ? ' · до '+dealerDateText(dealer.deliveryOverride.endDate) : '');
+                    deliveryContainer.appendChild(detail);
+                }
+            }
             if(bonusesContainer) {
                 const motivation = dealer.motivation_scheme && typeof dealer.motivation_scheme === 'object' ? dealer.motivation_scheme : null;
                 const motivationPeriod = motivation
@@ -868,8 +876,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? active.map(item => {
                     const isDiscount = item.kind === 'discount';
                     const title = isDiscount
-                        ? `${safeText(discountTitle(item))}`
-                        : safeText(item.priceListName || item.name);
+                        ? safeText(discountTitle(item))
+                        : item.kind === 'delivery'
+                            ? safeText(item.deliveryText || 'Условия доставки')
+                            : safeText(item.priceListName || item.name);
                     const conditionStart = item.startDate || item.priceList?.validFrom || '';
                     const conditionEnd = item.endDate || item.priceList?.validTo || '';
                     const dates = `${dealerDateText(conditionStart,'сразу')} — ${dealerDateText(conditionEnd,'без срока')}`;
@@ -881,7 +891,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         : '';
                     return `<article class="dealer-price-condition">
                         <div><strong>${title}</strong><small>${scopeText} · ${dates}</small>${req}</div>
-                        <span class="dealer-price-kind">${isDiscount ? 'скидка' : 'прайс'}</span>
+                        <span class="dealer-price-kind">${isDiscount ? 'скидка' : (item.kind === 'delivery' ? 'доставка' : 'прайс')}</span>
                     </article>`;
                 }).join('')
                 : '<div class="dealer-price-empty"><i class="bi bi-check2-circle"></i><span>Активных специальных условий нет</span></div>';
