@@ -232,7 +232,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function rowMatches(row) {
         const term = ($('pricing-search')?.value || '').trim().toLowerCase();
         if (term) {
-            const text = [row.dealerName,row.city,row.sector,row.responsible,row.effectivePriceList].join(' ').toLowerCase();
+            const text = [row.dealerName,row.city,row.sector,row.responsible,row.effectivePriceList,row.effectiveDelivery].join(' ').toLowerCase();
             if (!text.includes(term)) return false;
         }
         const filter = $('pricing-filter')?.value || 'all';
@@ -329,7 +329,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div>${inherited.map(item => {
                     const value = item.kind === 'discount'
                         ? esc(discountTitle(item))
-                        : esc(item.priceListName || item.name);
+                        : esc(item.kind === 'delivery' ? item.deliveryText || 'Условия доставки' : item.priceListName || item.name);
                     return `<span title="Это условие задано на уровне ${esc(item.scopeType)}">${item.kind === 'discount' ? value : value + ' · ' + esc(item.name)}</span>`;
                 }).join('')}</div>
                 <small>Эти условия нельзя снять только у одного дилера из этой строки — они заданы для региона/города/сети.</small>
@@ -1242,7 +1242,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const value = condition.kind === 'discount'
                 ? `−${fmt(condition.discountPercent,2)}%${condition.stackable === false ? ' · не суммируется':''}`
-                : condition.priceListName || 'Базовый прайс';
+                : condition.kind === 'delivery'
+                    ? condition.deliveryText || 'Не указаны'
+                    : condition.priceListName || 'Базовый прайс';
             const affected = affectedDealers(condition);
             const dealerListId = 'pricing-condition-dealers-' + idOf(condition);
             const dealerList = affected.length
@@ -1483,7 +1485,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function syncPromotionPeriod() {
-        const enabled = Boolean($('pricing-discount-5')?.checked || $('pricing-discount-10')?.checked || customDiscountValue() > 0);
+        const enabled = Boolean($('pricing-discount-5')?.checked || $('pricing-discount-10')?.checked || customDiscountValue() > 0 || $('pricing-delivery-condition')?.value);
         const section = $('pricing-promo-period-section');
         const hint = $('pricing-promo-period-hint');
         ['pricing-start-date','pricing-end-date'].forEach(id => {
@@ -1491,8 +1493,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         section?.classList.toggle('is-disabled', !enabled);
         if (hint) hint.textContent = enabled
-            ? 'Период будет применён только к выбранным скидкам.'
-            : 'Выберите хотя бы одну скидку, чтобы задать период акции.';
+            ? 'Период применяется к выбранным скидкам и условиям доставки. Для прайса срок устанавливается в самом прайсе.'
+            : 'Выберите скидку или условия доставки, чтобы задать период действия.';
     }
 
     function resetForm() {
@@ -1507,6 +1509,8 @@ document.addEventListener('DOMContentLoaded', () => {
         $('pricing-discount-5').checked = false;
         $('pricing-discount-10').checked = false;
         if ($('pricing-discount-custom')) $('pricing-discount-custom').value = '';
+        if ($('pricing-delivery-condition')) window.CRMDelivery?.setSelected('pricing-delivery-condition','');
+        if ($('pricing-delivery-condition')) $('pricing-delivery-condition').value = '';
         $('pricing-note').value = '';
         syncScopeFields({clear:false});
         syncPromotionPeriod();
@@ -1587,13 +1591,23 @@ document.addEventListener('DOMContentLoaded', () => {
             Math.abs(n(item.discountPercent)-5) >= 0.001 &&
             Math.abs(n(item.discountPercent)-10) >= 0.001
         );
+        const delivery = related.find(item => item.kind === 'delivery' && item.deliveryText);
 
         if (price) $('pricing-price-list').value = idOf(price.priceList) || state.priceLists.find(item => item.name === price.priceListName)?.id || '';
         syncPriceOverrideHint();
         $('pricing-discount-5').checked = Boolean(d5);
         $('pricing-discount-10').checked = Boolean(d10);
         if ($('pricing-discount-custom')) $('pricing-discount-custom').value = customDiscount ? String(n(customDiscount.discountPercent)) : '';
-        const promo = d5 || d10 || customDiscount;
+        if ($('pricing-delivery-condition')) {
+            const selectedDelivery = String(delivery?.deliveryText || '');
+            if (window.CRMDelivery?.setSelected) CRMDelivery.setSelected('pricing-delivery-condition',selectedDelivery);
+            else {
+                const select=$('pricing-delivery-condition');
+                if (selectedDelivery && ![...select.options].some(option=>option.value===selectedDelivery)) select.add(new Option(selectedDelivery,selectedDelivery));
+                select.value=selectedDelivery;
+            }
+        }
+        const promo = d5 || d10 || customDiscount || delivery;
         $('pricing-start-date').value = promo?.startDate || state.today || todayValue();
         $('pricing-end-date').value = promo?.endDate || '';
         $('pricing-note').value = condition.note || promo?.note || price?.note || '';
@@ -1610,16 +1624,23 @@ document.addEventListener('DOMContentLoaded', () => {
         const discounts = [];
         if ($('pricing-discount-5')?.checked) discounts.push(5);
         if ($('pricing-discount-10')?.checked) discounts.push(10);
+        const customInput = $('pricing-discount-custom');
+        const rawCustom = String(customInput?.value || '').trim().replace(',', '.');
+        if (customInput?.validity?.badInput || (rawCustom && (!/^(?:\d+)(?:\.\d{1,2})?$/.test(rawCustom) || Number(rawCustom) <= 0 || Number(rawCustom) > 100))) {
+            throw new Error('Введите свою скидку числом от 0,01 до 100%, не больше двух знаков после запятой');
+        }
         const custom = customDiscountValue();
         if (custom > 0 && !discounts.some(value => Math.abs(value-custom) < 0.001)) discounts.push(custom);
+        const deliveryText = String($('pricing-delivery-condition')?.value || '').trim();
         return {
             scopeType,
             dealerIds: scopeType === 'dealer' ? [...selectedTargets] : [],
             scopeValues: (scopeType === 'sector' || scopeType === 'city') ? [...selectedTargets] : [],
             priceListId:$('pricing-price-list')?.value || '',
             discounts,
-            startDate:discounts.length ? $('pricing-start-date').value : '',
-            endDate:discounts.length ? $('pricing-end-date').value : '',
+            deliveryText,
+            startDate:(discounts.length || deliveryText) ? $('pricing-start-date').value : '',
+            endDate:(discounts.length || deliveryText) ? $('pricing-end-date').value : '',
             note:$('pricing-note').value
         };
     }
@@ -1644,12 +1665,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (payload.scopeType !== 'all' && !selectedTargets.size) {
                 throw new Error('Выберите, на кого действует настройка');
             }
-            if (!payload.priceListId && !payload.discounts.length) {
-                throw new Error('Выберите хотя бы одну скидку или прайс');
+            if (!payload.priceListId && !payload.discounts.length && !payload.deliveryText) {
+                throw new Error('Выберите прайс, скидку или условия доставки');
             }
             await send(API+'/setup','POST',payload);
             bootstrap.Modal.getOrCreateInstance($('pricing-condition-modal')).hide();
-            toast('Ценовые условия сохранены');
+            toast('Коммерческие условия сохранены');
             await load();
         } catch (error) {
             toast(error.message,'error');
@@ -1677,7 +1698,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!manage) return;
         const condition = state.conditions.find(item => idOf(item) === String(conditionId));
         if (!condition) return;
-        if (!confirm(`Восстановить условие «${condition.kind === 'discount' ? discountTitle(condition) : condition.name}» и снова включить его в расчёт цен?`)) return;
+        if (!confirm(`Восстановить условие «${condition.kind === 'discount' ? discountTitle(condition) : condition.name}» и снова применять его к дилерам?`)) return;
         try {
             const restored = await send(API+'/conditions/'+encodeURIComponent(conditionId)+'/restore','POST',{});
             const nextStatus = restored?.computedStatus || 'active';
@@ -1695,11 +1716,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!manage) return;
         const condition = state.conditions.find(item => idOf(item) === String(conditionId));
         if (!condition) return;
-        const type = condition.kind === 'price_list' ? 'прайс' : 'скидку';
+        const type = condition.kind === 'price_list' ? 'прайс' : (condition.kind === 'delivery' ? 'условия доставки' : 'скидку');
         if (!confirm(`Удалить ${type} «${condition.kind === 'discount' ? discountTitle(condition) : condition.name}» навсегда? История этого условия будет удалена, восстановить его будет нельзя.`)) return;
         try {
             await send(API+'/conditions/'+encodeURIComponent(conditionId)+'/permanent','DELETE',{});
-            toast(condition.kind === 'price_list' ? 'Прайс удалён из условий' : 'Скидка удалена');
+            toast(condition.kind === 'price_list' ? 'Прайс удалён из условий' : (condition.kind === 'delivery' ? 'Условия доставки удалены' : 'Скидка удалена'));
             await load();
             switchPricingView('conditions');
         } catch (error) {
@@ -1749,6 +1770,7 @@ document.addEventListener('DOMContentLoaded', () => {
     $('pricing-discount-5')?.addEventListener('change',syncPromotionPeriod);
     $('pricing-discount-10')?.addEventListener('change',syncPromotionPeriod);
     $('pricing-discount-custom')?.addEventListener('input',syncPromotionPeriod);
+    $('pricing-delivery-condition')?.addEventListener('change',syncPromotionPeriod);
     $('pricing-condition-form')?.addEventListener('submit',saveCondition);
     $('pricing-condition-modal')?.addEventListener('shown.bs.modal',resetPricingModalViewport);
 
