@@ -107,6 +107,12 @@ self.addEventListener('fetch', event => {
 
     const url = new URL(event.request.url);
 
+    // APK downloads and redirects must never be cached by the service worker.
+    if (url.pathname === '/download/android') {
+        event.respondWith(fetch(event.request));
+        return;
+    }
+
     // API никогда не кэшируем: там персональные и коммерческие данные.
     if (url.pathname.startsWith('/api/')) {
         event.respondWith(fetch(event.request));
