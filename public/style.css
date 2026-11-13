@@ -2266,6 +2266,17 @@ body.modal-open {
     --if-soft-red: #f8e9e9;
     --if-green: #178256;
     --if-amber: #a96808;
+
+    /* Shared IDEAL FLOOR interface rules: dealer, pricing, motivation, delivery */
+    --crm-modal-hero: radial-gradient(circle at 92% -20%,rgba(185,4,10,.52),transparent 23rem),linear-gradient(120deg,#171719 0%,#292628 100%);
+    --crm-modal-canvas: #f5f3f0;
+    --crm-modal-panel: #ffffff;
+    --crm-modal-border: #e7e3df;
+    --crm-modal-control: #faf9f7;
+    --crm-modal-radius: 24px;
+    --crm-modal-ink: #292a2e;
+    --crm-modal-muted: #77797f;
+    --crm-modal-accent: #b9040a;
 }
 
 html, body {
@@ -4774,8 +4785,8 @@ body.bg-light {
 .dealer-form-content {
     overflow: hidden;
     border: 0;
-    border-radius: 26px;
-    background: #f5f3f0;
+    border-radius: var(--crm-modal-radius);
+    background: var(--crm-modal-canvas);
     box-shadow: 0 32px 90px rgba(20,18,18,.22);
 }
 
@@ -4787,9 +4798,7 @@ body.bg-light {
     gap: 20px;
     padding: 24px 26px 22px;
     overflow: hidden;
-    background:
-        radial-gradient(circle at 92% -20%, rgba(185,4,10,.52), transparent 23rem),
-        linear-gradient(120deg, #171719 0%, #292628 100%);
+    background: var(--crm-modal-hero);
     color: #fff;
 }
 
