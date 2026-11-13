@@ -56,3 +56,38 @@
  .delivery-manager-modal .delivery-manager-card .motivation-scheme-actions{grid-column:2;justify-content:flex-start;margin-top:4px}
  .delivery-manager-modal .motivation-manager-head p{font-size:.72rem}
 }
+
+
+/* One catalog option = two editable parts = one dealer cell / one filter value. */
+.delivery-form-parts{display:grid;grid-template-columns:minmax(0,1fr);gap:11px}
+.delivery-form-parts label{min-width:0;display:block}
+.delivery-form-parts label>span{display:block;margin-bottom:6px;font-weight:740}
+.delivery-manager-modal .delivery-form-parts textarea{min-height:86px;max-height:210px;resize:vertical}
+.delivery-form-preview{margin-top:12px;padding:12px;border:1px solid #e7e2de;border-radius:13px;background:#faf9f8;min-width:0}
+.delivery-form-preview>strong{display:block;font-size:.72rem;margin-bottom:9px;color:#5d5e64}
+.delivery-form-preview>small{display:block;overflow-wrap:anywhere;margin-top:9px;color:#93959a;font-size:.62rem;line-height:1.4}
+.delivery-badge-pair,.dealer-list-v6-delivery,.dealer-profile-delivery-pair{display:flex;align-items:center;gap:5px;min-width:0;max-width:100%}
+.crm-delivery-chip{display:inline-flex;align-items:center;flex:0 1 auto;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:3px 8px;border:1px solid transparent;border-radius:7px;font-size:.62rem;line-height:1.4;font-weight:750}
+.crm-delivery-chip.is-delivery{background:#eaf2ff;border-color:#d1e2fa;color:#225f9d}
+.crm-delivery-chip.is-payment{background:#f2ebfa;border-color:#e4d7f4;color:#7650a1}
+.delivery-badge-pair .crm-delivery-chip,.dealer-list-v6-delivery .crm-delivery-chip{max-width:calc(50% - 3px)}
+.delivery-badge-pair .crm-delivery-chip:only-child,.dealer-list-v6-delivery .crm-delivery-chip:only-child{max-width:100%}
+.delivery-preview-placeholder{font-size:.67rem;color:#96989d}
+.delivery-manager-card .delivery-badge-pair{margin:7px 0 3px}
+.delivery-manager-card .delivery-badge-pair .crm-delivery-chip{max-width:calc(50% - 3px)}
+.delivery-manager-card .delivery-badge-pair .crm-delivery-chip:only-child{max-width:100%}
+.dealer-list-v6-delivery{margin-top:6px;overflow:hidden}
+.dealer-list-v6-delivery .crm-delivery-chip{min-height:22px;font-size:.59rem}
+.dealer-profile-delivery-pair{margin:2px 0 0}
+.dealer-profile-delivery-pair .crm-delivery-chip{font-size:.75rem;max-width:calc(50% - 3px)}
+.dealer-profile-delivery-pair .crm-delivery-chip:only-child{max-width:100%}
+:root[data-crm-theme=dark] .crm-delivery-chip.is-delivery{background:#1c334a;border-color:#2d5173;color:#a8cfff}
+:root[data-crm-theme=dark] .crm-delivery-chip.is-payment{background:#342b43;border-color:#55426c;color:#dcc1fa}
+:root[data-crm-theme=dark] .delivery-form-preview{background:#24252b;border-color:#484950}
+:root[data-crm-theme=dark] .delivery-form-preview>strong{color:#e5e5e8}
+@media(max-width:520px){
+ .delivery-form-parts{gap:9px}
+ .delivery-manager-modal .delivery-form-parts textarea{min-height:72px}
+ .dealer-list-v6-delivery{gap:4px}
+ .dealer-list-v6-delivery .crm-delivery-chip{padding:3px 5px;font-size:.54rem}
+}
