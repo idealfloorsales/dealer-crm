@@ -19,7 +19,7 @@
  }
  function bindFields(){if(!ready)return;for(const id of ['delivery','edit_delivery','profile-edit-delivery']){let field=document.getElementById(id);if(!field)continue;
   if(field.tagName!=='SELECT'){const select=make('select');select.id=id;select.className=field.className||'form-select';select.disabled=field.disabled;select.required=field.required;if(field.name)select.name=field.name;select.setAttribute('aria-label','Условия доставки');select.dataset.deliverySelect='1';if(field.value){const o=make('option',field.value);o.value=field.value;select.appendChild(o);}field.replaceWith(select);field=select;}
-  fillSelect(field);field.title=field.value;if(!field.dataset.deliveryBound){field.addEventListener('change',()=>field.title=field.value);field.dataset.deliveryBound='1';}const parent=field.parentElement;if(!parent.classList.contains('delivery-field')){const wrapper=make('div',undefined,'delivery-field');field.before(wrapper);wrapper.appendChild(field);if(canManage){const gear=button('⚙',()=>openManager(field));gear.className='delivery-gear';gear.title='Настроить условия доставки';gear.setAttribute('aria-label','Настроить условия доставки');wrapper.appendChild(gear);}}
+  fillSelect(field);field.title=field.value;if(!field.dataset.deliveryBound){field.addEventListener('change',()=>field.title=field.value);field.dataset.deliveryBound='1';}const parent=field.parentElement;if(!parent.classList.contains('delivery-field')){const wrapper=make('div',undefined,'delivery-field');field.before(wrapper);wrapper.appendChild(field);if(canManage){const gear=button('',()=>openManager(field));gear.innerHTML='<i class="bi bi-gear"></i>';gear.className='motivation-gear-btn delivery-gear';gear.title='Настроить условия доставки';gear.setAttribute('aria-label','Настроить условия доставки');wrapper.appendChild(gear);}}
   const label=field.closest('.col-md-4,.col-md-6,.mb-3')?.querySelector('label');if(label&&/^Доставка$/.test(label.textContent.trim()))label.textContent='Условия доставки';
  }}
  let filterPanel=null;
@@ -31,24 +31,159 @@
   list.replaceChildren(...choices.map(c=>{const label=make('label'),check=make('input');check.type='checkbox';check.checked=filterKeys.has(c.token);check.addEventListener('change',()=>{check.checked?filterKeys.add(c.token):filterKeys.delete(c.token);filterPanel.querySelector('summary').textContent=filterKeys.size?'Условия доставки · '+filterKeys.size:'Все условия доставки';notify();});label.append(check,make('span',c.name));return label;}));filterPanel.querySelector('summary').textContent=filterKeys.size?'Условия доставки · '+filterKeys.size:'Все условия доставки';
  }
  async function load(){if(loading)return loading;loading=api().then(data=>{items=data.items.map(i=>({...i,aliases:Array.isArray(i.aliases)?i.aliases:[]}));canManage=data.canManage;ready=true;bindFields();filterUI();notify();return data;}).finally(()=>loading=null);return loading;}
- function ensureManager(){if(manager)return;manager=make('div',undefined,'delivery-catalog-overlay');manager.hidden=true;manager.innerHTML=`<section class="delivery-catalog" role="dialog" aria-modal="true" aria-labelledby="delivery-catalog-title"><header><div><small>СПРАВОЧНИК ДИЛЕРОВ</small><h2 id="delivery-catalog-title">Условия доставки</h2></div><button type="button" data-delivery-close aria-label="Закрыть справочник">×</button></header><p class="delivery-help">Одна полная формулировка для быстрого выбора. Переименование не переписывает условия в карточках дилеров; прежние названия остаются связаны с вариантом для фильтра.</p><p data-delivery-message role="status"></p><div class="delivery-catalog-body"><form><label for="delivery-condition-name">Условия доставки и оплаты</label><textarea id="delivery-condition-name" rows="3" maxlength="700" required placeholder="Самовывоз · отсрочка 14 дней от нашей реализации"></textarea><div class="delivery-actions"><button type="submit">Сохранить вариант</button><button type="button" data-delivery-new>Новый вариант</button></div></form><label class="delivery-archive"><input type="checkbox" data-delivery-archive> Показывать архив</label><input type="search" data-delivery-search aria-label="Поиск по справочнику" placeholder="Найти условия…"><div data-delivery-rows></div></div></section>`;document.body.appendChild(manager);
-  manager.querySelector('[data-delivery-close]').addEventListener('click',closeManager);manager.addEventListener('click',e=>{if(e.target===manager)closeManager();});manager.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closeManager();}if(e.key==='Tab'){const focus=[...manager.querySelectorAll('button,input,textarea')].filter(e=>!e.disabled&&e.getClientRects().length),first=focus[0],last=focus.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}});
-  manager.querySelector('[data-delivery-new]').addEventListener('click',()=>{editing=null;manager.querySelector('textarea').value='';manager.querySelector('textarea').focus();});manager.querySelector('[data-delivery-archive]').addEventListener('change',renderManager);manager.querySelector('[data-delivery-search]').addEventListener('input',renderManager);
-  manager.querySelector('form').addEventListener('submit',async e=>{e.preventDefault();const name=manager.querySelector('textarea').value.trim();if(!name)return;const buttons=[...manager.querySelectorAll('button')];buttons.forEach(b=>b.disabled=true);try{await api(editing?.id?'/'+editing.id:'',{name,...(editing&&!editing.id?{legacyName:editing.name}:{})},editing?.id?'PATCH':'POST');await load();editing=null;manager.querySelector('textarea').value='';renderManager();message('Вариант сохранён. Выберите его в списке, чтобы применить к дилеру.');}catch(e){message(e.message);}finally{buttons.forEach(b=>b.disabled=false);}});
+
+ function ensureManager(){
+  if(manager)return manager;
+  manager=make('div');
+  manager.className='modal fade motivation-manager-modal delivery-manager-modal';
+  manager.id='delivery-manager-modal';
+  manager.tabIndex=-1;
+  manager.dataset.bsBackdrop='static';
+  manager.innerHTML='<div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">'+
+   '<div class="modal-content motivation-manager">'+
+    '<div class="motivation-manager-head"><div><span>УСЛОВИЯ ДЛЯ ДИЛЕРОВ</span><h3>Условия доставки</h3><p>Создавайте свои варианты доставки и оплаты. Затем выбирайте их в карточке дилера.</p></div>'+
+     '<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Закрыть"></button></div>'+
+    '<div class="motivation-manager-stats">'+
+     '<article><small>Всего вариантов</small><strong data-delivery-total>0</strong></article>'+
+     '<article><small>Активных</small><strong data-delivery-active>0</strong></article>'+
+     '<article><small>Назначено дилерам</small><strong data-delivery-usage>0</strong></article>'+
+    '</div>'+
+    '<div class="motivation-manager-grid">'+
+     '<section class="motivation-scheme-list-panel">'+
+      '<div class="motivation-panel-head"><div><strong>Справочник условий</strong><small>Здесь только варианты, которые вы добавите сами.</small></div><button type="button" class="motivation-add-btn" data-delivery-new><i class="bi bi-plus-lg"></i> Новое</button></div>'+
+      '<div class="delivery-manager-search"><input type="search" class="form-control" data-delivery-search placeholder="Найти условия…" aria-label="Поиск по условиям"></div>'+
+      '<div class="motivation-scheme-list" data-delivery-rows></div>'+
+     '</section>'+
+     '<section class="motivation-editor-panel">'+
+      '<div class="motivation-editor-title"><span data-delivery-kicker>НОВЫЙ ВАРИАНТ</span><h4 data-delivery-editor-title>Условия доставки</h4></div>'+
+      '<form data-delivery-form>'+
+       '<label><span>Условия доставки и оплаты</span><textarea data-delivery-name class="form-control" rows="5" maxlength="700" required placeholder="Введите ваш вариант условий доставки"></textarea></label>'+
+       '<label class="motivation-active-toggle"><span><strong>Активен</strong><small>Доступен для выбора в карточке дилера</small></span><input type="checkbox" data-delivery-active-toggle checked></label>'+
+       '<p class="delivery-manager-hint">Уже сохранённые условия дилеров не изменяются при редактировании справочника.</p>'+
+       '<div class="motivation-editor-actions"><button type="button" class="btn btn-light border" data-delivery-new>Очистить</button><button type="submit" class="btn btn-dark" data-delivery-save>Сохранить</button></div>'+
+       '<p data-delivery-message role="status" aria-live="polite"></p>'+
+      '</form>'+
+     '</section>'+
+    '</div>'+
+   '</div></div>';
+  document.body.appendChild(manager);
+  manager.querySelectorAll('[data-delivery-new]').forEach(b=>b.addEventListener('click',resetEditor));
+  manager.querySelector('[data-delivery-search]').addEventListener('input',renderManager);
+  manager.querySelector('[data-delivery-form]').addEventListener('submit',async e=>{
+   e.preventDefault();if(!canManage)return;
+   const name=manager.querySelector('[data-delivery-name]').value.trim();
+   if(!name)return;
+   const active=manager.querySelector('[data-delivery-active-toggle]').checked;
+   const save=manager.querySelector('[data-delivery-save]'),before=save.innerHTML;
+   save.disabled=true;save.innerHTML='<span class="spinner-border spinner-border-sm"></span> Сохраняем';
+   try{
+    await api(editing?.id?'/'+editing.id:'',{name,active},editing?.id?'PATCH':'POST');
+    await load();resetEditor();renderManager();
+    message('Вариант сохранён. Теперь его можно выбрать в карточке дилера.');
+   }catch(err){message(err.message,true);}
+   finally{save.disabled=!canManage;save.innerHTML=before;}
+  });
+  manager.addEventListener('hidden.bs.modal',()=>{
+   document.body.classList.remove('motivation-modal-open');
+   if(suspended){
+    const back=suspended;suspended=null;
+    bootstrap.Modal.getOrCreateInstance(back).show();
+   }else if(focusBefore?.isConnected){focusBefore.focus();}
+   originSelect=null;
+  });
+  manager.addEventListener('shown.bs.modal',()=>{
+   document.body.classList.add('motivation-modal-open');
+   manager.querySelector('[data-delivery-name]')?.focus();
+  });
+  return manager;
  }
- const message=text=>{if(manager)manager.querySelector('[data-delivery-message]').textContent=text;};
- function renderManager(){if(!manager)return;const archived=manager.querySelector('[data-delivery-archive]').checked,q=manager.querySelector('[data-delivery-search]').value.trim().toLowerCase(),list=manager.querySelector('[data-delivery-rows]');list.replaceChildren();
-  for(const item of items.filter(i=>(archived||i.active)&&[i.name,...i.aliases].join(' ').toLowerCase().includes(q))){const row=make('article',undefined,'delivery-condition-row');row.append(make('strong',item.name),make('small',(item.active?'Действует':'Архив')+' · дилеров: '+item.usage+(item.legacy?' · из существующих карточек':'')));const actions=make('div',undefined,'delivery-actions');
-   if(item.active&&originSelect)actions.appendChild(button('Выбрать',()=>{originSelect.value=item.name;originSelect.dispatchEvent(new Event('change',{bubbles:true}));closeManager();}));
-   actions.appendChild(button('Редактировать',()=>{editing=item;manager.querySelector('textarea').value=item.name;manager.querySelector('textarea').focus();}));
-   const archive=button(item.active?'В архив':'Вернуть',async()=>{archive.disabled=true;try{await api(item.id?'/'+item.id:'',{...(item.id?{}:{name:item.name,legacyName:item.name}),active:!item.active},item.id?'PATCH':'POST');await load();renderManager();message(item.active?'Вариант в архиве. Условия у дилеров сохранены.':'Вариант снова доступен для выбора.');}catch(e){message(e.message);archive.disabled=false;}});actions.appendChild(archive);row.appendChild(actions);list.appendChild(row);
-  }if(!list.children.length)list.appendChild(make('p','Нет подходящих вариантов. Добавьте новый или включите архив.'));
+ function message(text,error=false){
+  const host=manager?.querySelector('[data-delivery-message]');
+  if(host){host.textContent=text;host.classList.toggle('text-danger',error);}
  }
- async function openManager(select){if(!canManage)return;ensureManager();originSelect=select;focusBefore=document.activeElement;oldOverflow=document.body.style.overflow;
-  const parent=document.querySelector('.modal.show');if(parent&&window.bootstrap?.Modal){suspended=parent;const instance=bootstrap.Modal.getOrCreateInstance(parent);const hidden=new Promise(resolve=>{const retry=()=>instance.hide();parent.addEventListener('shown.bs.modal',retry,{once:true});parent.addEventListener('hidden.bs.modal',()=>{parent.removeEventListener('shown.bs.modal',retry);resolve();},{once:true});});instance.hide();await hidden;}
-  document.body.style.overflow='hidden';manager.hidden=false;editing=null;manager.querySelector('textarea').value='';message('');renderManager();manager.querySelector('textarea').focus();
+ function resetEditor(){
+  editing=null;
+  if(!manager)return;
+  manager.querySelector('[data-delivery-kicker]').textContent='НОВЫЙ ВАРИАНТ';
+  manager.querySelector('[data-delivery-editor-title]').textContent='Условия доставки';
+  manager.querySelector('[data-delivery-name]').value='';
+  manager.querySelector('[data-delivery-active-toggle]').checked=true;
+  message('');
  }
- function closeManager(){manager.hidden=true;document.body.style.overflow=oldOverflow;if(suspended){bootstrap.Modal.getOrCreateInstance(suspended).show();suspended=null;}else focusBefore?.focus();}
+ function editCondition(item){
+  if(!canManage)return;
+  editing=item;
+  manager.querySelector('[data-delivery-kicker]').textContent='РЕДАКТИРОВАНИЕ';
+  manager.querySelector('[data-delivery-editor-title]').textContent='Изменить условия';
+  manager.querySelector('[data-delivery-name]').value=item.name;
+  manager.querySelector('[data-delivery-active-toggle]').checked=item.active;
+  message('');
+  manager.querySelector('[data-delivery-name]').focus();
+ }
+ async function toggleCondition(item){
+  if(!canManage||!item.id)return;
+  if(item.active&&!confirm('Переместить условия доставки в архив? Уже назначенные дилерам значения сохранятся.'))return;
+  try{
+   await api('/'+encodeURIComponent(item.id),{active:!item.active},'PATCH');
+   await load();renderManager();
+   if(editing?.id===item.id)resetEditor();
+   message(item.active?'Вариант архивирован. Данные дилеров сохранены.':'Вариант снова активен.');
+  }catch(err){message(err.message,true);}
+ }
+ function renderManager(){
+  if(!manager)return;
+  const query=manager.querySelector('[data-delivery-search]').value.trim().toLowerCase();
+  const filtered=items.filter(i=>[i.name,...i.aliases].join(' ').toLowerCase().includes(query));
+  const list=manager.querySelector('[data-delivery-rows]');
+  list.replaceChildren();
+  manager.querySelector('[data-delivery-total]').textContent=items.length;
+  manager.querySelector('[data-delivery-active]').textContent=items.filter(i=>i.active).length;
+  manager.querySelector('[data-delivery-usage]').textContent=items.reduce((sum,i)=>sum+Number(i.usage||0),0);
+  if(!filtered.length){
+   list.appendChild(make('div',items.length?'По вашему запросу вариантов нет.':'Вариантов пока нет. Добавьте первый справа.','motivation-empty'));
+  }
+  for(const item of filtered){
+   const row=make('article',undefined,'motivation-scheme-card delivery-manager-card');
+   if(!item.active)row.classList.add('is-archive');
+   const icon=make('div',undefined,'motivation-scheme-icon');icon.innerHTML='<i class="bi bi-truck"></i>';
+   const copy=make('div',undefined,'motivation-scheme-copy');
+   const heading=make('div'),name=make('strong',item.name);
+   heading.appendChild(name);
+   if(!item.active)heading.appendChild(make('span','архив','motivation-archive-badge'));
+   copy.appendChild(heading,make('small','Дилеров: '+item.usage));
+   const actions=make('div',undefined,'motivation-scheme-actions');
+   if(item.active&&originSelect){
+    const choose=button('',()=>{
+     window.CRMDelivery.setSelected(originSelect.id,item.name);
+     originSelect.dispatchEvent(new Event('change',{bubbles:true}));
+     bootstrap.Modal.getOrCreateInstance(manager).hide();
+    });choose.innerHTML='<i class="bi bi-check-lg"></i>';choose.title='Выбрать';choose.setAttribute('aria-label','Выбрать условия');actions.appendChild(choose);
+   }
+   if(canManage){
+    const edit=button('',()=>editCondition(item));edit.innerHTML='<i class="bi bi-pencil"></i>';edit.title='Редактировать';edit.setAttribute('aria-label','Редактировать условия');actions.appendChild(edit);
+    const toggle=button('',()=>toggleCondition(item));toggle.innerHTML=item.active?'<i class="bi bi-archive"></i>':'<i class="bi bi-arrow-counterclockwise"></i>';toggle.title=item.active?'В архив':'Восстановить';toggle.setAttribute('aria-label',toggle.title);if(item.active)toggle.classList.add('is-danger');actions.appendChild(toggle);
+   }
+   row.append(icon,copy,actions);list.appendChild(row);
+  }
+  manager.querySelectorAll('[data-delivery-form] textarea,[data-delivery-form] input,[data-delivery-form] button,[data-delivery-new]').forEach(control=>control.disabled=!canManage);
+  if(!canManage)manager.querySelector('[data-delivery-kicker]').textContent='ТОЛЬКО ПРОСМОТР';
+ }
+ async function openManager(select){
+  if(!canManage)return;
+  ensureManager();
+  originSelect=select;
+  focusBefore=document.activeElement;
+  resetEditor();
+  const parent=[...document.querySelectorAll('.modal.show')].find(el=>el!==manager);
+  if(parent){
+   suspended=parent;
+   const instance=bootstrap.Modal.getOrCreateInstance(parent);
+   const done=new Promise(resolve=>parent.addEventListener('hidden.bs.modal',resolve,{once:true}));
+   instance.hide();await done;
+  }
+  bootstrap.Modal.getOrCreateInstance(manager).show();
+  renderManager();
+ }
  window.CRMDelivery={matches,setSelected(id,value){const field=document.getElementById(id);if(!field)return;const text=String(value||'');if(field.tagName==='SELECT'&&text&&![...field.options].some(o=>o.value===text)){const option=make('option',text+' · сохранённые условия');option.value=text;option.disabled=true;field.appendChild(option);}field.value=text;field.title=text;},getFilter:()=>[...filterKeys],setFilter(values,dispatch=true){filterKeys=new Set(Array.isArray(values)?values:[]);renderFilter();if(dispatch)notify();},refresh:load};
  try{await load();const observer=new MutationObserver(bindFields);observer.observe(document.body,{childList:true,subtree:true});}catch(_){console.warn('Не удалось загрузить справочник условий доставки; исходные поля сохранены.');}
 })();
