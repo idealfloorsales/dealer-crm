@@ -5,6 +5,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Элементы
     const listContainer = document.getElementById('products-list-container'); 
     const searchInput = document.getElementById('product-search');
+    const productViewTabs = [...document.querySelectorAll('[data-product-view]')];
+    const archiveCountEl = document.getElementById('product-archive-count');
+    const archiveNotice = document.getElementById('product-archive-notice');
+    const productToolbar = document.querySelector('.product-toolbar');
     const searchClear = document.getElementById('product-search-clear');
     const totalLabel = document.getElementById('total-count');
     const kpiHost = document.getElementById('product-kpis');
@@ -37,7 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const collectionOptions = document.getElementById('product-collection-options');
     const productTypeInputs = [...document.querySelectorAll('input[name="product_type"]')];
     const laminateFields = [...document.querySelectorAll('.product-laminate-field')];
-    const btnDelete = document.getElementById('btn-delete-prod');
+    const btnArchive = document.getElementById('btn-archive-prod');
     const inpLiquid = document.getElementById('prod_is_liquid');
     const inpAlias = document.getElementById('prod_alias');
     const inpPhotoId = document.getElementById('prod_photo_id');
@@ -78,6 +82,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const calcInMargin = document.getElementById('calc-input-margin');
     
     let allProducts = [];
+    let archivedProducts = [];
+    let archiveView = false;
     let unmappedItems = [];
     let sortMode = 'sku';
     let typeMode = 'laminate';
@@ -353,7 +359,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const selectedClass = classFilter?.value || '';
         const selectedThickness = thicknessFilter?.value || '';
 
-        const laminateProducts = allProducts.filter(p => productType(p) === 'laminate');
+        const laminateProducts = (archiveView?archivedProducts:allProducts).filter(p => productType(p) === 'laminate');
         const classes = [...new Set(laminateProducts.map(p => String(p.characteristics?.class || '').trim()).filter(Boolean))]
             .sort((a,b)=>a.localeCompare(b,'ru',{numeric:true}));
         const thicknesses = [...new Set(laminateProducts.map(p => String(p.characteristics?.thickness || '').trim()).filter(Boolean))]
@@ -395,6 +401,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function applyQuickFilter(kind) {
+        if (kind === 'archive') {
+            switchProductView('archive');
+            return;
+        }
+        if (archiveView) archiveView=false;
+        updateArchiveTabs();
         resetWorkingFilters({showAll:kind==='all'});
         if (kind === 'laminate') { typeMode = 'laminate'; filterMode = 'all'; }
         if (kind === 'equipment') { typeMode = 'equipment'; filterMode = 'all'; }
@@ -411,6 +423,31 @@ document.addEventListener('DOMContentLoaded', () => {
         applyLogic();
     }
 
+    function updateArchiveTabs() {
+        productViewTabs.forEach(tab=>{
+            const selected=(tab.dataset.productView==='archive')===archiveView;
+            tab.classList.toggle('is-active',selected);
+            tab.setAttribute('aria-selected',String(selected));
+            tab.tabIndex=selected?0:-1;
+        });
+        if (archiveCountEl) archiveCountEl.textContent=String(archivedProducts.length);
+        productToolbar?.classList.toggle('is-archive-view',archiveView);
+    }
+    function switchProductView(view) {
+        const next=view==='archive';
+        if (archiveView===next) return;
+        archiveView=next;
+        resetWorkingFilters({showAll:next});
+        updateArchiveTabs();
+        populateDynamicFilters();
+        syncMatrixTypeFilters();
+        applyLogic();
+    }
+    function notice(text) {
+        if (!archiveNotice) return;
+        archiveNotice.textContent=text;
+        archiveNotice.hidden=!text;
+    }
     function renderKpis() {
         if (!kpiHost) return;
         const laminate = allProducts.filter(p => productType(p) === 'laminate');
@@ -424,7 +461,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }).length;
         const incomplete = allProducts.filter(p => !isProductComplete(p)).length;
 
-        const cleanState = !normalize(searchInput?.value) &&
+        const cleanState = !archiveView && !normalize(searchInput?.value) &&
             !classFilter?.value && !thicknessFilter?.value &&
             stockMode === 'all' && completenessMode === 'all';
 
@@ -434,7 +471,7 @@ document.addEventListener('DOMContentLoaded', () => {
             {key:'equipment',icon:'bi-display',label:'Торговое оборудование',value:equipment.length,foot:'отдельный тип позиции',tone:'',active:cleanState&&typeMode==='equipment'},
             {key:'liquid',icon:'bi-check2-circle',label:'Ликвид',value:liquid.length,foot:'ламинат',tone:'good',active:cleanState&&typeMode==='laminate'&&filterMode==='liquid'},
             {key:'illiquid',icon:'bi-archive',label:'Неликвид',value:illiquid.length,foot:'ламинат',tone:'risk',active:cleanState&&typeMode==='laminate'&&filterMode==='illiquid'},
-            {key:'incomplete',icon:'bi-exclamation-diamond',label:'Нужно заполнить',value:incomplete,foot:'неполных карточек',tone:incomplete?'warn':'',active:completenessMode==='incomplete'}
+            {key:'incomplete',icon:'bi-exclamation-diamond',label:'Нужно заполнить',value:incomplete,foot:'неполных карточек',tone:incomplete?'warn':'',active:!archiveView&&completenessMode==='incomplete'}
         ];
 
         kpiHost.innerHTML = cards.map(card=>`
@@ -456,12 +493,14 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadProducts() {
         try {
             listContainer.innerHTML = '<div class="text-center text-muted py-5">Загрузка...</div>';
-            const [res] = await Promise.all([
-                fetch(API_URL),
+            const [res,archiveResponse] = await Promise.all([
+                fetch(API_URL,{cache:'no-store'}),
+                fetch(API_URL+'/archive',{cache:'no-store'}),
                 loadStockImportMeta()
             ]);
-            if (!res.ok) throw new Error('Ошибка');
-            allProducts = await res.json();
+            if (!res.ok || !archiveResponse.ok) throw new Error('Ошибка загрузки матрицы');
+            [allProducts,archivedProducts] = await Promise.all([res.json(),archiveResponse.json()]);
+            updateArchiveTabs();
             populateDynamicFilters();
             applyLogic();
         } catch (e) {
@@ -481,7 +520,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const classValue = classFilter?.value || '';
         const thicknessValue = thicknessFilter?.value || '';
 
-        let filtered = allProducts.filter(product => {
+        const productsForView = archiveView ? archivedProducts : allProducts;
+        let filtered = productsForView.filter(product => {
             const c = product.characteristics || {};
             const searchBlob = normalize([
                 product.sku, product.name, product.collection, product.excel_alias,
@@ -556,21 +596,25 @@ document.addEventListener('DOMContentLoaded', () => {
             stockText = `${total.toLocaleString('ru-RU',{maximumFractionDigits:2})} шт · ${stockText}`;
         }
 
+        if (archiveView) labels.unshift('Архив');
         if (activeFilterSummary) activeFilterSummary.textContent = labels.join(' · ');
-        if (filteredSummary) filteredSummary.textContent = `${products.length} позиций · ${stockText}`;
+        if (filteredSummary) filteredSummary.textContent = archiveView
+            ? `${products.length} архивных позиций · не участвуют в других разделах CRM`
+            : `${products.length} позиций · ${stockText}`;
     }
 
     function renderList(products) {
+        const totalForView=archiveView?archivedProducts.length:allProducts.length;
         if (totalLabel) {
             if (!products.length) totalLabel.textContent = 'По текущим фильтрам позиций нет';
             else if (typeMode === 'laminate') {
                 const total = products.reduce((sum,p)=>sum + Math.max(0,stockValue(p) ?? 0),0);
-                totalLabel.textContent = `Показано ${products.length} из ${allProducts.length} · ${total.toLocaleString('ru-RU',{maximumFractionDigits:2})} м²`;
+                totalLabel.textContent = `Показано ${products.length} из ${totalForView} · ${total.toLocaleString('ru-RU',{maximumFractionDigits:2})} м²`;
             } else if (typeMode === 'equipment') {
                 const total = products.reduce((sum,p)=>sum + Math.max(0,stockValue(p) ?? 0),0);
-                totalLabel.textContent = `Показано ${products.length} из ${allProducts.length} · ${total.toLocaleString('ru-RU',{maximumFractionDigits:2})} шт`;
+                totalLabel.textContent = `Показано ${products.length} из ${totalForView} · ${total.toLocaleString('ru-RU',{maximumFractionDigits:2})} шт`;
             } else {
-                totalLabel.textContent = `Показано ${products.length} из ${allProducts.length}`;
+                totalLabel.textContent = `Показано ${products.length} из ${totalForView}`;
             }
         }
 
@@ -614,7 +658,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 : '<span class="product-row-photo is-empty"><i class="bi bi-image"></i></span>';
 
             return `
-                <article class="product-row ${!isEquipment && !isLiquid?'is-illiquid':''} ${isEquipment?'is-equipment':''}" ${canManageProducts?`data-edit-product="${esc(product.id)}"`:''}>
+                <article class="product-row ${!isEquipment && !isLiquid?'is-illiquid':''} ${isEquipment?'is-equipment':''} ${archiveView?'is-archived':''}" ${canManageProducts&&!archiveView?`data-edit-product="${esc(product.id)}"`:''}>
                     <div class="product-position">
                         <div class="product-position-top">
                             ${rowPhoto}
@@ -623,7 +667,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                         ${!isEquipment ? (product.collection ? `<small class="product-collection" title="${esc(product.collection)}"><i class="bi bi-collection me-1"></i>${esc(product.collection)}</small>` : '<small class="product-collection is-empty"><i class="bi bi-collection me-1"></i>Коллекция не указана</small>') : '<small class="product-collection is-equipment"><i class="bi bi-display me-1"></i>Торговое оборудование</small>'}
                         ${product.excel_alias ? `<small class="product-alias" title="${esc(product.excel_alias)}">Excel: ${esc(product.excel_alias)}</small>` : ''}
-                        ${missing.length ? `<span class="product-alert"><i class="bi bi-exclamation-circle"></i>Не заполнено: ${esc(missing.slice(0,3).join(', '))}${missing.length>3?'…':''}</span>` : ''}
+                        ${archiveView ? `<small class="product-archived-meta"><i class="bi bi-archive me-1"></i>В архиве ${product.archived_at ? esc(new Date(product.archived_at).toLocaleDateString('ru-RU')) : ''}${product.archived_by?.name?' · '+esc(product.archived_by.name):''}</small>` : ''}
+                        ${missing.length && !archiveView ? `<span class="product-alert"><i class="bi bi-exclamation-circle"></i>Не заполнено: ${esc(missing.slice(0,3).join(', '))}${missing.length>3?'…':''}</span>` : ''}
                     </div>
                     <div class="product-characteristics">
                         ${chars.length ? chars.join('') : '<span class="product-tag is-empty">Характеристики не заполнены</span>'}
@@ -640,10 +685,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                     <div class="product-status-stack">
                         <span class="product-type-badge ${isEquipment?'is-equipment':'is-laminate'}">${isEquipment?'Оборудование':'Ламинат'}</span>
-                        ${!isEquipment ? `<span class="product-status ${isLiquid?'':'is-illiquid'}">${isLiquid?'Ликвид':'Неликвид'}</span>` : ''}
+                        ${archiveView
+                            ? '<span class="product-status is-archived"><i class="bi bi-archive me-1"></i>Архив</span>'
+                            : (!isEquipment ? `<span class="product-status ${isLiquid?'':'is-illiquid'}">${isLiquid?'Ликвид':'Неликвид'}</span>` : '')}
                     </div>
-                    <div>
-                        ${canManageProducts?'<button type="button" class="product-edit-btn" title="Редактировать"><i class="bi bi-pencil"></i></button>':''}
+                    <div class="product-row-actions">
+                        ${canManageProducts ? (archiveView
+                            ? `<button type="button" class="product-restore-btn" data-restore-product="${esc(product.id)}" title="Вернуть в рабочую матрицу" aria-label="Восстановить позицию ${esc(product.sku||product.name||'')}"><i class="bi bi-arrow-counterclockwise"></i></button>`
+                            : `<button type="button" class="product-edit-btn" title="Редактировать" aria-label="Редактировать ${esc(product.sku||'позицию')}"><i class="bi bi-pencil"></i></button><button type="button" class="product-archive-btn" data-archive-product="${esc(product.id)}" title="В архив" aria-label="Архивировать ${esc(product.sku||product.name||'')}"><i class="bi bi-archive"></i></button>`
+                        ) : ''}
                     </div>
                 </article>
             `;
@@ -653,11 +703,41 @@ document.addEventListener('DOMContentLoaded', () => {
             listContainer.querySelectorAll('[data-edit-product]').forEach(row=>{
                 row.addEventListener('click',event=>{
                     if (event.target.closest('button')) event.preventDefault();
+                    if (event.target.closest('[data-archive-product],[data-restore-product]')) return;
                     openModal(row.dataset.editProduct);
                 });
             });
         }
     }
+
+    async function changeArchiveStatus(id,archived) {
+        if(!canManageProducts)return;
+        const product=(archived?allProducts:archivedProducts).find(item=>String(item.id)===String(id));
+        if(!product)return;
+        const label=[product.sku,product.name].filter(Boolean).join(' · ')||'позицию';
+        const question=archived
+            ? 'Отправить «'+label+'» в архив? Позиция исчезнет из рабочих списков, прайсов, КП, выставленности и цеха. Данные сохранятся.'
+            : 'Восстановить «'+label+'» в рабочую матрицу?';
+        if(!confirm(question))return;
+        const route=archived?'archive':'restore';
+        try {
+            const response=await fetch(API_URL+'/'+encodeURIComponent(id)+'/'+route,{
+                method:'PATCH',headers:{'Content-Type':'application/json'},body:'{}'
+            });
+            const data=await response.json().catch(()=>({}));
+            if(!response.ok)throw new Error(data.error||'Не удалось изменить архив');
+            await loadProducts();
+            notice(archived?'Позиция перемещена в архив. Её можно восстановить на вкладке «Архив».':'Позиция возвращена в рабочую матрицу.');
+            return true;
+        }catch(e){alert(e.message||'Ошибка изменения архива');return false;}
+    }
+    listContainer?.addEventListener('click',event=>{
+        const archive=event.target.closest('[data-archive-product]');
+        if(archive){event.preventDefault();event.stopPropagation();changeArchiveStatus(archive.dataset.archiveProduct,true);return;}
+        const restore=event.target.closest('[data-restore-product]');
+        if(restore){event.preventDefault();event.stopPropagation();changeArchiveStatus(restore.dataset.restoreProduct,false);}
+    });
+    productViewTabs.forEach(tab=>tab.addEventListener('click',()=>{notice('');switchProductView(tab.dataset.productView);}));
 
     // --- ЛОГИКА КАЛЬКУЛЯТОРА ---
     window.openGlobalCalc = () => {
@@ -773,7 +853,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!canManageProducts) return;
         form.reset();
         productTypeInputs.forEach(input => { input.checked = input.value === 'laminate'; });
-        if(btnDelete) btnDelete.style.display = 'none';
+        if(btnArchive) btnArchive.style.display = 'none';
 
         if (id) {
             const p = allProducts.find(x => String(x.id) === String(id));
@@ -802,9 +882,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 modalTitle.textContent = type === 'equipment' ? 'Торговое оборудование' : 'Ламинат';
-                if(btnDelete) {
-                    btnDelete.style.display = 'block';
-                    btnDelete.onclick = () => deleteProduct(p.id);
+                if(btnArchive) {
+                    btnArchive.style.display = 'inline-flex';
+                    btnArchive.onclick = async()=>{
+                        const success=await changeArchiveStatus(p.id,true);
+                        if(success)modal.hide();
+                    };
                 }
             }
         } else {
@@ -820,20 +903,7 @@ document.addEventListener('DOMContentLoaded', () => {
         modal.show();
     };
 
-    window.deleteProduct = async (id) => {
-        if (!canManageProducts) return;
-        if(confirm('Удалить товар?')) {
-            try {
-                const response = await fetch(`${API_URL}/${encodeURIComponent(id)}`, { method: 'DELETE' });
-                if (!response.ok) {
-                    const data = await response.json().catch(() => ({}));
-                    throw new Error(data.error || 'Не удалось удалить товар');
-                }
-                await loadProducts();
-                modal.hide();
-            } catch(e) { alert(e.message || 'Ошибка удаления товара'); }
-        }
-    };
+    window.archiveProduct = id => changeArchiveStatus(id,true);
 
     if(form) {
         form.onsubmit = async (e) => {
@@ -1216,7 +1286,7 @@ document.addEventListener('DOMContentLoaded', () => {
     completenessFilter?.addEventListener('change',applyLogic);
     sortSelect?.addEventListener('change',applyLogic);
     resetFiltersBtn?.addEventListener('click',()=>{
-        resetWorkingFilters();
+        resetWorkingFilters({showAll:archiveView});
         applyLogic();
     });
 
@@ -1238,7 +1308,10 @@ document.addEventListener('DOMContentLoaded', () => {
         await loadProducts();
     }
 
-    if (addBtn) addBtn.onclick = () => openModal();
+    if (addBtn) addBtn.onclick = () => {
+        if(archiveView)switchProductView('active');
+        openModal();
+    };
     initPermissionsAndLoad();
 });
 
