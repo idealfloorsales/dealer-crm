@@ -28,7 +28,7 @@ function archiveIndex(products = []) {
 
 function rowReferencesArchivedProduct(row, archive) {
     if (!row || typeof row !== 'object') return false;
-    const rawId = row.productId || row.product || row._id || null;
+    const rawId = row.productId || row.product || null; // row._id belongs to the price-list subdocument, not Product
     const id = rawId ? String(rawId?._id || rawId?.id || rawId) : '';
     if (id && archive.ids.has(id)) return true;
     if (id) return false; // An active item with a reused SKU must stay visible.
