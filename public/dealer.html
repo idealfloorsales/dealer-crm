@@ -225,16 +225,23 @@
             </div>
 
             <div class="tab-pane fade" id="sales-pane">
-                <div class="content-card">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="card-heading mb-0">История продаж</h5>
-                        <div class="btn-group">
-                            <button class="btn btn-sm btn-light border" onclick="printDiv('dealer-sales-history', 'Продажи')"><i class="bi bi-printer"></i></button>
-                            <button class="btn btn-sm btn-light border text-success" onclick="exportData('sales')"><i class="bi bi-download"></i></button>
+                <section class="content-card dealer-sales-history-card" aria-labelledby="dealer-sales-history-title">
+                    <header class="dealer-sales-history-head">
+                        <div class="dealer-sales-heading">
+                            <span class="dealer-sales-heading-icon"><i class="bi bi-bar-chart-line" aria-hidden="true"></i></span>
+                            <div class="dealer-sales-heading-copy">
+                                <small>ПРОДАЖИ ДИЛЕРА</small>
+                                <h2 id="dealer-sales-history-title">История продаж</h2>
+                                <p>Помесячная история с итогами по годам</p>
+                            </div>
                         </div>
-                    </div>
-                    <div id="dealer-sales-history"><p class="text-muted text-center py-4">Загрузка...</p></div>
-                </div>
+                        <div class="dealer-sales-actions">
+                            <button type="button" onclick="printDiv('dealer-sales-history', 'Продажи')" title="Печать истории продаж" aria-label="Печать истории продаж"><i class="bi bi-printer" aria-hidden="true"></i><span>Печать</span></button>
+                            <button type="button" onclick="exportData('sales')" title="Экспорт истории продаж в CSV" aria-label="Экспорт истории продаж в CSV"><i class="bi bi-file-earmark-arrow-down" aria-hidden="true"></i><span>Экспорт</span></button>
+                        </div>
+                    </header>
+                    <div id="dealer-sales-history" class="dealer-sales-history-body"><p class="text-muted text-center py-4">Загрузка...</p></div>
+                </section>
             </div>
 
             <div class="tab-pane fade" id="visits-pane">

@@ -471,69 +471,61 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderDealerSales(mySales) {
         if (!salesHistoryContainer) return;
         if (!can('can_view_sales')) {
-            salesHistoryContainer.innerHTML = '<div class="cc-empty">Нет доступа к продажам</div>';
+            salesHistoryContainer.innerHTML = '<div class="dealer-sales-empty"><i class="bi bi-shield-lock"></i>Нет доступа к продажам</div>';
             return;
         }
         try {
-
-            if (!mySales || mySales.length === 0) { 
-                salesHistoryContainer.innerHTML = '<div class="text-center py-4 text-muted bg-light rounded">Нет данных о продажах.</div>'; 
-                return; 
+            if (!Array.isArray(mySales) || !mySales.length) {
+                salesHistoryContainer.innerHTML = '<div class="dealer-sales-empty"><i class="bi bi-inbox"></i>Нет данных о продажах.</div>';
+                return;
             }
-
-            // Агрегация
-            const aggregatedData = {}; 
+            const aggregatedData = {};
             let grandTotal = 0;
-
             mySales.forEach(s => {
-                if(!s.month) return;
-                const year = s.month.split('-')[0];
+                if (!s.month) return;
+                const year = String(s.month).split('-')[0];
                 const fact = parseFloat(s.fact) || 0;
                 if (fact === 0) return;
-
                 if (!aggregatedData[year]) aggregatedData[year] = {};
                 if (!aggregatedData[year][s.month]) aggregatedData[year][s.month] = 0;
-                
                 aggregatedData[year][s.month] += fact;
                 grandTotal += fact;
             });
-
             const years = Object.keys(aggregatedData).sort().reverse();
-
-            if (years.length === 0) {
-                salesHistoryContainer.innerHTML = '<div class="text-center py-4 text-muted bg-light rounded">Продажи равны нулю.</div>'; 
+            if (!years.length) {
+                salesHistoryContainer.innerHTML = '<div class="dealer-sales-empty"><i class="bi bi-graph-up"></i>Продажи равны нулю.</div>';
                 return;
             }
-
-            let html = '<div class="table-responsive"><table class="table table-bordered table-sm mb-0">';
-            html += '<thead class="table-light"><tr><th>Период</th><th class="text-end">Факт (м²)</th></tr></thead><tbody>';
-
+            const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            const area = value => Number(value).toLocaleString('ru-RU', {maximumFractionDigits:2});
+            const monthLabel = key => {
+                const m = /^\d{4}-(\d{2})$/.exec(String(key));
+                if (!m || +m[1]<1 || +m[1]>12) return String(key);
+                const text = new Date(2024, +m[1]-1, 1).toLocaleString('ru-RU', {month:'long'});
+                return text.charAt(0).toUpperCase()+text.slice(1);
+            };
+            const lastMonth = Object.keys(aggregatedData[years[0]]).sort().reverse()[0];
+            const activeMonths = years.reduce((sum, year) => sum + Object.keys(aggregatedData[year]).length, 0);
+            let html = '<div class="dealer-sales-metrics">';
+            html += '<div class="dealer-sales-metric"><span>Продажи за всё время</span><strong>'+area(grandTotal)+' <small>м²</small></strong></div>';
+            html += '<div class="dealer-sales-metric"><span>Последний месяц с продажами</span><strong class="is-period">'+esc(lastMonth ? monthLabel(lastMonth)+' '+years[0] : '—')+'</strong></div>';
+            html += '<div class="dealer-sales-metric"><span>Месяцев с продажами</span><strong>'+activeMonths+'</strong></div></div>';
+            html += '<div class="dealer-sales-table-wrap"><table class="dealer-sales-table"><thead><tr><th scope="col">Период</th><th scope="col">Факт, м²</th></tr></thead><tbody>';
             years.forEach(year => {
-                html += `<tr class="table-secondary"><td colspan="2" class="fw-bold ps-3 text-dark">${year} год</td></tr>`;
-                const monthsData = aggregatedData[year];
-                const sortedMonths = Object.keys(monthsData).sort().reverse(); 
+                html += '<tr class="dealer-sales-year"><th colspan="2" scope="rowgroup"><i class="bi bi-calendar3" aria-hidden="true"></i> '+esc(year)+' год</th></tr>';
                 let yearTotal = 0;
-
-                sortedMonths.forEach(monthKey => {
-                    const value = monthsData[monthKey];
-                    const date = new Date(monthKey + '-01');
-                    const monthName = date.toLocaleString('ru-RU', { month: 'long' });
-                    const monthDisplay = monthName.charAt(0).toUpperCase() + monthName.slice(1);
-                    const displayValue = parseFloat(value.toFixed(2));
+                Object.keys(aggregatedData[year]).sort().reverse().forEach(month => {
+                    const value = aggregatedData[year][month];
                     yearTotal += value;
-                    html += `<tr><td class="ps-4">${monthDisplay}</td><td class="text-end font-monospace">${displayValue}</td></tr>`;
+                    html += '<tr class="dealer-sales-month"><td>'+esc(monthLabel(month))+'</td><td class="dealer-sales-number">'+area(value)+'</td></tr>';
                 });
-                html += `<tr style="background-color: #fffbeb;"><td class="ps-3 fw-bold text-muted">Итого за ${year}:</td><td class="text-end fw-bold text-dark">${parseFloat(yearTotal.toFixed(2))}</td></tr>`;
+                html += '<tr class="dealer-sales-year-total"><td>Итого за '+esc(year)+' год</td><td class="dealer-sales-number">'+area(yearTotal)+'</td></tr>';
             });
-
-            html += '</tbody>';
-            html += `<tfoot class="table-dark"><tr><td class="fw-bold ps-3 text-uppercase">Всего за все время</td><td class="text-end fw-bold fs-6">${parseFloat(grandTotal.toFixed(2))}</td></tr></tfoot>`;
-            html += '</table></div>';
+            html += '</tbody><tfoot><tr><th scope="row">Всего за всё время</th><td class="dealer-sales-number">'+area(grandTotal)+'</td></tr></tfoot></table></div>';
             salesHistoryContainer.innerHTML = html;
-
-        } catch (e) { 
+        } catch (e) {
             console.error(e);
-            salesHistoryContainer.innerHTML = `<p class="text-danger">Ошибка загрузки продаж</p>`; 
+            salesHistoryContainer.innerHTML = '<div class="dealer-sales-empty"><i class="bi bi-exclamation-triangle"></i>Ошибка загрузки продаж</div>';
         }
     }
 
