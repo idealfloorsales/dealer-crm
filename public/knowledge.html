@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="style.css?v={{VER}}">
     <link rel="stylesheet" href="training.css?v={{VER}}">
     <link rel="stylesheet" href="training-installation.css?v={{VER}}">
+    <link rel="stylesheet" href="training-sales.css?v={{VER}}">
     <link rel="icon" href="favicon.gif" type="image/gif">
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -43,12 +44,13 @@
 
         <section class="training-shell">
             <div class="training-tabs" role="tablist" aria-label="Разделы обучения">
-                <button class="training-tab is-active" type="button" data-training-view="course"><i class="bi bi-mortarboard"></i><span>Курс</span></button>
-                <button class="training-tab" type="button" data-training-view="catalog"><i class="bi bi-grid-3x3-gap"></i><span>Номенклатура</span><small id="catalog-count-badge">83</small></button>
-                <button class="training-tab" type="button" data-training-view="materials"><i class="bi bi-journal-text"></i><span>Материалы команды</span></button>
+                <button id="training-tab-course" class="training-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="training-panel-course" data-training-view="course"><i class="bi bi-mortarboard"></i><span>Курс</span></button>
+                <button id="training-tab-catalog" class="training-tab" type="button" role="tab" aria-selected="false" aria-controls="training-panel-catalog" data-training-view="catalog"><i class="bi bi-grid-3x3-gap"></i><span>Номенклатура</span><small id="catalog-count-badge">83</small></button>
+                <button id="training-tab-sales" class="training-tab" type="button" role="tab" aria-selected="false" aria-controls="training-panel-sales" data-training-view="sales"><i class="bi bi-chat-square-quote"></i><span>Скрипты продаж</span></button>
+                <button id="training-tab-materials" class="training-tab" type="button" role="tab" aria-selected="false" aria-controls="training-panel-materials" data-training-view="materials"><i class="bi bi-journal-text"></i><span>Материалы команды</span></button>
             </div>
 
-            <section class="training-view is-active" data-training-panel="course">
+            <section class="training-view is-active" id="training-panel-course" role="tabpanel" aria-labelledby="training-tab-course" data-training-panel="course">
                 <div class="training-toolbar">
                     <label class="training-search"><i class="bi bi-search"></i><input id="training-search" type="search" placeholder="Найти тему, коллекцию или характеристику…"></label>
                     <div class="training-category-row" id="training-category-row"></div>
@@ -56,7 +58,7 @@
                 <div class="training-grid" id="training-grid"></div>
             </section>
 
-            <section class="training-view" data-training-panel="catalog">
+            <section class="training-view" id="training-panel-catalog" role="tabpanel" aria-labelledby="training-tab-catalog" data-training-panel="catalog">
                 <div class="catalog-intro">
                     <div>
                         <span class="catalog-eyebrow">СПРАВОЧНИК ПРОДУКЦИИ</span>
@@ -73,7 +75,61 @@
                 <div class="catalog-grid" id="catalog-grid"></div>
             </section>
 
-            <section class="training-view" data-training-panel="materials">
+            <section class="training-view" id="training-panel-sales" role="tabpanel" aria-labelledby="training-tab-sales" data-training-panel="sales">
+                <div class="sales-intro">
+                    <div>
+                        <span class="catalog-eyebrow">IDEAL FLOOR · ПРАКТИКА ПРОДАЖ</span>
+                        <h2>Скрипты, которые помогают продавать уверенно</h2>
+                        <p>Как установить контакт, определить потребности, показать выгоду, отработать возражения и перейти к заказу. Аргументы опираются на учебные характеристики конкретных коллекций.</p>
+                    </div>
+                    <div class="sales-intro-mark"><i class="bi bi-chat-dots"></i><span>От вопроса — к покупке</span></div>
+                </div>
+
+                <div class="sales-section-head">
+                    <div><span class="sales-section-kicker">01 · ЛОГИКА ПРОДАЖИ</span><h3>Пять шагов хорошего разговора</h3></div>
+                </div>
+                <div class="sales-method" aria-label="Пять этапов продажи">
+                    <div class="sales-method-step"><b>1</b><span>Установить контакт</span></div>
+                    <div class="sales-method-step"><b>2</b><span>Узнать задачу</span></div>
+                    <div class="sales-method-step"><b>3</b><span>Показать выгоды</span></div>
+                    <div class="sales-method-step"><b>4</b><span>Снять сомнения</span></div>
+                    <div class="sales-method-step"><b>5</b><span>Предложить шаг</span></div>
+                </div>
+
+                <div class="sales-quick">
+                    <div class="sales-quick-header">
+                        <span class="sales-quick-icon"><i class="bi bi-lightning-charge"></i></span>
+                        <div><strong>Презентация IDEAL FLOOR за 40 секунд</strong><small>Для первого разговора или сообщения клиенту</small></div>
+                    </div>
+                    <button type="button" class="sales-copy-btn" data-sales-copy="quick"><i class="bi bi-copy"></i><span>Копировать</span></button>
+                    <blockquote class="sales-quick-script" id="sales-quick-script"></blockquote>
+                </div>
+
+                <div class="sales-section-head">
+                    <div><span class="sales-section-kicker">02 · АРГУМЕНТЫ</span><h3>Не характеристика, а выгода для клиента</h3><p>Покажите, что именно покупатель получает от особенностей IDEAL FLOOR.</p></div>
+                </div>
+                <div class="sales-benefits-grid" id="sales-benefits-grid"></div>
+
+                <div class="sales-section-head">
+                    <div><span class="sales-section-kicker">03 · ГОТОВЫЕ СИТУАЦИИ</span><h3>Библиотека скриптов</h3><p>Для торговой точки, WhatsApp, возражений, завершения сделки и работы с дилерами.</p></div>
+                </div>
+                <div class="sales-scripts-toolbar">
+                    <label class="training-search"><i class="bi bi-search"></i><input id="sales-script-search" type="search" autocomplete="off" placeholder="Найти ситуацию: дорого, кухня, ёлочка, дилер…" aria-label="Поиск по скриптам продаж"></label>
+                    <div class="training-category-row" id="sales-category-row" role="group" aria-label="Категории скриптов"></div>
+                </div>
+                <p class="sales-results" id="sales-result-count" role="status" aria-live="polite"></p>
+                <div class="sales-scripts-grid" id="sales-scripts-grid"></div>
+                <button id="sales-show-more" class="sales-show-more" type="button" hidden>Показать ещё</button>
+
+                <div class="sales-guardrails">
+                    <h3><i class="bi bi-shield-check"></i> Что нельзя обещать покупателю</h3>
+                    <ul id="sales-guardrails-list"></ul>
+                    <p class="sales-source" id="sales-playbook-source"></p>
+                </div>
+                <div class="sales-copy-message" id="sales-copy-message" role="status" aria-live="polite"></div>
+            </section>
+
+            <section class="training-view" id="training-panel-materials" role="tabpanel" aria-labelledby="training-tab-materials" data-training-panel="materials">
                 <div class="materials-head">
                     <div>
                         <span class="catalog-eyebrow">ВНУТРЕННИЕ МАТЕРИАЛЫ</span>
@@ -131,6 +187,8 @@
     <script src="knowledge.js?v={{VER}}"></script>
     <script src="training-data.js?v={{VER}}"></script>
     <script src="training-installation.js?v={{VER}}"></script>
+    <script src="training-sales-data.js?v={{VER}}"></script>
+    <script src="training-sales.js?v={{VER}}"></script>
     <script src="assistant-guide.js?v={{VER}}"></script>
 </body>
 </html>
