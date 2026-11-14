@@ -26,6 +26,30 @@ document.addEventListener('DOMContentLoaded', () => {
     const summaryVisible = document.getElementById('map-summary-visible');
     const summaryMissing = document.getElementById('map-summary-missing');
     const mobileCount = document.getElementById('map-mobile-count');
+    const foldButton = document.getElementById('map-toggle-filters');
+    const mapHeader = document.querySelector('.map-workspace-header');
+    const foldKey = 'crm_map_filters_collapsed_v1';
+    const compactByDefault = window.matchMedia?.('(min-width: 768px)').matches ?? true;
+    let filtersCollapsed = compactByDefault;
+    try {
+        const saved = localStorage.getItem(foldKey);
+        if (saved === '1' || saved === '0') filtersCollapsed = saved === '1';
+    } catch (_) {}
+    function renderMapFilterFold() {
+        if (!foldButton || !mapHeader) return;
+        mapHeader.classList.toggle('is-collapsed',filtersCollapsed);
+        foldButton.setAttribute('aria-expanded',String(!filtersCollapsed));
+        foldButton.querySelector('span').textContent=filtersCollapsed?'Показать фильтры':'Скрыть фильтры';
+        const arrow=foldButton.querySelector('.map-fold-chevron');
+        if(arrow)arrow.className='bi '+(filtersCollapsed?'bi-chevron-down':'bi-chevron-up')+' map-fold-chevron';
+    }
+    foldButton?.addEventListener('click',()=>{
+        filtersCollapsed=!filtersCollapsed;
+        try { localStorage.setItem(foldKey,filtersCollapsed?'1':'0'); } catch (_) {}
+        renderMapFilterFold();
+    });
+    renderMapFilterFold();
+
 
     const toast = (message, type = 'info') => {
         if (window.showToast) window.showToast(message, type);
