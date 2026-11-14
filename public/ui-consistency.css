@@ -216,7 +216,8 @@ body:not(.map-page) :is(.app-page-shell,.command-center-shell) { min-width:0; }
 .map-page .map-fold-toggle {border-radius:10px!important;}
 .map-page .map-fold-toggle:focus-visible {outline:2px solid #fff;outline-offset:2px;}
 
-/* Back to top: one accessible control, invisible near the start and on short pages. */
+/* Back to top: one accessible control, invisible near the start and on short pages.
+   The AI launcher is a separate floating action: reserve a full 16px+ gap. */
 .crm-scroll-to-top {
   right:22px!important;
   bottom:22px!important;
@@ -229,6 +230,10 @@ body:not(.map-page) :is(.app-page-shell,.command-center-shell) { min-width:0; }
 }
 .crm-scroll-to-top.is-visible {transform:translateY(0) scale(1);}
 .crm-scroll-to-top:hover {transform:translateY(-2px) scale(1.03);background:#b9040a;color:#fff;}
+/* Desktop: stack the independent top arrow above (not over) the red AI launcher. */
+body:has(.ideal-ai-launch:not([hidden])) .crm-scroll-to-top {
+  bottom:102px!important;
+}
 body:has(.modal.show) .crm-scroll-to-top {opacity:0;visibility:hidden;pointer-events:none;}
 @media(max-width:991.98px) {
   body:not(.map-page):not(.login-page) :is(.command-center-shell,.app-page-shell,
@@ -247,6 +252,9 @@ body:has(.modal.show) .crm-scroll-to-top {opacity:0;visibility:hidden;pointer-ev
   #cc-activity-panel .cc-activity-feed,#cc-plan-panel .cc-task-list {max-height:310px!important;}
   .crm-scroll-to-top {right:14px!important;bottom:calc(104px + env(safe-area-inset-bottom))!important;width:44px;height:44px;}
   body:has(#mobile-fab-add) .crm-scroll-to-top {bottom:calc(162px + env(safe-area-inset-bottom))!important;}
+  /* On phones the AI launcher is left-aligned; the arrow stays on the right. */
+  body:has(.ideal-ai-launch:not([hidden])) .crm-scroll-to-top {right:14px!important;bottom:calc(104px + env(safe-area-inset-bottom))!important;}
+  body:has(.ideal-ai-launch:not([hidden])):has(#mobile-fab-add) .crm-scroll-to-top {bottom:calc(162px + env(safe-area-inset-bottom))!important;}
   .map-page .map-sidebar {height:min(90dvh,850px)!important;}
 }
 @media(max-width:420px) {
