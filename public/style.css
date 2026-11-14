@@ -14101,3 +14101,64 @@ body:not(.map-page) .dealer-list-toolbar {border-radius:16px!important}
   background:rgba(255,255,255,.09);
   color:#fff;
 }
+
+
+/* Dashboard directory actions share the same control geometry as the filter grid. */
+.command-center-shell .dealer-directory-actions {
+  align-items:center;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.command-center-shell #dealer-fallback-select {
+  width:190px;
+  min-width:155px;
+  max-width:190px;
+  min-height:42px!important;
+  padding:8px 35px 8px 13px;
+  border:1px solid #e1ddda!important;
+  border-radius:11px!important;
+  background-color:#faf9f7!important;
+  color:#4f5157;
+  font:650 .74rem 'Onest',sans-serif!important;
+  box-shadow:none!important;
+}
+.command-center-shell #dealer-fallback-select:focus-visible {
+  border-color:#b9040a!important;
+  box-shadow:var(--crm-focus-ring)!important;
+}
+.command-center-shell .dealer-directory-actions .cc-secondary-btn {
+  justify-content:center;
+  min-height:42px;
+  padding:8px 14px;
+  border-radius:11px;
+  border-color:#e1ddda;
+  background:#fff;
+  color:#54565d;
+  font:750 .73rem 'Onest',sans-serif;
+}
+.command-center-shell .dealer-directory-actions .cc-secondary-btn:hover {
+  border-color:#d1cbc6;
+  background:#f7f5f2;
+  color:#292b30;
+}
+@media(max-width:1350px){
+  .dealer-profile-page .profile-nav-wrapper {
+    overflow-x:auto;
+    overscroll-behavior-x:contain;
+    scrollbar-width:thin;
+  }
+  .dealer-profile-page .profile-tabs {
+    flex-wrap:nowrap!important;
+    min-width:max-content;
+  }
+  .dealer-profile-page .profile-tabs .nav-item {flex:0 0 auto}
+}
+@media(max-width:650px){
+  .command-center-shell .dealer-directory-actions #dealer-fallback-select {width:100%;max-width:none}
+}
+:root[data-crm-theme="dark"] .command-center-shell #dealer-fallback-select,
+:root[data-crm-theme="dark"] .command-center-shell .dealer-directory-actions .cc-secondary-btn {
+  background-color:#28292e!important;
+  border-color:#414249!important;
+  color:#e3e4e8!important;
+}
