@@ -159,7 +159,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.addEventListener('click', async event => {
         const tab = event.target.closest('[data-training-view]');
-        if (tab){ switchView(tab.dataset.trainingView); return; }
+        if (tab){
+            const view = tab.dataset.trainingView;
+            switchView(view);
+            try { history.replaceState(null, '', location.pathname + location.search + '#' + view); } catch (_) {}
+            return;
+        }
         const category = event.target.closest('[data-training-category]');
         if (category){ trainingCategory = category.dataset.trainingCategory; renderCategories(); renderTraining(); return; }
         const openTopic = event.target.closest('[data-training-open]');
@@ -267,6 +272,9 @@ document.addEventListener('DOMContentLoaded', () => {
     renderTraining();
     setupCatalog();
     updateHeroStats();
+    // Allow direct links like /knowledge.html#sales without changing the main navigation.
+    const requestedView = String(window.location.hash || '').replace(/^#/, '');
+    if (requestedView) switchView(requestedView);
 
     (async () => {
         if (window.CRMAuth && CRMAuth.ready) await CRMAuth.ready;
