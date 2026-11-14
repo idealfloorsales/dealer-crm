@@ -15,6 +15,10 @@ document.addEventListener('DOMContentLoaded', () => {
         {id:'benefits',category:'Продажи',icon:'bi-chat-heart',title:'Язык выгод для покупателя',lead:'Говорим не только о характеристике, а о том, что получает клиент.',metrics:[['Формула','характеристика → выгода'],['Акцент','дизайн'],['Акцент','практичность'],['Акцент','срок службы']],bullets:['Художественный ламинат — визуальный эффект паркета.','3D-текстура и глубокое тиснение — красивый и тактильно приятный пол.','Восковая пропитка замков — дополнительная защита от влаги для кухни и входной зоны.','Стоимость — акцент на сроке службы и ценности качественного покрытия.']}
     ];
     const nomenclature = window.IDEAL_NOMENCLATURE || {products:[],collections:[],stats:{}};
+    let catalogProducts = []; // Nothing is shown until the server confirms the product is active.
+    let catalogCollections = [];
+    let catalogLoadError = '';
+    let catalogLoading = true;
     const completedKey = 'ideal_training_completed_v2';
     let completed = new Set(CRMUI.readStoredJSON(completedKey, [], Array.isArray).filter(value => typeof value === 'string'));
     let trainingCategory = 'Все';
@@ -33,9 +37,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateHeroStats(){
         $('training-topics-count').textContent = modules.length;
-        $('training-products-count').textContent = nomenclature.stats.products || nomenclature.products.length;
-        $('training-collections-count').textContent = nomenclature.stats.collections || nomenclature.collections.length;
-        $('catalog-count-badge').textContent = nomenclature.stats.products || nomenclature.products.length;
+        $('training-products-count').textContent = catalogLoading ? '…' : catalogProducts.length;
+        $('training-collections-count').textContent = catalogLoading ? '…' : catalogCollections.length;
+        $('catalog-count-badge').textContent = catalogLoading ? '…' : catalogProducts.length;
+        const introCount=$('catalog-intro-count');
+        if(introCount) introCount.textContent=catalogLoading ? 'Проверяем номенклатуру' : catalogProducts.length + ' позиций';
         const done = modules.filter(item => completed.has(item.id)).length;
         const percent = modules.length ? Math.round(done / modules.length * 100) : 0;
         $('training-progress-value').textContent = percent + '%';
@@ -88,21 +94,47 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.classList.remove('training-modal-open');
     }
 
-    function setupCatalog(){
-        const select = $('catalog-collection');
-        select.innerHTML = '<option value="">Все коллекции</option>' + nomenclature.collections.map(name => '<option value="' + esc(name) + '">' + esc(name) + '</option>').join('');
-        renderCatalog();
+    async function setupCatalog(){
+        const select=$('catalog-collection');
+        const skuKey = value => String(value||'').trim().toUpperCase().replace(/Ё/g,'Е').replace(/\s+/g,'');
+        $('catalog-grid').innerHTML='<div class="training-empty"><i class="bi bi-hourglass-split"></i><strong>Проверяем актуальные позиции…</strong></div>';
+        try{
+            if(window.CRMAuth?.ready) await CRMAuth.ready;
+            const response=await fetch('/api/training/active-catalog',{cache:'no-store'});
+            if(!response.ok)throw new Error('Не удалось загрузить актуальную номенклатуру');
+            const data=await response.json();
+            if(!Array.isArray(data.skus))throw new Error('Некорректный ответ справочника');
+            const active=new Set(data.skus.map(skuKey));
+            catalogProducts=(nomenclature.products || []).filter(row=>active.has(skuKey(row.s)));
+            catalogCollections=[...new Set(catalogProducts.map(p=>String(p.c||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ru'));
+            catalogLoadError='';
+        }catch(e){
+            catalogProducts=[];
+            catalogCollections=[];
+            catalogLoadError='Не удалось проверить актуальность каталога. Позиции скрыты до восстановления соединения.';
+        }finally{
+            catalogLoading=false;
+            select.innerHTML='<option value="">Все коллекции</option>'+catalogCollections.map(name=>'<option value="'+esc(name)+'">'+esc(name)+'</option>').join('');
+            updateHeroStats();
+            renderCatalog();
+        }
     }
 
     function renderCatalog(){
         const query = $('catalog-search').value.trim().toLowerCase();
         const collection = $('catalog-collection').value;
-        const products = nomenclature.products.filter(item => {
+        if(catalogLoading)return;
+        if(catalogLoadError){
+            $('catalog-summary').textContent=catalogLoadError;
+            $('catalog-grid').innerHTML='<div class="training-empty"><i class="bi bi-wifi-off"></i><strong>Номенклатура пока недоступна</strong><span>'+esc(catalogLoadError)+'</span></div>';
+            return;
+        }
+        const products = catalogProducts.filter(item => {
             if (collection && item.c !== collection) return false;
             const haystack = [item.c,item.s,item.n,item.d,item.p,item.q,item.k,item.b,item.t,item.ean,item.ntin].join(' ').toLowerCase();
             return !query || haystack.includes(query);
         });
-        $('catalog-summary').textContent = 'Показано ' + products.length + ' из ' + nomenclature.products.length + ' позиций';
+        $('catalog-summary').textContent = 'Показано ' + products.length + ' из ' + catalogProducts.length + ' позиций';
         $('catalog-grid').innerHTML = products.length ? products.map(item => '<article class="catalog-card">' +
             '<div class="catalog-card-head"><span class="catalog-card-sku">' + esc(item.s) + '</span><span class="catalog-card-class">' + esc(item.k || '—') + '</span></div>' +
             '<h3>' + esc(item.n) + '</h3><div class="catalog-card-collection">' + esc(item.c) + '</div>' +
