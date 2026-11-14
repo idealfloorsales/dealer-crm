@@ -550,3 +550,56 @@
 :root[data-crm-theme="dark"] .product-photo-gallery{
   border-top-color:#333
 }
+
+
+/* Matrix-only archive: follows current IDEAL FLOOR filter/card styling. */
+.product-view-tabs{display:inline-flex;max-width:100%;gap:5px;margin-bottom:12px;padding:4px;border:1px solid #e6e1dd;border-radius:13px;background:#f6f4f2}
+.product-view-tab{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:37px;padding:7px 13px;border:0;border-radius:10px;background:transparent;color:#77797e;font:800 .72rem 'Onest',sans-serif;transition:background .18s,color .18s}
+.product-view-tab:hover{color:#34363b;background:#ede9e5}
+.product-view-tab.is-active{background:#25262a;color:#fff;box-shadow:0 4px 13px rgba(30,30,34,.12)}
+.product-view-tab b{display:grid;place-items:center;min-width:21px;height:21px;padding:0 5px;border-radius:999px;background:#e8e4e1;color:#73747a;font:800 .64rem 'Onest',sans-serif}
+.product-view-tab.is-active b{background:rgba(255,255,255,.17);color:#fff}
+.product-view-tab:focus-visible,.product-row-actions button:focus-visible{outline:2px solid #b9040a;outline-offset:2px}
+.product-archive-notice{margin-bottom:10px;padding:11px 13px;border:1px solid #cce0d4;border-radius:11px;background:#f1f8f3;color:#33774b;font:700 .72rem/1.5 'Onest',sans-serif}
+.product-archive-notice[hidden]{display:none}
+.product-kpi.is-archive .product-kpi-icon{background:#f0eff4;color:#68607b}
+.product-kpi.is-archive.active{border-color:#c7bfd6;background:#f8f7fa}
+.product-row.is-archived{background:#faf9fb}
+.product-row.is-archived:hover{background:#f7f5f9}
+.product-row.is-archived .product-position{opacity:.83}
+.product-status.is-archived{background:#f1edf8;color:#75618f}
+.product-archived-meta{display:block;margin-top:5px;color:#8d8993;font-size:.62rem;line-height:1.4}
+.product-row-actions{display:flex;align-items:center;justify-content:flex-end;gap:5px;min-width:0}
+.product-row-actions .product-edit-btn,.product-row-actions .product-archive-btn,.product-row-actions .product-restore-btn{flex:0 0 34px;display:grid;place-items:center;width:34px;height:34px;border:1px solid #e5e0dc;border-radius:9px;background:#fff;color:#77797e;cursor:pointer}
+.product-row-actions .product-archive-btn:hover{background:#fff7e7;border-color:#ebd9bd;color:#a3741c}
+.product-row-actions .product-restore-btn{color:#496a56}
+.product-row-actions .product-restore-btn:hover{background:#eef7f0;border-color:#c8dece;color:#2e744b}
+.products-page .product-toolbar.is-archive-view .product-filter-grid{opacity:1}
+.products-page .product-toolbar.is-archive-view .product-toolbar-meta{border-top-color:#e4dfe9}
+@media(min-width:1281px){
+ .product-list-head,.product-row{grid-template-columns:minmax(250px,1.35fr) minmax(220px,1.2fr) minmax(170px,.8fr) 120px 110px 82px}
+}
+@media(min-width:901px) and (max-width:1280px){
+ .product-list-head,.product-row{grid-template-columns:minmax(230px,1.25fr) minmax(205px,1fr) minmax(155px,.75fr) 110px 100px 82px}
+}
+@media(max-width:900px){
+ .product-row-actions{grid-column:2;grid-row:4;justify-self:end}
+ .product-row-actions .product-edit-btn{grid-column:auto;grid-row:auto}
+}
+@media(max-width:600px){
+ .product-view-tabs{display:grid;grid-template-columns:1fr 1fr;width:100%;gap:4px;margin-bottom:10px}
+ .product-view-tab{min-width:0;min-height:40px;padding:7px 6px;font-size:.68rem}
+ .product-view-tab i{font-size:.83rem}
+ .product-row-actions .product-archive-btn,.product-row-actions .product-restore-btn{width:36px;height:36px}
+}
+html:root[data-crm-theme="dark"] .product-view-tabs{background:#222329;border-color:#383a42}
+html:root[data-crm-theme="dark"] .product-view-tab{color:#aeb1b7}
+html:root[data-crm-theme="dark"] .product-view-tab.is-active{background:#393b42;color:#fff}
+html:root[data-crm-theme="dark"] .product-view-tab b{background:#34363c;color:#b3b5ba}
+html:root[data-crm-theme="dark"] .product-view-tab.is-active b{background:rgba(255,255,255,.15);color:#fff}
+html:root[data-crm-theme="dark"] .product-row.is-archived{background:#232228}
+html:root[data-crm-theme="dark"] .product-row.is-archived:hover{background:#29272f}
+html:root[data-crm-theme="dark"] .product-status.is-archived{background:#38313f;color:#dbc2ed}
+html:root[data-crm-theme="dark"] .product-archived-meta{color:#b3aabd}
+html:root[data-crm-theme="dark"] .product-row-actions button{background:#2a2b30!important;border-color:#494a51!important;color:#ddd!important}
+html:root[data-crm-theme="dark"] .product-archive-notice{background:#20352b;border-color:#335742;color:#b2dfbd}
