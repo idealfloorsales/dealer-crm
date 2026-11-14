@@ -4,6 +4,11 @@ on:
     workflows:
       - "Build IDEAL FLOOR CRM Standalone Android APK"
     types: [completed]
+  # Bootstrap publication from the verified build when GitHub does not
+  # dispatch workflow_run events for builds on the secondary mobile-app branch.
+  push:
+    branches: [main]
+    paths: ['.github/workflows/publish-mobile-download.yml']
 
 permissions:
   contents: write
@@ -16,23 +21,25 @@ concurrency:
 jobs:
   publish:
     if: >-
-      ${{ github.event.workflow_run.conclusion == 'success' &&
-          github.event.workflow_run.head_branch == 'mobile-app' &&
-          github.event.workflow_run.event == 'push' &&
-          github.event.workflow_run.head_repository.full_name == github.repository }}
+      ${{ github.event_name == 'push' ||
+          (github.event_name == 'workflow_run' &&
+           github.event.workflow_run.conclusion == 'success' &&
+           github.event.workflow_run.head_branch == 'mobile-app' &&
+           github.event.workflow_run.event == 'push' &&
+           github.event.workflow_run.head_repository.full_name == github.repository) }}
     runs-on: ubuntu-latest
     timeout-minutes: 12
     env:
       GH_REPO: ${{ github.repository }}
       GH_TOKEN: ${{ github.token }}
-      RUN_ID: ${{ github.event.workflow_run.id }}
-      RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+      RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || '43582306944' }}
+      RELEASE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || 'dc4c25d15233242aae23b0fae8b95e5209791ca9' }}
 
     steps:
       - name: Check out precisely the emulator-tested mobile revision
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ env.RELEASE_SHA }}
           persist-credentials: false
 
       - name: Verify successful build and check its branch
