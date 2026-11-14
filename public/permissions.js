@@ -1494,12 +1494,81 @@
         observer.observe(document.body, { childList:true, subtree:true });
     }
 
+    // Shared adaptive "back to top". Uses the actual scrolling surface and remains
+    // invisible when content fits the viewport or the user is near the beginning.
+    function initAdaptiveScrollTop() {
+        if (!document.body || document.getElementById('crm-scroll-to-top')) return;
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.id = 'crm-scroll-to-top';
+        button.className = 'crm-scroll-to-top';
+        button.setAttribute('aria-label','Прокрутить вверх');
+        button.setAttribute('title','Наверх');
+        button.setAttribute('aria-hidden','true');
+        button.tabIndex = -1;
+        button.innerHTML = '<i class="bi bi-arrow-up" aria-hidden="true"></i>';
+        document.body.appendChild(button);
+
+        const doc = document.scrollingElement || document.documentElement;
+        let scrollTarget = null;
+        let frame = 0;
+        const isVisible = node => {
+            if (!node || !node.isConnected) return false;
+            const rect = node.getBoundingClientRect();
+            return rect.width > 0 && rect.height > 0;
+        };
+        const scrollAmount = node => node ? Math.max(0,Number(node.scrollTop)||0) : Math.max(0,window.scrollY||doc.scrollTop||0);
+        const remaining = node => node
+            ? node.scrollHeight-node.clientHeight
+            : Math.max(document.documentElement.scrollHeight,document.body.scrollHeight)-window.innerHeight;
+
+        function update() {
+            frame=0;
+            // Do not put the scroll button over a modal or full-screen action.
+            if (document.querySelector('.modal.show,.offcanvas.show,.global-search-overlay.open')) {
+                scrollTarget=null;
+                button.classList.remove('is-visible');
+                button.tabIndex=-1;
+                button.setAttribute('aria-hidden','true');
+                return;
+            }
+            const inner = [...document.querySelectorAll(
+                '.map-page .sidebar-content,.app-workspace-page .sidebar-content,.audit-list-scroll'
+            )].find(el=>isVisible(el) && remaining(el)>350 && scrollAmount(el)>320);
+            const windowReady = remaining(null)>350 && scrollAmount(null)>320;
+            scrollTarget = inner || (windowReady ? null : undefined);
+            const visible = Boolean(inner || windowReady);
+            button.classList.toggle('is-visible',visible);
+            button.tabIndex=visible?0:-1;
+            button.setAttribute('aria-hidden',visible?'false':'true');
+        }
+        function requestUpdate() {
+            if (frame) return;
+            frame=window.requestAnimationFrame(update);
+        }
+
+        button.addEventListener('click',()=>{
+            if (!button.classList.contains('is-visible')) return;
+            const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+            const options={top:0,behavior:reduced?'auto':'smooth'};
+            if (scrollTarget && scrollTarget.isConnected) scrollTarget.scrollTo(options);
+            else window.scrollTo(options);
+            requestUpdate();
+        });
+        window.addEventListener('scroll',requestUpdate,{passive:true});
+        document.addEventListener('scroll',requestUpdate,{capture:true,passive:true});
+        window.addEventListener('resize',requestUpdate,{passive:true});
+        window.addEventListener('pageshow',requestUpdate);
+        requestUpdate();
+    }
+
     function initInteractionLayer() {
         if (!document.body || document.body.dataset.crmUiReady === '1') return;
         document.body.dataset.crmUiReady = '1';
         document.body.classList.add('crm-ui-enhanced');
         initSeamlessNavigation();
         initPageContextLayer();
+        initAdaptiveScrollTop();
         ensureFeedbackShell();
         initConnectivityLayer();
         scheduleReveal(document);
