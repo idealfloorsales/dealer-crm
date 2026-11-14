@@ -90,21 +90,31 @@
     function closeEditor(){
       editDealerId=null;draft=null;++editVersion;
       if(marker){map.removeLayer(marker);marker=null;}
-      if(panel)panel.hidden=true;
+      if(panel){panel.hidden=true;panel.setAttribute('aria-hidden','true');}
       if(pinResults){pinResults.hidden=true;pinResults.innerHTML='';}
     }
     function openEditor(id){
-      if(!canEdit()){toast('Нет права изменять местоположение дилера','error');return;}
+      if(!canEdit()){toast('Нет права изменять местоположение дилера','error');return false;}
       const dealer=getDealers().find(d=>String(d.id)===String(id));
-      if(!dealer)return;
-      closeEditor();editDealerId=String(dealer.id);
-      if(panel)panel.hidden=false;
+      if(!dealer){toast('Дилер не найден в текущем списке','warning');return false;}
+      if(!panel){toast('Панель установки метки недоступна. Обновите карту.','error');return false;}
+      closeEditor();
+      editDealerId=String(dealer.id);
+      panel.hidden=false;
+      panel.setAttribute('aria-hidden','false');
       if(pinName)pinName.textContent=dealer.name||'Дилер';
       if(pinQuery)pinQuery.value=dealer.address||'';
       if(pinSave)pinSave.disabled=true;
       if(pinStatus)pinStatus.innerHTML='<i class="bi bi-cursor"></i> Выберите точку';
       if(hasPoint(dealer))selectDraft(dealer.latitude,dealer.longitude);
       closeMobileList();
+      // Focusing a visible panel after the mobile sheet closes prevents
+      // the overlay from appearing behind the sidebar or a map repaint.
+      if(typeof requestAnimationFrame==='function')requestAnimationFrame(()=>{
+        map.invalidateSize?.();
+        if(window.innerWidth>=768)pinQuery?.focus?.({preventScroll:true});
+      });
+      return true;
     }
     map.on('click',e=>{if(editDealerId)selectDraft(e.latlng.lat,e.latlng.lng);});
     el('map-pin-cancel')?.addEventListener('click',closeEditor);

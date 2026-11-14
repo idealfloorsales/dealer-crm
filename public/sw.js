@@ -45,6 +45,7 @@ const LOCAL_ASSETS = [
     '/map.js?v={{VER}}',
     '/map-search-core.js?v={{VER}}',
     '/map-experience.js?v={{VER}}',
+    '/map-controls.css?v={{VER}}',
     '/workshop.js?v={{VER}}',
     '/workshop.css?v={{VER}}',
     '/audit.js?v={{VER}}',

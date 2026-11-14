@@ -1,0 +1,255 @@
+/* IDEAL FLOOR | Dealer map controls
+   Loaded LAST on map.html: map-specific controls keep the same Onest
+   typography, slate surfaces, soft borders and muted red accent as the CRM.
+   The placement panel needs explicit positioning over the Leaflet canvas. */
+
+.map-page .map-search-shell {
+  grid-template-columns:18px minmax(0,1fr) 32px 28px;
+  column-gap:6px;
+}
+.map-page .map-search-shell #map-find-address {
+  appearance:none;display:grid;place-items:center;
+  width:31px;height:31px;min-width:31px;min-height:31px;padding:0;
+  border:1px solid rgba(255,255,255,.16);
+  border-radius:9px;background:rgba(255,255,255,.09);color:#f6eeee;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
+  cursor:pointer;transition:background .18s ease,transform .18s ease,border-color .18s ease;
+}
+.map-page .map-search-shell #map-find-address:hover {
+  background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.28);
+  transform:translateY(-1px);
+}
+.map-page .map-search-shell #map-find-address:focus-visible {
+  outline:2px solid #ef606a;outline-offset:2px;
+}
+.map-page .map-search-shell #map-find-address:disabled {opacity:.48;cursor:wait;transform:none;}
+
+.map-page .map-list-head {gap:8px;min-width:0;}
+.map-page #map-unmapped-toggle {
+  appearance:none;box-sizing:border-box;display:inline-flex;flex:0 0 auto;
+  align-items:center;justify-content:center;gap:5px;min-height:31px;
+  margin:0;padding:5px 9px;border:1px solid #dedad5;
+  border-radius:10px;background:#fff;color:#505258;
+  box-shadow:0 1px 3px rgba(28,29,32,.03);
+  font:750 10px/1.15 'Onest',sans-serif;
+  text-decoration:none;white-space:nowrap;cursor:pointer;
+  transition:background .18s ease,border-color .18s ease,color .18s ease,transform .18s ease,box-shadow .18s ease;
+}
+.map-page #map-unmapped-toggle > i {font-size:12px;line-height:1;color:#ba343b;}
+.map-page #map-unmapped-toggle > b {
+  display:inline-grid;place-items:center;min-width:23px;height:19px;
+  padding:0 5px;border-radius:6px;background:#f2f1f0;color:#6c6d72;
+  font:850 10px/1 'Onest',sans-serif;font-variant-numeric:tabular-nums;
+}
+.map-page #map-unmapped-toggle:hover {
+  background:#fff7f6;border-color:#e6b4b6;color:#aa1d27;
+  transform:translateY(-1px);
+}
+.map-page #map-unmapped-toggle.active,
+.map-page #map-unmapped-toggle[aria-pressed="true"] {
+  background:#2b2c31;color:#fff;border-color:#2b2c31;
+  box-shadow:0 5px 14px rgba(26,27,31,.13);
+}
+.map-page #map-unmapped-toggle.active > i {color:#ff9299;}
+.map-page #map-unmapped-toggle.active > b {background:#48494e;color:#fff;}
+.map-page #map-unmapped-toggle:focus-visible {outline:2px solid #b9040a;outline-offset:2px;}
+
+.map-page .map-dealer-card.is-unmapped {
+  border:1px solid #e8e1d6;background:#fffefa;
+}
+.map-page .map-unmapped-badge {
+  box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;
+  gap:4px;max-width:102px;margin:0;padding:5px 7px;
+  border:1px solid #eadcca;border-radius:8px;
+  background:#fbf3e8;color:#946b34;
+  font:750 10px/1 'Onest',sans-serif;white-space:nowrap;
+}
+.map-page .map-unmapped-badge i {font-size:12px;line-height:1;}
+
+/* Three actions on a single row whenever there is enough room. */
+.map-page .map-card-actions {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);
+  gap:6px;padding:0 10px 9px 21px;
+  align-items:stretch;
+}
+.map-page .map-card-actions:has(.map-card-place) {
+  grid-template-columns:minmax(0,.9fr) minmax(0,1.35fr) minmax(0,.84fr);
+}
+.map-page .map-card-actions > :is(a,button) {
+  box-sizing:border-box;display:inline-flex;align-items:center;
+  justify-content:center;gap:5px;width:100%;min-width:0;min-height:33px;
+  margin:0;padding:0 5px;border-radius:9px;
+  font:750 10px/1.1 'Onest',sans-serif;
+  text-align:center;text-decoration:none;white-space:nowrap;
+}
+.map-page .map-card-actions > :is(a,button) i {flex:0 0 auto;font-size:11px;line-height:1;}
+.map-page .map-card-actions .map-card-place {
+  appearance:none;border:1px solid #e9caca;
+  background:linear-gradient(155deg,#fff6f5,#fdebea);
+  color:#9e252d;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.8);
+  cursor:pointer;
+  transition:background .16s ease,border-color .16s ease,transform .16s ease,box-shadow .16s ease;
+}
+.map-page .map-card-actions .map-card-place:hover {
+  background:#b9040a;border-color:#b9040a;color:#fff;
+  box-shadow:0 5px 13px rgba(185,4,10,.15);transform:translateY(-1px);
+}
+.map-page .map-card-actions .map-card-place:active {transform:translateY(0) scale(.98);}
+.map-page .map-card-actions .map-card-place:focus-visible {outline:2px solid #b9040a;outline-offset:2px;}
+.map-page .map-card-actions > a:focus-visible {outline:2px solid #b9040a;outline-offset:2px;}
+
+/* The editor MUST be above tile panes, markers, zoom and list toggles.
+   This was missing in the earlier deployment, making the click look inert. */
+.map-page #map-pin-editor[hidden],
+.map-page #map-pin-results[hidden] {display:none!important;}
+.map-page .map-canvas #map-pin-editor:not([hidden]) {
+  position:absolute;z-index:1500;display:flex;flex-direction:column;
+  left:18px;bottom:19px;width:min(412px,calc(100% - 36px));
+  max-height:min(68dvh,600px);overflow-y:auto;overscroll-behavior:contain;
+  padding:17px;border:1px solid #e3dfdb;border-radius:20px;
+  background:rgba(255,255,255,.985);color:#2f3036;
+  box-shadow:0 23px 75px rgba(26,27,32,.21),0 2px 9px rgba(26,27,32,.06);
+  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  font-family:'Onest',sans-serif;pointer-events:auto;
+  animation:crmMapPinOpen .28s cubic-bezier(.22,1,.36,1) both;
+}
+@keyframes crmMapPinOpen {
+  from {opacity:0;transform:translateY(15px) scale(.97);}
+  to {opacity:1;transform:translateY(0) scale(1);}
+}
+.map-page #map-pin-editor .map-pin-editor-head {
+  display:flex;align-items:flex-start;justify-content:space-between;gap:10px;
+}
+.map-page #map-pin-editor .map-pin-editor-head > div {
+  display:flex;flex-direction:column;gap:4px;min-width:0;
+}
+.map-page #map-pin-editor .map-pin-eyebrow {
+  display:inline-flex;align-items:center;gap:5px;
+  color:#b51b26;font-size:9px;font-weight:850;
+  letter-spacing:.09em;text-transform:uppercase;
+}
+.map-page #map-pin-editor .map-pin-editor-head strong {
+  font-size:15px;font-weight:850;line-height:1.3;overflow-wrap:anywhere;
+}
+.map-page #map-pin-editor .map-pin-close {
+  appearance:none;flex:0 0 33px;display:grid;place-items:center;
+  width:33px;height:33px;padding:0;border:1px solid #e6e2de;
+  border-radius:10px;background:#f8f7f6;color:#686a71;
+  cursor:pointer;transition:background .16s ease,color .16s ease;
+}
+.map-page #map-pin-editor .map-pin-close:hover {background:#f1e4e4;color:#9e1b22;}
+.map-page #map-pin-editor > p {
+  margin:11px 0 12px;color:#767981;
+  font-size:11px;font-weight:500;line-height:1.55;
+}
+.map-page #map-pin-editor .map-pin-editor-search {display:flex;gap:7px;align-items:center;}
+.map-page #map-pin-editor #map-pin-query {
+  flex:1 1 auto;min-width:0;min-height:42px;padding:9px 11px;
+  border:1px solid #dedbd6;border-radius:11px;
+  outline:0;background:#faf9f7;color:#303136;
+  font:600 12px/1.35 'Onest',sans-serif;
+}
+.map-page #map-pin-editor #map-pin-query:focus {
+  border-color:#b9040a;box-shadow:0 0 0 3px rgba(185,4,10,.08);
+}
+.map-page #map-pin-editor #map-pin-find {
+  appearance:none;display:inline-flex;align-items:center;justify-content:center;
+  gap:7px;flex:0 0 auto;min-height:42px;padding:0 13px;
+  border:1px solid #2b2c30;border-radius:11px;
+  background:#2b2c30;color:#fff;cursor:pointer;
+  font:750 11px/1 'Onest',sans-serif;
+  transition:background .16s ease,transform .16s ease;
+}
+.map-page #map-pin-editor #map-pin-find:hover {background:#43444a;transform:translateY(-1px);}
+.map-page #map-pin-editor #map-pin-find:disabled {opacity:.6;cursor:wait;transform:none;}
+.map-page #map-pin-editor .map-pin-results:not([hidden]) {
+  display:flex;flex-direction:column;gap:4px;flex:0 1 auto;
+  margin-top:8px;padding:5px;max-height:187px;overflow:auto;
+  border:1px solid #ebe6e2;border-radius:12px;background:#faf9f7;
+}
+.map-page #map-pin-editor .map-pin-results > button {
+  appearance:none;display:flex;align-items:flex-start;gap:8px;
+  width:100%;padding:9px;border:0;border-radius:8px;
+  background:#fff;color:#494b52;text-align:left;
+  font:550 11px/1.45 'Onest',sans-serif;cursor:pointer;
+}
+.map-page #map-pin-editor .map-pin-results > button:hover {background:#fff1f1;color:#9d2429;}
+.map-page #map-pin-editor .map-pin-results > button i {color:#aa262d;}
+.map-page #map-pin-editor .map-pin-search-note {padding:9px;color:#86888e;font-size:11px;line-height:1.45;}
+.map-page #map-pin-editor .map-pin-editor-foot {
+  display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:9px;margin-top:14px;
+}
+.map-page #map-pin-editor .map-pin-status {
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:10px;font-weight:700;color:#898b90;
+}
+.map-page #map-pin-editor .map-pin-status .bi-check-circle-fill {color:#2b8a59;}
+.map-page #map-pin-editor #map-pin-save {
+  appearance:none;display:inline-flex;align-items:center;justify-content:center;
+  gap:7px;min-height:39px;padding:0 12px;
+  border:1px solid #b9040a;border-radius:10px;
+  background:#b9040a;color:#fff;cursor:pointer;
+  font:800 11px/1 'Onest',sans-serif;
+  transition:background .16s ease,transform .16s ease;
+}
+.map-page #map-pin-editor #map-pin-save:hover:not(:disabled) {background:#97070c;transform:translateY(-1px);}
+.map-page #map-pin-editor #map-pin-save:disabled {
+  background:#ebe8e6;border-color:#ebe8e6;color:#9da0a4;cursor:not-allowed;transform:none;
+}
+.map-page #map-pin-editor .map-pin-license {
+  display:block;margin-top:11px;color:#989a9f;
+  font-size:9px;font-weight:550;line-height:1.45;
+}
+.map-page #map-pin-editor :is(button,input):focus-visible {outline:2px solid #b9040a;outline-offset:2px;}
+
+/* Dark mode follows the rest of CRM, never hardcoded white controls. */
+:root[data-crm-theme="dark"] .map-page #map-unmapped-toggle {
+  background:#2e2f35;border-color:#47484f;color:#e8e9ed;
+}
+:root[data-crm-theme="dark"] .map-page #map-unmapped-toggle > b {background:#45464e;color:#f0f1f3;}
+:root[data-crm-theme="dark"] .map-page #map-unmapped-toggle[aria-pressed="true"] {
+  background:#45464e;border-color:#696b74;color:#fff;
+}
+:root[data-crm-theme="dark"] .map-page .map-dealer-card.is-unmapped {
+  background:#2b292a;border-color:#494448;
+}
+:root[data-crm-theme="dark"] .map-page .map-unmapped-badge {
+  background:#42372b;border-color:#635041;color:#e6c6a0;
+}
+:root[data-crm-theme="dark"] .map-page .map-card-actions .map-card-place {
+  background:#3a292d;border-color:#694044;color:#ffb5b7;box-shadow:none;
+}
+:root[data-crm-theme="dark"] .map-page .map-card-actions .map-card-place:hover {
+  background:#b9040a;border-color:#b9040a;color:#fff;
+}
+:root[data-crm-theme="dark"] .map-page .map-canvas #map-pin-editor:not([hidden]) {
+  background:rgba(35,36,42,.98);border-color:#4c4e56;color:#eef0f3;
+}
+:root[data-crm-theme="dark"] .map-page #map-pin-editor > p,
+:root[data-crm-theme="dark"] .map-page #map-pin-editor .map-pin-status {color:#b8bbc3;}
+:root[data-crm-theme="dark"] .map-page #map-pin-editor :is(.map-pin-close,#map-pin-query,.map-pin-results:not([hidden])) {
+  background:#2d2f36;border-color:#4a4c54;color:#edf0f2;
+}
+:root[data-crm-theme="dark"] .map-page #map-pin-editor .map-pin-results > button {
+  background:#373940;color:#e6e7eb;
+}
+:root[data-crm-theme="dark"] .map-page #map-pin-editor .map-pin-results > button:hover {background:#543338;}
+
+@media(max-width:767.98px) {
+  .map-page .map-card-actions:has(.map-card-place) {grid-template-columns:minmax(0,1fr) minmax(0,1fr);}
+  .map-page .map-card-actions .map-card-place {grid-column:1/-1;grid-row:2;}
+  .map-page .map-card-actions:has(.map-card-place) > a.is-2gis {grid-row:1;grid-column:2;}
+  .map-page #map-unmapped-toggle > span {display:none;}
+  .map-page .map-canvas #map-pin-editor:not([hidden]) {
+    left:10px;bottom:calc(76px + env(safe-area-inset-bottom));
+    width:calc(100% - 20px);max-height:60dvh;padding:14px;border-radius:17px;
+  }
+  .map-page #map-pin-editor .map-pin-editor-head strong {font-size:14px;}
+}
+@media(prefers-reduced-motion:reduce) {
+  .map-page #map-unmapped-toggle,.map-page .map-card-actions .map-card-place,
+  .map-page .map-canvas #map-pin-editor:not([hidden]) {animation:none!important;transition:none!important;}
+}

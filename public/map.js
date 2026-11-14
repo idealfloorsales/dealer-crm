@@ -416,7 +416,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="map-card-actions">
                         <a href="dealer.html?id=${encodeURIComponent(dealer.id)}"><i class="bi bi-person-vcard"></i>Профиль</a>
                         ${!located && canEditLocations()
-                            ? `<button type="button" class="map-card-place" data-map-place="${escapeHtml(dealer.id)}"><i class="bi bi-pin-map"></i>Поставить точку</button>`
+                            ? `<button type="button" class="map-card-place" data-map-place="${escapeHtml(dealer.id)}" title="Отметить расположение на карте" aria-label="Поставить точку дилера ${escapeHtml(dealer.name||'')}"><i class="bi bi-pin-map" aria-hidden="true"></i><span>Поставить точку</span></button>`
                             : ''}
                         <a href="${twoGisUrl}" target="_blank" rel="noopener" class="is-2gis"><i class="bi bi-box-arrow-up-right"></i>2ГИС</a>
                     </div>
@@ -543,7 +543,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const place=event.target.closest('[data-map-place]');
-        if(place){enhancements?.openEditor(place.dataset.mapPlace);return;}
+        if(place){
+            event.preventDefault();
+            event.stopPropagation();
+            if(!enhancements || typeof enhancements.openEditor!=='function') {
+                toast('Редактор точек не загрузился. Обновите страницу CRM.','error');
+                console.error('Map editor unavailable: map-experience.js was not initialized');
+                return;
+            }
+            enhancements.openEditor(place.dataset.mapPlace);
+            return;
+        }
         const focusButton = event.target.closest('[data-map-focus]');
         if (focusButton) focusDealer(focusButton.dataset.mapFocus);
     });
