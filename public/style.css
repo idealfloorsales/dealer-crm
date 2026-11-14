@@ -13638,3 +13638,466 @@ body:not(.app-workspace-page) .modal-header .btn-close{
             .sales-print-item .summary-deviation-row.is-neutral,
             .sales-print-item .summary-deviation-empty { color:#64666c; font-size:7.2pt; }
 }
+
+
+/* ======================================================================
+   IDEAL FLOOR | CRM DESIGN COHERENCE 2026-11
+   Shared tokens, page rhythm, consistent controls and accessible density.
+   Map keeps its full-bleed layout by design.
+   ====================================================================== */
+:root {
+  --crm-canvas-width:1480px;
+  --crm-control-height:42px;
+  --crm-radius-control:11px;
+  --crm-line-neutral:#e4e0dc;
+  --crm-control-paper:#faf9f7;
+  --crm-action-ink:#27282c;
+  --crm-focus-ring:0 0 0 3px rgba(185,4,10,.10);
+}
+body:not(.map-page):not(.login-page) :is(
+  .command-center-shell,
+  .app-page-shell,
+  .dealer-profile-shell,
+  .sales-shell,
+  .workshop-shell,
+  .audit-shell,
+  .pricing-shell,
+  .report-shell,
+  .competitors-shell,
+  .competitor-shell,
+  .training-page .app-page-shell
+) {
+  width:min(var(--crm-canvas-width),calc(100% - 32px)) !important;
+  max-width:var(--crm-canvas-width) !important;
+  margin-left:auto !important;
+  margin-right:auto !important;
+  padding-left:0 !important;
+  padding-right:0 !important;
+  box-sizing:border-box;
+}
+body:not(.map-page) {
+  font-family:'Onest',sans-serif;
+}
+body:not(.map-page) .app-page-shell {padding-top:20px}
+body:not(.map-page) .app-page-hero {margin-bottom:14px}
+body:not(.map-page) .app-toolbar-card,
+body:not(.map-page) .dealer-list-toolbar {border-radius:16px!important}
+:where(.app-workspace-page,.dealer-profile-page) :is(
+  .form-control,.form-select,select:not([multiple]),input[type="month"]
+) {
+  border-radius:var(--crm-radius-control);
+  font-family:'Onest',sans-serif;
+}
+:where(.app-workspace-page,.dealer-profile-page) :is(
+  .form-control,.form-select,select:not([multiple]),input[type="month"]
+):focus-visible {
+  outline:0;
+  border-color:rgba(185,4,10,.4)!important;
+  box-shadow:var(--crm-focus-ring)!important;
+}
+:where(.app-workspace-page,.dealer-profile-page) :is(
+  .cc-secondary-btn,.sales-secondary-btn,.product-reset-btn,
+  .dealer-reset-filters,.dealer-filter-toggle,.audit-refresh,
+  .app-hero-secondary,.motivation-payout-tools button:not(.is-primary)
+) {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  border-radius:var(--crm-radius-control);
+  border:1px solid var(--crm-line-neutral);
+  background:#fff;
+  color:#555860;
+  font-family:'Onest',sans-serif;
+  font-size:.73rem;
+  font-weight:750;
+  line-height:1.25;
+  text-decoration:none;
+  transition:background .16s ease,border-color .16s ease,color .16s ease;
+}
+:where(.app-workspace-page,.dealer-profile-page) :is(
+  .cc-secondary-btn,.sales-secondary-btn,.product-reset-btn,
+  .dealer-reset-filters,.dealer-filter-toggle,.audit-refresh,
+  .motivation-payout-tools button:not(.is-primary)
+):hover {
+  background:#f7f5f2;
+  border-color:#d4cec8;
+  color:#303237;
+}
+:where(.app-workspace-page,.dealer-profile-page) :is(
+  .motivation-payout-tools .is-primary,.sales-save-btn,.cc-primary-btn,.app-hero-primary
+) {
+  border-radius:var(--crm-radius-control);
+  font-family:'Onest',sans-serif;
+  font-weight:780;
+}
+:where(.app-workspace-page,.dealer-profile-page) :is(
+  .motivation-payout-tools .is-primary,.sales-save-btn
+) { background:#27282c;color:#fff;border:1px solid #27282c }
+:where(.app-workspace-page,.dealer-profile-page) :is(
+  .motivation-payout-tools .is-primary,.sales-save-btn
+):hover {background:#151619;border-color:#151619;color:#fff}
+:where(.app-workspace-page,.dealer-profile-page) :is(
+  .btn,.dealer-quick-filter,.product-view-tab,.map-soft-action,
+  .motivation-payout-tools button,.profile-tabs .nav-link
+):focus-visible {outline:2px solid #b9040a;outline-offset:2px}
+
+/* Directory: all filters have one tone and align on desktop. */
+.command-center-shell .dealer-list-toolbar {
+  padding:12px!important;
+  background:#fff!important;
+  backdrop-filter:none;
+}
+.command-center-shell .dealer-toolbar-filters {
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:9px;
+  margin-top:11px;
+  padding-top:11px;
+}
+.command-center-shell .dealer-toolbar-filters > * {min-width:0}
+.command-center-shell .dealer-toolbar-filters :is(.form-select,select) {
+  width:100%;
+  min-width:0;
+  min-height:42px;
+  padding:8px 34px 8px 12px;
+  border:1px solid #e1ddda!important;
+  border-radius:11px!important;
+  background-color:#faf9f7!important;
+  color:#52545a;
+  font-family:'Onest',sans-serif!important;
+  font-size:.74rem!important;
+  font-weight:650;
+  box-shadow:none!important;
+  text-overflow:ellipsis;
+}
+.command-center-shell .dealer-toolbar-filters .dealer-filter-field .form-select {
+  border-radius:11px 0 0 11px!important;
+}
+.command-center-shell .dealer-filter-settings {
+  flex-basis:42px;
+  min-height:42px;
+  border:1px solid #e1ddda;
+  border-left:0;
+  border-radius:0 11px 11px 0;
+  background:#faf9f7;
+  color:#73757b;
+}
+.command-center-shell .dealer-filter-settings:hover {color:#b9040a;background:#fff}
+.command-center-shell .dealer-toolbar-filters .dealer-reset-filters {
+  min-height:42px;
+  padding:8px 12px;
+  border:1px solid #e1ddda;
+  background:#fff;
+}
+.command-center-shell .dealer-sort-select {
+  border:1px solid #e1ddda;
+  border-radius:11px;
+  background-color:#faf9f7;
+  color:#505258;
+}
+.command-center-shell .dealer-quick-filter:not(.active) {
+  background:#fff;
+  border-color:#e1ddda;
+  color:#565960;
+}
+.command-center-shell .dealer-quick-filter.active {
+  border-color:#28292d;
+  background:#28292d;
+  color:#fff;
+}
+@media (min-width:1400px) {
+  .command-center-shell .dealer-toolbar-filters {
+    grid-template-columns:repeat(4,minmax(0,1fr));
+  }
+}
+@media (min-width:768px) and (max-width:1199.98px) {
+  .command-center-shell .dealer-toolbar-main {
+    grid-template-columns:minmax(190px,1fr) minmax(240px,1.5fr) minmax(145px,.75fr);
+  }
+  .command-center-shell .dealer-toolbar-filters {
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+}
+@media (max-width:767.98px) {
+  .command-center-shell .dealer-toolbar-filters {display:none;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .command-center-shell .dealer-list-toolbar.filters-open .dealer-toolbar-filters {display:grid}
+}
+@media (max-width:480px) {
+  .command-center-shell .dealer-toolbar-filters {grid-template-columns:minmax(0,1fr)}
+}
+
+/* Activity stream: prevent flex children being squeezed into overlapping rows. */
+#cc-activity-panel .cc-activity-feed {
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  gap:8px;
+  min-height:0;
+  max-height:388px;
+  overflow-y:auto;
+  overflow-x:hidden;
+  padding:2px 5px 3px 0;
+  scrollbar-gutter:stable;
+}
+#cc-activity-panel .cc-event-item {
+  display:flex;
+  align-items:center;
+  flex:0 0 auto!important;
+  width:100%;
+  min-width:0;
+  min-height:62px!important;
+  margin:0;
+  padding:10px 12px!important;
+  border-radius:13px;
+  overflow:visible;
+  box-sizing:border-box;
+}
+#cc-activity-panel .cc-event-icon {
+  flex:0 0 34px;
+  width:34px;
+  height:34px;
+}
+#cc-activity-panel .cc-event-copy {
+  display:flex;
+  flex:1 1 auto;
+  min-width:0;
+  flex-direction:column;
+  align-items:flex-start;
+  justify-content:center;
+  gap:4px;
+}
+#cc-activity-panel :is(.cc-event-title,.cc-event-meta) {
+  width:100%;
+  max-width:100%;
+  height:auto;
+  margin:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+#cc-activity-panel .cc-event-title {line-height:1.35;font-size:.77rem}
+#cc-activity-panel .cc-event-meta {line-height:1.35;font-size:.65rem}
+
+/* Consistent commercial controls; icon glyphs inherit text color. */
+.sales-page .motivation-payout-head {align-items:center;flex-wrap:wrap}
+.sales-page .motivation-payout-tools {flex:1 1 490px;justify-content:flex-end;flex-wrap:wrap;min-width:0}
+.sales-page .motivation-payout-tools button {
+  min-height:41px;
+  padding:8px 13px;
+  white-space:nowrap;
+  font-size:.73rem;
+}
+.sales-page .motivation-payout-tools input {
+  min-height:41px;
+  border:1px solid #e1ddda;
+  background:#faf9f7;
+  border-radius:11px;
+  font-size:.74rem;
+}
+.sales-page .motivation-payout-tools button:not(.is-primary) i {color:inherit}
+.sales-page .motivation-payout-tools button.is-primary i {color:#fff}
+
+/* Dealer tabs: same neutral/inverse selected state across all sections. */
+.dealer-profile-page .profile-nav-wrapper {
+  border-radius:16px;
+  background:#fff;
+}
+.dealer-profile-page .profile-tabs .nav-link {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  min-height:41px;
+  border-radius:11px;
+  font-family:'Onest',sans-serif;
+  font-size:.73rem;
+  font-weight:750;
+  white-space:nowrap;
+}
+.dealer-profile-page .profile-tabs .nav-link > i {
+  margin:0!important;
+  font-size:.9rem;
+  color:inherit;
+}
+.dealer-profile-page .profile-tabs .nav-link.active {
+  background:#26272b;
+  color:#fff;
+}
+
+/* Map: one compact control surface, more room for dealer cards. */
+.map-page .map-sidebar {width:380px;min-width:380px}
+.map-page .map-workspace-header {
+  padding:12px 13px 11px;
+  flex:0 0 auto;
+}
+.map-page .map-workspace-title {
+  margin:1px 0 0;
+  font-size:1.15rem;
+  line-height:1.22;
+}
+.map-page .map-workspace-eyebrow {font-size:.51rem}
+.map-page .map-workspace-subtitle {display:none}
+.map-page .map-summary-grid {gap:5px;margin-top:9px}
+.map-page .map-summary-card {padding:6px 8px;border-radius:9px}
+.map-page .map-summary-card span {font-size:.51rem;margin-bottom:1px}
+.map-page .map-summary-card strong {font-size:.91rem}
+.map-page .map-search-shell {min-height:37px;margin-top:8px;border-radius:10px}
+.map-page .map-search-shell input {font-size:.69rem}
+.map-page .map-filter-grid {gap:6px;margin-top:7px}
+.map-page .map-filter-grid label>span {margin-bottom:2px;font-size:.5rem}
+.map-page .map-filter-grid .form-select {min-height:34px;padding:4px 28px 4px 9px;font-size:.65rem}
+.map-page .map-header-actions {gap:6px;margin-top:7px}
+.map-page .map-soft-action {flex:1;min-height:31px;padding:5px 8px;font-size:.62rem}
+.map-page .map-list-head {padding:8px 12px 7px}
+.map-page .sidebar-content {padding:7px}
+.map-page .map-dealer-card {margin-bottom:6px;border-radius:12px}
+.map-page .map-dealer-main {padding:9px 10px 7px;gap:8px}
+.map-page .map-card-status {min-height:36px}
+.map-page .map-card-copy strong {margin-bottom:2px;font-size:.72rem}
+.map-page .map-card-copy small {margin-top:2px}
+@media (min-width:768px) and (max-width:991.98px) {
+  .map-page .map-sidebar {width:350px;min-width:350px}
+}
+@media (max-width:767.98px) {
+  .map-page .map-sidebar {width:auto;min-width:0;height:min(82dvh,780px)}
+  .map-page .map-workspace-header {padding:16px 12px 10px}
+  .map-page .map-summary-grid {margin-top:8px}
+  .map-page .map-filter-grid {grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:380px) {
+  .map-page .map-summary-card {padding:5px}
+}
+
+/* Floating top button is created only on usable, scrollable pages by permissions.js. */
+.crm-scroll-to-top {
+  position:fixed;
+  z-index:1036;
+  right:22px;
+  bottom:92px;
+  display:grid;
+  place-items:center;
+  width:46px;
+  height:46px;
+  padding:0;
+  border:1px solid rgba(255,255,255,.18);
+  border-radius:15px;
+  background:linear-gradient(145deg,#25262b,#141519);
+  color:#fff;
+  box-shadow:0 12px 28px rgba(17,17,20,.22);
+  cursor:pointer;
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+  transform:translateY(12px) scale(.94);
+  transition:opacity .2s ease,visibility .2s ease,transform .2s ease,background .2s ease;
+}
+.crm-scroll-to-top.is-visible {
+  opacity:1;
+  visibility:visible;
+  pointer-events:auto;
+  transform:translateY(0) scale(1);
+}
+.crm-scroll-to-top:hover {background:#b9040a;color:#fff}
+.crm-scroll-to-top:focus-visible {outline:2px solid #b9040a;outline-offset:4px}
+.crm-scroll-to-top i {font-size:1.12rem;line-height:1}
+@media (min-width:768px) {
+  .crm-scroll-to-top {bottom:25px;right:168px}
+}
+@media (max-width:767.98px) {
+  .crm-scroll-to-top {
+    bottom:calc(100px + env(safe-area-inset-bottom));
+    right:14px;
+    width:43px;
+    height:43px;
+  }
+}
+@media (prefers-reduced-motion:reduce) {
+  .crm-scroll-to-top {transition:none}
+}
+
+/* Dark theme uses neutral controls instead of isolated light patches. */
+:root[data-crm-theme="dark"] :is(.command-center-shell .dealer-list-toolbar,.dealer-profile-page .profile-nav-wrapper) {
+  background:#202126!important;
+  border-color:#37383e!important;
+}
+:root[data-crm-theme="dark"] .command-center-shell .dealer-toolbar-filters :is(.form-select,select),
+:root[data-crm-theme="dark"] .command-center-shell .dealer-sort-select,
+:root[data-crm-theme="dark"] .command-center-shell .dealer-filter-settings,
+:root[data-crm-theme="dark"] .sales-page .motivation-payout-tools input {
+  background-color:#28292e!important;
+  border-color:#3a3c43!important;
+  color:#e0e1e5!important;
+}
+:root[data-crm-theme="dark"] :is(
+  .command-center-shell .dealer-quick-filter:not(.active),
+  .command-center-shell .dealer-toolbar-filters .dealer-reset-filters,
+  .sales-page .motivation-payout-tools button:not(.is-primary)
+) {background:#292a30;color:#e0e1e5;border-color:#404148}
+:root[data-crm-theme="dark"] #cc-activity-panel .cc-event-item {background:#24252a;border-color:#35363d}
+:root[data-crm-theme="dark"] #cc-activity-panel .cc-event-title {color:#eff0f3}
+:root[data-crm-theme="dark"] .dealer-profile-page .profile-tabs .nav-link:not(.active) {color:#bfc0c7}
+:root[data-crm-theme="dark"] .dealer-profile-page .profile-tabs .nav-link.active {background:#3b3d44;color:#fff}
+
+
+/* Map toolbar may be folded without sacrificing quick search or list access. */
+.map-page .map-topline-actions {
+  display:flex;
+  align-items:center;
+  gap:7px;
+  flex:0 0 auto;
+  margin-left:auto;
+}
+.map-page .map-fold-toggle {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  min-height:30px;
+  padding:5px 9px;
+  border:1px solid rgba(255,255,255,.15);
+  border-radius:9px;
+  background:rgba(255,255,255,.075);
+  color:rgba(255,255,255,.86);
+  font:750 .62rem 'Onest',sans-serif;
+  white-space:nowrap;
+  cursor:pointer;
+}
+.map-page .map-fold-toggle:hover,
+.map-page .map-fold-toggle:focus-visible {
+  border-color:rgba(255,255,255,.33);
+  background:rgba(255,255,255,.15);
+  color:#fff;
+}
+.map-page .map-fold-toggle .map-fold-chevron {font-size:.55rem}
+.map-page .map-workspace-header.is-collapsed :is(
+  .map-summary-grid,.map-filter-grid,.map-header-actions
+) {display:none!important}
+.map-page .map-workspace-header.is-collapsed .map-search-shell {
+  margin-top:10px;
+}
+.map-page .map-card-actions {
+  gap:5px;
+  padding:0 9px 8px 22px;
+}
+.map-page .map-card-actions a {min-height:29px;font-size:.6rem}
+@media(max-width:767.98px) {
+  .map-page .map-fold-toggle {min-height:31px}
+  .map-page .map-fold-toggle>span {font-size:.61rem}
+  .map-page .map-topline-actions {gap:4px}
+}
+
+
+/* Typography and tab icon rhythm across CRM sections. */
+.map-page {font-family:'Onest',sans-serif}
+.sales-page .sales-mobile-tab {
+  display:inline-flex;
+  justify-content:center;
+  align-items:center;
+  gap:7px;
+}
+.sales-page .sales-mobile-tab i {font-size:.85rem;line-height:1}
+:root[data-crm-theme="dark"] .map-page .map-fold-toggle {
+  border-color:rgba(255,255,255,.18);
+  background:rgba(255,255,255,.09);
+  color:#fff;
+}
