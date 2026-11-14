@@ -10,6 +10,11 @@
     const findButton=el('map-find-address'),panel=el('map-pin-editor');
     const pinName=el('map-pin-dealer-name'),pinQuery=el('map-pin-query');
     const pinFind=el('map-pin-find'),pinResults=el('map-pin-results');
+    const sourceAddress=el('map-pin-source-address');
+    const sourceExtras=el('map-pin-source-extras');
+    const editQueryButton=el('map-pin-edit-query');
+    const editorSearch=el('map-pin-editor-search');
+    const addressTools=window.CRMAddressSearch;
     const pinStatus=el('map-pin-status'),pinSave=el('map-pin-save');
     let searchVersion=0,editVersion=0,editDealerId=null,draft=null,marker=null;
     let lastSuggested=[];
@@ -92,6 +97,59 @@
       if(marker){map.removeLayer(marker);marker=null;}
       if(panel){panel.hidden=true;panel.setAttribute('aria-hidden','true');}
       if(pinResults){pinResults.hidden=true;pinResults.innerHTML='';}
+      if(editorSearch)editorSearch.hidden=true;
+      if(editQueryButton)editQueryButton.setAttribute('aria-expanded','false');
+    }
+    function placeError(text){
+      if(pinResults){pinResults.hidden=false;pinResults.innerHTML='<div class="map-pin-search-note">'+escapeHtml(text)+'</div>';}
+    }
+    async function runPinSearch({automatic=false}={}){
+      if(!editDealerId)return;
+      const dealer=getDealers().find(d=>String(d.id)===editDealerId);
+      if(!dealer)return;
+      const prepared=addressTools?.prepare(dealer.address||'',dealer.city||'')
+        || {address:String(dealer.address||'').trim(),city:String(dealer.city||'').trim(),details:''};
+      const query=automatic?prepared.address:String(pinQuery?.value||'').trim();
+      if(query.length<3){
+        placeError('В карточке нет адреса здания. Укажите адрес дилера или нажмите на нужное место на карте.');
+        return;
+      }
+      const version=++editVersion;
+      if(pinFind)pinFind.disabled=true;
+      if(pinResults){pinResults.hidden=false;pinResults.innerHTML='<div class="map-pin-search-note"><span class="spinner-border spinner-border-sm"></span> Ищем здание по адресу из карточки…</div>';}
+      if(pinStatus)pinStatus.innerHTML='<i class="bi bi-search"></i> Поиск здания';
+      try{
+        const results=await findAddresses(query,prepared.city);
+        if(version!==editVersion||String(dealer.id)!==editDealerId)return;
+        if(pinResults){
+          pinResults.dataset.candidates=JSON.stringify(results);
+          if(!results.length){
+            placeError('По этому адресу здание не найдено. Уточните запрос или укажите точку вручную.');
+          }else{
+            const known=results.filter(p=>p.precision==='house');
+            const intro=known.length
+              ? '<div class="map-pin-search-note">Нашли '+known.length+' вариант(а) с совпадающим номером дома. Выберите и проверьте на карте.</div>'
+              : '<div class="map-pin-search-note">Варианты требуют проверки: карта не подтвердила точный номер дома.</div>';
+            pinResults.innerHTML=intro+results.map((p,i)=>
+              '<button type="button" data-pin-option="'+i+'"><i class="bi bi-geo-alt"></i><span>'+escapeHtml(p.name)+
+              '<small class="map-pin-accuracy '+(p.precision==='house'?'is-house':'')+'">'+
+              (p.precision==='house'?'Номер дома совпадает':'Уточните здание на карте')+'</small></span></button>'
+            ).join('');
+            if(results.length===1&&results[0].precision==='house'){
+              // Preview a unique house-level result; employee still confirms Save.
+              selectDraft(results[0].lat,results[0].lon);
+              if(pinStatus)pinStatus.innerHTML='<i class="bi bi-check-circle"></i> Проверьте точку и сохраните';
+            }else if(pinStatus)pinStatus.innerHTML='<i class="bi bi-list-check"></i> Выберите результат';
+          }
+        }
+      }catch(error){
+        if(version===editVersion){
+          placeError(error.message||'Сервис поиска временно недоступен. Можно выбрать точку вручную.');
+          if(pinStatus)pinStatus.innerHTML='<i class="bi bi-exclamation-circle"></i> Найдите точку на карте';
+        }
+      }finally{
+        if(version===editVersion&&pinFind)pinFind.disabled=false;
+      }
     }
     function openEditor(id){
       if(!canEdit()){toast('Нет права изменять местоположение дилера','error');return false;}
@@ -102,42 +160,41 @@
       editDealerId=String(dealer.id);
       panel.hidden=false;
       panel.setAttribute('aria-hidden','false');
+      const prepared=addressTools?.prepare(dealer.address||'',dealer.city||'')
+        || {address:String(dealer.address||'').trim(),city:String(dealer.city||'').trim(),details:''};
       if(pinName)pinName.textContent=dealer.name||'Дилер';
-      if(pinQuery)pinQuery.value=dealer.address||'';
+      if(sourceAddress)sourceAddress.textContent=[prepared.city,prepared.original].filter(Boolean).join(' · ')||'Адрес не указан';
+      if(sourceExtras){
+        sourceExtras.textContent=prepared.details?'Не используем в поиске здания: '+prepared.details:'';
+        sourceExtras.hidden=!prepared.details;
+      }
+      if(pinQuery)pinQuery.value=prepared.address;
+      if(editorSearch)editorSearch.hidden=true;
+      if(editQueryButton)editQueryButton.setAttribute('aria-expanded','false');
       if(pinSave)pinSave.disabled=true;
-      if(pinStatus)pinStatus.innerHTML='<i class="bi bi-cursor"></i> Выберите точку';
+      if(pinStatus)pinStatus.innerHTML='<i class="bi bi-cursor"></i> Поиск по адресу';
       if(hasPoint(dealer))selectDraft(dealer.latitude,dealer.longitude);
       closeMobileList();
-      // Focusing a visible panel after the mobile sheet closes prevents
-      // the overlay from appearing behind the sidebar or a map repaint.
-      if(typeof requestAnimationFrame==='function')requestAnimationFrame(()=>{
-        map.invalidateSize?.();
-        if(window.innerWidth>=768)pinQuery?.focus?.({preventScroll:true});
-      });
+      if(typeof requestAnimationFrame==='function')requestAnimationFrame(()=>map.invalidateSize?.());
+      // Only after an employee explicitly opens an unmarked dealer:
+      // no bulk lookup, background scanning or autocomplete.
+      // Never replace an existing verified point with a guessed address.
+      if(!hasPoint(dealer))void runPinSearch({automatic:true});
+      else if(pinStatus)pinStatus.innerHTML='<i class="bi bi-check-circle"></i> Метка сохранена · при необходимости уточните поиск';
       return true;
     }
+    editQueryButton?.addEventListener('click',()=>{
+      if(!editorSearch)return;
+      const show=editorSearch.hidden;
+      editorSearch.hidden=!show;
+      editQueryButton.setAttribute('aria-expanded',String(show));
+      if(show)pinQuery?.focus?.({preventScroll:true});
+    });
+
     map.on('click',e=>{if(editDealerId)selectDraft(e.latlng.lat,e.latlng.lng);});
     el('map-pin-cancel')?.addEventListener('click',closeEditor);
     pinQuery?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();pinFind?.click();}});
-    pinFind?.addEventListener('click',async()=>{
-      if(!editDealerId)return;
-      const dealer=getDealers().find(d=>String(d.id)===editDealerId);
-      const version=++editVersion;
-      pinFind.disabled=true;
-      if(pinResults){pinResults.hidden=false;pinResults.innerHTML='<div class="map-pin-search-note">Ищем адрес…</div>';}
-      try{
-        const results=await findAddresses(pinQuery?.value||'',dealer?.city||'');
-        if(version!==editVersion)return;
-        if(pinResults){
-          pinResults.dataset.candidates=JSON.stringify(results);
-          pinResults.innerHTML=results.length
-            ? results.map((p,i)=>'<button type="button" data-pin-option="'+i+'"><i class="bi bi-geo-alt"></i><span>'+escapeHtml(p.name)+'</span></button>').join('')
-            : '<div class="map-pin-search-note">Не найдено. Поставьте точку вручную на карте.</div>';
-        }
-      }catch(error){
-        if(version===editVersion && pinResults)pinResults.innerHTML='<div class="map-pin-search-note">'+escapeHtml(error.message)+'</div>';
-      }finally{if(version===editVersion)pinFind.disabled=false;}
-    });
+    pinFind?.addEventListener('click',()=>runPinSearch({automatic:false}));
     pinResults?.addEventListener('click',e=>{
       const target=e.target.closest('[data-pin-option]');
       if(!target)return;

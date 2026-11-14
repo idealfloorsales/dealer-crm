@@ -40,3 +40,68 @@ test('geocoder is explicit, country-scoped and caches repeated address requests'
  assert.match(new URL(lastUrl).searchParams.get('q'),/Астана/);
  await assert.rejects(lookup('x'),/трёх символов/);
 });
+
+test('geocoder removes floor, boutique and office while preserving house',()=>{
+ const a=require('../public/address-search');
+ const examples=[
+  ['Астана','ул. Мәскеу 9, 2 этаж, офис 301','ул. Мәскеу 9','2 этаж, офис 301'],
+  ['Алматы','Абая 57, бутик №17','Абая 57','бутик №17'],
+  ['Астана','ТРЦ Хан Шатыр, 3-й этаж, павильон 16','ТРЦ Хан Шатыр','3-й этаж, павильон 16'],
+  ['Караганда','мкр 12, дом 9, корпус 2, этаж 1','мкр 12, дом 9, корпус 2','этаж 1'],
+  ['Астана','Мангилик Ел 55/7 2 этаж офис 15','Мангилик Ел 55/7','2 этаж офис 15']
+ ];
+ for(const [city,raw,want,details] of examples){
+  const parsed=a.prepare(raw,city);
+  assert.equal(parsed.address,want);
+  assert.equal(parsed.details,details);
+  assert.equal(parsed.city,city);
+ }
+ assert.equal(a.extractHouseNumber('Мангилик Ел 55/7, 2 этаж'),'55/7');
+ assert.equal(a.extractHouseNumber('мкр 12, дом 9'),'9');
+ assert.equal(a.prepare('2 этаж, офис 301','Астана').address,'');
+});
+test('Nominatim request contains building and city but never floor or office',async()=>{
+ let lastUrl;
+ const lookup=geo.createLookup({clock:()=>10000,sleep:async()=>{},fetchImpl:async(url)=>{
+  lastUrl=url;
+  return {ok:true,json:async()=>[{
+   lat:'51.2',lon:'71.4',display_name:'Мәскеу 9, Астана',
+   address:{house_number:'9',city:'Астана',road:'улица Мәскеу'}
+  }]};
+ }});
+ const rows=await lookup('Мәскеу 9, 2 этаж, офис 301','Астана');
+ const query=new URL(lastUrl).searchParams.get('q');
+ assert.match(query,/Мәскеу 9/);
+ assert.doesNotMatch(query,/офис|этаж/i);
+ assert.equal(rows[0].precision,'house');
+});
+test('street-level and different-city matches are not claimed as verified buildings',async()=>{
+ const lookup=geo.createLookup({clock:()=>10000,sleep:async()=>{},fetchImpl:async()=>({
+  ok:true,json:async()=>[
+   {lat:'51.2',lon:'71.4',display_name:'Мәскеу 9, Алматы',address:{house_number:'9',city:'Алматы'}},
+   {lat:'51.3',lon:'71.5',display_name:'улица Мәскеу, Астана',address:{road:'Мәскеу',city:'Астана'}}
+  ]
+ })});
+ const rows=await lookup('Мәскеу 9','Астана');
+ assert.equal(rows.every(r=>r.precision==='review'),true);
+});
+
+test('matching house number in a different street does not produce automatic location',async()=>{
+ const lookup=geo.createLookup({clock:()=>10000,sleep:async()=>{},fetchImpl:async()=>({
+  ok:true,json:async()=>[
+   {lat:'51.2',lon:'71.4',display_name:'ул Сатпаева 9, Астана',
+    address:{house_number:'9',city:'Астана',road:'Сатпаева'}}
+  ]
+ })});
+ const result=await lookup('Мәскеу 9','Астана');
+ assert.equal(result[0].precision,'review');
+});
+
+test('a house without a city remains an unverified candidate',async()=>{
+ const lookup=geo.createLookup({clock:()=>10000,sleep:async()=>{},fetchImpl:async()=>({
+  ok:true,json:async()=>[{lat:'51.2',lon:'71.4',display_name:'Мәскеу 9',
+    address:{house_number:'9',road:'Мәскеу',city:'Астана'}}]
+ })});
+ const rows=await lookup('Мәскеу 9','');
+ assert.equal(rows[0].precision,'review');
+});

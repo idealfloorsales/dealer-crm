@@ -4,6 +4,7 @@
 // attributable User-Agent, caching and conservative per-user quota.
 // https://operations.osmfoundation.org/policies/nominatim/
 const rateLimit = require('express-rate-limit');
+const addressSearch = require('../public/address-search');
 const NOMINATIM_ENDPOINT = 'https://nominatim.openstreetmap.org/search';
 const MAX_CACHE = 400;
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -52,8 +53,9 @@ function createLookup(options={}) {
         return job;
     }
     return async function lookup(q,city='') {
-        const address=cleanQuery(q), town=cleanQuery(city,70);
-        if (address.length<3) {const err=new Error('Введите адрес длиной не менее трёх символов.');err.status=400;throw err;}
+        const prepared=addressSearch.prepare(cleanQuery(q),cleanQuery(city,70));
+        const address=prepared.address, town=prepared.city;
+        if (address.length<3) {const err=new Error('Укажите улицу и дом или название здания, без номера офиса и этажа.');err.status=400;throw err;}
         const key=(address+'|'+town).toLocaleLowerCase('ru');
         const fromCache=cache.get(key);
         if (fromCache && clock()-fromCache.time<CACHE_TTL_MS) return fromCache.rows;
@@ -81,7 +83,31 @@ function createLookup(options={}) {
                     err.status=response.status===429?429:503;
                     throw err;
                 }
-                return parseResults(await response.json());
+                const raw=await response.json();
+                const expectedHouse=addressSearch.extractHouseNumber(address);
+                const locations=parseResults(raw);
+                return locations.map(place=>{
+                    const original=raw.find(row=>Number(row?.lat)===place.lat&&Number(row?.lon)===place.lon);
+                    const actualHouse=String(original?.address?.house_number||'').trim();
+                    const actualCity=String(original?.address?.city||original?.address?.town||original?.address?.village||original?.address?.municipality||'').trim();
+                    const normalCity=value=>String(value||'').toLocaleLowerCase('ru')
+                        .replace(/[ёәғқңөұүһі]/g,ch=>({'ё':'е','ә':'а','ғ':'г','қ':'к','ң':'н','ө':'о','ұ':'у','ү':'у','һ':'х','і':'и'}[ch]||ch));
+                    // A missing city cannot establish a unique house across Kazakhstan.
+                    const cityConfirmed=Boolean(town&&actualCity&&(
+                        normalCity(actualCity).includes(normalCity(town)) ||
+                        normalCity(town).includes(normalCity(actualCity))
+                    ));
+                    const actualRoad=String(original?.address?.road||original?.address?.pedestrian||original?.address?.residential||'');
+                    const normalizeRoad=value=>normalCity(value).replace(/[^а-яa-z0-9]+/giu,' ').trim().split(/\s+/)
+                        .filter(x=>x.length>=4&&!new Set(['улица','улице','проспект','переулок','шоссе','проезд','микрорайон','район','город','корпус','строение','көшесі','кошеси']).has(x));
+                    const streetWords=normalizeRoad(actualRoad);
+                    const searchedWords=normalizeRoad(address);
+                    const streetConfirmed=streetWords.length>0 && streetWords.every(x=>searchedWords.includes(x));
+                    const houseConfirmed=Boolean(expectedHouse&&actualHouse&&cityConfirmed&&streetConfirmed&&addressSearch.sameHouse(expectedHouse,actualHouse));
+                    // A street/district centroid must never be presented as the exact house.
+                    const precision=houseConfirmed?'house':'review';
+                    return {...place,precision};
+                }).sort((a,b)=>Number(b.precision==='house')-Number(a.precision==='house'));
             } finally { clearTimeout(timer); }
         });
         if (cache.size>=MAX_CACHE) cache.delete(cache.keys().next().value);

@@ -807,18 +807,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if(btnManageStatuses) { btnManageStatuses.onclick = () => { resetStatusForm(); statusModal.show(); }; }
 
-    function setupMapLogic(mapId, latId, lngId, searchId, btnSearchId, btnLocId, instanceKey) {
+    function setupMapLogic(mapId,latId,lngId,searchId,btnSearchId,btnLocId,instanceKey) {
         const mapEl=document.getElementById(mapId);
         if(!mapEl)return;
-        const latInput=document.getElementById(latId);
-        const lngInput=document.getElementById(lngId);
+        const latInput=document.getElementById(latId),lngInput=document.getElementById(lngId);
         const input=document.getElementById(searchId);
         const resultBox=document.getElementById(instanceKey+'-location-results');
         const state=document.getElementById(instanceKey+'-location-status');
+        const source=document.getElementById(instanceKey+'-location-source-value');
+        const details=document.getElementById(instanceKey+'-location-extras');
+        const refine=document.getElementById(instanceKey+'-location-refine');
         const addressId=instanceKey==='add'?'address':'edit_address';
         const cityId=instanceKey==='add'?'city':'edit_city';
-        let searchVersion=0;
-        let candidates=[];
+        const searchBtn=document.getElementById(btnSearchId);
+        let searchVersion=0,candidates=[],lastAutoKey='',previewMarker=null;
         if(!mapInstances[instanceKey]){
             const map=L.map(mapId).setView([51.1605,71.4704],12);
             L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
@@ -828,16 +830,30 @@ document.addEventListener('DOMContentLoaded', () => {
             map.on('click',e=>setMarker(e.latlng.lat,e.latlng.lng,true));
         }
         const map=mapInstances[instanceKey];
-        function setState(text,confirmed=false) {
+        function prepared(){
+            const address=document.getElementById(addressId)?.value||'';
+            const city=document.getElementById(cityId)?.value||'';
+            return window.CRMAddressSearch?.prepare(address,city)||
+                {address:String(address).trim(),city:String(city).trim(),details:'',original:address};
+        }
+        function renderSource(info){
+            if(source)source.textContent=[info.city,info.original].filter(Boolean).join(' · ')||'Адрес ещё не заполнен';
+            if(details){
+                details.textContent=info.details?'Для поиска здания исключено: '+info.details:'';
+                details.hidden=!info.details;
+            }
+        }
+        function setState(text,confirmed=false){
             if(!state)return;
             state.classList.toggle('is-verified',confirmed);
-            state.innerHTML='<i class="bi '+(confirmed?'bi-check-circle-fill':'bi-info-circle')+'"></i><span>'+text+'</span>';
+            state.innerHTML='<i class="bi '+(confirmed?'bi-check-circle-fill':'bi-info-circle')+'"></i><span>'+safeText(text)+'</span>';
         }
-        function setMarker(lat,lng,confirmed=true) {
+        function setMarker(lat,lng,confirmed=true){
             const a=Number(lat),b=Number(lng);
             if(!Number.isFinite(a)||!Number.isFinite(b)||a<40||a>56.5||b<45||b>88.5){
                 window.showToast?.('Выберите точку на территории Казахстана','warning');return;
             }
+            if(previewMarker){map.removeLayer(previewMarker);previewMarker=null;}
             if(markerInstances[instanceKey])map.removeLayer(markerInstances[instanceKey]);
             const marker=L.marker([a,b],{draggable:true}).addTo(map);
             markerInstances[instanceKey]=marker;
@@ -845,48 +861,82 @@ document.addEventListener('DOMContentLoaded', () => {
             if(lngInput)lngInput.value=b.toFixed(6);
             marker.on('dragend',e=>{const p=e.target.getLatLng();setMarker(p.lat,p.lng,true);});
             map.setView([a,b],16);
-            setState(confirmed?'Точка выбрана — будет сохранена вместе с карточкой дилера.':'Метка уже есть. При необходимости перетащите её.',confirmed);
+            setState(confirmed?'Точка выбрана — проверьте её перед сохранением дилера.':'Метка уже есть. При необходимости перетащите её.',confirmed);
         }
-        async function searchAddress(){
-            const query=(input?.value||'').trim() || (document.getElementById(addressId)?.value||'').trim();
-            const city=(document.getElementById(cityId)?.value||'').trim();
-            if(query.length<3){window.showToast?.('Укажите адрес дилера в карточке или введите его в строку поиска','info');return;}
-            const button=document.getElementById(btnSearchId);
-            if(!button || button.disabled)return;
-            button.disabled=true;
-            const original=button.innerHTML;
-            button.innerHTML='<span class="spinner-border spinner-border-sm"></span>';
+        async function searchAddress({automatic=false}={}){
+            const info=prepared();renderSource(info);
+            const query=automatic?info.address:((input?.value||'').trim()||info.address);
+            if(query.length<3){
+                if(resultBox){resultBox.hidden=false;resultBox.innerHTML='<div class="dealer-location-hint">Нет адреса здания. Заполните адрес в карточке или укажите точку на карте вручную.</div>';}
+                return;
+            }
+            const dealerKey=instanceKey==='edit'
+                ? document.getElementById('edit_db_id')?.value||''
+                : document.getElementById('dealer_id')?.value||'';
+            const key=dealerKey+'|'+info.city.toLowerCase()+'|'+info.address.toLowerCase();
+            if(automatic&&key===lastAutoKey)return;
+            if(automatic)lastAutoKey=key;
             const version=++searchVersion;
-            if(resultBox){resultBox.hidden=false;resultBox.innerHTML='<div class="dealer-location-hint">Ищем адрес…</div>';}
+            if(previewMarker){map.removeLayer(previewMarker);previewMarker=null;}
+            if(searchBtn)searchBtn.disabled=true;
+            const oldHtml=searchBtn?.innerHTML;
+            if(searchBtn)searchBtn.innerHTML='<span class="spinner-border spinner-border-sm"></span> Поиск';
+            if(resultBox){resultBox.hidden=false;resultBox.innerHTML='<div class="dealer-location-hint"><span class="spinner-border spinner-border-sm"></span> Ищем здание по адресу дилера…</div>';}
             try{
                 const params=new URLSearchParams({q:query});
-                if(city)params.set('city',city);
+                if(info.city)params.set('city',info.city);
                 const response=await fetch('/api/map/geocode?'+params.toString());
                 const data=await response.json().catch(()=>({}));
                 if(!response.ok)throw Error(data.error||'Не удалось найти адрес');
                 if(version!==searchVersion)return;
                 candidates=Array.isArray(data.results)?data.results:[];
-                if(resultBox)resultBox.innerHTML=candidates.length
-                    ? '<div class="dealer-location-hint">Выберите точный адрес из найденных:</div>'+
-                        candidates.map((place,index)=>'<button type="button" data-dealer-location="'+index+'"><i class="bi bi-geo-alt"></i><span>'+safeText(place.name)+'</span></button>').join('')
-                    : '<div class="dealer-location-hint">Адрес не найден. Уточните город и дом либо установите точку на карте вручную.</div>';
-            }catch(e){
-                if(version===searchVersion && resultBox)resultBox.innerHTML='<div class="dealer-location-hint">'+safeText(e.message||'Ошибка поиска')+'</div>';
-            }finally{if(version===searchVersion){button.innerHTML=original;button.disabled=false;}}
+                if(resultBox){
+                    resultBox.innerHTML=candidates.length
+                        ? '<div class="dealer-location-hint">Выберите подходящее здание — метка не сохраняется автоматически:</div>'+
+                          candidates.map((place,index)=>
+                            '<button type="button" data-dealer-location="'+index+'"><i class="bi bi-geo-alt"></i><span>'+
+                            safeText(place.name)+'<small class="dealer-location-accuracy">'+
+                            (place.precision==='house'?'Номер дома совпадает':'Проверьте здание на карте')+
+                            '</small></span></button>').join('')
+                        : '<div class="dealer-location-hint">Здание не найдено. Уточните адрес или поставьте точку на карте.</div>';
+                }
+                if(candidates.length&&!latInput?.value&&!lngInput?.value){
+                    // Locate, but do not persist a guessed building until the user selects it.
+                    const candidate=candidates[0];
+                    if(Number.isFinite(Number(candidate.lat))&&Number.isFinite(Number(candidate.lon))){
+                        if(previewMarker)map.removeLayer(previewMarker);
+                        previewMarker=L.circleMarker([Number(candidate.lat),Number(candidate.lon)],{
+                            radius:10,color:'#b9040a',weight:2,fillColor:'#fff',fillOpacity:.72
+                        }).addTo(map);
+                        map.setView([Number(candidate.lat),Number(candidate.lon)],15);
+                        setState('Предварительная точка на карте. Выберите адрес из списка или нажмите на карту.');
+                    }
+                }
+            }catch(error){
+                if(version===searchVersion&&resultBox)resultBox.innerHTML='<div class="dealer-location-hint">'+safeText(error.message||'Поиск временно недоступен')+'</div>';
+                if(automatic)lastAutoKey=''; // allow a retry after temporary failure
+            }finally{
+                if(version===searchVersion&&searchBtn){searchBtn.disabled=false;searchBtn.innerHTML=oldHtml;}
+            }
         }
-        const button=document.getElementById(btnSearchId);
-        if(button)button.addEventListener('click',searchAddress);
-        if(input)input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();searchAddress();}});
+        refine?.addEventListener('click',()=>{
+            if(!input||!searchBtn)return;
+            const show=input.hidden;
+            input.hidden=!show;searchBtn.hidden=!show;
+            if(show){input.value=prepared().address;input.focus({preventScroll:true});}
+        });
+        searchBtn?.addEventListener('click',()=>searchAddress({automatic:false}));
+        input?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();void searchAddress({automatic:false});}});
         resultBox?.addEventListener('click',e=>{
-            const btn=e.target.closest('[data-dealer-location]');
-            if(!btn)return;
-            const d=candidates[Number(btn.dataset.dealerLocation)];
-            if(!d)return;
-            setMarker(d.lat,d.lon,true);
+            const choice=e.target.closest('[data-dealer-location]');
+            if(!choice)return;
+            const place=candidates[Number(choice.dataset.dealerLocation)];
+            if(!place)return;
+            setMarker(place.lat,place.lon,true);
             resultBox.hidden=true;
         });
         const locBtn=document.getElementById(btnLocId);
-        if(locBtn)locBtn.addEventListener('click',()=>{
+        locBtn?.addEventListener('click',()=>{
             if(!navigator.geolocation){window.showToast?.('Геолокация недоступна','warning');return;}
             locBtn.disabled=true;
             navigator.geolocation.getCurrentPosition(pos=>{
@@ -899,26 +949,35 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         [cityId,addressId].forEach(id=>{
             document.getElementById(id)?.addEventListener('input',()=>{
-                if(latInput?.value && lngInput?.value)setState('Адрес изменён? Проверьте, что метка всё ещё в нужном месте.');
+                if(latInput?.value&&lngInput?.value)setState('Адрес изменён — проверьте, соответствует ли ему сохранённая точка.');
             });
         });
         return function invalidate(){
             setTimeout(()=>{
                 map.invalidateSize();
+                if(previewMarker){map.removeLayer(previewMarker);previewMarker=null;}
+                const info=prepared();
+                renderSource(info);
                 const lat=Number(latInput?.value),lng=Number(lngInput?.value);
-                if(latInput?.value && lngInput?.value && Number.isFinite(lat)&&Number.isFinite(lng)&&lat && lng) {
+                const hasSaved=Boolean(latInput?.value&&lngInput?.value&&Number.isFinite(lat)&&Number.isFinite(lng)&&lat&&lng);
+                if(hasSaved) {
                     setMarker(lat,lng,false);
                 } else {
-                    if(markerInstances[instanceKey]) {
+                    if(markerInstances[instanceKey]){
                         map.removeLayer(markerInstances[instanceKey]);
                         markerInstances[instanceKey]=null;
                     }
-                    setState('Точка не отмечена. Найдите адрес или нажмите на карту.');
+                    setState('Поиск здания по адресу дилера. Подтвердите подходящую точку на карте.');
                 }
-                ++searchVersion;
-                candidates=[];
-                if(resultBox){resultBox.innerHTML='';resultBox.hidden=true;}
-            },250);
+                if(input){input.hidden=true;input.value=info.address;}
+                if(searchBtn)searchBtn.hidden=true;
+                if(info.address.length>=3&&!hasSaved){
+                    void searchAddress({automatic:true});
+                }else if(!hasSaved&&resultBox){
+                    resultBox.hidden=false;
+                    resultBox.innerHTML='<div class="dealer-location-hint">Заполните адрес на вкладке «Основное», чтобы найти здание автоматически.</div>';
+                } else if(resultBox){resultBox.hidden=true;resultBox.innerHTML='';}
+            },260);
         };
     }
 

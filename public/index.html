@@ -610,10 +610,16 @@
                                     <span class="dealer-section-icon"><i class="bi bi-map"></i></span>
                                     <div><strong>Локация</strong><small>Найдите адрес или поставьте точку на карте</small></div>
                                 </div>
+                                <div class="dealer-location-source" id="add-location-source">
+                                    <span><i class="bi bi-geo-alt"></i> Адрес из карточки</span>
+                                    <strong id="add-location-source-value">Укажите город и адрес на первом шаге</strong>
+                                    <small id="add-location-extras" hidden></small>
+                                </div>
                                 <div class="dealer-location-search">
-                                    <input type="text" id="add-smart-search" class="form-control" placeholder="Улица, дом — либо возьмём из адреса дилера" aria-label="Найти адрес дилера на карте">
-                                    <button type="button" class="dealer-secondary-action" id="btn-search-add"><i class="bi bi-search"></i> Найти</button>
-                                    <button type="button" class="dealer-icon-action" id="btn-loc-add" title="Мое местоположение"><i class="bi bi-crosshair"></i></button>
+                                    <button type="button" class="dealer-secondary-action" id="add-location-refine"><i class="bi bi-pencil"></i> Уточнить поиск</button>
+                                    <input type="text" id="add-smart-search" class="form-control" placeholder="Улица, дом" aria-label="Уточнённый адрес" hidden>
+                                    <button type="button" class="dealer-secondary-action" id="btn-search-add" hidden><i class="bi bi-search"></i> Найти ещё</button>
+                                    <button type="button" class="dealer-icon-action" id="btn-loc-add" title="Использовать моё местоположение"><i class="bi bi-crosshair"></i></button>
                                 </div>
                                 <div id="add-location-results" class="dealer-location-results" hidden></div>
                                 <div id="add-map" class="dealer-map"></div>
@@ -933,10 +939,16 @@
                                         <span class="dealer-section-icon"><i class="bi bi-map"></i></span>
                                         <div><strong>Локация дилера</strong><small>Поиск по адресу или ручная точка на карте</small></div>
                                     </div>
+                                    <div class="dealer-location-source" id="edit-location-source">
+                                        <span><i class="bi bi-geo-alt"></i> Адрес из карточки</span>
+                                        <strong id="edit-location-source-value">Адрес дилера</strong>
+                                        <small id="edit-location-extras" hidden></small>
+                                    </div>
                                     <div class="dealer-location-search">
-                                        <input type="text" id="edit-smart-search" class="form-control" placeholder="Улица, дом — либо возьмём из адреса дилера" aria-label="Найти адрес дилера на карте">
-                                        <button type="button" class="dealer-secondary-action" id="btn-search-edit"><i class="bi bi-search"></i> Найти</button>
-                                        <button type="button" class="dealer-icon-action" id="btn-loc-edit" title="Мое местоположение"><i class="bi bi-crosshair"></i></button>
+                                        <button type="button" class="dealer-secondary-action" id="edit-location-refine"><i class="bi bi-pencil"></i> Уточнить поиск</button>
+                                        <input type="text" id="edit-smart-search" class="form-control" placeholder="Улица, дом" aria-label="Уточнённый адрес" hidden>
+                                        <button type="button" class="dealer-secondary-action" id="btn-search-edit" hidden><i class="bi bi-search"></i> Найти ещё</button>
+                                        <button type="button" class="dealer-icon-action" id="btn-loc-edit" title="Использовать моё местоположение"><i class="bi bi-crosshair"></i></button>
                                     </div>
                                     <div id="edit-location-results" class="dealer-location-results" hidden></div>
                                     <div id="edit-map" class="dealer-map dealer-map-large"></div>
@@ -1234,6 +1246,7 @@
     <script src="dealer-score.js?v={{VER}}"></script>
     <script src="motivation.js?v={{VER}}"></script>
     <script src="motivation-overview.js?v={{VER}}"></script>
+    <script src="address-search.js?v={{VER}}"></script>
     <script src="script.js?v={{VER}}"></script>
     <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(err => console.error(err)); }</script>
 </body>

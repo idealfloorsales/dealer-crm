@@ -25,6 +25,7 @@ const LOCAL_ASSETS = [
     '/ui-motion.css?v={{VER}}',
     '/ui-consistency.css?v={{VER}}',
     '/script.js?v={{VER}}',
+    '/address-search.js?v={{VER}}',
     '/sales.js?v={{VER}}',
     '/report.js?v={{VER}}',
     '/report.css?v={{VER}}',

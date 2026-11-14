@@ -133,12 +133,20 @@
                     <div><span class="map-pin-eyebrow"><i class="bi bi-geo-alt"></i> ТОЧКА ДИЛЕРА</span><strong id="map-pin-dealer-name">Дилер</strong></div>
                     <button type="button" id="map-pin-cancel" class="map-pin-close" aria-label="Закрыть"><i class="bi bi-x-lg"></i></button>
                 </div>
-                <p>Найдите адрес и выберите результат либо нажмите на точное место на карте. Метку можно перетащить.</p>
-                <div class="map-pin-editor-search">
-                    <input type="search" id="map-pin-query" autocomplete="off" aria-label="Адрес дилера" placeholder="Улица, номер дома">
+                <p>CRM ищет здание по адресу из карточки. Этажи, офисы и бутики не влияют на поиск. Проверьте найденное место перед сохранением.</p>
+                <div class="map-pin-source" id="map-pin-source">
+                    <div class="map-pin-source-head">
+                        <span><i class="bi bi-geo-alt-fill"></i> Адрес из карточки</span>
+                        <button type="button" id="map-pin-edit-query" aria-controls="map-pin-editor-search" aria-expanded="false"><i class="bi bi-pencil"></i> Уточнить</button>
+                    </div>
+                    <strong id="map-pin-source-address">Адрес не указан</strong>
+                    <small id="map-pin-source-extras" hidden></small>
+                </div>
+                <div class="map-pin-editor-search" id="map-pin-editor-search" hidden>
+                    <input type="search" id="map-pin-query" autocomplete="off" aria-label="Уточнение поискового адреса" placeholder="Улица, номер дома">
                     <button type="button" id="map-pin-find"><i class="bi bi-search"></i> Найти</button>
                 </div>
-                <div class="map-pin-results" id="map-pin-results" hidden></div>
+                <div class="map-pin-results" id="map-pin-results" role="status" aria-live="polite" hidden></div>
                 <div class="map-pin-editor-foot">
                     <span class="map-pin-status" id="map-pin-status"><i class="bi bi-cursor"></i> Выберите точку</span>
                     <button type="button" id="map-pin-save" disabled><i class="bi bi-check-lg"></i> Сохранить точку</button>
@@ -185,6 +193,7 @@
     <script defer src="permissions.js?v={{VER}}"></script>
     <script src="ui-consistency.js?v={{VER}}"></script>
     <script defer src="map-search-core.js?v={{VER}}"></script>
+    <script defer src="address-search.js?v={{VER}}"></script>
     <script defer src="map-experience.js?v={{VER}}"></script>
     <script defer src="map.js?v={{VER}}"></script>
 </body>

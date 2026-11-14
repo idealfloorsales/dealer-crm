@@ -579,3 +579,44 @@ body:has(.modal.show,.offcanvas.show) #crm-scroll-to-top {opacity:0;visibility:h
 :root[data-crm-theme="dark"] .dealer-form-modal .dealer-location-results button{background:#31343a;border-color:#454750;color:#e6e8ed}
 :root[data-crm-theme="dark"] .dealer-form-modal .dealer-location-status{background:#303137;color:#b9bdc4}
 :root[data-crm-theme="dark"] .dealer-form-modal .dealer-location-status.is-verified{background:#243a30;color:#b5e0c7}
+
+
+/* Dealer add/edit: the main address is reused, only optional search refinement is editable. */
+.dealer-form-modal .dealer-location-source {
+  display:flex;flex-direction:column;gap:4px;
+  margin-bottom:9px;padding:10px 12px;
+  border:1px solid #e9e3de;border-radius:12px;background:#faf8f5;
+}
+.dealer-form-modal .dealer-location-source > span {
+  display:inline-flex;gap:6px;align-items:center;color:#a7494e;
+  font:800 10px/1.3 'Onest',sans-serif;
+}
+.dealer-form-modal .dealer-location-source > strong {
+  color:#34363b;font:800 12px/1.4 'Onest',sans-serif;
+  overflow-wrap:anywhere;
+}
+.dealer-form-modal .dealer-location-source > small {
+  color:#968980;font:650 10px/1.4 'Onest',sans-serif;
+}
+.dealer-form-modal .dealer-location-source > small[hidden],
+.dealer-form-modal .dealer-location-search > [hidden] {display:none!important;}
+.dealer-form-modal .dealer-location-search {
+  display:flex;align-items:center;flex-wrap:wrap;gap:7px;
+}
+.dealer-form-modal .dealer-location-search .dealer-secondary-action {
+  flex:0 0 auto;min-height:38px;border-radius:10px;
+  font:750 11px/1 'Onest',sans-serif;
+}
+.dealer-form-modal .dealer-location-search .form-control:not([hidden]) {
+  flex:1 1 180px;min-width:0;min-height:38px;
+}
+.dealer-form-modal .dealer-location-search .dealer-icon-action {flex:0 0 38px;}
+.dealer-form-modal .dealer-location-accuracy {
+  display:block;margin-top:3px;color:#888b91;
+  font:700 10px/1.35 'Onest',sans-serif;
+}
+:root[data-crm-theme="dark"] .dealer-form-modal .dealer-location-source {
+  background:#2b2c33;border-color:#4a4a50;
+}
+:root[data-crm-theme="dark"] .dealer-form-modal .dealer-location-source > strong {color:#edf0f2;}
+:root[data-crm-theme="dark"] .dealer-form-modal .dealer-location-source > small {color:#c7a69c;}
