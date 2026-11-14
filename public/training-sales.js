@@ -84,11 +84,17 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderCards() {
         const items = filteredScripts();
         const shown = items.slice(0, visible);
-        $('sales-result-count').textContent = 'Показано ' + shown.length + ' из ' + items.length + ' скриптов';
+        const noun = value => {
+            const count = Math.abs(value) % 100, last = count % 10;
+            return count >= 11 && count <= 14 ? 'скриптов'
+                : last === 1 ? 'скрипт' : last >= 2 && last <= 4 ? 'скрипта' : 'скриптов';
+        };
+        $('sales-result-count').textContent = 'Показано ' + shown.length + ' из ' + items.length + ' ' + noun(items.length);
         $('sales-scripts-grid').innerHTML = items.length ? shown.map(scriptCard).join('') :
             '<div class="training-empty sales-empty"><i class="bi bi-search"></i><strong>Скрипты не найдены</strong><span>Измените поиск или категорию.</span></div>';
         $('sales-show-more').hidden = items.length <= visible;
-        $('sales-show-more').textContent = 'Показать ещё ' + Math.min(8, items.length - visible) + ' скриптов';
+        const remain = Math.min(8, Math.max(0, items.length - visible));
+        $('sales-show-more').textContent = 'Показать ещё ' + remain + ' ' + noun(remain);
     }
 
     function toast(message) {
