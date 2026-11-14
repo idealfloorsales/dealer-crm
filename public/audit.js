@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     competitors:'Конкуренты',knowledge:'Обучение',reclamations:'Рекламации',workshop:'Цех',
     pricing:'Цены',exports:'Экспорт',users:'Сотрудники',settings:'Настройки',system:'Система'
   };
-  const actionLabels = {create:'Добавление',update:'Изменение',delete:'Удаление',execute:'Операция'};
+  const actionLabels = {create:'Добавление',update:'Изменение',delete:'Удаление',execute:'Операция',product_archive:'В архив',product_restore:'Восстановление из архива'};
   let page=1,pages=1,items=[],metaLoaded=false;
 
   const esc = value => String(value ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
