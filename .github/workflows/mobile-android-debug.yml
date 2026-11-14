@@ -12,7 +12,7 @@ on:
 jobs:
   android-debug:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     defaults:
       run:
@@ -47,13 +47,17 @@ jobs:
       - name: Expo Doctor
         run: npx expo-doctor
 
+      - name: Strict TypeScript compilation
+        run: npx tsc --noEmit
+
       - name: Generate Android native project
         run: npx expo prebuild --platform android --clean --non-interactive
 
       - name: Verify release compatibility settings
         run: |
-          grep -qx 'android.enableMinifyInReleaseBuilds=false' android/gradle.properties
-          grep -qx 'android.enableShrinkResourcesInReleaseBuilds=false' android/gradle.properties
+          grep -qx 'android.enableMinifyInReleaseBuilds=true' android/gradle.properties
+          grep -qx 'android.enableShrinkResourcesInReleaseBuilds=true' android/gradle.properties
+          grep -q 'WorkManager/Room reflective initialization' android/app/proguard-rules.pro
 
       - name: Build standalone APK
         run: |
@@ -71,6 +75,23 @@ jobs:
               bundle = archive.getinfo('assets/index.android.bundle')
               assert bundle.file_size > 10000, 'Standalone JavaScript bundle is missing or empty'
           print('Standalone APK contains bundled application code')
+          print(f"APK size: {apk.stat().st_size / (1024 * 1024):.1f} MiB")
+          print(f"Native shrinking: enabled with Room/WorkManager keep rules")
+          baseline = 101047362
+          reduction = 100 * (baseline - apk.stat().st_size) / baseline
+          print(f"Change vs Android 0.1.2: {reduction:+.1f}% smaller")
+          diagnostics = Path("diagnostics")
+          diagnostics.mkdir(exist_ok=True)
+          with ZipFile(apk) as archive:
+              top = sorted(archive.infolist(), key=lambda entry: entry.compress_size, reverse=True)[:25]
+          lines = [
+              f"APK bytes: {apk.stat().st_size}",
+              f"Previous 0.1.2 APK bytes: {baseline}",
+              f"Size difference: {baseline-apk.stat().st_size:+d} bytes",
+              "Largest compressed APK entries:"
+          ] + [f"{entry.compress_size:>12d} {entry.filename}" for entry in top]
+          (diagnostics / "apk-size.txt").write_text("\n".join(lines), encoding="utf-8")
+          print("\n".join(lines[:4]))
           PYVERIFY
           "$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner" verify android/app/build/outputs/apk/release/app-release.apk
 

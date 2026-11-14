@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
 import { Page } from '@/components/Page';
 import { MetricCard } from '@/components/MetricCard';
 import { useAuth } from '@/context/auth';
@@ -7,7 +8,10 @@ import { apiFetch } from '@/lib/api';
 import { colors, radius } from '@/theme';
 import type { Dealer, SaleRow } from '@/types';
 
-const currentMonth = () => new Date().toISOString().slice(0, 7);
+const currentMonth = () => {
+  const date = new Date();
+  return String(date.getFullYear()) + '-' + String(date.getMonth() + 1).padStart(2, '0');
+};
 
 export default function DashboardScreen() {
   const { user, can } = useAuth();
@@ -34,9 +38,7 @@ export default function DashboardScreen() {
     }
   }, [can]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   const refresh = async () => {
     setRefreshing(true);
@@ -106,16 +108,25 @@ export default function DashboardScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionEyebrow}>СЕГОДНЯ</Text>
         <Text style={styles.sectionTitle}>Работа в поле</Text>
-        <View style={styles.fieldCard}>
+        <Pressable style={({pressed}) => [styles.fieldCard, pressed && {opacity:.84}]} onPress={() => router.navigate('/(tabs)/map')}>
           <View style={styles.fieldIcon}>
             <Text style={styles.fieldIconText}>↗</Text>
           </View>
           <View style={styles.fieldCopy}>
             <Text style={styles.fieldTitle}>Дилеры, карта и визиты</Text>
             <Text style={styles.fieldText}>
-              Откройте вкладку «Карта», чтобы видеть точки дилеров и быстро перейти к карточке.
+              Найдите ближайший магазин, проверьте адрес или отметьте новую точку на карте.
             </Text>
           </View>
+          <Text style={styles.fieldChevron}>›</Text>
+        </Pressable>
+        <View style={styles.quickRow}>
+          <Pressable onPress={() => router.navigate('/(tabs)/dealers')} style={styles.quickButton}>
+            <Text style={styles.quickIcon}>▦</Text><Text style={styles.quickText}>Все дилеры</Text>
+          </Pressable>
+          <Pressable onPress={() => router.navigate('/(tabs)/sales')} style={styles.quickButton}>
+            <Text style={styles.quickIcon}>↗</Text><Text style={styles.quickText}>Продажи</Text>
+          </Pressable>
         </View>
       </View>
     </Page>
@@ -159,4 +170,10 @@ const styles = StyleSheet.create({
   fieldCopy: { flex: 1 },
   fieldTitle: { color: colors.ink, fontSize: 14, fontWeight: '900' },
   fieldText: { marginTop: 3, color: colors.muted, fontSize: 12, lineHeight: 17 },
+  fieldChevron:{color:'#A3A4AB',fontSize:24,marginLeft:3},
+  quickRow:{flexDirection:'row',gap:9,marginTop:10},
+  quickButton:{flex:1,minHeight:51,borderRadius:13,borderWidth:1,borderColor:colors.border,
+    backgroundColor:'#fff',alignItems:'center',justifyContent:'center',flexDirection:'row',gap:8},
+  quickIcon:{color:colors.brand,fontSize:20,fontWeight:'900'},
+  quickText:{color:colors.ink,fontSize:12,fontWeight:'800'},
 });

@@ -9,6 +9,7 @@ export default function RootLayout() {
         <Stack.Screen name="login" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="dealer/[id]" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="module/[key]" options={{ animation: 'slide_from_right' }} />
       </Stack>
     </AuthProvider>
   );

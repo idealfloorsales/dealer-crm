@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Page } from '@/components/Page';
 import { MetricCard } from '@/components/MetricCard';
 import { apiFetch } from '@/lib/api';
@@ -21,17 +21,27 @@ function monthLabel(month: string) {
 }
 
 export default function SalesScreen() {
-  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [month, setMonth] = useState(() => {
+    const date = new Date();
+    return String(date.getFullYear()) + '-' + String(date.getMonth()+1).padStart(2,'0');
+  });
   const [rows, setRows] = useState<SaleRow[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState('');
 
   const load = useCallback(async () => {
-    setRows(await apiFetch<SaleRow[]>('/api/sales?month=' + encodeURIComponent(month)));
+    setError('');
+    try{
+      const result = await apiFetch<SaleRow[]>('/api/sales?month=' + encodeURIComponent(month));
+      setRows(Array.isArray(result)?result:[]);
+    }catch(err){
+      setError(err instanceof Error?err.message:'Не удалось загрузить продажи');
+      setRows([]);
+    }finally{setLoading(false);}
   }, [month]);
 
-  useEffect(() => {
-    load().catch(() => setRows([]));
-  }, [load]);
+  useEffect(() => {setLoading(true);void load();}, [load]);
 
   const stats = useMemo(() => {
     const dealerRows = rows.filter(row => !String(row.dealerId || '').startsWith('PLAN_'));
@@ -69,6 +79,10 @@ export default function SalesScreen() {
         </Pressable>
       </View>
 
+      {!!error && <Pressable onPress={()=>void load()} style={styles.error}>
+        <Text style={styles.errorText}>{error} · Нажмите, чтобы повторить</Text>
+      </Pressable>}
+      {loading&&<ActivityIndicator style={{marginBottom:12}} color={colors.brand}/>}
       <View style={styles.metrics}>
         <MetricCard label="ФАКТ" value={stats.fact.toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + ' м²'} accent />
         <MetricCard label="ПЛАН" value={stats.plan ? stats.plan.toLocaleString('ru-RU') + ' м²' : '—'} />
@@ -103,6 +117,8 @@ export default function SalesScreen() {
 }
 
 const styles = StyleSheet.create({
+  error:{marginBottom:12,padding:12,borderRadius:11,backgroundColor:'#FFF0F0'},
+  errorText:{color:colors.brand,fontSize:11,fontWeight:'800'},
   monthBar: {
     height: 48,
     borderRadius: radius.md,

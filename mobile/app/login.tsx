@@ -18,6 +18,7 @@ export default function LoginScreen() {
   const { signIn, signingIn, ready, user } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword,setShowPassword]=useState(false);
   const [error, setError] = useState('');
 
   if (ready && user) return <Redirect href="/(tabs)" />;
@@ -70,15 +71,22 @@ export default function LoginScreen() {
           />
 
           <Text style={styles.label}>Пароль</Text>
-          <TextInput
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            placeholder="Введите пароль"
-            placeholderTextColor="#A2A5AB"
-            style={styles.input}
-            onSubmitEditing={submit}
-          />
+          <View style={styles.passwordWrap}>
+            <TextInput
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              placeholder="Введите пароль"
+              placeholderTextColor="#A2A5AB"
+              style={styles.passwordInput}
+              onSubmitEditing={submit}
+            />
+            <Pressable onPress={()=>setShowPassword(value=>!value)} accessibilityRole="button"
+              accessibilityLabel={showPassword?'Скрыть пароль':'Показать пароль'}
+              style={styles.passwordEye}>
+              <Text style={styles.eyeText}>{showPassword?'◉':'◎'}</Text>
+            </Pressable>
+          </View>
 
           {!!error && <Text style={styles.error}>{error}</Text>}
 
@@ -144,6 +152,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#FBFBFC',
     marginBottom: 14,
   },
+  passwordWrap:{flexDirection:'row',alignItems:'center',height:52,marginBottom:14,
+    borderRadius:radius.md,borderColor:'#D9DCE1',borderWidth:1,backgroundColor:'#FBFBFC'},
+  passwordInput:{flex:1,minWidth:0,paddingHorizontal:15,fontSize:16,color:colors.ink},
+  passwordEye:{width:48,height:48,alignItems:'center',justifyContent:'center'},
+  eyeText:{fontSize:22,color:colors.muted},
   error: { color: colors.danger, fontSize: 12, fontWeight: '700', marginBottom: 12 },
   button: {
     marginTop: 4,

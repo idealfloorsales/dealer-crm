@@ -13,7 +13,7 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { apiFetch, API_BASE_URL } from '@/lib/api';
+import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/context/auth';
 import { colors, radius, shadow } from '@/theme';
 import type { Dealer, MotivationScheme } from '@/types';
@@ -105,10 +105,10 @@ export default function DealerDetailsScreen() {
           <Text numberOfLines={1} style={styles.topTitle}>{dealer?.name || 'Дилер'}</Text>
         </View>
         <Pressable
-          onPress={() => Linking.openURL(API_BASE_URL + '/dealer.html?id=' + encodeURIComponent(id))}
+          onPress={() => router.push({pathname:'/module/[key]',params:{key:'dealer',id}})}
           style={styles.webButton}
         >
-          <Text style={styles.webText}>Web</Text>
+          <Text style={styles.webText}>Все разделы</Text>
         </Pressable>
       </View>
 
@@ -139,7 +139,7 @@ export default function DealerDetailsScreen() {
           {dealer?.address ? (
             <Pressable
               onPress={() =>
-                Linking.openURL('https://2gis.kz/astana/search/' + encodeURIComponent([dealer.name, dealer.address].filter(Boolean).join(' ')))
+                Linking.openURL('https://2gis.kz/search/' + encodeURIComponent([dealer.city,dealer.address,dealer.name].filter(Boolean).join(' ')))
               }
               style={styles.action}
             >
