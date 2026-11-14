@@ -1506,8 +1506,24 @@
         button.setAttribute('title','Наверх');
         button.setAttribute('aria-hidden','true');
         button.tabIndex = -1;
-        button.innerHTML = '<i class="bi bi-arrow-up" aria-hidden="true"></i>';
+        button.innerHTML = `
+            <svg class="crm-scroll-top-ring" viewBox="0 0 56 56" aria-hidden="true" focusable="false">
+                <circle class="crm-scroll-top-track" cx="28" cy="28" r="24" pathLength="100"></circle>
+                <circle class="crm-scroll-top-progress" cx="28" cy="28" r="24" pathLength="100"></circle>
+            </svg>
+            <span class="crm-scroll-top-arrow" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+                    <path d="M12 19V5M5.5 11.5 12 5l6.5 6.5"></path>
+                </svg>
+            </span>
+            <span class="crm-scroll-top-label" aria-hidden="true">Наверх</span>
+        `;
         document.body.appendChild(button);
+        const progressArc = button.querySelector('.crm-scroll-top-progress');
+        button.addEventListener('animationend', event => {
+            if (event.animationName === 'crmTopArrowLaunch') button.classList.remove('is-launching');
+        });
 
         const doc = document.scrollingElement || document.documentElement;
         let scrollTarget = null;
@@ -1538,7 +1554,15 @@
             const windowReady = remaining(null)>Math.max(24,window.innerHeight*.08) && scrollAmount(null)>Math.min(280,Math.max(180,window.innerHeight*.35));
             scrollTarget = inner || (windowReady ? null : undefined);
             const visible = Boolean(inner || windowReady);
+            const activeSurface = inner || (windowReady ? null : undefined);
+            const maxScroll = activeSurface === undefined ? 0 : remaining(activeSurface);
+            const scrollFraction = maxScroll > 0
+                ? Math.min(1, Math.max(0, scrollAmount(activeSurface) / maxScroll))
+                : 0;
+            // SVG progress completes a full revolution at the end of the actual scroll surface.
+            if (progressArc) progressArc.style.strokeDashoffset = String(100 - Math.round(scrollFraction * 100));
             button.classList.toggle('is-visible',visible);
+            if (!visible) button.classList.remove('is-launching');
             button.tabIndex=visible?0:-1;
             button.setAttribute('aria-hidden',visible?'false':'true');
         }
@@ -1550,6 +1574,7 @@
         button.addEventListener('click',()=>{
             if (!button.classList.contains('is-visible')) return;
             const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+            if (!reduced) button.classList.add('is-launching');
             const options={top:0,behavior:reduced?'auto':'smooth'};
             if (scrollTarget && scrollTarget.isConnected) scrollTarget.scrollTo(options);
             else window.scrollTo(options);
