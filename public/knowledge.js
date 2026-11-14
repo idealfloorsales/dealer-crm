@@ -111,8 +111,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function switchView(view){
-        document.querySelectorAll('[data-training-view]').forEach(button => button.classList.toggle('is-active', button.dataset.trainingView === view));
-        document.querySelectorAll('[data-training-panel]').forEach(panel => panel.classList.toggle('is-active', panel.dataset.trainingPanel === view));
+        const available = [...document.querySelectorAll('[data-training-view]')];
+        if (!available.some(button => button.dataset.trainingView === view)) return;
+        available.forEach(button => {
+            const selected = button.dataset.trainingView === view;
+            button.classList.toggle('is-active', selected);
+            button.setAttribute('aria-selected', String(selected));
+            button.tabIndex = selected ? 0 : -1;
+        });
+        document.querySelectorAll('[data-training-panel]').forEach(panel => {
+            panel.classList.toggle('is-active', panel.dataset.trainingPanel === view);
+        });
     }
 
     async function fetchArticles(searchTerm = ''){
@@ -168,7 +177,19 @@ document.addEventListener('DOMContentLoaded', () => {
     $('training-search').addEventListener('input', event => { trainingQuery = event.target.value; renderTraining(); });
     $('catalog-search').addEventListener('input', renderCatalog);
     $('catalog-collection').addEventListener('change', renderCatalog);
-    document.addEventListener('keydown', event => { if (event.key === 'Escape') closeTrainingTopic(); });
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape') { closeTrainingTopic(); return; }
+        const tab = event.target.closest?.('[data-training-view][role="tab"]');
+        if (!tab || !['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return;
+        const tabs = [...document.querySelectorAll('[data-training-view][role="tab"]')];
+        const index = tabs.indexOf(tab);
+        if (index < 0 || !tabs.length) return;
+        const target = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1
+            : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+        event.preventDefault();
+        switchView(tabs[target].dataset.trainingView);
+        tabs[target].focus();
+    });
 
     if (articleList){
         articleList.addEventListener('show.bs.collapse', async event => {
