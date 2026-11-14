@@ -956,7 +956,10 @@ const productSchema = new mongoose.Schema({
     characteristics: { class: String, thickness: String, bevel: String, size: String, package_area: String, package_qty: String, weight: String }
 });
 
+productSchema.add({is_archived:{type:Boolean,default:false,index:true},archived_at:{type:Date,default:null},archived_by:{id:String,name:String}});
 const Product = mongoose.model('Product', productSchema);
+const {activeProductFilter,archiveIndex,visibleRows,visibleSnapshot,rowReferencesArchivedProduct}=require('./server/product-archive');
+async function getArchivedProductIndex(){return archiveIndex(await Product.find({is_archived:true}).select('_id sku').lean());}
 
 async function cleanupDealerEquipmentProducts() {
     const equipmentIds = await Product.find({ product_type:'equipment' }).distinct('_id');
@@ -1911,10 +1914,10 @@ async function normalizeWorkshopPosRecipes() {
 }
 
 async function seedWorkshopRecipes() {
-    const arabica = await Product.findOne({
+    const arabica = await Product.findOne(activeProductFilter({
         name: /Арабика/i,
         sku: /702/i
-    }).lean();
+    })).lean();
     if (arabica) {
         const exists = await WorkshopRecipe.findOne({ product: arabica._id, outputType: 'sample' }).lean();
         if (!exists) {
@@ -2767,9 +2770,9 @@ app.get('/api/dealers/:id', requirePermission('can_view_dealers'), async (req, r
         let query = Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) })
             .populate('price_list', 'name code versionDate validFrom validTo active includeIlliquid').populate('motivation_scheme', 'name ratePerM2 validFrom validTo active');
         if (req.query.view === 'profile') {
-            query = query.select('-photos').populate('products', 'sku name');
+            query = query.select('-photos').populate({path:'products',match:activeProductFilter(),select:'sku name'});
         } else {
-            query = query.populate('products');
+            query = query.populate({path:'products',match:activeProductFilter()});
         }
         const d = await query.lean();
         if (!d) return res.status(404).json({ error: 'Дилер не найден' });
@@ -2917,9 +2920,9 @@ app.patch('/api/dealers/:id', requirePermission('can_edit_dealer'), async (req, 
 });
 app.delete('/api/dealers/:id', requirePermission('can_delete_dealer'), async (req, res) => { try { await Dealer.findOneAndDelete({ _id: req.params.id, ...getDealerFilter(req) }); res.json({status:'deleted'}); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.get('/api/dealers/:id/products', requireAnyPermission('can_view_dealers', 'can_view_products'), async (req, res) => {
-    const d = await Dealer.findOne({ _id:req.params.id, ...getDealerFilter(req) }).populate('products');
+    const d = await Dealer.findOne({ _id:req.params.id, ...getDealerFilter(req) }).populate({path:'products',match:activeProductFilter()});
     if (!d) return res.status(404).json({ error:'Дилер не найден' });
-    const laminateProducts = (d.products || []).filter(product => String(product?.product_type || 'laminate') !== 'equipment');
+    const laminateProducts = (d.products || []).filter(product => product && product.is_archived !== true && String(product.product_type || 'laminate') !== 'equipment');
     res.json(laminateProducts.map(convertToClient));
 });
 app.put('/api/dealers/:id/products', requirePermission('can_edit_matrix'), async (req, res) => {
@@ -2930,15 +2933,21 @@ app.put('/api/dealers/:id/products', requirePermission('can_edit_matrix'), async
                 .filter(value => mongoose.Types.ObjectId.isValid(value))
         )];
         const laminateProducts = requestedIds.length
-            ? await Product.find({
+            ? await Product.find(activeProductFilter({
                 _id:{ $in:requestedIds },
                 product_type:{ $ne:'equipment' }
-            }).select('_id').lean()
+            })).select('_id').lean()
             : [];
         const productIds = laminateProducts.map(item => item._id);
+        const dealerFilter={_id:req.params.id,...getDealerFilter(req)};
+        const previous=await Dealer.findOne(dealerFilter).select('products').lean();
+        if(!previous)return res.status(404).json({error:'Дилер не найден'});
+        // Keep hidden assignments, so restoring a product also restores its former exhibition placement.
+        const archivedAssigned=await Product.find({is_archived:true,_id:{$in:previous.products||[]}}).distinct('_id');
+        const finalIds=[...new Set([...productIds,...archivedAssigned].map(String))];
         const d = await Dealer.findOneAndUpdate(
-            { _id:req.params.id, ...getDealerFilter(req) },
-            { $set:{ products:productIds } },
+            dealerFilter,
+            { $set:{ products:finalIds } },
             { new:true }
         ).lean();
         if (!d) return res.status(404).json({ error:'Дилер не найден' });
@@ -3031,7 +3040,7 @@ async function resolveSummaryPriceList(summary) {
 
 app.get('/api/pricing/catalog', requirePermission('can_view_pricing'), async (req, res) => {
     try {
-        const products = await Product.find({})
+        const products = await Product.find(activeProductFilter())
             .select('_id sku name product_type collection is_liquid stock_qty characteristics photo_id')
             .sort({ sku: 1, name: 1 })
             .lean();
@@ -3068,7 +3077,10 @@ app.get('/api/pricing/price-lists', requireAnyPermission('can_view_pricing', 'ca
             .select('_id name code versionDate validFrom validTo active includeIlliquid archivedAt note rows createdAt updatedAt')
             .sort({ active: -1, versionDate: -1, updatedAt: -1 })
             .lean();
-        res.json(lists.map(item => ({
+        const archived=await getArchivedProductIndex();
+        res.json(lists.map(item => {
+            const rows=visibleRows(item.rows || [],archived);
+            return ({
             id: String(item._id),
             name: item.name || '',
             code: item.code || '',
@@ -3079,11 +3091,12 @@ app.get('/api/pricing/price-lists', requireAnyPermission('can_view_pricing', 'ca
             includeIlliquid: item.includeIlliquid === true,
             archivedAt: item.archivedAt || null,
             note: item.note || '',
-            rowsCount: Array.isArray(item.rows) ? item.rows.length : 0,
-            pricedCount: Array.isArray(item.rows) ? item.rows.filter(row => Number(row.opt) > 0 || Number(row.rrp) > 0 || Number(row.displayPrice) > 0 || Number(row.maxRrp) > 0).length : 0,
+            rowsCount:rows.length,
+            pricedCount:rows.filter(row => Number(row.opt)>0 || Number(row.rrp)>0 || Number(row.displayPrice)>0 || Number(row.maxRrp)>0).length,
             createdAt: item.createdAt,
             updatedAt: item.updatedAt
-        })));
+        });
+        }));
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
@@ -3093,6 +3106,7 @@ app.get('/api/pricing/price-lists/:id', requirePermission('can_view_pricing'), a
     try {
         const list = await PriceList.findById(req.params.id).lean();
         if (!list) return res.status(404).json({ error: 'Прайс не найден' });
+        const archivedIndex=await getArchivedProductIndex();
         res.json({
             id: String(list._id),
             name: list.name || '',
@@ -3103,7 +3117,7 @@ app.get('/api/pricing/price-lists/:id', requirePermission('can_view_pricing'), a
             active: list.active !== false,
             includeIlliquid: list.includeIlliquid === true,
             note: list.note || '',
-            rows: (list.rows || []).map(row => ({
+            rows: visibleRows(list.rows || [],archivedIndex).map(row => ({
                 scopeType: row.scopeType || (row.product ? 'product' : 'collection'),
                 collection: row.collection || '',
                 productId: String(row.product || ''),
@@ -3141,7 +3155,7 @@ app.post('/api/pricing/price-lists', requirePermission('can_manage_pricing'), as
             active: req.body?.active !== false,
             includeIlliquid: req.body?.includeIlliquid === true,
             note: String(req.body?.note || '').trim(),
-            rows: cleanPriceListRows(req.body?.rows),
+            rows: visibleRows(cleanPriceListRows(req.body?.rows),await getArchivedProductIndex()),
             createdBy: user,
             updatedBy: user
         });
@@ -3172,7 +3186,9 @@ app.put('/api/pricing/price-lists/:id', requirePermission('can_manage_pricing'),
         list.includeIlliquid = req.body?.includeIlliquid === true;
         list.archivedAt = list.active ? null : (list.archivedAt || new Date());
         list.note = String(req.body?.note || '').trim();
-        list.rows = cleanPriceListRows(req.body?.rows);
+        const hidden=await getArchivedProductIndex();
+        const preserved=(list.rows || []).filter(row=>rowReferencesArchivedProduct(row,hidden));
+        list.rows=[...visibleRows(cleanPriceListRows(req.body?.rows),hidden),...preserved];
         list.updatedBy = pricingUserMeta(req);
         await list.save();
         res.json({ status: 'ok' });
@@ -3246,7 +3262,7 @@ async function buildManualOfferPriceSheetSnapshot(priceListId, manualClient = {}
     const list = await PriceList.findOne({ _id:id, active:{ $ne:false } }).lean();
     if (!list) { const err = new Error('Выбранный прайс не найден'); err.statusCode = 404; throw err; }
 
-    const products = await Product.find({})
+    const products = await Product.find(activeProductFilter())
         .select('_id sku name product_type collection is_liquid')
         .sort({ sku:1, name:1 })
         .lean();
@@ -3420,7 +3436,7 @@ async function buildDealerPriceSheetSnapshot(req, dealerId, options = {}) {
             (sum, condition) => sum + Math.max(0, Number(condition.discountPercent) || 0), 0
         )));
 
-        const products = await Product.find({})
+        const products = await Product.find(activeProductFilter())
             .select('_id sku name product_type collection is_liquid')
             .sort({ sku: 1, name: 1 })
             .lean();
@@ -3767,8 +3783,9 @@ app.get('/api/pricing/offers', requirePermission('can_view_pricing'), async (req
             .limit(250)
             .lean();
         const now = new Date();
+        const archived=await getArchivedProductIndex();
         res.json(offers.map(item => {
-            const snapshot = item.snapshot || {};
+            const snapshot = visibleSnapshot(item.snapshot || {},archived);
             const expired = item.expiresAt && new Date(item.expiresAt) <= now;
             return {
                 id:String(item._id),
@@ -3838,9 +3855,9 @@ app.post('/api/pricing/offers', requirePermission('can_view_pricing'), async (re
             .filter(value => mongoose.Types.ObjectId.isValid(value)))];
         if (!selectedIds.length) return res.status(400).json({ error:'Выберите хотя бы один декор' });
 
-        const productCandidates = await Product.find({
+        const productCandidates = await Product.find(activeProductFilter({
             _id:{ $in:selectedIds }
-        }).select('_id sku name product_type collection characteristics is_liquid stock_qty photo_id').lean();
+        })).select('_id sku name product_type collection characteristics is_liquid stock_qty photo_id').lean();
         const products = productCandidates.filter(product =>
             isPricingLaminateProduct(product) || product.product_type === 'equipment'
         );
@@ -3991,7 +4008,7 @@ app.get('/api/public/offers/:token', async (req, res) => {
             createdBy:offer.createdBy || {},
             createdAt:offer.createdAt,
             expiresAt:offer.expiresAt,
-            snapshot:offer.snapshot || {}
+            snapshot:visibleSnapshot(offer.snapshot || {},await getArchivedProductIndex())
         });
     } catch (e) {
         res.status(500).json({ error:e.message });
@@ -4012,9 +4029,9 @@ app.get('/api/public/price-share/:token.xlsx', async (req, res) => {
         const dealer = snapshot.dealer || {};
         const priceList = snapshot.priceList || {};
         const includeIlliquid = priceList.includeIlliquid === true;
-        const rows = Array.isArray(snapshot.rows)
+        const rows = visibleRows(Array.isArray(snapshot.rows)
             ? snapshot.rows.filter(row => row.isLiquid !== false || includeIlliquid)
-            : [];
+            : [],await getArchivedProductIndex());
         const discount = Math.max(0, Number(snapshot.totalDiscountPercent) || 0);
 
         const workbook = new ExcelJS.Workbook();
@@ -4190,7 +4207,7 @@ app.get('/api/public/price-share/:token', async (req, res) => {
             dealer:{ dealer_id:share.dealerId || '', name:share.dealerName || '', city:share.dealerCity || '' },
             expiresAt:share.expiresAt,
             createdAt:share.createdAt,
-            snapshot:share.snapshot || {}
+            snapshot:visibleSnapshot(share.snapshot || {},await getArchivedProductIndex())
         });
     } catch (e) {
         res.status(500).json({ error:e.message });
@@ -4231,6 +4248,7 @@ app.put('/api/pricing/dealers/:id/display-prices', requirePermission('can_manage
 
             const productId = String(row?.productId || '').trim();
             if (!mongoose.Types.ObjectId.isValid(productId)) continue;
+            if (!await Product.exists(activeProductFilter({_id:productId}))) continue;
             if (price <= 0) {
                 await DealerDisplayPrice.deleteOne({ dealer: dealer._id, product: productId });
             } else {
@@ -5005,15 +5023,35 @@ app.patch('/api/motivation/payouts/:id', requireAnyPermission('can_edit_sales_fa
     } catch (e) { res.status(400).json({error:e.message}); }
 });
 
+// Active product keys for the learning catalog. Archived products never leave the Matrix archive.
+app.get('/api/training/active-catalog',requirePermission('can_view_knowledge'),async(req,res)=>{
+ try{
+  const items=await Product.find(activeProductFilter({product_type:{$ne:'equipment'}})).select('sku').lean();
+  res.set('Cache-Control','no-store');
+  res.json({skus:items.map(item=>String(item.sku||'').trim()).filter(Boolean)});
+ }catch(e){res.status(500).json({error:'Не удалось проверить актуальность номенклатуры'});}
+});
 app.get('/api/products/count', requireAnyPermission('can_view_products', 'can_view_report', 'can_view_reclamations', 'can_view_dealers'), async (req, res) => {
     try {
-        const count = await Product.countDocuments({});
+        const count = await Product.countDocuments(activeProductFilter());
         res.json({ count });
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
 });
-app.get('/api/products', requireAnyPermission('can_view_products', 'can_view_report', 'can_view_reclamations', 'can_view_dealers'), async (req, res) => { const s = new RegExp(req.query.search||'', 'i'); const p = await Product.find({$or:[{sku:s},{name:s},{collection:s}]}).sort({sku:1}).lean(); res.json(p.map(x=>{x.id=x._id;return x;})); });
+
+app.get('/api/products/archive',requirePermission('can_view_products'),async(req,res)=>{
+ try{const items=await Product.find({is_archived:true}).sort({archived_at:-1,sku:1}).lean();
+  res.set('Cache-Control','no-store');res.json(items.map(item=>({...item,id:String(item._id)})));}
+ catch(e){res.status(500).json({error:'Не удалось загрузить архив позиций'});}
+});
+app.get('/api/products',requireAnyPermission('can_view_products','can_view_report','can_view_reclamations','can_view_dealers'),async(req,res)=>{
+ try{const raw=String(req.query?.search||'').trim().slice(0,150);
+  const search=new RegExp(raw.replace(/[.*+?^$|{}()[\]\\]/g,'\\$&'),'i');
+  const items=await Product.find(activeProductFilter({$or:[{sku:search},{name:search},{collection:search}]})).sort({sku:1}).lean();
+  res.set('Cache-Control','no-store');res.json(items.map(item=>({...item,id:String(item._id)})));}
+ catch(e){res.status(500).json({error:'Не удалось загрузить матрицу'});}
+});
 
 app.get('/api/products/gmail-stock-status', requirePermission('can_manage_products'), async (req,res) => {
     try { res.json(await gmailStockSync.status()); }
@@ -5063,14 +5101,51 @@ app.post('/api/products/stock-import-meta', requirePermission('can_manage_produc
         res.status(400).json({ error:e.message });
     }
 });
-app.post('/api/products', requirePermission('can_manage_products'), async (req, res) => { const p = new Product(req.body); await p.save(); res.json(convertToClient(p)); });
-app.put('/api/products/:id', requirePermission('can_manage_products'), async (req, res) => { const p = await Product.findByIdAndUpdate(req.params.id, req.body); res.json(convertToClient(p)); });
-app.delete('/api/products/:id', requirePermission('can_manage_products'), async (req, res) => { await Product.findByIdAndDelete(req.params.id); res.json({}); });
+// Archive/restore are reversible and do not delete linked data.
+async function setProductArchived(req,res,archived){
+ try{
+  const id=String(req.params.id||'');
+  if(!mongoose.isValidObjectId(id))return res.status(400).json({error:'Некорректный ID позиции'});
+  const actor={id:String(req.user?.id||''),name:String(req.user?.fullName||req.user?.username||'Сотрудник')};
+  const item=await Product.findOneAndUpdate(
+   {_id:id,...(archived?activeProductFilter():{is_archived:true})},
+   {$set:{is_archived:archived,archived_at:archived?new Date():null,archived_by:archived?actor:{id:'',name:''}}},
+   {new:true,runValidators:true}
+  ).lean();
+  if(!item){const exists=await Product.exists({_id:id});
+   return res.status(exists?409:404).json({error:exists?(archived?'Позиция уже в архиве':'Позиция уже восстановлена'):'Позиция не найдена'});}
+  await AuditLog.create({actor:{...actor,role:req.user?.role||''},module:'products',
+   action:archived?'product_archive':'product_restore',method:'PATCH',path:req.originalUrl,
+   entityType:'product',entityId:id,entityLabel:[item.sku,item.name].filter(Boolean).join(' · '),
+   summary:archived?'Переместил позицию в архив матрицы':'Восстановил позицию из архива матрицы',
+   success:true,after:{is_archived:archived}
+  }).catch(e=>console.warn('Product archive audit:',e.message));
+  res.set('Cache-Control','no-store');res.json({status:'ok',id,archived,product:{id,sku:item.sku,name:item.name}});
+ }catch(e){res.status(400).json({error:e.message||'Не удалось изменить архив'});}
+}
+app.patch('/api/products/:id/archive',requirePermission('can_manage_products'),(req,res)=>setProductArchived(req,res,true));
+app.patch('/api/products/:id/restore',requirePermission('can_manage_products'),(req,res)=>setProductArchived(req,res,false));
+app.post('/api/products',requirePermission('can_manage_products'),async(req,res)=>{
+ try{const {is_archived,archived_at,archived_by,...data}=req.body||{};
+  const item=await Product.create({...data,is_archived:false});res.status(201).json(convertToClient(item));}
+ catch(e){res.status(400).json({error:e.message});}
+});
+app.put('/api/products/:id',requirePermission('can_manage_products'),async(req,res)=>{
+ try{const {is_archived,archived_at,archived_by,...data}=req.body||{};
+  const item=await Product.findOneAndUpdate({_id:req.params.id,...activeProductFilter()},{$set:data},{new:true,runValidators:true}).lean();
+  if(!item)return res.status(404).json({error:'Позиция не найдена в рабочей матрице'});
+  res.json(convertToClient(item));}
+ catch(e){res.status(400).json({error:e.message});}
+});
+// No physical deletion; old DELETE clients are guided to the Matrix archive.
+app.delete('/api/products/:id',requirePermission('can_manage_products'),(req,res)=>{
+ res.status(409).json({error:'Удаление отключено. Используйте «В архив» в Матрице.'});
+});
 app.post('/api/admin/import-catalog', requirePermission('can_manage_products'), async (req, res) => { res.json({status: 'ok'}); });
 app.get('/api/matrix', requireAnyPermission('can_view_products', 'can_view_report'), async (req, res) => {
     try {
         const [prods, dealers] = await Promise.all([
-            Product.find({}).select('sku name product_type collection is_liquid photo_id').sort({sku:1}).lean(),
+            Product.find(activeProductFilter()).select('sku name product_type collection is_liquid photo_id').sort({sku:1}).lean(),
             Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id name city responsible products pos_materials status').lean()
         ]);
         const dealerIds = dealers.map(d => d._id);
@@ -5469,31 +5544,35 @@ app.post('/api/workshop/print-log', requirePermission('can_view_workshop'), asyn
 
 app.get('/api/workshop/bootstrap', requirePermission('can_view_workshop'), async (req, res) => {
     try {
+        const archivedProductIds=await Product.find({is_archived:true}).distinct('_id');
+        const archivedRecipeIds=archivedProductIds.length
+            ? await WorkshopRecipe.find({product:{$in:archivedProductIds}}).distinct('_id')
+            : [];
         const [products, dealers, materials, recipes, laminateStocks, assets, productions, movements, memos] = await Promise.all([
-            Product.find().select('sku name collection is_liquid characteristics.package_qty characteristics.size characteristics.class characteristics.thickness').sort({ sku: 1 }).lean(),
+            Product.find(activeProductFilter()).select('sku name collection is_liquid characteristics.package_qty characteristics.size characteristics.class characteristics.thickness').sort({ sku: 1 }).lean(),
             Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id dealer_id name city status').sort({ name: 1 }).lean(),
             WorkshopMaterial.find({ active: { $ne: false } }).sort({ category: 1, name: 1 }).lean(),
-            WorkshopRecipe.find({ active: { $ne: false } })
+            WorkshopRecipe.find({ active: { $ne: false }, product:{$nin:archivedProductIds} })
                 .populate('product', 'sku name is_liquid characteristics.package_qty')
                 .populate('materials.material', 'code name unit purchaseUnit purchaseUnitSize stockQty')
                 .populate('components.recipe', 'name outputType stockQty')
                 .sort({ outputType: 1, name: 1 }).lean(),
-            WorkshopLaminateStock.find().populate('product', 'sku name is_liquid characteristics.package_qty').lean(),
-            WorkshopDealerAsset.find({ qty: { $gt: 0 } })
+            WorkshopLaminateStock.find({product:{$nin:archivedProductIds}}).populate('product', 'sku name is_liquid characteristics.package_qty').lean(),
+            WorkshopDealerAsset.find({qty:{$gt:0},recipe:{$nin:archivedRecipeIds}})
                 .populate('dealer', 'dealer_id name city status')
                 .populate({ path: 'recipe', populate: { path: 'product', select: 'sku name is_liquid' } })
                 .sort({ updatedAt: -1 }).lean(),
-            WorkshopProduction.find({ cancelledAt: { $exists: false } })
+            WorkshopProduction.find({cancelledAt:{$exists:false},product:{$nin:archivedProductIds},recipe:{$nin:archivedRecipeIds}})
                 .populate('recipe', 'name outputType')
                 .populate('product', 'sku name')
                 .sort({ date: -1, createdAt: -1 }).limit(30).lean(),
-            WorkshopMovement.find()
+            WorkshopMovement.find({product:{$nin:archivedProductIds},recipe:{$nin:archivedRecipeIds}})
                 .populate('product', 'sku name')
                 .populate('material', 'code name unit')
                 .populate('recipe', 'name outputType')
                 .populate('dealer', 'dealer_id name city')
                 .sort({ date: -1, createdAt: -1 }).limit(60).lean(),
-            WorkshopMemo.find()
+            WorkshopMemo.find({'lines.product':{$nin:archivedProductIds},'lines.actualProduct':{$nin:archivedProductIds}})
                 .populate('lines.product', 'sku name is_liquid characteristics.package_qty')
                 .populate('lines.actualProduct', 'sku name is_liquid characteristics.package_qty')
                 .populate('lines.recipe', 'name outputType planksPerUnit')
@@ -5514,7 +5593,7 @@ app.get('/api/workshop/bootstrap', requirePermission('can_view_workshop'), async
 
         const today = new Date();
         today.setHours(0,0,0,0);
-        const todayRows = await WorkshopProduction.find({ date: { $gte: today }, cancelledAt: { $exists: false } }).select('outputQty').lean();
+        const todayRows = await WorkshopProduction.find({date:{$gte:today},cancelledAt:{$exists:false},product:{$nin:archivedProductIds},recipe:{$nin:archivedRecipeIds}}).select('outputQty').lean();
         const todayProduction = todayRows.reduce((sum, item) => sum + (Number(item.outputQty) || 0), 0);
         const finishedStock = recipes.reduce((sum, item) => sum + (Number(item.stockQty) || 0), 0);
         const lowMaterials = materials.filter(item => Number(item.minQty) > 0 && Number(item.stockQty) <= Number(item.minQty)).length;
@@ -5545,8 +5624,11 @@ app.get('/api/workshop/bootstrap', requirePermission('can_view_workshop'), async
 
 app.get('/api/workshop/movements', requirePermission('can_view_workshop'), async (req, res) => {
     try {
+        const archivedProductIds=await Product.find({is_archived:true}).distinct('_id');
+        const archivedRecipeIds=archivedProductIds.length
+            ? await WorkshopRecipe.find({product:{$in:archivedProductIds}}).distinct('_id') : [];
         const limit = Math.max(1, Math.min(500, Number(req.query.limit) || 150));
-        const filter = {};
+        const filter = {product:{$nin:archivedProductIds},recipe:{$nin:archivedRecipeIds}};
         if (req.query.type) filter.type = req.query.type;
         const list = await WorkshopMovement.find(filter)
             .populate('product', 'sku name')
@@ -5651,6 +5733,8 @@ app.post('/api/workshop/material-movement', requirePermission('can_manage_worksh
 
 app.post('/api/workshop/recipes', requirePermission('can_manage_workshop'), async (req, res) => {
     try {
+        if(req.body?.productId && !await Product.exists(activeProductFilter({_id:req.body.productId})))
+            return res.status(400).json({error:'Позиция находится в архиве или не найдена. Восстановите её в Матрице.'});
         const recipe = new WorkshopRecipe({
             name: String(req.body.name || '').trim(),
             outputType: req.body.outputType || 'sample',
@@ -5684,6 +5768,8 @@ app.post('/api/workshop/recipes', requirePermission('can_manage_workshop'), asyn
 
 app.put('/api/workshop/recipes/:id', requirePermission('can_manage_workshop'), async (req, res) => {
     try {
+        if(req.body?.productId && !await Product.exists(activeProductFilter({_id:req.body.productId})))
+            return res.status(400).json({error:'Позиция находится в архиве или не найдена. Восстановите её в Матрице.'});
         const payload = {
             name: String(req.body.name || '').trim(),
             outputType: req.body.outputType || 'sample',
@@ -5758,7 +5844,7 @@ app.post('/api/workshop/memos', requirePermission('can_manage_workshop'), async 
             const requestedPacks = Math.max(0, Math.floor(workshopNumber(input.requestedPacks)));
             if (!input.productId || requestedPacks <= 0) continue;
 
-            const product = await Product.findById(input.productId).lean();
+            const product = await Product.findOne(activeProductFilter({_id:input.productId})).lean();
             if (!product) continue;
             const productKey = String(product._id);
             if (seenProducts.has(productKey)) {
@@ -5858,7 +5944,7 @@ app.put('/api/workshop/memos/:id', requirePermission('can_manage_workshop'), asy
             const requestedPacks = Math.max(0, Math.floor(workshopNumber(input.requestedPacks)));
             if (!input.productId || requestedPacks <= 0) continue;
 
-            const product = await Product.findById(input.productId).lean();
+            const product = await Product.findOne(activeProductFilter({_id:input.productId})).lean();
             if (!product) continue;
             const productKey = String(product._id);
             if (seenProducts.has(productKey)) {
@@ -6004,7 +6090,7 @@ app.post('/api/workshop/memos/:id/receive', requirePermission('can_manage_worksh
 
         if (!memo.postedAt) {
             for (const line of memo.lines) {
-                const product = await Product.findById(line.product).lean();
+                const product = await Product.findOne(activeProductFilter({_id:line.product})).lean();
                 if (!product) throw new Error('Одна из позиций служебки больше не найдена в каталоге');
                 const packQty = Number(line.packQty) > 0 ? Number(line.packQty) : workshopPackQty(product);
                 const planksQty = Number(line.requestedPacks || 0) * packQty;
@@ -6419,7 +6505,9 @@ app.post('/api/workshop/dealer-movement', requirePermission('can_manage_workshop
 
 app.get('/api/workshop/dealers/:dealerId/assets', requireAnyPermission('can_view_workshop', 'can_view_dealers'), async (req, res) => {
     try {
-        const assets = await WorkshopDealerAsset.find({ dealer: req.params.dealerId, qty: { $gt: 0 } })
+        const archivedProductIds=await Product.find({is_archived:true}).distinct('_id');
+        const hiddenRecipes=archivedProductIds.length?await WorkshopRecipe.find({product:{$in:archivedProductIds}}).distinct('_id'):[];
+        const assets = await WorkshopDealerAsset.find({ dealer: req.params.dealerId,qty:{$gt:0},recipe:{$nin:hiddenRecipes} })
             .populate({ path: 'recipe', populate: { path: 'product', select: 'sku name is_liquid' } })
             .sort({ updatedAt: -1 }).lean();
         res.json(assets.map(convertToClient));
@@ -6452,7 +6540,7 @@ app.post('/api/workshop/opening-balance', requirePermission('can_manage_workshop
             if (line.recipeId) {
                 recipe = await WorkshopRecipe.findOne({ _id: line.recipeId, active: { $ne: false } });
             } else if (line.productId) {
-                const product = await Product.findById(line.productId).lean();
+                const product = await Product.findOne(activeProductFilter({_id:line.productId})).lean();
                 if (!product) continue;
 
                 const posDef = workshopPosDefinition({ product });
@@ -6569,6 +6657,8 @@ app.post('/api/workshop/correction', requirePermission('can_manage_workshop'), a
             if (entityType === 'finished') {
                 const item = await WorkshopRecipe.findById(id).lean();
                 if (!item) return res.status(404).json({ error: 'Готовое изделие не найдено' });
+                if(item.product && !await Product.exists(activeProductFilter({_id:item.product})))
+                    return res.status(400).json({error:'Изделие связано с архивной позицией. Восстановите позицию в Матрице.'});
                 prepared.push({
                     entityType, id, actualQty,
                     previousQty: Math.max(0, Number(item.stockQty) || 0),
@@ -6587,7 +6677,7 @@ app.post('/api/workshop/correction', requirePermission('can_manage_workshop'), a
                     material: id
                 });
             } else {
-                const product = await Product.findById(id).select('sku name').lean();
+                const product = await Product.findOne(activeProductFilter({_id:id})).select('sku name').lean();
                 if (!product) return res.status(404).json({ error: 'Ламинат не найден' });
                 const stock = await WorkshopLaminateStock.findOne({ product: id }).lean();
                 prepared.push({
