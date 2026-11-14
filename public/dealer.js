@@ -1507,12 +1507,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     if(navigateBtn) navigateBtn.addEventListener('click', () => {
-        if (!currentDealer || !dealerLat || !dealerLng) {
-            window.showToast?.('Координаты не заданы', 'warning');
-            return;
-        }
-        const query = encodeURIComponent([currentDealer.name, currentDealer.address].filter(Boolean).join(' '));
-        window.open(`https://2gis.kz/search/${query}?m=${dealerLng},${dealerLat}/17`, '_blank', 'noopener');
+        if(!currentDealer)return;
+        const query=encodeURIComponent([currentDealer.city,currentDealer.address,currentDealer.name].filter(Boolean).join(' '));
+        const valid=dealerLat!=null&&dealerLng!=null&&Number(dealerLat)&&Number(dealerLng);
+        const center=valid?'?m='+Number(dealerLng)+','+Number(dealerLat)+'/17':'';
+        window.open('https://2gis.kz/search/'+query+center,'_blank','noopener');
     });
     if(deleteBtn) deleteBtn.addEventListener('click', async () => {
         if (!window.CRMAuth || !CRMAuth.can('can_delete_dealer')) return;

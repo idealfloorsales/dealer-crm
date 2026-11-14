@@ -1383,7 +1383,7 @@ const motivationSchemeSchema = new mongoose.Schema({
 motivationSchemeSchema.index({ active:1, validFrom:1, validTo:1, name:1 });
 const MotivationScheme = mongoose.model('MotivationScheme', motivationSchemeSchema);
 
-const dealerSchema = new mongoose.Schema({ dealer_id: String, name: String, price_type: String, price_list: { type: mongoose.Schema.Types.ObjectId, ref: 'PriceList', default: null }, motivation_scheme: { type: mongoose.Schema.Types.ObjectId, ref: 'MotivationScheme', default: null }, city: String, address: String, contacts: [contactSchema], bonuses: String, photos: [photoSchema], legal_entities: [dealerLegalEntitySchema], contract: { isSigned: Boolean, date: String }, region_sector: String, hasPersonalPlan: { type: Boolean, default: false }, delivery: String, website: String, instagram: String, additional_addresses: [additionalAddressSchema], pos_materials: [posMaterialSchema], visits: [visitSchema], products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }], latitude: Number, longitude: Number, status: { type: String, default: 'standard' }, avatarUrl: String, competitors: [competitorSchema], responsible: String, responsibleUserId: String, responsibleAssignmentSource: String }, { timestamps: true });
+const dealerSchema = new mongoose.Schema({ dealer_id: String, name: String, price_type: String, price_list: { type: mongoose.Schema.Types.ObjectId, ref: 'PriceList', default: null }, motivation_scheme: { type: mongoose.Schema.Types.ObjectId, ref: 'MotivationScheme', default: null }, city: String, address: String, contacts: [contactSchema], bonuses: String, photos: [photoSchema], legal_entities: [dealerLegalEntitySchema], contract: { isSigned: Boolean, date: String }, region_sector: String, hasPersonalPlan: { type: Boolean, default: false }, delivery: String, website: String, instagram: String, additional_addresses: [additionalAddressSchema], pos_materials: [posMaterialSchema], visits: [visitSchema], products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }], latitude: Number, longitude: Number, geoUpdatedAt: Date, geoSource: String, status: { type: String, default: 'standard' }, avatarUrl: String, competitors: [competitorSchema], responsible: String, responsibleUserId: String, responsibleAssignmentSource: String }, { timestamps: true });
 const Dealer = mongoose.model('Dealer', dealerSchema);
 
 const priceListRowSchema = new mongoose.Schema({
@@ -2734,7 +2734,7 @@ app.get('/api/dealers', requireAnyPermission('can_view_dealers', 'can_view_map',
 
         let query = Dealer.find(filter);
         if (req.query.view === 'map') {
-            query = query.select('_id name city address contacts latitude longitude status responsible responsibleUserId');
+            query = query.select('_id dealer_id name city address contacts latitude longitude geoUpdatedAt geoSource status responsible responsibleUserId region_sector');
         } else {
             query = query.select('-photos -visits -products -avatarUrl')
                 .populate('price_list', 'name code versionDate validFrom validTo active includeIlliquid').populate('motivation_scheme', 'name ratePerM2 validFrom validTo active');
@@ -2752,6 +2752,8 @@ app.get('/api/dealers', requireAnyPermission('can_view_dealers', 'can_view_map',
         res.status(500).json({ error: e.message });
     }
 });
+require('./server/map-geocoding').install({app,Dealer,requireAnyPermission,requirePermission,getDealerFilter,mongoose});
+
 app.get('/api/dealers/next-id', requirePermission('can_create_dealer'), async (req, res) => {
     try { res.json({ dealer_id: await nextDealerCode() }); }
     catch (e) { res.status(500).json({ error:e.message }); }

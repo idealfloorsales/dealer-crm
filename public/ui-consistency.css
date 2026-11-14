@@ -563,3 +563,19 @@ body:has(.modal.show,.offcanvas.show) #crm-scroll-to-top {opacity:0;visibility:h
  .dealer-profile-page .dealer-sales-table :is(th,td){border:1px solid #ddd;padding:8px!important;color:#171717!important}
  .dealer-profile-page .dealer-sales-table tfoot :is(th,td){background:#e9e9e9!important;color:#171717!important}
 }
+
+
+/* Dealer edit forms use address candidates instead of visible latitude/longitude. */
+.dealer-form-modal .dealer-location-results[hidden]{display:none!important}
+.dealer-form-modal .dealer-location-results{display:flex;flex-direction:column;gap:5px;margin:10px 0;padding:8px;border:1px solid #e5e0dc;border-radius:12px;background:#faf9f7;max-height:215px;overflow:auto}
+.dealer-form-modal .dealer-location-hint{padding:7px 6px;color:#83858c;font-size:.7rem;line-height:1.42}
+.dealer-form-modal .dealer-location-results button{display:flex;align-items:flex-start;gap:9px;width:100%;padding:10px;border:1px solid #ebe5e2;border-radius:9px;background:#fff;color:#4c4f55;font:.72rem/1.5 'Onest',sans-serif;text-align:left}
+.dealer-form-modal .dealer-location-results button i{color:#b9040a;flex:0 0 auto}
+.dealer-form-modal .dealer-location-results button:hover{background:#fff1f1;border-color:#eed1d2}
+.dealer-form-modal .dealer-location-status{display:flex;align-items:center;gap:7px;margin-top:9px;padding:10px 11px;border-radius:10px;background:#f3f1ef;color:#777981;font-size:.69rem;line-height:1.4}
+.dealer-form-modal .dealer-location-status.is-verified{background:#eef8f1;color:#286b48}
+.dealer-form-modal .dealer-location-status .bi{flex:0 0 auto;font-size:.83rem}
+:root[data-crm-theme="dark"] .dealer-form-modal .dealer-location-results{background:#292b30;border-color:#44464d}
+:root[data-crm-theme="dark"] .dealer-form-modal .dealer-location-results button{background:#31343a;border-color:#454750;color:#e6e8ed}
+:root[data-crm-theme="dark"] .dealer-form-modal .dealer-location-status{background:#303137;color:#b9bdc4}
+:root[data-crm-theme="dark"] .dealer-form-modal .dealer-location-status.is-verified{background:#243a30;color:#b5e0c7}

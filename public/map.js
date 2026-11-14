@@ -9,6 +9,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchInput = document.getElementById('map-search');
     const searchClear = document.getElementById('map-search-clear');
     const suggestionsBox = document.getElementById('map-search-suggestions');
+    const unmappedToggle = document.getElementById('map-unmapped-toggle');
+    const unmappedCount = document.getElementById('map-unmapped-count');
+    const core = window.CRMMapSearch;
+    const hasPoint = d => core?.hasCoordinates(d) ?? Boolean(Number(d?.latitude) && Number(d?.longitude));
+    const canEditLocations = () => Boolean(window.CRMAuth?.can('can_edit_dealer'));
     const btnResetFilters = document.getElementById('map-reset-filters');
     const btnFitVisible = document.getElementById('map-fit-visible');
     const btnFitMap = document.getElementById('btn-fit-map');
@@ -64,7 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
         "'": '&#039;'
     })[char]);
 
-    const normalize = (value) => String(value || '').toLowerCase().replace(/ё/g, 'е').trim();
+    const normalize = value => core?.normalize(value) ?? String(value || '').toLowerCase().replace(/ё/g,'е').trim();
 
     if (typeof window.L === 'undefined') {
         const mapHost = document.getElementById('main-map');
@@ -105,8 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let heatLayer = null;
     let isHeatmapMode = false;
     let activeDealerId = null;
-    let addressLookupMarker = null;
-    let addressLookupTimer = null;
+    let unmappedOnly = false;
     const markerByDealerId = new Map();
 
     const markersCluster = typeof L.markerClusterGroup === 'function'
@@ -214,9 +218,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const encodedQuery = encodeURIComponent(query);
         const lat = Number(dealer.latitude);
         const lng = Number(dealer.longitude);
-        const mapParam = Number.isFinite(lat) && Number.isFinite(lng)
-            ? `?m=${lng},${lat}/17`
-            : '';
+        const mapParam = hasPoint(dealer) ? `?m=${lng},${lat}/17` : '';
         return slug
             ? `https://2gis.kz/${slug}/search/${encodedQuery}${mapParam}`
             : `https://2gis.kz/search/${encodedQuery}`;
@@ -280,55 +282,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateSummary() {
         const working = allDealers.filter(dealer => !isNonWorkingDealer(dealer));
-        const withCoordinates = working.filter(dealer => Number(dealer.latitude) && Number(dealer.longitude));
+        const withCoordinates = working.filter(hasPoint);
         const missingCoordinates = working.length - withCoordinates.length;
         if (summaryTotal) summaryTotal.textContent = String(working.length);
         if (summaryMissing) summaryMissing.textContent = String(missingCoordinates);
     }
 
+
     function dealerMatchesSearch(dealer, query) {
         if (!query) return true;
-        const contacts = (dealer.contacts || []).flatMap(contact => [
-            contact?.name,
-            contact?.position,
-            contact?.contactInfo
-        ]);
-        const haystack = normalize([
-            dealer.name,
-            dealer.city,
-            dealer.address,
-            dealer.responsible,
-            ...contacts
-        ].filter(Boolean).join(' '));
-        return haystack.includes(query);
+        if (core?.scoreDealer) return core.scoreDealer(dealer,query)>0;
+        return normalize([dealer.name,dealer.dealer_id,dealer.city,dealer.address].filter(Boolean).join(' ')).includes(normalize(query));
     }
-
     function getFilteredDealers() {
-        const city = filterCity?.value || '';
-        const status = filterStatus?.value || '';
-        const query = normalize(searchInput?.value || '');
-
-        const result = allDealers.filter(dealer => {
-            const lat = Number(dealer.latitude);
-            const lng = Number(dealer.longitude);
-            if (!Number.isFinite(lat) || !Number.isFinite(lng) || !lat || !lng) return false;
+        const city=filterCity?.value||'';
+        const status=filterStatus?.value||'';
+        const query=String(searchInput?.value||'').trim();
+        const result=allDealers.filter(dealer=>{
             if (!status && !isDealerVisibleByStatus(dealer)) return false;
-            if (city && dealer.city !== city) return false;
-            if (status && dealer.status !== status) return false;
-            if (!dealerMatchesSearch(dealer, query)) return false;
-            return true;
+            if (city && normalize(city)!==normalize(dealer.city)) return false;
+            if (status && dealer.status!==status) return false;
+            if (unmappedOnly && hasPoint(dealer)) return false;
+            return dealerMatchesSearch(dealer,query);
         });
-
+        const ranked=query && core?.rankDealers
+            ? core.rankDealers(result,query)
+            : result.sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'ru'));
         if (userLat && userLng) {
-            result.forEach(dealer => {
-                dealer._distance = getDistanceKm(userLat, userLng, Number(dealer.latitude), Number(dealer.longitude));
+            ranked.forEach(dealer=>{
+                dealer._distance=hasPoint(dealer)
+                    ? getDistanceKm(userLat,userLng,Number(dealer.latitude),Number(dealer.longitude))
+                    : undefined;
             });
-            result.sort((a, b) => a._distance - b._distance);
-        } else {
-            result.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'ru'));
-        }
-
-        return result;
+            if (!query) ranked.sort((a,b)=>Number(hasPoint(b))-Number(hasPoint(a)) ||
+                (a._distance??Infinity)-(b._distance??Infinity));
+        } else ranked.forEach(dealer=>{delete dealer._distance;});
+        return ranked;
     }
 
     function makePopupHtml(dealer) {
@@ -359,6 +348,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderMapMarkers(dealers) {
+        dealers=dealers.filter(hasPoint);
         markerByDealerId.clear();
         markersCluster.clearLayers();
         if (map.hasLayer(markersCluster)) map.removeLayer(markersCluster);
@@ -388,81 +378,85 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+
     function renderSideList(dealers) {
-        if (!dealerListContainer) return;
-
-        if (listCaption) listCaption.textContent = dealers.length
-            ? `${dealers.length} ${dealers.length === 1 ? 'точка' : 'точек'} на карте`
-            : 'Нет точек по выбранным условиям';
-
-        if (!dealers.length) {
-            dealerListContainer.innerHTML = `
+        if(!dealerListContainer)return;
+        const located=dealers.filter(hasPoint).length,missing=dealers.length-located;
+        if(listCaption)listCaption.textContent=dealers.length
+            ? located+' на карте'+(missing?' · '+missing+' без точки':'')
+            : 'Нет дилеров по выбранным условиям';
+        if(!dealers.length){
+            dealerListContainer.innerHTML=`
                 <div class="map-empty-state">
                     <i class="bi bi-search"></i>
                     <strong>Дилеры не найдены</strong>
-                    <span>Измените поиск или сбросьте фильтры.</span>
+                    <span>Уточните название, ID или адрес либо сбросьте фильтры.</span>
                     <button type="button" data-map-reset>Сбросить фильтры</button>
                 </div>`;
             return;
         }
-
-        dealerListContainer.innerHTML = dealers.map(dealer => {
-            const status = getStatusInfo(dealer.status);
-            const distance = dealer._distance !== undefined
-                ? `<span class="map-card-distance"><i class="bi bi-cursor"></i>${dealer._distance.toFixed(1)} км</span>`
-                : '';
-            const twoGisUrl = build2GisUrl(dealer);
-
+        dealerListContainer.innerHTML=dealers.map(dealer=>{
+            const status=getStatusInfo(dealer.status);
+            const located=hasPoint(dealer);
+            const distance=Number.isFinite(dealer._distance)
+                ? `<span class="map-card-distance"><i class="bi bi-cursor"></i>${dealer._distance.toFixed(1)} км</span>` : '';
+            const twoGisUrl=build2GisUrl(dealer);
             return `
-                <article class="map-dealer-card ${String(activeDealerId) === String(dealer.id) ? 'active' : ''}" data-dealer-id="${escapeHtml(dealer.id)}">
-                    <button type="button" class="map-dealer-main" data-map-focus="${escapeHtml(dealer.id)}">
-                        <span class="map-card-status" style="background:${escapeHtml(status.color || '#777')}"></span>
+                <article class="map-dealer-card ${String(activeDealerId)===String(dealer.id)?'active':''} ${located?'':'is-unmapped'}" data-dealer-id="${escapeHtml(dealer.id)}">
+                    <button type="button" class="map-dealer-main" data-map-focus="${escapeHtml(dealer.id)}"
+                        title="${located?'Показать на карте':'Местоположение пока не отмечено'}">
+                        <span class="map-card-status" style="background:${escapeHtml(status.color||'#777')}"></span>
                         <span class="map-card-copy">
-                            <strong>${escapeHtml(dealer.name || 'Без названия')}</strong>
-                            <span><i class="bi bi-geo-alt"></i>${escapeHtml(dealer.address || dealer.city || 'Адрес не указан')}</span>
-                            <small>${escapeHtml(dealer.city || '')} · ${escapeHtml(status.label || 'Без статуса')}</small>
+                            <strong>${escapeHtml(dealer.name||'Без названия')}</strong>
+                            <span><i class="bi bi-geo-alt"></i>${escapeHtml(dealer.address||dealer.city||'Адрес не указан')}</span>
+                            <small>${escapeHtml(dealer.city||'')} · ${escapeHtml(status.label||'Без статуса')}</small>
                         </span>
-                        ${distance}
+                        ${located?distance:'<span class="map-unmapped-badge"><i class="bi bi-geo"></i>Без точки</span>'}
                     </button>
                     <div class="map-card-actions">
                         <a href="dealer.html?id=${encodeURIComponent(dealer.id)}"><i class="bi bi-person-vcard"></i>Профиль</a>
-                        <a href="${twoGisUrl}" target="_blank" rel="noopener" class="is-2gis"><i class="bi bi-box-arrow-up-right"></i>Открыть в 2ГИС</a>
+                        ${!located && canEditLocations()
+                            ? `<button type="button" class="map-card-place" data-map-place="${escapeHtml(dealer.id)}"><i class="bi bi-pin-map"></i>Поставить точку</button>`
+                            : ''}
+                        <a href="${twoGisUrl}" target="_blank" rel="noopener" class="is-2gis"><i class="bi bi-box-arrow-up-right"></i>2ГИС</a>
                     </div>
                 </article>`;
         }).join('');
     }
 
-    function updateCounters() {
-        const count = filteredDealers.length;
-        if (summaryVisible) summaryVisible.textContent = String(count);
-        if (visibleCountBadge) visibleCountBadge.innerHTML = `<i class="bi bi-geo-alt-fill"></i><strong>${count}</strong><span>на карте</span>`;
-        if (mobileCount) mobileCount.textContent = String(count);
-    }
 
-    function applyFilters({ fit = false } = {}) {
-        filteredDealers = getFilteredDealers();
+    function updateCounters() {
+        const withPoint=filteredDealers.filter(hasPoint).length;
+        const status=filterStatus?.value||'';
+        const city=filterCity?.value||'';
+        const missingCount=allDealers.filter(d=>(status?d.status===status:isDealerVisibleByStatus(d)) &&
+            (!city||normalize(d.city)===normalize(city)) && !hasPoint(d)).length;
+        if(unmappedCount)unmappedCount.textContent=String(missingCount);
+        if(unmappedToggle){
+            unmappedToggle.setAttribute('aria-pressed',String(unmappedOnly));
+            unmappedToggle.classList.toggle('active',unmappedOnly);
+        }
+        if(summaryVisible)summaryVisible.textContent=String(withPoint);
+        if(visibleCountBadge)visibleCountBadge.innerHTML=`<i class="bi bi-geo-alt-fill"></i><strong>${withPoint}</strong><span>на карте</span>`;
+        if(mobileCount)mobileCount.textContent=String(filteredDealers.length);
+    }
+    function applyFilters({fit=false}={}) {
+        filteredDealers=getFilteredDealers();
         renderMapMarkers(filteredDealers);
         renderSideList(filteredDealers);
         updateCounters();
-
-        if (fit) fitVisibleDealers();
+        if(fit)fitVisibleDealers();
     }
-
-    function fitVisibleDealers() {
-        if (!filteredDealers.length) return;
-        if (filteredDealers.length === 1) {
-            const dealer = filteredDealers[0];
-            map.flyTo([Number(dealer.latitude), Number(dealer.longitude)], 16, { duration: 0.55 });
+    function fitVisibleDealers(){
+        const located=filteredDealers.filter(hasPoint);
+        if(!located.length)return;
+        if(located.length===1){
+            const d=located[0];
+            map.flyTo([Number(d.latitude),Number(d.longitude)],16,{duration:.55});
             return;
         }
-        const bounds = L.latLngBounds(filteredDealers.map(dealer => [
-            Number(dealer.latitude),
-            Number(dealer.longitude)
-        ]));
-        map.fitBounds(bounds, {
-            padding: window.innerWidth < 768 ? [42, 96] : [58, 58],
-            maxZoom: 13,
-            animate: true
+        map.fitBounds(L.latLngBounds(located.map(d=>[Number(d.latitude),Number(d.longitude)])),{
+            padding:window.innerWidth<768?[42,96]:[58,58],maxZoom:13,animate:true
         });
     }
 
@@ -480,6 +474,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!dealer) return;
 
         setActiveDealer(id);
+        if(!hasPoint(dealer)){
+            if(canEditLocations()) enhancements?.openEditor(dealer.id);
+            else toast('Метка дилера ещё не установлена. Редактор может добавить её здесь.','info');
+            return;
+        }
         const marker = markerByDealerId.get(String(id));
         map.flyTo([Number(dealer.latitude), Number(dealer.longitude)], 16, { duration: 0.55 });
 
@@ -509,6 +508,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function resetFilters() {
+        clearTimeout(pendingSearchRender);
+        enhancements?.closeEditor();
+        unmappedOnly=false;
         if (filterCity) filterCity.value = '';
         if (filterStatus) filterStatus.value = '';
         if (searchInput) searchInput.value = '';
@@ -518,59 +520,19 @@ document.addEventListener('DOMContentLoaded', () => {
             suggestionsBox.classList.remove('show');
         }
         activeDealerId = null;
+        enhancements?.cancelSearch();
         applyFilters({ fit: true });
     }
 
-    async function lookupAddress(query) {
-        if (!suggestionsBox || query.length < 4) return;
-        const localMatches = allDealers.filter(dealer => dealerMatchesSearch(dealer, normalize(query)));
-        if (localMatches.length) {
-            suggestionsBox.classList.remove('show');
-            suggestionsBox.innerHTML = '';
-            return;
-        }
 
-        try {
-            const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=kz&limit=4&q=${encodeURIComponent(query)}`);
-            if (!response.ok) return;
-            const data = await response.json();
-            if (!Array.isArray(data) || !data.length) {
-                suggestionsBox.classList.remove('show');
-                return;
-            }
-
-            suggestionsBox.innerHTML = `
-                <div class="map-suggestion-label">Найти адрес на карте</div>
-                ${data.map((place, index) => `
-                    <button type="button" data-address-index="${index}">
-                        <i class="bi bi-geo-alt"></i>
-                        <span>${escapeHtml(place.display_name)}</span>
-                    </button>`).join('')}`;
-            suggestionsBox.dataset.results = JSON.stringify(data.map(place => ({
-                lat: Number(place.lat),
-                lon: Number(place.lon),
-                name: place.display_name
-            })));
-            suggestionsBox.classList.add('show');
-        } catch (error) {
-            console.warn('Address lookup error', error);
-        }
-    }
-
-    suggestionsBox?.addEventListener('click', event => {
-        const button = event.target.closest('[data-address-index]');
-        if (!button) return;
-        const results = JSON.parse(suggestionsBox.dataset.results || '[]');
-        const place = results[Number(button.dataset.addressIndex)];
-        if (!place) return;
-
-        if (addressLookupMarker) map.removeLayer(addressLookupMarker);
-        map.flyTo([place.lat, place.lon], 16, { duration: 0.5 });
-        addressLookupMarker = L.marker([place.lat, place.lon]).addTo(map)
-            .bindPopup(`<strong>Найденный адрес</strong><br>${escapeHtml(place.name)}`)
-            .openPopup();
-
-        suggestionsBox.classList.remove('show');
+    // Outside address lookups are explicitly triggered; never call public search on keystrokes.
+    const enhancements=window.CRMMapExperience?.install({
+        map,
+        getDealers:()=>allDealers,
+        refresh:()=>{updateSummary();applyFilters({fit:false});},
+        focus:id=>focusDealer(id),
+        hasPoint,canEdit:canEditLocations,escapeHtml,toast,closeMobileList,
+        setUnmappedOnly:value=>{unmappedOnly=Boolean(value);}
     });
 
     dealerListContainer?.addEventListener('click', event => {
@@ -580,39 +542,51 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        const place=event.target.closest('[data-map-place]');
+        if(place){enhancements?.openEditor(place.dataset.mapPlace);return;}
         const focusButton = event.target.closest('[data-map-focus]');
         if (focusButton) focusDealer(focusButton.dataset.mapFocus);
     });
 
-    filterCity?.addEventListener('change', () => applyFilters({ fit: true }));
-    filterStatus?.addEventListener('change', () => applyFilters({ fit: true }));
 
-    searchInput?.addEventListener('input', () => {
-        const query = searchInput.value.trim();
-        if (searchClear) searchClear.hidden = !query;
-        applyFilters({ fit: false });
-
-        clearTimeout(addressLookupTimer);
-        if (suggestionsBox) suggestionsBox.classList.remove('show');
-        addressLookupTimer = setTimeout(() => lookupAddress(query), 500);
+    filterCity?.addEventListener('change',()=>applyFilters({fit:true}));
+    filterStatus?.addEventListener('change',()=>applyFilters({fit:true}));
+    unmappedToggle?.addEventListener('click',()=>{
+        unmappedOnly=!unmappedOnly;
+        applyFilters({fit:!unmappedOnly});
+        if(unmappedOnly&&!filteredDealers.length)toast('Нет дилеров без точки в этой выборке','info');
     });
-
-    searchInput?.addEventListener('keydown', event => {
-        if (event.key === 'Escape') {
-            suggestionsBox?.classList.remove('show');
-            searchInput.blur();
-        }
-        if (event.key === 'Enter' && filteredDealers.length === 1) {
-            event.preventDefault();
+    // Batch marker rebuilding during typing; suggestions remain local to our CRM.
+    let pendingSearchRender=0;
+    searchInput?.addEventListener('input',()=>{
+        const q=searchInput.value.trim();
+        if(searchClear)searchClear.hidden=!q;
+        clearTimeout(pendingSearchRender);
+        pendingSearchRender=setTimeout(()=>{
+            applyFilters({fit:false});
+            enhancements?.suggestionsFor(filteredDealers,q);
+        },120);
+    });
+    searchInput?.addEventListener('keydown',event=>{
+        if(event.key==='Escape'){enhancements?.cancelSearch();searchInput.blur();return;}
+        if(event.key!=='Enter')return;
+        event.preventDefault();
+        clearTimeout(pendingSearchRender);
+        applyFilters({fit:false});
+        const q=searchInput.value.trim();
+        if(filteredDealers.length===1) {
+            enhancements?.cancelSearch();
             focusDealer(filteredDealers[0].id);
-        }
+        } else if (filteredDealers.length>1) {
+            enhancements?.suggestionsFor(filteredDealers,q);
+        } else if(q.length>=3) toast('В базе дилеры не найдены. Для поиска адреса нажмите значок прицела справа.','info');
     });
-
-    searchClear?.addEventListener('click', () => {
-        searchInput.value = '';
-        searchClear.hidden = true;
-        suggestionsBox?.classList.remove('show');
-        applyFilters({ fit: false });
+    searchClear?.addEventListener('click',()=>{
+        clearTimeout(pendingSearchRender);
+        searchInput.value='';
+        searchClear.hidden=true;
+        enhancements?.cancelSearch();
+        applyFilters({fit:false});
         searchInput.focus();
     });
 

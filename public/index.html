@@ -611,15 +611,15 @@
                                     <div><strong>Локация</strong><small>Найдите адрес или поставьте точку на карте</small></div>
                                 </div>
                                 <div class="dealer-location-search">
-                                    <input type="text" id="add-smart-search" class="form-control" placeholder="Введите адрес или координаты">
+                                    <input type="text" id="add-smart-search" class="form-control" placeholder="Улица, дом — либо возьмём из адреса дилера" aria-label="Найти адрес дилера на карте">
                                     <button type="button" class="dealer-secondary-action" id="btn-search-add"><i class="bi bi-search"></i> Найти</button>
                                     <button type="button" class="dealer-icon-action" id="btn-loc-add" title="Мое местоположение"><i class="bi bi-crosshair"></i></button>
                                 </div>
+                                <div id="add-location-results" class="dealer-location-results" hidden></div>
                                 <div id="add-map" class="dealer-map"></div>
-                                <div class="dealer-coordinates">
-                                    <label>Широта <input type="text" id="add_latitude" class="form-control" readonly></label>
-                                    <label>Долгота <input type="text" id="add_longitude" class="form-control" readonly></label>
-                                </div>
+                                <div class="dealer-location-status" id="add-location-status"><i class="bi bi-info-circle"></i><span>Точка не выбрана. Нажмите на карту или найдите адрес — цифры вводить не нужно.</span></div>
+                                <input type="hidden" id="add_latitude">
+                                <input type="hidden" id="add_longitude">
                             </section>
 
                             <div class="row g-3">
@@ -934,15 +934,15 @@
                                         <div><strong>Локация дилера</strong><small>Поиск по адресу или ручная точка на карте</small></div>
                                     </div>
                                     <div class="dealer-location-search">
-                                        <input type="text" id="edit-smart-search" class="form-control" placeholder="Введите адрес или координаты">
+                                        <input type="text" id="edit-smart-search" class="form-control" placeholder="Улица, дом — либо возьмём из адреса дилера" aria-label="Найти адрес дилера на карте">
                                         <button type="button" class="dealer-secondary-action" id="btn-search-edit"><i class="bi bi-search"></i> Найти</button>
                                         <button type="button" class="dealer-icon-action" id="btn-loc-edit" title="Мое местоположение"><i class="bi bi-crosshair"></i></button>
                                     </div>
+                                    <div id="edit-location-results" class="dealer-location-results" hidden></div>
                                     <div id="edit-map" class="dealer-map dealer-map-large"></div>
-                                    <div class="dealer-coordinates">
-                                        <label>Широта <input type="text" id="edit_latitude" class="form-control" readonly></label>
-                                        <label>Долгота <input type="text" id="edit_longitude" class="form-control" readonly></label>
-                                    </div>
+                                    <div class="dealer-location-status" id="edit-location-status"><i class="bi bi-info-circle"></i><span>Найдите адрес или выберите точку. Существующую метку можно перетаскивать.</span></div>
+                                    <input type="hidden" id="edit_latitude">
+                                    <input type="hidden" id="edit_longitude">
                                 </section>
                             </div>
 
