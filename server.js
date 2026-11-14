@@ -29,8 +29,48 @@ if (!process.env.JWT_SECRET) console.warn('JWT_SECRET is not configured: session
 
 const APP_ORIGIN = String(process.env.APP_ORIGIN || 'https://dealer-crm.onrender.com').replace(/\/+$/, '');
 const ANDROID_APK_RELEASE_URL = 'https://github.com/idealfloorsales/dealer-crm/releases/download/android-v0.1.2/IDEAL-FLOOR-CRM-0.1.2.apk';
-// GitHub release asset is 101047362 bytes; sha256:336872de8f75d04ed9ff9a6a762accb03e7b2ce2070aa92ff5cd488744d53429.
-// Keep the user-facing URL on the CRM; update this target when a new tested release is published.
+// The CRM download URL is permanent. It resolves the latest published, emulator-tested
+// GitHub Release and safely falls back to the last verified APK if GitHub is unavailable.
+const ANDROID_RELEASES_API = 'https://api.github.com/repos/idealfloorsales/dealer-crm/releases/latest';
+const ANDROID_RELEASE_CACHE_MS = 5 * 60 * 1000;
+let androidReleaseCache = {url: ANDROID_APK_RELEASE_URL, version: '0.1.2', checkedAt: 0};
+async function getLatestAndroidRelease() {
+    if (Date.now() - androidReleaseCache.checkedAt < ANDROID_RELEASE_CACHE_MS) return androidReleaseCache;
+    androidReleaseCache.checkedAt = Date.now();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3500);
+    timeout.unref?.();
+    try {
+        const response = await fetch(ANDROID_RELEASES_API, {
+            signal: controller.signal,
+            headers: {
+                'Accept': 'application/vnd.github+json',
+                'User-Agent': 'IDEAL-FLOOR-CRM-APK-Resolver'
+            }
+        });
+        if (!response.ok) return androidReleaseCache;
+        const release = await response.json();
+        const tag = String(release.tag_name || '');
+        if (release.draft || release.prerelease || !/^android-v\d+\.\d+\.\d+$/.test(tag)) return androidReleaseCache;
+        const asset = (Array.isArray(release.assets) ? release.assets : []).find(item =>
+            String(item.name || '').endsWith('.apk') &&
+            String(item.browser_download_url || '').startsWith(
+                'https://github.com/idealfloorsales/dealer-crm/releases/download/' + tag + '/'
+            )
+        );
+        if (asset) androidReleaseCache = {
+            url: asset.browser_download_url,
+            version: tag.slice('android-v'.length),
+            checkedAt: Date.now()
+        };
+    } catch (error) {
+        // Fallback remains a known, previously verified signed APK.
+        console.warn('Latest Android APK lookup unavailable:', error?.message || String(error));
+    } finally {
+        clearTimeout(timeout);
+    }
+    return androidReleaseCache;
+}
 const ALLOWED_ORIGINS = new Set([
     APP_ORIGIN,
     process.env.RENDER_EXTERNAL_URL,
@@ -69,12 +109,17 @@ function healthPayload() {
 }
 
 // Liveness: process is responding. Useful for external monitoring.
-// Permanent, one-tap Android installer link from the CRM (desktop and mobile).
-// Redirect instead of proxying 101 MB through Render, which risks interrupted APK transfers.
-app.get('/download/android', (req, res) => {
+// Permanent download link in the web CRM, even when APK releases change.
+app.get('/download/android', async (req, res) => {
     res.set('Cache-Control', 'no-store');
     res.set('Referrer-Policy', 'no-referrer');
-    res.redirect(302, ANDROID_APK_RELEASE_URL);
+    const release = await getLatestAndroidRelease();
+    res.redirect(302, release.url);
+});
+app.get('/api/mobile/latest', async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const release = await getLatestAndroidRelease();
+    res.json({ platform: 'android', version: release.version, downloadUrl: '/download/android' });
 });
 
 app.get('/healthz', (req, res) => {

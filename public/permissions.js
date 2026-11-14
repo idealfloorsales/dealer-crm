@@ -338,7 +338,7 @@
                         ${itemsHtml}
                     </ul>
                     <div class="crm-topbar-account">
-                        <a class="crm-app-download-icon" href="/download/android" target="_blank" rel="noopener" title="Скачать приложение для Android · 0.1.2 · APK" aria-label="Скачать приложение для Android, версия 0.1.2"><i class="bi bi-download" aria-hidden="true"></i></a>
+                        <a class="crm-app-download-icon" href="/download/android" target="_blank" rel="noopener" title="Скачать актуальную версию Android-приложения" aria-label="Скачать актуальную версию Android-приложения"><i class="bi bi-download" aria-hidden="true"></i></a>
                         <button type="button" class="crm-theme-desktop" id="crm-theme-cycle" title="Тема интерфейса"><i class="bi bi-circle-half"></i></button>
                         <button type="button" class="crm-connection-chip" data-crm-network-status title="Состояние соединения">
                             <span class="crm-topbar-live-dot"></span><span data-crm-network-label>Связь</span>
@@ -798,7 +798,7 @@
                     </div>
                     <a class="crm-app-download-card" href="/download/android" target="_blank" rel="noopener">
                         <span class="crm-app-download-mark"><i class="bi bi-android2" aria-hidden="true"></i></span>
-                        <span><strong>Скачать приложение</strong><small>Android · 0.1.2 · APK</small></span>
+                        <span><strong>Скачать приложение</strong><small>Android · последняя версия · APK</small></span>
                         <i class="bi bi-arrow-up-right" aria-hidden="true"></i>
                     </a>
                     <div class="crm-theme-row">

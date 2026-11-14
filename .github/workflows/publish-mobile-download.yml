@@ -1,40 +1,94 @@
-name: Publish Android app download
+name: Publish verified Android APK
 on:
-  workflow_dispatch:
-  push:
-    branches: [main]
-    paths: ['.github/workflows/publish-mobile-download.yml']
+  workflow_run:
+    workflows:
+      - "Build IDEAL FLOOR CRM Standalone Android APK"
+    types: [completed]
+
 permissions:
   contents: write
   actions: read
+
+concurrency:
+  group: publish-ideal-floor-android
+  cancel-in-progress: false
+
 jobs:
   publish:
+    if: >-
+      ${{ github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.head_branch == 'mobile-app' &&
+          github.event.workflow_run.event == 'push' &&
+          github.event.workflow_run.head_repository.full_name == github.repository }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     env:
-      GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
+      GH_TOKEN: ${{ github.token }}
+      RUN_ID: ${{ github.event.workflow_run.id }}
+      RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+
     steps:
-      - name: Require verified emulator-tested build
+      - name: Check out precisely the emulator-tested mobile revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+
+      - name: Verify successful build and check its branch
+        shell: bash
         run: |
-          test "$(gh api repos/$GH_REPO/actions/runs/42839594843 --jq .conclusion)" = success
-          test "$(gh api repos/$GH_REPO/actions/runs/42839594843 --jq .head_sha)" = 2198157e72d9ca4db2b66df18c8ed508ba471f04
-      - name: Download verified standalone build
-        run: gh run download 42839594843 --name ideal-floor-crm-android-standalone --dir package
-      - name: Verify application bundle
+          set -euo pipefail
+          test "$(gh api repos/$GH_REPO/actions/runs/$RUN_ID --jq .conclusion)" = success
+          test "$(gh api repos/$GH_REPO/actions/runs/$RUN_ID --jq .head_branch)" = mobile-app
+          test "$(gh api repos/$GH_REPO/actions/runs/$RUN_ID --jq .head_sha)" = "$RELEASE_SHA"
+          test "$(gh api repos/$GH_REPO/actions/runs/$RUN_ID --jq .event)" = push
+
+      - name: Download verified APK from tested workflow
+        shell: bash
         run: |
+          set -euo pipefail
+          mkdir -p package
+          gh run download "$RUN_ID" --name ideal-floor-crm-android-standalone --dir package
+          test -s package/app-release.apk
+
+      - name: Validate artifact and version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./mobile/package.json').version")"
+          JSON_VERSION="$(node -p "require('./mobile/app.json').expo.version")"
+          test "$VERSION" = "$JSON_VERSION"
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          TAG="android-v$VERSION"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           python3 - <<'PY'
           from pathlib import Path
           from zipfile import ZipFile
-          apk = Path('package/app-release.apk')
+          apk = Path("package/app-release.apk")
+          assert apk.stat().st_size > 10_000_000, "Unexpectedly small APK"
           with ZipFile(apk) as archive:
-              assert archive.getinfo('assets/index.android.bundle').file_size > 10000
-          apk.rename('package/IDEAL-FLOOR-CRM-0.1.2.apk')
+              assert archive.getinfo("assets/index.android.bundle").file_size > 10_000
+          apk.rename("package/IDEAL-FLOOR-CRM.apk")
           PY
-      - name: Publish permanent APK link
+          sha256sum package/IDEAL-FLOOR-CRM.apk | tee package/SHA256SUMS
+          echo "Publishing release $TAG from $RELEASE_SHA, verified run $RUN_ID"
+
+      - name: Publish a new immutable versioned Release
+        shell: bash
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          if gh release view android-v0.1.2 >/dev/null 2>&1; then
-            gh release upload android-v0.1.2 package/IDEAL-FLOOR-CRM-0.1.2.apk --clobber
-          else
-            gh release create android-v0.1.2 package/IDEAL-FLOOR-CRM-0.1.2.apk --target mobile-app --title 'IDEAL FLOOR CRM Android 0.1.2' --notes 'Самостоятельное Android-приложение. Исправлен сбой AndroidX при запуске. Проверено открытие формы входа на Android 13.'
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; refusing to overwrite a published APK."
+            exit 0
           fi
+          gh release create "$TAG" package/IDEAL-FLOOR-CRM.apk package/SHA256SUMS \
+            --target "$RELEASE_SHA" \
+            --title "IDEAL FLOOR CRM Android $VERSION" \
+            --notes "Verified standalone Android release. Built from commit $RELEASE_SHA. Android 13 emulator startup, signing and JS bundle validated in workflow $RUN_ID." \
+            --latest
