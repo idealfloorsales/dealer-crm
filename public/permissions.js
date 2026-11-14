@@ -1534,8 +1534,8 @@
             }
             const inner = [...document.querySelectorAll(
                 '.map-page .sidebar-content,.app-workspace-page .sidebar-content,.audit-list-scroll'
-            )].find(el=>isVisible(el) && remaining(el)>350 && scrollAmount(el)>320);
-            const windowReady = remaining(null)>350 && scrollAmount(null)>320;
+            )].find(el=>isVisible(el) && remaining(el)>Math.max(32,el.clientHeight*.08) && scrollAmount(el)>Math.min(280,Math.max(180,el.clientHeight*.35)));
+            const windowReady = remaining(null)>Math.max(24,window.innerHeight*.08) && scrollAmount(null)>Math.min(280,Math.max(180,window.innerHeight*.35));
             scrollTarget = inner || (windowReady ? null : undefined);
             const visible = Boolean(inner || windowReady);
             button.classList.toggle('is-visible',visible);
@@ -1559,6 +1559,15 @@
         document.addEventListener('scroll',requestUpdate,{capture:true,passive:true});
         window.addEventListener('resize',requestUpdate,{passive:true});
         window.addEventListener('pageshow',requestUpdate);
+        window.addEventListener('load',requestUpdate,{once:true});
+        document.addEventListener('shown.bs.modal',requestUpdate);
+        document.addEventListener('hidden.bs.modal',requestUpdate);
+        document.addEventListener('shown.bs.offcanvas',requestUpdate);
+        document.addEventListener('hidden.bs.offcanvas',requestUpdate);
+        if (typeof ResizeObserver !== 'undefined') {
+            const sizeObserver = new ResizeObserver(requestUpdate);
+            sizeObserver.observe(document.body);
+        }
         requestUpdate();
     }
 

@@ -28,9 +28,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const mobileCount = document.getElementById('map-mobile-count');
     const foldButton = document.getElementById('map-toggle-filters');
     const mapHeader = document.querySelector('.map-workspace-header');
-    const foldKey = 'crm_map_filters_collapsed_v1';
-    const compactByDefault = window.matchMedia?.('(min-width: 768px)').matches ?? true;
-    let filtersCollapsed = compactByDefault;
+    const foldKey = 'crm_map_filters_collapsed_v2';
+    // Start in compact mode at every viewport; a deliberate user choice is saved.
+    let filtersCollapsed = true;
     try {
         const saved = localStorage.getItem(foldKey);
         if (saved === '1' || saved === '0') filtersCollapsed = saved === '1';

@@ -1,0 +1,333 @@
+/* IDEAL FLOOR CRM: shared visual corrections. Keep this layer after dark-theme.css.
+   Page-specific layouts retain their functions; only shared rhythm and controls change. */
+:root {
+  --crm-ui-max-width:1480px;
+  --crm-ui-control:42px;
+  --crm-ui-radius:11px;
+  --crm-ui-neutral:#27282c;
+  --crm-ui-border:#e1ddda;
+  --crm-ui-paper:#faf9f7;
+  --crm-ui-muted:#64666d;
+}
+body:not(.map-page):not(.login-page) :is(
+  .command-center-shell,.app-page-shell,.dealer-profile-shell,.sales-shell,
+  .workshop-shell,.audit-shell,.pricing-shell,.report-shell,
+  .competitors-shell,.competitor-shell
+) {
+  width:min(var(--crm-ui-max-width),calc(100% - 32px))!important;
+  max-width:var(--crm-ui-max-width)!important;
+  margin-inline:auto!important;
+  padding-inline:0!important;
+  box-sizing:border-box;
+}
+body:not(.map-page) :is(.app-page-shell,.command-center-shell) { min-width:0; }
+:where(.app-workspace-page,.command-center-shell,.audit-page) :is(
+  .app-toolbar-card,.dealer-list-toolbar,.rec-toolbar,.product-toolbar,
+  .exhibition-toolbar,.competitors-toolbar
+) { box-sizing:border-box; }
+:where(.app-workspace-page,.command-center-shell) :is(
+  .product-filter-grid,.rec-filter-grid,.exhibition-filter-grid,
+  .competitors-filters,.dealer-toolbar-filters
+) > * { min-width:0; }
+:where(.app-workspace-page,.command-center-shell) :is(
+  .product-filter-grid,.rec-filter-grid,.exhibition-filter-grid,
+  .competitors-filters,.dealer-toolbar-filters
+) :is(.form-select,.form-control) {
+  min-width:0;
+  width:100%;
+  min-height:var(--crm-ui-control)!important;
+  border:1px solid var(--crm-ui-border)!important;
+  border-radius:var(--crm-ui-radius)!important;
+  background-color:var(--crm-ui-paper)!important;
+  color:#4f5158!important;
+  font-family:'Onest',sans-serif!important;
+  font-size:.74rem!important;
+  font-weight:650;
+  box-shadow:none!important;
+  text-overflow:ellipsis;
+}
+:where(.app-workspace-page,.command-center-shell) :is(
+  .product-filter-grid,.rec-filter-grid,.exhibition-filter-grid,
+  .competitors-filters,.dealer-toolbar-filters
+) :is(.form-select,.form-control):focus-visible {
+  border-color:rgba(185,4,10,.45)!important;
+  box-shadow:0 0 0 3px rgba(185,4,10,.11)!important;
+}
+:where(.app-workspace-page,.command-center-shell) :is(
+  .product-filter-grid,.rec-filter-grid,.exhibition-filter-grid,
+  .competitors-filters
+) label > span {display:block;margin:0 0 5px 2px;color:#777a82;font-size:.65rem;font-weight:750;}
+
+/* The neutral buttons must remain neutral. Actions inside dark heroes are different. */
+:where(.app-workspace-page,.command-center-shell) :is(
+  .product-reset-btn,.rec-reset-btn,.exhibition-reset-btn,
+  .competitors-filter-toggle,.dealer-reset-filters,.dealer-filter-toggle,
+  .crm-inline-filter-toggle
+) {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  min-height:var(--crm-ui-control);
+  padding:0 13px;
+  border:1px solid var(--crm-ui-border)!important;
+  border-radius:var(--crm-ui-radius)!important;
+  background:#fff!important;
+  color:#55575d!important;
+  font:750 .73rem 'Onest',sans-serif!important;
+  box-shadow:none;
+  transition:background .16s ease,border-color .16s ease,color .16s ease,transform .16s ease;
+}
+:where(.app-workspace-page,.command-center-shell) :is(
+  .product-reset-btn,.rec-reset-btn,.exhibition-reset-btn,
+  .competitors-filter-toggle,.dealer-reset-filters,.dealer-filter-toggle,
+  .crm-inline-filter-toggle
+):hover { background:#f6f4f1!important;color:#2d2e33!important;border-color:#cbc6c1!important; }
+.app-workspace-page .app-page-hero :is(.app-hero-secondary,.app-hero-icon) {
+  border:1px solid rgba(255,255,255,.19)!important;
+  background:rgba(255,255,255,.09)!important;
+  color:#fff!important;
+}
+.app-workspace-page .app-page-hero :is(.app-hero-secondary,.app-hero-icon):hover {
+  border-color:rgba(255,255,255,.32)!important;
+  background:rgba(255,255,255,.17)!important;
+  color:#fff!important;
+}
+.app-workspace-page .app-page-hero .app-hero-primary {background:#b9040a!important;color:#fff!important;border-color:transparent!important;}
+.app-workspace-page .app-page-hero .app-hero-primary:hover {background:#d10b12!important;}
+:where(.app-workspace-page,.command-center-shell) :is(button,select,input):focus-visible {
+  outline:2px solid rgba(185,4,10,.65);
+  outline-offset:2px;
+}
+
+/* Tabs: identical icon alignment, sizing and active contrast on every screen. */
+:is(.product-view-tabs,.pricing-view-tabs,.workshop-tabs,.workshop-stock-view-tabs,
+  .employee-tabs,.dealer-edit-nav,.profile-tabs,.training-tabs,.training-view-tabs,
+  .sales-mobile-tabs,.nav[role="tablist"]) :is(button,a) {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  white-space:nowrap;
+  font-family:'Onest',sans-serif;
+}
+:is(.product-view-tabs,.pricing-view-tabs,.workshop-tabs,.workshop-stock-view-tabs,
+  .employee-tabs,.dealer-edit-nav,.profile-tabs,.training-tabs,.training-view-tabs,
+  .sales-mobile-tabs,.nav[role="tablist"]) :is(button,a) i.bi {
+  display:inline-block;
+  flex:0 0 1.1em;
+  width:1.1em;
+  margin:0!important;
+  line-height:1;
+  text-align:center;
+  font-size:.96em;
+}
+:where(.product-view-tabs,.pricing-view-tabs,.workshop-tabs,.workshop-stock-view-tabs)
+  :is(button.active,button.is-active) {
+  background:#27282c!important;
+  border-color:#27282c!important;
+  color:#fff!important;
+}
+
+/* Catalog: the old sticky seven-filter panel covered actual products. */
+.products-page .product-toolbar {
+  position:relative!important;
+  top:auto!important;
+  z-index:20!important;
+  padding:12px!important;
+  margin-bottom:12px!important;
+}
+.products-page .product-search-row {grid-template-columns:minmax(0,1fr) auto auto;gap:8px;}
+.products-page .product-toolbar.crm-filters-collapsed .product-filter-grid {display:none!important;}
+.products-page .product-filter-grid {grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-top:12px;}
+.products-page .crm-inline-filter-toggle.is-active {
+  background:#27282c!important;
+  border-color:#27282c!important;
+  color:#fff!important;
+}
+.products-page .product-toolbar-meta {margin-top:9px;padding-top:9px;flex-wrap:wrap;}
+.products-page .product-stock-last-updated {min-width:0;}
+/* Additional catalog-style toolbars must never cover lists on short displays. */
+:is(.reclamations-page .rec-toolbar,.report-page .exhibition-toolbar,
+   .competitors-page .competitors-toolbar) {
+  position:relative!important;
+  top:auto!important;
+  z-index:20;
+}
+.command-center-shell .dealer-toolbar-filters .dealer-filter-settings {
+  color:#55575d;
+  background:var(--crm-ui-paper)!important;
+  border-color:var(--crm-ui-border)!important;
+}
+
+/* Dashboard's two secondary cards must have matched dimensions and real scrolling. */
+.cc-dashboard-secondary-row {align-items:stretch;}
+#cc-activity-panel,#cc-plan-panel {min-width:0;}
+#cc-activity-panel .cc-panel,#cc-plan-panel .cc-panel {
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+  min-height:0;
+  max-height:410px;
+}
+#cc-activity-panel .cc-panel-head,#cc-plan-panel .cc-panel-head {flex:0 0 auto;}
+#cc-activity-panel .cc-activity-feed,#cc-plan-panel .cc-task-list {
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  flex:1 1 auto;
+  min-height:0;
+  max-height:330px!important;
+  overflow-y:auto;
+  overflow-x:hidden;
+  padding:2px 5px 3px 0;
+  scrollbar-gutter:stable;
+}
+#cc-activity-panel .cc-event-item {
+  flex:0 0 auto!important;
+  min-height:56px!important;
+  padding:9px 11px!important;
+  gap:10px;
+}
+#cc-activity-panel .cc-event-copy {flex:1 1 auto;min-width:0;overflow:hidden;}
+#cc-activity-panel :is(.cc-event-title,.cc-event-meta) {
+  max-width:100%;
+  min-width:0;
+  margin:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+/* Map: quick search + dealer list are primary; details stay one click away. */
+.map-page .map-workspace-header.is-collapsed {
+  padding:9px 12px 9px!important;
+}
+.map-page .map-workspace-header.is-collapsed .map-workspace-eyebrow {display:none;}
+.map-page .map-workspace-header.is-collapsed .map-workspace-title {font-size:1.04rem;line-height:1.2;margin:0;}
+.map-page .map-workspace-header.is-collapsed .map-search-shell {margin-top:7px;min-height:35px;}
+.map-page .map-workspace-header.is-collapsed .map-search-shell input {height:35px;}
+.map-page .map-list-head {padding:7px 12px!important;min-height:37px;}
+.map-page .sidebar-content {padding:7px!important;}
+.map-page .map-dealer-card {margin-bottom:6px!important;}
+.map-page .map-dealer-main {padding:8px 10px 6px!important;gap:8px;}
+.map-page .map-card-actions {padding:0 9px 7px 20px!important;}
+.map-page .map-card-actions a {min-height:28px!important;}
+.map-page .map-fold-toggle {border-radius:10px!important;}
+.map-page .map-fold-toggle:focus-visible {outline:2px solid #fff;outline-offset:2px;}
+
+/* Back to top: one accessible control, invisible near the start and on short pages. */
+.crm-scroll-to-top {
+  right:22px!important;
+  bottom:22px!important;
+  width:46px;
+  height:46px;
+  border-radius:14px;
+  background:linear-gradient(145deg,#303136,#17181c);
+  color:#fff;
+  box-shadow:0 13px 30px rgba(18,19,24,.24),inset 0 1px rgba(255,255,255,.12);
+}
+.crm-scroll-to-top.is-visible {transform:translateY(0) scale(1);}
+.crm-scroll-to-top:hover {transform:translateY(-2px) scale(1.03);background:#b9040a;color:#fff;}
+body:has(.modal.show) .crm-scroll-to-top {opacity:0;visibility:hidden;pointer-events:none;}
+@media(max-width:991.98px) {
+  body:not(.map-page):not(.login-page) :is(.command-center-shell,.app-page-shell,
+    .dealer-profile-shell,.sales-shell,.workshop-shell,.audit-shell,.pricing-shell,
+    .report-shell,.competitors-shell,.competitor-shell) {
+    width:min(var(--crm-ui-max-width),calc(100% - 24px))!important;
+  }
+}
+@media(max-width:767.98px) {
+  .products-page .product-filter-grid {grid-template-columns:repeat(2,minmax(0,1fr));}
+  .products-page .product-toolbar {padding:10px!important;}
+  .products-page .product-search-row {grid-template-columns:minmax(0,1fr) auto auto;}
+  .products-page .crm-inline-filter-toggle {width:42px;padding:0;}
+  .products-page .crm-inline-filter-toggle span {display:none;}
+  #cc-activity-panel .cc-panel,#cc-plan-panel .cc-panel {max-height:none;}
+  #cc-activity-panel .cc-activity-feed,#cc-plan-panel .cc-task-list {max-height:310px!important;}
+  .crm-scroll-to-top {right:14px!important;bottom:calc(104px + env(safe-area-inset-bottom))!important;width:44px;height:44px;}
+  body:has(#mobile-fab-add) .crm-scroll-to-top {bottom:calc(162px + env(safe-area-inset-bottom))!important;}
+  .map-page .map-sidebar {height:min(90dvh,850px)!important;}
+}
+@media(max-width:420px) {
+  .products-page .product-search-row {gap:5px;}
+  .products-page .product-search-box .form-control {font-size:.68rem;}
+  .products-page .product-filter-grid {gap:7px;}
+  body:not(.map-page):not(.login-page) :is(.command-center-shell,.app-page-shell,
+    .dealer-profile-shell,.sales-shell,.workshop-shell,.audit-shell,.pricing-shell,
+    .report-shell,.competitors-shell,.competitor-shell) {
+    width:calc(100% - 20px)!important;
+  }
+}
+:root[data-crm-theme="dark"] :is(
+  .products-page .product-toolbar,.reclamations-page .rec-toolbar,
+  .report-page .exhibition-toolbar,.competitors-page .competitors-toolbar
+) {background:#222329!important;border-color:#383a42!important;}
+:root[data-crm-theme="dark"] :where(.app-workspace-page,.command-center-shell) :is(
+  .product-filter-grid,.rec-filter-grid,.exhibition-filter-grid,.competitors-filters,.dealer-toolbar-filters
+) :is(.form-select,.form-control) {
+  background-color:#292a30!important;
+  border-color:#42434a!important;
+  color:#e7e8ec!important;
+}
+:root[data-crm-theme="dark"] :where(.app-workspace-page,.command-center-shell) :is(
+  .product-reset-btn,.rec-reset-btn,.exhibition-reset-btn,.competitors-filter-toggle,
+  .dealer-reset-filters,.dealer-filter-toggle,.crm-inline-filter-toggle
+) {background:#2a2b30!important;border-color:#42434a!important;color:#eaebef!important;}
+:root[data-crm-theme="dark"] :where(.app-workspace-page,.command-center-shell) :is(
+  .product-reset-btn,.rec-reset-btn,.exhibition-reset-btn,.competitors-filter-toggle,
+  .dealer-reset-filters,.dealer-filter-toggle,.crm-inline-filter-toggle
+):hover {background:#35363d!important;border-color:#5c5d64!important;color:#fff!important;}
+:root[data-crm-theme="dark"] .products-page .crm-inline-filter-toggle.is-active,
+:root[data-crm-theme="dark"] :where(.product-view-tabs,.pricing-view-tabs,.workshop-tabs,.workshop-stock-view-tabs)
+  :is(button.active,button.is-active) {background:#484a52!important;border-color:#575961!important;color:#fff!important;}
+:root[data-crm-theme="dark"] .products-page .product-toolbar-meta {border-color:#3b3d43;}
+:root[data-crm-theme="dark"] #cc-activity-panel .cc-event-item {background:#26272d;border-color:#3a3b43;}
+@media print {
+  /* Full-size A4 complaint act; allow a second page instead of shrinking text. */
+  @page {size:A4 portrait;margin:10mm 12mm;}
+  body.reclamations-page.printing #printable-area {
+    width:100%!important;
+    max-width:none!important;
+    padding:0!important;
+    transform:none!important;
+    zoom:1!important;
+    font-size:11.5pt!important;
+    line-height:1.38!important;
+  }
+  body.reclamations-page.printing #printable-area .print-title {font-size:21pt!important;line-height:1.18!important;}
+  body.reclamations-page.printing #printable-area .print-subtitle {font-size:10.5pt!important;}
+  body.reclamations-page.printing #printable-area .print-section-title {
+    font-size:12.5pt!important;
+    margin:5mm 0 3mm!important;
+    padding-bottom:2mm!important;
+  }
+  body.reclamations-page.printing #printable-area .print-row {
+    margin-bottom:3.6mm!important;
+    gap:2.2mm 3mm!important;
+    line-height:1.35!important;
+    break-inside:avoid;
+    page-break-inside:avoid;
+  }
+  body.reclamations-page.printing #printable-area .print-label {
+    font-size:11pt!important;
+    line-height:1.35!important;
+    white-space:normal!important;
+  }
+  body.reclamations-page.printing #printable-area .print-value {
+    flex:1 1 41mm!important;
+    min-height:6.5mm!important;
+    font-size:11.5pt!important;
+    line-height:1.35!important;
+  }
+  body.reclamations-page.printing #printable-area .print-block-label {font-size:11.25pt!important;}
+  body.reclamations-page.printing #printable-area .print-block-value {
+    min-height:20mm!important;
+    font-size:11.5pt!important;
+    line-height:1.4!important;
+  }
+  body.reclamations-page.printing #printable-area .sig-text {font-size:10.5pt!important;}
+}
+@media(prefers-reduced-motion:reduce) {
+  .crm-scroll-to-top {transition:none!important;scroll-behavior:auto!important;}
+}
