@@ -123,3 +123,98 @@ html:root[data-crm-theme="dark"] .motivation-editor-panel .btn-light{background:
  .motivation-scheme-card{grid-template-columns:34px minmax(0,1fr) auto;gap:8px;padding:9px}
  .motivation-scheme-icon{width:34px;height:34px}
 }
+
+
+/* Unified commercial action row: neutral controls, dark primary, brand red only for alerts. */
+.sales-page .motivation-payout-head {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:12px;
+  padding:16px 20px;
+}
+.sales-page .motivation-payout-head>div:first-child {flex:1 1 250px;min-width:0}
+.sales-page .motivation-payout-tools {
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  flex:1 1 590px;
+  gap:7px;
+  min-width:0;
+  flex-wrap:wrap;
+}
+.sales-page .motivation-payout-tools button:not(.is-primary) {
+  display:inline-flex;
+  justify-content:center;
+  align-items:center;
+  gap:7px;
+  min-height:40px;
+  padding:8px 12px;
+  border:1px solid #dedbd7;
+  border-radius:11px;
+  background:#fff;
+  color:#54575e;
+  font:750 .72rem 'Onest',sans-serif;
+  white-space:nowrap;
+}
+.sales-page .motivation-payout-tools button:not(.is-primary):hover {
+  background:#f7f5f2;
+  border-color:#d3cec9;
+  color:#27282c;
+}
+.sales-page .motivation-payout-tools button:not(.is-primary) i,
+.sales-page .motivation-payout-tools button:not(.is-primary) span {
+  color:inherit!important;
+}
+.sales-page .motivation-payout-tools button.is-primary {
+  display:inline-flex;
+  justify-content:center;
+  align-items:center;
+  gap:7px;
+  min-height:40px;
+  padding:8px 13px;
+  border:1px solid #26272b;
+  border-radius:11px;
+  background:#26272b;
+  color:#fff;
+  font:800 .72rem 'Onest',sans-serif;
+}
+.sales-page .motivation-payout-tools button.is-primary:hover {
+  background:#141519;
+  border-color:#141519;
+}
+.sales-page .motivation-payout-tools button.is-primary :is(i,span) {color:#fff!important}
+.sales-page .motivation-payout-tools input[type="month"] {
+  width:155px;
+  min-height:40px;
+  padding:5px 10px;
+  border:1px solid #dedbd7;
+  border-radius:11px;
+  background:#faf9f7;
+  color:#383a3f;
+  font:600 .73rem 'Onest',sans-serif;
+}
+@media(max-width:800px){
+  .sales-page .motivation-payout-tools {justify-content:flex-start}
+  .sales-page .motivation-payout-tools input[type="month"] {flex:1 1 140px}
+}
+@media(max-width:520px){
+  .sales-page .motivation-payout-head {padding:14px}
+  .sales-page .motivation-payout-tools {display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .sales-page .motivation-payout-tools input[type="month"] {width:100%}
+  .sales-page .motivation-payout-tools button {min-width:0;padding:8px 7px!important}
+  .sales-page .motivation-payout-tools button span {display:inline!important;font-size:.67rem}
+  .sales-page #motivation-payout-toggle {grid-column:1/-1}
+}
+:root[data-crm-theme="dark"] .sales-page .motivation-payout-tools button:not(.is-primary),
+:root[data-crm-theme="dark"] .sales-page .motivation-payout-tools input[type="month"] {
+  background:#28292e!important;
+  color:#e4e5e8!important;
+  border-color:#414249!important;
+}
+:root[data-crm-theme="dark"] .sales-page .motivation-payout-tools button.is-primary {
+  background:#3e4048!important;
+  border-color:#3e4048!important;
+  color:#fff!important;
+}
