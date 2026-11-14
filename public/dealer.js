@@ -1529,10 +1529,36 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     window.printDiv = (divId, title) => {
-        const content = document.getElementById(divId).innerHTML;
-        const win = window.open('', '', 'height=600,width=800');
-        win.document.write(`<html><head><title>${title}</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"></head><body class="p-4"><h3>${currentDealerName} - ${title}</h3>${content}</body></html>`);
-        setTimeout(() => { win.print(); }, 1000);
+        const host = document.getElementById(divId);
+        if (!host) return;
+        const content = host.innerHTML;
+        const win = window.open('', '', 'height=700,width=900');
+        if (!win) { window.showToast?.('Разрешите всплывающие окна для печати', 'warning'); return; }
+        const safe = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        const salesPrintStyles = divId === 'dealer-sales-history' ? \`
+          @page {size:A4 portrait;margin:14mm 15mm}
+          body{font-family:Arial,sans-serif;font-size:11pt;color:#25262a}
+          h3{font-size:17pt;margin:0 0 15px}
+          .dealer-sales-metrics{display:flex;gap:8px;margin:0 0 16px}
+          .dealer-sales-metric{flex:1;min-width:0;padding:11px;border:1px solid #d7d7d7;border-radius:8px}
+          .dealer-sales-metric>span{display:block;color:#666;font-size:9pt}
+          .dealer-sales-metric strong{display:block;margin-top:4px;font-size:13pt}
+          .dealer-sales-metric small{font-size:9pt}
+          .dealer-sales-table-wrap{overflow:visible}
+          .dealer-sales-table{width:100%;border-collapse:collapse;font-size:10pt}
+          .dealer-sales-table th,.dealer-sales-table td{padding:9px 12px;border:1px solid #ddd}
+          .dealer-sales-table thead th{background:#ececec;text-align:left}
+          .dealer-sales-table th:last-child,.dealer-sales-number{text-align:right}
+          .dealer-sales-table .dealer-sales-year th{background:#f4f4f4;text-align:left}
+          .dealer-sales-table .dealer-sales-year-total td{background:#f7f3eb;font-weight:bold}
+          .dealer-sales-table tfoot :is(th,td){background:#e8e8e8;font-weight:bold}
+          .dealer-sales-year,.dealer-sales-year-total,.dealer-sales-table tfoot{break-inside:avoid}
+          .bi{display:none}
+        \` : '';
+        win.document.open();
+        win.document.write(\`<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>\${safe(title)}</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"><style>\${salesPrintStyles}</style></head><body class="p-4"><h3>\${safe(currentDealerName)} — \${safe(title)}</h3>\${content}</body></html>\`);
+        win.document.close();
+        setTimeout(() => { if (!win.closed) win.print(); }, 500);
     };
 
     window.exportData = (type) => {
