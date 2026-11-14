@@ -84,7 +84,7 @@ function createGmailStockSync({ Product, StockImportMeta, AuditLog, connection, 
                 if (buffer.length > MAX_BYTES) throw new Error('Файл остатков превышает 20 МБ');
                 const workbook = XLSX.read(buffer, {type:'buffer'});
                 const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {header:1,defval:''});
-                const products = await Product.find({}).select('_id sku name excel_alias stock_qty').lean();
+                const products = await Product.find({ is_archived:{ $ne:true } }).select('_id sku name excel_alias stock_qty').lean();
                 const plan = planStockImport(rows, products);
                 const lease = await state().findOne({_id:'free_stock',owner,leaseUntil:{$gt:new Date()}});
                 if (!lease || !ready()) throw new Error('Импорт прерван до записи остатков');
