@@ -60,6 +60,10 @@
         </section>
 
         <section class="app-toolbar-card sticky-filters product-toolbar">
+            <div class="product-view-tabs" role="tablist" aria-label="Разделы матрицы">
+                <button type="button" class="product-view-tab is-active" role="tab" aria-selected="true" data-product-view="active"><i class="bi bi-grid-3x3-gap"></i><span>Рабочая матрица</span></button>
+                <button type="button" class="product-view-tab" role="tab" aria-selected="false" data-product-view="archive"><i class="bi bi-archive"></i><span>Архив</span><b id="product-archive-count">0</b></button>
+            </div>
             <div class="product-search-row">
                 <div class="product-search-box">
                     <i class="bi bi-search"></i>
@@ -143,6 +147,7 @@
                 <span>Статус</span>
                 <span></span>
             </div>
+            <div id="product-archive-notice" class="product-archive-notice" role="status" aria-live="polite" hidden></div>
             <div id="products-list-container" class="product-list">
                 <div class="product-empty-state"><span class="spinner-border spinner-border-sm"></span>Загрузка…</div>
             </div>
@@ -244,7 +249,7 @@
 
                     <div class="modal-footer product-editor-footer">
                         <button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button>
-                        <button type="button" class="btn btn-outline-danger me-auto" id="btn-delete-prod" style="display:none"><i class="bi bi-trash"></i> Удалить</button>
+                        <button type="button" class="btn btn-outline-secondary me-auto" id="btn-archive-prod" style="display:none"><i class="bi bi-archive"></i> В архив</button>
                         <button type="submit" class="btn btn-dark"><i class="bi bi-check2"></i> Сохранить</button>
                     </div>
                 </form>
