@@ -620,3 +620,34 @@ body:has(.modal.show,.offcanvas.show) #crm-scroll-to-top {opacity:0;visibility:h
 }
 :root[data-crm-theme="dark"] .dealer-form-modal .dealer-location-source > strong {color:#edf0f2;}
 :root[data-crm-theme="dark"] .dealer-form-modal .dealer-location-source > small {color:#c7a69c;}
+
+
+/* Inside the Android app: the native tab bar is already outside the WebView.
+   Keep one navigation system and give Leaflet the full available viewport. */
+@media(max-width:991.98px){
+ html.crm-native-embedded .crm-mobile-nav,
+ html.crm-native-embedded .crm-mobile-sheet-backdrop,
+ html.crm-native-embedded .bottom-nav {display:none!important;}
+ html.crm-native-embedded body,
+ html.crm-native-embedded body.map-page {padding-bottom:0!important;}
+ html.crm-native-embedded body.map-page {height:100dvh!important;min-height:100dvh!important;}
+ html.crm-native-embedded body.map-page .map-wrapper {height:100%!important;min-height:0!important;}
+ html.crm-native-embedded body.map-page .map-sidebar {
+   height:min(78dvh,720px)!important;bottom:8px!important;
+ }
+ html.crm-native-embedded body.map-page .map-mobile-list-btn {
+   bottom:14px!important;
+ }
+ html.crm-native-embedded body.map-page .map-actions-right {
+   bottom:18px!important;
+ }
+ html.crm-native-embedded body.map-page .leaflet-bottom.leaflet-right {
+   bottom:18px!important;
+ }
+ html.crm-native-embedded body.map-page .map-canvas #map-pin-editor:not([hidden]) {
+   bottom:12px!important;max-height:70dvh!important;
+ }
+ html.crm-native-embedded #crm-scroll-to-top {
+   bottom:calc(20px + env(safe-area-inset-bottom))!important;
+ }
+}
