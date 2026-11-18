@@ -178,11 +178,18 @@
                 </button>
             </div>
 
-            <button id="btn-show-list-mobile" class="map-mobile-list-btn d-md-none" type="button">
-                <i class="bi bi-list-ul"></i>
-                <span>Список дилеров</span>
-                <b id="map-mobile-count">0</b>
-            </button>
+            <div class="map-mobile-action-dock d-md-none" role="group" aria-label="Управление списком и фильтрами дилеров">
+                <button id="btn-show-filters-mobile" class="map-mobile-filters-btn" type="button" aria-controls="map-sidebar" aria-expanded="false" aria-label="Открыть фильтры карты">
+                    <i class="bi bi-sliders2" aria-hidden="true"></i>
+                    <span>Фильтры</span>
+                    <b id="map-mobile-filters-count" hidden>0</b>
+                </button>
+                <button id="btn-show-list-mobile" class="map-mobile-list-btn" type="button" aria-controls="map-sidebar" aria-expanded="false">
+                    <i class="bi bi-list-ul" aria-hidden="true"></i>
+                    <span>Дилеры</span>
+                    <b id="map-mobile-count">0</b>
+                </button>
+            </div>
         </section>
     </main>
 

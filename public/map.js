@@ -24,6 +24,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const sidebar = document.getElementById('map-sidebar');
     const dealerListContainer = document.getElementById('dealer-list-container');
     const btnShowListMobile = document.getElementById('btn-show-list-mobile');
+    const btnShowFiltersMobile = document.getElementById('btn-show-filters-mobile');
+    const mobileFiltersCount = document.getElementById('map-mobile-filters-count');
     const btnCloseMapList = document.getElementById('btn-close-map-list');
     const visibleCountBadge = document.getElementById('map-visible-count');
     const listCaption = document.getElementById('map-list-caption');
@@ -33,9 +35,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const mobileCount = document.getElementById('map-mobile-count');
     const foldButton = document.getElementById('map-toggle-filters');
     const mapHeader = document.querySelector('.map-workspace-header');
-    const foldKey = 'crm_map_filters_collapsed_v2';
-    // Start in compact mode at every viewport; a deliberate user choice is saved.
-    let filtersCollapsed = true;
+    const mobileMapViewport = () => window.matchMedia('(max-width:767.98px)').matches;
+    // A dedicated mobile preference: filters are visible when the dealer sheet opens.
+    // Keep desktop compact, without inheriting the old hidden mobile preference.
+    const foldKey = mobileMapViewport() ? 'crm_map_filters_collapsed_mobile_v1' : 'crm_map_filters_collapsed_v2';
+    let filtersCollapsed = !mobileMapViewport();
     try {
         const saved = localStorage.getItem(foldKey);
         if (saved === '1' || saved === '0') filtersCollapsed = saved === '1';
@@ -439,6 +443,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if(summaryVisible)summaryVisible.textContent=String(withPoint);
         if(visibleCountBadge)visibleCountBadge.innerHTML=`<i class="bi bi-geo-alt-fill"></i><strong>${withPoint}</strong><span>на карте</span>`;
         if(mobileCount)mobileCount.textContent=String(filteredDealers.length);
+        // Make selected filters visible even while the mobile drawer is closed.
+        const activeFilterCount = [filterCity?.value,filterStatus?.value,
+            String(searchInput?.value || '').trim()].filter(Boolean).length + Number(unmappedOnly);
+        if(mobileFiltersCount) {
+            mobileFiltersCount.textContent=String(activeFilterCount);
+            mobileFiltersCount.hidden=activeFilterCount===0;
+        }
+        if(btnShowFiltersMobile) {
+            btnShowFiltersMobile.classList.toggle('has-active-filters',activeFilterCount>0);
+            btnShowFiltersMobile.setAttribute('aria-label',activeFilterCount
+                ? `Открыть фильтры карты, активно: ${activeFilterCount}` : 'Открыть фильтры карты');
+        }
     }
     function applyFilters({fit=false}={}) {
         filteredDealers=getFilteredDealers();
@@ -495,16 +511,25 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.innerWidth < 768) closeMobileList();
     }
 
-    function openMobileList() {
+    function openMobileList({ showFilters = false } = {}) {
         if (!sidebar) return;
+        if (showFilters) {
+            filtersCollapsed = false;
+            try { localStorage.setItem(foldKey, '0'); } catch (_) {}
+            renderMapFilterFold();
+        }
         sidebar.classList.add('open');
         document.body.classList.add('map-list-open');
+        btnShowListMobile?.setAttribute('aria-expanded', 'true');
+        btnShowFiltersMobile?.setAttribute('aria-expanded', 'true');
     }
 
     function closeMobileList() {
         if (!sidebar) return;
         sidebar.classList.remove('open');
         document.body.classList.remove('map-list-open');
+        btnShowListMobile?.setAttribute('aria-expanded', 'false');
+        btnShowFiltersMobile?.setAttribute('aria-expanded', 'false');
     }
 
     function resetFilters() {
@@ -662,7 +687,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    btnShowListMobile?.addEventListener('click', openMobileList);
+    btnShowListMobile?.addEventListener('click', () => openMobileList());
+    btnShowFiltersMobile?.addEventListener('click', () => openMobileList({ showFilters: true }));
     btnCloseMapList?.addEventListener('click', closeMobileList);
 
     document.addEventListener('click', event => {

@@ -295,3 +295,142 @@
 }
 :root[data-crm-theme="dark"] .map-page #map-pin-editor #map-pin-source-address {color:#f1eef0;}
 :root[data-crm-theme="dark"] .map-page #map-pin-editor #map-pin-edit-query {background:#383039;border-color:#705157;color:#ffbdc0;}
+
+
+/* Map mobile UX: a permanent, explicit filter entry point.
+   The previous UI hid both the filter panel and the sidebar on phones. */
+@media (max-width:767.98px) {
+  .map-page .map-mobile-action-dock {
+    position:absolute;
+    z-index:1093;
+    left:50%;
+    bottom:16px;
+    display:flex;
+    align-items:stretch;
+    justify-content:center;
+    gap:9px;
+    width:max-content;
+    max-width:calc(100% - 20px);
+    transform:translateX(-50%);
+    transition:opacity .2s ease,transform .24s cubic-bezier(.2,.8,.2,1),visibility .2s;
+  }
+  .map-page .map-mobile-action-dock > button {
+    box-sizing:border-box;
+    position:static!important;
+    display:inline-flex;
+    flex:0 1 auto;
+    align-items:center;
+    justify-content:center;
+    gap:7px;
+    min-width:0;
+    min-height:46px;
+    margin:0;
+    padding:0 13px;
+    border:1px solid rgba(255,255,255,.18);
+    border-radius:15px;
+    transform:none!important;
+    white-space:nowrap;
+    font:800 12px/1.1 'Onest',sans-serif;
+    box-shadow:0 12px 30px rgba(22,22,27,.25);
+    cursor:pointer;
+    touch-action:manipulation;
+  }
+  .map-page .map-mobile-action-dock .map-mobile-filters-btn {
+    color:#fff;
+    background:linear-gradient(130deg,#ad0911,#d3222a);
+    border-color:rgba(255,255,255,.28);
+  }
+  .map-page .map-mobile-action-dock .map-mobile-filters-btn.has-active-filters {
+    background:linear-gradient(125deg,#94050b,#b9040a);
+    border-color:#ffabb0;
+  }
+  .map-page .map-mobile-action-dock .map-mobile-list-btn {
+    color:#fff;
+    background:#24252a;
+  }
+  .map-page .map-mobile-action-dock .map-mobile-filters-btn > b:not([hidden]) {
+    display:inline-grid;
+    place-items:center;
+    min-width:21px;
+    height:21px;
+    padding:0 5px;
+    border-radius:7px;
+    color:#a10c17;
+    background:#fff;
+    font:900 11px/1 'Onest',sans-serif;
+  }
+  .map-page .map-mobile-action-dock .map-mobile-filters-btn > b[hidden] {
+    display:none!important;
+  }
+  .map-page .map-mobile-action-dock .map-mobile-list-btn > b {
+    min-width:21px;
+    height:21px;
+    border-radius:7px;
+  }
+  .map-page .map-mobile-action-dock > button:focus-visible {
+    outline:3px solid #fff;
+    outline-offset:3px;
+  }
+  body.map-list-open .map-mobile-action-dock {
+    opacity:0;
+    visibility:hidden;
+    pointer-events:none;
+    transform:translate(-50%,16px);
+  }
+  /* A sheet taller than its map container clipped the header on short phones. */
+  .map-page .map-sidebar {
+    height:min(78dvh,calc(100% - 12px))!important;
+    max-height:calc(100% - 12px)!important;
+    bottom:6px!important;
+  }
+  .map-page .map-workspace-header {
+    flex:0 0 auto;
+    padding:19px 12px 11px!important;
+  }
+  .map-page .map-workspace-header .map-summary-grid {
+    display:none!important;
+  }
+  .map-page .map-workspace-header .map-filter-grid {
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:9px;
+    margin-top:10px;
+  }
+  .map-page .map-workspace-header .map-filter-grid label {
+    min-width:0;
+  }
+  .map-page .map-workspace-header .map-filter-grid label > span {
+    color:rgba(255,255,255,.8);
+    font-size:11px;
+    margin:0 0 5px 1px;
+  }
+  .map-page .map-workspace-header .map-filter-grid .form-select {
+    width:100%;
+    min-width:0;
+    min-height:42px;
+    padding:7px 25px 7px 9px;
+    border-radius:10px;
+    font-size:14px;
+    font-weight:700;
+  }
+  .map-page .map-header-actions .map-soft-action {
+    min-height:37px;
+    font-size:12px;
+  }
+  .map-page .map-topline-actions .map-fold-toggle {
+    min-height:35px;
+    padding:5px 9px;
+    font-size:11px;
+  }
+  .map-page .map-mobile-action-dock + .map-provider-note {display:none;}
+  html.crm-native-embedded .map-page .map-mobile-action-dock {
+    bottom:14px;
+  }
+}
+@media (max-width:350px) {
+  .map-page .map-mobile-action-dock {gap:6px;}
+  .map-page .map-mobile-action-dock > button {padding:0 9px;font-size:11px;gap:5px;}
+  .map-page .map-mobile-action-dock .map-mobile-list-btn > b {min-width:19px;}
+}
+@media (prefers-reduced-motion:reduce) {
+  .map-page .map-mobile-action-dock {transition:none!important;}
+}
