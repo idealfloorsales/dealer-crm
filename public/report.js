@@ -299,7 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let posUnits = 0;
         let replacements=0,tagIssues=0,tagChecked=0,priceTagUnits=0;
         data.matrix.forEach(row=>indices.forEach(index=>{
-            const cell=row.dealers[index]||{};
+            const cell=previewCell(row,index);
             if(needsSampleReplace(cell))replacements++;
             if(needsTagAttention(cell))tagIssues++;
             if(row.type!=='pos'&&knownPriceTag(cell))tagChecked++;
@@ -307,7 +307,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }));
 
         products.forEach(row => indices.forEach(index => {
-            const cell = row.dealers[index] || {};
+            const cell = previewCell(row,index);
             const state = cellState(cell);
             samples += n(cell.sample_qty);
             if (state !== 'missing') present++;
@@ -317,7 +317,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }));
 
         posRows.forEach(row => indices.forEach(index => {
-            posUnits += n(row.dealers[index]?.value);
+            posUnits += n(previewCell(row,index).value);
         }));
 
         const coverage = totalCells ? Math.round((present / totalCells) * 100) : 0;
@@ -401,10 +401,23 @@ document.addEventListener('DOMContentLoaded', () => {
         const badge=badges.filter(x=>!x.includes('✓')).length
             ? '<span class="exhibition-cell-alert" title="'+safeText(badges.join(' · '))+'"><i class="bi bi-exclamation-lg"></i></span>'
             : '';
-        const edit=canEditMatrix()
-            ? '<button type="button" class="exhibition-cell-edit" data-exhibition-edit="1" data-edit-dealer="'+safeText(dealerId)+'" data-edit-kind="'+(row.type==='pos'?'pos':'laminate')+'" data-edit-key="'+safeText(row.type==='pos'?row.name:row.id)+'" title="Редактировать выставленность / ценники" aria-label="Редактировать '+safeText(row.name)+'"><i class="bi bi-pencil"></i></button>'
+        const editable=row.type!=='pos'&&batchEditMode&&canEditMatrix();
+        const pending=row.type!=='pos'&&stagedEntry(dealerId,row.id);
+        if(editable||pending)html=html.replace('matrix-state-cell',
+            'matrix-state-cell'+(editable?' is-batch-editable':'')+(pending?' is-staged':''));
+        const quick=editable
+            ? '<button type="button" class="exhibition-quick-toggle" data-exhibition-presence="1"'+
+              ' data-edit-dealer="'+safeText(dealerId)+'" data-edit-key="'+safeText(row.id)+'"'+
+              ' aria-label="'+safeText((n(cell.value)?'Убрать образец: ':'Отметить образец: ')+
+                [row.sku,row.name].filter(Boolean).join(' '))+'"'+
+              ' aria-pressed="'+(n(cell.value)?'true':'false')+'">'+
+              '<span class="exhibition-quick-glyph"><i class="bi '+
+                (n(cell.value)?'bi-check2':'bi-plus-lg')+'"></i></span></button>'
             : '';
-        return html.replace(/<\/td>\s*$/,badge+edit+'</td>');
+        const edit=canEditMatrix()
+            ? '<button type="button" class="exhibition-cell-edit" data-exhibition-edit="1" data-edit-dealer="'+safeText(dealerId)+'" data-edit-kind="'+(row.type==='pos'?'pos':'laminate')+'" data-edit-key="'+safeText(row.type==='pos'?row.name:row.id)+'" title="Состояние, замены и ценники" aria-label="Редактировать '+safeText(row.name)+'"><i class="bi bi-pencil"></i></button>'
+            : '';
+        return html.replace(/<\/td>\s*$/,quick+badge+edit+'</td>');
     }
 
     function renderMatrix() {
@@ -436,7 +449,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let rowPresent = 0;
 
             const cells = indices.map((index, visibleIndex) => {
-                const cell = row.dealers[index] || {};
+                const cell = previewCell(row,index);
                 const state = cellState(cell);
                 if (isPos) {
                     if (n(cell.value)>0) rowPresent++;
@@ -479,6 +492,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         renderKpis();
+        updateBatchControls();
         updateDropdownLabels();
         ensureActiveFieldDealer();
         renderFieldDealers();
