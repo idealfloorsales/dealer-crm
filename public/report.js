@@ -628,8 +628,8 @@ document.addEventListener('DOMContentLoaded', () => {
             button.classList.toggle('active',button.dataset.reportView===reportView);
         });
         if (isField) {
-            renderFieldDealers();
             ensureActiveFieldDealer();
+            renderFieldDealers();
             renderFieldDealer();
         }
     }
@@ -656,7 +656,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const productRows = data.matrix.filter(row=>row.type!=='pos');
             let present=0, issues=0, samples=0,replacements=0,tagIssues=0;
             productRows.forEach(row=>{
-                const cell=row.dealers[originalIndex]||{};
+                const cell=previewCell(row,originalIndex);
                 const state=cellState(cell);
                 if(state!=='missing') present++;
                 if(state==='manual'||state==='workshop') issues++;
@@ -665,7 +665,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 samples+=n(cell.sample_qty);
             });
             data.matrix.filter(row=>row.type==='pos').forEach(row=>{
-                if(needsSampleReplace(row.dealers[originalIndex]))replacements++;
+                if(needsSampleReplace(previewCell(row,originalIndex)))replacements++;
             });
             const percent=productRows.length?Math.round((present/productRows.length)*100):0;
             const workCount=replacements+tagIssues;
@@ -712,7 +712,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const products=rows.filter(row=>row.type!=='pos');
         let present=0,confirmed=0,issues=0,samples=0,replacements=0,tagIssues=0,tagChecked=0;
         products.forEach(row=>{
-            const cell=row.dealers[originalIndex]||{};
+            const cell=previewCell(row,originalIndex);
             const state=cellState(cell);
             if(state!=='missing')present++;
             if(state==='confirmed')confirmed++;
@@ -742,7 +742,7 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
         const term=String(fieldProductSearch?.value||'').trim().toLowerCase();
         const filtered=rows.filter(row=>{
-            const cell=row.dealers[originalIndex]||{};
+            const cell=previewCell(row,originalIndex);
             const state=cellState(cell);
             const blob=`${row.sku||''} ${row.name||''}`.toLowerCase();
             return (!term||blob.includes(term))&&
@@ -750,7 +750,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 fieldRowMatches(state,row,cell);
         });
         fieldProductList.innerHTML=filtered.length?filtered.map(row=>{
-            const cell=row.dealers[originalIndex]||{};
+            const cell=previewCell(row,originalIndex);
+            const pending=row.type!=='pos'&&stagedEntry(activeFieldDealerId,row.id);
             const state=cellState(cell);
             const qty=n(cell.sample_qty);
             const posQty=row.type==='pos'?n(cell.value):0;
@@ -774,11 +775,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 safeText(message)+'</span>').join('');
             const tagCount=row.type!=='pos'&&n(cell.priceTagQty)>0
                 ? '<span class="exhibition-check-flag is-neutral">Ценников: '+fmt(cell.priceTagQty)+'</span>':'';
+            const quickButton=batchEditMode&&row.type!=='pos'&&canEditMatrix()
+                ? '<button type="button" class="exhibition-field-quick-toggle" data-exhibition-presence="1"'+
+                  ' data-edit-dealer="'+safeText(activeFieldDealerId)+'" data-edit-key="'+safeText(row.id)+'"'+
+                  ' aria-pressed="'+(n(cell.value)?'true':'false')+'">'+
+                  '<i class="bi '+(n(cell.value)?'bi-check2-circle':'bi-plus-circle')+'"></i>'+
+                  '<span>'+(n(cell.value)?'Убрать':'Отметить')+'</span></button>'
+                : '';
             const editButton=canEditMatrix()
                 ? '<button type="button" class="exhibition-field-edit" data-exhibition-edit="1" data-edit-dealer="'+safeText(activeFieldDealerId)+'" data-edit-kind="'+(row.type==='pos'?'pos':'laminate')+'" data-edit-key="'+safeText(row.type==='pos'?row.name:row.id)+'" title="Изменить выставленность и состояние"><i class="bi bi-pencil-square"></i><span>Изменить</span></button>'
                 : '';
             return `
-                <article class="exhibition-field-product is-${safeText(state)} ${needsAttention(cell)?'has-inspection-issue':''}">
+                <article class="exhibition-field-product is-${safeText(state)} ${needsAttention(cell)?'has-inspection-issue':''} ${pending?'is-staged':''}">
                     <span class="exhibition-field-state"><i class="bi ${icon}"></i></span>
                     <div class="exhibition-field-product-main">
                         <div><strong>${row.type==='pos'?'POS':safeText(row.sku)}</strong><span>${safeText(row.name)}</span>${row.type!=='pos'&&row.is_liquid===false?'<em class="exhibition-liquidity-tag">Неликвид</em>':''}</div>
@@ -788,6 +796,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                     <div class="exhibition-field-product-side">
                         <span class="exhibition-field-status">${safeText(stateLabel(state))}</span>
+                        ${quickButton}
                         ${editButton}
                     </div>
                 </article>
@@ -798,6 +807,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function openInspectionEditor({dealerId,kind,key}) {
         if(!canEditMatrix()||!inspectionModal)return;
+        if(stagedPresence.size){
+            window.showToast?.('Сначала сохраните или сбросьте выбранные изменения','warning');
+            return;
+        }
         const dealer=fullData.headers.find(item=>idOf(item.id)===dealerId);
         const row=fullData.matrix.find(item=>kind==='pos'
             ? item.type==='pos'&&item.name===key
@@ -1379,6 +1392,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.addEventListener('click',event=>{
+        const quick=event.target.closest('[data-exhibition-presence]');
+        if(quick){
+            event.preventDefault();
+            toggleStagedPresence(quick.dataset.editDealer,quick.dataset.editKey);
+            return;
+        }
         const edit=event.target.closest('[data-exhibition-edit]');
         if(edit){
             event.preventDefault();
@@ -1427,6 +1446,15 @@ document.addEventListener('DOMContentLoaded', () => {
         button.addEventListener('click',()=>setView(button.dataset.reportView));
     });
 
+    editModeButton?.addEventListener('click',toggleBatchEditMode);
+    batchSave?.addEventListener('click',saveStagedPresence);
+    batchUndo?.addEventListener('click',undoStagedPresence);
+    batchDiscard?.addEventListener('click',discardStagedPresence);
+    window.addEventListener('beforeunload',event=>{
+        if(!stagedPresence.size)return;
+        event.preventDefault();
+        event.returnValue='';
+    });
     inspectionForm?.addEventListener('submit',saveInspection);
     $('exhibition-inspection-condition')?.addEventListener('change',event=>{
         const input=$('exhibition-inspection-replace-qty');
