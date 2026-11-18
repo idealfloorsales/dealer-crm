@@ -1628,7 +1628,7 @@
 
         function setVisibility(visible) {
             button.classList.toggle('is-visible',visible);
-            if(!visible)button.classList.remove('is-launching');
+            if(!visible)button.classList.remove('is-launching','is-scrolling');
             button.tabIndex=visible?0:-1;
             button.setAttribute('aria-hidden',visible?'false':'true');
         }
@@ -1650,6 +1650,12 @@
             scrollTarget=inner||(windowReady?null:undefined);
             const scrollable=Boolean(inner||windowReady);
             if(!scrollable){
+                // Let the click animation finish its gentle landing before
+                // fading the button out at the top of the page.
+                if(button.classList.contains('is-launching')&&lastDock){
+                    button.style.setProperty('--crm-scroll-ratio','0');
+                    return;
+                }
                 lastDock=null;
                 setVisibility(false);
                 return;
@@ -1682,8 +1688,8 @@
         }
         button.addEventListener('animationend',event=>{
             if(event.animationName==='crmTopArrowTravel'){
-                button.classList.remove('is-launching');
-                button.classList.remove('is-scrolling');
+                button.classList.remove('is-launching','is-scrolling');
+                requestUpdate();
             }
         });
         button.addEventListener('click',()=>{
@@ -1691,8 +1697,8 @@
             const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
             if(!reduced){
                 button.classList.remove('is-launching');
-                // Restart a gentle vertical arrow flight and a narrow trailing
-                // light as the actual document scrolls smoothly to the top.
+                // Restart the gentle lift and rising light trail while native
+                // smooth scrolling stays interruptible by touch or wheel.
                 void button.offsetWidth;
                 button.classList.add('is-launching','is-scrolling');
             }
