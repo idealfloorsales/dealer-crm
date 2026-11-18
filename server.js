@@ -1385,6 +1385,17 @@ const collectionItemSchema = new mongoose.Schema({
 }, { _id: false });
 const compContactSchema = new mongoose.Schema({ name: String, position: String, phone: String }, { _id: false });
 
+const competitorObservationSchema = new mongoose.Schema({
+    date: { type: String, default: '' },
+    topic: { type: String, enum: ['price','assortment','promotion','dealer','stock','logistics','quality','reviews','marketing','other'], default: 'other' },
+    city: { type: String, default: '' }, dealer: { type: String, default: '' }, dealer_id: { type: String, default: '' }, product: { type: String, default: '' },
+    detail: { type: String, default: '' },
+    source_type: { type: String, enum: ['website','instagram','marketplace','dealer','visit','offer','review','other'], default: 'other' },
+    source: { type: String, default: '' }, source_url: { type: String, default: '' },
+    confidence: { type: String, enum: ['verified','observed','reported','estimate'], default: 'reported' },
+    createdAt: { type: Date, default: Date.now }
+}, { _id: false });
+
 const compRefSchema = new mongoose.Schema({
     name: String,
     country: String,
@@ -1411,7 +1422,8 @@ const compRefSchema = new mongoose.Schema({
     stock_info: String,
     reserve_days: String,
     contacts: [compContactSchema],
-    collections: [collectionItemSchema]
+    collections: [collectionItemSchema],
+    observations: [competitorObservationSchema]
 }, { timestamps: true });
 const CompRef = mongoose.model('CompRef', compRefSchema);
 
@@ -5499,6 +5511,55 @@ app.get('/api/competitors-ref', requirePermission('can_view_competitors'), async
         const list=await query.lean();
         res.json(list.map(convertToClient));
     } catch(_){res.status(500).json({error:'Не удалось загрузить конкурентов'});}
+});
+app.post('/api/competitors-ref/:id/observations', requirePermission('can_view_competitors'), async (req, res) => {
+    try {
+        const detail = String(req.body.detail || '').trim().slice(0, 2000);
+        const date = String(req.body.date || '').trim();
+        const topic = String(req.body.topic || 'other').trim();
+        const sourceType = String(req.body.source_type || 'visit').trim();
+        const sourceUrl = String(req.body.source_url || '').trim().slice(0, 2000);
+        const topics = ['price','assortment','promotion','dealer','stock','logistics','quality','reviews','marketing','other'];
+        const sources = ['website','instagram','marketplace','dealer','visit','offer','review','other'];
+        if (!detail) return res.status(400).json({ error: 'Опишите наблюдение' });
+        const parsedDate = new Date(date + 'T00:00:00Z');
+        if (date.length !== 10 || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== date) return res.status(400).json({ error: 'Некорректная дата' });
+        if (!topics.includes(topic) || !sources.includes(sourceType)) return res.status(400).json({ error: 'Некорректная тема или источник' });
+        if (sourceUrl) {
+            let parsedUrl;
+            try { parsedUrl = new URL(sourceUrl); } catch (_) { return res.status(400).json({ error: 'Некорректная ссылка' }); }
+            if (!['http:', 'https:'].includes(parsedUrl.protocol)) return res.status(400).json({ error: 'Ссылка должна начинаться с http:// или https://' });
+        }
+
+        let linkedDealer = null;
+        const dealerId = String(req.body.dealer_id || '').trim();
+        if (dealerId) {
+            const allowedDealerIds = await getScopedDealerIds(req);
+            if (!allowedDealerIds.includes(dealerId)) return res.status(403).json({ error: 'Нет доступа к выбранному дилеру' });
+            linkedDealer = await Dealer.findById(dealerId).select('_id name city').lean();
+            if (!linkedDealer) return res.status(404).json({ error: 'Дилер не найден' });
+        }
+
+        const competitor = await CompRef.findById(req.params.id).select('_id');
+        if (!competitor) return res.status(404).json({ error: 'Конкурент не найден' });
+        const observation = {
+            date, topic, detail, source_type: sourceType, source_url: sourceUrl,
+            source: sourceUrl ? 'Публичная ссылка' : '',
+            confidence: sourceUrl ? 'verified' : (sourceType === 'visit' ? 'observed' : (sourceType === 'dealer' ? 'reported' : 'reported')),
+            dealer_id: linkedDealer ? String(linkedDealer._id) : '',
+            dealer: linkedDealer ? String(linkedDealer.name || '') : '',
+            city: linkedDealer ? String(linkedDealer.city || '') : '',
+            createdAt: new Date()
+        };
+        await CompRef.updateOne(
+            { _id: competitor._id },
+            { $push: { observations: { $each: [observation], $slice: -500 } }, $max: { last_monitoring_date: date } },
+            { runValidators: true }
+        );
+        res.status(201).json({ status: 'ok', observation });
+    } catch (error) {
+        res.status(400).json({ error: error.message || 'Не удалось сохранить наблюдение' });
+    }
 });
 app.post('/api/competitors-ref', requirePermission('can_manage_competitors'), async (req, res) => { const c = new CompRef(req.body); await c.save(); res.json(convertToClient(c)); });
 app.put('/api/competitors-ref/:id', requirePermission('can_manage_competitors'), async (req, res) => { await CompRef.findByIdAndUpdate(req.params.id, req.body); res.json({status:'ok'}); });

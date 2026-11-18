@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const modal = bootstrap.Modal.getOrCreateInstance($('comp-modal'), { backdrop:'static', keyboard:false });
     const typesModal = bootstrap.Modal.getOrCreateInstance($('types-manager-modal'));
     const dealersModal = bootstrap.Modal.getOrCreateInstance($('dealers-list-modal'));
+    const observationModal = bootstrap.Modal.getOrCreateInstance($('observation-modal'));
 
     const form = $('comp-form');
     const saveBtn = $('btn-save-comp');
@@ -58,6 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const collectionsContainer = $('collections-container');
     const contactsContainer = $('comp-contacts-list');
     const addressesContainer = $('comp-addresses-list');
+    const observationsContainer = $('comp-observations-list');
 
     const defaultTypes = [
         { val:'std', label:'Стандарт', color:'#94a3b8' },
@@ -72,7 +74,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let allDealers = [];
     let dynamicTypes = [];
     let currentLogo = '';
+    let currentObservations = [];
     let canManage = false;
+    let canObserve = false;
+    let selectedCompetitorId = '';
     let canExport = false;
     let viewMode = localStorage.getItem('competitors_view') || 'cards';
     let quickFilter = 'all';
@@ -111,6 +116,11 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.appendChild(box);
         setTimeout(()=>box.remove(),2600);
     }
+
+    const observationTopics = {price:'Цена',assortment:'Ассортимент',promotion:'Акция',dealer:'Дилер / выкладка',stock:'Наличие',logistics:'Доставка / склад',quality:'Качество',reviews:'Отзывы',marketing:'Реклама',other:'Другое'};
+    const observationSources = {website:'Сайт',instagram:'Instagram',marketplace:'Маркетплейс',dealer:'Дилер',visit:'Визит',offer:'Коммерческое предложение',review:'Отзыв',other:'Другое'};
+    const observationConfidence = {verified:'Подтверждено',observed:'Видел лично',reported:'Со слов дилера',estimate:'Оценка'};
+    const orderedObservations = rows => [...(Array.isArray(rows)?rows:[])].sort((a,b)=>String(b.date||b.createdAt||'').localeCompare(String(a.date||a.createdAt||'')));
 
     function statusLabel(value) {
         return ({active:'Активный',watch:'Наблюдение',inactive:'Неактивный'})[value] || 'Активный';
@@ -167,6 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             competitors = Array.isArray(competitors) ? competitors : [];
             allDealers = Array.isArray(allDealers) ? allDealers : [];
+            populateObservationDealers();
             refreshDynamicTypes();
             populateFilters();
             renderAll();
@@ -222,6 +233,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const withDealers = competitors.filter(c=>dealerCount(c)>0).length;
         const overdue = competitors.filter(c=>monitoringState(c).key==='overdue').length;
         const pricePositions = competitors.reduce((sum,c)=>sum+pricedCollectionCount(c),0);
+        const observationsTotal = competitors.reduce((sum,c)=>sum+(Array.isArray(c.observations)?c.observations.length:0),0);
+        const stale = competitors.filter(c=>{ const latest=orderedObservations(c.observations)[0]?.date || c.last_monitoring_date || ''; return !latest || latest < plusDays(dateKeyToday(),-30); }).length;
 
         dashboard.innerHTML = [
             ['bi-shop','Брендов',totalBrands,'шт',''],
@@ -229,7 +242,9 @@ document.addEventListener('DOMContentLoaded', () => {
             ['bi-exclamation-diamond','Высокий приоритет',important,'брендов',important?'is-danger':''],
             ['bi-buildings','Есть у дилеров',withDealers,'брендов',''],
             ['bi-clock-history','Просрочен мониторинг',overdue,'брендов',overdue?'is-warning':''],
-            ['bi-cash-stack','Цены заполнены',pricePositions,'коллекций','']
+            ['bi-cash-stack','Цены заполнены',pricePositions,'коллекций',''],
+            ['bi-journal-text','Наблюдения',observationsTotal,'записей',''],
+            ['bi-hourglass-split','Нет свежих данных',stale,'брендов',stale?'is-warning':'']
         ].map(([icon,label,value,unit,cls])=>`
             <article class="competitor-kpi ${cls}">
                 <span class="competitor-kpi-icon"><i class="bi ${icon}"></i></span>
@@ -244,6 +259,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return norm([
             c.name,c.country,c.supplier,c.warehouse,c.segment,(c.tags||[]).join(' '),
             c.strengths,c.weaknesses,c.info,c.monitoring_owner,c.price_positioning,
+            (c.observations||[]).map(o=>[o.topic,o.city,o.dealer,o.product,o.detail,o.source,o.source_url].join(' ')).join(' '),
             collections,contacts,addresses
         ].join(' '));
     }
@@ -334,6 +350,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const dealers = dealerCount(c);
         const priced = pricedCollectionCount(c);
         const mon = monitoringState(c);
+        const observations = orderedObservations(c.observations);
         const collections = c.collections || [];
         const preview = collections.slice(0,3).map(col=>{
             const obj = typeof col==='string' ? {name:col,type:'std'} : col;
@@ -379,6 +396,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
                 <div class="competitor-card-actions">
+                    ${canObserve?`<button type="button" class="comp-icon-btn" data-observe-id="${esc(idOf(c))}" title="Добавить наблюдение"><i class="bi bi-journal-plus"></i></button>`:''}
                     ${canManage?`<button type="button" class="comp-icon-btn" data-edit-id="${esc(idOf(c))}" title="Редактировать"><i class="bi bi-pencil"></i></button>`:''}
                 </div>
             </div>
@@ -387,6 +405,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="competitor-card-metric"><small>Коллекций</small><strong>${fmt(collections.length)}</strong></div>
                 <div class="competitor-card-metric"><small>У дилеров</small><strong>${fmt(dealers)}</strong></div>
                 <div class="competitor-card-metric"><small>С ценами</small><strong>${fmt(priced)}/${fmt(collections.length)}</strong></div>
+                <div class="competitor-card-metric"><small>Наблюдений</small><strong>${fmt(observations.length)}</strong></div>
             </div>
 
             <div class="competitor-card-info">${supplierLine}${segmentLine}</div>
@@ -407,6 +426,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="competitor-analysis-grid">
                     <div class="competitor-analysis-box is-good"><strong><i class="bi bi-plus-circle me-1"></i>Сильные стороны</strong><p>${esc(c.strengths||'Не заполнено')}</p></div>
                     <div class="competitor-analysis-box is-bad"><strong><i class="bi bi-dash-circle me-1"></i>Слабые стороны</strong><p>${esc(c.weaknesses||'Не заполнено')}</p></div>
+                </div>
+                <div class="competitor-observation-preview">
+                    <div class="competitor-observation-preview-head"><strong><i class="bi bi-journal-text me-1"></i>Последние наблюдения</strong><span>${fmt(observations.length)}</span></div>
+                    ${observations.slice(0,3).map(o=>`<article><div><strong>${esc(observationTopics[o.topic]||'Наблюдение')}</strong><small>${dateText(o.date)} · ${esc(observationSources[o.source_type]||'Источник не указан')} · ${esc(observationConfidence[o.confidence]||'Не проверено')}</small></div><p>${esc(o.detail||'')}</p>${o.dealer_id?`<a class="observation-context observation-context-link" href="/dealer.html?id=${encodeURIComponent(o.dealer_id)}">${esc([o.city,o.dealer].filter(Boolean).join(' · ')||'Открыть дилера')}</a>`:o.city||o.dealer||o.product?`<small class="observation-context">${esc([o.city,o.dealer,o.product].filter(Boolean).join(' · '))}</small>`:''}</article>`).join('') || '<div class="competitor-observation-empty">Пока нет записей. Добавьте наблюдение в карточке бренда.</div>'}
                 </div>
                 ${c.info?`<div class="competitor-note">${esc(c.info)}</div>`:''}
             </div>
@@ -432,6 +455,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         grid.innerHTML = rows.map(cardHtml).join('');
         grid.querySelectorAll('[data-edit-id]').forEach(btn=>btn.addEventListener('click',()=>openEdit(btn.dataset.editId)));
+        grid.querySelectorAll('[data-observe-id]').forEach(btn=>btn.addEventListener('click',()=>openObservation(btn.dataset.observeId)));
         grid.querySelectorAll('[data-expand-id]').forEach(btn=>btn.addEventListener('click',()=>toggleExpand(btn.dataset.expandId)));
         grid.querySelectorAll('[data-dealers-id]').forEach(btn=>btn.addEventListener('click',()=>openDealers(btn.dataset.dealersId)));
     }
@@ -536,8 +560,85 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(error){toast('Не удалось обновить типы','error');}
     }
 
+    function renderObservations() {
+        if(!observationsContainer) return;
+        const rows=orderedObservations(currentObservations);
+        observationsContainer.innerHTML=rows.length?rows.map(o=>{
+            const link=String(o.source_url||'').trim();
+            const safeLink=/^https?:\/\//i.test(link)?link:'';
+            const context=[o.city,o.dealer,o.product].filter(Boolean).join(' · ');
+            const dealerLink=o.dealer_id?`<a href="/dealer.html?id=${encodeURIComponent(o.dealer_id)}"><i class="bi bi-shop"></i>${esc([o.city,o.dealer].filter(Boolean).join(' · ')||'Карточка дилера')}</a>`:'';
+            return `<article class="competitor-observation-row">
+                <div class="competitor-observation-row-top"><strong>${esc(observationTopics[o.topic]||'Наблюдение')}</strong><span>${dateText(o.date)} · ${esc(observationConfidence[o.confidence]||'Не проверено')}</span></div>
+                <p>${esc(o.detail||'')}</p>
+                <div class="competitor-observation-row-meta">${dealerLink|| (context?`<span><i class="bi bi-geo-alt"></i>${esc(context)}</span>`:'')}<span><i class="bi bi-link-45deg"></i>${esc(observationSources[o.source_type]||'Источник')}${o.source?` · ${esc(o.source)}`:''}</span>${safeLink?`<a href="${esc(safeLink)}" target="_blank" rel="noopener noreferrer">Открыть источник <i class="bi bi-box-arrow-up-right"></i></a>`:''}</div>
+            </article>`;
+        }).join(''):'<div class="competitor-observation-empty">Записей пока нет. Добавьте первое наблюдение с датой и источником.</div>';
+    }
+
+    function populateObservationDealers() {
+        const select=$('obs-dealer-id');
+        if(!select) return;
+        const current=select.value||'';
+        const rows=[...allDealers].sort((a,b)=>String(a.city||'').localeCompare(String(b.city||''),'ru')||String(a.name||'').localeCompare(String(b.name||''),'ru'));
+        select.innerHTML='<option value="">Общее наблюдение, без дилера</option>'+rows.map(dealer=>{
+            const label=[dealer.city,dealer.name,dealer.dealer_id].filter(Boolean).join(' · ');
+            return `<option value="${esc(idOf(dealer))}">${esc(label||dealer.name||'Дилер')}</option>`;
+        }).join('');
+        if(rows.some(dealer=>idOf(dealer)===current)) select.value=current;
+    }
+
+    function openObservation(id) {
+        if(!canObserve) return;
+        const competitor=competitors.find(item=>idOf(item)===String(id));
+        if(!competitor) return;
+        selectedCompetitorId=idOf(competitor);
+        $('obs-competitor-name').textContent=competitor.name||'';
+        $('obs-topic').value='price';
+        $('obs-source-type').value='visit';
+        $('obs-detail').value='';
+        $('obs-url').value='';
+        $('obs-dealer-id').value='';
+        observationModal.show();
+        setTimeout(()=>$('obs-detail')?.focus(),180);
+    }
+
+    async function saveObservation() {
+        if(!canObserve||!selectedCompetitorId) return;
+        const detail=$('obs-detail')?.value.trim()||'';
+        if(!detail) return toast('Напишите, что заметили','warning');
+        const sourceUrl=$('obs-url')?.value.trim()||'';
+        if(sourceUrl&&!/^https?:\/\//i.test(sourceUrl)) return toast('Ссылка должна начинаться с http:// или https://','warning');
+        const saveBtn=$('obs-save-btn');
+        const old=saveBtn.innerHTML;
+        saveBtn.disabled=true;
+        saveBtn.innerHTML='<span class="spinner-border spinner-border-sm"></span> Сохраняем…';
+        const sourceType=$('obs-source-type')?.value||'visit';
+        try{
+            const response=await fetch(`${API_URL}/${encodeURIComponent(selectedCompetitorId)}/observations`,{
+                method:'POST',headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({
+                    date:dateKeyToday(),
+                    topic:$('obs-topic')?.value||'other',
+                    source_type:sourceType,
+                    source_url:sourceUrl,
+                    dealer_id:$('obs-dealer-id')?.value||'',
+                    detail
+                })
+            });
+            const data=await response.json().catch(()=>({}));
+            if(!response.ok) throw new Error(data.error||'Не удалось сохранить наблюдение');
+            observationModal.hide();
+            toast('Наблюдение сохранено в досье конкурента');
+            await loadData();
+        }catch(error){toast(error.message||'Ошибка сохранения','error');}
+        finally{saveBtn.disabled=false;saveBtn.innerHTML=old;}
+    }
+
     function resetForm() {
         form.reset();
+        currentObservations=[];
+        renderObservations();
         fields.id.value='';
         fields.status.value='active';
         fields.priority.value='medium';
@@ -602,6 +703,8 @@ document.addEventListener('DOMContentLoaded', () => {
         fields.weaknesses.value=c.weaknesses||'';
         fields.info.value=c.info||'';
         setLogo(c.logoUrl||'');
+        currentObservations=Array.isArray(c.observations)?[...c.observations]:[];
+        renderObservations();
 
         collectionsContainer.innerHTML='';
         (c.collections||[]).length
@@ -779,13 +882,14 @@ document.addEventListener('DOMContentLoaded', () => {
     async function exportCsv() {
         if(!competitors.length) return toast('Нет данных для экспорта','warning');
         const clean=value=>`"${String(value??'').replace(/"/g,'""')}"`;
-        let csv='\uFEFFБренд;Страна;Статус;Приоритет;Сегмент;Поставщик;Склад;Коллекция;Тип;Класс;Толщина;Формат;Опт;Розница;Валюта;Дилеров;Последний мониторинг;Следующий мониторинг;Ответственный;Сильные стороны;Слабые стороны;Теги;Сайт;Instagram;Заметки\n';
+        let csv='\uFEFFБренд;Страна;Статус;Приоритет;Сегмент;Поставщик;Склад;Коллекция;Тип;Класс;Толщина;Формат;Опт;Розница;Валюта;Дилеров;Последний мониторинг;Следующий мониторинг;Ответственный;Сильные стороны;Слабые стороны;Теги;Сайт;Instagram;Заметки;История наблюдений\n';
         competitors.forEach(c=>{
             const base=[
                 c.name,c.country,statusLabel(c.status||'active'),priorityLabel(c.priority||'medium'),c.segment,c.supplier,c.warehouse
             ].map(clean).join(';');
             const tail=[
-                dealerCount(c),c.last_monitoring_date,c.next_monitoring_date,c.monitoring_owner,c.strengths,c.weaknesses,(c.tags||[]).join(', '),c.website,c.instagram,c.info
+                dealerCount(c),c.last_monitoring_date,c.next_monitoring_date,c.monitoring_owner,c.strengths,c.weaknesses,(c.tags||[]).join(', '),c.website,c.instagram,c.info,
+                orderedObservations(c.observations).map(o=>[`${dateText(o.date)} ${observationTopics[o.topic]||'Наблюдение'}: ${o.detail}`,o.city,o.dealer,o.source,o.source_url,observationConfidence[o.confidence]||''].filter(Boolean).join(' · ')).join(' | ')
             ].map(clean).join(';');
             const collections=(c.collections||[]).length?c.collections:[{}];
             collections.forEach(raw=>{
@@ -803,6 +907,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function init() {
         if(window.CRMAuth?.ready) await CRMAuth.ready;
         canManage=Boolean(window.CRMAuth?.can('can_manage_competitors'));
+        canObserve=Boolean(window.CRMAuth?.can('can_view_competitors'));
         canExport=Boolean(window.CRMAuth?.can('can_export_prices'));
         if(addBtn) addBtn.style.display=canManage?'':'none';
         if(manageTypesBtn) manageTypesBtn.style.display=canManage?'':'none';
@@ -828,6 +933,7 @@ document.addEventListener('DOMContentLoaded', () => {
     $('add-coll-row-btn')?.addEventListener('click',()=>addCollectionRow());
     $('btn-add-contact')?.addEventListener('click',()=>addContactRow());
     $('btn-add-address')?.addEventListener('click',()=>addAddressRow());
+    $('obs-save-btn')?.addEventListener('click',saveObservation);
 
     searchInput?.addEventListener('input',renderGrid);
     filterIds.forEach(id=>filters[id]?.addEventListener('change',renderGrid));

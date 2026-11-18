@@ -216,6 +216,13 @@
                             </div>
                         </section>
 
+                        <section class="competitor-form-section competitor-observation-section" id="competitor-observations">
+                            <div class="competitor-form-section-head">
+                                <div><span>ИСТОРИЯ РЫНКА</span><strong>Журнал наблюдений</strong><small>Записи сохраняются отдельно и не меняют данные дилера или карточку бренда.</small></div>
+                            </div>
+                            <div id="comp-observations-list" class="competitor-observations-list"></div>
+                        </section>
+
                         <section class="competitor-form-section">
                             <div class="competitor-form-section-head">
                                 <div><span>АССОРТИМЕНТ И ЦЕНЫ</span><strong>Коллекции</strong><small>Можно хранить характеристики и цены по каждой коллекции.</small></div>
@@ -237,6 +244,24 @@
                         <button type="submit" id="btn-save-comp" class="btn btn-dark"><i class="bi bi-check2 me-1"></i>Сохранить</button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="observation-modal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content competitor-small-modal observation-quick-modal">
+                <div class="modal-header"><div><small>БЫСТРАЯ ЗАПИСЬ</small><h5>Наблюдение о конкуренте</h5><span id="obs-competitor-name" class="observation-competitor-name"></span></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <label class="observation-quick-field"><span>Дилер из CRM</span><select id="obs-dealer-id" class="form-select"><option value="">Общее наблюдение, без дилера</option></select><small>Выберите существующего дилера — город и связь с его карточкой добавятся автоматически.</small></label>
+                    <div class="observation-quick-grid">
+                        <label class="observation-quick-field"><span>Тема</span><select id="obs-topic" class="form-select"><option value="price">Цена</option><option value="assortment">Ассортимент</option><option value="promotion">Акция</option><option value="dealer">Дилер / выкладка</option><option value="stock">Наличие</option><option value="logistics">Доставка / склад</option><option value="quality">Качество</option><option value="reviews">Отзывы</option><option value="marketing">Реклама</option><option value="other">Другое</option></select></label>
+                        <label class="observation-quick-field"><span>Откуда информация</span><select id="obs-source-type" class="form-select"><option value="visit">Осмотр менеджера</option><option value="website">Сайт</option><option value="instagram">Instagram</option><option value="marketplace">Маркетплейс</option><option value="dealer">Со слов дилера</option><option value="offer">Коммерческое предложение</option><option value="review">Отзыв</option><option value="other">Другое</option></select></label>
+                    </div>
+                    <label class="observation-quick-field"><span>Что заметили *</span><textarea id="obs-detail" class="form-control" rows="3" maxlength="2000" placeholder="Коротко: цена, акция, ассортимент, выкладка или другое изменение"></textarea></label>
+                    <details class="observation-source-details"><summary>Добавить ссылку на источник</summary><input type="url" id="obs-url" class="form-control" placeholder="https://…"></details>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button><button type="button" id="obs-save-btn" class="btn btn-dark"><i class="bi bi-check2 me-1"></i>Сохранить наблюдение</button></div>
             </div>
         </div>
     </div>
