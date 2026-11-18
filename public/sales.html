@@ -72,6 +72,17 @@
         .sales-intelligence-action{align-self:center;white-space:nowrap;color:var(--if-red);font-size:.68rem;font-weight:800;text-decoration:none}
         .sales-intelligence-empty{padding:14px;border:1px dashed var(--if-line);border-radius:12px;color:var(--if-muted);font-size:.75rem}
         @media(max-width:767px){.sales-intelligence{padding:14px;border-radius:14px}.sales-intelligence-head{align-items:flex-start}.sales-intelligence-head h2{font-size:1rem}.sales-intelligence-head p{font-size:.7rem}.sales-intelligence-refresh{padding:7px 8px;font-size:.66rem}.sales-intelligence-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.sales-intelligence-kpi{padding:9px}.sales-intelligence-kpi strong{font-size:1.05rem}.sales-intelligence-dealer{grid-template-columns:1fr}.sales-intelligence-action{justify-self:start}}
+
+        .sales-module-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0 0 16px;padding:5px;border:1px solid var(--if-line);border-radius:15px;background:var(--if-card)}
+        .sales-module-tab{display:grid;grid-template-columns:24px minmax(0,1fr);grid-template-rows:auto auto;align-items:center;column-gap:8px;text-align:left;min-width:0;padding:10px 12px;border:1px solid transparent;border-radius:11px;background:transparent;color:var(--if-muted);transition:background .18s ease,color .18s ease,border-color .18s ease}
+        .sales-module-tab>i{grid-row:1/3;display:grid;place-items:center;width:24px;height:24px;border-radius:8px;background:var(--if-canvas);font-size:13px}
+        .sales-module-tab>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--if-ink);font-size:.76rem;font-weight:800}
+        .sales-module-tab>small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--if-muted);font-size:.62rem}
+        .sales-module-tab.active{border-color:var(--if-line);background:var(--if-canvas);box-shadow:0 2px 8px rgba(30,20,15,.06)}
+        .sales-module-tab.active>i{background:var(--if-soft-red);color:var(--if-red)}
+        .sales-module-tab:focus-visible{outline:2px solid var(--if-red);outline-offset:2px}
+        .sales-module-content{min-height:160px}
+        @media(max-width:767px){.sales-module-nav{display:flex;gap:6px;margin-left:-2px;margin-right:-2px;overflow-x:auto;scrollbar-width:none}.sales-module-nav::-webkit-scrollbar{display:none}.sales-module-tab{flex:1 0 112px;padding:9px 8px}.sales-module-tab>span{font-size:.7rem}.sales-module-tab>small{font-size:.57rem}}
 </style>
     <script src="theme-init.js?v={{VER}}"></script>
     <link id="crm-dark-theme-file" rel="stylesheet" href="dark-theme.css?v={{VER}}" media="screen">
@@ -106,7 +117,20 @@
             </div>
         </section>
 
-        <section class="sales-performance-section">
+                <nav class="sales-module-nav" role="tablist" aria-label="Разделы продаж">
+            <button type="button" class="sales-module-tab active" id="sales-entry-tab" data-bs-toggle="tab" data-bs-target="#sales-entry-pane" role="tab" aria-controls="sales-entry-pane" aria-selected="true" data-sales-module-tab>
+                <i class="bi bi-pencil-square"></i><span>Ввод продаж</span><small>План и факт</small>
+            </button>
+            <button type="button" class="sales-module-tab" id="sales-radar-tab" data-bs-toggle="tab" data-bs-target="#sales-radar-pane" role="tab" aria-controls="sales-radar-pane" aria-selected="false" data-sales-module-tab>
+                <i class="bi bi-radar"></i><span>Радар продаж</span><small>Снижение и рост</small>
+            </button>
+            <button type="button" class="sales-module-tab" id="sales-motivation-tab" data-bs-toggle="tab" data-bs-target="#sales-motivation-pane" role="tab" aria-controls="sales-motivation-pane" aria-selected="false" data-sales-module-tab>
+                <i class="bi bi-cash-coin"></i><span>Мотивации</span><small>Начисления и выплаты</small>
+            </button>
+        </nav>
+        <div class="tab-content sales-module-content" id="salesModulesContent">
+            <div class="tab-pane fade show active" id="sales-entry-pane" role="tabpanel" aria-labelledby="sales-entry-tab">
+<section class="sales-performance-section">
             <div class="sales-performance-head">
                 <div>
                     <h2>Выполнение плана</h2>
@@ -123,43 +147,9 @@
             </div>
         </section>
 
-        <section class="sales-intelligence" id="sales-intelligence">
-            <header class="sales-intelligence-head">
-                <div><h2><i class="bi bi-radar me-2"></i>Радар продаж</h2><p>Автоматически находит дилеров с замедлением продаж и показывает сигналы для проверки.</p></div>
-                <button type="button" id="sales-intelligence-refresh" class="sales-intelligence-refresh"><i class="bi bi-arrow-clockwise me-1"></i>Обновить анализ</button>
-            </header>
-            <div id="sales-intelligence-kpis" class="sales-intelligence-kpis"><div class="sales-intelligence-empty">Загружаем историю продаж…</div></div>
-            <div id="sales-intelligence-regions" class="sales-intelligence-regions"></div>
-            <div id="sales-intelligence-list" class="sales-intelligence-list"></div>
-        </section>
+        
 
-        <section class="motivation-payout-panel" id="motivation-payouts-panel">
-            <div class="motivation-payout-head">
-                <div>
-                    <span>МОТИВАЦИЯ ДИЛЕРОВ</span>
-                    <h2>Мотивации к выплате</h2>
-                    <p>Расчёт по фактическим продажам: ставка за 1 м² × проданные м².</p>
-                </div>
-                <div class="motivation-payout-tools">
-                    <button type="button" id="motivation-payout-toggle" aria-expanded="true" aria-controls="motivation-payout-content">Скрыть мотивацию</button>
-                    <input type="month" id="motivation-payout-month" class="form-control">
-                    <button type="button" id="motivation-payout-print"><i class="bi bi-printer"></i><span> Печать списка</span></button>
-                    <button type="button" id="motivation-payout-settings" class="motivation-manager-open"><i class="bi bi-gear"></i><span> Настройки</span></button>
-                    <button type="button" id="motivation-payout-recalc" class="is-primary"><i class="bi bi-arrow-repeat"></i><span> Пересчитать</span></button>
-                </div>
-            </div>
-            <div id="motivation-payout-content">
-            <div class="motivation-payout-summary">
-                <article><small>Дилеров к расчёту</small><strong id="motivation-payout-count">0</strong></article>
-                <article><small>Продажи</small><strong id="motivation-payout-sales">0 м²</strong></article>
-                <article><small>Осталось выплатить</small><strong id="motivation-payout-pending">0 ₸</strong></article>
-                <article><small>Уже выплачено</small><strong id="motivation-payout-paid">0 ₸</strong></article>
-            </div>
-            <div id="motivation-payout-list" class="motivation-payout-list">
-                <div class="motivation-payout-empty">Загрузка расчёта…</div>
-            </div>
-            </div>
-        </section>
+        
 
         <div class="mobile-view-toggler sales-mobile-switch">
             <button class="sales-mobile-tab active" id="tab-input-btn" type="button"><i class="bi bi-pencil-square" aria-hidden="true"></i><span>Ввод продаж</span></button>
@@ -218,7 +208,45 @@
                 </section>
             </div>
         </div>
-    </main>
+                </div>
+            <div class="tab-pane fade" id="sales-radar-pane" role="tabpanel" aria-labelledby="sales-radar-tab"><section class="sales-intelligence" id="sales-intelligence">
+            <header class="sales-intelligence-head">
+                <div><h2><i class="bi bi-radar me-2"></i>Радар продаж</h2><p>Автоматически находит дилеров с замедлением продаж и показывает сигналы для проверки.</p></div>
+                <button type="button" id="sales-intelligence-refresh" class="sales-intelligence-refresh"><i class="bi bi-arrow-clockwise me-1"></i>Обновить анализ</button>
+            </header>
+            <div id="sales-intelligence-kpis" class="sales-intelligence-kpis"><div class="sales-intelligence-empty">Загружаем историю продаж…</div></div>
+            <div id="sales-intelligence-regions" class="sales-intelligence-regions"></div>
+            <div id="sales-intelligence-list" class="sales-intelligence-list"></div>
+        </section></div>
+            <div class="tab-pane fade" id="sales-motivation-pane" role="tabpanel" aria-labelledby="sales-motivation-tab"><section class="motivation-payout-panel" id="motivation-payouts-panel">
+            <div class="motivation-payout-head">
+                <div>
+                    <span>МОТИВАЦИЯ ДИЛЕРОВ</span>
+                    <h2>Мотивации к выплате</h2>
+                    <p>Расчёт по фактическим продажам: ставка за 1 м² × проданные м².</p>
+                </div>
+                <div class="motivation-payout-tools">
+                    <button type="button" id="motivation-payout-toggle" aria-expanded="true" aria-controls="motivation-payout-content">Скрыть мотивацию</button>
+                    <input type="month" id="motivation-payout-month" class="form-control">
+                    <button type="button" id="motivation-payout-print"><i class="bi bi-printer"></i><span> Печать списка</span></button>
+                    <button type="button" id="motivation-payout-settings" class="motivation-manager-open"><i class="bi bi-gear"></i><span> Настройки</span></button>
+                    <button type="button" id="motivation-payout-recalc" class="is-primary"><i class="bi bi-arrow-repeat"></i><span> Пересчитать</span></button>
+                </div>
+            </div>
+            <div id="motivation-payout-content">
+            <div class="motivation-payout-summary">
+                <article><small>Дилеров к расчёту</small><strong id="motivation-payout-count">0</strong></article>
+                <article><small>Продажи</small><strong id="motivation-payout-sales">0 м²</strong></article>
+                <article><small>Осталось выплатить</small><strong id="motivation-payout-pending">0 ₸</strong></article>
+                <article><small>Уже выплачено</small><strong id="motivation-payout-paid">0 ₸</strong></article>
+            </div>
+            <div id="motivation-payout-list" class="motivation-payout-list">
+                <div class="motivation-payout-empty">Загрузка расчёта…</div>
+            </div>
+            </div>
+        </section></div>
+        </div>
+</main>
 
     <section id="sales-print-report" class="sales-print-report" aria-hidden="true">
         <header class="sales-print-header">
