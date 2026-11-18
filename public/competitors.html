@@ -216,6 +216,27 @@
                             </div>
                         </section>
 
+                        <section class="competitor-form-section competitor-observation-section">
+                            <div class="competitor-form-section-head">
+                                <div><span>ИСТОРИЯ РЫНКА</span><strong>Журнал наблюдений</strong><small>Фиксируйте изменения с датой, источником и уровнем достоверности.</small></div>
+                            </div>
+                            <div class="competitor-observation-form">
+                                <label><span>Дата</span><input type="date" id="obs-date" class="form-control"></label>
+                                <label><span>Что наблюдаем</span><select id="obs-topic" class="form-select"><option value="price">Цена</option><option value="assortment">Ассортимент</option><option value="promotion">Акция</option><option value="dealer">Дилер / выкладка</option><option value="stock">Наличие</option><option value="logistics">Доставка / склад</option><option value="quality">Качество</option><option value="reviews">Отзывы</option><option value="marketing">Реклама</option><option value="other">Другое</option></select></label>
+                                <label><span>Город</span><input type="text" id="obs-city" class="form-control" placeholder="Астана"></label>
+                                <label><span>Дилер / магазин</span><input type="text" id="obs-dealer" class="form-control" placeholder="Название точки"></label>
+                                <label><span>Товар / коллекция</span><input type="text" id="obs-product" class="form-control" placeholder="Артикул или коллекция"></label>
+                                <label><span>Источник</span><select id="obs-source-type" class="form-select"><option value="website">Сайт</option><option value="instagram">Instagram</option><option value="marketplace">Маркетплейс</option><option value="dealer">Сообщение дилера</option><option value="visit">Визит менеджера</option><option value="offer">Коммерческое предложение</option><option value="review">Отзыв</option><option value="other">Другое</option></select></label>
+                                <label><span>Уточнение источника</span><input type="text" id="obs-source" class="form-control" placeholder="Площадка или комментарий"></label>
+                                <label><span>Достоверность</span><select id="obs-confidence" class="form-select"><option value="verified">Подтверждено источником</option><option value="observed">Видел лично</option><option value="reported">Со слов дилера</option><option value="estimate">Оценка</option></select></label>
+                                <label class="wide"><span>Ссылка на источник</span><input type="url" id="obs-url" class="form-control" placeholder="https://…"></label>
+                                <label class="wide"><span>Что именно произошло *</span><textarea id="obs-detail" class="form-control" rows="2" placeholder="Например: цена изменилась, появилась новая коллекция или стенд"></textarea></label>
+                                <button type="button" id="btn-add-observation" class="competitor-section-action"><i class="bi bi-plus-lg"></i>Добавить наблюдение</button>
+                            </div>
+                            <div class="competitor-observation-save-note"><i class="bi bi-info-circle"></i> Записи сохранятся вместе с карточкой после нажатия «Сохранить».</div>
+                            <div id="comp-observations-list" class="competitor-observations-list"></div>
+                        </section>
+
                         <section class="competitor-form-section">
                             <div class="competitor-form-section-head">
                                 <div><span>АССОРТИМЕНТ И ЦЕНЫ</span><strong>Коллекции</strong><small>Можно хранить характеристики и цены по каждой коллекции.</small></div>
