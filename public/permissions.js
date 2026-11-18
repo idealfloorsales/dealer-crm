@@ -1556,6 +1556,7 @@
         let frame=0;
         let lastDockAt=0;
         let lastDock=null;
+        let recentScrollRegion=null;
         const visibleOnScreen=el=>{
             if(!el||!el.isConnected)return false;
             const rect=el.getBoundingClientRect();
@@ -1571,12 +1572,18 @@
         function blockedByOverlay(){
             if(document.body.classList.contains('map-list-open')||
                document.body.classList.contains('crm-mobile-sheet-open'))return true;
-            if(document.activeElement?.matches('input,textarea,select,[contenteditable="true"]'))return true;
-            return Boolean(document.querySelector(
+            // A hidden mobile sheet remains in the DOM with role="dialog".
+            // Only block when a real OPEN overlay is present, not every dialog.
+            if(document.querySelector(
                 '.modal.show,.offcanvas.show,.global-search-overlay.open,'+
-                '.crm-mobile-sheet-backdrop.open,.dropdown-menu.show,'+
-                '.sidebar-backdrop.show,[role="dialog"][aria-modal="true"]:not([hidden])'
-            ));
+                '.crm-mobile-sheet-backdrop.open,.sidebar-backdrop.show'
+            ))return true;
+            // The software keyboard can cover a floating button on phones.
+            const focused=document.activeElement;
+            const keyboardVisible=window.innerWidth<768 &&
+                window.visualViewport &&
+                window.visualViewport.height<window.innerHeight*.72;
+            return Boolean(keyboardVisible && focused?.matches('input,textarea,[contenteditable="true"]'));
         }
         function findFreeDock() {
             const width=Math.max(280,document.documentElement.clientWidth||window.innerWidth);
@@ -1591,21 +1598,21 @@
                 baseline=Math.max(baseline,Math.round(height-nav.getBoundingClientRect().top+12));
             }
 
+            // Only floating controls can obstruct an edge-docked shortcut.
+            // Scanning every button/link/input hid the control across the CRM,
+            // especially on tables and dashboards with many ordinary actions.
             const selectors=[
                 '.crm-mobile-nav','#mobile-fab-add','.dealer-route-bar',
                 '.ideal-ai-launch','.map-actions-right','.map-mobile-action-dock',
                 '.map-mobile-list-btn','.crm-floating-toolbar','.leaflet-control-zoom',
                 '.crm-sticky-actions','.floating-action','.chat-widget',
-                '.toast-container','.crm-mobile-sheet-backdrop.open',
-                'button','a','input','select','textarea','[role="button"]'
+                '.toast-container.show','.toast.show'
             ].join(',');
             const obstacles=[];
             document.querySelectorAll(selectors).forEach(el=>{
-                if(el===button||button.contains(el))return;
-                if(!el.isConnected)return;
+                if(el===button||button.contains(el)||!visibleOnScreen(el))return;
                 const rect=el.getBoundingClientRect();
-                if(rect.width<=0||rect.height<=0||rect.bottom<height*.32||
-                   rect.top>height||rect.right<=0||rect.left>=width)return;
+                if(rect.bottom<height*.32||rect.top>height)return;
                 obstacles.push({left:rect.left,top:rect.top,right:rect.right,bottom:rect.bottom});
             });
             return pickScrollTopDock(width,height,size,baseline,obstacles);
@@ -1625,13 +1632,13 @@
                 setVisibility(false);
                 return;
             }
-            const inner=[...document.querySelectorAll(
+            const inner=[recentScrollRegion,...document.querySelectorAll(
                 '.map-page .sidebar-content,.app-workspace-page .sidebar-content,.audit-list-scroll'
-            )].find(el=>visibleOnScreen(el)&&
-                remaining(el)>Math.max(32,el.clientHeight*.08)&&
-                scrollAmount(el)>Math.min(280,Math.max(180,el.clientHeight*.35)));
-            const windowReady=remaining(null)>Math.max(24,window.innerHeight*.08)&&
-                scrollAmount(null)>Math.min(280,Math.max(180,window.innerHeight*.35));
+            )].find(el=>el&&visibleOnScreen(el)&&
+                remaining(el)>Math.max(30,el.clientHeight*.05)&&
+                scrollAmount(el)>Math.min(120,Math.max(60,el.clientHeight*.12)));
+            const windowReady=remaining(null)>Math.max(30,window.innerHeight*.05)&&
+                scrollAmount(null)>Math.min(120,Math.max(65,window.innerHeight*.10));
             scrollTarget=inner||(windowReady?null:undefined);
             const scrollable=Boolean(inner||windowReady);
             if(!scrollable){
@@ -1678,8 +1685,14 @@
             requestUpdate();
         });
         window.addEventListener('scroll',requestUpdate,{passive:true});
-        document.addEventListener('scroll',requestUpdate,{capture:true,passive:true});
+        document.addEventListener('scroll',event=>{
+            const el=event.target;
+            if(el&&el.nodeType===1&&el!==doc&&
+               el.clientHeight>80&&el.scrollHeight>el.clientHeight+30)recentScrollRegion=el;
+            requestUpdate();
+        },{capture:true,passive:true});
         window.addEventListener('resize',()=>{lastDock=null;requestUpdate();},{passive:true});
+        window.visualViewport?.addEventListener('resize',()=>{lastDock=null;requestUpdate();},{passive:true});
         window.addEventListener('pageshow',requestUpdate);
         window.addEventListener('load',requestUpdate,{once:true});
         document.addEventListener('shown.bs.modal',requestUpdate);

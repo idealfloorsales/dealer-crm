@@ -53,3 +53,94 @@ test('new control is subtle, respects motion preference, and removes the rotatin
   assert.match(style,/@media\(prefers-reduced-motion:reduce\)/);
   assert.doesNotMatch(style,/animation:crmTopReveal/);
 });
+
+
+function simulateVisibleScrollButton(isMobile){
+  const viewportWidth=isMobile?390:1280;
+  const height=isMobile?844:900;
+  const listeners={};
+  const classes=new Set();
+  const styles={};
+  const attributes={};
+  const nav=isMobile?{
+    isConnected:true,
+    getBoundingClientRect(){return {left:8,right:382,top:766,bottom:830,width:374,height:64};}
+  }:null;
+  const button={
+    isConnected:true,
+    tabIndex:-1,
+    classList:{
+      add:name=>classes.add(name),
+      remove:name=>classes.delete(name),
+      toggle(name,yes){if(yes)classes.add(name);else classes.delete(name);},
+      contains:name=>classes.has(name)
+    },
+    setAttribute(name,value){attributes[name]=value;},
+    style:{setProperty(name,value){styles[name]=value;}},
+    contains(){return false;},
+    addEventListener(name,cb){listeners['button:'+name]=cb;}
+  };
+  const page={scrollTop:225,scrollHeight:2400,clientHeight:height,clientWidth:viewportWidth};
+  const body={
+    scrollHeight:2400,
+    classList:{contains(){return false;}},
+    appendChild(el){if(el!==button)throw Error('unexpected element');}
+  };
+  const fakeDocument={
+    body,documentElement:page,scrollingElement:page,
+    activeElement:{matches:()=>false},
+    createElement(name){assert.equal(name,'button');return button;},
+    getElementById(){return null;},
+    querySelector(query){
+      if(query==='.crm-mobile-nav')return nav;
+      // The hidden menu exists on every page, but must never hide the button.
+      if(query.includes('[role="dialog"]'))return {id:'crm-mobile-sheet',hidden:false};
+      return null;
+    },
+    querySelectorAll(query){
+      if(query.includes('.map-page .sidebar-content'))return [];
+      // Ordinary actions fill both edges of busy dashboard pages.
+      const broad=/(^|,)button(,|$)|(^|,)a(,|$)/.test(query);
+      if(broad)return [
+        {isConnected:true,getBoundingClientRect:()=>({left:0,top:290,right:100,bottom:height,width:100,height:height-290})},
+        {isConnected:true,getBoundingClientRect:()=>({left:viewportWidth-100,top:290,right:viewportWidth,bottom:height,width:100,height:height-290})}
+      ];
+      return nav?[nav]:[];
+    },
+    addEventListener(name,cb){listeners['document:'+name]=cb;}
+  };
+  const fakeWindow={
+    innerHeight:height,innerWidth:viewportWidth,scrollY:225,visualViewport:undefined,
+    requestAnimationFrame(cb){cb();return 1;},
+    addEventListener(name,cb){listeners['window:'+name]=cb;},
+    matchMedia(){return {matches:false};},
+    scrollTo(value){styles.scrollTo=value;}
+  };
+  const start=script.indexOf('    function pickScrollTopDock(');
+  const end=script.indexOf('    function initInteractionLayer()',start);
+  const init=new Function('window','document','ResizeObserver',
+    script.slice(start,end)+'\nreturn initAdaptiveScrollTop;'
+  )(fakeWindow,fakeDocument,undefined);
+  init();
+  return {classes,attributes,styles,listeners,button};
+}
+test('regression: scroll control is visible on desktop even with many buttons and a hidden dialog',()=>{
+  const app=simulateVisibleScrollButton(false);
+  assert.ok(app.classes.has('is-visible'));
+  assert.equal(app.attributes['aria-hidden'],'false');
+  assert.equal(app.button.tabIndex,0);
+  assert.ok(app.styles['--crm-top-right']);
+  app.listeners['button:click']();
+  assert.equal(app.styles.scrollTo.top,0);
+});
+test('regression: scroll control is visible on phones above the actual mobile nav',()=>{
+  const app=simulateVisibleScrollButton(true);
+  assert.ok(app.classes.has('is-visible'));
+  assert.equal(app.attributes['aria-hidden'],'false');
+  assert.ok(parseInt(app.styles['--crm-top-bottom'],10)>=85);
+});
+test('only an open overlay hides the control',()=>{
+  assert.doesNotMatch(script,/\[role="dialog"\]\[aria-modal="true"\]:not\(\[hidden\]\)/);
+  assert.match(script,/\.crm-mobile-sheet-backdrop\.open/);
+  assert.doesNotMatch(script,/'button','a','input','select','textarea'/);
+});
