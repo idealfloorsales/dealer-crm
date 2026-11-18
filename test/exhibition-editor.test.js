@@ -38,8 +38,8 @@ function setup(){
  const factory=new Function('fullData','$','inspectionModal','inspectionSave',
   'inspectionFeedback','safeText','fmt','n','idOf','canEditMatrix',
   'fetch','renderMatrix','window','needsSampleReplace','needsTagAttention','stagedPresence',
-  'let inspectionContext=null;\\n'+report.slice(start,end)+
-  '\\nreturn {openInspectionEditor,saveInspection};');
+  'let inspectionContext=null;\n'+report.slice(start,end)+
+  '\nreturn {openInspectionEditor,saveInspection};');
  const obj=factory(fullData,$,inspectionModal,$('exhibition-inspection-save'),
   $('exhibition-inspection-feedback'),String,String,
   v=>Number(v)||0,v=>String(v?.id||v),()=>true,fetch,()=>rendered++,
