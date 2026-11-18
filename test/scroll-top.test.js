@@ -47,8 +47,8 @@ test('new control is subtle, respects motion preference, and removes the rotatin
   assert.match(script,/\.crm-mobile-nav.*#mobile-fab-add/);
   assert.match(script,/blockedByOverlay/);
   assert.doesNotMatch(script,/crm-scroll-top-ring/);
-  assert.match(style,/--crm-top-size:44px/);
-  assert.match(style,/--crm-top-size:42px/);
+  assert.match(style,/--crm-top-size:40px/);
+  assert.match(style,/--crm-top-size:38px/);
   assert.match(style,/:root\[data-crm-theme="dark"\] #crm-scroll-to-top/);
   assert.match(style,/@media\(prefers-reduced-motion:reduce\)/);
   assert.doesNotMatch(style,/animation:crmTopReveal/);
@@ -143,4 +143,26 @@ test('only an open overlay hides the control',()=>{
   assert.doesNotMatch(script,/\[role="dialog"\]\[aria-modal="true"\]:not\(\[hidden\]\)/);
   assert.match(script,/\.crm-mobile-sheet-backdrop\.open/);
   assert.doesNotMatch(script,/'button','a','input','select','textarea'/);
+});
+
+test('narrow vertical control fits a wider page gutter instead of covering content',()=>{
+  const dock=pick(1600,900,40,21,[],95,74);
+  assert.deepEqual(dock,{right:95,bottom:21,side:'right'});
+});
+test('vertical control clears tall floating panels',()=>{
+  const floating={left:1510,right:1600,top:730,bottom:901};
+  const dock=pick(1600,900,40,21,[floating],8,74);
+  assert.ok(dock);
+  const x=1600-dock.right-40;
+  const y=900-dock.bottom-74;
+  assert.ok(x+40+7<=floating.left || x-7>=floating.right ||
+    y+74+8<=floating.top || y-8>=floating.bottom);
+});
+test('flat vertical UI has a real animation and reduced-motion fallback',()=>{
+  assert.match(style,/--crm-top-height:74px/);
+  assert.match(style,/--crm-top-height:70px/);
+  assert.match(style,/@keyframes crmTopArrowTravel/);
+  assert.match(style,/@keyframes crmTopLightRail/);
+  assert.match(script,/class="crm-scroll-top-caption"/);
+  assert.match(script,/const preferredRight=width>=768&&gutter>size\+20/);
 });

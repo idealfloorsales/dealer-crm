@@ -1497,33 +1497,28 @@
     // The dock chooses an actual free part of the screen: it never sits on
     // navigation, floating actions, form controls, or an open sheet.
     // Pure layout helper, intentionally independent from the DOM for tests.
-    function pickScrollTopDock(viewportWidth,viewportHeight,size,baseBottom,obstacles) {
+    function pickScrollTopDock(viewportWidth,viewportHeight,size,baseBottom,obstacles,preferredRight,buttonHeight=size) {
         const margin=viewportWidth<768?7:12;
-        const maxRise=Math.min(viewportWidth<768?144:168,viewportHeight*.26);
-        const minimumTop=Math.max(70,viewportHeight*.34);
-        const positions=[
-            Math.max(margin,viewportWidth-size-margin),
-            margin
-        ];
+        const rightMargin=Number.isFinite(preferredRight)?Math.max(2,preferredRight):margin;
+        const maxRise=Math.min(viewportWidth<768?158:188,viewportHeight*.28);
+        const minimumTop=Math.max(70,viewportHeight*.29);
+        const positions=[Math.max(margin,viewportWidth-size-rightMargin),margin];
         for(let side=0;side<positions.length;side++){
             const left=positions[side];
             for(let rise=0;rise<=maxRise;rise+=12){
-                const top=Math.round(viewportHeight-baseBottom-size-rise);
+                const top=Math.round(viewportHeight-baseBottom-buttonHeight-rise);
                 if(top<minimumTop)break;
                 const overlapping=obstacles.some(rect=>
                     left-7<rect.right && left+size+7>rect.left &&
-                    top-8<rect.bottom && top+size+8>rect.top
+                    top-8<rect.bottom && top+buttonHeight+8>rect.top
                 );
-                if(!overlapping){
-                    return {
-                        right:Math.max(0,Math.round(viewportWidth-left-size)),
-                        bottom:Math.max(0,Math.round(viewportHeight-top-size)),
-                        side:side===0?'right':'left'
-                    };
-                }
+                if(!overlapping)return {
+                    right:Math.max(0,Math.round(viewportWidth-left-size)),
+                    bottom:Math.max(0,Math.round(viewportHeight-top-buttonHeight)),
+                    side:side===0?'right':'left'
+                };
             }
         }
-        // On a densely packed screen, hiding is better than blocking an action.
         return null;
     }
 
@@ -1546,6 +1541,7 @@
                     <path d="M12 19V5M6.5 10.5 12 5l5.5 5.5"></path>
                 </svg>
             </span>
+            <span class="crm-scroll-top-caption" aria-hidden="true">ВВЕРХ</span>
             <span class="crm-scroll-top-progress" aria-hidden="true"></span>
             <span class="crm-scroll-top-label" aria-hidden="true">Наверх</span>
         `;
@@ -1588,9 +1584,21 @@
         function findFreeDock() {
             const width=Math.max(280,document.documentElement.clientWidth||window.innerWidth);
             const height=window.innerHeight;
-            const size=width<768?42:44;
+            const size=width<768?38:40;
+            const dockHeight=width<768?70:74;
             if(height<340)return null;
             let baseline=width<768?18:21;
+            // When the content is narrower than the viewport, put the slim
+            // handle in the gutter between the page and browser scrollbar.
+            const content=document.querySelector(
+                'main.app-page-shell,main.command-center-shell,main.dealer-profile-shell,'+
+                'main.sales-shell,main.workshop-shell,main.exhibition-shell,main'
+            );
+            const contentRight=content?.getBoundingClientRect()?.right;
+            const gutter=Number.isFinite(contentRight)?Math.max(0,width-contentRight):0;
+            const preferredRight=width>=768&&gutter>size+20
+                ? Math.min(gutter-size-8,Math.max(8,Math.round(gutter*.5-size*.5)))
+                : width<768?3:8;
 
             // Reserve the real navigation bar height rather than guessing 100 px.
             const nav=document.querySelector('.crm-mobile-nav');
@@ -1615,7 +1623,7 @@
                 if(rect.bottom<height*.32||rect.top>height)return;
                 obstacles.push({left:rect.left,top:rect.top,right:rect.right,bottom:rect.bottom});
             });
-            return pickScrollTopDock(width,height,size,baseline,obstacles);
+            return pickScrollTopDock(width,height,size,baseline,obstacles,preferredRight,dockHeight);
         }
 
         function setVisibility(visible) {
@@ -1673,12 +1681,21 @@
             frame=window.requestAnimationFrame(update);
         }
         button.addEventListener('animationend',event=>{
-            if(event.animationName==='crmTopArrowTravel')button.classList.remove('is-launching');
+            if(event.animationName==='crmTopArrowTravel'){
+                button.classList.remove('is-launching');
+                button.classList.remove('is-scrolling');
+            }
         });
         button.addEventListener('click',()=>{
             if(!button.classList.contains('is-visible'))return;
             const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-            if(!reduced)button.classList.add('is-launching');
+            if(!reduced){
+                button.classList.remove('is-launching');
+                // Restart a gentle vertical arrow flight and a narrow trailing
+                // light as the actual document scrolls smoothly to the top.
+                void button.offsetWidth;
+                button.classList.add('is-launching','is-scrolling');
+            }
             const options={top:0,behavior:reduced?'auto':'smooth'};
             if(scrollTarget&&scrollTarget.isConnected)scrollTarget.scrollTo(options);
             else window.scrollTo(options);

@@ -43,6 +43,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const fieldDealerHead = $('field-dealer-head');
     const fieldProductSearch = $('field-product-search');
     const fieldProductList = $('field-product-list');
+    const inspectionModalEl = $('exhibition-inspection-modal');
+    const inspectionModal = inspectionModalEl ? bootstrap.Modal.getOrCreateInstance(inspectionModalEl) : null;
+    const inspectionForm = $('exhibition-inspection-form');
+    const inspectionSave = $('exhibition-inspection-save');
+    const inspectionFeedback = $('exhibition-inspection-feedback');
+    const canEditMatrix = () => Boolean(window.CRMAuth?.can('can_edit_matrix'));
+    let inspectionContext = null;
 
     let fullData = { headers: [], matrix: [] };
     let selectedDealerIds = new Set();
@@ -86,6 +93,22 @@ document.addEventListener('DOMContentLoaded', () => {
         })[state] || state;
     }
 
+    const needsSampleReplace = cell => ['damaged','missing'].includes(cell?.condition);
+    const needsTagAttention = cell => ['replace','missing'].includes(cell?.priceTag);
+    const needsAttention = cell => needsSampleReplace(cell)||needsTagAttention(cell);
+    const knownPriceTag = cell => Boolean(cell?.priceTag&&cell.priceTag!=='unknown');
+    function checkBadgeText(cell,type) {
+        const messages=[];
+        if(needsSampleReplace(cell))messages.push(type==='pos'
+            ? (cell.condition==='damaged'?'Брак оборудования':'Оборудование отсутствует')
+            : (cell.condition==='damaged'?'Образец повреждён':'Образец отсутствует'));
+        if(type!=='pos'){
+            if(cell?.priceTag==='replace')messages.push('Заменить ценник');
+            else if(cell?.priceTag==='missing')messages.push('Нет ценника');
+            else if(cell?.priceTag==='ok')messages.push('Ценник ✓');
+        }
+        return messages;
+    }
     function rowMatchesLiquidity(row) {
         const mode = filterLiquidity?.value || 'liquid';
         if (row?.type === 'pos') return mode !== 'illiquid';
@@ -132,6 +155,14 @@ document.addEventListener('DOMContentLoaded', () => {
         let workshopOnly = 0;
         let samples = 0;
         let posUnits = 0;
+        let replacements=0,tagIssues=0,tagChecked=0,priceTagUnits=0;
+        data.matrix.forEach(row=>indices.forEach(index=>{
+            const cell=row.dealers[index]||{};
+            if(needsSampleReplace(cell))replacements++;
+            if(needsTagAttention(cell))tagIssues++;
+            if(row.type!=='pos'&&knownPriceTag(cell))tagChecked++;
+            if(row.type!=='pos')priceTagUnits+=n(cell.priceTagQty);
+        }));
 
         products.forEach(row => indices.forEach(index => {
             const cell = row.dealers[index] || {};
@@ -162,7 +193,11 @@ document.addEventListener('DOMContentLoaded', () => {
             discrepancies:manualOnly + workshopOnly,
             missing:Math.max(0,totalCells-present),
             samples,
-            posUnits
+            posUnits,
+            replacements,
+            tagIssues,
+            tagChecked,
+            priceTagUnits
         };
     }
 
@@ -175,7 +210,9 @@ document.addEventListener('DOMContentLoaded', () => {
             {icon:'bi-patch-check',label:'Подтверждено',value:stats.confirmedPercent+'%',unit:`${fmt(stats.confirmed)} совпадений`,tone:'good'},
             {icon:'bi-exclamation-triangle',label:'Расхождения',value:stats.discrepancies,unit:`${fmt(stats.manualOnly)} матрица · ${fmt(stats.workshopOnly)} цех`,tone:stats.discrepancies?'warn':''},
             {icon:'bi-layers',label:'Образцов у дилеров',value:stats.samples,unit:'шт по учёту Цеха',tone:''},
-            {icon:'bi-easel2',label:'POS-материалов',value:stats.posUnits,unit:'шт в выбранной сети',tone:''}
+            {icon:'bi-easel2',label:'POS-материалов',value:stats.posUnits,unit:'шт в выбранной сети',tone:''},
+            {icon:'bi-wrench-adjustable',label:'На замену',value:stats.replacements,unit:'образцы и оборудование',tone:stats.replacements?'warn':''},
+            {icon:'bi-tags',label:'Ценники',value:stats.tagIssues,unit:`${fmt(stats.tagChecked)} проверено · ${fmt(stats.priceTagUnits)} шт`,tone:stats.tagIssues?'risk':''}
         ];
         kpiHost.innerHTML = cards.map(card => `
             <article class="exhibition-kpi ${card.tone ? 'is-'+card.tone : ''}">
@@ -217,6 +254,17 @@ document.addEventListener('DOMContentLoaded', () => {
         return '<td class="text-center matrix-state-cell is-missing"><span class="matrix-state-icon"><i class="bi bi-dash"></i></span></td>';
     }
 
+    function decorateMatrixCell(html,cell,row,dealerId) {
+        const badges=checkBadgeText(cell,row.type);
+        const badge=badges.filter(x=>!x.includes('✓')).length
+            ? '<span class="exhibition-cell-alert" title="'+safeText(badges.join(' · '))+'"><i class="bi bi-exclamation-lg"></i></span>'
+            : '';
+        const edit=canEditMatrix()
+            ? '<button type="button" class="exhibition-cell-edit" data-exhibition-edit="1" data-edit-dealer="'+safeText(dealerId)+'" data-edit-kind="'+(row.type==='pos'?'pos':'laminate')+'" data-edit-key="'+safeText(row.type==='pos'?row.name:row.id)+'" title="Редактировать выставленность / ценники" aria-label="Редактировать '+safeText(row.name)+'"><i class="bi bi-pencil"></i></button>'
+            : '';
+        return html.replace(/<\/td>\s*$/,badge+edit+'</td>');
+    }
+
     function renderMatrix() {
         const data = getFilteredData();
         const indices = visibleOriginalIndices(data.headers);
@@ -254,7 +302,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     rowPresent++;
                     dealerTotals[visibleIndex]++;
                 }
-                return matrixCellHtml(cell);
+                return decorateMatrixCell(matrixCellHtml(cell),cell,row,idOf(data.headers[visibleIndex].id));
             }).join('');
 
             const percent = totalDealers ? Math.round((rowPresent/totalDealers)*100) : 0;
@@ -449,19 +497,26 @@ document.addEventListener('DOMContentLoaded', () => {
             const id = idOf(dealer.id);
             const originalIndex = fullData.headers.findIndex(h=>idOf(h.id)===id);
             const productRows = getFilteredData().matrix.filter(row=>row.type!=='pos');
-            let present=0, issues=0, samples=0;
+            let present=0, issues=0, samples=0,replacements=0,tagIssues=0;
             productRows.forEach(row=>{
                 const cell=row.dealers[originalIndex]||{};
                 const state=cellState(cell);
                 if(state!=='missing') present++;
                 if(state==='manual'||state==='workshop') issues++;
+                if(needsSampleReplace(cell))replacements++;
+                if(needsTagAttention(cell))tagIssues++;
                 samples+=n(cell.sample_qty);
             });
+            getFilteredData().matrix.filter(row=>row.type==='pos').forEach(row=>{
+                if(needsSampleReplace(row.dealers[originalIndex]))replacements++;
+            });
             const percent=productRows.length?Math.round((present/productRows.length)*100):0;
+            const workCount=replacements+tagIssues;
+            const workLabel=workCount?workCount+' требуют внимания':issues?issues+' расх.':samples+' обр.';
             return `
                 <button type="button" class="exhibition-field-dealer ${id===activeFieldDealerId?'active':''}" data-field-dealer="${safeText(id)}">
                     <span class="exhibition-field-dealer-main"><strong>${safeText(dealer.name)}</strong><small><i class="bi bi-geo-alt"></i>${safeText(dealer.city||'—')}</small></span>
-                    <span class="exhibition-field-dealer-stats"><b>${percent}%</b><small>${issues?issues+' расх.':samples+' обр.'}</small></span>
+                    <span class="exhibition-field-dealer-stats ${workCount?'has-work':''}"><b>${percent}%</b><small>${safeText(workLabel)}</small></span>
                 </button>
             `;
         }).join('') : '<div class="exhibition-field-placeholder">Дилеры не найдены</div>';
@@ -475,9 +530,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function fieldRowMatches(state,row) {
+
+    function fieldRowMatches(state,row,cell) {
         if (fieldStatus==='all') return true;
         if (fieldStatus==='issues') return state==='manual'||state==='workshop';
+        if (fieldStatus==='replace') return needsAttention(cell);
+        if (fieldStatus==='tags') return row.type!=='pos'&&knownPriceTag(cell);
         if (fieldStatus==='missing') return state==='missing'||state==='pos-missing';
         if (fieldStatus==='present') return ['confirmed','manual','workshop','pos-present'].includes(state);
         if (fieldStatus==='pos') return row.type==='pos';
@@ -485,28 +543,32 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderFieldDealer() {
-        if (!fieldDealerHead || !fieldProductList) return;
-        const dealer = fullData.headers.find(h=>idOf(h.id)===activeFieldDealerId);
-        if (!dealer) {
+        if(!fieldDealerHead||!fieldProductList)return;
+        const dealer=fullData.headers.find(h=>idOf(h.id)===activeFieldDealerId);
+        if(!dealer){
             fieldDealerHead.innerHTML='<div class="exhibition-field-placeholder">Выберите дилера</div>';
             fieldProductList.innerHTML='<div class="exhibition-field-placeholder">Нет данных</div>';
             return;
         }
-
         const originalIndex=fullData.headers.findIndex(h=>idOf(h.id)===activeFieldDealerId);
         const rows=getFilteredData().matrix;
         const products=rows.filter(row=>row.type!=='pos');
-        let present=0,confirmed=0,issues=0,samples=0;
+        let present=0,confirmed=0,issues=0,samples=0,replacements=0,tagIssues=0,tagChecked=0;
         products.forEach(row=>{
             const cell=row.dealers[originalIndex]||{};
             const state=cellState(cell);
             if(state!=='missing')present++;
             if(state==='confirmed')confirmed++;
             if(state==='manual'||state==='workshop')issues++;
+            if(needsSampleReplace(cell))replacements++;
+            if(needsTagAttention(cell))tagIssues++;
+            if(knownPriceTag(cell))tagChecked++;
             samples+=n(cell.sample_qty);
         });
+        rows.filter(row=>row.type==='pos').forEach(row=>{
+            if(needsSampleReplace(row.dealers[originalIndex]))replacements++;
+        });
         const percent=products.length?Math.round((present/products.length)*100):0;
-
         fieldDealerHead.innerHTML=`
             <div class="exhibition-field-dealer-title">
                 <div><span>ВЫБРАННЫЙ ДИЛЕР</span><h2>${safeText(dealer.name)}</h2><p><i class="bi bi-geo-alt"></i>${safeText(dealer.city||'—')}</p></div>
@@ -516,18 +578,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div><small>Выставлено</small><strong>${percent}%</strong><span>${present}/${products.length}</span></div>
                 <div><small>Подтверждено</small><strong>${confirmed}</strong><span>позиций</span></div>
                 <div class="${issues?'is-warning':''}"><small>Расхождения</small><strong>${issues}</strong><span>позиций</span></div>
-                <div><small>Образцов</small><strong>${samples}</strong><span>шт</span></div>
+                <div><small>Образцов Цеха</small><strong>${samples}</strong><span>шт</span></div>
+                <div class="${replacements?'is-warning':''}"><small>На замену</small><strong>${replacements}</strong><span>образцы / POS</span></div>
+                <div class="${tagIssues?'is-warning':''}"><small>Ценники</small><strong>${tagIssues}</strong><span>проблем · ${tagChecked} провер.</span></div>
             </div>
         `;
-
         const term=String(fieldProductSearch?.value||'').trim().toLowerCase();
         const filtered=rows.filter(row=>{
             const cell=row.dealers[originalIndex]||{};
             const state=cellState(cell);
             const blob=`${row.sku||''} ${row.name||''}`.toLowerCase();
-            return (!term||blob.includes(term)) && fieldRowMatches(state,row);
+            return (!term||blob.includes(term))&&fieldRowMatches(state,row,cell);
         });
-
         fieldProductList.innerHTML=filtered.length?filtered.map(row=>{
             const cell=row.dealers[originalIndex]||{};
             const state=cellState(cell);
@@ -538,7 +600,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 state==='workshop'?'bi-tools':
                 state==='pos-present'?'bi-easel2':'bi-dash';
             const detail=row.type==='pos'
-                ? (posQty?`${posQty} шт у дилера`:'POS отсутствует')
+                ? (posQty?`${posQty} шт по учёту Цеха / дилера`:'POS отсутствует')
                 : state==='confirmed'
                     ? `Матрица + Цех${qty?' · '+qty+' шт':''}`
                     : state==='manual'
@@ -546,17 +608,122 @@ document.addEventListener('DOMContentLoaded', () => {
                         : state==='workshop'
                             ? `По Цеху ${qty} шт, в матрице не отмечено`
                             : 'Нет ни в матрице, ни по учёту Цеха';
+            const badges=checkBadgeText(cell,row.type);
+            const issueBadges=badges.map(message=>
+                '<span class="exhibition-check-flag '+(message.includes('✓')?'is-ok':'is-warning')+'">'+
+                '<i class="bi '+(message.includes('✓')?'bi-check-circle':'bi-exclamation-triangle')+'"></i>'+
+                safeText(message)+'</span>').join('');
+            const tagCount=row.type!=='pos'&&n(cell.priceTagQty)>0
+                ? '<span class="exhibition-check-flag is-neutral">Ценников: '+fmt(cell.priceTagQty)+'</span>':'';
+            const editButton=canEditMatrix()
+                ? '<button type="button" class="exhibition-field-edit" data-exhibition-edit="1" data-edit-dealer="'+safeText(activeFieldDealerId)+'" data-edit-kind="'+(row.type==='pos'?'pos':'laminate')+'" data-edit-key="'+safeText(row.type==='pos'?row.name:row.id)+'" title="Изменить выставленность и состояние"><i class="bi bi-pencil-square"></i><span>Изменить</span></button>'
+                : '';
             return `
-                <article class="exhibition-field-product is-${safeText(state)}">
+                <article class="exhibition-field-product is-${safeText(state)} ${needsAttention(cell)?'has-inspection-issue':''}">
                     <span class="exhibition-field-state"><i class="bi ${icon}"></i></span>
                     <div class="exhibition-field-product-main">
-                        <div><strong>${row.type==='pos'?'POS':safeText(row.sku)}</strong><span>${safeText(row.name)}</span>${row.type!=='pos' && row.is_liquid===false?'<em class="exhibition-liquidity-tag">Неликвид</em>':''}</div>
+                        <div><strong>${row.type==='pos'?'POS':safeText(row.sku)}</strong><span>${safeText(row.name)}</span>${row.type!=='pos'&&row.is_liquid===false?'<em class="exhibition-liquidity-tag">Неликвид</em>':''}</div>
                         <small>${safeText(detail)}</small>
+                        ${issueBadges||tagCount?'<div class="exhibition-check-flags">'+issueBadges+tagCount+'</div>':''}
+                        ${cell.note?'<small class="exhibition-check-note">'+safeText(cell.note)+'</small>':''}
                     </div>
-                    <span class="exhibition-field-status">${safeText(stateLabel(state))}</span>
+                    <div class="exhibition-field-product-side">
+                        <span class="exhibition-field-status">${safeText(stateLabel(state))}</span>
+                        ${editButton}
+                    </div>
                 </article>
             `;
         }).join(''):'<div class="exhibition-field-placeholder">По выбранному фильтру позиций нет</div>';
+    }
+
+
+    function openInspectionEditor({dealerId,kind,key}) {
+        if(!canEditMatrix()||!inspectionModal)return;
+        const dealer=fullData.headers.find(item=>idOf(item.id)===dealerId);
+        const row=fullData.matrix.find(item=>kind==='pos'
+            ? item.type==='pos'&&item.name===key
+            : item.type!=='pos'&&String(item.id)===key);
+        if(!dealer||!row)return;
+        const index=fullData.headers.findIndex(item=>idOf(item.id)===dealerId);
+        const cell=row.dealers[index]||{};
+        inspectionContext={dealerId,kind,key,row,index};
+        $('exhibition-inspection-dealer').textContent=[dealer.name,dealer.city].filter(Boolean).join(' · ');
+        $('exhibition-inspection-item').textContent=[row.sku,row.name].filter(Boolean).join(' · ');
+        $('exhibition-inspection-type').textContent=kind==='pos'?'ТОРГОВОЕ ОБОРУДОВАНИЕ':'ОБРАЗЕЦ ЛАМИНАТА';
+        $('exhibition-inspection-stock').textContent=kind==='pos'
+            ? 'В учёте оборудования: '+fmt(cell.value)+' шт. Количество меняется через Цех.'
+            : 'Выдано из Цеха: '+fmt(cell.sample_qty)+' шт. · Матрица: '+(n(cell.value)?'есть':'нет');
+        $('exhibition-inspection-presence-row').hidden=kind==='pos';
+        $('exhibition-inspection-tags').hidden=kind==='pos';
+        $('exhibition-inspection-present').checked=Boolean(n(cell.value));
+        $('exhibition-inspection-condition').value=['ok','damaged','missing'].includes(cell.condition)?cell.condition:'ok';
+        $('exhibition-inspection-replace-qty').value=Number.isInteger(Number(cell.replacementQty))?Number(cell.replacementQty):0;
+        $('exhibition-inspection-tag').value=['unknown','ok','replace','missing'].includes(cell.priceTag)?cell.priceTag:'unknown';
+        $('exhibition-inspection-tag-qty').value=Number.isInteger(Number(cell.priceTagQty))?Number(cell.priceTagQty):0;
+        $('exhibition-inspection-note').value=cell.note||'';
+        if(inspectionFeedback){inspectionFeedback.hidden=true;inspectionFeedback.textContent='';}
+        if(inspectionSave)inspectionSave.disabled=false;
+        inspectionModal.show();
+    }
+    function showInspectionError(message){
+        if(inspectionFeedback){
+            inspectionFeedback.hidden=false;
+            inspectionFeedback.textContent=message||'Не удалось сохранить проверку';
+        }
+    }
+    function parsePositiveInteger(id) {
+        const raw=$(id)?.value||'0';
+        const number=Number(raw);
+        if(!Number.isSafeInteger(number)||number<0||number>1000)throw new Error('Количество должно быть целым числом от 0 до 1000');
+        return number;
+    }
+    async function saveInspection(event){
+        event.preventDefault();
+        if(!inspectionContext||!canEditMatrix())return;
+        const {dealerId,kind,key,row,index}=inspectionContext;
+        let body;
+        try{
+            const condition=$('exhibition-inspection-condition')?.value||'ok';
+            body={
+                kind,key,condition,
+                replacementQty:condition==='ok'?0:parsePositiveInteger('exhibition-inspection-replace-qty'),
+                priceTag:kind==='pos'?'unknown':$('exhibition-inspection-tag')?.value||'unknown',
+                priceTagQty:kind==='pos'?0:parsePositiveInteger('exhibition-inspection-tag-qty'),
+                note:String($('exhibition-inspection-note')?.value||'').trim().slice(0,500)
+            };
+            if(kind!=='pos')body.present=Boolean($('exhibition-inspection-present')?.checked);
+        }catch(error){showInspectionError(error.message);return;}
+        if(inspectionSave){
+            inspectionSave.disabled=true;
+            inspectionSave.innerHTML='<span class="spinner-border spinner-border-sm"></span> Сохраняю…';
+        }
+        if(inspectionFeedback)inspectionFeedback.hidden=true;
+        try{
+            const response=await fetch('/api/exhibition/dealers/'+encodeURIComponent(dealerId)+'/item',{
+                method:'PUT',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify(body)
+            });
+            const data=await response.json().catch(()=>({}));
+            if(!response.ok)throw new Error(data.error||'Не удалось сохранить выставленность');
+            // Update only the inspected cell. Filters, current dealer and scroll
+            // position stay intact. Workshop quantities remain untouched.
+            const cell=row.dealers[index]||{};
+            Object.assign(cell,data.inspection||{});
+            if(kind!=='pos'&&typeof data.present==='boolean')cell.value=data.present?1:0;
+            row.dealers[index]=cell;
+            inspectionModal?.hide();
+            inspectionContext=null;
+            renderMatrix();
+            if(window.showToast)window.showToast('Выставленность и отметки сохранены','success');
+        }catch(error){
+            showInspectionError(error.message||'Ошибка сети');
+        }finally{
+            if(inspectionSave){
+                inspectionSave.disabled=false;
+                inspectionSave.innerHTML='<i class="bi bi-check2-circle"></i> Сохранить';
+            }
+        }
     }
 
     function resetFilters() {
@@ -591,7 +758,8 @@ document.addEventListener('DOMContentLoaded', () => {
             matrix:Boolean($('excel-sheet-matrix')?.checked),
             dealers:Boolean($('excel-sheet-dealers')?.checked),
             issues:Boolean($('excel-sheet-issues')?.checked),
-            pos:Boolean($('excel-sheet-pos')?.checked)
+            pos:Boolean($('excel-sheet-pos')?.checked),
+            inspection:Boolean($('excel-sheet-inspection')?.checked)
         };
     }
 
@@ -933,6 +1101,52 @@ document.addEventListener('DOMContentLoaded', () => {
         return ws;
     }
 
+
+    function addInspectionSheet(workbook,data) {
+        const ws=workbook.addWorksheet('Замены и ценники',{properties:{tabColor:{argb:excelColors.red}}});
+        ws.views=[{state:'frozen',xSplit:3,ySplit:1}];
+        const columns=[
+            ['Дилер',25],['Город',18],['Тип',17],['Артикул / POS',27],['Позиция',39],
+            ['Выставлено',14],['Состояние',21],['На замену, шт',16],
+            ['Ценник',18],['Ценников, шт',15],['Примечание',43],['Проверено',20],['Сотрудник',22]
+        ];
+        ws.columns=columns.map(([header,width])=>({header,width}));
+        styleHeaderRow(ws.getRow(1));
+        const indices=visibleOriginalIndices(data.headers);
+        const conditionLabel={ok:'В порядке',damaged:'Повреждено — заменить',missing:'Отсутствует — установить'};
+        const tagLabel={unknown:'Не проверен',ok:'Актуален',replace:'Заменить',missing:'Нет ценника'};
+        data.headers.forEach((dealer,visibleIndex)=>{
+            const index=indices[visibleIndex];
+            data.matrix.forEach(row=>{
+                const cell=row.dealers[index]||{};
+                const tagKnown=row.type!=='pos'&&knownPriceTag(cell);
+                if(!needsAttention(cell)&&!tagKnown&&!cell.note&&!n(cell.priceTagQty))return;
+                const type=row.type==='pos'?'Оборудование':'Ламинат';
+                const value=row.type==='pos'?n(cell.value):n(cell.value)?'Да':'Нет';
+                const checked=cell.checkedAt?new Date(cell.checkedAt).toLocaleString('ru-RU'):'';
+                const excelRow=ws.addRow([
+                    dealer.name,dealer.city||'',type,row.type==='pos'?row.name:row.sku,
+                    row.name,value,conditionLabel[cell.condition]||'В порядке',
+                    n(cell.replacementQty),row.type==='pos'?'—':tagLabel[cell.priceTag]||'Не проверен',
+                    row.type==='pos'?'':n(cell.priceTagQty),cell.note||'',checked,cell.checkedBy||''
+                ]);
+                if(needsAttention(cell)){
+                    excelRow.getCell(7).fill={type:'pattern',pattern:'solid',fgColor:{argb:excelColors.amberSoft}};
+                    excelRow.getCell(7).font={bold:true,color:excelColors.amber};
+                    if(needsTagAttention(cell)){
+                        excelRow.getCell(9).fill={type:'pattern',pattern:'solid',fgColor:{argb:excelColors.redSoft}};
+                        excelRow.getCell(9).font={bold:true,color:excelColors.red};
+                    }
+                }
+                excelRow.getCell(11).alignment={wrapText:true,vertical:'middle'};
+                excelRow.height=30;
+            });
+        });
+        ws.autoFilter={from:'A1',to:'M1'};
+        if(ws.lastRow.number>1)applyGridBorders(ws,1,ws.lastRow.number,1,13);
+        return ws;
+    }
+
     function addPosSheet(workbook,data) {
         const ws=workbook.addWorksheet('POS',{properties:{tabColor:{argb:'FF6A5592'}}});
         ws.views=[{state:'frozen',ySplit:2}];
@@ -978,6 +1192,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if(sheets.dealers) addDealersSheet(workbook,data);
             if(sheets.issues) addIssuesSheet(workbook,data);
             if(sheets.pos) addPosSheet(workbook,data);
+            if(sheets.inspection) addInspectionSheet(workbook,data);
 
             const buffer=await workbook.xlsx.writeBuffer();
             const blob=new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
@@ -1004,6 +1219,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.addEventListener('click',event=>{
+        const edit=event.target.closest('[data-exhibition-edit]');
+        if(edit){
+            event.preventDefault();
+            openInspectionEditor({dealerId:edit.dataset.editDealer,kind:edit.dataset.editKind,key:edit.dataset.editKey});
+            return;
+        }
         if(!event.target.closest('#dealer-dropdown')) dealerMenu?.classList.remove('show');
         if(!event.target.closest('#product-dropdown')) productMenu?.classList.remove('show');
     });
@@ -1034,7 +1255,7 @@ document.addEventListener('DOMContentLoaded', () => {
     exportBtn?.addEventListener('click',openExcelExport);
     excelExportConfirm?.addEventListener('click',exportExcel);
     excelSelectAll?.addEventListener('click',()=>{
-        const checkboxes=['excel-sheet-summary','excel-sheet-matrix','excel-sheet-dealers','excel-sheet-issues','excel-sheet-pos']
+        const checkboxes=['excel-sheet-summary','excel-sheet-matrix','excel-sheet-dealers','excel-sheet-issues','excel-sheet-pos','excel-sheet-inspection']
             .map(id=>$(id)).filter(Boolean);
         const allChecked=checkboxes.every(input=>input.checked);
         checkboxes.forEach(input=>input.checked=!allChecked);
@@ -1045,6 +1266,13 @@ document.addEventListener('DOMContentLoaded', () => {
         button.addEventListener('click',()=>setView(button.dataset.reportView));
     });
 
+    inspectionForm?.addEventListener('submit',saveInspection);
+    $('exhibition-inspection-condition')?.addEventListener('change',event=>{
+        const input=$('exhibition-inspection-replace-qty');
+        if(!input)return;
+        if(event.target.value==='ok')input.value=0;
+        else if(!(Number(input.value)>0))input.value=1;
+    });
     fieldDealerSearch?.addEventListener('input',renderFieldDealers);
     fieldProductSearch?.addEventListener('input',renderFieldDealer);
     document.querySelectorAll('[data-field-status]').forEach(button=>{

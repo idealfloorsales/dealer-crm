@@ -5189,10 +5189,13 @@ app.delete('/api/products/:id',requirePermission('can_manage_products'),(req,res
  res.status(409).json({error:'Удаление отключено. Используйте «В архив» в Матрице.'});
 });
 app.post('/api/admin/import-catalog', requirePermission('can_manage_products'), async (req, res) => { res.json({status: 'ok'}); });
+const exhibitionInspection = require('./server/exhibition-inspection').register({
+    app,mongoose,Dealer,Product,AuditLog,requirePermission,getDealerFilter,getWorkingDealerFilter,activeProductFilter
+});
 app.get('/api/matrix', requireAnyPermission('can_view_products', 'can_view_report'), async (req, res) => {
     try {
         const [prods, dealers] = await Promise.all([
-            Product.find(activeProductFilter()).select('sku name product_type collection is_liquid photo_id').sort({sku:1}).lean(),
+            Product.find(activeProductFilter({product_type:{$ne:'equipment'}})).select('sku name product_type collection is_liquid photo_id').sort({sku:1}).lean(),
             Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('_id name city responsible products pos_materials status').lean()
         ]);
         const dealerIds = dealers.map(d => d._id);
@@ -5202,6 +5205,7 @@ app.get('/api/matrix', requireAnyPermission('can_view_products', 'can_view_repor
                 .lean()
             : [];
 
+        const inspections = await exhibitionInspection.getChecks(dealerIds);
         const productMap = new Map();
         dealers.forEach(d => productMap.set(d._id.toString(), new Set((d.products||[]).map(String))));
 
@@ -5213,17 +5217,22 @@ app.get('/api/matrix', requireAnyPermission('can_view_products', 'can_view_repor
             sampleMap.set(key, (sampleMap.get(key) || 0) + (Number(asset.qty) || 0));
         });
 
-        const posList = ["С600 - 600мм задняя стенка", "С800 - 800мм задняя стенка", "РФ-2 - Расческа из фанеры", "Н600 - 600мм наклейка", "Н800 - 800мм наклейка", "Табличка - Табличка орг.стекло"];
+        const posList = [...new Set([
+            ...exhibitionInspection.STANDARD_POS_NAMES,
+            ...dealers.flatMap(d=>(d.pos_materials||[]).map(m=>String(m.name||'').trim()).filter(Boolean))
+        ])];
         const matrix = prods.map(p => ({
+            id:String(p._id),
             sku: p.sku,
             name: p.name,
             collection: p.collection || '',
-            type: p.product_type === 'equipment' ? 'equipment' : 'product',
+            type: 'product',
             is_liquid: p.is_liquid !== false,
             photoId: String(p.photo_id || '').trim(),
             dealers: dealers.map(d => ({
                 value: productMap.get(d._id.toString()).has(p._id.toString()) ? 1 : 0,
                 sample_qty: sampleMap.get(`${d._id}|${p._id}`) || 0,
+                ...exhibitionInspection.getCheck(inspections,d._id,'laminate',String(p._id)),
                 is_pos: false
             }))
         }));
@@ -5235,6 +5244,7 @@ app.get('/api/matrix', requireAnyPermission('can_view_products', 'can_view_repor
                 type: 'pos',
                 dealers: dealers.map(d => ({
                     value: (d.pos_materials||[]).find(m=>m.name===pn)?.quantity||0,
+                    ...exhibitionInspection.getCheck(inspections,d._id,'pos',pn),
                     is_pos: true
                 }))
             });

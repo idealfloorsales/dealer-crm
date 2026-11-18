@@ -217,152 +217,109 @@ body:not(.map-page) :is(.app-page-shell,.command-center-shell) { min-width:0; }
 .map-page .map-fold-toggle:focus-visible {outline:2px solid #fff;outline-offset:2px;}
 
 
-/* Compact scroll-to-top edge dock.
-   No orbiting ring, no overshooting bounce: only a quiet slide/fade.
-   JS locates a free place and hides the control when an action is in the way. */
-#crm-scroll-to-top {
-  --crm-top-size:44px;
-  --crm-top-right:12px;
-  --crm-top-bottom:21px;
-  --crm-scroll-ratio:0;
-  box-sizing:border-box;
-  position:fixed!important;
-  z-index:1036;
-  display:grid!important;
-  place-items:center;
-  overflow:visible;
-  right:var(--crm-top-right)!important;
-  bottom:var(--crm-top-bottom)!important;
-  left:auto!important;
-  width:var(--crm-top-size)!important;
-  height:var(--crm-top-size)!important;
-  padding:0!important;
-  border:1px solid rgba(45,47,54,.13)!important;
-  border-radius:15px!important;
-  color:#292b32!important;
-  background:rgba(255,255,255,.94)!important;
-  box-shadow:0 8px 22px rgba(30,31,38,.11),0 1px 4px rgba(30,31,38,.05)!important;
-  backdrop-filter:blur(14px);
-  -webkit-backdrop-filter:blur(14px);
-  cursor:pointer;
-  opacity:0;
-  visibility:hidden;
-  pointer-events:none;
-  transform:translate3d(12px,9px,0) scale(.92);
-  transition:opacity .22s ease,transform .3s cubic-bezier(.22,1,.36,1),
-    visibility 0s linear .3s,box-shadow .2s ease,background .2s ease;
-  -webkit-tap-highlight-color:transparent;
+/* Thin vertical edge rail — deliberately flat, quiet and reachable.
+   JS places it in the gutter where space permits, and avoids floating actions. */
+#crm-scroll-to-top{
+  --crm-top-size:40px;--crm-top-height:74px;
+  --crm-top-right:8px;--crm-top-bottom:21px;--crm-scroll-ratio:0;
+  position:fixed!important;z-index:1036;box-sizing:border-box;
+  right:var(--crm-top-right)!important;bottom:var(--crm-top-bottom)!important;
+  left:auto!important;width:var(--crm-top-size)!important;height:var(--crm-top-height)!important;
+  display:flex!important;flex-direction:column;align-items:center;justify-content:flex-start;
+  padding:0!important;margin:0!important;border:0!important;border-radius:14px!important;
+  background:transparent!important;color:#46474d!important;box-shadow:none!important;
+  cursor:pointer;visibility:hidden;opacity:0;pointer-events:none;
+  transform:translate3d(7px,9px,0);
+  transition:opacity .23s ease,transform .32s cubic-bezier(.2,1,.3,1),visibility 0s linear .32s;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;
 }
-#crm-scroll-to-top.is-visible {
-  opacity:.97;
-  visibility:visible;
-  pointer-events:auto;
-  transform:translate3d(0,0,0) scale(1);
-  transition:opacity .22s ease,transform .3s cubic-bezier(.22,1,.36,1),
-    visibility 0s,box-shadow .2s ease,background .2s ease;
-  animation:none!important;
+#crm-scroll-to-top::before{
+  content:"";position:absolute;inset:0 5px;z-index:-1;
+  border:1px solid #d9d9dc;border-radius:14px;
+  background:#f9f9f8;box-shadow:0 2px 7px rgba(23,25,29,.045);
+  transition:background .2s ease,border-color .2s ease;
 }
-#crm-scroll-to-top .crm-scroll-top-arrow {
-  display:grid;
-  place-items:center;
-  width:23px;
-  height:23px;
-  color:inherit;
-  transition:transform .2s cubic-bezier(.2,1,.3,1);
+#crm-scroll-to-top.is-visible{
+  visibility:visible;opacity:.98;pointer-events:auto;
+  transform:translate3d(0,0,0);
+  transition:opacity .23s ease,transform .32s cubic-bezier(.2,1,.3,1),visibility 0s;
 }
-#crm-scroll-to-top .crm-scroll-top-arrow svg {
-  width:22px;height:22px;display:block;
+#crm-scroll-to-top .crm-scroll-top-arrow{
+  position:absolute;top:10px;left:50%;width:22px;height:24px;
+  display:grid;place-items:center;transform:translateX(-50%);color:#a91c24;
 }
-#crm-scroll-to-top .crm-scroll-top-progress {
-  position:absolute;
-  bottom:5px;
-  left:8px;
-  width:calc(100% - 16px);
-  height:2px;
-  border-radius:99px;
-  background:#cb2028;
-  transform-origin:left center;
-  transform:scaleX(var(--crm-scroll-ratio));
-  transition:transform .15s linear;
-  pointer-events:none;
+#crm-scroll-to-top .crm-scroll-top-arrow svg{display:block;width:21px;height:21px}
+#crm-scroll-to-top .crm-scroll-top-caption{
+  position:absolute;top:40px;left:50%;font:900 7px/1 Onest,sans-serif;
+  letter-spacing:.11em;color:#77787d;writing-mode:vertical-rl;
+  transform:translateX(-50%) rotate(180deg);
 }
-#crm-scroll-to-top .crm-scroll-top-label {
-  position:absolute;
-  right:calc(100% + 9px);
-  top:50%;
-  padding:7px 10px;
-  border-radius:8px;
-  background:#27292e;
-  color:#fff;
-  font:700 11px/1 'Onest',sans-serif;
-  white-space:nowrap;
-  opacity:0;
-  pointer-events:none;
-  transform:translate(5px,-50%);
-  transition:opacity .16s ease,transform .18s ease;
+#crm-scroll-to-top .crm-scroll-top-progress{
+  position:absolute;right:5px;bottom:12px;width:2px;height:47px;
+  border-radius:99px;background:#c3222d;pointer-events:none;
+  transform-origin:bottom;transform:scaleY(var(--crm-scroll-ratio));
+  transition:transform .13s linear;
 }
-#crm-scroll-to-top.is-docked-left .crm-scroll-top-label {
-  left:calc(100% + 9px);
-  right:auto;
-  transform:translate(-5px,-50%);
+#crm-scroll-to-top::after{
+  content:"";position:absolute;right:5px;bottom:12px;width:2px;height:15px;
+  border-radius:99px;background:#f87b81;opacity:0;pointer-events:none;
 }
-@media(hover:hover) {
-  #crm-scroll-to-top.is-visible:hover {
-    opacity:1;
-    color:#b9040a!important;
-    border-color:rgba(185,4,10,.27)!important;
-    background:#fff!important;
-    box-shadow:0 9px 24px rgba(30,31,38,.14),0 0 0 3px rgba(185,4,10,.045)!important;
-    transform:translate3d(0,-2px,0);
-  }
-  #crm-scroll-to-top.is-visible:hover .crm-scroll-top-arrow {
-    transform:translateY(-2px);
-  }
-  #crm-scroll-to-top.is-visible:hover .crm-scroll-top-label {
-    opacity:1;transform:translate(0,-50%);
-  }
+#crm-scroll-to-top .crm-scroll-top-label{
+  position:absolute;right:calc(100% + 8px);top:50%;
+  padding:7px 9px;border-radius:8px;background:#2a2b31;color:#fff;
+  font:750 11px/1 Onest,sans-serif;white-space:nowrap;
+  opacity:0;pointer-events:none;transform:translate(4px,-50%);
+  transition:opacity .17s ease,transform .17s ease;
 }
-#crm-scroll-to-top:focus-visible {
-  outline:2px solid #b9040a!important;
-  outline-offset:3px;
+#crm-scroll-to-top.is-docked-left .crm-scroll-top-label{
+  left:calc(100% + 8px);right:auto;
 }
-#crm-scroll-to-top.is-launching .crm-scroll-top-arrow {
-  animation:crmTopArrowTravel .42s ease-in-out both;
+@media(hover:hover){
+  #crm-scroll-to-top.is-visible:hover{color:#b9040a!important;transform:translate3d(0,-2px,0)}
+  #crm-scroll-to-top.is-visible:hover::before{background:#fff1f1;border-color:#d9a0a3}
+  #crm-scroll-to-top.is-visible:hover .crm-scroll-top-label{opacity:1;transform:translate(0,-50%)}
 }
-@keyframes crmTopArrowTravel {
-  0%,100%{transform:translateY(0)}
-  45%{transform:translateY(-5px)}
-  55%{transform:translateY(-5px);opacity:.7}
+#crm-scroll-to-top:focus-visible{outline:2px solid #b9040a!important;outline-offset:3px}
+#crm-scroll-to-top.is-scrolling::after{
+  opacity:.95;animation:crmTopLightRail .7s cubic-bezier(.16,.8,.32,1) both;
 }
-:root[data-crm-theme="dark"] #crm-scroll-to-top {
-  background:rgba(38,40,47,.95)!important;
-  color:#f4f4f5!important;
-  border-color:rgba(255,255,255,.15)!important;
-  box-shadow:0 8px 26px rgba(0,0,0,.28)!important;
+#crm-scroll-to-top.is-launching .crm-scroll-top-arrow{
+  animation:crmTopArrowTravel .7s cubic-bezier(.2,.7,.25,1) both;
 }
-:root[data-crm-theme="dark"] #crm-scroll-to-top.is-visible:hover {
-  background:#33353d!important;
-  color:#fff!important;
+@keyframes crmTopArrowTravel{
+  0%,100%{transform:translateX(-50%) translateY(0);opacity:1}
+  30%{transform:translateX(-50%) translateY(-7px);opacity:1}
+  55%{transform:translateX(-50%) translateY(-13px);opacity:.2}
+  75%{transform:translateX(-50%) translateY(10px);opacity:0}
 }
-body:has(.modal.show,.offcanvas.show,.crm-mobile-sheet-backdrop.open) #crm-scroll-to-top {
-  opacity:0!important;visibility:hidden!important;pointer-events:none!important;
+@keyframes crmTopLightRail{
+  0%{transform:translateY(18px);opacity:0}
+  30%{opacity:1}
+  75%{transform:translateY(-42px);opacity:.8}
+  100%{transform:translateY(-52px);opacity:0}
 }
-@media(max-width:767.98px) {
-  #crm-scroll-to-top {
-    --crm-top-size:42px;
-    border-radius:14px!important;
-    box-shadow:0 6px 18px rgba(25,26,29,.11)!important;
-  }
-  #crm-scroll-to-top .crm-scroll-top-label {display:none!important;}
+:root[data-crm-theme="dark"] #crm-scroll-to-top{color:#f7f7f8!important}
+:root[data-crm-theme="dark"] #crm-scroll-to-top::before{
+  background:#292b31;border-color:#51535a;box-shadow:none;
 }
-@media(prefers-reduced-motion:reduce) {
+:root[data-crm-theme="dark"] #crm-scroll-to-top .crm-scroll-top-caption{color:#c6c6ca}
+:root[data-crm-theme="dark"] #crm-scroll-to-top .crm-scroll-top-arrow{color:#ff8289}
+body:has(.modal.show,.offcanvas.show,.crm-mobile-sheet-backdrop.open) #crm-scroll-to-top{
+  visibility:hidden!important;opacity:0!important;pointer-events:none!important;
+}
+@media(max-width:767.98px){
+  #crm-scroll-to-top{--crm-top-size:38px;--crm-top-height:70px}
+  #crm-scroll-to-top .crm-scroll-top-label{display:none}
+}
+@media(prefers-reduced-motion:reduce){
   #crm-scroll-to-top,#crm-scroll-to-top.is-visible,
-  #crm-scroll-to-top .crm-scroll-top-arrow,
-  #crm-scroll-to-top .crm-scroll-top-progress,
-  #crm-scroll-to-top .crm-scroll-top-label {
-    transition:none!important;animation:none!important;
+  #crm-scroll-to-top .crm-scroll-top-arrow,#crm-scroll-to-top .crm-scroll-top-progress,
+  #crm-scroll-to-top .crm-scroll-top-label{
+    animation:none!important;transition:none!important;
   }
+  #crm-scroll-to-top.is-scrolling::after{animation:none!important;display:none}
 }
+
 @media(max-width:991.98px) {
   body:not(.map-page):not(.login-page) :is(.command-center-shell,.app-page-shell,
     .dealer-profile-shell,.sales-shell,.workshop-shell,.audit-shell,.pricing-shell,

@@ -158,6 +158,8 @@
                         <div id="field-status-filters" class="exhibition-field-status-filters">
                             <button type="button" class="active" data-field-status="all">Все</button>
                             <button type="button" data-field-status="issues">Расхождения</button>
+                            <button type="button" data-field-status="replace"><i class="bi bi-wrench-adjustable"></i> Замена</button>
+                            <button type="button" data-field-status="tags"><i class="bi bi-tag"></i> Ценники</button>
                             <button type="button" data-field-status="missing">Нет</button>
                             <button type="button" data-field-status="present">Есть</button>
                             <button type="button" data-field-status="pos">POS</button>
@@ -171,6 +173,57 @@
             </div>
         </section>
     </main>
+
+
+    <div class="modal fade" id="exhibition-inspection-modal" tabindex="-1" aria-labelledby="exhibition-inspection-title">
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+            <div class="modal-content exhibition-inspection-modal">
+                <form id="exhibition-inspection-form">
+                    <div class="modal-header exhibition-inspection-header">
+                        <div><div class="exhibition-inspection-eyebrow"><i class="bi bi-clipboard-check"></i> КОНТРОЛЬ ВЫСТАВЛЕННОСТИ</div>
+                            <h2 class="modal-title" id="exhibition-inspection-title">Проверка позиции</h2>
+                            <p id="exhibition-inspection-dealer"></p></div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                    </div>
+                    <div class="modal-body exhibition-inspection-body">
+                        <div class="exhibition-inspection-product"><span id="exhibition-inspection-type"></span>
+                            <strong id="exhibition-inspection-item"></strong><small id="exhibition-inspection-stock"></small></div>
+                        <div class="exhibition-inspection-presence" id="exhibition-inspection-presence-row">
+                            <div><strong>Образец выставлен</strong><small>Изменяет матрицу дилера, не учёт Цеха</small></div>
+                            <label class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" id="exhibition-inspection-present" aria-label="Образец выставлен"></label>
+                        </div>
+                        <div class="exhibition-inspection-grid">
+                            <label><span>Состояние образца / оборудования</span><select id="exhibition-inspection-condition" class="form-select" required>
+                                <option value="ok">В порядке</option><option value="damaged">Повреждён — заменить</option>
+                                <option value="missing">Отсутствует — установить</option></select></label>
+                            <label><span>Количество на замену, шт.</span>
+                                <input type="number" id="exhibition-inspection-replace-qty" class="form-control" min="0" max="1000" step="1" value="0"></label>
+                        </div>
+                        <button type="button" id="exhibition-inspection-complete-sample" class="exhibition-inspection-complete" hidden><i class="bi bi-check2-all"></i><span>Образец заменён — отметить выполнение</span></button>
+                        <section class="exhibition-inspection-tags" id="exhibition-inspection-tags">
+                            <div class="exhibition-inspection-section-title"><i class="bi bi-tag"></i><div><strong>Ценники</strong><small>Отдельный учёт для каждого декора</small></div></div>
+                            <div class="exhibition-inspection-grid">
+                                <label><span>Состояние</span><select id="exhibition-inspection-tag" class="form-select">
+                                    <option value="unknown">Не проверен</option><option value="ok">Актуален</option>
+                                    <option value="replace">Нужно заменить</option><option value="missing">Нет — установить</option></select></label>
+                                <label><span>Ценников у дилера, шт.</span>
+                                    <input type="number" id="exhibition-inspection-tag-qty" class="form-control" min="0" max="1000" step="1" value="0"></label>
+                            </div>
+                        </section>
+                        <button type="button" id="exhibition-inspection-complete-tag" class="exhibition-inspection-complete" hidden><i class="bi bi-tags"></i><span>Ценники обновлены — отметить выполнение</span></button>
+                        <label class="exhibition-inspection-note"><span>Примечание / причина замены</span>
+                            <textarea id="exhibition-inspection-note" class="form-control" maxlength="500" rows="3" placeholder="Например: скол образца, старый ценник или повреждена рамка стенда"></textarea></label>
+                        <p class="exhibition-inspection-hint"><i class="bi bi-info-circle"></i> Изменения записываются в журнал CRM. Замены не списывают остатки Цеха автоматически.</p>
+                        <div id="exhibition-inspection-feedback" class="exhibition-inspection-feedback" role="alert" hidden></div>
+                    </div>
+                    <div class="modal-footer exhibition-inspection-footer">
+                        <button type="button" class="exhibition-inspection-cancel" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" id="exhibition-inspection-save" class="exhibition-inspection-save"><i class="bi bi-check2-circle"></i> Сохранить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
     <div class="modal fade" id="excel-export-modal" tabindex="-1" data-bs-backdrop="static">
         <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -223,6 +276,11 @@
                                 <input type="checkbox" id="excel-sheet-issues" checked>
                                 <span class="exhibition-export-option-icon"><i class="bi bi-exclamation-triangle"></i></span>
                                 <span><strong>Расхождения</strong><small>Матрица ≠ Цех — готовый список для проверки</small></span>
+                            </label>
+                            <label>
+                                <input type="checkbox" id="excel-sheet-inspection" checked>
+                                <span class="exhibition-export-option-icon"><i class="bi bi-tags"></i></span>
+                                <span><strong>Замены и ценники</strong><small>Состояния образцов, POS, ценники и примечания</small></span>
                             </label>
                             <label>
                                 <input type="checkbox" id="excel-sheet-pos" checked>
