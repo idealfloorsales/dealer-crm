@@ -244,8 +244,17 @@ body:not(.map-page) :is(.app-page-shell,.command-center-shell) { min-width:0; }
   transform:translate3d(0,0,0);
   transition:opacity .23s ease,transform .32s cubic-bezier(.2,1,.3,1),visibility 0s;
 }
+#crm-scroll-to-top .crm-scroll-top-wave{
+  position:absolute;inset:2px 6px;z-index:0;overflow:hidden;border-radius:12px;
+  pointer-events:none;opacity:0;
+}
+#crm-scroll-to-top .crm-scroll-top-wave::before{
+  content:"";position:absolute;left:-18px;right:-18px;bottom:-42px;height:76px;
+  background:linear-gradient(0deg,transparent 0%,rgba(217,32,46,.09) 22%,rgba(255,104,115,.29) 52%,rgba(255,236,237,.45) 66%,transparent 100%);
+  filter:blur(3px);opacity:0;transform:translateY(34px);
+}
 #crm-scroll-to-top .crm-scroll-top-arrow{
-  position:absolute;top:10px;left:50%;width:22px;height:24px;
+  position:absolute;top:10px;left:50%;width:22px;height:24px;z-index:2;
   display:grid;place-items:center;transform:translateX(-50%);color:#a91c24;
   transition:transform .34s cubic-bezier(.22,1,.36,1),color .25s ease;
 }
@@ -255,6 +264,12 @@ body:not(.map-page) :is(.app-page-shell,.command-center-shell) { min-width:0; }
   opacity:0;transform:scale(.75);pointer-events:none;
 }
 #crm-scroll-to-top .crm-scroll-top-arrow svg{position:relative;display:block;width:21px;height:21px}
+#crm-scroll-to-top .crm-scroll-top-echo{
+  position:absolute;top:35px;left:50%;z-index:2;display:grid;place-items:center;
+  width:20px;height:20px;color:#b9040a;pointer-events:none;opacity:0;
+  transform:translate(-50%,18px) scale(.8);
+}
+#crm-scroll-to-top .crm-scroll-top-echo svg{display:block;width:18px;height:18px}
 #crm-scroll-to-top .crm-scroll-top-caption{
   position:absolute;top:40px;left:50%;font:900 7px/1 Onest,sans-serif;
   letter-spacing:.11em;color:#77787d;writing-mode:vertical-rl;
@@ -288,46 +303,69 @@ body:not(.map-page) :is(.app-page-shell,.command-center-shell) { min-width:0; }
     transform:translateX(-50%) translateY(-3px)
   }
   #crm-scroll-to-top.is-visible:hover .crm-scroll-top-label{opacity:1;transform:translate(0,-50%)}
+  #crm-scroll-to-top.is-visible:hover .crm-scroll-top-progress{
+    filter:drop-shadow(0 0 4px rgba(185,4,10,.38))
+  }
 }
 #crm-scroll-to-top:focus-visible{outline:2px solid #b9040a!important;outline-offset:3px}
-/* One restrained lift on click. The arrow never disappears or flashes back:
-   a halo expands, the thin light trace rises, then everything settles. */
+/* A clear but restrained launch: a red light sweep climbs the rail,
+   an echo arrow follows, and the primary arrow lands softly. */
 #crm-scroll-to-top.is-launching::before{
-  animation:crmTopSurfacePulse .98s cubic-bezier(.22,1,.36,1) both;
+  animation:crmTopSurfacePulse 1.08s cubic-bezier(.2,1,.3,1) both;
+}
+#crm-scroll-to-top.is-launching .crm-scroll-top-wave{opacity:1}
+#crm-scroll-to-top.is-launching .crm-scroll-top-wave::before{
+  animation:crmTopWaveTravel 1.08s cubic-bezier(.32,.05,.3,1) both;
 }
 #crm-scroll-to-top.is-launching .crm-scroll-top-arrow{
-  animation:crmTopArrowTravel .98s cubic-bezier(.22,1,.36,1) both;
+  animation:crmTopArrowTravel 1.08s cubic-bezier(.22,1,.36,1) both;
+}
+#crm-scroll-to-top.is-launching .crm-scroll-top-echo{
+  animation:crmTopEchoTravel 1.08s cubic-bezier(.2,.75,.27,1) both;
 }
 #crm-scroll-to-top.is-launching .crm-scroll-top-arrow::before{
-  animation:crmTopHalo .94s ease-out both;
+  animation:crmTopHalo 1.02s ease-out both;
 }
 #crm-scroll-to-top.is-scrolling::after{
-  animation:crmTopLightRail 1.02s cubic-bezier(.2,.74,.24,1) both;
+  animation:crmTopLightRail 1.08s cubic-bezier(.2,.7,.28,1) both;
 }
 #crm-scroll-to-top.is-scrolling .crm-scroll-top-progress{
-  filter:drop-shadow(0 0 3px rgba(185,4,10,.32));
+  filter:drop-shadow(0 0 5px rgba(220,30,47,.55));
 }
 @keyframes crmTopArrowTravel{
   0%{transform:translateX(-50%) translateY(0) scale(1)}
-  16%{transform:translateX(-50%) translateY(2px) scale(.94)}
-  46%{transform:translateX(-50%) translateY(-6px) scale(1.04)}
-  72%{transform:translateX(-50%) translateY(-2px) scale(1.01)}
+  14%{transform:translateX(-50%) translateY(2px) scale(.96)}
+  53%{transform:translateX(-50%) translateY(-10px) scale(1.12)}
+  78%{transform:translateX(-50%) translateY(-3px) scale(1.02)}
   100%{transform:translateX(-50%) translateY(0) scale(1)}
+}
+@keyframes crmTopEchoTravel{
+  0%{opacity:0;transform:translate(-50%,23px) scale(.72)}
+  20%{opacity:.15}
+  42%{opacity:.85;transform:translate(-50%,0) scale(1)}
+  76%{opacity:.45;transform:translate(-50%,-16px) scale(.9)}
+  100%{opacity:0;transform:translate(-50%,-23px) scale(.8)}
+}
+@keyframes crmTopWaveTravel{
+  0%{opacity:0;transform:translateY(46px)}
+  17%{opacity:1}
+  62%{opacity:.95}
+  100%{opacity:0;transform:translateY(-102px)}
 }
 @keyframes crmTopHalo{
   0%{opacity:0;transform:scale(.72)}
-  26%{opacity:.95;transform:scale(.95)}
-  100%{opacity:0;transform:scale(1.55)}
+  26%{opacity:.92;transform:scale(1.04)}
+  100%{opacity:0;transform:scale(1.65)}
 }
 @keyframes crmTopLightRail{
-  0%{transform:translateY(26px);opacity:0}
-  23%{opacity:.9}
-  72%{opacity:.75}
-  100%{transform:translateY(-56px);opacity:0}
+  0%{transform:translateY(35px);opacity:0}
+  24%{opacity:1}
+  75%{opacity:.82}
+  100%{transform:translateY(-54px);opacity:0}
 }
 @keyframes crmTopSurfacePulse{
   0%,100%{box-shadow:0 2px 7px rgba(23,25,29,.045)}
-  36%{box-shadow:0 0 0 4px rgba(185,4,10,.045),0 5px 14px rgba(185,4,10,.09);border-color:#d4a1a4}
+  48%{box-shadow:0 0 0 5px rgba(185,4,10,.095),0 6px 18px rgba(185,4,10,.13);border-color:#d9959a}
 }
 :root[data-crm-theme="dark"] #crm-scroll-to-top{color:#f7f7f8!important}
 :root[data-crm-theme="dark"] #crm-scroll-to-top::before{
@@ -345,7 +383,8 @@ body:has(.modal.show,.offcanvas.show,.crm-mobile-sheet-backdrop.open) #crm-scrol
 @media(prefers-reduced-motion:reduce){
   #crm-scroll-to-top,#crm-scroll-to-top.is-visible,
   #crm-scroll-to-top .crm-scroll-top-arrow,#crm-scroll-to-top .crm-scroll-top-progress,
-  #crm-scroll-to-top .crm-scroll-top-label,
+  #crm-scroll-to-top .crm-scroll-top-label,#crm-scroll-to-top .crm-scroll-top-wave,
+  #crm-scroll-to-top .crm-scroll-top-wave::before,#crm-scroll-to-top .crm-scroll-top-echo,
   #crm-scroll-to-top .crm-scroll-top-arrow::before,
   #crm-scroll-to-top::before,#crm-scroll-to-top::after{
     animation:none!important;transition:none!important;
