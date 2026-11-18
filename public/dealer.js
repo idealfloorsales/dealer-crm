@@ -59,6 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const dealerScoreValueEl = document.getElementById('dealer-score-value');
     const dealerScoreLabelEl = document.getElementById('dealer-score-label');
     const dealerScoreBreakdownEl = document.getElementById('dealer-score-breakdown');
+    const dealerGrowthRecommendationsEl = document.getElementById('dealer-growth-recommendations');
     const dealerSalesMonthEl = document.getElementById('dealer-sales-month');
     const dealerPlanProgressEl = document.getElementById('dealer-plan-progress');
     const dealerLastVisitEl = document.getElementById('dealer-last-visit');
@@ -459,12 +460,57 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             fetchDealerProducts(dealer.products);
             renderDealerOverview(dealer, currentDealerSales);
+            renderDealerGrowth(dealer, currentDealerSales);
             renderDealerSales(currentDealerSales); 
 
         } catch (error) { 
             console.error(error); 
             if(dealerNameEl) dealerNameEl.textContent = 'Ошибка загрузки'; 
         }
+    }
+
+    function renderDealerGrowth(dealer, salesRows) {
+        if (!dealerGrowthRecommendationsEl) return;
+        if (!window.CRMScore?.getDealerGrowthRecommendations) {
+            dealerGrowthRecommendationsEl.innerHTML='<div class="dealer-growth-empty">Не удалось рассчитать рекомендации.</div>';
+            return;
+        }
+        const recommendations=CRMScore.getDealerGrowthRecommendations({
+            dealer,
+            salesRows,
+            visits:dealer.visits||[],
+            canViewSales:can('can_view_sales'),
+            canViewVisits:can('can_view_dashboard')
+        });
+        const icons={high:'bi-exclamation-triangle',medium:'bi-lightbulb',low:'bi-stars'};
+        const labels={high:'Срочно проверить',medium:'Возможность роста',low:'Идея'};
+        const cards=recommendations.map(item=>`
+            <article class="dealer-growth-card is-${item.priority}">
+                <div class="dealer-growth-card-head">
+                    <span class="dealer-growth-icon"><i class="bi ${icons[item.priority]||icons.medium}"></i></span>
+                    <div><span class="dealer-growth-priority">${labels[item.priority]||labels.medium}</span><h4>${safeText(item.title)}</h4></div>
+                </div>
+                <p class="dealer-growth-reason">${safeText(item.reason)}</p>
+                <ul>${item.steps.map(step=>`<li>${safeText(step)}</li>`).join('')}</ul>
+                <div class="dealer-growth-actions">
+                    ${item.action==='pricing'&&can('can_manage_pricing')?`<a class="dealer-growth-action" href="/pricing.html?dealer=${encodeURIComponent(dealerId)}"><i class="bi bi-tags"></i>Открыть условия и цены</a>`:''}
+                    ${item.action==='sales'&&can('can_view_sales')?`<button type="button" class="dealer-growth-action" data-growth-tab="#sales-pane"><i class="bi bi-graph-up-arrow"></i>Посмотреть продажи</button>`:''}
+                </div>
+            </article>`).join('');
+        const ideas=`
+            <article class="dealer-growth-card is-idea">
+                <div class="dealer-growth-card-head"><span class="dealer-growth-icon"><i class="bi bi-stars"></i></span><div><span class="dealer-growth-priority">Варианты предложения дилеру</span><h4>Выберите решение после разговора с дилером</h4></div></div>
+                <div class="dealer-growth-idea-grid">
+                    <div><strong>Обновить выкладку</strong><p>Образцы, актуальные ценники и подборка декоров под формат магазина.</p></div>
+                    <div><strong>Поддержать продавцов</strong><p>Короткое обучение и готовые аргументы по характеристикам IDEAL FLOOR.</p></div>
+                    <div><strong>Запустить адресную акцию</strong><p>Предложение на выбранные позиции с понятным сроком и условиями.</p></div>
+                    <div><strong>Привлечь новые обращения</strong><p>Совместная публикация или локальные материалы для соцсетей дилера.</p></div>
+                </div>
+            </article>`;
+        dealerGrowthRecommendationsEl.innerHTML=cards+ideas;
+        dealerGrowthRecommendationsEl.querySelectorAll('[data-growth-tab]').forEach(button=>button.addEventListener('click',()=>{
+            document.querySelector(`[data-bs-target="${button.dataset.growthTab}"]`)?.click();
+        }));
     }
 
     // --- RENDER SALES ---
