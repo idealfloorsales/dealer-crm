@@ -67,6 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let autoSaveRevision = 0;
     let salesIntelligenceRows = [];
     let salesIntelligenceLoaded = false;
+    let salesIntelligenceDirty = false;
     let salesIntelligencePromise = null;
     let salesIntelligenceTimer = null;
     
@@ -92,11 +93,15 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('sales-intelligence')?.setAttribute('hidden','');
             return Promise.resolve();
         }
-        if(salesIntelligenceLoaded&&!force) {
+        if(salesIntelligencePromise) {
+            if(force)salesIntelligenceDirty=true;
+            return salesIntelligencePromise;
+        }
+        if(salesIntelligenceLoaded&&!force&&!salesIntelligenceDirty) {
             renderSalesIntelligence(salesIntelligenceRows);
             return Promise.resolve();
         }
-        if(salesIntelligencePromise&&!force)return salesIntelligencePromise;
+        salesIntelligenceDirty=false;
         salesIntelligenceKpis.innerHTML='<div class="sales-intelligence-empty"><span class="spinner-border spinner-border-sm me-2"></span>Сверяем продажи по периодам…</div>';
         salesIntelligencePromise=fetch(API_SALES+'?months=16&context=sales')
             .then(response=>{if(!response.ok)throw new Error('Не удалось получить историю продаж');return response.json();})
@@ -105,6 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 salesIntelligenceRows=rows;
                 salesIntelligenceLoaded=true;
                 renderSalesIntelligence(rows);
+                if(salesIntelligenceDirty)scheduleSalesIntelligenceRefresh();
             })
             .catch(error=>{
                 salesIntelligenceLoaded=false;
@@ -116,7 +122,13 @@ document.addEventListener('DOMContentLoaded', () => {
         return salesIntelligencePromise;
     }
 
+    function salesRadarIsActive() {
+        return Boolean(document.getElementById('sales-radar-pane')?.classList.contains('active'));
+    }
+
     function scheduleSalesIntelligenceRefresh() {
+        salesIntelligenceDirty=true;
+        if(!salesIntelligenceLoaded||!salesRadarIsActive())return;
         if(salesIntelligenceTimer)clearTimeout(salesIntelligenceTimer);
         salesIntelligenceTimer=setTimeout(()=>{salesIntelligenceTimer=null;loadSalesIntelligence(true);},1800);
     }
@@ -291,6 +303,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         await loadSectors();
         if(salesIntelligenceRefresh)salesIntelligenceRefresh.addEventListener('click',()=>loadSalesIntelligence(true));
+        document.querySelectorAll('[data-sales-module-tab]').forEach(tab=>tab.addEventListener('shown.bs.tab',event=>{
+            if(event.target?.getAttribute('data-bs-target')==='#sales-radar-pane')loadSalesIntelligence(false);
+        }));
         loadData();
         setupMobileTabs();
     }
@@ -463,7 +478,7 @@ document.addEventListener('DOMContentLoaded', () => {
             isLoading = false;
             clearDirty();
             renderAll();
-            loadSalesIntelligence(false);
+            if(salesIntelligenceLoaded)renderSalesIntelligence(salesIntelligenceRows);
             updateLastModifiedText();
             setSaveButtonState(canEditFact || canEditPlan ? 'saved' : 'readonly');
         } catch (e) {
@@ -736,6 +751,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(data.error || 'Ошибка при сохранении');
             }
 
+            document.dispatchEvent(new CustomEvent('crm:sales-saved',{detail:{month:monthAtStart}}));
             scheduleSalesIntelligenceRefresh();
             const noNewChanges = revisionAtStart === autoSaveRevision && monthAtStart === monthPicker.value;
             if (noNewChanges) {
