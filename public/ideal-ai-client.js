@@ -9,7 +9,7 @@
  <header><div><small>IDEAL FLOOR · ПОМОЩНИК</small><h2 id="ideal-ai-title">IDEAL AI</h2></div><button type="button" data-ai-close aria-label="Закрыть">×</button></header>
  <nav class="ideal-ai-modes" aria-label="Режим помощника"><button type="button" data-ai-mode="knowledge" aria-pressed="true">Эксперт IDEAL FLOOR</button><button type="button" data-ai-mode="reports" aria-pressed="false">Аналитика CRM</button></nav>
  <p class="ideal-ai-intro">Характеристики, укладка и рабочие тексты по материалам обучения. Источники доступны под ответом.</p>
- <div class="ideal-ai-report-tools" hidden><label>Месяц <input type="month" aria-label="Месяц отчёта" data-ai-month></label><div><button type="button" data-ai-report="sales">Продажи за месяц</button><button type="button" data-ai-report="sales-analysis">Анализ сети и решения</button><button type="button" data-ai-report="visits">Кому нужен визит</button><button type="button" data-ai-report="kpi">Выполнение KPI</button></div><small>Расчёты внутри CRM. Продажи, дилеры и выводы не отправляются во внешний ИИ.</small></div>
+ <div class="ideal-ai-report-tools" hidden><label>Месяц <input type="month" aria-label="Месяц отчёта" data-ai-month></label><div><button type="button" data-ai-report="sales">Продажи за месяц</button><button type="button" data-ai-report="sales-analysis">Динамика сети: факты</button><button type="button" data-ai-report="visits">Кому нужен визит</button><button type="button" data-ai-report="kpi">Выполнение KPI</button></div><small>Расчёты внутри CRM. Продажи, дилеры и выводы не отправляются во внешний ИИ.</small></div>
  <div class="ideal-ai-messages" role="log" aria-live="polite"></div>
  <div class="ideal-ai-suggestions"><button type="button">Сравни ENGLAND HERRINGBONE и ROYAL PARQUET</button><button type="button">Как подготовить основание перед укладкой?</button><button type="button">Составь план обучения дилера</button></div>
  <p class="ideal-ai-status" role="status"></p>
@@ -32,7 +32,7 @@
  }
  function changeMode(next){if(busy)return;mode=next;const local=mode==='reports';reportTools.hidden=!local;form.hidden=local;suggestions.hidden=local;
   overlay.querySelectorAll('[data-ai-mode]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.aiMode===mode)));
-  overlay.querySelector('.ideal-ai-intro').textContent=local?'Продажи анализируются по динамике сети; причины и действия строятся только на фактах CRM. Данные не передаются внешнему ИИ.':'Характеристики, укладка и рабочие тексты по материалам обучения. Источники доступны под ответом.';
+  overlay.querySelector('.ideal-ai-intro').textContent=local?'Локальный отчёт показывает подтверждённые изменения продаж и сигналы из CRM. Совпадение сигналов не доказывает причину.':'Характеристики, укладка и рабочие тексты по материалам обучения. Источники доступны под ответом.';
   footer.textContent=local?'Отчёты и анализ выполняются внутри CRM. Запросов к OpenAI или Google при расчёте нет.':providerNotice;
   log.querySelectorAll('[data-ai-mode]').forEach(el=>el.hidden=el.dataset.aiMode!==mode);status.textContent=local?'Выберите анализ или отчёт выше':'Готов к вопросу';
  }

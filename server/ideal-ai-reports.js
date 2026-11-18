@@ -71,15 +71,11 @@ function salesAnalysisReport(dealers,sales,requestedMonth,now){
   const lastVisit=visits[visits.length-1]||null;
   const daysSince=lastVisit?Math.floor((Date.parse(cal.today+'T00:00:00Z')-Date.parse(lastVisit+'T00:00:00Z'))/86400000):null;
   const facts=[];
-  const actions=[];
   if(yearChange!==null)facts.push('тот же период год назад '+(yearChange>0?'+':'')+Math.round(yearChange)+'%'+(yearChange>=-8?' (возможна сезонность)':''));
-  if(competitors.length){facts.push('в карточке отмечено конкурентов: '+competitors.length);actions.push('На встрече уточнить, какие товары и условия конкурента сейчас выигрывают.');}
-  if(daysSince===null||daysSince>45){facts.push(daysSince===null?'нет завершённого визита в CRM':'последний визит '+daysSince+' дн. назад');actions.push('Запланировать визит: продажи, выкладка, ценники, обратная связь продавцов.');}
-  if(products.length===0){facts.push('в матрице не отмечены товары IDEAL FLOOR');actions.push('Сверить фактическую выкладку и подобрать ассортимент под магазин.');}
-  if(!actions.length)actions.push('Уточнить у дилера, что изменилось в спросе, заказах, ценах и работе продавцов.');
-  actions.push('Сверить условия и наличие ходовых позиций; при необходимости подготовить адресное предложение.');
-  actions.push('После контакта проверить динамику заказов в следующем месяце.');
-  eligible.push({d,change,recent,previous,severity,facts,actions,yearChange});
+  if(competitors.length){facts.push('в карточке отмечено конкурентов: '+competitors.length);}
+  if(daysSince===null||daysSince>45){facts.push(daysSince===null?'нет завершённого визита в CRM':'последний визит '+daysSince+' дн. назад');}
+  if(products.length===0){facts.push('в матрице не отмечены товары IDEAL FLOOR');}
+  eligible.push({d,change,recent,previous,severity,facts,yearChange});
  }
  eligible.sort((a,b)=>a.change-b.change);
  growth.sort((a,b)=>b.change-a.change);
@@ -98,7 +94,7 @@ function salesAnalysisReport(dealers,sales,requestedMonth,now){
   lines.push('\n• '+x.severity+' · '+x.d.name+(x.d.city?' · '+x.d.city:'')+(x.d.responsible?' · менеджер: '+x.d.responsible:''));
   lines.push('  Последние 3 месяца: '+amount(x.recent*3)+' м²; предыдущие 3: '+amount(x.previous*3)+' м²; изменение '+Math.round(x.change)+'%'+(x.yearChange===null?'':'; к тем же месяцам прошлого года '+(x.yearChange>0?'+':'')+Math.round(x.yearChange)+'%')+'.');
   if(x.facts.length)lines.push('  Сигналы CRM: '+x.facts.join('; ')+'.');
-  lines.push('  План: '+x.actions.join(' '));
+  lines.push('  Сигналы для проверки: '+(x.facts.length?x.facts.join('; '):'дополнительных сведений в CRM нет')+'.');
  }
  if(eligible.length>20)lines.push('\nПоказаны первые 20 дилеров с наибольшим снижением.');
  const groups=new Map();
@@ -110,11 +106,11 @@ function salesAnalysisReport(dealers,sales,requestedMonth,now){
  const regional=[...groups.entries()].filter(([,list])=>list.length>=2).sort((a,b)=>b[1].length-a[1].length);
  if(regional.length){
   lines.push('\nЛОКАЛЬНЫЕ СИГНАЛЫ');
-  for(const [label,list] of regional.slice(0,8))lines.push('• '+label+': '+list.length+' дилера снизили продажи на 20% и более. Проверить общий спрос, условия конкурентов и доступность ассортимента.');
+  for(const [label,list] of regional.slice(0,8))lines.push('• '+label+': '+list.length+' дилера снизили продажи на 20% и более. Это общий кластер снижения; данных недостаточно, чтобы установить единую причину.');
  }
  if(growth.length){
   lines.push('\nТОЧКИ РОСТА');
-  for(const x of growth.slice(0,5))lines.push('• '+x.d.name+(x.d.city?' · '+x.d.city:'')+': '+(x.change>0?'+':'')+Math.round(x.change)+'%, последние 3 месяца '+amount(x.recent*3)+' м². Узнать, что сработало, и проверить, можно ли повторить подход у похожих дилеров.');
+  for(const x of growth.slice(0,5))lines.push('• '+x.d.name+(x.d.city?' · '+x.d.city:'')+': '+(x.change>0?'+':'')+Math.round(x.change)+'%, последние 3 месяца '+amount(x.recent*3)+' м². CRM показывает динамику, но пока не связывает её с конкретным действием.');
  }
  if(anchor===cal.month&&cal.day>=10){
   const currentFacts=sales.filter(row=>!row.isCustom&&!String(row.dealerId||'').startsWith('PLAN_')&&row.month===cal.month&&activeIds.has(String(row.dealerId||''))).reduce((sum,row)=>sum+num(row.fact),0);
