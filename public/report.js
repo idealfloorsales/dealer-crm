@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const filterCity = $('filter-city');
     const filterResponsible = $('filter-responsible');
     const filterLiquidity = $('filter-liquidity');
+    const filterNeedsReplacement = $('filter-needs-replacement');
     const resetFiltersBtn = $('report-reset-filters');
 
     const dealerBtn = $('dealer-dropdown-btn');
@@ -130,13 +131,25 @@ document.addEventListener('DOMContentLoaded', () => {
             return matchCity && matchResponsible && matchDealer;
         });
 
-        const matrix = fullData.matrix.filter(row => {
+        const selectedRows = fullData.matrix.filter(row => {
             if (!rowMatchesLiquidity(row)) return false;
             const key = row.type === 'pos' ? row.name : row.sku;
             return selectedProductSkus.size === 0 || selectedProductSkus.has(String(key));
         });
+        if (!filterNeedsReplacement?.checked) return {headers,matrix:selectedRows};
 
-        return { headers, matrix };
+        // Only inspected problems count. A product not displayed at a dealer
+        // does not automatically require replacement.
+        const matchedIndices = new Set();
+        const originalIndices = visibleOriginalIndices(headers);
+        const matrix = selectedRows.filter(row => originalIndices.some(index => {
+            if (!needsAttention(row.dealers?.[index])) return false;
+            matchedIndices.add(index);
+            return true;
+        }));
+        const matchingHeaders = headers.filter((_,index)=>matchedIndices.has(originalIndices[index]));
+        return {headers:matchingHeaders,matrix};
+
     }
 
     function visibleOriginalIndices(headers) {
@@ -338,8 +351,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         renderKpis();
         updateDropdownLabels();
-        renderFieldDealers();
         ensureActiveFieldDealer();
+        renderFieldDealers();
         renderFieldDealer();
     }
 
@@ -479,7 +492,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function ensureActiveFieldDealer() {
-        const available = baseDealerFilter();
+        const available = getFilteredData().headers;
         if (!available.some(d=>idOf(d.id)===activeFieldDealerId)) {
             activeFieldDealerId = available[0] ? idOf(available[0].id) : '';
         }
@@ -488,7 +501,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderFieldDealers() {
         if (!fieldDealerList) return;
         const term = String(fieldDealerSearch?.value || '').trim().toLowerCase();
-        const dealers = baseDealerFilter().filter(d => {
+        const data = getFilteredData();
+        const dealers = data.headers.filter(d => {
             const blob = `${d.name||''} ${d.city||''}`.toLowerCase();
             return !term || blob.includes(term);
         });
@@ -496,7 +510,7 @@ document.addEventListener('DOMContentLoaded', () => {
         fieldDealerList.innerHTML = dealers.length ? dealers.map(dealer => {
             const id = idOf(dealer.id);
             const originalIndex = fullData.headers.findIndex(h=>idOf(h.id)===id);
-            const productRows = getFilteredData().matrix.filter(row=>row.type!=='pos');
+            const productRows = data.matrix.filter(row=>row.type!=='pos');
             let present=0, issues=0, samples=0,replacements=0,tagIssues=0;
             productRows.forEach(row=>{
                 const cell=row.dealers[originalIndex]||{};
@@ -507,7 +521,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if(needsTagAttention(cell))tagIssues++;
                 samples+=n(cell.sample_qty);
             });
-            getFilteredData().matrix.filter(row=>row.type==='pos').forEach(row=>{
+            data.matrix.filter(row=>row.type==='pos').forEach(row=>{
                 if(needsSampleReplace(row.dealers[originalIndex]))replacements++;
             });
             const percent=productRows.length?Math.round((present/productRows.length)*100):0;
@@ -588,7 +602,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const cell=row.dealers[originalIndex]||{};
             const state=cellState(cell);
             const blob=`${row.sku||''} ${row.name||''}`.toLowerCase();
-            return (!term||blob.includes(term))&&fieldRowMatches(state,row,cell);
+            return (!term||blob.includes(term))&&
+                (!filterNeedsReplacement?.checked||needsAttention(cell))&&
+                fieldRowMatches(state,row,cell);
         });
         fieldProductList.innerHTML=filtered.length?filtered.map(row=>{
             const cell=row.dealers[originalIndex]||{};
@@ -730,6 +746,7 @@ document.addEventListener('DOMContentLoaded', () => {
         filterCity.value='';
         filterResponsible.value='';
         if (filterLiquidity) filterLiquidity.value='liquid';
+        if (filterNeedsReplacement) filterNeedsReplacement.checked=false;
         selectedDealerIds.clear();
         selectedProductSkus.clear();
         dealerSearch.value='';
@@ -1245,6 +1262,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     filterCity?.addEventListener('change',()=>{updateDealerListOptions();renderMatrix();});
     filterResponsible?.addEventListener('change',()=>{updateDealerListOptions();renderMatrix();});
+    filterNeedsReplacement?.addEventListener('change',()=>renderMatrix());
     filterLiquidity?.addEventListener('change',()=>{
         selectedProductSkus.clear();
         if (productSearch) productSearch.value='';
