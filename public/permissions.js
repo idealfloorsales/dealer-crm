@@ -1535,10 +1535,17 @@
         button.setAttribute('aria-hidden','true');
         button.tabIndex=-1;
         button.innerHTML=`
+            <span class="crm-scroll-top-wave" aria-hidden="true"></span>
             <span class="crm-scroll-top-arrow" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
                      stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
                     <path d="M12 19V5M6.5 10.5 12 5l5.5 5.5"></path>
+                </svg>
+            </span>
+            <span class="crm-scroll-top-echo" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+                    <path d="m6 14 6-6 6 6"></path>
                 </svg>
             </span>
             <span class="crm-scroll-top-caption" aria-hidden="true">ВВЕРХ</span>
@@ -1553,6 +1560,7 @@
         let lastDockAt=0;
         let lastDock=null;
         let recentScrollRegion=null;
+        let glideFrame=0;
         const visibleOnScreen=el=>{
             if(!el||!el.isConnected)return false;
             const rect=el.getBoundingClientRect();
@@ -1562,8 +1570,46 @@
         };
         const scrollAmount=node=>node?Math.max(0,Number(node.scrollTop)||0):
             Math.max(0,window.scrollY||doc.scrollTop||0);
-        const remaining=node=>node?node.scrollHeight-node.clientHeight:
+        const remaining=node=>node.scrollHeight-node.clientHeight:
             Math.max(document.documentElement.scrollHeight,document.body.scrollHeight)-window.innerHeight;
+
+        // A distance-aware glide makes long pages feel deliberate instead of
+        // snapping to the top; any new wheel/touch/key action can interrupt it.
+        function cancelScrollGlide() {
+            if (!glideFrame) return;
+            window.cancelAnimationFrame?.(glideFrame);
+            glideFrame=0;
+            button.classList.remove('is-launching','is-scrolling');
+            requestUpdate();
+        }
+        function glideToTop(node) {
+            const surface=node?.isConnected ? node : doc;
+            const start=Math.max(0,surface.scrollTop||0,scrollAmount(node||null));
+            if (!start) return;
+            if (typeof window.performance?.now!=='function' ||
+                typeof window.cancelAnimationFrame!=='function') {
+                // Keep older browser/webview support; fallback is still smooth.
+                const options={top:0,behavior:'smooth'};
+                if (node?.isConnected) node.scrollTo(options);
+                else window.scrollTo(options);
+                return;
+            }
+            if (glideFrame) window.cancelAnimationFrame(glideFrame);
+            const duration=Math.min(1200,Math.max(660,520+Math.sqrt(start)*12));
+            const started=window.performance.now();
+            function step(timestamp) {
+                const progress=Math.min(1,Math.max(0,(timestamp-started)/duration));
+                const eased=1-Math.pow(1-progress,3);
+                surface.scrollTop=Math.max(0,Math.round(start*(1-eased)));
+                if(progress<1)glideFrame=window.requestAnimationFrame(step);
+                else {
+                    surface.scrollTop=0;
+                    glideFrame=0;
+                    requestUpdate();
+                }
+            }
+            glideFrame=window.requestAnimationFrame(step);
+        }
 
         function blockedByOverlay(){
             if(document.body.classList.contains('map-list-open')||
@@ -1635,6 +1681,7 @@
         function update() {
             frame=0;
             if(blockedByOverlay()){
+                cancelScrollGlide();
                 scrollTarget=null;
                 lastDock=null;
                 setVisibility(false);
@@ -1695,19 +1742,27 @@
         button.addEventListener('click',()=>{
             if(!button.classList.contains('is-visible'))return;
             const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-            if(!reduced){
-                button.classList.remove('is-launching');
-                // Restart the gentle lift and rising light trail while native
-                // smooth scrolling stays interruptible by touch or wheel.
+            if(glideFrame)window.cancelAnimationFrame?.(glideFrame);
+            glideFrame=0;
+            button.classList.remove('is-launching','is-scrolling');
+            if(reduced){
+                const options={top:0,behavior:'auto'};
+                if(scrollTarget?.isConnected)scrollTarget.scrollTo(options);
+                else window.scrollTo(options);
+            }else{
+                // Replay the visible light sweep and arrow echo from the start.
                 void button.offsetWidth;
                 button.classList.add('is-launching','is-scrolling');
+                glideToTop(scrollTarget);
             }
-            const options={top:0,behavior:reduced?'auto':'smooth'};
-            if(scrollTarget&&scrollTarget.isConnected)scrollTarget.scrollTo(options);
-            else window.scrollTo(options);
             requestUpdate();
         });
         window.addEventListener('scroll',requestUpdate,{passive:true});
+        document.addEventListener('wheel',cancelScrollGlide,{passive:true,capture:true});
+        document.addEventListener('touchstart',cancelScrollGlide,{passive:true,capture:true});
+        document.addEventListener('keydown',event=>{
+            if(['ArrowUp','ArrowDown','PageUp','PageDown','Home','End',' '].includes(event.key))cancelScrollGlide();
+        },{capture:true});
         document.addEventListener('scroll',event=>{
             const el=event.target;
             if(el&&el.nodeType===1&&el!==doc&&
