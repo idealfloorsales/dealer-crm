@@ -1385,6 +1385,17 @@ const collectionItemSchema = new mongoose.Schema({
 }, { _id: false });
 const compContactSchema = new mongoose.Schema({ name: String, position: String, phone: String }, { _id: false });
 
+const competitorObservationSchema = new mongoose.Schema({
+    date: { type: String, default: '' },
+    topic: { type: String, enum: ['price','assortment','promotion','dealer','stock','logistics','quality','reviews','marketing','other'], default: 'other' },
+    city: { type: String, default: '' }, dealer: { type: String, default: '' }, product: { type: String, default: '' },
+    detail: { type: String, default: '' },
+    source_type: { type: String, enum: ['website','instagram','marketplace','dealer','visit','offer','review','other'], default: 'other' },
+    source: { type: String, default: '' }, source_url: { type: String, default: '' },
+    confidence: { type: String, enum: ['verified','observed','reported','estimate'], default: 'reported' },
+    createdAt: { type: Date, default: Date.now }
+}, { _id: false });
+
 const compRefSchema = new mongoose.Schema({
     name: String,
     country: String,
@@ -1411,7 +1422,8 @@ const compRefSchema = new mongoose.Schema({
     stock_info: String,
     reserve_days: String,
     contacts: [compContactSchema],
-    collections: [collectionItemSchema]
+    collections: [collectionItemSchema],
+    observations: [competitorObservationSchema]
 }, { timestamps: true });
 const CompRef = mongoose.model('CompRef', compRefSchema);
 
