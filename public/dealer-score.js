@@ -227,10 +227,16 @@
             const elapsed=currentDay/Math.max(1,daysInMonth);
             const currentPace=currentFact/Math.max(elapsed,0.1);
             const recentBaseline=recentCoverage>=2 ? recentAvg : 0;
-            if (currentDay>=10 && currentFact>0 && recentBaseline>0 && currentPace<recentBaseline*0.75) {
-                if (risk==='stable') risk='watch';
-                reasons.push(`Текущий месяц пока идет примерно на ${Math.max(0,Math.round((1-currentPace/recentBaseline)*100))}% ниже среднего темпа последних месяцев.`);
-                metricLines.push(`Текущий темп: около ${area(currentPace)} м²/мес.`);
+            if (currentDay>=10 && recentBaseline>0) {
+                const hasCurrentFact=presentMonths.has(currentMonth);
+                if (hasCurrentFact && currentPace<recentBaseline*0.75) {
+                    if (risk==='stable') risk='watch';
+                    reasons.push(`Текущий темп примерно на ${Math.max(0,Math.round((1-currentPace/recentBaseline)*100))}% ниже среднего темпа последних месяцев.`);
+                    metricLines.push(`Текущий темп: около ${area(currentPace)} м²/мес.`);
+                } else if (!hasCurrentFact) {
+                    if (risk==='stable') risk='watch';
+                    reasons.push('В CRM пока нет факта продаж за текущий месяц. Сначала проверьте, обновлены ли данные; отсутствие записи не считается подтверждённым нулём продаж.');
+                }
             }
 
             if (risk==='critical'||risk==='high'||risk==='watch') {
