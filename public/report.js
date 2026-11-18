@@ -271,11 +271,18 @@ document.addEventListener('DOMContentLoaded', () => {
         // does not automatically require replacement.
         const matchedIndices = new Set();
         const originalIndices = visibleOriginalIndices(headers);
-        const matrix = selectedRows.filter(row => originalIndices.some(index => {
-            if (!needsAttention(row.dealers?.[index])) return false;
-            matchedIndices.add(index);
-            return true;
-        }));
+        const matrix = selectedRows.filter(row => {
+            let matches=false;
+            // Visit every dealer: Array.some() would stop at the first issue
+            // and hide other dealers with problems in the same product row.
+            originalIndices.forEach(index=>{
+                if(needsAttention(row.dealers?.[index])){
+                    matchedIndices.add(index);
+                    matches=true;
+                }
+            });
+            return matches;
+        });
         const matchingHeaders = headers.filter((_,index)=>matchedIndices.has(originalIndices[index]));
         return {headers:matchingHeaders,matrix};
 
