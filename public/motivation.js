@@ -2,7 +2,7 @@
     const API = '/api/motivation';
     const payoutPending = new Set();
     let payoutLoadRevision=0;
-    const state = { schemes: [], loaded:false, loading:null, manager:null, editingId:'', payoutMonth:'', payoutData:null, suspendedModal:null };
+    const state = { schemes: [], loaded:false, loading:null, manager:null, editingId:'', payoutMonth:'', payoutData:null, payoutPanelLoaded:false, payoutPanelDirty:false, payoutPanelTimer:null, suspendedModal:null };
 
     const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
     const n = value => Number(value) || 0;
@@ -42,9 +42,11 @@
     }
 
     async function refreshSelects() {
+        const selects=[...document.querySelectorAll('[data-motivation-select], #motivation_scheme, #edit_motivation_scheme, #profile-edit-motivation-scheme')];
+        if(!selects.length)return;
         let schemes = [];
         try { schemes = await loadSchemes(); } catch (e) { console.warn(e); }
-        document.querySelectorAll('[data-motivation-select], #motivation_scheme, #edit_motivation_scheme, #profile-edit-motivation-scheme').forEach(select => {
+        selects.forEach(select => {
             if (!(select instanceof HTMLSelectElement)) return;
 
             if (select.dataset.motivationBound !== '1') {
@@ -463,6 +465,15 @@ td small{margin-top:2px;color:#888;font-size:8px}
         finally{payoutPending.delete(String(id));payoutControls();element?.removeAttribute('aria-busy');element?.querySelectorAll('button').forEach(b=>b.disabled=false);}
     }
 
+    function activatePayoutPanel(force=false) {
+        const panel=document.getElementById('motivation-payouts-panel');
+        if(!panel)return;
+        if(state.payoutPanelLoaded&&!state.payoutPanelDirty&&!force)return;
+        state.payoutPanelLoaded=true;
+        state.payoutPanelDirty=false;
+        loadPayouts(true);
+    }
+
     function initPayoutPanel() {
         const panel=document.getElementById('motivation-payouts-panel');
         if(!panel) return;
@@ -473,7 +484,7 @@ td small{margin-top:2px;color:#888;font-size:8px}
         toggle?.addEventListener('click',()=>{const hidden=!body.hidden;collapse(hidden);try{localStorage.setItem(collapsedKey,String(hidden));}catch(_){} });
         const picker=document.getElementById('motivation-payout-month');
         if(picker && !picker.value) picker.value=currentMonth();
-        picker?.addEventListener('change',()=>loadPayouts(canManage()));
+        picker?.addEventListener('change',()=>{state.payoutPanelLoaded=true;state.payoutPanelDirty=false;loadPayouts(canManage());});
         document.getElementById('motivation-payout-recalc')?.addEventListener('click',()=>loadPayouts(true));
         document.getElementById('motivation-payout-print')?.addEventListener('click',printPayoutList);
         document.getElementById('motivation-payout-settings')?.addEventListener('click',openManager);
@@ -481,7 +492,19 @@ td small{margin-top:2px;color:#888;font-size:8px}
             const btn=event.target.closest('[data-payout-status]');
             if(btn) setPayoutStatus(btn.dataset.payoutId,btn.dataset.payoutStatus);
         });
-        loadPayouts(true);
+        document.addEventListener('shown.bs.tab',event=>{
+            if(event.target?.getAttribute('data-bs-target')==='#sales-motivation-pane')activatePayoutPanel();
+        });
+        document.addEventListener('crm:sales-saved',event=>{
+            if(event.detail?.month&&picker?.value&&event.detail.month!==picker.value)return;
+            state.payoutPanelDirty=true;
+            if(panel.closest('.tab-pane')?.classList.contains('active')) {
+                if(state.payoutPanelTimer)clearTimeout(state.payoutPanelTimer);
+                state.payoutPanelTimer=setTimeout(()=>{state.payoutPanelTimer=null;activatePayoutPanel(true);},1500);
+            }
+        });
+        if(location.hash==='#motivation-payouts-panel')document.getElementById('sales-motivation-tab')?.click();
+        else if(!panel.closest('.tab-pane'))activatePayoutPanel();
     }
 
     function observeDynamicSelects() {
