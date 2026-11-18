@@ -1691,6 +1691,7 @@
                 '.ideal-ai-launch','.map-actions-right','.map-mobile-action-dock',
                 '.map-mobile-list-btn','.crm-floating-toolbar','.leaflet-control-zoom',
                 '.crm-sticky-actions','.floating-action','.chat-widget',
+                '.exhibition-batch-bar:not([hidden])',
                 '.toast-container.show','.toast.show'
             ].join(',');
             const obstacles=[];
