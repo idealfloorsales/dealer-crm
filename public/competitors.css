@@ -472,3 +472,15 @@ html,body.competitors-page{max-width:100%;overflow-x:hidden}
 @media(max-width:1200px){.competitors-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:900px){.competitors-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.competitor-observation-form{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.competitor-observation-form{grid-template-columns:1fr}.competitor-observation-form label.wide{grid-column:auto}.competitor-observation-row-top{align-items:flex-start;flex-direction:column;gap:2px}.competitor-observation-preview article>div{align-items:flex-start;flex-direction:column;gap:1px}}
+
+/* Manager quick observation entry linked to existing CRM dealers */
+.observation-quick-modal .modal-body{display:grid;gap:11px}
+.observation-competitor-name{display:block;margin-top:3px;color:#77797e;font-size:.68rem;font-weight:600}
+.observation-quick-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.observation-quick-field{display:block;min-width:0}
+.observation-quick-field>span{display:block;margin:0 0 4px 2px;color:#77797e;font-size:.64rem;font-weight:750}
+.observation-quick-field .form-control,.observation-quick-field .form-select{min-height:40px;border:1px solid #ded9d5;border-radius:9px;font-size:.72rem;box-shadow:none!important}
+.observation-quick-field small{display:block;margin:4px 2px 0;color:#92949a;font-size:.6rem}
+.observation-source-details summary{color:#8c3439;font-size:.65rem;font-weight:750;cursor:pointer}
+.observation-source-details .form-control{margin-top:7px}
+@media(max-width:560px){.observation-quick-grid{grid-template-columns:1fr}}
