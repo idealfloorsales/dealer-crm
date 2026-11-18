@@ -50,6 +50,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const inspectionSave = $('exhibition-inspection-save');
     const inspectionFeedback = $('exhibition-inspection-feedback');
     const canEditMatrix = () => Boolean(window.CRMAuth?.can('can_edit_matrix'));
+    const editModeButton = $('exhibition-edit-mode');
+    const editHint = $('exhibition-edit-hint');
+    const batchBar = $('exhibition-batch-bar');
+    const batchCount = $('exhibition-batch-count');
+    const batchDetails = $('exhibition-batch-details');
+    const batchSave = $('exhibition-batch-save');
+    const batchUndo = $('exhibition-batch-undo');
+    const batchDiscard = $('exhibition-batch-discard');
+    let batchEditMode = false;
+    let batchSaving = false;
+    const stagedPresence = new Map();
+    const editHistory = [];
     let inspectionContext = null;
 
     let fullData = { headers: [], matrix: [] };
@@ -71,6 +83,123 @@ document.addEventListener('DOMContentLoaded', () => {
     const idOf = value => String(value?.id || value?._id || value || '');
     const n = value => Number(value) || 0;
     const fmt = value => n(value).toLocaleString('ru-RU');
+
+    // Protected two-step editor: an explicit edit mode plus one batch Save.
+    // Original matrix data is never changed while the user is selecting.
+    const presenceKey=(dealerId,productId)=>String(dealerId)+'|'+String(productId);
+    function stagedEntry(dealerId,productId){
+        return stagedPresence.get(presenceKey(dealerId,productId));
+    }
+    function previewCell(row,index){
+        const cell=row.dealers?.[index]||{};
+        if(row.type==='pos')return cell;
+        const dealerId=idOf(fullData.headers[index]?.id);
+        const pending=stagedEntry(dealerId,row.id);
+        return pending?{...cell,value:pending.present?1:0}:cell;
+    }
+    function updateBatchControls(){
+        if(editModeButton){
+            editModeButton.hidden=!canEditMatrix();
+            editModeButton.disabled=batchSaving;
+            editModeButton.classList.toggle('is-active',batchEditMode);
+            editModeButton.setAttribute('aria-pressed',batchEditMode?'true':'false');
+            editModeButton.innerHTML=batchEditMode
+                ? '<i class="bi bi-lock-fill"></i><span>Завершить правки</span>'
+                : '<i class="bi bi-unlock"></i><span>Редактировать</span>';
+        }
+        if(editHint)editHint.hidden=!batchEditMode;
+        if(batchBar)batchBar.hidden=stagedPresence.size===0;
+        if(batchCount)batchCount.textContent=stagedPresence.size+' '+(
+            stagedPresence.size%10===1&&stagedPresence.size%100!==11?'изменение':
+            [2,3,4].includes(stagedPresence.size%10)&&![12,13,14].includes(stagedPresence.size%100)?'изменения':'изменений'
+        );
+        if(batchDetails)batchDetails.textContent=batchSaving?'Сохраняю изменения…'
+            :'Предпросмотр · ещё не сохранено';
+        if(batchSave){
+            batchSave.disabled=batchSaving||!stagedPresence.size;
+            batchSave.innerHTML=batchSaving
+                ? '<span class="spinner-border spinner-border-sm"></span><span>Сохраняю…</span>'
+                : '<i class="bi bi-check2-circle"></i><span>Сохранить '+stagedPresence.size+'</span>';
+        }
+        if(batchUndo)batchUndo.disabled=batchSaving||!editHistory.length;
+        if(batchDiscard)batchDiscard.disabled=batchSaving||!stagedPresence.size;
+        document.body.classList.toggle('exhibition-batch-editing',batchEditMode);
+    }
+    function toggleBatchEditMode(){
+        if(!canEditMatrix()||batchSaving)return;
+        if(batchEditMode&&stagedPresence.size){
+            window.showToast?.('Сначала сохраните или сбросьте изменения','warning');
+            return;
+        }
+        batchEditMode=!batchEditMode;
+        renderMatrix();
+    }
+    function toggleStagedPresence(dealerId,productId){
+        if(!batchEditMode||batchSaving||!canEditMatrix())return;
+        const index=fullData.headers.findIndex(header=>idOf(header.id)===dealerId);
+        const row=fullData.matrix.find(item=>item.type!=='pos'&&String(item.id)===productId);
+        if(index<0||!row)return;
+        const original=Boolean(n(row.dealers[index]?.value));
+        const key=presenceKey(dealerId,productId);
+        const previous=stagedPresence.get(key)||null;
+        if(!previous&&stagedPresence.size>=250){
+            window.showToast?.('За один раз можно сохранить до 250 отметок','warning');
+            return;
+        }
+        const next=!(previous?previous.present:original);
+        editHistory.push({key,previous});
+        if(next===original)stagedPresence.delete(key);
+        else stagedPresence.set(key,{dealerId,productId,present:next,expectedPresent:original});
+        if(!stagedPresence.size)editHistory.length=0;
+        renderMatrix();
+    }
+    function undoStagedPresence(){
+        if(batchSaving||!editHistory.length)return;
+        const last=editHistory.pop();
+        if(last.previous)stagedPresence.set(last.key,last.previous);
+        else stagedPresence.delete(last.key);
+        if(!stagedPresence.size)editHistory.length=0;
+        renderMatrix();
+    }
+    function discardStagedPresence(){
+        if(batchSaving)return;
+        stagedPresence.clear();
+        editHistory.length=0;
+        renderMatrix();
+    }
+    async function saveStagedPresence(){
+        if(batchSaving||!stagedPresence.size||!canEditMatrix())return;
+        batchSaving=true;
+        updateBatchControls();
+        const changes=[...stagedPresence.values()];
+        try{
+            const response=await fetch('/api/exhibition/presence/batch',{
+                method:'PUT',headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({changes})
+            });
+            const result=await response.json().catch(()=>({}));
+            if(!response.ok)throw new Error(result.error||'Не удалось сохранить выставленность');
+            if(result.status!=='ok'||!Array.isArray(result.changes)||result.changes.length!==changes.length)
+                throw new Error('Сервер вернул неполный результат. Обновите данные выставленности.');
+            result.changes.forEach(item=>{
+                const index=fullData.headers.findIndex(d=>idOf(d.id)===item.dealerId);
+                const row=fullData.matrix.find(r=>r.type!=='pos'&&String(r.id)===item.productId);
+                if(index>=0&&row){
+                    const cell=row.dealers[index]||{};
+                    row.dealers[index]={...cell,value:item.present?1:0};
+                }
+            });
+            stagedPresence.clear();
+            editHistory.length=0;
+            batchEditMode=false;
+            window.showToast?.('Сохранено '+result.changes.length+' отметок выставленности','success');
+        }catch(error){
+            window.showToast?.(error.message||'Ошибка сохранения','error');
+        }finally{
+            batchSaving=false;
+            renderMatrix();
+        }
+    }
 
     function cellState(cell) {
         if (!cell) return 'missing';
