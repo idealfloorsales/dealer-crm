@@ -158,9 +158,162 @@
         };
     }
 
+    function getDealerGrowthRecommendations(options) {
+        options = options || {};
+        const dealer = options.dealer || {};
+        const rows = Array.isArray(options.salesRows) ? options.salesRows : [];
+        const visits = Array.isArray(options.visits) ? options.visits : (dealer.visits || []);
+        const canViewSales = options.canViewSales !== false;
+        const canViewVisits = options.canViewVisits !== false;
+        const result = [];
+        const dateParts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+            timeZone:'Asia/Almaty', year:'numeric', month:'2-digit', day:'2-digit'
+        }).formatToParts(new Date()).map(part=>[part.type,part.value]));
+        const today = `${dateParts.year}-${dateParts.month}-${dateParts.day}`;
+        const currentMonth = today.slice(0,7);
+        const currentDay = Number(dateParts.day)||1;
+        const daysInMonth = new Date(Date.UTC(Number(dateParts.year),Number(dateParts.month),0)).getUTCDate();
+        const monthOffset = (month, offset) => {
+            const [y,m] = String(month).split('-').map(Number);
+            const d = new Date(Date.UTC(y,m-1+offset,1));
+            return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`;
+        };
+        const area = value => Math.round(Number(value)||0);
+        const salesByMonth = new Map();
+        const presentMonths = new Set();
+        rows.filter(row => !String(row.dealerId||'').startsWith('PLAN_') && /^\\d{4}-\\d{2}$/.test(String(row.month||'')))
+            .forEach(row => {
+                const key=String(row.month);
+                presentMonths.add(key);
+                salesByMonth.set(key,(salesByMonth.get(key)||0)+number(row.fact));
+            });
+        const factAt = key => salesByMonth.get(key)||0;
+        const average = keys => keys.reduce((sum,key)=>sum+factAt(key),0)/Math.max(1,keys.length);
+        const reasons = [];
+        const actions = [];
+        const metricLines = [];
+        let risk = 'stable';
+
+        if (canViewSales) {
+            const lastClosed = monthOffset(currentMonth,-1);
+            const recentKeys = [-3,-2,-1].map(offset=>monthOffset(currentMonth,offset));
+            const priorKeys = [-6,-5,-4].map(offset=>monthOffset(currentMonth,offset));
+            const recentAvg=average(recentKeys);
+            const priorAvg=average(priorKeys);
+            const recentCoverage=recentKeys.filter(key=>presentMonths.has(key)).length;
+            const priorCoverage=priorKeys.filter(key=>presentMonths.has(key)).length;
+            const completeHistory=recentCoverage>=2 && priorCoverage>=2 && priorAvg>0;
+            const decline=completeHistory ? (priorAvg-recentAvg)/priorAvg : 0;
+            const recentTotal=recentKeys.reduce((sum,key)=>sum+factAt(key),0);
+            const priorTotal=priorKeys.reduce((sum,key)=>sum+factAt(key),0);
+
+            if (completeHistory) {
+                metricLines.push(`Последние 3 закрытых месяца: ${area(recentTotal)} м²`);
+                metricLines.push(`Предыдущие 3 месяца: ${area(priorTotal)} м²`);
+                if (decline>=0.2) {
+                    risk=decline>=0.4?'critical':'high';
+                    reasons.push(`Средние продажи за последние 3 месяца ниже предыдущего периода на ${Math.round(decline*100)}%.`);
+                    actions.push('Связаться с дилером в ближайшие 1–2 рабочих дня и выяснить, что изменилось в спросе и заказах.');
+                } else if (decline>=0.1) {
+                    risk='watch';
+                    reasons.push(`Средний темп за последние 3 месяца снизился на ${Math.round(decline*100)}% — ранний сигнал, стоит проверить ситуацию.`);
+                    actions.push('Запланировать короткий контакт с дилером и сверить ожидания по заказам.');
+                }
+            } else {
+                metricLines.push('Для сравнения темпа пока не хватает данных за 6 закрытых месяцев.');
+            }
+
+            const currentFact=factAt(currentMonth);
+            const elapsed=currentDay/Math.max(1,daysInMonth);
+            const currentPace=currentFact/Math.max(elapsed,0.1);
+            const recentBaseline=recentCoverage>=2 ? recentAvg : 0;
+            if (currentDay>=10 && recentBaseline>0) {
+                const hasCurrentFact=presentMonths.has(currentMonth);
+                if (hasCurrentFact && currentPace<recentBaseline*0.75) {
+                    if (risk==='stable') risk='watch';
+                    reasons.push(`Текущий темп примерно на ${Math.max(0,Math.round((1-currentPace/recentBaseline)*100))}% ниже среднего темпа последних месяцев.`);
+                    metricLines.push(`Текущий темп: около ${area(currentPace)} м²/мес.`);
+                } else if (!hasCurrentFact) {
+                    if (risk==='stable') risk='watch';
+                    reasons.push('В CRM пока нет факта продаж за текущий месяц. Сначала проверьте, обновлены ли данные; отсутствие записи не считается подтверждённым нулём продаж.');
+                }
+            }
+
+            if (risk==='critical'||risk==='high'||risk==='watch') {
+                const competitorList=Array.isArray(dealer.competitors)?dealer.competitors:[];
+                if (competitorList.length) {
+                    reasons.push(`В карточке отмечено ${competitorList.length} конкурирующих бренда. Это фактор для проверки, но само по себе не доказывает причину снижения.`);
+                    actions.push('На встрече уточнить, какие именно товары конкурента продаются активнее и какие у него условия.');
+                }
+                const lastVisit=latestCompletedVisit(visits);
+                const daysSince=lastVisit?Math.max(0,Math.floor((Date.now()-lastVisit._date.getTime())/86400000)):null;
+                if (canViewVisits && (daysSince===null||daysSince>45)) {
+                    reasons.push(daysSince===null?'В CRM нет завершённых визитов.':`Последний завершённый визит был ${daysSince} дней назад.`);
+                    actions.push('Провести визит с проверкой выкладки, ценников, наличия образцов и обратной связи продавцов.');
+                }
+                if (Array.isArray(dealer.products)&&dealer.products.length===0) {
+                    reasons.push('В матрице дилера не отмечены наши товары.');
+                    actions.push('Сверить фактическую выкладку и подобрать минимальный набор ходовых декоров.');
+                }
+                if (!actions.some(item=>item.includes('цен')||item.includes('услов'))) {
+                    actions.push('Сверить цену и условия на 2–3 сопоставимые позиции; при необходимости запросить адресное предложение.');
+                }
+                actions.push('После контакта отметить результат и повторно проверить продажи в следующем месяце.');
+            }
+
+            if (!result.length && risk!=='stable') {
+                result.push({
+                    priority:risk==='critical'?'high':risk==='watch'?'medium':'high',
+                    title:risk==='critical'?'Критическое снижение темпа продаж':risk==='watch'?'Появился сигнал к проверке':'Продажи дилера снизились',
+                    reason:reasons[0]||'Изменился темп продаж относительно истории дилера.',
+                    signals:reasons.slice(1),
+                    metrics:metricLines,
+                    steps:[...new Set(actions)],
+                    action:'sales'
+                });
+            } else if (risk==='stable' && completeHistory) {
+                result.push({
+                    priority:'low',
+                    title:'Темп продаж стабилен',
+                    reason:'Сравнение последних трёх закрытых месяцев с предыдущими тремя не выявило существенного снижения.',
+                    signals:[],
+                    metrics:metricLines,
+                    steps:['Продолжать текущую работу; обратить внимание на новые изменения темпа в следующих месяцах.'],
+                    action:'sales'
+                });
+            }
+        }
+
+        if (canViewVisits && !result.length) {
+            const hasUpcoming=visits.some(visit=>!visit?.isCompleted&&visit?.date&&String(visit.date).slice(0,10)>=today);
+            const lastVisit=latestCompletedVisit(visits);
+            const daysSince=lastVisit?Math.max(0,Math.floor((Date.now()-lastVisit._date.getTime())/86400000)):null;
+            if (!hasUpcoming&&(daysSince===null||daysSince>60)) {
+                result.push({
+                    priority:daysSince===null||daysSince>90?'high':'medium',
+                    title:'Давно не было контакта с дилером',
+                    reason:daysSince===null?'В CRM нет завершённых визитов.':`Последний завершённый визит был ${daysSince} дней назад.`,
+                    signals:dealer.competitors?.length?[ `У дилера отмечено конкурентов: ${dealer.competitors.length}.` ]:[],
+                    metrics:[],
+                    steps:['Связаться с дилером и уточнить текущие продажи, спрос, выкладку и предложения конкурентов.'],
+                    action:'visit'
+                });
+            }
+        }
+        return result;
+    }
+
+    function previousMonthKey(month) {
+        const [year,monthNumber]=String(month||'').split('-').map(Number);
+        if(!year||!monthNumber) return '';
+        const d=new Date(Date.UTC(year,monthNumber-2,1));
+        return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`;
+    }
+
     window.CRMScore = {
         calculateDealerScore,
         latestCompletedVisit,
-        getSalesTotals
+        getSalesTotals,
+        getDealerGrowthRecommendations
     };
 })();

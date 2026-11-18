@@ -59,6 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const dealerScoreValueEl = document.getElementById('dealer-score-value');
     const dealerScoreLabelEl = document.getElementById('dealer-score-label');
     const dealerScoreBreakdownEl = document.getElementById('dealer-score-breakdown');
+    const dealerGrowthRecommendationsEl = document.getElementById('dealer-growth-recommendations');
     const dealerSalesMonthEl = document.getElementById('dealer-sales-month');
     const dealerPlanProgressEl = document.getElementById('dealer-plan-progress');
     const dealerLastVisitEl = document.getElementById('dealer-last-visit');
@@ -459,12 +460,53 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             fetchDealerProducts(dealer.products);
             renderDealerOverview(dealer, currentDealerSales);
+            renderDealerGrowth(dealer, currentDealerSales);
             renderDealerSales(currentDealerSales); 
 
         } catch (error) { 
             console.error(error); 
             if(dealerNameEl) dealerNameEl.textContent = 'Ошибка загрузки'; 
         }
+    }
+
+    function renderDealerGrowth(dealer, salesRows) {
+        if (!dealerGrowthRecommendationsEl) return;
+        if (!window.CRMScore?.getDealerGrowthRecommendations) {
+            dealerGrowthRecommendationsEl.innerHTML='<div class="dealer-growth-empty">Не удалось рассчитать динамику продаж.</div>';
+            return;
+        }
+        const items=CRMScore.getDealerGrowthRecommendations({
+            dealer,
+            salesRows,
+            visits:dealer.visits||[],
+            canViewSales:can('can_view_sales'),
+            canViewVisits:can('can_view_dashboard')
+        });
+        if (!items.length) {
+            dealerGrowthRecommendationsEl.innerHTML='<div class="dealer-growth-empty"><i class="bi bi-info-circle me-2"></i>Недостаточно доступных данных для анализа. Проверьте историю продаж и визитов.</div>';
+            return;
+        }
+        const icons={high:'bi-exclamation-triangle',medium:'bi-activity',low:'bi-check2-circle'};
+        const labels={high:'Нужна проверка',medium:'Ранний сигнал',low:'В норме'};
+        const cards=items.map(item=>{
+            const metrics=Array.isArray(item.metrics)&&item.metrics.length
+                ? '<div class="dealer-growth-metrics">'+item.metrics.map(metric=>'<span>'+safeText(metric)+'</span>').join('')+'</div>' : '';
+            const signals=Array.isArray(item.signals)&&item.signals.length
+                ? '<div class="dealer-growth-evidence"><strong>Что ещё проверить</strong><ul>'+item.signals.map(signal=>'<li>'+safeText(signal)+'</li>').join('')+'</ul></div>' : '';
+            return '<article class="dealer-growth-card is-'+safeText(item.priority)+'">'+
+                '<div class="dealer-growth-card-head"><span class="dealer-growth-icon"><i class="bi '+(icons[item.priority]||icons.medium)+'"></i></span>'+
+                '<div><span class="dealer-growth-priority">'+(labels[item.priority]||labels.medium)+'</span><h4>'+safeText(item.title)+'</h4></div></div>'+
+                '<p class="dealer-growth-reason">'+safeText(item.reason)+'</p>'+metrics+signals+
+                '<div class="dealer-growth-plan"><strong>План действий</strong><ol>'+item.steps.map(step=>'<li>'+safeText(step)+'</li>').join('')+'</ol></div>'+
+                '<div class="dealer-growth-actions">'+
+                (item.action==='pricing'&&can('can_manage_pricing')?'<a class="dealer-growth-action" href="/pricing.html?dealer='+encodeURIComponent(dealerId)+'"><i class="bi bi-tags"></i>Открыть цены дилера</a>':'')+
+                (item.action==='sales'&&can('can_view_sales')?'<button type="button" class="dealer-growth-action" data-growth-tab="#sales-pane"><i class="bi bi-graph-up-arrow"></i>История продаж</button>':'')+
+                '</div></article>';
+        }).join('');
+        dealerGrowthRecommendationsEl.innerHTML='<div class="dealer-growth-intro"><span><i class="bi bi-radar"></i></span><div><strong>Раннее предупреждение</strong><small>Продажи сравниваются по темпу; конкуренты и активность помогают определить, что проверить.</small></div></div>'+cards;
+        dealerGrowthRecommendationsEl.querySelectorAll('[data-growth-tab]').forEach(button=>button.addEventListener('click',()=>{
+            document.querySelector(`[data-bs-target="${button.dataset.growthTab}"]`)?.click();
+        }));
     }
 
     // --- RENDER SALES ---
