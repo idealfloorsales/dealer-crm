@@ -1561,6 +1561,13 @@
         let lastDock=null;
         let recentScrollRegion=null;
         let glideFrame=0;
+        let glideSurface=null;
+        let savedScrollBehavior='';
+        const resetGlideBehavior=()=>{
+            if(glideSurface?.style)glideSurface.style.scrollBehavior=savedScrollBehavior;
+            glideSurface=null;
+            savedScrollBehavior='';
+        };
         const visibleOnScreen=el=>{
             if(!el||!el.isConnected)return false;
             const rect=el.getBoundingClientRect();
@@ -1576,9 +1583,10 @@
         // A distance-aware glide makes long pages feel deliberate instead of
         // snapping to the top; any new wheel/touch/key action can interrupt it.
         function cancelScrollGlide() {
-            if (!glideFrame) return;
-            window.cancelAnimationFrame?.(glideFrame);
+            if(!glideFrame&&!glideSurface)return;
+            if(glideFrame)window.cancelAnimationFrame?.(glideFrame);
             glideFrame=0;
+            resetGlideBehavior();
             button.classList.remove('is-launching','is-scrolling');
             requestUpdate();
         }
@@ -1594,7 +1602,17 @@
                 else window.scrollTo(options);
                 return;
             }
-            if (glideFrame) window.cancelAnimationFrame(glideFrame);
+            if(glideFrame)window.cancelAnimationFrame(glideFrame);
+            resetGlideBehavior();
+            // html has scroll-behavior:smooth globally, which turns EVERY
+            // scrollTop assignment into a separate delayed smooth animation.
+            // Override that rule only while this controlled glide is running.
+            // Otherwise the page barely moves until the button animation ends.
+            if(surface.style){
+                glideSurface=surface;
+                savedScrollBehavior=surface.style.scrollBehavior||'';
+                surface.style.scrollBehavior='auto';
+            }
             // The first movement happens synchronously in the click handler,
             // BEFORE any button animation/reflow. No waiting for a CSS keyframe
             // or for the next requestAnimationFrame before scrolling begins.
@@ -1603,6 +1621,7 @@
             surface.scrollTop=remainingDistance;
             if (!remainingDistance) {
                 glideFrame=0;
+                resetGlideBehavior();
                 requestUpdate();
                 return;
             }
@@ -1616,6 +1635,7 @@
                 else {
                     surface.scrollTop=0;
                     glideFrame=0;
+                    resetGlideBehavior();
                     requestUpdate();
                 }
             }
@@ -1755,6 +1775,7 @@
             const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
             if(glideFrame)window.cancelAnimationFrame?.(glideFrame);
             glideFrame=0;
+            resetGlideBehavior();
             button.classList.remove('is-launching','is-scrolling');
             if(reduced){
                 const options={top:0,behavior:'auto'};
