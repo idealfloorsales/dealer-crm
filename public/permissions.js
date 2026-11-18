@@ -1570,7 +1570,7 @@
         };
         const scrollAmount=node=>node?Math.max(0,Number(node.scrollTop)||0):
             Math.max(0,window.scrollY||doc.scrollTop||0);
-        const remaining=node=>node.scrollHeight-node.clientHeight:
+        const remaining=node=>node?node.scrollHeight-node.clientHeight:
             Math.max(document.documentElement.scrollHeight,document.body.scrollHeight)-window.innerHeight;
 
         // A distance-aware glide makes long pages feel deliberate instead of
