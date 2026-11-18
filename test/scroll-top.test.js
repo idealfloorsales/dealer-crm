@@ -70,8 +70,8 @@ function simulateVisibleScrollButton(isMobile){
     isConnected:true,
     tabIndex:-1,
     classList:{
-      add:name=>classes.add(name),
-      remove:name=>classes.delete(name),
+      add:(...names)=>names.forEach(name=>classes.add(name)),
+      remove:(...names)=>names.forEach(name=>classes.delete(name)),
       toggle(name,yes){if(yes)classes.add(name);else classes.delete(name);},
       contains:name=>classes.has(name)
     },
