@@ -429,7 +429,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="competitor-observation-preview">
                     <div class="competitor-observation-preview-head"><strong><i class="bi bi-journal-text me-1"></i>Последние наблюдения</strong><span>${fmt(observations.length)}</span></div>
-                    ${observations.slice(0,3).map(o=>`<article><div><strong>${esc(observationTopics[o.topic]||'Наблюдение')}</strong><small>${dateText(o.date)} · ${esc(observationSources[o.source_type]||'Источник не указан')} · ${esc(observationConfidence[o.confidence]||'Не проверено')}</small></div><p>${esc(o.detail||'')}</p>${o.city||o.dealer||o.product?`<small class="observation-context">${esc([o.city,o.dealer,o.product].filter(Boolean).join(' · '))}</small>`:''}</article>`).join('') || '<div class="competitor-observation-empty">Пока нет записей. Добавьте наблюдение в карточке бренда.</div>'}
+                    ${observations.slice(0,3).map(o=>`<article><div><strong>${esc(observationTopics[o.topic]||'Наблюдение')}</strong><small>${dateText(o.date)} · ${esc(observationSources[o.source_type]||'Источник не указан')} · ${esc(observationConfidence[o.confidence]||'Не проверено')}</small></div><p>${esc(o.detail||'')}</p>${o.dealer_id?`<a class="observation-context observation-context-link" href="/dealer.html?id=${encodeURIComponent(o.dealer_id)}">${esc([o.city,o.dealer].filter(Boolean).join(' · ')||'Открыть дилера')}</a>`:o.city||o.dealer||o.product?`<small class="observation-context">${esc([o.city,o.dealer,o.product].filter(Boolean).join(' · '))}</small>`:''}</article>`).join('') || '<div class="competitor-observation-empty">Пока нет записей. Добавьте наблюдение в карточке бренда.</div>'}
                 </div>
                 ${c.info?`<div class="competitor-note">${esc(c.info)}</div>`:''}
             </div>
@@ -567,10 +567,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const link=String(o.source_url||'').trim();
             const safeLink=/^https?:\/\//i.test(link)?link:'';
             const context=[o.city,o.dealer,o.product].filter(Boolean).join(' · ');
+            const dealerLink=o.dealer_id?`<a href="/dealer.html?id=${encodeURIComponent(o.dealer_id)}"><i class="bi bi-shop"></i>${esc([o.city,o.dealer].filter(Boolean).join(' · ')||'Карточка дилера')}</a>`:'';
             return `<article class="competitor-observation-row">
                 <div class="competitor-observation-row-top"><strong>${esc(observationTopics[o.topic]||'Наблюдение')}</strong><span>${dateText(o.date)} · ${esc(observationConfidence[o.confidence]||'Не проверено')}</span></div>
                 <p>${esc(o.detail||'')}</p>
-                <div class="competitor-observation-row-meta">${context?`<span><i class="bi bi-geo-alt"></i>${esc(context)}</span>`:''}<span><i class="bi bi-link-45deg"></i>${esc(observationSources[o.source_type]||'Источник')}${o.source?` · ${esc(o.source)}`:''}</span>${safeLink?`<a href="${esc(safeLink)}" target="_blank" rel="noopener noreferrer">Открыть источник <i class="bi bi-box-arrow-up-right"></i></a>`:''}</div>
+                <div class="competitor-observation-row-meta">${dealerLink|| (context?`<span><i class="bi bi-geo-alt"></i>${esc(context)}</span>`:'')}<span><i class="bi bi-link-45deg"></i>${esc(observationSources[o.source_type]||'Источник')}${o.source?` · ${esc(o.source)}`:''}</span>${safeLink?`<a href="${esc(safeLink)}" target="_blank" rel="noopener noreferrer">Открыть источник <i class="bi bi-box-arrow-up-right"></i></a>`:''}</div>
             </article>`;
         }).join(''):'<div class="competitor-observation-empty">Записей пока нет. Добавьте первое наблюдение с датой и источником.</div>';
     }
@@ -638,7 +639,6 @@ document.addEventListener('DOMContentLoaded', () => {
         form.reset();
         currentObservations=[];
         renderObservations();
-        $('obs-date').value=dateKeyToday();
         fields.id.value='';
         fields.status.value='active';
         fields.priority.value='medium';
