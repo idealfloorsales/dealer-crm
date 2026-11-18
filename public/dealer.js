@@ -472,42 +472,38 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderDealerGrowth(dealer, salesRows) {
         if (!dealerGrowthRecommendationsEl) return;
         if (!window.CRMScore?.getDealerGrowthRecommendations) {
-            dealerGrowthRecommendationsEl.innerHTML='<div class="dealer-growth-empty">Не удалось рассчитать рекомендации.</div>';
+            dealerGrowthRecommendationsEl.innerHTML='<div class="dealer-growth-empty">Не удалось рассчитать динамику продаж.</div>';
             return;
         }
-        const recommendations=CRMScore.getDealerGrowthRecommendations({
+        const items=CRMScore.getDealerGrowthRecommendations({
             dealer,
             salesRows,
             visits:dealer.visits||[],
             canViewSales:can('can_view_sales'),
             canViewVisits:can('can_view_dashboard')
         });
-        const icons={high:'bi-exclamation-triangle',medium:'bi-lightbulb',low:'bi-stars'};
-        const labels={high:'Срочно проверить',medium:'Возможность роста',low:'Идея'};
-        const cards=recommendations.map(item=>`
-            <article class="dealer-growth-card is-${item.priority}">
-                <div class="dealer-growth-card-head">
-                    <span class="dealer-growth-icon"><i class="bi ${icons[item.priority]||icons.medium}"></i></span>
-                    <div><span class="dealer-growth-priority">${labels[item.priority]||labels.medium}</span><h4>${safeText(item.title)}</h4></div>
-                </div>
-                <p class="dealer-growth-reason">${safeText(item.reason)}</p>
-                <ul>${item.steps.map(step=>`<li>${safeText(step)}</li>`).join('')}</ul>
-                <div class="dealer-growth-actions">
-                    ${item.action==='pricing'&&can('can_manage_pricing')?`<a class="dealer-growth-action" href="/pricing.html?dealer=${encodeURIComponent(dealerId)}"><i class="bi bi-tags"></i>Открыть условия и цены</a>`:''}
-                    ${item.action==='sales'&&can('can_view_sales')?`<button type="button" class="dealer-growth-action" data-growth-tab="#sales-pane"><i class="bi bi-graph-up-arrow"></i>Посмотреть продажи</button>`:''}
-                </div>
-            </article>`).join('');
-        const ideas=`
-            <article class="dealer-growth-card is-idea">
-                <div class="dealer-growth-card-head"><span class="dealer-growth-icon"><i class="bi bi-stars"></i></span><div><span class="dealer-growth-priority">Варианты предложения дилеру</span><h4>Выберите решение после разговора с дилером</h4></div></div>
-                <div class="dealer-growth-idea-grid">
-                    <div><strong>Обновить выкладку</strong><p>Образцы, актуальные ценники и подборка декоров под формат магазина.</p></div>
-                    <div><strong>Поддержать продавцов</strong><p>Короткое обучение и готовые аргументы по характеристикам IDEAL FLOOR.</p></div>
-                    <div><strong>Запустить адресную акцию</strong><p>Предложение на выбранные позиции с понятным сроком и условиями.</p></div>
-                    <div><strong>Привлечь новые обращения</strong><p>Совместная публикация или локальные материалы для соцсетей дилера.</p></div>
-                </div>
-            </article>`;
-        dealerGrowthRecommendationsEl.innerHTML=cards+ideas;
+        if (!items.length) {
+            dealerGrowthRecommendationsEl.innerHTML='<div class="dealer-growth-empty"><i class="bi bi-info-circle me-2"></i>Недостаточно доступных данных для анализа. Проверьте историю продаж и визитов.</div>';
+            return;
+        }
+        const icons={high:'bi-exclamation-triangle',medium:'bi-activity',low:'bi-check2-circle'};
+        const labels={high:'Нужна проверка',medium:'Ранний сигнал',low:'В норме'};
+        const cards=items.map(item=>{
+            const metrics=Array.isArray(item.metrics)&&item.metrics.length
+                ? '<div class="dealer-growth-metrics">'+item.metrics.map(metric=>'<span>'+safeText(metric)+'</span>').join('')+'</div>' : '';
+            const signals=Array.isArray(item.signals)&&item.signals.length
+                ? '<div class="dealer-growth-evidence"><strong>Что ещё проверить</strong><ul>'+item.signals.map(signal=>'<li>'+safeText(signal)+'</li>').join('')+'</ul></div>' : '';
+            return '<article class="dealer-growth-card is-'+safeText(item.priority)+'">'+
+                '<div class="dealer-growth-card-head"><span class="dealer-growth-icon"><i class="bi '+(icons[item.priority]||icons.medium)+'"></i></span>'+
+                '<div><span class="dealer-growth-priority">'+(labels[item.priority]||labels.medium)+'</span><h4>'+safeText(item.title)+'</h4></div></div>'+
+                '<p class="dealer-growth-reason">'+safeText(item.reason)+'</p>'+metrics+signals+
+                '<div class="dealer-growth-plan"><strong>План действий</strong><ol>'+item.steps.map(step=>'<li>'+safeText(step)+'</li>').join('')+'</ol></div>'+
+                '<div class="dealer-growth-actions">'+
+                (item.action==='pricing'&&can('can_manage_pricing')?'<a class="dealer-growth-action" href="/pricing.html?dealer='+encodeURIComponent(dealerId)+'"><i class="bi bi-tags"></i>Открыть цены дилера</a>':'')+
+                (item.action==='sales'&&can('can_view_sales')?'<button type="button" class="dealer-growth-action" data-growth-tab="#sales-pane"><i class="bi bi-graph-up-arrow"></i>История продаж</button>':'')+
+                '</div></article>';
+        }).join('');
+        dealerGrowthRecommendationsEl.innerHTML='<div class="dealer-growth-intro"><span><i class="bi bi-radar"></i></span><div><strong>Раннее предупреждение</strong><small>Продажи сравниваются по темпу; конкуренты и активность помогают определить, что проверить.</small></div></div>'+cards;
         dealerGrowthRecommendationsEl.querySelectorAll('[data-growth-tab]').forEach(button=>button.addEventListener('click',()=>{
             document.querySelector(`[data-bs-target="${button.dataset.growthTab}"]`)?.click();
         }));
