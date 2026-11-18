@@ -1595,12 +1595,23 @@
                 return;
             }
             if (glideFrame) window.cancelAnimationFrame(glideFrame);
-            const duration=Math.min(1200,Math.max(660,520+Math.sqrt(start)*12));
+            // The first movement happens synchronously in the click handler,
+            // BEFORE any button animation/reflow. No waiting for a CSS keyframe
+            // or for the next requestAnimationFrame before scrolling begins.
+            const immediateStep=Math.min(start,Math.max(18,Math.min(90,start*.06)));
+            const remainingDistance=Math.max(0,start-immediateStep);
+            surface.scrollTop=remainingDistance;
+            if (!remainingDistance) {
+                glideFrame=0;
+                requestUpdate();
+                return;
+            }
+            const duration=Math.min(760,Math.max(360,300+Math.sqrt(start)*5.2));
             const started=window.performance.now();
             function step(timestamp) {
                 const progress=Math.min(1,Math.max(0,(timestamp-started)/duration));
                 const eased=1-Math.pow(1-progress,3);
-                surface.scrollTop=Math.max(0,Math.round(start*(1-eased)));
+                surface.scrollTop=Math.max(0,Math.round(remainingDistance*(1-eased)));
                 if(progress<1)glideFrame=window.requestAnimationFrame(step);
                 else {
                     surface.scrollTop=0;
@@ -1750,10 +1761,11 @@
                 if(scrollTarget?.isConnected)scrollTarget.scrollTo(options);
                 else window.scrollTo(options);
             }else{
-                // Replay the visible light sweep and arrow echo from the start.
+                // Start the page movement first. The button's light/arrow
+                // animations then run alongside it, never ahead of it.
+                glideToTop(scrollTarget);
                 void button.offsetWidth;
                 button.classList.add('is-launching','is-scrolling');
-                glideToTop(scrollTarget);
             }
             requestUpdate();
         });
