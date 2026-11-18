@@ -88,7 +88,7 @@ function salesAnalysisReport(dealers,sales,requestedMonth,now){
   'АНАЛИТИКА ПРОДАЖ IDEAL FLOOR · период до '+anchor,
   'Сравнение: последние 3 закрытых месяца ('+recentKeys[0]+'—'+recentKeys[2]+') и предыдущие 3 ('+previousKeys[0]+'—'+previousKeys[2]+').',
   'Дилеров в сети: '+active.length+' · достаточно истории для сравнения: '+(active.length-insufficient)+' · пока недостаточно истории: '+insufficient+'.',
-  'Общий объём по дилерам за последние 3 месяца: '+amount(totalRecent*3)+' м²; за предыдущие 3: '+amount(totalPrevious*3)+' м²'+(networkChange===null?'':'; динамика '+(networkChange>0?'+':'')+Math.round(networkChange)+'%.'),
+  'Общий объём по дилерам с достаточной историей за последние 3 месяца: '+amount(totalRecent*3)+' м²; за предыдущие 3: '+amount(totalPrevious*3)+' м²'+(networkChange===null?'':'; динамика '+(networkChange>0?'+':'')+Math.round(networkChange)+'%.'),
   'Падение от 20%: '+eligible.filter(x=>x.change<=-20).length+' · критическое от 40%: '+eligible.filter(x=>x.change<=-40).length+' · рост от 15%: '+growth.length+'.',
   '',
   'ДИЛЕРЫ, ТРЕБУЮЩИЕ ВНИМАНИЯ'
@@ -144,11 +144,11 @@ function installReports({app,guard,Dealer,Sales,User,employeeKpi}){
   res.set('Cache-Control','no-store');
   const kind=req.query.kind,month=req.query.month||calendar().month;
   if(!['sales','sales-analysis','visits','kpi'].includes(kind)||!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month))return res.status(400).json({error:'Выберите отчёт и корректный месяц'});
-  if(!Dealer||!Sales||!User||!employeeKpi)return res.status(503).json({error:'Отчёты ещё не настроены'});
+  if(!Dealer||!Sales||(kind==='kpi'&&(!User||!employeeKpi)))return res.status(503).json({error:'Отчёты ещё не настроены'});
   try{
    const now=new Date();let answer,sources;
    if(kind==='sales'){const [d,s]=await Promise.all([rows(Dealer,{},'_id name city status'),rows(Sales,{month},'dealerId fact plan isCustom')]);answer=salesReport(d,s,month,now);sources=[{title:'Продажи · '+month,url:'/sales.html'}];}
-   else if(kind==='sales-analysis'){const cal=calendar(now),anchor=month>cal.month?cal.month:month;const from=monthOffset(anchor,anchor===cal.month?-15:-15);const [d,s]=await Promise.all([rows(Dealer,{},'_id name city status region_sector responsible competitors visits products'),rows(Sales,{month:{$gte:from,$lte:anchor}},'month dealerId fact isCustom')]);answer=salesAnalysisReport(d,s,month,now);sources=[{title:'Аналитика продаж и карточки дилеров',url:'/sales.html'}];}
+   else if(kind==='sales-analysis'){const cal=calendar(now),anchor=month>cal.month?cal.month:month;const from=monthOffset(anchor,-15);const [d,s]=await Promise.all([rows(Dealer,{},'_id name city status region_sector responsible competitors visits products'),rows(Sales,{month:{$gte:from,$lte:anchor}},'month dealerId fact isCustom')]);answer=salesAnalysisReport(d,s,month,now);sources=[{title:'Аналитика продаж и карточки дилеров',url:'/sales.html'}];}
    else if(kind==='visits'){answer=visitsReport(await rows(Dealer,{},'_id name city status visits'),now);sources=[{title:'Карточки дилеров · завершённые визиты',url:'/'}];}
    else{const [p,e,s,u]=await Promise.all([rows(employeeKpi.Plan,{month},'employeeId sections newDealerTarget illiquidTarget salesTargets'),rows(employeeKpi.Entry,{month},'employeeId sectionId type dealerId productId quantity'),rows(Sales,{month},'dealerId fact isCustom'),rows(User,{},'_id fullName username')]);answer=kpiReport(p,e,s,u,month);sources=[{title:'Сотрудники · KPI · '+month,url:'/users.html'}];}
    res.json({answer,sources,mode:'local-report',generatedAt:now.toISOString(),period:kind==='visits'?calendar(now).today:month,externalProcessing:false});
