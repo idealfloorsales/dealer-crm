@@ -242,3 +242,19 @@ test('reduced-motion preference keeps immediate scrolling and no launch animatio
   assert.equal(app.styles.scrollTo.behavior,'auto');
   assert.equal(app.classes.has('is-launching'),false);
 });
+
+test('scroll starts on the same click before the button animation or first frame',()=>{
+  assert.match(script,/glideToTop\(scrollTarget\);\s*void button\.offsetWidth/);
+  for(const mobile of [false,true]){
+    const app=simulateVisibleScrollButton(mobile,true);
+    const before=app.page.scrollTop;
+    app.listeners['button:click']();
+    assert.ok(app.page.scrollTop<before,
+      'first scroll movement must happen synchronously, before RAF or CSS animation');
+    assert.ok(app.page.scrollTop>0,'the movement should still be smooth');
+    assert.ok(app.classes.has('is-launching'),'button animation runs in parallel');
+    app.advance();
+    app.advance(450);
+    assert.equal(app.page.scrollTop,0,'short pages must finish quickly');
+  }
+});
