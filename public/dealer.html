@@ -92,6 +92,30 @@
         @media (min-width: 992px) {
             .mobile-back-btn { display: none; }
         }
+        .dealer-growth-panel{border:1px solid #e8e3df;border-radius:18px}
+        .dealer-growth-panel-head p{max-width:820px;margin:0;color:#85878d;font-size:.75rem;line-height:1.5}
+        .dealer-growth-list{display:grid;gap:10px;margin-top:16px}
+        .dealer-growth-card{padding:14px;border:1px solid #e7e2de;border-radius:14px;background:#fff}
+        .dealer-growth-card.is-high{border-color:#efc6c9;background:#fffafa}
+        .dealer-growth-card.is-medium{border-color:#eeddbb;background:#fffdf8}
+        .dealer-growth-card.is-idea{background:#f9f8f6}
+        .dealer-growth-card-head{display:flex;align-items:center;gap:10px}
+        .dealer-growth-icon{width:36px;height:36px;flex:0 0 36px;display:grid;place-items:center;border-radius:11px;background:#f1eeeb;color:#9b4248}
+        .dealer-growth-card.is-high .dealer-growth-icon{background:#f9e8e9;color:#ad2f35}
+        .dealer-growth-card h4{margin:2px 0 0;color:#36373b;font-size:.82rem;font-weight:800}
+        .dealer-growth-priority{color:#8b8d92;font-size:.59rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
+        .dealer-growth-reason{margin:10px 0 7px;color:#55575c;font-size:.72rem}
+        .dealer-growth-card ul{margin:0;padding-left:18px;color:#6b6d72;font-size:.68rem;line-height:1.55}
+        .dealer-growth-card li+li{margin-top:2px}
+        .dealer-growth-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+        .dealer-growth-action{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:0 10px;border:1px solid #e2ddd9;border-radius:9px;background:#fff;color:#66686d;text-decoration:none;font-size:.64rem;font-weight:750}
+        .dealer-growth-action:hover{border-color:#d6c2c4;color:#8e3439}
+        .dealer-growth-idea-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:11px}
+        .dealer-growth-idea-grid>div{padding:10px;border-radius:10px;background:#fff}
+        .dealer-growth-idea-grid strong{color:#55575c;font-size:.68rem}
+        .dealer-growth-idea-grid p{margin:3px 0 0;color:#7e8085;font-size:.62rem;line-height:1.45}
+        .dealer-growth-empty{padding:14px;border:1px dashed #ddd7d2;border-radius:12px;color:#999ba0;text-align:center;font-size:.7rem}
+        @media(max-width:560px){.dealer-growth-panel-head p{font-size:.68rem}.dealer-growth-card{padding:11px}.dealer-growth-idea-grid{grid-template-columns:1fr}}
     </style>
     <script src="theme-init.js?v={{VER}}"></script>
     <link id="crm-dark-theme-file" rel="stylesheet" href="dark-theme.css?v={{VER}}" media="screen">
@@ -172,6 +196,7 @@
             <ul class="nav nav-pills nav-fill profile-tabs" id="dealerTab" role="tablist">
                 <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#info-pane"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>Инфо</button></li>
                 <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#sales-pane"><i class="bi bi-graph-up-arrow me-1" aria-hidden="true"></i>Продажи</button></li>
+                <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#growth-pane"><i class="bi bi-lightbulb me-1" aria-hidden="true"></i>Развитие</button></li>
                 <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#visits-pane"><i class="bi bi-geo-alt me-1" aria-hidden="true"></i>Визиты</button></li>
                 <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#contacts-pane"><i class="bi bi-people me-1" aria-hidden="true"></i>Контакты</button></li>
                 <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#competitors-pane"><i class="bi bi-tags me-1" aria-hidden="true"></i>Конкуренты</button></li>
@@ -185,6 +210,14 @@
         </div>
 
         <div class="tab-content" id="dealerTabContent">
+            <div class="tab-pane fade" id="growth-pane">
+                <div class="content-card dealer-growth-panel">
+                    <div class="dealer-growth-panel-head">
+                        <div><h5 class="card-heading mb-1"><i class="bi bi-lightbulb me-2"></i>Как помочь дилеру увеличить продажи</h5><p>Подсказки по уже имеющимся в CRM продажам и визитам. Это сигналы для проверки с дилером, а не автоматический вывод о причине.</p></div>
+                    </div>
+                    <div id="dealer-growth-recommendations" class="dealer-growth-list"><div class="dealer-growth-empty">Рассчитываем рекомендации…</div></div>
+                </div>
+            </div>
             
             <div class="tab-pane fade show active" id="info-pane">
                 <div class="row g-4">
