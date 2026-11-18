@@ -230,7 +230,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const overdue = competitors.filter(c=>monitoringState(c).key==='overdue').length;
         const pricePositions = competitors.reduce((sum,c)=>sum+pricedCollectionCount(c),0);
         const observationsTotal = competitors.reduce((sum,c)=>sum+(Array.isArray(c.observations)?c.observations.length:0),0);
-        const stale = competitors.filter(c=>!c.last_monitoring_date || c.last_monitoring_date < plusDays(dateKeyToday(),-30)).length;
+        const stale = competitors.filter(c=>{ const latest=orderedObservations(c.observations)[0]?.date || c.last_monitoring_date || ''; return !latest || latest < plusDays(dateKeyToday(),-30); }).length;
 
         dashboard.innerHTML = [
             ['bi-shop','Брендов',totalBrands,'шт',''],
@@ -575,6 +575,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const sourceUrl=$('obs-url')?.value.trim()||'';
         if(sourceUrl && !/^https?:\/\//i.test(sourceUrl)) return toast('Ссылка должна начинаться с https:// или http://','warning');
         const date=$('obs-date')?.value||dateKeyToday();
+        if(fields.lastMonitoring && (!fields.lastMonitoring.value || date>fields.lastMonitoring.value)) fields.lastMonitoring.value=date;
         currentObservations.push({
             date, topic:$('obs-topic')?.value||'other',
             city:$('obs-city')?.value.trim()||'', dealer:$('obs-dealer')?.value.trim()||'',
