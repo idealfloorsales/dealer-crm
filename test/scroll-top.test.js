@@ -55,13 +55,21 @@ test('new control is subtle, respects motion preference, and removes the rotatin
 });
 
 
-function simulateVisibleScrollButton(isMobile){
+function simulateVisibleScrollButton(isMobile,animateFrames=false){
   const viewportWidth=isMobile?390:1280;
   const height=isMobile?844:900;
   const listeners={};
   const classes=new Set();
   const styles={};
   const attributes={};
+  let clock=0, frameId=1;
+  const pendingFrames=new Map();
+  const advance=(milliseconds=0)=>{
+    clock+=milliseconds;
+    const frames=[...pendingFrames.values()];
+    pendingFrames.clear();
+    frames.forEach(cb=>cb(clock));
+  };
   const nav=isMobile?{
     isConnected:true,
     getBoundingClientRect(){return {left:8,right:382,top:766,bottom:830,width:374,height:64};}
@@ -111,7 +119,12 @@ function simulateVisibleScrollButton(isMobile){
   };
   const fakeWindow={
     innerHeight:height,innerWidth:viewportWidth,scrollY:225,visualViewport:undefined,
-    requestAnimationFrame(cb){cb();return 0;}, // Run queued updates synchronously in tests
+    requestAnimationFrame(cb){
+      if(animateFrames){const id=frameId++;pendingFrames.set(id,cb);return id;}
+      cb();return 0;
+    }, // Deferred animation frames are used by the glide interruption tests.
+    cancelAnimationFrame(id){pendingFrames.delete(id);},
+    performance:animateFrames?{now:()=>clock}:undefined,
     addEventListener(name,cb){listeners['window:'+name]=cb;},
     matchMedia(){return {matches:false};},
     scrollTo(value){styles.scrollTo=value;}
@@ -122,7 +135,8 @@ function simulateVisibleScrollButton(isMobile){
     script.slice(start,end)+'\nreturn initAdaptiveScrollTop;'
   )(fakeWindow,fakeDocument,undefined);
   init();
-  return {classes,attributes,styles,listeners,button,fakeWindow,page};
+  if(animateFrames)advance();
+  return {classes,attributes,styles,listeners,button,fakeWindow,page,advance};
 }
 test('regression: scroll control is visible on desktop even with many buttons and a hidden dialog',()=>{
   const app=simulateVisibleScrollButton(false);
@@ -186,4 +200,45 @@ test('click lift finishes before the button fades away at the top',()=>{
     assert.equal(app.classes.has('is-scrolling'),false);
     assert.equal(app.classes.has('is-visible'),false,'fade only after landing');
   }
+});
+
+test('visual launch has an upward light wave and an echo arrow',()=>{
+  assert.match(script,/class="crm-scroll-top-wave"/);
+  assert.match(script,/class="crm-scroll-top-echo"/);
+  assert.match(style,/@keyframes crmTopWaveTravel/);
+  assert.match(style,/@keyframes crmTopEchoTravel/);
+  assert.match(style,/#crm-scroll-to-top\.is-launching \.crm-scroll-top-wave::before/);
+});
+
+test('custom page glide has a measurable mid-flight position and settles at zero',()=>{
+  const app=simulateVisibleScrollButton(false,true);
+  assert.ok(app.classes.has('is-visible'));
+  const original=app.page.scrollTop;
+  app.listeners['button:click']();
+  app.advance();
+  app.advance(300);
+  assert.ok(app.page.scrollTop<original && app.page.scrollTop>0,'glide should move gradually');
+  app.advance(1300);
+  assert.equal(app.page.scrollTop,0);
+});
+
+test('manual mouse wheel cancels the glide without fighting user scrolling',()=>{
+  const app=simulateVisibleScrollButton(true,true);
+  app.listeners['button:click']();
+  app.advance();
+  app.advance(225);
+  const midway=app.page.scrollTop;
+  assert.ok(midway>0&&midway<225);
+  app.listeners['document:wheel']();
+  app.advance(1400);
+  assert.equal(app.page.scrollTop,midway);
+  assert.equal(app.classes.has('is-launching'),false);
+});
+
+test('reduced-motion preference keeps immediate scrolling and no launch animation',()=>{
+  const app=simulateVisibleScrollButton(false,true);
+  app.fakeWindow.matchMedia=()=>({matches:true});
+  app.listeners['button:click']();
+  assert.equal(app.styles.scrollTo.behavior,'auto');
+  assert.equal(app.classes.has('is-launching'),false);
 });
