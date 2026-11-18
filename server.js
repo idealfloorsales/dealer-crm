@@ -5522,9 +5522,14 @@ app.post('/api/competitors-ref/:id/observations', requirePermission('can_view_co
         const topics = ['price','assortment','promotion','dealer','stock','logistics','quality','reviews','marketing','other'];
         const sources = ['website','instagram','marketplace','dealer','visit','offer','review','other'];
         if (!detail) return res.status(400).json({ error: 'Опишите наблюдение' });
-        if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return res.status(400).json({ error: 'Некорректная дата' });
+        const parsedDate = new Date(date + 'T00:00:00Z');
+        if (date.length !== 10 || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== date) return res.status(400).json({ error: 'Некорректная дата' });
         if (!topics.includes(topic) || !sources.includes(sourceType)) return res.status(400).json({ error: 'Некорректная тема или источник' });
-        if (sourceUrl && !/^https?:\\/\\//i.test(sourceUrl)) return res.status(400).json({ error: 'Ссылка должна начинаться с http:// или https://' });
+        if (sourceUrl) {
+            let parsedUrl;
+            try { parsedUrl = new URL(sourceUrl); } catch (_) { return res.status(400).json({ error: 'Некорректная ссылка' }); }
+            if (!['http:', 'https:'].includes(parsedUrl.protocol)) return res.status(400).json({ error: 'Ссылка должна начинаться с http:// или https://' });
+        }
 
         let linkedDealer = null;
         const dealerId = String(req.body.dealer_id || '').trim();
