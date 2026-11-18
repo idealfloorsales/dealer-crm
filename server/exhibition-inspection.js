@@ -75,6 +75,90 @@ function register({app,mongoose,Dealer,Product,AuditLog,requirePermission,getDea
     function getCheck(map,dealerId,kind,key){
         return map.get(String(dealerId)+'|'+kind+'|'+key)||normalizeInspection(null);
     }
+    // Explicitly staged presence edits from the exhibition page. This endpoint
+    // changes ONLY Dealer.products: inspection flags, price tags and workshop
+    // inventory remain untouched. Validate the entire selection before writing.
+    app.put('/api/exhibition/presence/batch',requirePermission('can_edit_matrix'),async(req,res)=>{
+        try {
+            const raw=req.body?.changes;
+            if(!Array.isArray(raw)||raw.length<1||raw.length>250)
+                return res.status(400).json({error:'Выберите от 1 до 250 изменений для сохранения'});
+            const seen=new Set();
+            const changes=raw.map(item=>{
+                const dealerId=clean(item?.dealerId,40).toLowerCase();
+                const productId=clean(item?.productId,40).toLowerCase();
+                if(!/^[a-f0-9]{24}$/.test(dealerId)||!/^[a-f0-9]{24}$/.test(productId)||
+                    !mongoose.isValidObjectId(dealerId)||!mongoose.isValidObjectId(productId)||
+                    typeof item?.present!=='boolean'||typeof item?.expectedPresent!=='boolean')
+                    throw Object.assign(new Error('Некорректная отметка выставленности'),{status:400});
+                const identity=dealerId+'|'+productId;
+                if(seen.has(identity))throw Object.assign(new Error('В запросе повторяется одна позиция'),{status:400});
+                seen.add(identity);
+                return {dealerId,productId,present:item.present,expectedPresent:item.expectedPresent};
+            });
+            const dealerIds=[...new Set(changes.map(c=>c.dealerId))];
+            const productIds=[...new Set(changes.map(c=>c.productId))];
+            const dealers=await Dealer.find({$and:[
+                scopedDealer(req),{_id:{$in:dealerIds}}
+            ]}).select('_id name products').lean();
+            if(dealers.length!==dealerIds.length)
+                return res.status(403).json({error:'Один из дилеров недоступен для редактирования'});
+            const products=await Product.find(activeProductFilter({
+                _id:{$in:productIds},product_type:{$ne:'equipment'}
+            })).select('_id').lean();
+            if(products.length!==productIds.length)
+                return res.status(400).json({error:'Одна из позиций отсутствует в рабочей матрице ламината'});
+            const dealerMap=new Map(dealers.map(d=>[String(d._id),d]));
+            for(const c of changes){
+                const dealer=dealerMap.get(c.dealerId);
+                const actual=(dealer.products||[]).some(id=>String(id)===c.productId);
+                if(actual!==c.expectedPresent)
+                    return res.status(409).json({error:'Выставленность изменилась у другого сотрудника. Обновите страницу и повторите выбор.'});
+                if(actual===c.present)
+                    return res.status(400).json({error:'В запросе есть позиция без изменений'});
+            }
+            const operations=changes.map(c=>({
+                updateOne:{
+                    filter:{$and:[
+                        scopedDealer(req),{_id:c.dealerId},
+                        {products:c.expectedPresent?c.productId:{$ne:c.productId}}
+                    ]},
+                    update:c.present?{$addToSet:{products:c.productId}}:{$pull:{products:c.productId}}
+                }
+            }));
+            const result=await Dealer.bulkWrite(operations,{ordered:true});
+            if(result.matchedCount!==operations.length)
+                return res.status(409).json({
+                    error:'Не все изменения применились из-за параллельной правки. Обновите страницу.',
+                    reloadRequired:true
+                });
+            const actor={id:String(req.user?.id||''),name:String(req.user?.fullName||req.user?.username||'Сотрудник'),
+                role:req.user?.role||''};
+            const byDealer=new Map();
+            changes.forEach(c=>{
+                if(!byDealer.has(c.dealerId))byDealer.set(c.dealerId,[]);
+                byDealer.get(c.dealerId).push(c);
+            });
+            await Promise.all([...byDealer].map(async([dealerId,items])=>{
+                await AuditLog.create({
+                    actor,module:'matrix',action:'exhibition_batch',method:'PUT',
+                    path:req.originalUrl,entityType:'dealer',entityId:dealerId,
+                    entityLabel:dealerMap.get(dealerId)?.name||'Дилер',
+                    summary:'Изменил выставленность в матрице: '+items.length+' поз.',
+                    success:true,
+                    before:items.map(({productId,expectedPresent})=>({productId,present:expectedPresent})),
+                    after:items.map(({productId,present})=>({productId,present})),
+                    meta:{kind:'laminate',count:items.length,source:'exhibition_matrix'}
+                }).catch(err=>console.warn('Exhibition batch audit:',err.message));
+            }));
+            res.set('Cache-Control','no-store');
+            return res.json({status:'ok',updated:changes.length,changes:changes.map(
+                ({dealerId,productId,present})=>({dealerId,productId,present})
+            )});
+        }catch(error){
+            res.status(error.status||500).json({error:error.message||'Не удалось сохранить выставленность'});
+        }
+    });
     app.put('/api/exhibition/dealers/:id/item',requirePermission('can_edit_matrix'),async(req,res)=>{
         try {
             if(!mongoose.isValidObjectId(req.params.id))return res.status(400).json({error:'Некорректный ID дилера'});
