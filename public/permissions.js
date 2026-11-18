@@ -1494,104 +1494,201 @@
         observer.observe(document.body, { childList:true, subtree:true });
     }
 
-    // Shared adaptive "back to top". Uses the actual scrolling surface and remains
-    // invisible when content fits the viewport or the user is near the beginning.
+    // The dock chooses an actual free part of the screen: it never sits on
+    // navigation, floating actions, form controls, or an open sheet.
+    // Pure layout helper, intentionally independent from the DOM for tests.
+    function pickScrollTopDock(viewportWidth,viewportHeight,size,baseBottom,obstacles) {
+        const margin=viewportWidth<768?7:12;
+        const maxRise=Math.min(viewportWidth<768?144:168,viewportHeight*.26);
+        const minimumTop=Math.max(70,viewportHeight*.34);
+        const positions=[
+            Math.max(margin,viewportWidth-size-margin),
+            margin
+        ];
+        for(let side=0;side<positions.length;side++){
+            const left=positions[side];
+            for(let rise=0;rise<=maxRise;rise+=12){
+                const top=Math.round(viewportHeight-baseBottom-size-rise);
+                if(top<minimumTop)break;
+                const overlapping=obstacles.some(rect=>
+                    left-7<rect.right && left+size+7>rect.left &&
+                    top-8<rect.bottom && top+size+8>rect.top
+                );
+                if(!overlapping){
+                    return {
+                        right:Math.max(0,Math.round(viewportWidth-left-size)),
+                        bottom:Math.max(0,Math.round(viewportHeight-top-size)),
+                        side:side===0?'right':'left'
+                    };
+                }
+            }
+        }
+        // On a densely packed screen, hiding is better than blocking an action.
+        return null;
+    }
+
+    // Small edge-docked scroll shortcut. Appears only when there is real scroll
+    // distance and a clear touch target. Works with native nested scroll regions.
     function initAdaptiveScrollTop() {
         if (!document.body || document.getElementById('crm-scroll-to-top')) return;
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.id = 'crm-scroll-to-top';
-        button.className = 'crm-scroll-to-top';
-        button.setAttribute('aria-label','Прокрутить вверх');
+        const button=document.createElement('button');
+        button.type='button';
+        button.id='crm-scroll-to-top';
+        button.className='crm-scroll-to-top';
+        button.setAttribute('aria-label','Прокрутить страницу вверх');
         button.setAttribute('title','Наверх');
         button.setAttribute('aria-hidden','true');
-        button.tabIndex = -1;
-        button.innerHTML = `
-            <svg class="crm-scroll-top-ring" viewBox="0 0 56 56" aria-hidden="true" focusable="false">
-                <circle class="crm-scroll-top-track" cx="28" cy="28" r="24" pathLength="100"></circle>
-                <circle class="crm-scroll-top-progress" cx="28" cy="28" r="24" pathLength="100"></circle>
-            </svg>
+        button.tabIndex=-1;
+        button.innerHTML=`
             <span class="crm-scroll-top-arrow" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" focusable="false">
-                    <path d="M12 19V5M5.5 11.5 12 5l6.5 6.5"></path>
+                     stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+                    <path d="M12 19V5M6.5 10.5 12 5l5.5 5.5"></path>
                 </svg>
             </span>
+            <span class="crm-scroll-top-progress" aria-hidden="true"></span>
             <span class="crm-scroll-top-label" aria-hidden="true">Наверх</span>
         `;
         document.body.appendChild(button);
-        const progressArc = button.querySelector('.crm-scroll-top-progress');
-        button.addEventListener('animationend', event => {
-            if (event.animationName === 'crmTopArrowLaunch') button.classList.remove('is-launching');
-        });
 
-        const doc = document.scrollingElement || document.documentElement;
-        let scrollTarget = null;
-        let frame = 0;
-        const isVisible = node => {
-            if (!node || !node.isConnected) return false;
-            const rect = node.getBoundingClientRect();
-            return rect.width > 0 && rect.height > 0;
+        const doc=document.scrollingElement||document.documentElement;
+        let scrollTarget=null;
+        let frame=0;
+        let lastDockAt=0;
+        let lastDock=null;
+        const visibleOnScreen=el=>{
+            if(!el||!el.isConnected)return false;
+            const rect=el.getBoundingClientRect();
+            return rect.width>0&&rect.height>0&&
+                rect.bottom>0&&rect.right>0&&
+                rect.top<window.innerHeight&&rect.left<window.innerWidth;
         };
-        const scrollAmount = node => node ? Math.max(0,Number(node.scrollTop)||0) : Math.max(0,window.scrollY||doc.scrollTop||0);
-        const remaining = node => node
-            ? node.scrollHeight-node.clientHeight
-            : Math.max(document.documentElement.scrollHeight,document.body.scrollHeight)-window.innerHeight;
+        const scrollAmount=node=>node?Math.max(0,Number(node.scrollTop)||0):
+            Math.max(0,window.scrollY||doc.scrollTop||0);
+        const remaining=node=>node?node.scrollHeight-node.clientHeight:
+            Math.max(document.documentElement.scrollHeight,document.body.scrollHeight)-window.innerHeight;
 
-        function update() {
-            frame=0;
-            // Do not put the scroll button over a modal or full-screen action.
-            if (document.querySelector('.modal.show,.offcanvas.show,.global-search-overlay.open')) {
-                scrollTarget=null;
-                button.classList.remove('is-visible');
-                button.tabIndex=-1;
-                button.setAttribute('aria-hidden','true');
-                return;
+        function blockedByOverlay(){
+            if(document.body.classList.contains('map-list-open')||
+               document.body.classList.contains('crm-mobile-sheet-open'))return true;
+            if(document.activeElement?.matches('input,textarea,select,[contenteditable="true"]'))return true;
+            return Boolean(document.querySelector(
+                '.modal.show,.offcanvas.show,.global-search-overlay.open,'+
+                '.crm-mobile-sheet-backdrop.open,.dropdown-menu.show,'+
+                '.sidebar-backdrop.show,[role="dialog"][aria-modal="true"]:not([hidden])'
+            ));
+        }
+        function findFreeDock() {
+            const width=Math.max(280,document.documentElement.clientWidth||window.innerWidth);
+            const height=window.innerHeight;
+            const size=width<768?42:44;
+            if(height<340)return null;
+            let baseline=width<768?18:21;
+
+            // Reserve the real navigation bar height rather than guessing 100 px.
+            const nav=document.querySelector('.crm-mobile-nav');
+            if(nav&&visibleOnScreen(nav)) {
+                baseline=Math.max(baseline,Math.round(height-nav.getBoundingClientRect().top+12));
             }
-            const inner = [...document.querySelectorAll(
-                '.map-page .sidebar-content,.app-workspace-page .sidebar-content,.audit-list-scroll'
-            )].find(el=>isVisible(el) && remaining(el)>Math.max(32,el.clientHeight*.08) && scrollAmount(el)>Math.min(280,Math.max(180,el.clientHeight*.35)));
-            const windowReady = remaining(null)>Math.max(24,window.innerHeight*.08) && scrollAmount(null)>Math.min(280,Math.max(180,window.innerHeight*.35));
-            scrollTarget = inner || (windowReady ? null : undefined);
-            const visible = Boolean(inner || windowReady);
-            const activeSurface = inner || (windowReady ? null : undefined);
-            const maxScroll = activeSurface === undefined ? 0 : remaining(activeSurface);
-            const scrollFraction = maxScroll > 0
-                ? Math.min(1, Math.max(0, scrollAmount(activeSurface) / maxScroll))
-                : 0;
-            // SVG progress completes a full revolution at the end of the actual scroll surface.
-            if (progressArc) progressArc.style.strokeDashoffset = String(100 - Math.round(scrollFraction * 100));
+
+            const selectors=[
+                '.crm-mobile-nav','#mobile-fab-add','.dealer-route-bar',
+                '.ideal-ai-launch','.map-actions-right','.map-mobile-action-dock',
+                '.map-mobile-list-btn','.crm-floating-toolbar','.leaflet-control-zoom',
+                '.crm-sticky-actions','.floating-action','.chat-widget',
+                '.toast-container','.crm-mobile-sheet-backdrop.open',
+                'button','a','input','select','textarea','[role="button"]'
+            ].join(',');
+            const obstacles=[];
+            document.querySelectorAll(selectors).forEach(el=>{
+                if(el===button||button.contains(el))return;
+                if(!el.isConnected)return;
+                const rect=el.getBoundingClientRect();
+                if(rect.width<=0||rect.height<=0||rect.bottom<height*.32||
+                   rect.top>height||rect.right<=0||rect.left>=width)return;
+                obstacles.push({left:rect.left,top:rect.top,right:rect.right,bottom:rect.bottom});
+            });
+            return pickScrollTopDock(width,height,size,baseline,obstacles);
+        }
+
+        function setVisibility(visible) {
             button.classList.toggle('is-visible',visible);
-            if (!visible) button.classList.remove('is-launching');
+            if(!visible)button.classList.remove('is-launching');
             button.tabIndex=visible?0:-1;
             button.setAttribute('aria-hidden',visible?'false':'true');
         }
-        function requestUpdate() {
-            if (frame) return;
+        function update() {
+            frame=0;
+            if(blockedByOverlay()){
+                scrollTarget=null;
+                lastDock=null;
+                setVisibility(false);
+                return;
+            }
+            const inner=[...document.querySelectorAll(
+                '.map-page .sidebar-content,.app-workspace-page .sidebar-content,.audit-list-scroll'
+            )].find(el=>visibleOnScreen(el)&&
+                remaining(el)>Math.max(32,el.clientHeight*.08)&&
+                scrollAmount(el)>Math.min(280,Math.max(180,el.clientHeight*.35)));
+            const windowReady=remaining(null)>Math.max(24,window.innerHeight*.08)&&
+                scrollAmount(null)>Math.min(280,Math.max(180,window.innerHeight*.35));
+            scrollTarget=inner||(windowReady?null:undefined);
+            const scrollable=Boolean(inner||windowReady);
+            if(!scrollable){
+                lastDock=null;
+                setVisibility(false);
+                return;
+            }
+
+            const activeSurface=inner||(windowReady?null:undefined);
+            const distance=remaining(activeSurface);
+            const ratio=distance>0?Math.min(1,Math.max(0,scrollAmount(activeSurface)/distance)):0;
+            button.style.setProperty('--crm-scroll-ratio',ratio.toFixed(3));
+
+            // Check collisions several times per second, not on each scroll frame.
+            // This keeps heavy table pages responsive while moving controls slide past.
+            const now=Date.now();
+            if(!lastDock||now-lastDockAt>125){
+                lastDock=findFreeDock();
+                lastDockAt=now;
+            }
+            if(!lastDock){
+                setVisibility(false);
+                return;
+            }
+            button.style.setProperty('--crm-top-right',lastDock.right+'px');
+            button.style.setProperty('--crm-top-bottom',lastDock.bottom+'px');
+            button.classList.toggle('is-docked-left',lastDock.side==='left');
+            setVisibility(true);
+        }
+        function requestUpdate(){
+            if(frame)return;
             frame=window.requestAnimationFrame(update);
         }
-
+        button.addEventListener('animationend',event=>{
+            if(event.animationName==='crmTopArrowTravel')button.classList.remove('is-launching');
+        });
         button.addEventListener('click',()=>{
-            if (!button.classList.contains('is-visible')) return;
+            if(!button.classList.contains('is-visible'))return;
             const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-            if (!reduced) button.classList.add('is-launching');
+            if(!reduced)button.classList.add('is-launching');
             const options={top:0,behavior:reduced?'auto':'smooth'};
-            if (scrollTarget && scrollTarget.isConnected) scrollTarget.scrollTo(options);
+            if(scrollTarget&&scrollTarget.isConnected)scrollTarget.scrollTo(options);
             else window.scrollTo(options);
             requestUpdate();
         });
         window.addEventListener('scroll',requestUpdate,{passive:true});
         document.addEventListener('scroll',requestUpdate,{capture:true,passive:true});
-        window.addEventListener('resize',requestUpdate,{passive:true});
+        window.addEventListener('resize',()=>{lastDock=null;requestUpdate();},{passive:true});
         window.addEventListener('pageshow',requestUpdate);
         window.addEventListener('load',requestUpdate,{once:true});
         document.addEventListener('shown.bs.modal',requestUpdate);
         document.addEventListener('hidden.bs.modal',requestUpdate);
         document.addEventListener('shown.bs.offcanvas',requestUpdate);
         document.addEventListener('hidden.bs.offcanvas',requestUpdate);
-        if (typeof ResizeObserver !== 'undefined') {
-            const sizeObserver = new ResizeObserver(requestUpdate);
-            sizeObserver.observe(document.body);
+        if(typeof ResizeObserver!=='undefined'){
+            const observer=new ResizeObserver(()=>{lastDock=null;requestUpdate();});
+            observer.observe(document.body);
         }
         requestUpdate();
     }
