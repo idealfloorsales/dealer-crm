@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const modal = bootstrap.Modal.getOrCreateInstance($('comp-modal'), { backdrop:'static', keyboard:false });
     const typesModal = bootstrap.Modal.getOrCreateInstance($('types-manager-modal'));
     const dealersModal = bootstrap.Modal.getOrCreateInstance($('dealers-list-modal'));
+    const observationModal = bootstrap.Modal.getOrCreateInstance($('observation-modal'));
 
     const form = $('comp-form');
     const saveBtn = $('btn-save-comp');
@@ -75,6 +76,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentLogo = '';
     let currentObservations = [];
     let canManage = false;
+    let canObserve = false;
+    let selectedCompetitorId = '';
     let canExport = false;
     let viewMode = localStorage.getItem('competitors_view') || 'cards';
     let quickFilter = 'all';
@@ -174,6 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             competitors = Array.isArray(competitors) ? competitors : [];
             allDealers = Array.isArray(allDealers) ? allDealers : [];
+            populateObservationDealers();
             refreshDynamicTypes();
             populateFilters();
             renderAll();
@@ -392,6 +396,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
                 <div class="competitor-card-actions">
+                    ${canObserve?`<button type="button" class="comp-icon-btn" data-observe-id="${esc(idOf(c))}" title="Добавить наблюдение"><i class="bi bi-journal-plus"></i></button>`:''}
                     ${canManage?`<button type="button" class="comp-icon-btn" data-edit-id="${esc(idOf(c))}" title="Редактировать"><i class="bi bi-pencil"></i></button>`:''}
                 </div>
             </div>
@@ -450,6 +455,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         grid.innerHTML = rows.map(cardHtml).join('');
         grid.querySelectorAll('[data-edit-id]').forEach(btn=>btn.addEventListener('click',()=>openEdit(btn.dataset.editId)));
+        grid.querySelectorAll('[data-observe-id]').forEach(btn=>btn.addEventListener('click',()=>openObservation(btn.dataset.observeId)));
         grid.querySelectorAll('[data-expand-id]').forEach(btn=>btn.addEventListener('click',()=>toggleExpand(btn.dataset.expandId)));
         grid.querySelectorAll('[data-dealers-id]').forEach(btn=>btn.addEventListener('click',()=>openDealers(btn.dataset.dealersId)));
     }
@@ -569,26 +575,63 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join(''):'<div class="competitor-observation-empty">Записей пока нет. Добавьте первое наблюдение с датой и источником.</div>';
     }
 
-    function addObservation() {
-        const detail=$('obs-detail')?.value.trim();
-        if(!detail) return toast('Опишите наблюдение','warning');
+    function populateObservationDealers() {
+        const select=$('obs-dealer-id');
+        if(!select) return;
+        const current=select.value||'';
+        const rows=[...allDealers].sort((a,b)=>String(a.city||'').localeCompare(String(b.city||''),'ru')||String(a.name||'').localeCompare(String(b.name||''),'ru'));
+        select.innerHTML='<option value="">Общее наблюдение, без дилера</option>'+rows.map(dealer=>{
+            const label=[dealer.city,dealer.name,dealer.dealer_id].filter(Boolean).join(' · ');
+            return `<option value="${esc(idOf(dealer))}">${esc(label||dealer.name||'Дилер')}</option>`;
+        }).join('');
+        if(rows.some(dealer=>idOf(dealer)===current)) select.value=current;
+    }
+
+    function openObservation(id) {
+        if(!canObserve) return;
+        const competitor=competitors.find(item=>idOf(item)===String(id));
+        if(!competitor) return;
+        selectedCompetitorId=idOf(competitor);
+        $('obs-competitor-name').textContent=competitor.name||'';
+        $('obs-topic').value='price';
+        $('obs-source-type').value='visit';
+        $('obs-detail').value='';
+        $('obs-url').value='';
+        $('obs-dealer-id').value='';
+        observationModal.show();
+        setTimeout(()=>$('obs-detail')?.focus(),180);
+    }
+
+    async function saveObservation() {
+        if(!canObserve||!selectedCompetitorId) return;
+        const detail=$('obs-detail')?.value.trim()||'';
+        if(!detail) return toast('Напишите, что заметили','warning');
         const sourceUrl=$('obs-url')?.value.trim()||'';
-        if(sourceUrl && !/^https?:\/\//i.test(sourceUrl)) return toast('Ссылка должна начинаться с https:// или http://','warning');
-        const date=$('obs-date')?.value||dateKeyToday();
-        if(fields.lastMonitoring && (!fields.lastMonitoring.value || date>fields.lastMonitoring.value)) fields.lastMonitoring.value=date;
-        currentObservations.push({
-            date, topic:$('obs-topic')?.value||'other',
-            city:$('obs-city')?.value.trim()||'', dealer:$('obs-dealer')?.value.trim()||'',
-            product:$('obs-product')?.value.trim()||'', detail,
-            source_type:$('obs-source-type')?.value||'other',
-            source:$('obs-source')?.value.trim()||'', source_url:sourceUrl,
-            confidence:$('obs-confidence')?.value||'reported', createdAt:new Date().toISOString()
-        });
-        renderObservations();
-        $('obs-detail').value=''; $('obs-city').value=''; $('obs-dealer').value='';
-        $('obs-product').value=''; $('obs-source').value=''; $('obs-url').value='';
-        $('obs-date').value=dateKeyToday();
-        toast('Наблюдение добавлено в карточку. Сохраните конкурента.');
+        if(sourceUrl&&!/^https?:\/\//i.test(sourceUrl)) return toast('Ссылка должна начинаться с http:// или https://','warning');
+        const saveBtn=$('obs-save-btn');
+        const old=saveBtn.innerHTML;
+        saveBtn.disabled=true;
+        saveBtn.innerHTML='<span class="spinner-border spinner-border-sm"></span> Сохраняем…';
+        const sourceType=$('obs-source-type')?.value||'visit';
+        try{
+            const response=await fetch(`${API_URL}/${encodeURIComponent(selectedCompetitorId)}/observations`,{
+                method:'POST',headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({
+                    date:dateKeyToday(),
+                    topic:$('obs-topic')?.value||'other',
+                    source_type:sourceType,
+                    source_url:sourceUrl,
+                    dealer_id:$('obs-dealer-id')?.value||'',
+                    detail
+                })
+            });
+            const data=await response.json().catch(()=>({}));
+            if(!response.ok) throw new Error(data.error||'Не удалось сохранить наблюдение');
+            observationModal.hide();
+            toast('Наблюдение сохранено в досье конкурента');
+            await loadData();
+        }catch(error){toast(error.message||'Ошибка сохранения','error');}
+        finally{saveBtn.disabled=false;saveBtn.innerHTML=old;}
     }
 
     function resetForm() {
@@ -791,8 +834,7 @@ document.addEventListener('DOMContentLoaded', () => {
             logoUrl:currentLogo,
             collections:collectCollections(),
             contacts:collectContacts(),
-            addresses:collectAddresses(),
-            observations:currentObservations
+            addresses:collectAddresses()
         };
     }
 
@@ -865,6 +907,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function init() {
         if(window.CRMAuth?.ready) await CRMAuth.ready;
         canManage=Boolean(window.CRMAuth?.can('can_manage_competitors'));
+        canObserve=Boolean(window.CRMAuth?.can('can_view_competitors'));
         canExport=Boolean(window.CRMAuth?.can('can_export_prices'));
         if(addBtn) addBtn.style.display=canManage?'':'none';
         if(manageTypesBtn) manageTypesBtn.style.display=canManage?'':'none';
@@ -890,7 +933,7 @@ document.addEventListener('DOMContentLoaded', () => {
     $('add-coll-row-btn')?.addEventListener('click',()=>addCollectionRow());
     $('btn-add-contact')?.addEventListener('click',()=>addContactRow());
     $('btn-add-address')?.addEventListener('click',()=>addAddressRow());
-    $('btn-add-observation')?.addEventListener('click',addObservation);
+    $('obs-save-btn')?.addEventListener('click',saveObservation);
 
     searchInput?.addEventListener('input',renderGrid);
     filterIds.forEach(id=>filters[id]?.addEventListener('change',renderGrid));
