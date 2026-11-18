@@ -436,3 +436,39 @@ html,body.competitors-page{max-width:100%;overflow-x:hidden}
   .competitor-info-row strong{font-size:.74rem}
   .competitor-info-row small{font-size:.67rem}
 }
+
+/* Competitor intelligence journal */
+.competitors-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
+.competitor-card-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}
+.competitor-observation-section{border-color:#e2ddd8}
+.competitor-observation-form{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;align-items:end}
+.competitor-observation-form label{min-width:0}
+.competitor-observation-form label>span{display:block;margin:0 0 4px 2px;color:#77797e;font-size:.62rem;font-weight:750}
+.competitor-observation-form .form-control,.competitor-observation-form .form-select{min-height:38px;border:1px solid #ded9d5;border-radius:9px;font-size:.68rem;box-shadow:none!important}
+.competitor-observation-form textarea.form-control{min-height:62px}
+.competitor-observation-form label.wide{grid-column:span 2}
+.competitor-observation-form button{justify-self:start;min-height:38px}
+.competitor-observation-save-note{display:flex;align-items:center;gap:6px;margin:8px 0;color:#8d8f94;font-size:.61rem}
+.competitor-observations-list{display:grid;gap:6px;margin-top:8px}
+.competitor-observation-row{padding:10px 11px;border:1px solid #e9e4e0;border-radius:11px;background:#fbfaf8}
+.competitor-observation-row-top{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.competitor-observation-row-top strong{color:#45464a;font-size:.68rem}
+.competitor-observation-row-top span{color:#898b90;font-size:.59rem}
+.competitor-observation-row p{margin:5px 0;color:#5f6065;font-size:.67rem;line-height:1.45;white-space:pre-line}
+.competitor-observation-row-meta{display:flex;align-items:center;flex-wrap:wrap;gap:10px;color:#8d8f94;font-size:.58rem}
+.competitor-observation-row-meta a{color:#8e3439;text-decoration:none;font-weight:700}
+.competitor-observation-row-meta i{margin-right:3px}
+.competitor-observation-empty{padding:12px;border:1px dashed #e0dad5;border-radius:10px;color:#999ba0;text-align:center;font-size:.64rem}
+.competitor-observation-preview{margin-top:9px;padding:9px;border:1px solid #e7e2de;border-radius:11px;background:#fbfaf8}
+.competitor-observation-preview-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.competitor-observation-preview-head strong{color:#55575c;font-size:.66rem}
+.competitor-observation-preview-head span{color:#96989d;font-size:.59rem}
+.competitor-observation-preview article{padding:7px 0;border-top:1px solid #eee9e5}
+.competitor-observation-preview article>div{display:flex;justify-content:space-between;gap:6px;align-items:baseline}
+.competitor-observation-preview article strong{font-size:.62rem;color:#55575c}
+.competitor-observation-preview article small{font-size:.55rem;color:#96989d}
+.competitor-observation-preview article p{margin:3px 0 0;color:#66686d;font-size:.61rem;line-height:1.4}
+.competitor-observation-preview article .observation-context{display:block;margin-top:2px}
+@media(max-width:1200px){.competitors-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:900px){.competitors-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.competitor-observation-form{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.competitor-observation-form{grid-template-columns:1fr}.competitor-observation-form label.wide{grid-column:auto}.competitor-observation-row-top{align-items:flex-start;flex-direction:column;gap:2px}.competitor-observation-preview article>div{align-items:flex-start;flex-direction:column;gap:1px}}
