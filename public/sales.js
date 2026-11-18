@@ -180,8 +180,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 clues.push('Факт за текущий месяц ещё не внесён — проверьте актуальность данных.');
             }
             if(yearChange!=null&&yearChange>=-8&&change<=-20) {
-                severity=Math.min(severity,1);
-                clues.push('Сравнение с теми же месяцами прошлого года мягче: возможен сезонный эффект.');
+                clues.push('Сравнение с теми же месяцами прошлого года мягче: возможен сезонный эффект; проверьте его, но сигнал падения сохраняется.');
             } else if(yearChange!=null&&yearChange<=-20) {
                 clues.push('Продажи также ниже того же периода прошлого года.');
             }
@@ -226,7 +225,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return r>=2&&p>=2&&average(record.sales,recentKeys)>=average(record.sales,previousKeys)*1.15;
         }).length;
         salesIntelligenceKpis.innerHTML=
-            '<article class="sales-intelligence-kpi"><span>Дилеров в анализе</span><strong>'+dealers.length+'</strong></article>'+
+            '<article class="sales-intelligence-kpi"><span>Дилеров в сравнении</span><strong>'+Math.max(0,dealers.length-insufficient)+'</strong></article>'+
             '<article class="sales-intelligence-kpi is-critical"><span>Снижение от 20%</span><strong>'+analyzed.filter(item=>item.severity>=2).length+'</strong></article>'+
             '<article class="sales-intelligence-kpi is-critical"><span>Критическое от 40%</span><strong>'+critical+'</strong></article>'+
             '<article class="sales-intelligence-kpi is-growth"><span>Рост от 15%</span><strong>'+growingCount+'</strong></article>';
