@@ -484,3 +484,7 @@ html,body.competitors-page{max-width:100%;overflow-x:hidden}
 .observation-source-details summary{color:#8c3439;font-size:.65rem;font-weight:750;cursor:pointer}
 .observation-source-details .form-control{margin-top:7px}
 @media(max-width:560px){.observation-quick-grid{grid-template-columns:1fr}}
+
+.competitor-observation-row-meta a:not(:last-child){color:#62676d}
+.observation-context-link{display:inline-block;margin-top:3px;color:#8e3439;text-decoration:none;font-size:.57rem;font-weight:750}
+.observation-context-link:hover{text-decoration:underline}
