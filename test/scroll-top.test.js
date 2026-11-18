@@ -88,7 +88,8 @@ function simulateVisibleScrollButton(isMobile,animateFrames=false){
     contains(){return false;},
     addEventListener(name,cb){listeners['button:'+name]=cb;}
   };
-  const page={scrollTop:225,scrollHeight:2400,clientHeight:height,clientWidth:viewportWidth};
+  const page={scrollTop:225,scrollHeight:2400,clientHeight:height,clientWidth:viewportWidth,
+    style:{scrollBehavior:''}};
   const body={
     scrollHeight:2400,
     classList:{contains(){return false;}},
@@ -257,4 +258,29 @@ test('scroll starts on the same click before the button animation or first frame
     app.advance(450);
     assert.equal(app.page.scrollTop,0,'short pages must finish quickly');
   }
+});
+
+test('custom glide overrides global html smooth scrolling from the first click',()=>{
+  for(const mobile of [false,true]){
+    const app=simulateVisibleScrollButton(mobile,true);
+    assert.equal(app.page.style.scrollBehavior,'');
+    app.listeners['button:click']();
+    assert.equal(app.page.style.scrollBehavior,'auto',
+      'CSS smooth behavior must not queue every scrollTop frame');
+    assert.ok(app.page.scrollTop<225,'page must move during click');
+    app.advance(200);
+    assert.ok(app.page.scrollTop<200,'page should keep moving before button animation ends');
+    app.advance(1200);
+    assert.equal(app.page.scrollTop,0);
+    assert.equal(app.page.style.scrollBehavior,'',
+      'restore the site-wide scroll style after the glide');
+  }
+});
+test('interrupting a glide restores the original scroll behavior',()=>{
+  const app=simulateVisibleScrollButton(false,true);
+  app.page.style.scrollBehavior='smooth';
+  app.listeners['button:click']();
+  assert.equal(app.page.style.scrollBehavior,'auto');
+  app.listeners['document:wheel']();
+  assert.equal(app.page.style.scrollBehavior,'smooth');
 });
