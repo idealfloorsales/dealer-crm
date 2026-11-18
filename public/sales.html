@@ -38,7 +38,41 @@
             @page { size: A4 portrait; margin: 6mm; }
         }
 
-    </style>
+            .sales-intelligence{margin:0 0 22px;padding:20px;border:1px solid var(--if-line);border-radius:18px;background:var(--if-card);color:var(--if-ink);box-shadow:0 8px 24px rgba(23,19,17,.04)}
+        .sales-intelligence-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:14px}
+        .sales-intelligence-head h2{margin:0;font-size:1.1rem;font-weight:800;color:var(--if-ink)}
+        .sales-intelligence-head p{margin:4px 0 0;color:var(--if-muted);font-size:.78rem}
+        .sales-intelligence-refresh{flex:0 0 auto;border:1px solid var(--if-line);border-radius:10px;background:var(--if-card);color:var(--if-ink);padding:8px 11px;font-weight:700;font-size:.75rem}
+        .sales-intelligence-refresh:hover{border-color:var(--if-red);color:var(--if-red)}
+        .sales-intelligence-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+        .sales-intelligence-kpi{padding:12px;border:1px solid var(--if-line);border-radius:12px;background:var(--if-canvas)}
+        .sales-intelligence-kpi span{display:block;color:var(--if-muted);font-size:.65rem;font-weight:750;text-transform:uppercase;letter-spacing:.04em}
+        .sales-intelligence-kpi strong{display:block;margin-top:4px;color:var(--if-ink);font-size:1.28rem;font-weight:850}
+        .sales-intelligence-kpi.is-critical strong{color:var(--if-red)}
+        .sales-intelligence-kpi.is-growth strong{color:var(--if-green)}
+        .sales-intelligence-note{padding:10px 12px;border-radius:10px;background:var(--if-canvas);color:var(--if-muted);font-size:.73rem;line-height:1.5}
+        .sales-intelligence-regions{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:9px;margin:10px 0}
+        .sales-intelligence-region{padding:12px;border:1px solid rgba(185,4,10,.18);border-radius:12px;background:rgba(185,4,10,.035)}
+        .sales-intelligence-region strong{display:block;color:var(--if-ink);font-size:.78rem}
+        .sales-intelligence-region span{display:block;margin-top:3px;color:var(--if-muted);font-size:.7rem;line-height:1.45}
+        .sales-intelligence-list{display:grid;gap:9px;margin-top:10px}
+        .sales-intelligence-dealer{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:13px;border:1px solid var(--if-line);border-radius:13px;background:var(--if-card)}
+        .sales-intelligence-dealer.is-critical{border-color:rgba(185,4,10,.35);background:rgba(185,4,10,.035)}
+        .sales-intelligence-dealer-main{min-width:0}
+        .sales-intelligence-dealer-title{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+        .sales-intelligence-dealer-title a{color:var(--if-ink);font-size:.82rem;font-weight:800;text-decoration:none}
+        .sales-intelligence-dealer-title a:hover{color:var(--if-red)}
+        .sales-intelligence-badge{padding:3px 7px;border-radius:99px;background:var(--if-soft-red);color:var(--if-red);font-size:.61rem;font-weight:800}
+        .sales-intelligence-badge.is-watch{background:rgba(217,166,77,.14);color:#9a6714}
+        .sales-intelligence-meta{margin-top:4px;color:var(--if-muted);font-size:.68rem}
+        .sales-intelligence-stats{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
+        .sales-intelligence-stats span{padding:5px 7px;border:1px solid var(--if-line);border-radius:8px;color:var(--if-muted);font-size:.64rem}
+        .sales-intelligence-clues{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
+        .sales-intelligence-clues span{padding:4px 7px;border-radius:7px;background:var(--if-canvas);color:var(--if-muted);font-size:.62rem}
+        .sales-intelligence-action{align-self:center;white-space:nowrap;color:var(--if-red);font-size:.68rem;font-weight:800;text-decoration:none}
+        .sales-intelligence-empty{padding:14px;border:1px dashed var(--if-line);border-radius:12px;color:var(--if-muted);font-size:.75rem}
+        @media(max-width:767px){.sales-intelligence{padding:14px;border-radius:14px}.sales-intelligence-head{align-items:flex-start}.sales-intelligence-head h2{font-size:1rem}.sales-intelligence-head p{font-size:.7rem}.sales-intelligence-refresh{padding:7px 8px;font-size:.66rem}.sales-intelligence-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.sales-intelligence-kpi{padding:9px}.sales-intelligence-kpi strong{font-size:1.05rem}.sales-intelligence-dealer{grid-template-columns:1fr}.sales-intelligence-action{justify-self:start}}
+</style>
     <script src="theme-init.js?v={{VER}}"></script>
     <link id="crm-dark-theme-file" rel="stylesheet" href="dark-theme.css?v={{VER}}" media="screen">
     <link rel="stylesheet" href="ui-consistency.css?v={{VER}}">
@@ -87,6 +121,16 @@
             <div id="sales-performance-cards" class="sales-performance-cards">
                 <div class="cc-empty">Загрузка…</div>
             </div>
+        </section>
+
+        <section class="sales-intelligence" id="sales-intelligence">
+            <header class="sales-intelligence-head">
+                <div><h2><i class="bi bi-radar me-2"></i>Радар продаж</h2><p>Автоматически находит дилеров с замедлением продаж и показывает сигналы для проверки.</p></div>
+                <button type="button" id="sales-intelligence-refresh" class="sales-intelligence-refresh"><i class="bi bi-arrow-clockwise me-1"></i>Обновить анализ</button>
+            </header>
+            <div id="sales-intelligence-kpis" class="sales-intelligence-kpis"><div class="sales-intelligence-empty">Загружаем историю продаж…</div></div>
+            <div id="sales-intelligence-regions" class="sales-intelligence-regions"></div>
+            <div id="sales-intelligence-list" class="sales-intelligence-list"></div>
         </section>
 
         <section class="motivation-payout-panel" id="motivation-payouts-panel">
