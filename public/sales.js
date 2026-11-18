@@ -24,6 +24,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const customGroupLabel = document.getElementById('custom-sale-group-label');
     const customSaveBtn = document.getElementById('custom-sale-save');
     const performanceCards = document.getElementById('sales-performance-cards');
+    const salesIntelligenceKpis = document.getElementById('sales-intelligence-kpis');
+    const salesIntelligenceRegions = document.getElementById('sales-intelligence-regions');
+    const salesIntelligenceList = document.getElementById('sales-intelligence-list');
+    const salesIntelligenceRefresh = document.getElementById('sales-intelligence-refresh');
     const printReport = document.getElementById('sales-print-report');
     const printPeriod = document.getElementById('print-period');
     const printGenerated = document.getElementById('print-generated');
@@ -61,9 +65,216 @@ document.addEventListener('DOMContentLoaded', () => {
     let autoSaveInFlight = false;
     let autoSaveQueued = false;
     let autoSaveRevision = 0;
+    let salesIntelligenceRows = [];
+    let salesIntelligenceLoaded = false;
+    let salesIntelligencePromise = null;
+    let salesIntelligenceTimer = null;
     
     // Загрузка настроек видимости планов
     let planVisibility = CRMUI.readStoredJSON('sales_plan_config', {}, value => value !== null && typeof value === 'object' && !Array.isArray(value));
+
+
+    function salesMonthOffset(month, offset) {
+        const parts=String(month||'').split('-').map(Number);
+        if(parts.length!==2||!parts[0]||!parts[1])return '';
+        const date=new Date(Date.UTC(parts[0],parts[1]-1+offset,1));
+        return date.getUTCFullYear()+'-'+String(date.getUTCMonth()+1).padStart(2,'0');
+    }
+
+    function salesIntelligenceToday() {
+        const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Almaty',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()).map(part=>[part.type,part.value]));
+        return {month:parts.year+'-'+parts.month,day:Number(parts.day)||1};
+    }
+
+    function loadSalesIntelligence(force) {
+        if(!salesIntelligenceKpis||!salesIntelligenceList)return Promise.resolve();
+        if(window.CRMAuth&& !CRMAuth.can('can_view_sales')) {
+            document.getElementById('sales-intelligence')?.setAttribute('hidden','');
+            return Promise.resolve();
+        }
+        if(salesIntelligenceLoaded&&!force) {
+            renderSalesIntelligence(salesIntelligenceRows);
+            return Promise.resolve();
+        }
+        if(salesIntelligencePromise&&!force)return salesIntelligencePromise;
+        salesIntelligenceKpis.innerHTML='<div class="sales-intelligence-empty"><span class="spinner-border spinner-border-sm me-2"></span>Сверяем продажи по периодам…</div>';
+        salesIntelligencePromise=fetch(API_SALES+'?months=16&context=sales')
+            .then(response=>{if(!response.ok)throw new Error('Не удалось получить историю продаж');return response.json();})
+            .then(rows=>{
+                if(!Array.isArray(rows))throw new Error('Сервер вернул неверный формат продаж');
+                salesIntelligenceRows=rows;
+                salesIntelligenceLoaded=true;
+                renderSalesIntelligence(rows);
+            })
+            .catch(error=>{
+                salesIntelligenceLoaded=false;
+                salesIntelligenceKpis.innerHTML='<div class="sales-intelligence-empty"><i class="bi bi-exclamation-circle me-2"></i>'+escapeHtml(error.message||'Не удалось рассчитать аналитику')+'</div>';
+                salesIntelligenceRegions.innerHTML='';
+                salesIntelligenceList.innerHTML='';
+            })
+            .finally(()=>{salesIntelligencePromise=null;});
+        return salesIntelligencePromise;
+    }
+
+    function scheduleSalesIntelligenceRefresh() {
+        if(salesIntelligenceTimer)clearTimeout(salesIntelligenceTimer);
+        salesIntelligenceTimer=setTimeout(()=>{salesIntelligenceTimer=null;loadSalesIntelligence(true);},1800);
+    }
+
+    function renderSalesIntelligence(rows) {
+        if(!salesIntelligenceKpis||!salesIntelligenceList)return;
+        const current=salesIntelligenceToday();
+        const months=Array.from({length:16},(_,index)=>salesMonthOffset(current.month,-index));
+        const monthParts=current.month.split('-').map(Number);
+        const daysInCurrentMonth=new Date(Date.UTC(monthParts[0],monthParts[1],0)).getUTCDate();
+        const recentKeys=[-3,-2,-1].map(offset=>salesMonthOffset(current.month,offset));
+        const previousKeys=[-6,-5,-4].map(offset=>salesMonthOffset(current.month,offset));
+        const yearAgoKeys=[-15,-14,-13].map(offset=>salesMonthOffset(current.month,offset));
+        const dealers=(Array.isArray(allDealers)?allDealers:[]).filter(dealer=>dealer&&dealer.status!=='potential'&&dealer.status!=='archive');
+        const byDealer=new Map();
+        (Array.isArray(rows)?rows:[]).filter(row=>row&&!row.isCustom&&!String(row.dealerId||'').startsWith('PLAN_'))
+            .forEach(row=>{
+                const id=String(row.dealerId||'');
+                const month=String(row.month||'');
+                if(!id||!months.includes(month))return;
+                if(!byDealer.has(id))byDealer.set(id,{sales:new Map(),present:new Set()});
+                const item=byDealer.get(id);
+                item.present.add(month);
+                item.sales.set(month,(item.sales.get(month)||0)+(Number(row.fact)||0));
+            });
+        const area=value=>Math.round(Number(value)||0).toLocaleString('ru-RU');
+        const average=(sales,keys)=>keys.reduce((sum,key)=>sum+(sales.get(key)||0),0)/keys.length;
+        const fmtPercent=value=>(value>0?'+':'')+Math.round(value)+'%';
+        const analyzed=[];
+        let insufficient=0;
+        for(const dealer of dealers) {
+            const id=String(dealer.id||dealer._id||'');
+            const record=byDealer.get(id);
+            if(!id||!record){insufficient++;continue;}
+            const recentCoverage=recentKeys.filter(key=>record.present.has(key)).length;
+            const previousCoverage=previousKeys.filter(key=>record.present.has(key)).length;
+            if(recentCoverage<2||previousCoverage<2){insufficient++;continue;}
+            const recentAvg=average(record.sales,recentKeys);
+            const previousAvg=average(record.sales,previousKeys);
+            if(previousAvg<=0){insufficient++;continue;}
+            const change=(recentAvg-previousAvg)/previousAvg*100;
+            const yearCoverage=yearAgoKeys.filter(key=>record.present.has(key)).length;
+            const yearAvg=average(record.sales,yearAgoKeys);
+            const yearChange=yearCoverage>=2&&yearAvg>0?(recentAvg-yearAvg)/yearAvg*100:null;
+            let severity=change<=-40?3:change<=-20?2:change<=-10?1:0;
+            const clues=[];
+            const actions=[];
+            const competitors=Array.isArray(dealer.competitors)?dealer.competitors:[];
+            const products=Array.isArray(dealer.products)?dealer.products:[];
+            const completed=(Array.isArray(dealer.visits)?dealer.visits:[]).filter(visit=>visit&&visit.isCompleted&&visit.date)
+                .map(visit=>new Date(visit.date)).filter(date=>!Number.isNaN(date.getTime())).sort((a,b)=>b-a);
+            const daysSince=completed.length?Math.max(0,Math.floor((Date.now()-completed[0].getTime())/86400000)):null;
+            const activeMonths=recentKeys.filter(key=>(record.sales.get(key)||0)>0).length;
+            const currentFact=record.sales.get(current.month);
+            const currentElapsed=current.day/daysInCurrentMonth;
+            const currentPace=currentFact==null?null:currentFact/Math.max(currentElapsed,.1);
+            if(current.day>=10&&currentPace!=null&&recentAvg>0&&currentPace<recentAvg*.75&&severity<1) {
+                severity=1;
+                clues.push('Текущий месячный темп пока ниже недавнего среднего.');
+            } else if(current.day>=10&&currentPace==null) {
+                clues.push('Факт за текущий месяц ещё не внесён — проверьте актуальность данных.');
+            }
+            if(yearChange!=null&&yearChange>=-8&&change<=-20) {
+                severity=Math.min(severity,1);
+                clues.push('Сравнение с теми же месяцами прошлого года мягче: возможен сезонный эффект.');
+            } else if(yearChange!=null&&yearChange<=-20) {
+                clues.push('Продажи также ниже того же периода прошлого года.');
+            }
+            if(competitors.length) {
+                clues.push('В CRM отмечены конкуренты ('+competitors.length+'). Это фактор для проверки, не доказанная причина.');
+                actions.push('Уточнить, какие марки и предложения конкурента дилер продаёт активнее.');
+            }
+            if(daysSince==null||daysSince>45) {
+                clues.push(daysSince==null?'Нет завершённого визита в CRM.':'Последний визит был '+daysSince+' дн. назад.');
+                actions.push('Запланировать визит и проверить продажи, выкладку, ценники и обратную связь продавцов.');
+            }
+            if(products.length===0) {
+                clues.push('В матрице дилера не отмечены наши товары.');
+                actions.push('Сверить фактическую выкладку и подобрать подходящие декоры.');
+            }
+            actions.push('Сверить цену и наличие ходовых позиций; при необходимости подготовить адресное предложение.');
+            actions.push('После контакта проверить, изменился ли темп заказов в следующем месяце.');
+            if(severity>0)analyzed.push({
+                dealer,id,change,recentAvg,previousAvg,recentCoverage,previousCoverage,
+                yearChange,yearCoverage,activeMonths,daysSince,competitors:competitors.length,products:products.length,
+                severity,clues,actions
+            });
+        }
+        const growing=dealers.map(dealer=>{
+            const id=String(dealer.id||dealer._id||'');
+            const record=byDealer.get(id);
+            if(!record)return null;
+            const recentCoverage=recentKeys.filter(key=>record.present.has(key)).length;
+            const previousCoverage=previousKeys.filter(key=>record.present.has(key)).length;
+            if(recentCoverage<2||previousCoverage<2)return null;
+            const recentAvg=average(record.sales,recentKeys),previousAvg=average(record.sales,previousKeys);
+            if(previousAvg<=0)return null;
+            const change=(recentAvg-previousAvg)/previousAvg*100;
+            return change>=15?{dealer,id,change,recentAvg,previousAvg}:null;
+        }).filter(Boolean).sort((a,b)=>b.change-a.change).slice(0,5);
+        analyzed.sort((a,b)=>b.severity-a.severity||a.change-b.change);
+        const critical=analyzed.filter(item=>item.severity>=3).length;
+        const growingCount=dealers.filter(dealer=>{
+            const record=byDealer.get(String(dealer.id||dealer._id||''));
+            if(!record)return false;
+            const r=recentKeys.filter(key=>record.present.has(key)).length,p=previousKeys.filter(key=>record.present.has(key)).length;
+            return r>=2&&p>=2&&average(record.sales,recentKeys)>=average(record.sales,previousKeys)*1.15;
+        }).length;
+        salesIntelligenceKpis.innerHTML=
+            '<article class="sales-intelligence-kpi"><span>Дилеров в анализе</span><strong>'+dealers.length+'</strong></article>'+
+            '<article class="sales-intelligence-kpi is-critical"><span>Снижение от 20%</span><strong>'+analyzed.filter(item=>item.severity>=2).length+'</strong></article>'+
+            '<article class="sales-intelligence-kpi is-critical"><span>Критическое от 40%</span><strong>'+critical+'</strong></article>'+
+            '<article class="sales-intelligence-kpi is-growth"><span>Рост от 15%</span><strong>'+growingCount+'</strong></article>';
+        const groups=new Map();
+        analyzed.filter(item=>item.change<=-20).forEach(item=>{
+            const city=String(item.dealer.city||'').trim();
+            const sector=String(item.dealer.region_sector||'').trim();
+            const label=[city,sector].filter(Boolean).join(' · ')||'Регион не указан';
+            if(!groups.has(label))groups.set(label,[]);
+            groups.get(label).push(item);
+        });
+        const regional=[...groups.entries()].filter(([,items])=>items.length>=2).sort((a,b)=>b[1].length-a[1].length);
+        salesIntelligenceRegions.innerHTML=regional.map(([label,items])=>
+            '<article class="sales-intelligence-region"><strong><i class="bi bi-geo-alt me-1"></i>'+escapeHtml(label)+': '+items.length+' дилера с сигналом</strong><span>Снижение может быть общим для территории. Сверьте локальный спрос, наличие товара и предложения конкурентов у этих точек.</span></article>'
+        ).join('');
+        const dealerCards=analyzed.slice(0,20).map(item=>{
+            const dealer=item.dealer;
+            const id=String(dealer.id||dealer._id||'');
+            const level=item.severity>=3?'Критично':item.severity===2?'Падение': 'Наблюдение';
+            const badgeClass=item.severity===1?'is-watch':'';
+            const city=String(dealer.city||'');
+            const sector=String(dealer.region_sector||'');
+            const location=[city,sector].filter(Boolean).join(' · ');
+            const yearText=item.yearChange==null?'':' · тот же период год назад '+fmtPercent(item.yearChange);
+            const clues=item.clues.slice(0,3).map(clue=>'<span>'+escapeHtml(clue)+'</span>').join('');
+            const actions=item.actions.slice(0,2).map((action,index)=>(index+1)+'. '+escapeHtml(action)).join('<br>');
+            return '<article class="sales-intelligence-dealer '+(item.severity>=3?'is-critical':'')+'"><div class="sales-intelligence-dealer-main">'+
+                '<div class="sales-intelligence-dealer-title"><a href="dealer.html?id='+encodeURIComponent(id)+'">'+escapeHtml(dealer.name||'Дилер')+'</a><span class="sales-intelligence-badge '+badgeClass+'">'+level+'</span></div>'+
+                '<div class="sales-intelligence-meta">'+escapeHtml(location)+' · '+escapeHtml(dealer.responsible||'Ответственный не указан')+'</div>'+
+                '<div class="sales-intelligence-stats"><span>Последние 3 мес.: '+area(item.recentAvg*3)+' м²</span><span>Предыдущие 3 мес.: '+area(item.previousAvg*3)+' м²</span><span>Динамика: '+fmtPercent(item.change)+'</span><span>Данные: '+item.recentCoverage+'/3 и '+item.previousCoverage+'/3 мес.'+escapeHtml(yearText)+'</span></div>'+
+                (clues?'<div class="sales-intelligence-clues">'+clues+'</div>':'')+
+                '<div class="sales-intelligence-meta mt-2"><strong>План действий</strong><br>'+actions+'</div></div>'+
+                '<a class="sales-intelligence-action" href="dealer.html?id='+encodeURIComponent(id)+'">Открыть дилера <i class="bi bi-arrow-up-right"></i></a></article>';
+        }).join('');
+        const growthCards=growing.map(item=>
+            '<article class="sales-intelligence-dealer"><div class="sales-intelligence-dealer-main"><div class="sales-intelligence-dealer-title"><a href="dealer.html?id='+encodeURIComponent(item.id)+'">'+escapeHtml(item.dealer.name||'Дилер')+'</a><span class="sales-intelligence-badge" style="background:rgba(40,130,80,.12);color:#287749">Рост '+fmtPercent(item.change)+'</span></div>'+
+            '<div class="sales-intelligence-meta">'+escapeHtml([item.dealer.city,item.dealer.region_sector].filter(Boolean).join(' · '))+' · '+area(item.recentAvg*3)+' м² за последние 3 месяца</div></div>'+
+            '<a class="sales-intelligence-action" href="dealer.html?id='+encodeURIComponent(item.id)+'">Посмотреть подход <i class="bi bi-arrow-up-right"></i></a></article>'
+        ).join('');
+        const disclaimer='Сравнение: последние 3 закрытых месяца против предыдущих 3. Дилеры без достаточной истории не получают диагноз.';
+        salesIntelligenceList.innerHTML=analyzed.length
+            ? '<div class="sales-intelligence-note"><i class="bi bi-info-circle me-1"></i>'+escapeHtml(disclaimer)+' Для причин используем только отмеченные факты CRM; менеджер подтверждает их у дилера.</div>'+dealerCards+
+              (growing.length?'<div class="sales-intelligence-note mt-2"><i class="bi bi-graph-up-arrow me-1"></i><strong>Точки роста</strong> — дилеры с увеличением темпа минимум на 15%.</div>'+growthCards:'')+
+              (insufficient?'<div class="sales-intelligence-note mt-2">Не включено в сравнение из-за недостаточной истории: '+insufficient+' дилеров.</div>':'')
+            : '<div class="sales-intelligence-empty"><i class="bi bi-check2-circle me-2"></i>Снижение от 10% не обнаружено среди дилеров с достаточной историей.</div>'+
+              (growing.length?'<div class="sales-intelligence-note mt-2"><strong>Точки роста</strong> — дилеры с увеличением темпа минимум на 15%.</div>'+growthCards:'')+
+              (insufficient?'<div class="sales-intelligence-note mt-2">Недостаточно истории для сравнения по '+insufficient+' дилерам.</div>':'');
+    }
 
     async function init() {
         try {
@@ -80,6 +291,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) { console.error(e); }
 
         await loadSectors();
+        if(salesIntelligenceRefresh)salesIntelligenceRefresh.addEventListener('click',()=>loadSalesIntelligence(true));
         loadData();
         setupMobileTabs();
     }
@@ -252,6 +464,7 @@ document.addEventListener('DOMContentLoaded', () => {
             isLoading = false;
             clearDirty();
             renderAll();
+            loadSalesIntelligence(false);
             updateLastModifiedText();
             setSaveButtonState(canEditFact || canEditPlan ? 'saved' : 'readonly');
         } catch (e) {
@@ -524,6 +737,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(data.error || 'Ошибка при сохранении');
             }
 
+            scheduleSalesIntelligenceRefresh();
             const noNewChanges = revisionAtStart === autoSaveRevision && monthAtStart === monthPicker.value;
             if (noNewChanges) {
                 clearDirty();
