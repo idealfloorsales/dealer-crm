@@ -111,7 +111,7 @@ function simulateVisibleScrollButton(isMobile){
   };
   const fakeWindow={
     innerHeight:height,innerWidth:viewportWidth,scrollY:225,visualViewport:undefined,
-    requestAnimationFrame(cb){cb();return 1;},
+    requestAnimationFrame(cb){cb();return 0;}, // Run queued updates synchronously in tests
     addEventListener(name,cb){listeners['window:'+name]=cb;},
     matchMedia(){return {matches:false};},
     scrollTo(value){styles.scrollTo=value;}
@@ -122,7 +122,7 @@ function simulateVisibleScrollButton(isMobile){
     script.slice(start,end)+'\nreturn initAdaptiveScrollTop;'
   )(fakeWindow,fakeDocument,undefined);
   init();
-  return {classes,attributes,styles,listeners,button};
+  return {classes,attributes,styles,listeners,button,fakeWindow,page};
 }
 test('regression: scroll control is visible on desktop even with many buttons and a hidden dialog',()=>{
   const app=simulateVisibleScrollButton(false);
@@ -163,6 +163,27 @@ test('flat vertical UI has a real animation and reduced-motion fallback',()=>{
   assert.match(style,/--crm-top-height:70px/);
   assert.match(style,/@keyframes crmTopArrowTravel/);
   assert.match(style,/@keyframes crmTopLightRail/);
+  assert.match(style,/@keyframes crmTopHalo/);
+  assert.match(style,/@keyframes crmTopSurfacePulse/);
+  assert.match(style,/#crm-scroll-to-top\.is-launching::before/);
   assert.match(script,/class="crm-scroll-top-caption"/);
   assert.match(script,/const preferredRight=width>=768&&gutter>size\+20/);
+});
+
+test('click lift finishes before the button fades away at the top',()=>{
+  for(const mobile of [false,true]){
+    const app=simulateVisibleScrollButton(mobile);
+    app.listeners['button:click']();
+    assert.ok(app.classes.has('is-launching'));
+    assert.ok(app.classes.has('is-scrolling'));
+    assert.equal(app.styles.scrollTo.behavior,'smooth');
+    app.fakeWindow.scrollY=0;
+    app.page.scrollTop=0;
+    app.listeners['window:scroll']();
+    assert.ok(app.classes.has('is-visible'),'keep visible while easing finishes');
+    app.listeners['button:animationend']({animationName:'crmTopArrowTravel'});
+    assert.equal(app.classes.has('is-launching'),false);
+    assert.equal(app.classes.has('is-scrolling'),false);
+    assert.equal(app.classes.has('is-visible'),false,'fade only after landing');
+  }
 });
