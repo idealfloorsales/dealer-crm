@@ -34,6 +34,10 @@
                     <button type="button" data-report-view="matrix" class="active"><i class="bi bi-grid-3x3-gap"></i><span>Матрица</span></button>
                     <button type="button" data-report-view="field"><i class="bi bi-phone"></i><span>В поле</span></button>
                 </div>
+                <button type="button" id="exhibition-edit-mode" class="exhibition-edit-mode-btn" hidden
+                        aria-pressed="false" title="Включить защищённый режим редактирования выставленности">
+                    <i class="bi bi-unlock" aria-hidden="true"></i><span>Редактировать</span>
+                </button>
                 <button id="export-excel-btn" class="app-hero-primary exhibition-export-btn"><i class="bi bi-file-earmark-excel"></i><span>Экспорт в Excel</span></button>
             </div>
         </section>
@@ -111,6 +115,12 @@
             </div>
         </section>
 
+        <div id="exhibition-edit-hint" class="exhibition-edit-hint" hidden>
+            <i class="bi bi-hand-index-thumb" aria-hidden="true"></i>
+            <span><strong>Режим редактирования активен.</strong> Нажимайте на ячейки, чтобы отметить выставленные образцы.
+                Изменения выделяются цветом и сохраняются только после нажатия «Сохранить».</span>
+        </div>
+
         <p id="loading-msg" class="exhibition-loading"><span class="spinner-border spinner-border-sm"></span>Загрузка выставленности…</p>
 
         <section id="matrix-view" class="exhibition-view">
@@ -179,6 +189,24 @@
         </section>
     </main>
 
+    <aside id="exhibition-batch-bar" class="exhibition-batch-bar" hidden aria-live="polite" aria-label="Несохранённые изменения выставленности">
+        <div class="exhibition-batch-copy">
+            <span class="exhibition-batch-symbol"><i class="bi bi-pencil-square"></i></span>
+            <div><strong id="exhibition-batch-count">1 изменение</strong>
+                <small id="exhibition-batch-details">Предпросмотр · не сохранено</small></div>
+        </div>
+        <div class="exhibition-batch-actions">
+            <button type="button" id="exhibition-batch-undo" title="Отменить последнее нажатие">
+                <i class="bi bi-arrow-counterclockwise"></i><span>Шаг назад</span>
+            </button>
+            <button type="button" id="exhibition-batch-discard" title="Сбросить все несохранённые изменения">
+                <i class="bi bi-x-lg"></i><span>Сбросить</span>
+            </button>
+            <button type="button" id="exhibition-batch-save" class="exhibition-batch-save">
+                <i class="bi bi-check2-circle"></i><span>Сохранить</span>
+            </button>
+        </div>
+    </aside>
 
     <div class="modal fade" id="exhibition-inspection-modal" tabindex="-1" aria-labelledby="exhibition-inspection-title">
         <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
