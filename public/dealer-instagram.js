@@ -24,7 +24,7 @@
         const metricsEl = document.getElementById('instagram-metrics');
         const matchEl = document.getElementById('instagram-brand-match');
         const postsEl = document.getElementById('instagram-posts');
-        const admin = Boolean(window.CRMAuth?.user?.permissions?.is_admin || window.CRMAuth?.user?.role === 'admin');
+        let admin = Boolean(window.CRMAuth?.user?.permissions?.is_admin || window.CRMAuth?.user?.role === 'admin');
         let publicStatus = { connected: false };
         let currentUsername = '';
         let busy = false;
@@ -276,6 +276,7 @@
         });
 
         Promise.resolve(window.CRMAuth?.ready).then(async () => {
+            admin = Boolean(window.CRMAuth?.user?.permissions?.is_admin || window.CRMAuth?.user?.role === 'admin');
             await Promise.all([loadPublicStatus(), loadSnapshot()]);
             await loadAdminStatus();
         }).catch(() => {
