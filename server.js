@@ -5581,6 +5581,7 @@ async function getScopedDealerIds(req) {
 // ==========================================
 // РЕКВИЗИТЫ И РЕКЛАМАЦИИ
 // ==========================================
+const RECLAMATION_STATUSES = ['new','inspection','waiting_customer','waiting_expertise','decision_ready','closed','rejected'];
 const reclamationSchema = new mongoose.Schema({
     dealerId: String,
     dealerName: String,
@@ -5595,7 +5596,29 @@ const reclamationSchema = new mongoose.Schema({
     houseType: String,
     totalArea: String,
     purchasedVolume: String,
+    purchasedQuantity: { type: Number, min: 0 },
+    purchasedUnit: { type: String, enum: ['', 'm2', 'pack', 'piece'] },
+    defectVolume: String,
+    defectQuantity: { type: Number, min: 0 },
+    defectUnit: { type: String, enum: ['', 'm2', 'pack', 'piece'] },
     batchNumbers: [String],
+    claimantType: String,
+    problemType: String,
+    status: { type: String, enum: RECLAMATION_STATUSES, default: 'new' },
+    statusHistory: [{
+        _id: false,
+        status: { type: String, enum: RECLAMATION_STATUSES },
+        byId: String,
+        byName: String,
+        at: { type: Date, default: Date.now }
+    }],
+    assignedToName: String,
+    nextAction: String,
+    dueDate: String,
+    waitingFor: String,
+    confirmedCause: String,
+    causeConfidence: String,
+    inspectedDate: String,
     baseType: String,
     underlayment: String,
     warmFloor: String,
@@ -5613,6 +5636,7 @@ const reclamationSchema = new mongoose.Schema({
     
     description: String,
     clientDemand: String,
+    decisionType: String,
     resolution: String,
     photos: [{ photo_url: String }]
 }, { timestamps: true });
@@ -6958,17 +6982,11 @@ app.post('/api/workshop/stocktake', requirePermission('can_manage_workshop'), as
 app.get('/api/reclamations/dashboard', requirePermission('can_view_reclamations'), async (req, res) => {
     try {
         const dealerIds = await getScopedDealerIds(req);
-        const query = {
-            $or: [
-                { resolution: { $exists: false } },
-                { resolution: null },
-                { resolution: '' }
-            ]
-        };
+        const query = { status: { $nin: ['closed','rejected'] } };
         if (dealerIds) query.dealerId = { $in: dealerIds };
 
         const list = await Reclamation.find(query)
-            .select('dealerId dealerName resolution createdAt date')
+            .select('dealerId dealerName status nextAction dueDate assignedToName resolution createdAt date')
             .sort({ createdAt: -1 })
             .lean();
         res.json(list.map(convertToClient));
@@ -6994,6 +7012,11 @@ app.get('/api/reclamations', requirePermission('can_view_reclamations'), async (
                 invoiceNumber: 1,
                 clientName: 1,
                 defectVolume: 1,
+                status: 1,
+                assignedToName: 1,
+                nextAction: 1,
+                dueDate: 1,
+                problemType: 1,
                 compensationAmount: 1,
                 createdAt: 1,
                 updatedAt: 1,
@@ -7012,22 +7035,78 @@ app.get('/api/reclamations/:id', requirePermission('can_view_reclamations'), asy
         const item = await Reclamation.findOne(query).lean();
         if (!item) return res.status(404).json({ error: 'Рекламация не найдена' });
         if(req.query.view==='preview')item.photos=await require('./server/dealer-media').previewPhotoRows(item.photos||[],true);
+        if (!hasPermission(req, 'can_manage_reclamations')) delete item.internalNotes;
         res.json(convertToClient(item));
     } catch(e) { res.status(500).json({error: e.message}); }
 });
 
+const RECLAMATION_MUTABLE_FIELDS = [
+    'dealerId','dealerName','date','productName','invoiceNumber','purchaseDate','clientName','clientPhone',
+    'address','floor','houseType','totalArea','purchasedVolume','purchasedQuantity','purchasedUnit','defectVolume','defectQuantity','defectUnit','batchNumbers','claimantType',
+    'problemType','status','assignedToName','nextAction','dueDate','waitingFor','confirmedCause','causeConfidence',
+    'inspectedDate','baseType','underlayment','warmFloor','installer','acclimatization','storageMethod',
+    'dryingTime','floorFlatness','defectMoment','compensationAmount','internalNotes','description',
+    'clientDemand','decisionType','resolution','photos'
+];
+function reclamationPayload(body = {}) {
+    const payload = {};
+    for (const field of RECLAMATION_MUTABLE_FIELDS) {
+        if (Object.prototype.hasOwnProperty.call(body, field)) payload[field] = body[field];
+    }
+    return payload;
+}
+function reclamationActor(req) {
+    const name = [req.user?.firstName, req.user?.lastName].filter(Boolean).join(' ').trim()
+        || req.user?.fullName || req.user?.username || 'Сотрудник';
+    return { byId:String(req.user?.id || ''), byName:String(name) };
+}
+function validReclamationStatus(status) {
+    return RECLAMATION_STATUSES.includes(String(status || ''));
+}
 app.post('/api/reclamations', requirePermission('can_manage_reclamations'), async (req, res) => {
-    try { 
-        const r = new Reclamation(req.body); 
-        await r.save(); 
-        res.json(convertToClient(r)); 
-    } catch(e) { res.status(500).json({error: e.message}); }
+    try {
+        const payload = reclamationPayload(req.body);
+        const status = payload.status || 'new';
+        if (!validReclamationStatus(status)) return res.status(400).json({ error:'Неизвестный статус рекламации' });
+        if (status === 'closed' && !String(payload.decisionType || '').trim() && !String(payload.resolution || '').trim()) {
+            return res.status(400).json({ error:'Для закрытия рекламации укажите результат проверки или текст решения' });
+        }
+        const actor = reclamationActor(req);
+        const r = new Reclamation({ ...payload, status, statusHistory:[{status, ...actor, at:new Date()}] });
+        await r.save();
+        res.status(201).json(convertToClient(r));
+    } catch(e) { res.status(400).json({error: e.message}); }
 });
 app.put('/api/reclamations/:id', requirePermission('can_manage_reclamations'), async (req, res) => {
-    try { 
-        const r = await Reclamation.findByIdAndUpdate(req.params.id, req.body, { new: true }); 
-        res.json(convertToClient(r)); 
-    } catch(e) { res.status(500).json({error: e.message}); }
+    try {
+        const payload = reclamationPayload(req.body);
+        if (Object.prototype.hasOwnProperty.call(payload, 'status') && !validReclamationStatus(payload.status)) {
+            return res.status(400).json({ error:'Неизвестный статус рекламации' });
+        }
+        const r = await Reclamation.findById(req.params.id);
+        if (!r) return res.status(404).json({ error:'Рекламация не найдена' });
+        const resultingStatus = Object.prototype.hasOwnProperty.call(payload, 'status') ? payload.status : (r.status || (String(r.resolution || '').trim() ? 'decision_ready' : 'new'));
+        const resultingDecision = Object.prototype.hasOwnProperty.call(payload, 'decisionType') ? payload.decisionType : r.decisionType;
+        const resultingResolution = Object.prototype.hasOwnProperty.call(payload, 'resolution') ? payload.resolution : r.resolution;
+        if (resultingStatus === 'closed' && !String(resultingDecision || '').trim() && !String(resultingResolution || '').trim()) {
+            return res.status(400).json({ error:'Для закрытия рекламации укажите результат проверки или текст решения' });
+        }
+        const actor = reclamationActor(req);
+        const previousStatus = r.status || (String(r.resolution || '').trim() ? 'decision_ready' : 'new');
+        if (!r.status) {
+            r.status = previousStatus;
+            r.statusHistory.push({status:previousStatus,byId:actor.byId,byName:actor.byName,at:r.createdAt || new Date()});
+        }
+        if (Object.prototype.hasOwnProperty.call(payload, 'status')) {
+            const nextStatus = payload.status;
+            if (nextStatus !== previousStatus) r.statusHistory.push({status:nextStatus,...actor,at:new Date()});
+            r.status = nextStatus;
+            delete payload.status;
+        }
+        for (const [field, value] of Object.entries(payload)) r.set(field, value);
+        await r.save();
+        res.json(convertToClient(r));
+    } catch(e) { res.status(400).json({error: e.message}); }
 });
 app.delete('/api/reclamations/:id', requirePermission('can_manage_reclamations'), async (req, res) => {
     try { 
@@ -7098,4 +7177,5 @@ process.on('uncaughtException', err => {
     console.error('Uncaught exception:', err);
     appReady = false;
 });
+
 

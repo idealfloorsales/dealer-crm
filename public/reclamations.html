@@ -415,7 +415,15 @@
                     <select id="status-filter" class="form-select">
                         <option value="all">Все</option>
                         <option value="open">В работе</option>
-                        <option value="resolved">Решено</option>
+                        <option value="resolved">Завершённые</option>
+                        <option value="new">Новая</option>
+                        <option value="inspection">Проверка</option>
+                        <option value="waiting_customer">Ждём данные клиента / дилера</option>
+                        <option value="waiting_expertise">Ждём экспертизу</option>
+                        <option value="decision_ready">Решение подготовлено</option>
+                        <option value="closed">Закрыта</option>
+                        <option value="rejected">Отказано</option>
+                        <option value="overdue">Просрочено по следующему шагу</option>
                     </select>
                 </label>
                 <label><span>Фото / видео</span>
@@ -461,10 +469,10 @@
                 </div>
                 <div class="rec-field-shortcuts">
                     <button type="button" data-rec-target="#rec-section-main"><i class="bi bi-file-earmark-text"></i><span>Основное</span></button>
-                    <button type="button" data-rec-target="#rec-section-tech"><i class="bi bi-rulers"></i><span>Техника</span></button>
                     <button type="button" data-rec-target="#rec-section-problem"><i class="bi bi-exclamation-diamond"></i><span>Проблема</span></button>
-                    <button type="button" data-rec-target="#r_photos"><i class="bi bi-camera"></i><span>Фото</span></button>
-                    <button type="button" data-rec-target="#rec-section-resolution"><i class="bi bi-check2-circle"></i><span>Решение</span></button>
+                    <button type="button" data-rec-target="#rec-photo-section"><i class="bi bi-camera"></i><span>Фото</span></button>
+                    <button type="button" data-rec-target="#rec-tech-details"><i class="bi bi-rulers"></i><span>Проверка</span></button>
+                    <button type="button" data-rec-target="#rec-section-workflow"><i class="bi bi-kanban"></i><span>Контроль</span></button>
                 </div>
                 <div class="rec-form-progress"><span id="rec-form-progress-bar"></span><small id="rec-form-progress-text">Заполните обязательные поля</small></div>
                 <div class="modal-body rec-modal-body">
@@ -478,7 +486,7 @@
                                 <select id="r_dealer" class="form-select border-brand" required><option value="">Загрузка...</option></select>
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label small fw-bold text-muted">Дата подачи</label>
+                                <label class="form-label small fw-bold text-muted">Дата обращения *</label>
                                 <input type="date" id="r_date" class="form-control" required>
                             </div>
                             <div class="col-md-3">
@@ -486,8 +494,8 @@
                                 <input type="date" id="r_purchase_date" class="form-control">
                             </div>
                             <div class="col-md-8">
-                                <label class="form-label small fw-bold text-muted">Товар (Название / Артикул) *</label>
-                                <input type="text" id="r_product" class="form-control" list="products-datalist" placeholder="Начните вводить артикул..." required autocomplete="off">
+                                <label class="form-label small fw-bold text-muted">Товар / артикул *</label>
+                                <input type="text" id="r_product" class="form-control" list="products-datalist" placeholder="Выберите товар из списка или введите вручную" required autocomplete="off">
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label small fw-bold text-muted">Номер накладной</label>
@@ -495,7 +503,105 @@
                             </div>
                         </div>
 
-                        <h6 id="rec-section-client" class="rec-section-title"><span>02</span><div><strong>Объект и клиент</strong><small>Контакты и место эксплуатации</small></div></h6>
+                        <div class="rec-intake-hint"><i class="bi bi-lightning-charge"></i><span>Для регистрации нужны дилер, товар, тип дефекта и короткое описание. Точные объёмы и технические условия можно добавить после первичной проверки.</span></div>
+
+                        <h6 id="rec-section-problem" class="rec-section-title is-danger"><span>02</span><div><strong>Что произошло</strong><small>Фиксируем наблюдаемый дефект отдельно от причины</small></div></h6>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted">Кто обратился</label>
+                                <select id="r_claimant_type" class="form-select"><option value="dealer">Дилер</option><option value="customer">Конечный клиент</option></select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted">Тип проблемы *</label>
+                                <select id="r_problem_type" class="form-select" required>
+                                    <option value="">Выберите тип</option>
+                                    <option value="surface">Повреждение поверхности / декора</option>
+                                    <option value="lock">Замок / соединение</option>
+                                    <option value="geometry">Геометрия / размер планки</option>
+                                    <option value="moisture">Вздутие / влага</option>
+                                    <option value="color">Цвет / оттенок</option>
+                                    <option value="packaging">Упаковка / маркировка</option>
+                                    <option value="other">Другое</option>
+                                    <option value="legacy">Не классифицировано (старая запись)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted">Когда обнаружили</label>
+                                <select id="r_defect_moment" class="form-select">
+                                    <option value="">Не указано</option><option>При вскрытии упаковки</option><option>Во время укладки</option><option>После укладки</option><option>В процессе эксплуатации</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted">Куплено, объём</label>
+                                <div class="rec-volume-control">
+                                    <div class="input-group"><input type="number" id="r_purchased_quantity" class="form-control" min="0" step="0.01" inputmode="decimal" placeholder="Количество"><select id="r_purchased_unit" class="form-select rec-volume-unit"><option value="m2">м²</option><option value="pack">уп.</option><option value="piece">шт.</option></select></div>
+                                    <input type="hidden" id="r_purchased_volume"><input type="text" id="r_purchased_legacy" class="form-control rec-legacy-volume d-none" placeholder="Старое текстовое значение; сохраните или уточните">
+                                </div>
+                                <small class="rec-field-help">Можно оставить пустым, если пока неизвестно.</small>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted">Заявленный брак</label>
+                                <div class="rec-volume-control">
+                                    <div class="input-group"><input type="number" id="r_defect_quantity" class="form-control" min="0" step="0.01" inputmode="decimal" placeholder="Количество"><select id="r_defect_unit" class="form-select rec-volume-unit"><option value="m2">м²</option><option value="pack">уп.</option><option value="piece">шт.</option></select></div>
+                                    <input type="hidden" id="r_defect_volume"><input type="text" id="r_defect_legacy" class="form-control rec-legacy-volume d-none" placeholder="Старое текстовое значение; сохраните или уточните">
+                                </div>
+                                <small class="rec-field-help">Укажите единицу измерения.</small>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted">Номера партий</label>
+                                <div id="batch-list" class="d-flex flex-column gap-1 mb-1"><input type="text" class="form-control form-control-sm batch-input" placeholder="С упаковки; можно позже"></div>
+                                <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none text-brand" onclick="addBatchInput()">+ Добавить партию</button>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">Что просит клиент</label>
+                                <select id="r_client_demand" class="form-select">
+                                    <option value="">Пока не указано</option><option>Замена товара</option><option>Компенсация</option><option>Возврат средств</option><option>Проверка качества</option><option>Консультация / рекомендации</option><option>Другое</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">Описание дефекта *</label>
+                                <textarea id="r_description" class="form-control" rows="3" placeholder="Опишите то, что видно или слышно: где именно, сколько планок, при каких условиях. Не указывайте предположение о причине как установленный факт." required></textarea>
+                            </div>
+                            <div class="col-12 mt-3" id="rec-photo-section">
+                                <label class="form-label small fw-bold text-muted">Фото / видео для проверки</label>
+                                <div class="alert alert-warning py-1 small mb-2"><i class="bi bi-info-circle me-1"></i>Лучше приложить общий вид, крупный план дефекта и маркировку упаковки/партии. Если материалы появятся позже — сохраните обращение без них. Видео до 8 МБ.</div>
+                                <div class="rec-media-actions">
+                                    <label class="rec-media-btn is-primary" for="r_camera"><i class="bi bi-camera-fill"></i><span>Сделать фото</span></label>
+                                    <label class="rec-media-btn" for="r_photos"><i class="bi bi-images"></i><span>Выбрать фото / видео</span></label>
+                                </div>
+                                <input type="file" id="r_camera" class="visually-hidden" accept="image/*" capture="environment">
+                                <input type="file" id="r_photos" class="visually-hidden" multiple accept="image/*, video/*">
+                                <div id="r_photos_preview" class="photo-preview-grid rec-media-preview"></div>
+                            </div>
+                        </div>
+
+                        <h6 id="rec-section-workflow" class="rec-section-title"><span>03</span><div><strong>Контроль обращения</strong><small>Текущий этап, ответственный и конкретный следующий шаг</small></div></h6>
+                        <div class="row g-3 mb-3 rec-workflow-fields">
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted">Статус</label>
+                                <select id="r_status" class="form-select">
+                                    <option value="new">Новая</option><option value="inspection">Проверка</option><option value="waiting_customer">Ждём данные клиента / дилера</option><option value="waiting_expertise">Ждём экспертизу</option><option value="decision_ready">Решение подготовлено</option><option value="closed">Закрыта</option><option value="rejected">Отказано</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted">Ответственный</label>
+                                <input type="text" id="r_assigned_to" class="form-control" placeholder="Менеджер, ведущий обращение">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted">Дата следующего шага</label>
+                                <input type="date" id="r_due_date" class="form-control">
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label small fw-bold text-muted">Следующее действие</label>
+                                <input type="text" id="r_next_action" class="form-control" placeholder="Например: запросить фото партии и согласовать осмотр">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted">Ожидаем от</label>
+                                <select id="r_waiting_for" class="form-select"><option value="">Не ожидаем</option><option value="dealer">Дилера</option><option value="customer">Клиента</option><option value="expertise">Экспертизу</option><option value="internal">Внутреннее согласование</option></select>
+                            </div>
+                        </div>
+
+                        <h6 id="rec-section-client" class="rec-section-title"><span>04</span><div><strong>Клиент и объект</strong><small>Заполняется, если известны контакт и место укладки</small></div></h6>
                         <div class="row g-3 mb-3">
                             <div class="col-md-6">
                                 <label class="form-label small fw-bold text-muted">ФИО клиента</label>
@@ -521,13 +627,25 @@
                                 <label class="form-label small fw-bold text-muted">Общая пл. помещения</label>
                                 <input type="text" id="r_total_area" class="form-control" placeholder="Напр: 100 м²">
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label small fw-bold text-brand">Купленный объем (Товара)</label>
-                                <input type="text" id="r_purchased_volume" class="form-control border-brand" placeholder="Сколько всего м² или упаковок купили" required>
-                            </div>
                         </div>
 
-                        <h6 id="rec-section-tech" class="rec-section-title is-critical"><span>03</span><div><strong>Технические условия</strong><small>Основание, укладка, хранение и тёплый пол</small></div></h6>
+                        <details id="rec-tech-details" class="rec-collapsible">
+                        <summary><div class="rec-section-title is-critical"><span><i class="bi bi-rulers"></i></span><div><strong>Техническая проверка</strong><small>Основание, укладка, хранение и тёплый пол — заполните при осмотре</small></div></div><i class="bi bi-chevron-down rec-collapse-chevron"></i></summary>
+                        <div class="rec-collapsible-body">
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">Вывод проверки</label>
+                                <textarea id="r_confirmed_cause" class="form-control" rows="2" placeholder="Факты проверки и установленная причина. Если причина не подтверждена — так и укажите."></textarea>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small fw-bold text-muted">Степень подтверждения</label>
+                                <select id="r_cause_confidence" class="form-select"><option value="unknown">Не проверено</option><option value="possible">Предположение</option><option value="confirmed">Подтверждено проверкой</option></select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small fw-bold text-muted">Проверено</label>
+                                <input type="date" id="r_inspected_date" class="form-control">
+                            </div>
+                        </div>
                         <div class="row g-3 mb-3">
                             <div class="col-md-3">
                                 <label class="form-label small fw-bold text-muted">Тип основания</label>
@@ -563,52 +681,18 @@
                                 <input type="text" id="r_installer" class="form-control" list="installer-list" placeholder="Сам клиент" autocomplete="off">
                             </div>
                         </div>
-
-                        <h6 id="rec-section-problem" class="rec-section-title is-danger"><span>04</span><div><strong>Суть претензии</strong><small>Объём брака, партии, описание и доказательства</small></div></h6>
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-3">
-                                <label class="form-label small fw-bold text-muted">Момент выявления дефекта</label>
-                                <input type="text" id="r_defect_moment" class="form-control" list="defect-moment-list" placeholder="Когда выявили?" autocomplete="off">
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label small fw-bold text-danger">Объем брака</label>
-                                <input type="text" id="r_defect_volume" class="form-control border-danger" placeholder="Напр: 5 м²" required>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label small fw-bold text-muted">Номера партий</label>
-                                <div id="batch-list" class="d-flex flex-column gap-1 mb-1">
-                                    <input type="text" class="form-control form-control-sm batch-input" placeholder="Номер партии">
-                                </div>
-                                <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none text-brand" onclick="addBatchInput()">+ Добавить</button>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label small fw-bold text-muted">Требование клиента</label>
-                                <input type="text" id="r_client_demand" class="form-control" list="client-demand-list" placeholder="Замена товара" autocomplete="off">
-                            </div>
-
-                            <div class="col-12">
-                                <label class="form-label small fw-bold text-muted">Подробное описание проблемы *</label>
-                                <textarea id="r_description" class="form-control" rows="3" placeholder="Сломаны замки, вздутие, царапины..." required></textarea>
-                            </div>
-                            
-                            <div class="col-12 mt-3">
-                                <label class="form-label small fw-bold text-muted">Фотографии / Видео брака</label>
-                                <div class="alert alert-warning py-1 small mb-2"><i class="bi bi-info-circle me-1"></i> Максимальный размер видео 8 МБ. Большие видео лучше отправлять ссылкой.</div>
-                                <div class="rec-media-actions">
-                                    <label class="rec-media-btn is-primary" for="r_camera"><i class="bi bi-camera-fill"></i><span>Сделать фото</span></label>
-                                    <label class="rec-media-btn" for="r_photos"><i class="bi bi-images"></i><span>Выбрать фото / видео</span></label>
-                                </div>
-                                <input type="file" id="r_camera" class="visually-hidden" accept="image/*" capture="environment">
-                                <input type="file" id="r_photos" class="visually-hidden" multiple accept="image/*, video/*">
-                                <div id="r_photos_preview" class="photo-preview-grid rec-media-preview"></div>
-                            </div>
                         </div>
+                        </details>
 
-                        <h6 id="rec-section-resolution" class="rec-section-title is-success"><span>05</span><div><strong>Решение и компенсация</strong><small>Официальный итог по обращению</small></div></h6>
+                        <h6 id="rec-section-resolution" class="rec-section-title is-success"><span>05</span><div><strong>Решение и компенсация</strong><small>Итог после проверки; не считается отправленным клиенту</small></div></h6>
                         <div class="row g-3 mb-3">
-                            <div class="col-md-9">
-                                <label class="form-label small fw-bold text-muted">Официальное решение (Видно клиенту)</label>
-                                <textarea id="r_resolution" class="form-control border-success" rows="2" placeholder="Например: Одобрена замена 2-х пачек."></textarea>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted">Результат рассмотрения</label>
+                                <select id="r_decision_type" class="form-select"><option value="">Пока не принято</option><option value="replacement">Замена товара</option><option value="compensation">Компенсация</option><option value="refund">Возврат средств</option><option value="no_defect">Дефект не подтверждён</option><option value="recommendation">Рекомендации по эксплуатации</option><option value="other">Другое</option></select>
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label small fw-bold text-muted">Текст решения для акта</label>
+                                <textarea id="r_resolution" class="form-control border-success" rows="2" placeholder="Например: По результатам проверки согласована замена 2 упаковок."></textarea>
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label small fw-bold text-success">Сумма компенсации (₸)</label>
@@ -616,9 +700,9 @@
                             </div>
                         </div>
 
-                        <h6 id="rec-section-notes" class="rec-section-title is-note"><span>06</span><div><strong>Служебные заметки</strong><small>Внутренние комментарии — в акт не печатаются</small></div></h6>
+                        <h6 id="rec-section-notes" class="rec-section-title is-note" data-permission="can_manage_reclamations"><span>06</span><div><strong>Служебные заметки</strong><small>Видны только сотрудникам с правом ведения рекламаций</small></div></h6>
                         <div class="row g-3 mb-3">
-                            <div class="col-12">
+                            <div class="col-12" data-permission="can_manage_reclamations">
                                 <textarea id="r_internal_notes" class="form-control bg-warning bg-opacity-10 border-warning" rows="2" placeholder="Скрытые комментарии для менеджеров..."></textarea>
                             </div>
                         </div>
@@ -684,3 +768,4 @@
     <script src="reclamations.js?v={{VER}}"></script>
 </body>
 </html>
+

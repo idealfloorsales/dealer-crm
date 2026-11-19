@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (mediaInput && !canManageReclamations) mediaInput.disabled = true;
         if (cameraInput && !canManageReclamations) cameraInput.disabled = true;
 
-        document.getElementById('r_date').value = new Date().toISOString().slice(0, 10);
+        document.getElementById('r_date').value = localDateInputValue();
 
         referenceDataPromise = Promise.allSettled([
             fetchDealers(),
@@ -49,6 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
         await fetchReclamations();
         renderList();
         setupPhotoUpload();
+        setupVolumeControls();
         setupFieldShortcuts();
         setupFormProgress();
     }
@@ -77,8 +78,52 @@ document.addEventListener('DOMContentLoaded', () => {
         return String(value ?? '').trim().toLowerCase().replace(/\s+/g,' ');
     }
 
+    const reclamationStatuses = {
+        new: 'Новая', inspection: 'Проверка', waiting_customer: 'Ждём данные',
+        waiting_expertise: 'Ждём экспертизу', decision_ready: 'Решение подготовлено',
+        closed: 'Закрыта', rejected: 'Отказано'
+    };
+    const problemTypeLabels = {
+        surface:'Повреждение поверхности / декора', lock:'Замок / соединение',
+        geometry:'Геометрия / размер планки', moisture:'Вздутие / влага',
+        color:'Цвет / оттенок', packaging:'Упаковка / маркировка', other:'Другое',
+        legacy:'Не классифицировано (старая запись)'
+    };
+    const decisionTypeLabels = {
+        replacement:'Замена товара', compensation:'Компенсация', refund:'Возврат средств',
+        no_defect:'Дефект не подтверждён', recommendation:'Рекомендации по эксплуатации', other:'Другое'
+    };
+
+    function getStatusCode(item) {
+        const status = String(item?.status || '').trim();
+        if (Object.prototype.hasOwnProperty.call(reclamationStatuses, status)) return status;
+        // Старые обращения не закрываем автоматически из-за заполненного текста решения.
+        return String(item?.resolution || '').trim() ? 'decision_ready' : 'new';
+    }
+
     function isResolved(item) {
-        return Boolean(String(item?.resolution || '').trim());
+        return ['closed', 'rejected'].includes(getStatusCode(item));
+    }
+
+    function isOverdue(item) {
+        if (!item?.dueDate || isResolved(item)) return false;
+        const due = new Date(`${item.dueDate}T00:00:00`);
+        if (Number.isNaN(due.getTime())) return false;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return due < today;
+    }
+
+    function formatRecDate(value) {
+        if (!value) return '—';
+        const date = new Date(`${String(value).slice(0,10)}T00:00:00`);
+        return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('ru-RU');
+    }
+
+    function localDateInputValue() {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        return now.toISOString().slice(0,10);
     }
 
     function mediaCount(item) {
@@ -146,8 +191,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 r.clientName, r.description, r.clientDemand
             ].filter(Boolean).join(' '));
             if (query && !blob.includes(query)) return false;
+            const currentStatus = getStatusCode(r);
             if (status === 'open' && isResolved(r)) return false;
             if (status === 'resolved' && !isResolved(r)) return false;
+            if (status === 'overdue' && !isOverdue(r)) return false;
+            if (reclamationStatuses[status] && currentStatus !== status) return false;
             const photos = mediaCount(r);
             if (media === 'with' && photos <= 0) return false;
             if (media === 'without' && photos > 0) return false;
@@ -171,15 +219,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const open = allReclamations.filter(r => !isResolved(r)).length;
         const resolved = total - open;
         const withoutMedia = allReclamations.filter(r => mediaCount(r) === 0).length;
-        const recent = allReclamations.filter(r => daysSince(r.createdAt || r.date) <= 30).length;
+        const overdue = allReclamations.filter(isOverdue).length;
 
         const cleanSearch = !normalize(searchInput?.value) && !dealerFilter?.value;
         const cards = [
             {key:'all',icon:'bi-collection',label:'Всего',value:total,foot:'в реестре',tone:'',active:cleanSearch && statusFilter?.value==='all' && mediaFilter?.value==='all' && dateFilterMode==='all'},
-            {key:'open',icon:'bi-hourglass-split',label:'В работе',value:open,foot:'без решения',tone:open?'warn':'',active:statusFilter?.value==='open' && dateFilterMode==='all'},
-            {key:'resolved',icon:'bi-check2-circle',label:'Решено',value:resolved,foot:'закрытые обращения',tone:'good',active:statusFilter?.value==='resolved' && dateFilterMode==='all'},
+            {key:'open',icon:'bi-hourglass-split',label:'В работе',value:open,foot:'ещё не закрыты',tone:open?'warn':'',active:statusFilter?.value==='open' && dateFilterMode==='all'},
+            {key:'overdue',icon:'bi-alarm',label:'Просрочено',value:overdue,foot:'следующий шаг уже должен быть',tone:overdue?'risk':'',active:statusFilter?.value==='overdue' && dateFilterMode==='all'},
+            {key:'resolved',icon:'bi-check2-circle',label:'Закрыто',value:resolved,foot:'закрытые обращения',tone:'good',active:statusFilter?.value==='resolved' && dateFilterMode==='all'},
             {key:'without-media',icon:'bi-camera',label:'Без фото',value:withoutMedia,foot:'нужно проверить',tone:withoutMedia?'risk':'',active:mediaFilter?.value==='without' && dateFilterMode==='all'},
-            {key:'recent',icon:'bi-calendar3',label:'За 30 дней',value:recent,foot:'новые обращения',tone:'',active:dateFilterMode==='recent'}
         ];
 
         kpiHost.innerHTML = cards.map(card => `
@@ -194,9 +242,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const key = btn.dataset.recKpi;
                 if (searchInput) searchInput.value = '';
                 if (dealerFilter) dealerFilter.value = '';
-                if (statusFilter) statusFilter.value = key === 'open' ? 'open' : key === 'resolved' ? 'resolved' : 'all';
+                if (statusFilter) statusFilter.value = key === 'open' ? 'open' : key === 'resolved' ? 'resolved' : key === 'overdue' ? 'overdue' : 'all';
                 if (mediaFilter) mediaFilter.value = key === 'without-media' ? 'without' : 'all';
-                dateFilterMode = key === 'recent' ? 'recent' : 'all';
+                dateFilterMode = 'all';
                 renderList();
             });
         });
@@ -207,7 +255,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const status = statusFilter?.value || 'all';
         const media = mediaFilter?.value || 'all';
         if (status === 'open') parts.push('В работе');
-        else if (status === 'resolved') parts.push('Решено');
+        else if (status === 'resolved') parts.push('Закрытые');
+        else if (status === 'overdue') parts.push('Просрочено');
+        else if (reclamationStatuses[status]) parts.push(reclamationStatuses[status]);
         else parts.push('Все рекламации');
         if (media === 'with') parts.push('с медиа');
         if (media === 'without') parts.push('без медиа');
@@ -239,6 +289,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const dateStr = Number.isNaN(dateObj.getTime()) ? '—' : dateObj.toLocaleDateString('ru-RU');
             const photos = mediaCount(r);
             const resolved = isResolved(r);
+            const statusCode = getStatusCode(r);
+            const statusText = reclamationStatuses[statusCode] || 'В работе';
+            const overdue = isOverdue(r);
             const seq = sequenceMap.get(String(r.id)) || 0;
             const age = daysSince(r.createdAt || r.date);
             const ageText = !resolved && age > 0 ? `${age} дн. в работе` : dateStr;
@@ -246,6 +299,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const description = r.description || 'Описание не заполнено';
             const purchased = r.purchasedVolume || '—';
             const defect = r.defectVolume || '—';
+            const workflowMeta = [
+                r.assignedToName ? `<span><i class="bi bi-person"></i> ${escapeHtml(r.assignedToName)}</span>` : '',
+                r.dueDate ? `<span class="${overdue?'is-overdue':''}"><i class="bi bi-calendar-event"></i> ${overdue?'Просрочено · ':''}${escapeHtml(formatRecDate(r.dueDate))}</span>` : ''
+            ].filter(Boolean).join('');
             return `
                 <article class="reclamation-card" data-reclamation-id="${escapeHtml(r.id)}">
                     <div class="rec-card">
@@ -256,12 +313,13 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <small>${escapeHtml(dateStr)}${r.invoiceNumber ? ' · Накл. '+escapeHtml(r.invoiceNumber) : ''}</small>
                             </div>
                         </div>
-                        <span class="rec-status ${resolved?'is-resolved':''}"><i class="bi ${resolved?'bi-check2-circle':'bi-hourglass-split'}"></i>${resolved?'Решено':'В работе'}</span>
+                        <span class="rec-status is-${statusCode} ${overdue?'is-overdue':''}"><i class="bi ${resolved?'bi-check2-circle':overdue?'bi-alarm':'bi-hourglass-split'}"></i>${escapeHtml(statusText)}</span>
                         <div class="rec-card-product">
                             <strong>${escapeHtml(product)}</strong>
                             <small><span>Куплено: <b>${escapeHtml(purchased)}</b></span><span>Брак: <b>${escapeHtml(defect)}</b></span></small>
                         </div>
                         <div class="rec-card-problem">${escapeHtml(description)}</div>
+                        ${!resolved ? `<div class="rec-card-next ${r.nextAction?'':'is-missing'}"><strong><i class="bi ${r.nextAction?'bi-arrow-return-right':'bi-exclamation-circle'}"></i> ${r.nextAction?'Следующий шаг':'Нет следующего шага'}</strong><span>${r.nextAction?escapeHtml(r.nextAction):'Добавьте действие, чтобы обращение не потерялось.'}</span>${workflowMeta?`<small>${workflowMeta}</small>`:''}</div>` : ''}
                         <div class="rec-card-foot">
                             <span class="rec-card-demand">${escapeHtml(r.clientDemand || 'Требование не указано')}</span>
                             <span class="rec-card-meta">
@@ -305,6 +363,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.querySelectorAll('[data-rec-target]').forEach(item => item.classList.toggle('active', item === button));
                 const target = document.querySelector(button.dataset.recTarget);
                 if (!target) return;
+                if (target instanceof HTMLDetailsElement) target.open = true;
                 target.scrollIntoView({behavior:'smooth', block:'start'});
                 if (target.matches('input,textarea,select')) setTimeout(() => target.focus({preventScroll:true}), 180);
             });
@@ -312,7 +371,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateFormProgress() {
-        const requiredIds = ['r_dealer','r_date','r_product','r_purchased_volume','r_defect_volume','r_description'];
+        const requiredIds = ['r_dealer','r_date','r_product','r_problem_type','r_description'];
         const completed = requiredIds.filter(id => String(document.getElementById(id)?.value || '').trim()).length;
         const percent = Math.round((completed / requiredIds.length) * 100);
         const bar = document.getElementById('rec-form-progress-bar');
@@ -338,6 +397,95 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 50);
     }
 
+    function setSelectValue(id, value) {
+        const select = document.getElementById(id);
+        if (!select) return;
+        const normalized = String(value ?? '');
+        if (normalized && !Array.from(select.options).some(option => option.value === normalized)) {
+            const option = document.createElement('option');
+            option.value = normalized;
+            option.textContent = normalized;
+            option.dataset.legacyValue = 'true';
+            select.appendChild(option);
+        }
+        select.value = normalized;
+    }
+
+    function clearLegacySelectOptions() {
+        document.querySelectorAll('option[data-legacy-value="true"]').forEach(option => option.remove());
+    }
+
+    const volumeUnits = { m2:'м²', pack:'уп.', piece:'шт.' };
+    function formatVolumeValue(quantity, unit) {
+        const amount = Number(String(quantity).replace(',', '.'));
+        if (!Number.isFinite(amount) || !volumeUnits[unit]) return '';
+        return `${new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(amount)} ${volumeUnits[unit]}`;
+    }
+
+    function syncVolumeField(prefix) {
+        const quantity = document.getElementById(`r_${prefix}_quantity`);
+        const unit = document.getElementById(`r_${prefix}_unit`);
+        const legacy = document.getElementById(`r_${prefix}_legacy`);
+        const output = document.getElementById(`r_${prefix}_volume`);
+        const hasQuantity = String(quantity.value || '').trim() !== '';
+        if (hasQuantity) {
+            output.value = formatVolumeValue(quantity.value, unit.value);
+            legacy.value = '';
+            legacy.classList.add('d-none');
+        } else {
+            output.value = legacy.value.trim();
+        }
+    }
+
+    function parseVolumeText(value) {
+        const match = String(value || '').trim().match(/^(\d+(?:[.,]\d+)?)\s*(.*)$/);
+        if (!match || !match[2]) return null;
+        const suffix = match[2].trim().toLowerCase();
+        let unit = '';
+        if (/^(?:м(?:²|2)|кв\.?\s*м(?:етр(?:а|ов)?)?\.?)$/i.test(suffix)) unit = 'm2';
+        else if (/^(?:уп\.?|упаков(?:ка|ки|ок)?|пач(?:ка|ки|ек)?|короб(?:ка|ки|ок)?)$/i.test(suffix)) unit = 'pack';
+        else if (/^(?:шт\.?|штук(?:а|и)?|планк(?:а|и|у|и))$/i.test(suffix)) unit = 'piece';
+        if (!unit) return null;
+        return { quantity:match[1].replace(',', '.'), unit };
+    }
+
+    function setVolumeField(prefix, rawValue, quantityValue, unitValue) {
+        const quantity = document.getElementById(`r_${prefix}_quantity`);
+        const unit = document.getElementById(`r_${prefix}_unit`);
+        const legacy = document.getElementById(`r_${prefix}_legacy`);
+        const storedQuantity = quantityValue !== undefined && quantityValue !== null && quantityValue !== '' ? Number(quantityValue) : NaN;
+        const parsed = Number.isFinite(storedQuantity) && volumeUnits[unitValue] ? {quantity:String(storedQuantity),unit:unitValue} : parseVolumeText(rawValue);
+        quantity.value = '';
+        legacy.value = '';
+        legacy.classList.add('d-none');
+        if (parsed) {
+            quantity.value = parsed.quantity;
+            unit.value = parsed.unit;
+        } else if (String(rawValue || '').trim()) {
+            legacy.value = String(rawValue);
+            legacy.classList.remove('d-none');
+        }
+        syncVolumeField(prefix);
+    }
+
+    function resetVolumeField(prefix) {
+        document.getElementById(`r_${prefix}_quantity`).value = '';
+        document.getElementById(`r_${prefix}_unit`).value = 'm2';
+        const legacy = document.getElementById(`r_${prefix}_legacy`);
+        legacy.value = '';
+        legacy.classList.add('d-none');
+        syncVolumeField(prefix);
+    }
+
+    function setupVolumeControls() {
+        ['purchased','defect'].forEach(prefix => {
+            ['quantity','unit','legacy'].forEach(part => {
+                document.getElementById(`r_${prefix}_${part}`)?.addEventListener('input', () => syncVolumeField(prefix));
+                document.getElementById(`r_${prefix}_${part}`)?.addEventListener('change', () => syncVolumeField(prefix));
+            });
+        });
+    }
+
     window.addBatchInput = function() {
         const container = document.getElementById('batch-list');
         container.insertAdjacentHTML('beforeend', `<input type="text" class="form-control form-control-sm batch-input mt-1" placeholder="Номер партии">`);
@@ -347,9 +495,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!canManageReclamations) return;
         if (referenceDataPromise) await referenceDataPromise;
         form.reset();
+        resetVolumeField('purchased');
+        resetVolumeField('defect');
+        clearLegacySelectOptions();
         document.getElementById('r_id').value = ''; 
         document.getElementById('add-modal-title').textContent = 'Оформление рекламации';
-        document.getElementById('r_date').value = new Date().toISOString().slice(0, 10);
+        document.getElementById('r_date').value = localDateInputValue();
+        document.getElementById('r_status').value = 'new';
+        document.getElementById('r_assigned_to').value = String(window.CRMAuth?.user?.fullName || window.CRMAuth?.user?.username || '');
+        document.getElementById('rec-tech-details').open = false;
         uploadedPhotos = [];
         renderPhotoPreviews();
         document.getElementById('batch-list').innerHTML = `<input type="text" class="form-control form-control-sm batch-input" placeholder="Номер партии">`;
@@ -372,7 +526,16 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('r_id').value = r.id; 
         document.getElementById('add-modal-title').textContent = 'Редактирование рекламации';
         
-        document.getElementById('r_dealer').value = r.dealerId || '';
+        clearLegacySelectOptions();
+        const dealerSelect = document.getElementById('r_dealer');
+        if (r.dealerId && !Array.from(dealerSelect.options).some(option => option.value === String(r.dealerId))) {
+            const option = document.createElement('option');
+            option.value = String(r.dealerId);
+            option.textContent = `${r.dealerName || 'Дилер из старой рекламации'} · архивная запись`;
+            option.dataset.legacyValue = 'true';
+            dealerSelect.appendChild(option);
+        }
+        dealerSelect.value = r.dealerId || '';
         document.getElementById('r_date').value = r.date || '';
         document.getElementById('r_product').value = r.productName || '';
         document.getElementById('r_invoice').value = r.invoiceNumber || '';
@@ -384,7 +547,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('r_floor').value = r.floor || '';
         document.getElementById('r_house_type').value = r.houseType || '';
         document.getElementById('r_total_area').value = r.totalArea || '';
-        document.getElementById('r_purchased_volume').value = r.purchasedVolume || '';
+        setVolumeField('purchased', r.purchasedVolume, r.purchasedQuantity, r.purchasedUnit);
+        setVolumeField('defect', r.defectVolume, r.defectQuantity, r.defectUnit);
         
         document.getElementById('r_base_type').value = r.baseType || '';
         document.getElementById('r_underlayment').value = r.underlayment || '';
@@ -396,20 +560,33 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('r_drying_time').value = r.dryingTime || '';
         document.getElementById('r_floor_flatness').value = r.floorFlatness || '';
 
-        document.getElementById('r_defect_moment').value = r.defectMoment || '';
-        document.getElementById('r_defect_volume').value = r.defectVolume || '';
+        setSelectValue('r_defect_moment', r.defectMoment || '');
         document.getElementById('r_description').value = r.description || '';
-        document.getElementById('r_client_demand').value = r.clientDemand || '';
+        setSelectValue('r_client_demand', r.clientDemand || '');
+        document.getElementById('r_claimant_type').value = r.claimantType || 'dealer';
+        document.getElementById('r_problem_type').value = r.problemType || 'legacy';
+        document.getElementById('r_status').value = getStatusCode(r);
+        document.getElementById('r_assigned_to').value = r.assignedToName || '';
+        document.getElementById('r_due_date').value = r.dueDate || '';
+        document.getElementById('r_next_action').value = r.nextAction || '';
+        document.getElementById('r_waiting_for').value = r.waitingFor || '';
+        document.getElementById('r_confirmed_cause').value = r.confirmedCause || '';
+        document.getElementById('r_cause_confidence').value = r.causeConfidence || 'unknown';
+        document.getElementById('r_inspected_date').value = r.inspectedDate || '';
         
         document.getElementById('r_resolution').value = r.resolution || '';
+        document.getElementById('r_decision_type').value = r.decisionType || '';
         document.getElementById('r_compensation_amount').value = r.compensationAmount || '';
         document.getElementById('r_internal_notes').value = r.internalNotes || '';
+        document.getElementById('rec-tech-details').open = Boolean(r.baseType || r.underlayment || r.warmFloor || r.installer || r.acclimatization || r.storageMethod || r.dryingTime || r.floorFlatness || r.confirmedCause);
 
         const batchContainer = document.getElementById('batch-list');
         batchContainer.innerHTML = '';
         if(r.batchNumbers && r.batchNumbers.length > 0) {
             r.batchNumbers.forEach(bn => {
-                batchContainer.insertAdjacentHTML('beforeend', `<input type="text" class="form-control form-control-sm batch-input mt-1" value="${bn}">`);
+                const input = document.createElement('input');
+                input.type = 'text'; input.className = 'form-control form-control-sm batch-input mt-1'; input.value = bn;
+                batchContainer.appendChild(input);
             });
         } else {
             batchContainer.innerHTML = `<input type="text" class="form-control form-control-sm batch-input" placeholder="Номер партии">`;
@@ -505,6 +682,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const dealerSelect = document.getElementById('r_dealer');
         const dealerName = dealerSelect.options[dealerSelect.selectedIndex].text.split(' (')[0];
         const batchInputs = Array.from(document.querySelectorAll('.batch-input')).map(i => i.value.trim()).filter(Boolean);
+        const decisionType = document.getElementById('r_decision_type').value;
+        const resolution = document.getElementById('r_resolution').value.trim();
+        const selectedStatus = document.getElementById('r_status').value;
+        syncVolumeField('purchased');
+        syncVolumeField('defect');
+
+        if (selectedStatus === 'closed' && !decisionType && !resolution) {
+            if (window.CRMUI?.toast) CRMUI.toast('Чтобы закрыть рекламацию, укажите результат рассмотрения или текст решения.','error');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check-lg"></i><span>Сохранить рекламацию</span>';
+            document.getElementById('r_decision_type').focus();
+            document.getElementById('rec-section-resolution').scrollIntoView({behavior:'smooth',block:'start'});
+            return;
+        }
 
         // Формируем чистый массив фото для базы (сервер ждет { photo_url: '...' })
         const dbPhotos = uploadedPhotos.map(p => ({ photo_url: p.photo_url }));
@@ -524,6 +715,10 @@ document.addEventListener('DOMContentLoaded', () => {
             houseType: document.getElementById('r_house_type').value,
             totalArea: document.getElementById('r_total_area').value,
             purchasedVolume: document.getElementById('r_purchased_volume').value,
+            purchasedQuantity: String(document.getElementById('r_purchased_quantity').value || '').trim() ? Number(String(document.getElementById('r_purchased_quantity').value).replace(',', '.')) : null,
+            purchasedUnit: String(document.getElementById('r_purchased_quantity').value || '').trim() ? document.getElementById('r_purchased_unit').value : '',
+            defectQuantity: String(document.getElementById('r_defect_quantity').value || '').trim() ? Number(String(document.getElementById('r_defect_quantity').value).replace(',', '.')) : null,
+            defectUnit: String(document.getElementById('r_defect_quantity').value || '').trim() ? document.getElementById('r_defect_unit').value : '',
             
             baseType: document.getElementById('r_base_type').value,
             underlayment: document.getElementById('r_underlayment').value,
@@ -540,8 +735,19 @@ document.addEventListener('DOMContentLoaded', () => {
             defectVolume: document.getElementById('r_defect_volume').value,
             description: document.getElementById('r_description').value,
             clientDemand: document.getElementById('r_client_demand').value,
+            claimantType: document.getElementById('r_claimant_type').value,
+            problemType: document.getElementById('r_problem_type').value,
+            status: selectedStatus,
+            assignedToName: document.getElementById('r_assigned_to').value.trim(),
+            nextAction: document.getElementById('r_next_action').value.trim(),
+            dueDate: document.getElementById('r_due_date').value,
+            waitingFor: document.getElementById('r_waiting_for').value,
+            confirmedCause: document.getElementById('r_confirmed_cause').value.trim(),
+            causeConfidence: document.getElementById('r_cause_confidence').value,
+            inspectedDate: document.getElementById('r_inspected_date').value,
             
-            resolution: document.getElementById('r_resolution').value,
+            resolution,
+            decisionType,
             compensationAmount: parseFloat(document.getElementById('r_compensation_amount').value) || 0,
             internalNotes: document.getElementById('r_internal_notes').value,
 
@@ -549,7 +755,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const method = id ? 'PUT' : 'POST';
-        const url = id ? `/api/reclamations/${id}` : '/api/reclamations';
+        const url = id ? `/api/reclamations/${encodeURIComponent(id)}` : '/api/reclamations';
 
         try {
             const res = await fetch(url, { method: method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
@@ -557,8 +763,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 await fetchReclamations();
                 renderList();
                 addModal.hide();
-            } else { alert("Ошибка сохранения. Возможно размер видео слишком большой."); }
-        } catch(err) { alert(err.message); }
+            } else {
+                const payload = await res.json().catch(() => ({}));
+                throw new Error(payload.error || 'Не удалось сохранить рекламацию. Проверьте размер вложений и обязательные поля.');
+            }
+        } catch(err) {
+            if (window.CRMUI?.toast) CRMUI.toast(err.message,'error');
+            else alert(err.message);
+        }
         finally { btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg"></i><span>Сохранить рекламацию</span>'; }
     });
 
@@ -637,58 +849,79 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const pDate = r.purchaseDate ? new Date(r.purchaseDate).toLocaleDateString('ru-RU') : '-';
+        const statusCode = getStatusCode(r);
+        const statusText = reclamationStatuses[statusCode] || 'В работе';
+        const legacyResolutionNote = !r.status && String(r.resolution || '').trim()
+            ? '<div class="rec-legacy-status-note"><i class="bi bi-info-circle"></i> В старой записи есть текст решения. Этап «Закрыта» не назначен автоматически — проверьте и подтвердите его вручную.</div>'
+            : '';
+        const historyHtml = (Array.isArray(r.statusHistory) ? r.statusHistory : []).slice().reverse().map(entry => `
+            <li><span>${escapeHtml(reclamationStatuses[entry.status] || entry.status || 'Обновление')}</span><small>${escapeHtml(entry.byName || 'Сотрудник')} · ${escapeHtml(entry.at ? new Date(entry.at).toLocaleString('ru-RU') : 'дата не указана')}</small></li>
+        `).join('');
+        const nextActionHtml = r.nextAction
+            ? `<div class="rec-view-next"><strong>Следующее действие</strong><span>${escapeHtml(r.nextAction)}</span></div>`
+            : (!isResolved(r) ? '<div class="rec-view-next is-missing"><strong>Следующее действие не назначено</strong><span>Добавьте конкретный шаг и дату, чтобы не потерять обращение.</span></div>' : '');
+        const workflowHtml = `<div class="card rec-view-workflow mb-3"><div class="card-body p-3">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2"><span class="rec-status is-${statusCode} ${isOverdue(r)?'is-overdue':''}">${escapeHtml(statusText)}</span><span class="small text-muted">${r.assignedToName ? `Ответственный: <b>${escapeHtml(r.assignedToName)}</b>` : 'Ответственный не назначен'}${r.dueDate ? ` · Следующий шаг до <b>${escapeHtml(formatRecDate(r.dueDate))}</b>` : ''}</span></div>
+            ${legacyResolutionNote}${nextActionHtml}${historyHtml ? `<details class="rec-status-history mt-3"><summary>История статусов (${(r.statusHistory || []).length})</summary><ol>${historyHtml}</ol></details>` : ''}
+        </div></div>`;
+        const claimantLabel = r.claimantType === 'customer' ? 'Конечный клиент' : 'Дилер';
+        const problemTypeLabel = problemTypeLabels[r.problemType] || r.problemType || 'Не указано';
+        const causeConfidenceLabel = r.causeConfidence === 'confirmed' ? 'Подтверждено проверкой' : r.causeConfidence === 'possible' ? 'Предположение' : 'Не проверено';
 
         document.getElementById('view-body').innerHTML = `
+            ${workflowHtml}
             <div class="card border-0 mb-3"><div class="card-body p-3">
                 <p class="mb-1 small text-muted">Товар / Артикул</p>
-                <h5 class="fw-bold text-dark">${r.productName}</h5>
+                <h5 class="fw-bold text-dark">${escapeHtml(r.productName || '—')}</h5>
                 <div class="d-flex gap-4 mt-3">
-                    <div><small class="text-muted d-block">Куплено:</small><span class="fw-bold fs-6">${r.purchasedVolume || '-'}</span></div>
-                    <div><small class="text-danger d-block">Брак заявлен:</small><span class="fw-bold fs-6 text-danger">${r.defectVolume || '-'}</span></div>
-                    <div><small class="text-muted d-block">Площадь объекта:</small><span class="fw-bold fs-6">${r.totalArea || '-'}</span></div>
+                    <div><small class="text-muted d-block">Куплено:</small><span class="fw-bold fs-6">${escapeHtml(r.purchasedVolume || '-')}</span></div>
+                    <div><small class="text-danger d-block">Брак заявлен:</small><span class="fw-bold fs-6 text-danger">${escapeHtml(r.defectVolume || '-')}</span></div>
+                    <div><small class="text-muted d-block">Площадь объекта:</small><span class="fw-bold fs-6">${escapeHtml(r.totalArea || '-')}</span></div>
                 </div>
             </div></div>
 
             <div class="card border-0 mb-3"><div class="card-body p-3">
                 <h6 class="fw-bold border-bottom pb-2 mb-2 text-brand">Данные покупки и клиент</h6>
                 <div class="row g-2 small">
-                    <div class="col-6"><span class="text-muted">Накладная:</span> <br><b>${r.invoiceNumber || '-'}</b></div>
+                    <div class="col-6"><span class="text-muted">Накладная:</span> <br><b>${escapeHtml(r.invoiceNumber || '-')}</b></div>
                     <div class="col-6"><span class="text-muted">Дата покупки:</span> <br><b>${pDate}</b></div>
-                    <div class="col-12 mt-2"><span class="text-muted">Клиент:</span> <b>${r.clientName || '-'}</b> ${r.clientPhone ? `(${r.clientPhone})` : ''}</div>
-                    <div class="col-12"><span class="text-muted">Адрес:</span> <b>${r.address || '-'}</b> ${r.floor ? `, этаж ${r.floor}` : ''}</div>
+                    <div class="col-12 mt-2"><span class="text-muted">Обратился:</span> <b>${escapeHtml(claimantLabel)}</b></div>
+                    <div class="col-12"><span class="text-muted">Клиент:</span> <b>${escapeHtml(r.clientName || '-')}</b> ${r.clientPhone ? `(${escapeHtml(r.clientPhone)})` : ''}</div>
+                    <div class="col-12"><span class="text-muted">Адрес:</span> <b>${escapeHtml(r.address || '-')}</b> ${r.floor ? `, этаж ${escapeHtml(r.floor)}` : ''}</div>
                 </div>
             </div></div>
 
             <div class="card border-0 mb-3"><div class="card-body p-3">
                 <h6 class="fw-bold border-bottom pb-2 mb-2 text-brand">Технические данные</h6>
                 <div class="row g-2 small">
-                    <div class="col-6"><span class="text-muted">Тип дома:</span> <br><b>${r.houseType || '-'}</b></div>
-                    <div class="col-6"><span class="text-muted">Монтаж:</span> <br><b>${r.installer || '-'}</b></div>
-                    <div class="col-6"><span class="text-muted">Основание:</span> <br><b>${r.baseType || '-'}</b></div>
-                    <div class="col-6"><span class="text-muted">Теплый пол:</span> <br><b class="${r.warmFloor && r.warmFloor !== 'Нет' ? 'text-danger' : ''}">${r.warmFloor || '-'}</b></div>
+                    <div class="col-6"><span class="text-muted">Тип дома:</span> <br><b>${escapeHtml(r.houseType || '-')}</b></div>
+                    <div class="col-6"><span class="text-muted">Монтаж:</span> <br><b>${escapeHtml(r.installer || '-')}</b></div>
+                    <div class="col-6"><span class="text-muted">Основание:</span> <br><b>${escapeHtml(r.baseType || '-')}</b></div>
+                    <div class="col-6"><span class="text-muted">Теплый пол:</span> <br><b class="${r.warmFloor && r.warmFloor !== 'Нет' ? 'text-danger' : ''}">${escapeHtml(r.warmFloor || '-')}</b></div>
                     
-                    <div class="col-6"><span class="text-muted">Сушка пола:</span> <br><b>${r.dryingTime || '-'}</b></div>
-                    <div class="col-6"><span class="text-muted">Ровность (Перепад):</span> <br><b>${r.floorFlatness || '-'}</b></div>
-                    <div class="col-6"><span class="text-muted">Акклиматизация:</span> <br><b>${r.acclimatization || '-'}</b></div>
-                    <div class="col-6"><span class="text-muted">Способ хранения:</span> <br><b class="${r.storageMethod === 'Вертикально (Запрещено)' ? 'text-danger' : ''}">${r.storageMethod || '-'}</b></div>
+                    <div class="col-6"><span class="text-muted">Сушка пола:</span> <br><b>${escapeHtml(r.dryingTime || '-')}</b></div>
+                    <div class="col-6"><span class="text-muted">Ровность (Перепад):</span> <br><b>${escapeHtml(r.floorFlatness || '-')}</b></div>
+                    <div class="col-6"><span class="text-muted">Акклиматизация:</span> <br><b>${escapeHtml(r.acclimatization || '-')}</b></div>
+                    <div class="col-6"><span class="text-muted">Способ хранения:</span> <br><b class="${r.storageMethod === 'Вертикально (Запрещено)' ? 'text-danger' : ''}">${escapeHtml(r.storageMethod || '-')}</b></div>
 
-                    <div class="col-12"><span class="text-muted">Подложка:</span> <b>${r.underlayment || '-'}</b></div>
-                    <div class="col-12"><span class="text-muted">Партии:</span> <b>${(r.batchNumbers||[]).join(', ') || '-'}</b></div>
+                    <div class="col-12"><span class="text-muted">Подложка:</span> <b>${escapeHtml(r.underlayment || '-')}</b></div>
+                    <div class="col-12"><span class="text-muted">Партии:</span> <b>${escapeHtml((r.batchNumbers||[]).join(', ') || '-')}</b></div>
                 </div>
             </div></div>
 
             <div class="card border-0 mb-3"><div class="card-body p-3">
                 <h6 class="fw-bold border-bottom pb-2 mb-2 text-brand">Суть проблемы</h6>
-                <p class="small text-muted mb-1">Выявлено: <b>${r.defectMoment || '-'}</b></p>
-                <p class="small mb-2">${r.description}</p>
-                <div class="p-2 bg-light rounded text-dark small fw-bold mb-2">Требование: ${r.clientDemand || '-'}</div>
+                <p class="small text-muted mb-1">Категория: <b>${escapeHtml(problemTypeLabel)}</b> · Выявлено: <b>${escapeHtml(r.defectMoment || '-')}</b></p>
+                <p class="small mb-2">${escapeHtml(r.description || 'Описание не заполнено')}</p>
+                <div class="p-2 bg-light rounded text-dark small fw-bold mb-2">Требование: ${escapeHtml(r.clientDemand || '-')}</div>
+                ${r.confirmedCause ? `<div class="rec-cause-note"><small>Вывод проверки · ${escapeHtml(causeConfidenceLabel)}</small><p>${escapeHtml(r.confirmedCause)}</p></div>` : ''}
             </div></div>
 
-            ${r.internalNotes ? `
+            ${canManageReclamations && r.internalNotes ? `
             <div class="card border-0 mb-3" style="background-color: #fff3cd; border-left: 4px solid #ffc107 !important;">
                 <div class="card-body p-3">
                     <h6 class="fw-bold text-warning-emphasis mb-1"><i class="bi bi-lock-fill"></i> Служебные заметки</h6>
-                    <p class="small mb-0 text-dark">${r.internalNotes}</p>
+                    <p class="small mb-0 text-dark">${escapeHtml(r.internalNotes)}</p>
                 </div>
             </div>` : ''}
 
@@ -696,9 +929,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="card-body p-3">
                     <div class="d-flex justify-content-between align-items-start">
                         <h6 class="fw-bold text-success mb-2">Принятое решение</h6>
-                        ${r.compensationAmount ? `<span class="badge bg-success fs-6">${r.compensationAmount} ₸</span>` : ''}
+                        ${r.compensationAmount ? `<span class="badge bg-success fs-6">${escapeHtml(r.compensationAmount)} ₸</span>` : ''}
                     </div>
-                    <p class="small mb-0 text-dark fw-medium">${r.resolution ? r.resolution : '<span class="text-muted fw-normal fst-italic">Решение еще не заполнено...</span>'}</p>
+                    ${r.decisionType ? `<p class="small text-muted mb-1">Результат: ${escapeHtml(decisionTypeLabels[r.decisionType] || r.decisionType)}</p>` : ''}
+                    <p class="small mb-0 text-dark fw-medium">${r.resolution ? escapeHtml(r.resolution) : '<span class="text-muted fw-normal fst-italic">Решение еще не заполнено...</span>'}</p>
                 </div>
             </div>
 
@@ -763,6 +997,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const purchaseDate = hasValue(d.purchaseDate) ? new Date(d.purchaseDate).toLocaleDateString('ru-RU') : '';
         const batchNumbers = Array.isArray(d.batchNumbers) ? d.batchNumbers.join(', ') : (d.batchNumbers || '');
         const totalArea = hasValue(d.totalArea) ? String(d.totalArea) + ' м²' : '';
+        const claimantLabel = d.claimantType === 'customer' ? 'Конечный клиент' : 'Дилер';
+        const issueLabel = problemTypeLabels[d.problemType] || d.problemType || '';
 
         return [
             '<div class="print-document">',
@@ -796,8 +1032,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 '<section class="print-section">',
                     sectionTitle(2, 'Клиент и объект'),
                     '<div class="print-fields">',
-                        field('ФИО клиента', d.clientName, 7),
-                        field('Телефон', d.clientPhone, 5),
+                        field('ФИО клиента', d.clientName, 5),
+                        field('Телефон', d.clientPhone, 3),
+                        field('Кто обратился', claimantLabel, 4),
                         field('Адрес объекта', d.address, 12),
                         field('Тип помещения', d.houseType, 4),
                         field('Этаж', d.floor, 2),
@@ -823,6 +1060,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 '<section class="print-section">',
                     sectionTitle(4, 'Дефект и требование клиента'),
                     '<div class="print-fields">',
+                        field('Тип дефекта', issueLabel, 6),
                         field('Когда выявлен дефект', d.defectMoment, 6),
                         field('Объём заявленного брака', d.defectVolume, 6),
                     '</div>',
@@ -864,3 +1102,4 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.classList.remove('printing');
     };
 });
+
