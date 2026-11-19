@@ -70,7 +70,7 @@
             .sig-text { font-size: 12px; text-align: center; color: #555; }
 
             /* Real A4 print layout: never shrink the whole form to fit over-wide flex rows. */
-            html,body.printing {width:auto!important;min-width:0!important;height:auto!important;overflow:visible!important}
+            html,body.printing {width:auto!important;min-width:0!important;height:auto!important;overflow:visible!important;zoom:1!important;transform:none!important;transform-origin:top left!important}
             body.printing #printable-area {
                 position:static!important;
                 display:block!important;
