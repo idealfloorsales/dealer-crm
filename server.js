@@ -327,7 +327,7 @@ async function seedUsers() {
 // ==========================================
 const authMiddleware = (req, res, next) => {
     if (req.method === 'OPTIONS') return next(); 
-    if (req.path === '/api/auth/login' || req.path === '/api/public/telegram' || req.path.startsWith('/api/public/price-share/') || req.path.startsWith('/api/public/offers/') || !req.path.startsWith('/api')) return next();
+    if (req.path === '/api/auth/login' || req.path === '/api/public/telegram' || req.path.startsWith('/api/public/price-share/') || req.path.startsWith('/api/public/offers/') || req.path === '/api/instagram/callback' || !req.path.startsWith('/api')) return next();
 
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; 
@@ -1442,6 +1442,7 @@ const MotivationScheme = mongoose.model('MotivationScheme', motivationSchemeSche
 
 const dealerSchema = new mongoose.Schema({ dealer_id: String, name: String, price_type: String, price_list: { type: mongoose.Schema.Types.ObjectId, ref: 'PriceList', default: null }, motivation_scheme: { type: mongoose.Schema.Types.ObjectId, ref: 'MotivationScheme', default: null }, city: String, address: String, contacts: [contactSchema], bonuses: String, photos: [photoSchema], legal_entities: [dealerLegalEntitySchema], contract: { isSigned: Boolean, date: String }, region_sector: String, hasPersonalPlan: { type: Boolean, default: false }, delivery: String, website: String, instagram: String, additional_addresses: [additionalAddressSchema], pos_materials: [posMaterialSchema], visits: [visitSchema], products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }], latitude: Number, longitude: Number, geoUpdatedAt: Date, geoSource: String, status: { type: String, default: 'standard' }, avatarUrl: String, competitors: [competitorSchema], responsible: String, responsibleUserId: String, responsibleAssignmentSource: String }, { timestamps: true });
 const Dealer = mongoose.model('Dealer', dealerSchema);
+require('./server/instagram-monitor').install({app,mongoose,Dealer,User,requireAdmin,requirePermission,getDealerFilter,origin:APP_ORIGIN});
 
 const priceListRowSchema = new mongoose.Schema({
     scopeType: { type: String, enum: ['collection', 'product'], default: 'product' },
