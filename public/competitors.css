@@ -578,3 +578,8 @@ html,body.competitors-page{max-width:100%;overflow-x:hidden}
 @media(max-width:600px){
   .competitors-grid.is-list .competitor-card-metrics{min-width:0;flex:1 1 100%}
 }
+
+
+/* Collection picker for dealer competitor presence */
+.dealer-presence-line .form-control,.dealer-presence-line .form-select{min-height:38px;border-radius:9px;font-size:.72rem}
+.dealer-presence-line .form-select{padding-right:28px}
