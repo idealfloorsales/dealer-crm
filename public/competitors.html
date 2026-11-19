@@ -115,6 +115,7 @@
                 <div id="quick-filters" class="competitors-quick-filters">
                     <button type="button" class="active" data-quick="all">Все</button>
                     <button type="button" data-quick="important"><i class="bi bi-exclamation-diamond"></i>Важные</button>
+                    <button type="button" data-quick="main"><i class="bi bi-star-fill"></i>Главные конкуренты</button>
                     <button type="button" data-quick="overdue"><i class="bi bi-clock-history"></i>Просрочен мониторинг</button>
                     <button type="button" data-quick="dealers"><i class="bi bi-shop"></i>Есть у дилеров</button>
                     <button type="button" data-quick="no-prices"><i class="bi bi-currency-dollar"></i>Нет цен</button>
@@ -171,6 +172,10 @@
                                             <option value="medium" selected>Средний</option>
                                             <option value="low">Низкий</option>
                                         </select>
+                                    </label>
+                                    <label class="competitor-main-toggle">
+                                        <span class="competitor-main-toggle-copy"><strong>Главный конкурент</strong><small>Выделять отдельно в списке и аналитике</small></span>
+                                        <span class="form-check form-switch"><input type="checkbox" id="comp-is-main" class="form-check-input" role="switch" aria-label="Отметить как главного конкурента"></span>
                                     </label>
                                     <label><span>Ценовой сегмент</span><input type="text" id="comp_segment" class="form-control" placeholder="Эконом / средний / премиум / свой"></label>
                                     <label class="span-2"><span>Теги</span><input type="text" id="comp_tags" class="form-control" placeholder="ёлочка, Китай, агрессивная цена, Астана"></label>
@@ -281,8 +286,14 @@
     <div class="modal fade" id="dealers-list-modal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content competitor-small-modal">
-                <div class="modal-header"><div><small>ПРИСУТСТВИЕ</small><h5>Дилеры с брендом <span id="dl-brand-name"></span></h5></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-                <div class="modal-body"><div id="dealers-list-container" class="competitor-dealers-list"></div></div>
+                <div class="modal-header"><div><small>ПРИСУТСТВИЕ У ДИЛЕРОВ</small><h5><span id="dl-brand-name"></span></h5></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <div id="dealer-presence-tools" class="dealer-presence-tools" hidden>
+                        <label class="dealer-presence-search"><span class="visually-hidden">Поиск дилера</span><i class="bi bi-search"></i><input id="dealer-presence-search" type="search" class="form-control" placeholder="Найти дилера по названию или городу"></label>
+                        <label class="dealer-presence-filter"><span class="visually-hidden">Фильтр присутствия</span><select id="dealer-presence-filter" class="form-select"><option value="all">Все дилеры</option><option value="present">С конкурентом</option><option value="missing">Без конкурента</option></select></label>
+                    </div>
+                    <div id="dealers-list-container" class="competitor-dealers-list"></div>
+                </div>
             </div>
         </div>
     </div>

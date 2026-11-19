@@ -1040,7 +1040,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderDealerCompetitors(competitors) {
         if (!competitorsListContainer) return;
         if (!competitors || competitors.length === 0) { competitorsListContainer.innerHTML = '<p class="text-muted">Нет данных.</p>'; return; }
-        let html = '<div class="table-responsive"><table class="table table-hover table-sm border"><thead><tr class="table-light"><th>Бренд</th><th>Коллекция</th><th>ОПТ</th><th>Розница</th></tr></thead><tbody>';
+        let html = '<div class="table-responsive"><table class="table table-hover table-sm border"><thead><tr class="table-light"><th>Бренд</th><th>Коллекция</th><th>ОПТ, ₸/м²</th><th>Розница, ₸/м²</th></tr></thead><tbody>';
         competitors.forEach(c => { html += `<tr><td class="fw-bold">${safeText(c.brand)}</td><td>${safeText(c.collection)}</td><td>${safeText(c.price_opt)}</td><td>${safeText(c.price_retail)}</td></tr>`; });
         competitorsListContainer.innerHTML = html + '</tbody></table></div>';
     }

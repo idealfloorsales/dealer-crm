@@ -22,6 +22,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const modal = bootstrap.Modal.getOrCreateInstance($('comp-modal'), { backdrop:'static', keyboard:false });
     const typesModal = bootstrap.Modal.getOrCreateInstance($('types-manager-modal'));
     const dealersModal = bootstrap.Modal.getOrCreateInstance($('dealers-list-modal'));
+    const presenceTools = $('dealer-presence-tools');
+    const presenceSearch = $('dealer-presence-search');
+    const presenceFilter = $('dealer-presence-filter');
+    const presenceContainer = $('dealers-list-container');
     const observationModal = bootstrap.Modal.getOrCreateInstance($('observation-modal'));
 
     const form = $('comp-form');
@@ -35,6 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
         country:$('comp_country'),
         status:$('comp_status'),
         priority:$('comp_priority'),
+        isMain:$('comp-is-main'),
         segment:$('comp_segment'),
         tags:$('comp_tags'),
         supplier:$('comp_supplier'),
@@ -69,6 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
         { val:'mix', label:'Худ. микс', color:'#ef4444' }
     ];
     const typeColors = ['#8b5cf6','#06b6d4','#ec4899','#84cc16','#f97316','#6366f1'];
+    const MAIN_COMPETITOR_TAG = 'Главный конкурент';
 
     let competitors = [];
     let allDealers = [];
@@ -77,6 +83,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentObservations = [];
     let canManage = false;
     let canObserve = false;
+    let canEditDealers = false;
+    let currentPresenceCompetitorId = '';
+    const dealerPresenceDrafts = new Map();
+    const savingPresence = new Set();
     let selectedCompetitorId = '';
     let canExport = false;
     let viewMode = localStorage.getItem('competitors_view') || 'cards';
@@ -89,6 +99,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const idOf = value => String(value?.id || value?._id || value || '');
     const norm = value => String(value || '').trim().toLowerCase();
+    function isMainCompetitor(competitor) {
+        return Array.isArray(competitor?.tags) && competitor.tags.some(tag=>norm(tag)===norm(MAIN_COMPETITOR_TAG));
+    }
     const fmt = value => Number(value || 0).toLocaleString('ru-RU');
     const dateKeyToday = () => {
         const f = new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Almaty',year:'numeric',month:'2-digit',day:'2-digit'});
@@ -169,7 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const [compRes, dealerRes] = await Promise.all([
                 fetch(API_URL),
-                window.CRMAuth?.can('can_view_dealers') ? fetch(API_DEALERS) : Promise.resolve(null)
+                (window.CRMAuth?.can('can_view_dealers') || window.CRMAuth?.can('can_view_competitors')) ? fetch(API_DEALERS) : Promise.resolve(null)
             ]);
             if (!compRes.ok) throw new Error('Не удалось загрузить конкурентов');
             competitors = await compRes.json();
@@ -300,6 +313,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (prices === 'no' && pc>0) return false;
 
         if (quickFilter === 'important' && !['critical','high'].includes(c.priority||'medium')) return false;
+        if (quickFilter === 'main' && !isMainCompetitor(c)) return false;
         if (quickFilter === 'overdue' && ms !== 'overdue') return false;
         if (quickFilter === 'dealers' && dc<=0) return false;
         if (quickFilter === 'no-prices' && pc>0) return false;
@@ -330,9 +344,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (typeof col === 'string') return '';
         const opt = String(col.price_opt||'').trim();
         const retail = String(col.price_retail||'').trim();
-        if (opt && retail) return `опт ${esc(opt)} · розн. ${esc(retail)}`;
-        if (opt) return `опт ${esc(opt)}`;
-        if (retail) return `розн. ${esc(retail)}`;
+        if (opt && retail) return `опт ${esc(opt)} ₸/м² · розн. ${esc(retail)} ₸/м²`;
+        if (opt) return `опт ${esc(opt)} ₸/м²`;
+        if (retail) return `розн. ${esc(retail)} ₸/м²`;
         return '';
     }
 
@@ -346,7 +360,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function cardHtml(c) {
         const types = [...new Set((c.collections||[]).map(col=>typeof col==='string'?'std':normalizeType(col.type)))];
-        const tags = Array.isArray(c.tags) ? c.tags.filter(Boolean) : [];
+        const tags = Array.isArray(c.tags) ? c.tags.filter(tag=>tag&&norm(tag)!==norm(MAIN_COMPETITOR_TAG)) : [];
         const dealers = dealerCount(c);
         const priced = pricedCollectionCount(c);
         const mon = monitoringState(c);
@@ -393,6 +407,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="competitor-card-statuses">
                         <span class="comp-status is-${esc(c.status||'active')}">${statusLabel(c.status||'active')}</span>
                         <span class="comp-priority is-${esc(c.priority||'medium')}">${priorityLabel(c.priority||'medium')}</span>
+                        ${isMainCompetitor(c)?'<span class="competitor-main-badge"><i class="bi bi-star-fill"></i>Главный конкурент</span>':''}
                     </div>
                 </div>
                 <div class="competitor-card-actions">
@@ -494,17 +509,158 @@ document.addEventListener('DOMContentLoaded', () => {
         renderGrid();
     }
 
+    function dealerCompetitorEntries(dealer, competitorName) {
+        return (Array.isArray(dealer?.competitors) ? dealer.competitors : [])
+            .filter(item=>norm(item?.brand)===norm(competitorName))
+            .map(item=>({
+                collection:String(item.collection||''),
+                price_opt:String(item.price_opt||''),
+                price_retail:String(item.price_retail||'')
+            }));
+    }
+
+    function presenceKey(dealerId) {
+        return `${currentPresenceCompetitorId}::${dealerId}`;
+    }
+
+    function dealerPresenceState(dealer, competitor) {
+        const key=presenceKey(idOf(dealer));
+        if(dealerPresenceDrafts.has(key)) return dealerPresenceDrafts.get(key);
+        const entries=dealerCompetitorEntries(dealer,competitor.name);
+        return {present:entries.length>0,entries};
+    }
+
+    function presencePriceText(item) {
+        const parts=[];
+        if(item.price_opt) parts.push(`опт ${esc(item.price_opt)} ₸/м²`);
+        if(item.price_retail) parts.push(`розница ${esc(item.price_retail)} ₸/м²`);
+        return parts.join(' · ');
+    }
+
+    function renderDealerPresence() {
+        const competitor=competitors.find(item=>idOf(item)===currentPresenceCompetitorId);
+        if(!competitor||!presenceContainer) return;
+        if(presenceTools) presenceTools.hidden=!canEditDealers;
+
+        const query=norm(presenceSearch?.value);
+        const filter=presenceFilter?.value||'all';
+        const dealers=[...allDealers].sort((a,b)=>
+            String(a.name||'').localeCompare(String(b.name||''),'ru')
+        );
+        const filtered=dealers.filter(dealer=>{
+            const state=dealerPresenceState(dealer,competitor);
+            if(!canEditDealers&&!state.present) return false;
+            if(filter==='present'&&!state.present) return false;
+            if(filter==='missing'&&state.present) return false;
+            const searchable=norm([dealer.name,dealer.city,dealer.sector].filter(Boolean).join(' '));
+            return !query||searchable.includes(query);
+        });
+
+        if(!canEditDealers&&!allDealers.length) {
+            presenceContainer.innerHTML='<div class="competitors-empty">Нет доступа к списку дилеров</div>';
+            return;
+        }
+        if(!filtered.length) {
+            const message=canEditDealers
+                ? (query?'По запросу ничего не найдено':'Нет дилеров для отображения')
+                : 'У дилеров этот бренд не отмечен';
+            presenceContainer.innerHTML=`<div class="competitors-empty">${esc(message)}</div>`;
+            return;
+        }
+
+        const visible=filtered.slice(0,60);
+        const collectionNames=(competitor.collections||[])
+            .map(item=>typeof item==='string'?item:item?.name)
+            .filter(Boolean);
+        const items=visible.map(dealer=>{
+            const dealerId=idOf(dealer);
+            const key=presenceKey(dealerId);
+            const state=dealerPresenceState(dealer,competitor);
+            const dirty=dealerPresenceDrafts.has(key);
+            const entries=state.entries||[];
+            const profileHref=`/dealer.html?id=${encodeURIComponent(dealerId)}`;
+            if(!canEditDealers) {
+                const chips=entries.map(item=>{
+                    const label=[item.collection,presencePriceText(item)].filter(Boolean).join(' · ');
+                    return label?`<span class="dealer-presence-price-chip">${label}</span>`:'';
+                }).filter(Boolean).join('');
+                return `<article class="dealer-presence-card">
+                    <div class="dealer-presence-card-head"><div><a class="dealer-presence-name" href="${profileHref}"><strong>${esc(dealer.name||'Дилер')}</strong></a><small><i class="bi bi-geo-alt me-1"></i>${esc(dealer.city||'Город не указан')}</small></div></div>
+                    ${chips?`<div class="dealer-presence-readonly-prices">${chips}</div>`:''}
+                </article>`;
+            }
+
+            const listId=`dealer-collections-${dealerId.replace(/[^a-z0-9_-]/gi,'')}`;
+            const lineRows=state.present?entries.map((item,index)=>`<div class="dealer-presence-line">
+                <label class="collection-name"><span>Коллекция</span><input class="form-control" list="${listId}" data-presence-field="collection" data-dealer-id="${esc(dealerId)}" data-row-index="${index}" value="${esc(item.collection)}" placeholder="Название коллекции"></label>
+                <label><span>Опт, ₸/м²</span><input class="form-control" inputmode="decimal" data-presence-field="price_opt" data-dealer-id="${esc(dealerId)}" data-row-index="${index}" value="${esc(item.price_opt)}" placeholder="Цена"></label>
+                <label><span>Розница, ₸/м²</span><input class="form-control" inputmode="decimal" data-presence-field="price_retail" data-dealer-id="${esc(dealerId)}" data-row-index="${index}" value="${esc(item.price_retail)}" placeholder="Цена"></label>
+                <button type="button" class="remove-line" data-presence-remove="${esc(dealerId)}" data-row-index="${index}" title="Удалить коллекцию"><i class="bi bi-x-lg"></i></button>
+            </div>`).join(''):'';
+            const datalist=collectionNames.length
+                ? `<datalist id="${listId}">${collectionNames.map(name=>`<option value="${esc(name)}"></option>`).join('')}</datalist>`
+                : '';
+            return `<article class="dealer-presence-card">
+                <div class="dealer-presence-card-head">
+                    <div><a class="dealer-presence-name" href="${profileHref}"><strong>${esc(dealer.name||'Дилер')}</strong></a><small><i class="bi bi-geo-alt me-1"></i>${esc(dealer.city||'Город не указан')}</small></div>
+                    <label class="dealer-presence-toggle"><input type="checkbox" data-presence-toggle="${esc(dealerId)}" ${state.present?'checked':''}> Есть конкурент</label>
+                </div>
+                ${state.present?`<div class="dealer-presence-lines">${lineRows||'<div class="dealer-presence-empty">Коллекции пока не указаны</div>'}</div>${datalist}<div class="dealer-presence-actions"><button type="button" class="btn btn-sm btn-outline-secondary" data-presence-add="${esc(dealerId)}"><i class="bi bi-plus-lg me-1"></i>Добавить коллекцию</button><button type="button" class="btn btn-sm btn-danger" data-presence-save="${esc(dealerId)}" ${!dirty||savingPresence.has(key)?'disabled':''}>${savingPresence.has(key)?'Сохраняем…':'Сохранить'}</button></div>`:''}
+            </article>`;
+        }).join('');
+        const limit=filtered.length>visible.length?`<div class="dealer-presence-limit">Показаны первые ${visible.length} дилеров. Уточните поиск, чтобы найти остальных.</div>`:'';
+        presenceContainer.innerHTML=items+limit;
+    }
+
     function openDealers(id) {
         const competitor=competitors.find(x=>idOf(x)===String(id));
         if(!competitor) return;
-        const dealers=dealersFor(competitor);
+        currentPresenceCompetitorId=idOf(competitor);
         $('dl-brand-name').textContent=competitor.name||'';
-        $('dealers-list-container').innerHTML=dealers.length
-            ? dealers.map(dealer=>`<a class="competitor-dealer-row" href="/dealer.html?id=${encodeURIComponent(idOf(dealer))}">
-                <div><strong>${esc(dealer.name||'Дилер')}</strong><small><i class="bi bi-geo-alt me-1"></i>${esc(dealer.city||'Город не указан')}</small></div><i class="bi bi-chevron-right"></i>
-              </a>`).join('')
-            : '<div class="competitors-empty">У дилеров этот бренд не отмечен</div>';
+        if(presenceSearch) presenceSearch.value='';
+        if(presenceFilter) presenceFilter.value='all';
+        renderDealerPresence();
         dealersModal.show();
+    }
+
+    async function saveDealerPresence(dealerId) {
+        const competitor=competitors.find(item=>idOf(item)===currentPresenceCompetitorId);
+        const dealer=allDealers.find(item=>idOf(item)===String(dealerId));
+        if(!competitor||!dealer||!canEditDealers) return;
+        const key=presenceKey(idOf(dealer));
+        const state=dealerPresenceDrafts.get(key);
+        if(!state||savingPresence.has(key)) return;
+
+        const otherEntries=(Array.isArray(dealer.competitors)?dealer.competitors:[])
+            .filter(item=>norm(item?.brand)!==norm(competitor.name));
+        const markedEntries=state.present
+            ? (state.entries.length?state.entries:[{}]).map(item=>({
+                brand:competitor.name,
+                collection:String(item.collection||'').trim(),
+                price_opt:String(item.price_opt||'').trim(),
+                price_retail:String(item.price_retail||'').trim()
+            }))
+            : [];
+        const next=[...otherEntries,...markedEntries];
+
+        savingPresence.add(key);
+        renderDealerPresence();
+        try {
+            const response=await fetch(`${API_DEALERS}/${encodeURIComponent(idOf(dealer))}`,{
+                method:'PATCH',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({competitors:next})
+            });
+            if(!response.ok) throw new Error('Не удалось сохранить присутствие конкурента');
+            dealer.competitors=next;
+            dealerPresenceDrafts.delete(key);
+            toast('Данные о конкуренте у дилера сохранены');
+        } catch(error) {
+            toast(error.message||'Не удалось сохранить данные','error');
+        } finally {
+            savingPresence.delete(key);
+            renderDealerPresence();
+        }
     }
 
     function renderTypesManager() {
@@ -687,7 +843,8 @@ document.addEventListener('DOMContentLoaded', () => {
         fields.status.value=c.status||'active';
         fields.priority.value=c.priority||'medium';
         fields.segment.value=c.segment||'';
-        fields.tags.value=(c.tags||[]).join(', ');
+        fields.tags.value=(c.tags||[]).filter(tag=>norm(tag)!==norm(MAIN_COMPETITOR_TAG)).join(', ');
+        fields.isMain.checked=isMainCompetitor(c);
         fields.supplier.value=c.supplier||'';
         fields.warehouse.value=c.warehouse||'';
         fields.website.value=c.website||'';
@@ -738,9 +895,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 <label><span>Класс</span><input class="form-control coll-class" value="${esc(data.class||'')}" placeholder="33 / 34"></label>
                 <label><span>Толщина</span><input class="form-control coll-thickness" value="${esc(data.thickness||'')}" placeholder="8 мм"></label>
                 <label><span>Формат</span><input class="form-control coll-format" value="${esc(data.format||'')}" placeholder="600×100"></label>
-                <label><span>Опт. цена</span><input class="form-control coll-opt" value="${esc(data.price_opt||'')}" placeholder="тг / м²"></label>
-                <label><span>Розница</span><input class="form-control coll-retail" value="${esc(data.price_retail||'')}" placeholder="тг / м²"></label>
-                <label><span>Валюта</span><input class="form-control coll-currency" value="${esc(data.currency||'KZT')}" placeholder="KZT"></label>
+                <label><span>Опт, ₸/м²</span><input class="form-control coll-opt" value="${esc(data.price_opt||'')}" placeholder="Например, 8 500"></label>
+                <label><span>Розница, ₸/м²</span><input class="form-control coll-retail" value="${esc(data.price_retail||'')}" placeholder="Например, 11 900"></label>
                 <label class="wide"><span>Заметка</span><input class="form-control coll-note" value="${esc(data.note||'')}" placeholder="Акция, фаска, замок, особенности…"></label>
             </div>`;
         row.querySelector('.comp-entry-remove').addEventListener('click',()=>row.remove());
@@ -790,7 +946,6 @@ document.addEventListener('DOMContentLoaded', () => {
             format:row.querySelector('.coll-format').value.trim(),
             price_opt:row.querySelector('.coll-opt').value.trim(),
             price_retail:row.querySelector('.coll-retail').value.trim(),
-            currency:row.querySelector('.coll-currency').value.trim()||'KZT',
             note:row.querySelector('.coll-note').value.trim()
         })).filter(item=>item.name);
     }
@@ -816,7 +971,11 @@ document.addEventListener('DOMContentLoaded', () => {
             status:fields.status.value,
             priority:fields.priority.value,
             segment:fields.segment.value.trim(),
-            tags:fields.tags.value.split(',').map(x=>x.trim()).filter(Boolean),
+            tags:(()=>{
+                const tags=fields.tags.value.split(',').map(x=>x.trim()).filter(x=>x&&norm(x)!==norm(MAIN_COMPETITOR_TAG));
+                if(fields.isMain.checked) tags.push(MAIN_COMPETITOR_TAG);
+                return tags;
+            })(),
             supplier:fields.supplier.value.trim(),
             warehouse:fields.warehouse.value.trim(),
             website:fields.website.value.trim(),
@@ -882,7 +1041,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function exportCsv() {
         if(!competitors.length) return toast('Нет данных для экспорта','warning');
         const clean=value=>`"${String(value??'').replace(/"/g,'""')}"`;
-        let csv='\uFEFFБренд;Страна;Статус;Приоритет;Сегмент;Поставщик;Склад;Коллекция;Тип;Класс;Толщина;Формат;Опт;Розница;Валюта;Дилеров;Последний мониторинг;Следующий мониторинг;Ответственный;Сильные стороны;Слабые стороны;Теги;Сайт;Instagram;Заметки;История наблюдений\n';
+        let csv='\uFEFFБренд;Страна;Статус;Приоритет;Сегмент;Поставщик;Склад;Коллекция;Тип;Класс;Толщина;Формат;Опт, ₸/м²;Розница, ₸/м²;Дилеров;Последний мониторинг;Следующий мониторинг;Ответственный;Сильные стороны;Слабые стороны;Теги;Сайт;Instagram;Заметки;История наблюдений\n';
         competitors.forEach(c=>{
             const base=[
                 c.name,c.country,statusLabel(c.status||'active'),priorityLabel(c.priority||'medium'),c.segment,c.supplier,c.warehouse
@@ -894,7 +1053,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const collections=(c.collections||[]).length?c.collections:[{}];
             collections.forEach(raw=>{
                 const col=typeof raw==='string'?{name:raw,type:'std'}:raw;
-                csv+=base+';'+[col.name,typeInfo(col.type).label,col.class,col.thickness,col.format,col.price_opt,col.price_retail,col.currency||'KZT'].map(clean).join(';')+';'+tail+'\n';
+                csv+=base+';'+[col.name,typeInfo(col.type).label,col.class,col.thickness,col.format,col.price_opt,col.price_retail].map(clean).join(';')+';'+tail+'\n';
             });
         });
         const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
@@ -908,6 +1067,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(window.CRMAuth?.ready) await CRMAuth.ready;
         canManage=Boolean(window.CRMAuth?.can('can_manage_competitors'));
         canObserve=Boolean(window.CRMAuth?.can('can_view_competitors'));
+        canEditDealers=Boolean(window.CRMAuth?.can('can_edit_dealer'));
         canExport=Boolean(window.CRMAuth?.can('can_export_prices'));
         if(addBtn) addBtn.style.display=canManage?'':'none';
         if(manageTypesBtn) manageTypesBtn.style.display=canManage?'':'none';
@@ -957,6 +1117,81 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('[data-quick]').forEach(x=>x.classList.toggle('active',x===btn));
         renderGrid();
     }));
+
+    presenceSearch?.addEventListener('input',renderDealerPresence);
+    presenceFilter?.addEventListener('change',renderDealerPresence);
+
+    presenceContainer?.addEventListener('change',event=>{
+        const toggle=event.target.closest('[data-presence-toggle]');
+        if(!toggle||!canEditDealers) return;
+        const dealer=allDealers.find(item=>idOf(item)===toggle.dataset.presenceToggle);
+        const competitor=competitors.find(item=>idOf(item)===currentPresenceCompetitorId);
+        if(!dealer||!competitor) return;
+        const key=presenceKey(idOf(dealer));
+        const current=dealerPresenceState(dealer,competitor);
+        const entries=(current.entries||[]).map(item=>({...item}));
+        if(toggle.checked&&!entries.length) entries.push({collection:'',price_opt:'',price_retail:''});
+        dealerPresenceDrafts.set(key,{present:toggle.checked,entries});
+        renderDealerPresence();
+    });
+
+    presenceContainer?.addEventListener('input',event=>{
+        const input=event.target.closest('[data-presence-field]');
+        if(!input||!canEditDealers) return;
+        const dealer=allDealers.find(item=>idOf(item)===input.dataset.dealerId);
+        const competitor=competitors.find(item=>idOf(item)===currentPresenceCompetitorId);
+        if(!dealer||!competitor) return;
+        const key=presenceKey(idOf(dealer));
+        const current=dealerPresenceState(dealer,competitor);
+        const state={present:true,entries:(current.entries||[]).map(item=>({...item}))};
+        const index=Number(input.dataset.rowIndex);
+        if(!Number.isInteger(index)||index<0) return;
+        while(state.entries.length<=index) state.entries.push({collection:'',price_opt:'',price_retail:''});
+        const field=input.dataset.presenceField;
+        if(!['collection','price_opt','price_retail'].includes(field)) return;
+        state.entries[index][field]=input.value;
+        dealerPresenceDrafts.set(key,state);
+        const save=[...presenceContainer.querySelectorAll('[data-presence-save]')].find(button=>button.dataset.presenceSave===idOf(dealer));
+        if(save) save.disabled=savingPresence.has(key);
+    });
+
+    presenceContainer?.addEventListener('click',event=>{
+        const add=event.target.closest('[data-presence-add]');
+        if(add&&canEditDealers) {
+            const dealer=allDealers.find(item=>idOf(item)===add.dataset.presenceAdd);
+            const competitor=competitors.find(item=>idOf(item)===currentPresenceCompetitorId);
+            if(!dealer||!competitor) return;
+            const key=presenceKey(idOf(dealer));
+            const current=dealerPresenceState(dealer,competitor);
+            const entries=(current.entries||[]).map(item=>({...item}));
+            entries.push({collection:'',price_opt:'',price_retail:''});
+            dealerPresenceDrafts.set(key,{present:true,entries});
+            renderDealerPresence();
+            return;
+        }
+
+        const remove=event.target.closest('[data-presence-remove]');
+        if(remove&&canEditDealers) {
+            const dealer=allDealers.find(item=>idOf(item)===remove.dataset.presenceRemove);
+            const competitor=competitors.find(item=>idOf(item)===currentPresenceCompetitorId);
+            if(!dealer||!competitor) return;
+            const key=presenceKey(idOf(dealer));
+            const current=dealerPresenceState(dealer,competitor);
+            const entries=(current.entries||[]).map(item=>({...item}));
+            entries.splice(Number(remove.dataset.rowIndex),1);
+            dealerPresenceDrafts.set(key,{present:true,entries});
+            renderDealerPresence();
+            return;
+        }
+
+        const save=event.target.closest('[data-presence-save]');
+        if(save&&canEditDealers) saveDealerPresence(save.dataset.presenceSave);
+    });
+
+    dealersModal._element?.addEventListener('hidden.bs.modal',()=>{
+        currentPresenceCompetitorId='';
+        if(presenceContainer) presenceContainer.innerHTML='';
+    });
 
     init();
 });

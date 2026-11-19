@@ -488,3 +488,71 @@ html,body.competitors-page{max-width:100%;overflow-x:hidden}
 .competitor-observation-row-meta a:not(:last-child){color:#62676d}
 .observation-context-link{display:inline-block;margin-top:3px;color:#8e3439;text-decoration:none;font-size:.57rem;font-weight:750}
 .observation-context-link:hover{text-decoration:underline}
+
+/* Dealer-level competitor presence editor */
+.competitor-main-toggle{
+  display:flex!important;align-items:center;justify-content:space-between;gap:12px;
+  padding:10px 12px;border:1px solid #e5dfd9;border-radius:12px;background:#fbfaf8
+}
+.competitor-main-toggle-copy{display:flex;flex-direction:column;gap:2px}
+.competitor-main-toggle-copy strong{font-size:.76rem;font-weight:800;color:#292b30}
+.competitor-main-toggle-copy small{font-size:.64rem;color:#8b8d93}
+.competitor-main-toggle .form-check{margin:0;min-height:0;padding-left:2.4em}
+.competitor-main-toggle .form-check-input{width:2.2em;height:1.25em;margin-top:0;cursor:pointer}
+.competitor-main-badge{
+  display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:999px;
+  color:#7e5310;background:#fff1c2;font-size:.61rem;font-weight:800
+}
+.competitor-dealers-list{gap:9px}
+.dealer-presence-tools{
+  display:grid;grid-template-columns:minmax(0,1fr) 180px;gap:8px;margin-bottom:10px;
+  position:sticky;top:0;z-index:2;padding:8px 0;background:#fff
+}
+.dealer-presence-search{position:relative;display:block}
+.dealer-presence-search>i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#8b8d93}
+.dealer-presence-search input{padding-left:34px}
+.dealer-presence-filter select,.dealer-presence-search input{min-height:40px;border-radius:10px}
+.dealer-presence-card{padding:11px;border:1px solid #e7e2dd;border-radius:12px;background:#fff}
+.dealer-presence-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.dealer-presence-card-head strong{display:block;font-size:.76rem;color:#25272d}
+.dealer-presence-card-head small{display:block;margin-top:2px;color:#8c8e93;font-size:.64rem}
+.dealer-presence-toggle{display:flex;align-items:center;gap:7px;white-space:nowrap;font-size:.68rem;font-weight:700;color:#56585e}
+.dealer-presence-toggle input{width:1.1rem;height:1.1rem;accent-color:#b9040a}
+.dealer-presence-lines{display:flex;flex-direction:column;gap:7px;margin-top:10px}
+.dealer-presence-line{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(110px,.8fr) minmax(110px,.8fr) 34px;gap:7px;align-items:end}
+.dealer-presence-line label>span{display:block;margin:0 0 3px 2px;color:#85878d;font-size:.59rem;font-weight:800}
+.dealer-presence-line .form-control{min-height:38px;border-radius:9px;font-size:.72rem}
+.dealer-presence-line .remove-line{width:34px;height:38px;border:1px solid #eadedd;border-radius:9px;color:#a23434;background:#fff}
+.dealer-presence-line .remove-line:hover{background:#fff1f1}
+.dealer-presence-empty{margin-top:10px;color:#8b8d93;font-size:.67rem}
+.dealer-presence-actions{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:9px}
+.dealer-presence-actions .btn{min-height:36px;border-radius:9px;font-size:.68rem;font-weight:700}
+.dealer-presence-readonly-prices{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.dealer-presence-price-chip{padding:4px 7px;border-radius:7px;background:#f4f2ef;color:#55575d;font-size:.64rem}
+.dealer-presence-limit{padding:10px;text-align:center;color:#777;font-size:.68rem}
+@media(max-width:600px){
+  .competitor-main-toggle{grid-column:1/-1}
+  .dealer-presence-tools{grid-template-columns:1fr;top:0}
+  .dealer-presence-card{padding:9px}
+  .dealer-presence-line{grid-template-columns:1fr 1fr 34px}
+  .dealer-presence-line .collection-name{grid-column:1/-1}
+  .dealer-presence-actions{flex-wrap:wrap}
+}
+
+
+/* Fixed currency and dealer presence layout */
+.competitor-collection-edit-details{grid-template-columns:repeat(5,minmax(0,1fr))}
+.competitor-collection-edit-details .wide{grid-column:1/-1}
+.dealer-presence-tools[hidden]{display:none}
+.dealer-presence-name{color:inherit;text-decoration:none}
+.dealer-presence-name:hover{color:#a5080e;text-decoration:underline}
+.dealer-presence-toggle{cursor:pointer}
+.dealer-presence-actions .btn:disabled{opacity:.55;cursor:not-allowed}
+@media(max-width:900px){
+  .competitor-collection-edit-details{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .competitor-collection-edit-details .wide{grid-column:1/-1}
+}
+@media(max-width:600px){
+  .competitor-collection-edit-details{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .competitor-collection-edit-details .wide{grid-column:1/-1}
+}
