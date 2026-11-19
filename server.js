@@ -327,7 +327,7 @@ async function seedUsers() {
 // ==========================================
 const authMiddleware = (req, res, next) => {
     if (req.method === 'OPTIONS') return next(); 
-    if (req.path === '/api/auth/login' || req.path === '/api/public/telegram' || req.path.startsWith('/api/public/price-share/') || req.path.startsWith('/api/public/offers/') || !req.path.startsWith('/api')) return next();
+    if (req.path === '/api/auth/login' || req.path === '/api/public/telegram' || req.path.startsWith('/api/public/price-share/') || req.path.startsWith('/api/public/offers/') || req.path === '/api/instagram/callback' || !req.path.startsWith('/api')) return next();
 
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; 
@@ -425,7 +425,8 @@ function auditRouteMeta(req) {
     const path = req.path || '';
     let module = 'system';
     let entityType = 'record';
-    if (path.startsWith('/api/admin/users')) { module='users'; entityType='user'; }
+    if (path.includes('/instagram-monitor')) { module='dealers'; entityType='dealer'; }
+    else if (path.startsWith('/api/admin/users')) { module='users'; entityType='user'; }
     else if (path.startsWith('/api/dealers') && path.includes('/products')) { module='matrix'; entityType='dealer'; }
     else if (path.startsWith('/api/dealers') && path.includes('/visits')) { module='visits'; entityType='dealer'; }
     else if (path.startsWith('/api/dealers')) { module='dealers'; entityType='dealer'; }
@@ -440,7 +441,7 @@ function auditRouteMeta(req) {
     else if (path.startsWith('/api/exports')) { module='exports'; entityType='export'; }
     else if (path.startsWith('/api/statuses') || path.startsWith('/api/sectors')) { module='settings'; entityType=path.startsWith('/api/statuses')?'status':'sector'; }
     let action = req.method === 'DELETE' ? 'delete' : ((req.method === 'PUT' || req.method === 'PATCH') ? 'update' : 'create');
-    if (path === '/api/sales' || path.startsWith('/api/exports') || path === '/api/workshop/print-log' || path === '/api/workshop/correction' || /\/visits(?:\/|$)/.test(path) || /\/receive$/.test(path) || /\/material-movement$/.test(path) || /\/production$/.test(path) || /\/writeoff$/.test(path) || /\/dealer-movement$/.test(path) || /\/opening-balance$/.test(path) || /\/stocktake$/.test(path) || path === '/api/admin/import-catalog') action='execute';
+    if (path === '/api/sales' || path.startsWith('/api/exports') || path === '/api/workshop/print-log' || /\/instagram-monitor\/sync$/.test(path) || path === '/api/workshop/correction' || /\/visits(?:\/|$)/.test(path) || /\/receive$/.test(path) || /\/material-movement$/.test(path) || /\/production$/.test(path) || /\/writeoff$/.test(path) || /\/dealer-movement$/.test(path) || /\/opening-balance$/.test(path) || /\/stocktake$/.test(path) || path === '/api/admin/import-catalog') action='execute';
     return { module, entityType, action };
 }
 
@@ -501,6 +502,7 @@ function auditEntityLabel(before, after, requestData) {
 
 function auditSummary(req, route, label) {
     const path=req.path || '';
+    if (path.endsWith('/instagram-monitor/sync')) return 'Обновил статистику Instagram дилера' + (label ? ' «'+label+'»' : '');
     const suffix=label ? ' «'+label+'»' : '';
     if (path === '/api/dealers' && req.method === 'POST' && req.body && req.body._cloneSourceId) {
         const source=String(req.body._cloneSourceLabel || req.body._cloneSourceDealerId || '').trim();
@@ -1442,6 +1444,7 @@ const MotivationScheme = mongoose.model('MotivationScheme', motivationSchemeSche
 
 const dealerSchema = new mongoose.Schema({ dealer_id: String, name: String, price_type: String, price_list: { type: mongoose.Schema.Types.ObjectId, ref: 'PriceList', default: null }, motivation_scheme: { type: mongoose.Schema.Types.ObjectId, ref: 'MotivationScheme', default: null }, city: String, address: String, contacts: [contactSchema], bonuses: String, photos: [photoSchema], legal_entities: [dealerLegalEntitySchema], contract: { isSigned: Boolean, date: String }, region_sector: String, hasPersonalPlan: { type: Boolean, default: false }, delivery: String, website: String, instagram: String, additional_addresses: [additionalAddressSchema], pos_materials: [posMaterialSchema], visits: [visitSchema], products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }], latitude: Number, longitude: Number, geoUpdatedAt: Date, geoSource: String, status: { type: String, default: 'standard' }, avatarUrl: String, competitors: [competitorSchema], responsible: String, responsibleUserId: String, responsibleAssignmentSource: String }, { timestamps: true });
 const Dealer = mongoose.model('Dealer', dealerSchema);
+require('./server/instagram-monitor').install({app,mongoose,Dealer,User,requireAdmin,requirePermission,getDealerFilter,origin:APP_ORIGIN});
 
 const priceListRowSchema = new mongoose.Schema({
     scopeType: { type: String, enum: ['collection', 'product'], default: 'product' },

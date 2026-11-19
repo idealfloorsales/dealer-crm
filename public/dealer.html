@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="style.css?v={{VER}}">
     <link rel="stylesheet" href="price-control.css?v={{VER}}">
     <link rel="stylesheet" href="motivation.css?v={{VER}}"> 
+    <link rel="stylesheet" href="dealer-instagram.css?v={{VER}}">
     <link rel="icon" href="favicon.gif" type="image/gif">
     <meta name="theme-color" content="#b9040a">
 
@@ -209,6 +210,7 @@
                 <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#growth-pane"><i class="bi bi-lightbulb me-1" aria-hidden="true"></i>Развитие</button></li>
                 <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#visits-pane"><i class="bi bi-geo-alt me-1" aria-hidden="true"></i>Визиты</button></li>
                 <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#contacts-pane"><i class="bi bi-people me-1" aria-hidden="true"></i>Контакты</button></li>
+                <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#instagram-pane"><i class="bi bi-instagram me-1" aria-hidden="true"></i>Instagram</button></li>
                 <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#competitors-pane"><i class="bi bi-tags me-1" aria-hidden="true"></i>Конкуренты</button></li>
                 <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#photos-pane"><i class="bi bi-images me-1" aria-hidden="true"></i>Фото</button></li>
                 <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#products-pane"><i class="bi bi-grid-3x3-gap me-1" aria-hidden="true"></i>Матрица</button></li>
@@ -264,6 +266,37 @@
                             <div id="dealer-motivation-history" class="mt-3" style="display:none"></div>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="instagram-pane">
+                <div class="content-card dealer-instagram-panel">
+                    <div class="dealer-instagram-head">
+                        <div>
+                            <h5 class="card-heading mb-1"><i class="bi bi-instagram me-2"></i>Активность дилера в Instagram</h5>
+                            <p>Подписчики, количество публикаций и последние открытые публикации. CRM обновляет данные только по запросу менеджера.</p>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-danger" id="instagram-sync" disabled><i class="bi bi-arrow-repeat me-1"></i>Обновить</button>
+                    </div>
+                    <div id="instagram-monitor-status" class="dealer-instagram-status">Загружаем данные Instagram…</div>
+                    <div id="instagram-admin-setup" class="dealer-instagram-setup" hidden>
+                        <strong><i class="bi bi-shield-lock me-1"></i>Официальное подключение Meta</strong>
+                        <p>Сначала создайте Meta App и добавьте эти переменные в Render → dealer-crm → Environment. Секрет приложения вводится только в Render, не в CRM.</p>
+                        <code>META_APP_ID</code><code>META_APP_SECRET</code>
+                        <div class="dealer-instagram-callback-row"><small>OAuth Callback URL</small><code id="instagram-callback-uri"></code><button type="button" class="btn btn-sm btn-light border" id="instagram-copy-callback"><i class="bi bi-copy"></i> Скопировать</button></div>
+                        <p class="mb-0">Для просмотра профилей дилеров подключаемая учётная запись должна быть профессиональной (Автор/Бизнес) и связанной со Страницей Facebook. Можно использовать ваш ast.flooring, если перевести его в профессиональный режим.</p>
+                    </div>
+                    <div id="instagram-admin-controls" class="dealer-instagram-admin" hidden>
+                        <button type="button" class="btn btn-sm btn-danger" id="instagram-connect"><i class="bi bi-link-45deg me-1"></i>Подключить через Meta</button>
+                        <div id="instagram-page-picker" class="dealer-instagram-page-picker" hidden>
+                            <label for="instagram-page-select">Страница Facebook с подключённым Instagram</label>
+                            <div class="dealer-instagram-page-row"><select class="form-select form-select-sm" id="instagram-page-select"></select><button type="button" class="btn btn-sm btn-dark" id="instagram-select-page">Выбрать</button></div>
+                        </div>
+                    </div>
+                    <div id="instagram-metrics" class="dealer-instagram-metrics" hidden></div>
+                    <div id="instagram-brand-match" class="dealer-instagram-match" hidden></div>
+                    <div class="dealer-instagram-disclaimer">Совпадения считаются по подписи последних 12 публикаций. Если текстового совпадения нет, это не означает, что в кадре нет IDEAL FLOOR — визуальная проверка будет отдельным этапом.</div>
+                    <div id="instagram-posts" class="dealer-instagram-posts"></div>
                 </div>
             </div>
 
@@ -477,6 +510,7 @@
     <script src="dealer-score.js?v={{VER}}"></script>
     <script src="dealer-documents.js?v={{VER}}"></script>
     <script src="dealer.js?v={{VER}}"></script>
+    <script src="dealer-instagram.js?v={{VER}}"></script>
     <script src="price-control.js?v={{VER}}"></script>
 </body>
 </html>
