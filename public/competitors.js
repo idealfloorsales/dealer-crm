@@ -549,9 +549,10 @@ document.addEventListener('DOMContentLoaded', () => {
         );
         const filtered=dealers.filter(dealer=>{
             const state=dealerPresenceState(dealer,competitor);
+            const storedPresent=dealerCompetitorEntries(dealer,competitor.name).length>0;
             if(!canEditDealers&&!state.present) return false;
-            if(filter==='present'&&!state.present) return false;
-            if(filter==='missing'&&state.present) return false;
+            if(filter==='present'&&!storedPresent) return false;
+            if(filter==='missing'&&storedPresent) return false;
             const searchable=norm([dealer.name,dealer.city,dealer.sector].filter(Boolean).join(' '));
             return !query||searchable.includes(query);
         });
@@ -605,7 +606,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div><a class="dealer-presence-name" href="${profileHref}"><strong>${esc(dealer.name||'Дилер')}</strong></a><small><i class="bi bi-geo-alt me-1"></i>${esc(dealer.city||'Город не указан')}</small></div>
                     <label class="dealer-presence-toggle"><input type="checkbox" data-presence-toggle="${esc(dealerId)}" ${state.present?'checked':''}> Есть конкурент</label>
                 </div>
-                ${state.present?`<div class="dealer-presence-lines">${lineRows||'<div class="dealer-presence-empty">Коллекции пока не указаны</div>'}</div>${datalist}<div class="dealer-presence-actions"><button type="button" class="btn btn-sm btn-outline-secondary" data-presence-add="${esc(dealerId)}"><i class="bi bi-plus-lg me-1"></i>Добавить коллекцию</button><button type="button" class="btn btn-sm btn-danger" data-presence-save="${esc(dealerId)}" ${!dirty||savingPresence.has(key)?'disabled':''}>${savingPresence.has(key)?'Сохраняем…':'Сохранить'}</button></div>`:''}
+                ${state.present?`<div class="dealer-presence-lines">${lineRows||'<div class="dealer-presence-empty">Коллекции пока не указаны</div>'}</div>${datalist}`:''}
+                ${state.present||dirty?`<div class="dealer-presence-actions">${state.present?`<button type="button" class="btn btn-sm btn-outline-secondary" data-presence-add="${esc(dealerId)}"><i class="bi bi-plus-lg me-1"></i>Добавить коллекцию</button>`:''}<button type="button" class="btn btn-sm btn-danger" data-presence-save="${esc(dealerId)}" ${!dirty||savingPresence.has(key)?'disabled':''}>${savingPresence.has(key)?'Сохраняем…':'Сохранить'}</button></div>`:''}
             </article>`;
         }).join('');
         const limit=filtered.length>visible.length?`<div class="dealer-presence-limit">Показаны первые ${visible.length} дилеров. Уточните поиск, чтобы найти остальных.</div>`:'';
