@@ -418,7 +418,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             <div class="competitor-card-metrics">
                 <div class="competitor-card-metric"><small>Коллекций</small><strong>${fmt(collections.length)}</strong></div>
-                <div class="competitor-card-metric"><small>У дилеров</small><strong>${fmt(dealers)}</strong></div>
+                <button type="button" class="competitor-card-metric competitor-card-metric-action" data-dealers-id="${esc(idOf(c))}" aria-label="Показать дилеров с конкурентом ${esc(c.name||'')}" title="Открыть дилеров с этим конкурентом"><small>У дилеров</small><strong>${fmt(dealers)}</strong></button>
                 <div class="competitor-card-metric"><small>С ценами</small><strong>${fmt(priced)}/${fmt(collections.length)}</strong></div>
                 <div class="competitor-card-metric"><small>Наблюдений</small><strong>${fmt(observations.length)}</strong></div>
             </div>
