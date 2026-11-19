@@ -1827,3 +1827,38 @@ html:root[data-crm-theme="dark"] .workshop-opening-filter button{
 }
 html:root[data-crm-theme="dark"] .workshop-opening-name strong,
 html:root[data-crm-theme="dark"] .workshop-opening-current strong{color:var(--dark-text)!important}
+
+/* Reclamation workflow fields and stages */
+html:root[data-crm-theme="dark"] .rec-intake-hint,
+html:root[data-crm-theme="dark"] .rec-collapsible,
+html:root[data-crm-theme="dark"] .rec-collapsible-body>.row,
+html:root[data-crm-theme="dark"] .rec-card-next,
+html:root[data-crm-theme="dark"] .rec-view-workflow,
+html:root[data-crm-theme="dark"] .rec-view-next,
+html:root[data-crm-theme="dark"] .rec-cause-note{
+  background:var(--dark-surface-2)!important;border-color:var(--dark-line)!important;color:var(--dark-text-2)!important;
+}
+html:root[data-crm-theme="dark"] .rec-form-modal .rec-workflow-fields{background:var(--dark-surface)!important}
+html:root[data-crm-theme="dark"] .rec-form-modal .form-control,
+html:root[data-crm-theme="dark"] .rec-form-modal .form-select{
+  background:var(--dark-surface-2)!important;border-color:var(--dark-line)!important;color:var(--dark-text)!important;
+}
+html:root[data-crm-theme="dark"] .rec-form-modal .form-control::placeholder{color:var(--dark-muted-2)!important}
+html:root[data-crm-theme="dark"] .rec-status.is-new{background:#2a2b31!important;color:#c4c6cd!important}
+html:root[data-crm-theme="dark"] .rec-status.is-inspection{background:var(--dark-blue-bg)!important;color:#a9c9eb!important}
+html:root[data-crm-theme="dark"] .rec-status.is-waiting_customer,
+html:root[data-crm-theme="dark"] .rec-status.is-waiting_expertise{background:var(--dark-yellow-bg)!important;color:#e7c47e!important}
+html:root[data-crm-theme="dark"] .rec-status.is-decision_ready{background:var(--dark-red-bg)!important;color:#f18a8f!important}
+html:root[data-crm-theme="dark"] .rec-status.is-closed{background:var(--dark-green-bg)!important;color:#9bd3ae!important}
+html:root[data-crm-theme="dark"] .rec-status.is-rejected{background:#292a30!important;color:#c4c6cd!important}
+html:root[data-crm-theme="dark"] .rec-status.is-overdue{box-shadow:inset 0 0 0 1px rgba(240,120,128,.45)!important}
+html:root[data-crm-theme="dark"] #view-body{background:var(--dark-bg-2)!important;color:var(--dark-text-2)!important}
+html:root[data-crm-theme="dark"] #view-body .card{background:var(--dark-surface)!important;border-color:var(--dark-line)!important;color:var(--dark-text-2)!important}
+html:root[data-crm-theme="dark"] .rec-card-next strong,
+html:root[data-crm-theme="dark"] .rec-view-next strong,
+html:root[data-crm-theme="dark"] .rec-cause-note p{color:var(--dark-text)!important}
+html:root[data-crm-theme="dark"] .rec-cause-note small{color:var(--dark-blue)!important}
+html:root[data-crm-theme="dark"] .rec-card-next.is-missing,
+html:root[data-crm-theme="dark"] .rec-view-next.is-missing{background:rgba(185,4,10,.12)!important;color:#e6b1b3!important}
+html:root[data-crm-theme="dark"] .rec-legacy-status-note{background:var(--dark-yellow-bg)!important;color:#e7c47e!important}
+
