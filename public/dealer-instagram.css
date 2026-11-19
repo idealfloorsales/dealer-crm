@@ -1,0 +1,59 @@
+.dealer-instagram-panel{border:1px solid #e8e3df;border-radius:18px;padding:20px}
+.dealer-instagram-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}
+.dealer-instagram-head p{margin:0;color:#85878d;font-size:.78rem;line-height:1.5}
+.dealer-instagram-status{padding:12px 14px;border-radius:12px;background:#f5f3f1;color:#66686d;font-size:.78rem}
+.dealer-instagram-status.is-ok{background:#eef7f0;color:#287749}
+.dealer-instagram-status.is-warn{background:#fff8e9;color:#8c671d}
+.dealer-instagram-status.is-error{background:#fff0f0;color:#ad2f35}
+.dealer-instagram-setup{margin-top:12px;padding:14px;border:1px solid #ead8c0;border-radius:13px;background:#fffaf2;color:#5c5145;font-size:.77rem;line-height:1.5}
+.dealer-instagram-setup strong{display:block;margin-bottom:7px;color:#45403a}
+.dealer-instagram-setup p{margin:7px 0;color:#71685c}
+.dealer-instagram-setup>code{display:inline-block;margin:0 5px 5px 0;padding:3px 7px;border-radius:6px;background:#f0e9df;color:#6b5742;font-size:.7rem}
+.dealer-instagram-callback-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 0}
+.dealer-instagram-callback-row small{font-weight:700;color:#71685c}
+.dealer-instagram-callback-row code{overflow-wrap:anywhere;color:#5f5450}
+.dealer-instagram-admin{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;margin-top:12px}
+.dealer-instagram-page-picker{min-width:min(100%,420px);padding:11px;border:1px solid #e8e3df;border-radius:12px;background:#faf9f8}
+.dealer-instagram-page-picker label{display:block;margin-bottom:6px;color:#66686d;font-size:.7rem;font-weight:700}
+.dealer-instagram-page-row{display:flex;gap:8px}
+.dealer-instagram-page-row .form-select{min-width:0}
+.dealer-instagram-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:16px 0}
+.dealer-instagram-metric{padding:14px;border:1px solid #e9e4e0;border-radius:13px;background:#fff}
+.dealer-instagram-metric span{display:block;color:#85878d;font-size:.68rem}
+.dealer-instagram-metric strong{display:block;margin-top:4px;color:#34363b;font-size:1.25rem;font-weight:800}
+.dealer-instagram-match{margin:12px 0;padding:12px 14px;border:1px solid #e7e2de;border-radius:12px;background:#faf9f8;color:#55575c;font-size:.77rem}
+.dealer-instagram-match.has-match{border-color:#cfe7d8;background:#f2faf4;color:#287749}
+.dealer-instagram-disclaimer{margin:14px 0;color:#8b8d92;font-size:.68rem;line-height:1.5}
+.dealer-instagram-posts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.dealer-instagram-post{min-width:0;padding:13px;border:1px solid #e9e4e0;border-radius:12px;background:#fff}
+.dealer-instagram-post.has-match{border-color:#cfe7d8;background:#f8fdf9}
+.dealer-instagram-post-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+.dealer-instagram-post-head small{color:#85878d;font-size:.64rem}
+.dealer-instagram-post-head span{padding:3px 7px;border-radius:20px;background:#f1eeeb;color:#77797e;font-size:.6rem;font-weight:700}
+.dealer-instagram-post.has-match .dealer-instagram-post-head span{background:#e4f4e9;color:#287749}
+.dealer-instagram-post p{display:-webkit-box;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:4;margin:0;color:#5e6065;font-size:.72rem;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+.dealer-instagram-post a{display:inline-block;margin-top:9px;color:#a53137;font-size:.68rem;font-weight:700;text-decoration:none}
+.dealer-instagram-empty{padding:16px;border:1px dashed #ded9d5;border-radius:12px;color:#92949a;text-align:center;font-size:.72rem}
+@media(max-width:640px){
+ .dealer-instagram-panel{padding:14px}
+ .dealer-instagram-head{gap:10px}
+ .dealer-instagram-head h5{font-size:.95rem}
+ .dealer-instagram-head p{font-size:.7rem}
+ .dealer-instagram-head .btn{white-space:nowrap}
+ .dealer-instagram-metrics{gap:7px}
+ .dealer-instagram-metric{padding:10px}
+ .dealer-instagram-metric span{font-size:.6rem}
+ .dealer-instagram-metric strong{font-size:1rem}
+ .dealer-instagram-posts{grid-template-columns:1fr}
+ .dealer-instagram-page-picker{width:100%}
+}
+:root[data-crm-theme="dark"] .dealer-instagram-panel,
+:root[data-crm-theme="dark"] .dealer-instagram-post,
+:root[data-crm-theme="dark"] .dealer-instagram-metric,
+:root[data-crm-theme="dark"] .dealer-instagram-page-picker{background:var(--crm-theme-surface)!important;border-color:var(--crm-theme-border)!important}
+:root[data-crm-theme="dark"] .dealer-instagram-panel h5,
+:root[data-crm-theme="dark"] .dealer-instagram-metric strong{color:var(--crm-theme-text)!important}
+:root[data-crm-theme="dark"] .dealer-instagram-status,
+:root[data-crm-theme="dark"] .dealer-instagram-setup,
+:root[data-crm-theme="dark"] .dealer-instagram-match{background:var(--crm-theme-surface-2)!important;border-color:var(--crm-theme-border)!important;color:var(--crm-theme-muted)!important}
+:root[data-crm-theme="dark"] .dealer-instagram-post p{color:var(--crm-theme-muted)!important}
