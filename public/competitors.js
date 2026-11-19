@@ -182,7 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const [compRes, dealerRes] = await Promise.all([
                 fetch(API_URL),
-                (window.CRMAuth?.can('can_view_dealers') || window.CRMAuth?.can('can_view_competitors')) ? fetch(API_DEALERS) : Promise.resolve(null)
+                (window.CRMAuth?.can('can_view_dealers') || window.CRMAuth?.can('can_view_competitors')) ? fetch(`${API_DEALERS}?view=main`) : Promise.resolve(null)
             ]);
             if (!compRes.ok) throw new Error('Не удалось загрузить конкурентов');
             competitors = await compRes.json();
@@ -569,10 +569,11 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const visible=filtered.slice(0,60);
-        const collectionNames=(competitor.collections||[])
+        const visible=filtered;
+        const collectionNames=[...new Set((competitor.collections||[])
             .map(item=>typeof item==='string'?item:item?.name)
-            .filter(Boolean);
+            .map(name=>String(name||'').trim())
+            .filter(Boolean))];
         const items=visible.map(dealer=>{
             const dealerId=idOf(dealer);
             const key=presenceKey(dealerId);
@@ -591,27 +592,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 </article>`;
             }
 
-            const listId=`dealer-collections-${dealerId.replace(/[^a-z0-9_-]/gi,'')}`;
-            const lineRows=state.present?entries.map((item,index)=>`<div class="dealer-presence-line">
-                <label class="collection-name"><span>Коллекция</span><input class="form-control" list="${listId}" data-presence-field="collection" data-dealer-id="${esc(dealerId)}" data-row-index="${index}" value="${esc(item.collection)}" placeholder="Название коллекции"></label>
-                <label><span>Опт, ₸/м²</span><input class="form-control" inputmode="decimal" data-presence-field="price_opt" data-dealer-id="${esc(dealerId)}" data-row-index="${index}" value="${esc(item.price_opt)}" placeholder="Цена"></label>
-                <label><span>Розница, ₸/м²</span><input class="form-control" inputmode="decimal" data-presence-field="price_retail" data-dealer-id="${esc(dealerId)}" data-row-index="${index}" value="${esc(item.price_retail)}" placeholder="Цена"></label>
-                <button type="button" class="remove-line" data-presence-remove="${esc(dealerId)}" data-row-index="${index}" title="Удалить коллекцию"><i class="bi bi-x-lg"></i></button>
-            </div>`).join(''):'';
-            const datalist=collectionNames.length
-                ? `<datalist id="${listId}">${collectionNames.map(name=>`<option value="${esc(name)}"></option>`).join('')}</datalist>`
-                : '';
+            const lineRows=state.present?entries.map((item,index)=>{
+                const available=collectionNames.some(name=>norm(name)===norm(item.collection));
+                const options=[
+                    `<option value="" ${item.collection?'':'selected'}>${collectionNames.length?'Выберите коллекцию':'Коллекции не добавлены у конкурента'}</option>`,
+                    ...collectionNames.map(name=>`<option value="${esc(name)}" ${norm(name)===norm(item.collection)?'selected':''}>${esc(name)}</option>`),
+                    ...(!available&&item.collection?[`<option value="${esc(item.collection)}" selected>${esc(item.collection)} (ранее отмечена)</option>`]:[])
+                ].join('');
+                return `<div class="dealer-presence-line">
+                    <label class="collection-name"><span>Коллекция</span><select class="form-select" data-presence-field="collection" data-dealer-id="${esc(dealerId)}" data-row-index="${index}" ${!collectionNames.length&&!item.collection?'disabled':''}>${options}</select></label>
+                    <label><span>Опт, ₸/м²</span><input class="form-control" inputmode="decimal" data-presence-field="price_opt" data-dealer-id="${esc(dealerId)}" data-row-index="${index}" value="${esc(item.price_opt)}" placeholder="Цена"></label>
+                    <label><span>Розница, ₸/м²</span><input class="form-control" inputmode="decimal" data-presence-field="price_retail" data-dealer-id="${esc(dealerId)}" data-row-index="${index}" value="${esc(item.price_retail)}" placeholder="Цена"></label>
+                    <button type="button" class="remove-line" data-presence-remove="${esc(dealerId)}" data-row-index="${index}" title="Удалить коллекцию"><i class="bi bi-x-lg"></i></button>
+                </div>`;
+            }).join(''):'';
             return `<article class="dealer-presence-card">
                 <div class="dealer-presence-card-head">
                     <div><a class="dealer-presence-name" href="${profileHref}"><strong>${esc(dealer.name||'Дилер')}</strong></a><small><i class="bi bi-geo-alt me-1"></i>${esc(dealer.city||'Город не указан')}</small></div>
                     <label class="dealer-presence-toggle"><input type="checkbox" data-presence-toggle="${esc(dealerId)}" ${state.present?'checked':''}> Есть конкурент</label>
                 </div>
-                ${state.present?`<div class="dealer-presence-lines">${lineRows||'<div class="dealer-presence-empty">Коллекции пока не указаны</div>'}</div>${datalist}`:''}
+                ${state.present?`<div class="dealer-presence-lines">${lineRows||'<div class="dealer-presence-empty">Коллекции пока не указаны</div>'}</div>`:''}
                 ${state.present||dirty?`<div class="dealer-presence-actions">${state.present?`<button type="button" class="btn btn-sm btn-outline-secondary" data-presence-add="${esc(dealerId)}"><i class="bi bi-plus-lg me-1"></i>Добавить коллекцию</button>`:''}<button type="button" class="btn btn-sm btn-danger" data-presence-save="${esc(dealerId)}" ${!dirty||savingPresence.has(key)?'disabled':''}>${savingPresence.has(key)?'Сохраняем…':'Сохранить'}</button></div>`:''}
             </article>`;
         }).join('');
-        const limit=filtered.length>visible.length?`<div class="dealer-presence-limit">Показаны первые ${visible.length} дилеров. Уточните поиск, чтобы найти остальных.</div>`:'';
-        presenceContainer.innerHTML=items+limit;
+        presenceContainer.innerHTML=items;
     }
 
     function openDealers(id) {
@@ -1123,7 +1127,31 @@ document.addEventListener('DOMContentLoaded', () => {
     presenceSearch?.addEventListener('input',renderDealerPresence);
     presenceFilter?.addEventListener('change',renderDealerPresence);
 
+    function updateDealerPresenceField(input) {
+        if(!input||!canEditDealers) return;
+        const dealer=allDealers.find(item=>idOf(item)===input.dataset.dealerId);
+        const competitor=competitors.find(item=>idOf(item)===currentPresenceCompetitorId);
+        if(!dealer||!competitor) return;
+        const field=input.dataset.presenceField;
+        if(!['collection','price_opt','price_retail'].includes(field)) return;
+        const key=presenceKey(idOf(dealer));
+        const current=dealerPresenceState(dealer,competitor);
+        const state={present:true,entries:(current.entries||[]).map(item=>({...item}))};
+        const index=Number(input.dataset.rowIndex);
+        if(!Number.isInteger(index)||index<0) return;
+        while(state.entries.length<=index) state.entries.push({collection:'',price_opt:'',price_retail:''});
+        state.entries[index][field]=input.value;
+        dealerPresenceDrafts.set(key,state);
+        const save=[...presenceContainer.querySelectorAll('[data-presence-save]')].find(button=>button.dataset.presenceSave===idOf(dealer));
+        if(save) save.disabled=savingPresence.has(key);
+    }
+
     presenceContainer?.addEventListener('change',event=>{
+        const field=event.target.closest('[data-presence-field]');
+        if(field&&field.tagName==='SELECT') {
+            updateDealerPresenceField(field);
+            return;
+        }
         const toggle=event.target.closest('[data-presence-toggle]');
         if(!toggle||!canEditDealers) return;
         const dealer=allDealers.find(item=>idOf(item)===toggle.dataset.presenceToggle);
@@ -1139,22 +1167,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     presenceContainer?.addEventListener('input',event=>{
         const input=event.target.closest('[data-presence-field]');
-        if(!input||!canEditDealers) return;
-        const dealer=allDealers.find(item=>idOf(item)===input.dataset.dealerId);
-        const competitor=competitors.find(item=>idOf(item)===currentPresenceCompetitorId);
-        if(!dealer||!competitor) return;
-        const key=presenceKey(idOf(dealer));
-        const current=dealerPresenceState(dealer,competitor);
-        const state={present:true,entries:(current.entries||[]).map(item=>({...item}))};
-        const index=Number(input.dataset.rowIndex);
-        if(!Number.isInteger(index)||index<0) return;
-        while(state.entries.length<=index) state.entries.push({collection:'',price_opt:'',price_retail:''});
-        const field=input.dataset.presenceField;
-        if(!['collection','price_opt','price_retail'].includes(field)) return;
-        state.entries[index][field]=input.value;
-        dealerPresenceDrafts.set(key,state);
-        const save=[...presenceContainer.querySelectorAll('[data-presence-save]')].find(button=>button.dataset.presenceSave===idOf(dealer));
-        if(save) save.disabled=savingPresence.has(key);
+        if(input) updateDealerPresenceField(input);
     });
 
     presenceContainer?.addEventListener('click',event=>{
