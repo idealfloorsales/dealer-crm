@@ -733,146 +733,115 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================
     function generatePrintHTML(data) {
         const d = data || {};
-        
-        const val = (v) => v ? `<div class="print-value">${escapeHtml(v)}</div>` : `<div class="print-value empty"></div>`;
-        const blockVal = (v) => v ? `<div class="print-block-value">${escapeHtml(v)}</div>` : `<div class="print-block-value empty"></div>`;
-        
+        const hasValue = value => value !== undefined && value !== null && String(value).trim() !== '';
+        const field = (label, value, span) => {
+            const present = hasValue(value);
+            const content = present ? escapeHtml(String(value)) : '&nbsp;';
+            return '<div class="print-field print-span-' + (span || 6) + '">' +
+                '<div class="print-field-label">' + label + '</div>' +
+                '<div class="print-field-value' + (present ? '' : ' is-empty') + '">' + content + '</div>' +
+            '</div>';
+        };
+        const writingArea = (label, value, sizeClass) => {
+            const content = hasValue(value) ? escapeHtml(String(value)) : '';
+            return '<div class="print-writing-field ' + (sizeClass || '') + '">' +
+                '<div class="print-field-label">' + label + '</div>' +
+                '<div class="print-writing-area">' + content + '</div>' +
+            '</div>';
+        };
+        const sectionTitle = (number, title) =>
+            '<div class="print-section-title"><span>' + String(number).padStart(2, '0') + '</span><strong>' + title + '</strong></div>';
+
         let seqNumStr = '______';
         if (d.id && allReclamations.length > 0) {
-            // Абсолютный номер с момента первой рекламации
-            const sortedAll = [...allReclamations].sort((a,b) => new Date(a.createdAt) - new Date(b.createdAt));
+            const sortedAll = [...allReclamations].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
             const idx = sortedAll.findIndex(x => x.id === d.id);
-            if (idx !== -1) {
-                seqNumStr = String(idx + 1).padStart(3, '0');
-            }
+            if (idx !== -1) seqNumStr = String(idx + 1).padStart(3, '0');
         }
 
-        const formattedDate = d.date ? new Date(d.date).toLocaleDateString('ru-RU') : '';
-        const purchaseDate = d.purchaseDate ? new Date(d.purchaseDate).toLocaleDateString('ru-RU') : '';
+        const formattedDate = hasValue(d.date) ? new Date(d.date).toLocaleDateString('ru-RU') : '';
+        const purchaseDate = hasValue(d.purchaseDate) ? new Date(d.purchaseDate).toLocaleDateString('ru-RU') : '';
+        const batchNumbers = Array.isArray(d.batchNumbers) ? d.batchNumbers.join(', ') : (d.batchNumbers || '');
+        const totalArea = hasValue(d.totalArea) ? String(d.totalArea) + ' м²' : '';
 
-        return `
-            <div class="print-header">
-                <div class="print-title">АКТ РЕКЛАМАЦИИ № ${seqNumStr}</div>
-                <div class="print-subtitle">Документ фиксации претензии по качеству товара</div>
-            </div>
+        return [
+            '<div class="print-document">',
+                '<div class="print-top-accent"></div>',
+                '<header class="print-brand-header">',
+                    '<div class="print-brand-lockup">',
+                        '<img class="print-brand-logo" src="logo.png" alt="IDEAL FLOOR">',
+                        '<div class="print-brand-copy"><strong>КОНТРОЛЬ КАЧЕСТВА</strong><small>Документ по качеству товара</small></div>',
+                    '</div>',
+                    '<div class="print-document-mark"><span>IDEAL FLOOR CRM</span><strong>СЕРВИСНЫЙ ДОКУМЕНТ</strong></div>',
+                '</header>',
+                '<div class="print-title-row">',
+                    '<div class="print-title-copy"><div class="print-eyebrow">ФИКСАЦИЯ ОБРАЩЕНИЯ</div><h1>Акт рекламации</h1><p>Претензия по качеству товара</p></div>',
+                    '<div class="print-number"><small>Номер акта</small><strong>№ ' + seqNumStr + '</strong></div>',
+                '</div>',
+                '<div class="print-fields print-meta-grid">',
+                    field('Дата составления', formattedDate, 4),
+                    field('Дилер / магазин', d.dealerName, 8),
+                '</div>',
 
-            <div class="print-row">
-                <div class="print-label">Дата составления:</div>
-                <div class="print-value" style="flex-grow: 0; width: 150px;">${formattedDate}</div>
-                <div class="print-label" style="margin-left: 20px;">Дилер (Магазин):</div>
-                ${val(d.dealerName)}
-            </div>
-            
-            <div class="print-section">
-                <div class="print-section-title">1. Общая информация о товаре</div>
-                <div class="print-row">
-                    <div class="print-label">Товар (Название / Артикул):</div>
-                    ${val(d.productName)}
-                </div>
-                <div class="print-row">
-                    <div class="print-label">Номер накладной отгрузки:</div>
-                    ${val(d.invoiceNumber)}
-                    <div class="print-label" style="margin-left: 20px;">Дата покупки:</div>
-                    <div class="print-value" style="flex-grow: 0; width: 150px;">${purchaseDate}</div>
-                </div>
-            </div>
+                '<section class="print-section">',
+                    sectionTitle(1, 'Товар и поставка'),
+                    '<div class="print-fields">',
+                        field('Наименование товара / артикул', d.productName, 12),
+                        field('Номер накладной', d.invoiceNumber, 4),
+                        field('Дата покупки', purchaseDate, 4),
+                        field('Номера партий', batchNumbers, 4),
+                    '</div>',
+                '</section>',
 
-            <div class="print-section">
-                <div class="print-section-title">2. Данные объекта и клиента</div>
-                <div class="print-row">
-                    <div class="print-label">ФИО клиента:</div>
-                    ${val(d.clientName)}
-                    <div class="print-label" style="margin-left: 20px;">Телефон:</div>
-                    <div class="print-value" style="flex-grow: 0; width: 250px;">${escapeHtml(d.clientPhone || '')}</div>
-                </div>
-                <div class="print-row">
-                    <div class="print-label">Адрес объекта:</div>
-                    ${val(d.address)}
-                </div>
-                <div class="print-row">
-                    <div class="print-label">Тип помещения:</div>
-                    <div class="print-value" style="flex-grow: 0; width: 250px;">${escapeHtml(d.houseType || '')}</div>
-                    <div class="print-label" style="margin-left: 20px;">Этаж:</div>
-                    <div class="print-value" style="flex-grow: 0; width: 100px;">${escapeHtml(d.floor || '')}</div>
-                </div>
-                <div class="print-row">
-                    <div class="print-label">Общая площадь помещения:</div>
-                    <div class="print-value" style="flex-grow: 0; width: 150px;">${escapeHtml(d.totalArea ? d.totalArea + ' м²' : '')}</div>
-                    <div class="print-label" style="margin-left: 20px;">Купленный объем товара:</div>
-                    <div class="print-value" style="flex-grow: 0; width: 150px;">${escapeHtml(d.purchasedVolume || '')}</div>
-                </div>
-                <div class="print-row">
-                    <div class="print-label">Номера партий:</div>
-                    ${val(d.batchNumbers && d.batchNumbers.length ? d.batchNumbers.join(', ') : '')}
-                </div>
-            </div>
+                '<section class="print-section">',
+                    sectionTitle(2, 'Клиент и объект'),
+                    '<div class="print-fields">',
+                        field('ФИО клиента', d.clientName, 7),
+                        field('Телефон', d.clientPhone, 5),
+                        field('Адрес объекта', d.address, 12),
+                        field('Тип помещения', d.houseType, 4),
+                        field('Этаж', d.floor, 2),
+                        field('Площадь помещения', totalArea, 3),
+                        field('Купленный объём', d.purchasedVolume, 3),
+                    '</div>',
+                '</section>',
 
-            <div class="print-section">
-                <div class="print-section-title">3. Технические условия монтажа</div>
-                
-                <div class="print-row">
-                    <div class="print-label">Тип основания:</div>
-                    ${val(d.baseType)}
-                    <div class="print-label" style="margin-left: 20px;">Время сушки пола:</div>
-                    <div class="print-value" style="flex-grow: 0; width: 200px;">${escapeHtml(d.dryingTime || '')}</div>
-                </div>
-                
-                <div class="print-row">
-                    <div class="print-label">Ровность пола (перепад на 1м):</div>
-                    ${val(d.floorFlatness)}
-                    <div class="print-label" style="margin-left: 20px;">Акклиматизация:</div>
-                    <div class="print-value" style="flex-grow: 0; width: 200px;">${escapeHtml(d.acclimatization || '')}</div>
-                </div>
-                
-                <div class="print-row">
-                    <div class="print-label">Способ хранения до укладки:</div>
-                    ${val(d.storageMethod)}
-                    <div class="print-label" style="margin-left: 20px;">Подложка:</div>
-                    <div class="print-value" style="flex-grow: 0; width: 200px;">${escapeHtml(d.underlayment || '')}</div>
-                </div>
+                '<section class="print-section">',
+                    sectionTitle(3, 'Условия монтажа'),
+                    '<div class="print-fields">',
+                        field('Тип основания', d.baseType, 6),
+                        field('Время сушки пола', d.dryingTime, 6),
+                        field('Ровность пола · перепад на 1 м', d.floorFlatness, 6),
+                        field('Акклиматизация', d.acclimatization, 6),
+                        field('Хранение до укладки', d.storageMethod, 6),
+                        field('Подложка', d.underlayment, 6),
+                        field('Система «тёплый пол»', d.warmFloor, 4),
+                        field('Кто производил монтаж', d.installer, 8),
+                    '</div>',
+                '</section>',
 
-                <div class="print-row">
-                    <div class="print-label">Система "Теплый пол":</div>
-                    ${val(d.warmFloor)}
-                    <div class="print-label" style="margin-left: 20px;">Кто производил монтаж:</div>
-                    <div class="print-value" style="flex-grow: 0; width: 250px;">${escapeHtml(d.installer || '')}</div>
-                </div>
-            </div>
+                '<section class="print-section">',
+                    sectionTitle(4, 'Дефект и требование клиента'),
+                    '<div class="print-fields">',
+                        field('Когда выявлен дефект', d.defectMoment, 6),
+                        field('Объём заявленного брака', d.defectVolume, 6),
+                    '</div>',
+                    writingArea('Подробное описание проблемы', d.description, 'print-writing-large'),
+                    field('Требование клиента', d.clientDemand, 12),
+                '</section>',
 
-            <div class="print-section">
-                <div class="print-section-title">4. Суть претензии и требования</div>
-                <div class="print-row">
-                    <div class="print-label">Момент выявления дефекта:</div>
-                    ${val(d.defectMoment)}
-                    <div class="print-label" style="margin-left: 20px;">Объем заявленного брака:</div>
-                    <div class="print-value" style="flex-grow: 0; width: 150px;">${escapeHtml(d.defectVolume || '')}</div>
-                </div>
-                
-                <div class="print-block-label" style="margin-top: 15px;">Подробное описание проблемы:</div>
-                ${blockVal(d.description)}
-                
-                <div class="print-block-label" style="margin-top: 15px;">Требование клиента:</div>
-                <div class="print-row">
-                    ${val(d.clientDemand)}
-                </div>
-            </div>
+                '<section class="print-section">',
+                    sectionTitle(5, 'Решение по рекламации'),
+                    writingArea('Решение / комментарий', d.resolution, 'print-writing-medium'),
+                '</section>',
 
-            <div class="print-section">
-                <div class="print-section-title">5. Решение по рекламации</div>
-                ${blockVal(d.resolution)}
-            </div>
-
-            <div class="print-signatures">
-                <div class="sig-box">
-                    <div class="sig-line"></div>
-                    <div class="sig-text">Подпись клиента (ФИО)</div>
-                </div>
-                <div class="sig-box">
-                    <div class="sig-line"></div>
-                    <div class="sig-text">Представитель дилера (ФИО)</div>
-                </div>
-            </div>
-        `;
+                '<div class="print-signatures">',
+                    '<div class="print-signature"><div class="print-signature-line"></div><div class="print-signature-label">Подпись клиента · ФИО</div><div class="print-signature-date">Дата: __________________</div></div>',
+                    '<div class="print-signature"><div class="print-signature-line"></div><div class="print-signature-label">Представитель дилера · ФИО</div><div class="print-signature-date">Дата: __________________</div></div>',
+                '</div>',
+                '<footer class="print-footer"><span>IDEAL FLOOR · Акт рекламации</span><span>№ ' + seqNumStr + '</span></footer>',
+            '</div>'
+        ].join('\n');
     }
 
     window.printBlankForm = () => {
