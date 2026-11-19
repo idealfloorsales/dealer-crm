@@ -543,6 +543,7 @@ html,body.competitors-page{max-width:100%;overflow-x:hidden}
 /* Fixed currency and dealer presence layout */
 .competitor-collection-edit-details{grid-template-columns:repeat(5,minmax(0,1fr))}
 .competitor-collection-edit-details .wide{grid-column:1/-1}
+.dealer-presence-tools[hidden]{display:none}
 .dealer-presence-name{color:inherit;text-decoration:none}
 .dealer-presence-name:hover{color:#a5080e;text-decoration:underline}
 .dealer-presence-toggle{cursor:pointer}
