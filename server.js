@@ -425,7 +425,8 @@ function auditRouteMeta(req) {
     const path = req.path || '';
     let module = 'system';
     let entityType = 'record';
-    if (path.startsWith('/api/admin/users')) { module='users'; entityType='user'; }
+    if (path.includes('/instagram-monitor')) { module='dealers'; entityType='dealer'; }
+    else if (path.startsWith('/api/admin/users')) { module='users'; entityType='user'; }
     else if (path.startsWith('/api/dealers') && path.includes('/products')) { module='matrix'; entityType='dealer'; }
     else if (path.startsWith('/api/dealers') && path.includes('/visits')) { module='visits'; entityType='dealer'; }
     else if (path.startsWith('/api/dealers')) { module='dealers'; entityType='dealer'; }
@@ -440,7 +441,7 @@ function auditRouteMeta(req) {
     else if (path.startsWith('/api/exports')) { module='exports'; entityType='export'; }
     else if (path.startsWith('/api/statuses') || path.startsWith('/api/sectors')) { module='settings'; entityType=path.startsWith('/api/statuses')?'status':'sector'; }
     let action = req.method === 'DELETE' ? 'delete' : ((req.method === 'PUT' || req.method === 'PATCH') ? 'update' : 'create');
-    if (path === '/api/sales' || path.startsWith('/api/exports') || path === '/api/workshop/print-log' || path === '/api/workshop/correction' || /\/visits(?:\/|$)/.test(path) || /\/receive$/.test(path) || /\/material-movement$/.test(path) || /\/production$/.test(path) || /\/writeoff$/.test(path) || /\/dealer-movement$/.test(path) || /\/opening-balance$/.test(path) || /\/stocktake$/.test(path) || path === '/api/admin/import-catalog') action='execute';
+    if (path === '/api/sales' || path.startsWith('/api/exports') || path === '/api/workshop/print-log' || /\/instagram-monitor\/sync$/.test(path) || path === '/api/workshop/correction' || /\/visits(?:\/|$)/.test(path) || /\/receive$/.test(path) || /\/material-movement$/.test(path) || /\/production$/.test(path) || /\/writeoff$/.test(path) || /\/dealer-movement$/.test(path) || /\/opening-balance$/.test(path) || /\/stocktake$/.test(path) || path === '/api/admin/import-catalog') action='execute';
     return { module, entityType, action };
 }
 
@@ -501,6 +502,7 @@ function auditEntityLabel(before, after, requestData) {
 
 function auditSummary(req, route, label) {
     const path=req.path || '';
+    if (path.endsWith('/instagram-monitor/sync')) return 'Обновил статистику Instagram дилера' + (label ? ' «'+label+'»' : '');
     const suffix=label ? ' «'+label+'»' : '';
     if (path === '/api/dealers' && req.method === 'POST' && req.body && req.body._cloneSourceId) {
         const source=String(req.body._cloneSourceLabel || req.body._cloneSourceDealerId || '').trim();
