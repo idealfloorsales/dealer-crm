@@ -556,3 +556,25 @@ html,body.competitors-page{max-width:100%;overflow-x:hidden}
   .competitor-collection-edit-details{grid-template-columns:repeat(2,minmax(0,1fr))}
   .competitor-collection-edit-details .wide{grid-column:1/-1}
 }
+
+
+/* Competitor list view: readable metrics and direct dealer access */
+.competitor-card-metric-action{
+  width:100%;min-width:0;appearance:none;border:0;font:inherit;text-align:left;color:inherit;cursor:pointer;
+}
+.competitor-card-metric-action:hover{background:#f0ece8}
+.competitor-card-metric-action:focus-visible{outline:2px solid #b9040a;outline-offset:2px}
+.competitors-grid.is-list .competitor-card{
+  grid-template-columns:minmax(230px,1.05fr) minmax(340px,1.45fr) minmax(180px,.8fr) minmax(220px,.9fr) minmax(220px,.95fr);
+}
+@media(max-width:1200px){
+  .competitors-grid.is-list .competitor-card{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px}
+  .competitors-grid.is-list .competitor-card-head{flex:1 1 230px;padding:2px!important}
+  .competitors-grid.is-list .competitor-card-metrics{flex:1 1 320px;min-width:320px;padding:0!important}
+  .competitors-grid.is-list .competitor-card-info{flex:1 1 160px;padding:0!important}
+  .competitors-grid.is-list .competitor-badge-row{flex:1 1 180px;padding:0!important}
+  .competitors-grid.is-list .competitor-monitoring{flex:1 1 210px;margin:0!important}
+}
+@media(max-width:600px){
+  .competitors-grid.is-list .competitor-card-metrics{min-width:0;flex:1 1 100%}
+}
