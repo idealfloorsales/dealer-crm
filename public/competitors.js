@@ -182,7 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const [compRes, dealerRes] = await Promise.all([
                 fetch(API_URL),
-                (window.CRMAuth?.can('can_view_dealers') || window.CRMAuth?.can('can_edit_dealer')) ? fetch(API_DEALERS) : Promise.resolve(null)
+                (window.CRMAuth?.can('can_view_dealers') || window.CRMAuth?.can('can_view_competitors')) ? fetch(API_DEALERS) : Promise.resolve(null)
             ]);
             if (!compRes.ok) throw new Error('Не удалось загрузить конкурентов');
             competitors = await compRes.json();
