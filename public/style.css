@@ -14162,3 +14162,33 @@ body:not(.map-page) .dealer-list-toolbar {border-radius:16px!important}
   border-color:#414249!important;
   color:#e3e4e8!important;
 }
+
+
+/* Sales summary: separate remaining plan from pace and month forecast. */
+.summary-deviation-cell{display:grid;gap:5px}
+.summary-deviation-main{display:flex;align-items:baseline;justify-content:space-between;gap:7px;padding-bottom:4px;border-bottom:1px solid #e8e5e2}
+.summary-deviation-main span{margin:0;color:#777980;font-size:.5rem;font-weight:750;line-height:1.15}
+.summary-deviation-main strong{flex:0 0 auto;font-size:.68rem;font-weight:850;line-height:1.1;text-align:right;white-space:nowrap}
+.summary-deviation-main strong.is-negative{color:#b9040a}
+.summary-deviation-main strong.is-positive{color:#197450}
+.summary-deviation-main strong.is-neutral{color:#74767b}
+.summary-deviation-lines{gap:4px;margin-top:0}
+.summary-deviation-row{grid-template-columns:minmax(0,.9fr) minmax(0,1fr) auto;align-items:start;gap:4px}
+.summary-values .summary-deviation-row>span{white-space:normal;font-size:.49rem;line-height:1.1}
+.summary-deviation-row>strong{font-size:.56rem}
+.summary-deviation-row>em{font-size:.47rem}
+.summary-deviation-note{display:block;margin-top:-1px;color:#92949a;font-size:.43rem;font-weight:550;line-height:1.25}
+.summary-deviation-empty{margin-top:0}
+@media (max-width:1199px){
+    .summary-deviation-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto}
+    .summary-deviation-row>strong{font-size:.62rem}
+}
+@media (max-width:767px){
+    .summary-deviation-main span{font-size:.55rem}
+    .summary-deviation-main strong{font-size:.75rem}
+    .summary-deviation-row{grid-template-columns:minmax(110px,.8fr) minmax(110px,1fr) auto}
+    .summary-values .summary-deviation-row>span{font-size:.55rem}
+    .summary-deviation-row>strong{font-size:.62rem}
+    .summary-deviation-row>em{font-size:.52rem}
+    .summary-deviation-note{font-size:.48rem}
+}

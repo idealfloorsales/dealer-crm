@@ -1862,3 +1862,12 @@ html:root[data-crm-theme="dark"] .rec-card-next.is-missing,
 html:root[data-crm-theme="dark"] .rec-view-next.is-missing{background:rgba(185,4,10,.12)!important;color:#e6b1b3!important}
 html:root[data-crm-theme="dark"] .rec-legacy-status-note{background:var(--dark-yellow-bg)!important;color:#e7c47e!important}
 
+
+
+/* Sales summary labels for the expanded pace / forecast display. */
+html:root[data-crm-theme="dark"] .sales-page .summary-deviation-main{border-color:var(--dark-line)}
+html:root[data-crm-theme="dark"] .sales-page .summary-deviation-main span,
+html:root[data-crm-theme="dark"] .sales-page .summary-deviation-note{color:var(--dark-muted)}
+html:root[data-crm-theme="dark"] .sales-page .summary-deviation-main strong.is-negative{color:#ff989f}
+html:root[data-crm-theme="dark"] .sales-page .summary-deviation-main strong.is-positive{color:#92d5a8}
+html:root[data-crm-theme="dark"] .sales-page .summary-deviation-main strong.is-neutral{color:var(--dark-muted)}

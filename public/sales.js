@@ -644,42 +644,51 @@ document.addEventListener('DOMContentLoaded', () => {
         const factValue = Number(fact) || 0;
 
         if (!(planValue > 0)) {
-            return `<div class="summary-deviation-cell">
-                <span>Отклонение</span>
-                <div class="summary-deviation-empty">Нет плана</div>
-            </div>`;
+            return '<div class="summary-deviation-cell">' +
+                '<div class="summary-deviation-main"><span>Осталось до плана</span><strong class="is-neutral">—</strong></div>' +
+                '<small class="summary-deviation-note">Задайте месячный план, чтобы рассчитать темп и прогноз.</small>' +
+            '</div>';
         }
 
         const progress = calculateProgress(planValue, factValue, daysInMonth, currentDay);
         const monthlyDiff = progress.forecast - planValue;
-        const monthlyPct = planValue > 0 ? (monthlyDiff / planValue) * 100 : 0;
-
-        const row = (label, diff, pct) => `<div class="summary-deviation-row is-${deviationTone(diff)}">
-            <span>${label}</span>
-            <strong>${formatSigned(diff, ' м²')}</strong>
-            <em>${formatSigned(pct, '%')}</em>
-        </div>`;
-
-        const monthRow = row('Месяц', monthlyDiff, monthlyPct);
+        const monthlyPct = (monthlyDiff / planValue) * 100;
+        const row = (label, diff, pct) => '<div class="summary-deviation-row is-' + deviationTone(diff) + '">' +
+            '<span>' + label + '</span>' +
+            '<strong>' + formatSigned(diff, ' м²') + '</strong>' +
+            '<em>' + formatSigned(pct, '%') + '</em>' +
+        '</div>';
 
         if (!isCurrentSelectedMonth()) {
-            return `<div class="summary-deviation-cell">
-                <span>Отклонение</span>
-                <div class="summary-deviation-lines is-single">${monthRow}</div>
-            </div>`;
+            const resultDiff = factValue - planValue;
+            const resultPct = (resultDiff / planValue) * 100;
+            return '<div class="summary-deviation-cell">' +
+                '<div class="summary-deviation-main">' +
+                    '<span>Итог месяца к плану</span>' +
+                    '<strong class="is-' + deviationTone(resultDiff) + '">' + formatSigned(resultDiff, ' м²') + '</strong>' +
+                '</div>' +
+                '<small class="summary-deviation-note">Факт: ' + fmt(factValue) + ' м² из плана ' + fmt(planValue) + ' м² · ' + formatSigned(resultPct, '%') + '</small>' +
+            '</div>';
         }
 
         const planToDate = planValue * (Math.max(0, Math.min(currentDay, daysInMonth)) / Math.max(1, daysInMonth));
         const todayDiff = factValue - planToDate;
         const todayPct = planToDate > 0 ? (todayDiff / planToDate) * 100 : 0;
+        const remaining = planValue - factValue;
+        const remainingLabel = remaining > 0.005 ? 'Осталось до плана' : remaining < -0.005 ? 'План перевыполнен на' : 'План выполнен';
+        const remainingTone = remaining > 0.005 ? 'negative' : remaining < -0.005 ? 'positive' : 'neutral';
 
-        return `<div class="summary-deviation-cell">
-            <span>Отклонение</span>
-            <div class="summary-deviation-lines">
-                ${row('На сегодня', todayDiff, todayPct)}
-                ${monthRow}
-            </div>
-        </div>`;
+        return '<div class="summary-deviation-cell">' +
+            '<div class="summary-deviation-main">' +
+                '<span>' + remainingLabel + '</span>' +
+                '<strong class="is-' + remainingTone + '">' + fmt(Math.abs(remaining)) + ' м²</strong>' +
+            '</div>' +
+            '<div class="summary-deviation-lines">' +
+                row('Темп к дате', todayDiff, todayPct) +
+                row('Прогноз к плану', monthlyDiff, monthlyPct) +
+            '</div>' +
+            '<small class="summary-deviation-note">Прогноз: ' + fmt(progress.forecast) + ' м² при текущем темпе</small>' +
+        '</div>';
     }
 
     function captureState() {
