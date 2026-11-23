@@ -64,6 +64,11 @@
 .ideal-deck-diagram-flow .ideal-deck-diagram-item{border-left:3px solid #b9040a}
 .ideal-deck-diagram-steps .ideal-deck-diagram-index{background:#b9040a}
 .ideal-deck-diagram-grid .ideal-deck-diagram-item:nth-child(3n){background:#fbf4f3}
+.ideal-deck-schemes{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:7px;margin:0 0 10px}
+.ideal-deck-schemes figure{min-width:0;margin:0;overflow:hidden;border:1px solid #e6e2de;border-radius:10px;background:#f8f7f5}
+.ideal-deck-schemes a{display:grid;place-items:center;min-height:90px;padding:5px}
+.ideal-deck-schemes img{display:block;max-width:100%;max-height:170px;object-fit:contain}
+.ideal-deck-schemes figcaption{padding:6px 8px;border-top:1px solid #e7e3df;color:#77797f;font-size:.44rem;line-height:1.35}
 .ideal-deck-slide-note{display:flex;align-items:flex-start;gap:8px;margin-top:11px;padding:11px 12px;border-radius:11px;background:#f7f5f3;color:#81838a;font-size:.5rem;line-height:1.45}
 .ideal-deck-slide-note i{color:#a50912;font-size:.8rem}
 .ideal-deck-presenter-footer{display:grid;grid-template-columns:1fr minmax(160px,auto) 1fr;align-items:center;gap:12px;min-height:66px;padding:10px 22px;border-top:1px solid #e2dfdc;background:#fff}
@@ -120,6 +125,8 @@
 :root[data-crm-theme="dark"] .ideal-deck-slide,:root[data-crm-theme="dark"] .ideal-deck-presenter-footer,:root[data-crm-theme="dark"] .ideal-deck-editor-panel,:root[data-crm-theme="dark"] .ideal-deck-editor-footer{border-color:var(--crm-border,#3a3b40);background:var(--crm-surface,#202126);color:var(--crm-text,#f2f2f2)}
 :root[data-crm-theme="dark"] .ideal-deck-slide h1,:root[data-crm-theme="dark"] .ideal-deck-presenter-counter>strong,:root[data-crm-theme="dark"] .ideal-deck-edit-slide>header>div:first-child strong,:root[data-crm-theme="dark"] .ideal-deck-editor-head h2{color:var(--crm-text,#f2f2f2)}
 :root[data-crm-theme="dark"] .ideal-deck-slide-subtitle,:root[data-crm-theme="dark"] .ideal-deck-slide-bullets li{color:var(--crm-muted,#b5b7bd)}
+:root[data-crm-theme="dark"] .ideal-deck-schemes figure{border-color:var(--crm-border,#3a3b40);background:var(--crm-raised,#292a2f)}
+:root[data-crm-theme="dark"] .ideal-deck-schemes figcaption{border-color:var(--crm-border,#3a3b40);color:var(--crm-muted,#b5b7bd)}
 :root[data-crm-theme="dark"] .ideal-deck-diagram-item,:root[data-crm-theme="dark"] .ideal-deck-slide-note,:root[data-crm-theme="dark"] .ideal-deck-edit-slide,:root[data-crm-theme="dark"] .ideal-deck-add-slide{border-color:var(--crm-border,#3a3b40);background:var(--crm-raised,#292a2f);color:var(--crm-text,#f2f2f2)}
 :root[data-crm-theme="dark"] .ideal-deck-diagram-item strong{color:var(--crm-text,#f2f2f2)}
 :root[data-crm-theme="dark"] .ideal-deck-diagram-item small,:root[data-crm-theme="dark"] .ideal-deck-slide-note{color:var(--crm-muted,#b5b7bd)}
