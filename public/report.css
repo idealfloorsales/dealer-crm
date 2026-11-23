@@ -206,6 +206,21 @@ thead .matrix-summary-col{z-index:20!important;background:#f8f6f3!important}
 }
 .exhibition-field-status-filters button.active{background:#27282c;border-color:#27282c;color:#fff}
 .exhibition-field-product-list{display:flex;flex-direction:column;gap:6px;padding:10px 12px 14px}
+.exhibition-field-bulk-actions{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+  padding:10px 12px;border:1px solid var(--ex-line);border-radius:12px;
+  background:var(--crm-theme-surface,#fff)
+}
+.exhibition-field-bulk-actions button{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:36px;
+  padding:7px 12px;border:1px solid #b9040a;border-radius:10px;background:#b9040a;
+  color:#fff;font:800 11px/1.2 Onest,sans-serif;cursor:pointer;
+  transition:background .16s,border-color .16s,transform .16s
+}
+.exhibition-field-bulk-actions button:hover:not(:disabled){background:#98030a;border-color:#98030a;transform:translateY(-1px)}
+.exhibition-field-bulk-actions button:disabled{background:var(--crm-theme-surface,#fff);border-color:var(--ex-line);color:var(--crm-theme-muted,#777);cursor:default}
+.exhibition-field-bulk-actions button:focus-visible{outline:2px solid #b9040a;outline-offset:2px}
+.exhibition-field-bulk-actions small{color:var(--crm-theme-muted,#777);font-size:10px;line-height:1.4}
 .exhibition-field-product{
   display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:10px;align-items:center;min-height:64px;padding:9px 10px;border:1px solid #ebe7e3;border-radius:12px;background:#fff
 }

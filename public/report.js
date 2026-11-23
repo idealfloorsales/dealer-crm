@@ -153,10 +153,57 @@ document.addEventListener('DOMContentLoaded', () => {
         if(!stagedPresence.size)editHistory.length=0;
         renderMatrix();
     }
+    function markAllVisibleSamples(dealerId){
+        if(!batchEditMode||batchSaving||!canEditMatrix()||!dealerId||!fieldProductList)return;
+        const index=fullData.headers.findIndex(header=>idOf(header.id)===String(dealerId));
+        if(index<0)return;
+        const productIds=[...new Set([...fieldProductList.querySelectorAll('[data-exhibition-presence]')]
+            .map(button=>String(button.dataset.editKey||'')).filter(Boolean))];
+        const plans=[];
+        productIds.forEach(productId=>{
+            const row=fullData.matrix.find(item=>item.type!=='pos'&&String(item.id)===productId);
+            if(!row)return;
+            const original=Boolean(n(row.dealers[index]?.value));
+            const key=presenceKey(dealerId,productId);
+            const previous=stagedPresence.get(key)||null;
+            const current=previous?Boolean(previous.present):original;
+            if(current)return;
+            const next=original?null:{dealerId:String(dealerId),productId,present:true,expectedPresent:original};
+            plans.push({key,previous,next});
+        });
+        if(!plans.length){
+            window.showToast?.('Все образцы в текущем списке уже отмечены','info');
+            return;
+        }
+        let projectedSize=stagedPresence.size;
+        plans.forEach(plan=>{
+            if(plan.previous&&!plan.next)projectedSize--;
+            else if(!plan.previous&&plan.next)projectedSize++;
+        });
+        if(projectedSize>250){
+            window.showToast?.('За один раз можно сохранить до 250 отметок','warning');
+            return;
+        }
+        const historyGroup=[];
+        plans.forEach(plan=>{
+            historyGroup.push({key:plan.key,previous:plan.previous});
+            if(plan.next)stagedPresence.set(plan.key,plan.next);
+            else stagedPresence.delete(plan.key);
+        });
+        editHistory.push({batch:historyGroup});
+        renderMatrix();
+        window.showToast?.('Отмечено '+plans.length+' образцов. Изменения пока не сохранены','success');
+    }
+
     function undoStagedPresence(){
         if(batchSaving||!editHistory.length)return;
         const last=editHistory.pop();
-        if(last.previous)stagedPresence.set(last.key,last.previous);
+        if(Array.isArray(last.batch)){
+            [...last.batch].reverse().forEach(change=>{
+                if(change.previous)stagedPresence.set(change.key,change.previous);
+                else stagedPresence.delete(change.key);
+            });
+        }else if(last.previous)stagedPresence.set(last.key,last.previous);
         else stagedPresence.delete(last.key);
         if(!stagedPresence.size)editHistory.length=0;
         renderMatrix();
@@ -756,7 +803,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 (!filterNeedsReplacement?.checked||needsAttention(cell))&&
                 fieldRowMatches(state,row,cell);
         });
-        fieldProductList.innerHTML=filtered.length?filtered.map(row=>{
+        const visibleSampleRows=filtered.filter(row=>row.type!=='pos');
+        const unmarkedVisibleCount=visibleSampleRows.reduce((count,row)=>
+            count+(n(previewCell(row,originalIndex).value)?0:1),0);
+        const bulkAction=batchEditMode&&canEditMatrix()&&visibleSampleRows.length
+            ? '<div class="exhibition-field-bulk-actions"><button type="button" data-exhibition-mark-all="1" data-exhibition-dealer="'+safeText(activeFieldDealerId)+'" '+(unmarkedVisibleCount?'':'disabled')+'><i class="bi bi-check2-all"></i><span>'+(unmarkedVisibleCount?'Отметить все в списке · '+fmt(unmarkedVisibleCount):'Все образцы в списке уже отмечены')+'</span></button><small>Только отображаемые образцы ламината. POS и учёт Цеха не меняются.</small></div>'
+            : '';
+        fieldProductList.innerHTML=filtered.length?bulkAction+filtered.map(row=>{
             const cell=previewCell(row,originalIndex);
             const pending=row.type!=='pos'&&stagedEntry(activeFieldDealerId,row.id);
             const state=cellState(cell);
@@ -1399,6 +1452,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.addEventListener('click',event=>{
+        const markAll=event.target.closest('[data-exhibition-mark-all]');
+        if(markAll){
+            event.preventDefault();
+            if(!markAll.disabled)markAllVisibleSamples(markAll.dataset.exhibitionDealer);
+            return;
+        }
         const quick=event.target.closest('[data-exhibition-presence]');
         if(quick){
             event.preventDefault();
