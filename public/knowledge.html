@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="training.css?v={{VER}}">
     <link rel="stylesheet" href="training-installation.css?v={{VER}}">
     <link rel="stylesheet" href="training-sales.css?v={{VER}}">
+    <link rel="stylesheet" href="training-decks.css?v={{VER}}">
     <link rel="icon" href="favicon.gif" type="image/gif">
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -52,6 +53,7 @@
             </div>
 
             <section class="training-view is-active" id="training-panel-course" role="tabpanel" aria-labelledby="training-tab-course" data-training-panel="course">
+                <div id="training-decks-root"></div>
                 <div class="training-toolbar">
                     <label class="training-search"><i class="bi bi-search"></i><input id="training-search" type="search" placeholder="Найти тему, коллекцию или характеристику…"></label>
                     <div class="training-category-row" id="training-category-row"></div>
@@ -187,6 +189,7 @@
     <script src="ui-consistency.js?v={{VER}}"></script>
     <script src="nomenclature-data.js?v={{VER}}"></script>
     <script src="knowledge.js?v={{VER}}"></script>
+    <script src="training-decks.js?v={{VER}}"></script>
     <script src="training-data.js?v={{VER}}"></script>
     <script src="training-installation.js?v={{VER}}"></script>
     <script src="training-sales-data.js?v={{VER}}"></script>
