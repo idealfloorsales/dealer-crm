@@ -477,11 +477,6 @@ td small{margin-top:2px;color:#888;font-size:8px}
     function initPayoutPanel() {
         const panel=document.getElementById('motivation-payouts-panel');
         if(!panel) return;
-        const toggle=document.getElementById('motivation-payout-toggle'),body=document.getElementById('motivation-payout-content');
-        const collapsedKey='crm:motivation:collapsed:'+String(window.CRMAuth?.user?.id||'user');
-        const collapse=hidden=>{if(body)body.hidden=hidden;panel.classList.toggle('is-collapsed',hidden);if(toggle){toggle.textContent=hidden?'Показать мотивацию':'Скрыть мотивацию';toggle.setAttribute('aria-expanded',String(!hidden));}};
-        try{collapse(localStorage.getItem(collapsedKey)==='true' && location.hash!=='#motivation-payouts-panel');}catch(_){collapse(false);}
-        toggle?.addEventListener('click',()=>{const hidden=!body.hidden;collapse(hidden);try{localStorage.setItem(collapsedKey,String(hidden));}catch(_){} });
         const picker=document.getElementById('motivation-payout-month');
         if(picker && !picker.value) picker.value=currentMonth();
         picker?.addEventListener('change',()=>{state.payoutPanelLoaded=true;state.payoutPanelDirty=false;loadPayouts(canManage());});
