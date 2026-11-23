@@ -240,3 +240,104 @@ html:root[data-crm-theme="dark"] .motivation-editor-panel .btn-light{background:
   .sales-page #motivation-payout-content,
   .sales-page #motivation-payout-list{height:auto;min-height:0}
 }
+
+
+/* Mobile motivation layout: make the header content-sized and keep controls compact. */
+@media(max-width:900px){
+  .sales-page #motivation-payouts-panel{
+    display:block!important;
+    height:auto!important;
+    min-height:0!important;
+  }
+  .sales-page #motivation-payouts-panel .motivation-payout-head{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr)!important;
+    align-content:start!important;
+    justify-content:normal!important;
+    align-items:stretch!important;
+    gap:12px!important;
+    height:auto!important;
+    min-height:0!important;
+    padding:16px!important;
+  }
+  .sales-page #motivation-payouts-panel .motivation-payout-head>div:first-child{min-width:0}
+  .sales-page #motivation-payouts-panel .motivation-payout-tools{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:8px!important;
+    flex:0 0 auto!important;
+    width:100%!important;
+    min-height:0!important;
+    align-self:stretch!important;
+    justify-content:stretch!important;
+    align-items:stretch!important;
+    margin:0!important;
+  }
+  .sales-page #motivation-payouts-panel .motivation-payout-tools input{
+    grid-column:1;
+    width:100%!important;
+    min-width:0;
+    flex:none!important;
+    margin:0!important;
+  }
+  .sales-page #motivation-payouts-panel .motivation-payout-tools button{
+    width:100%!important;
+    min-width:0;
+    min-height:38px;
+    margin:0!important;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+  }
+  .sales-page #motivation-payout-content,
+  .sales-page #motivation-payout-list{
+    height:auto!important;
+    min-height:0!important;
+  }
+}
+@media(max-width:520px){
+  .sales-page #motivation-payouts-panel .motivation-payout-tools button span{
+    display:inline!important;
+    font-size:.63rem;
+  }
+  .sales-page #motivation-payouts-panel .motivation-payout-tools button{
+    padding:6px 7px;
+    font-size:.65rem;
+  }
+  .sales-page #motivation-payouts-panel .motivation-payout-summary{
+    gap:7px;
+    padding:10px 12px;
+  }
+  .sales-page #motivation-payouts-panel .motivation-payout-summary article{padding:9px 10px}
+  .sales-page #motivation-payouts-panel .motivation-payout-list{padding:0 12px 12px}
+  .sales-page #motivation-payouts-panel .motivation-payout-row{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:8px 10px!important;
+    padding:11px!important;
+    align-items:center;
+  }
+  .sales-page #motivation-payouts-panel .motivation-payout-dealer{grid-column:1/-1!important}
+  .sales-page #motivation-payouts-panel .motivation-payout-cell{min-width:0;padding:2px 0}
+  .sales-page #motivation-payouts-panel .motivation-payout-cell small{margin-bottom:2px}
+  .sales-page #motivation-payouts-panel .motivation-payout-cell strong{font-size:.75rem;line-height:1.25}
+  .sales-page #motivation-payouts-panel .motivation-payout-cell span{
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    max-width:100%;
+  }
+  .sales-page #motivation-payouts-panel .motivation-payout-cell.is-amount strong{
+    white-space:nowrap;
+    font-size:.82rem;
+  }
+  .sales-page #motivation-payouts-panel .motivation-payout-state{grid-column:2;align-self:center;min-width:0}
+  .sales-page #motivation-payouts-panel .motivation-payout-state small{margin-top:3px}
+  .sales-page #motivation-payouts-panel .motivation-payout-actions{
+    grid-column:1/-1!important;
+    justify-content:flex-end!important;
+    gap:6px;
+  }
+  .sales-page #motivation-payouts-panel .motivation-payout-actions button{width:34px;height:34px}
+}
