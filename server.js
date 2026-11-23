@@ -5246,8 +5246,7 @@ app.delete('/api/products/:id',requirePermission('can_manage_products'),(req,res
 });
 app.post('/api/admin/import-catalog', requirePermission('can_manage_products'), async (req, res) => { res.json({status: 'ok'}); });
 const exhibitionInspection = require('./server/exhibition-inspection').register({
-    app,mongoose,Dealer,Product,AuditLog,requirePermission,hasPermission,
-    WorkshopRecipe,WorkshopDealerAsset,WorkshopMovement,workshopChangeRecipe,syncWorkshopPosToDealer,workshopUser,
+    app,mongoose,Dealer,Product,AuditLog,requirePermission,
     getDealerFilter,getWorkingDealerFilter,activeProductFilter
 });
 app.get('/api/matrix', requireAnyPermission('can_view_products', 'can_view_report'), async (req, res) => {
@@ -5300,11 +5299,17 @@ app.get('/api/matrix', requireAnyPermission('can_view_products', 'can_view_repor
                 sku: "POS",
                 name: pn,
                 type: 'pos',
-                dealers: dealers.map(d => ({
-                    value: (d.pos_materials||[]).find(m=>m.name===pn)?.quantity||0,
-                    ...exhibitionInspection.getCheck(inspections,d._id,'pos',pn),
-                    is_pos: true
-                }))
+                dealers: dealers.map(d => {
+                    const inspection=exhibitionInspection.getCheck(inspections,d._id,'pos',pn);
+                    const observedQuantity=Number.isInteger(inspection.posQuantity)
+                        ? inspection.posQuantity
+                        : ((d.pos_materials||[]).find(m=>m.name===pn)?.quantity||0);
+                    return {
+                        value:observedQuantity,
+                        ...inspection,
+                        is_pos:true
+                    };
+                })
             });
         });
         res.json({

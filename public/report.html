@@ -228,7 +228,7 @@
                         <section class="exhibition-pos-quantity" id="exhibition-pos-quantity-row" hidden>
                             <div class="exhibition-pos-quantity-copy">
                                 <strong><i class="bi bi-box-seam"></i> Количество торгового оборудования</strong>
-                                <small>Увеличение оформит выдачу из Цеха. При уменьшении исправные единицы вернутся в остаток Цеха.</small>
+                                <small>Количество фиксируется у дилера в выставленности. Остатки и движения Цеха не меняются.</small>
                                 <small class="exhibition-pos-quantity-preview" id="exhibition-pos-quantity-preview" aria-live="polite">Количество не изменится.</small>
                             </div>
                             <label><span>У дилера, шт.</span>
@@ -256,7 +256,7 @@
                         <button type="button" id="exhibition-inspection-complete-tag" class="exhibition-inspection-complete" hidden><i class="bi bi-tags"></i><span>Ценники обновлены — отметить выполнение</span></button>
                         <label class="exhibition-inspection-note"><span>Примечание / причина замены</span>
                             <textarea id="exhibition-inspection-note" class="form-control" maxlength="500" rows="3" placeholder="Например: скол образца, старый ценник или повреждена рамка стенда"></textarea></label>
-                        <p class="exhibition-inspection-hint"><i class="bi bi-info-circle"></i> Изменения записываются в журнал CRM. Замены не списывают остатки Цеха автоматически.</p>
+                        <p class="exhibition-inspection-hint"><i class="bi bi-info-circle"></i> Проверка и количество оборудования у дилера записываются в CRM. Остатки и движения Цеха не меняются.</p>
                         <div id="exhibition-inspection-feedback" class="exhibition-inspection-feedback" role="alert" hidden></div>
                     </div>
                     <div class="modal-footer exhibition-inspection-footer">
@@ -353,6 +353,6 @@
     <script defer src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
     <script defer src="permissions.js?v={{VER}}"></script>
     <script src="ui-consistency.js?v={{VER}}"></script>
-    <script defer src="report.js?v={{VER}}"></script>
+    <script defer src="report.js?v={{VER}}&amp;pos-count=20261123-1"></script>
 </body>
 </html>
