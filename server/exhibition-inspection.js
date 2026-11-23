@@ -31,8 +31,9 @@ function parsePayload(body) {
     const replacementQty=condition==='ok'?0:integer(body.replacementQty,'замена');
     const priceTagQty=kind==='laminate'?integer(body.priceTagQty,'ценники'):0;
     if(body.present!==undefined && typeof body.present!=='boolean')throw Object.assign(new Error('Наличие образца должно быть Да/Нет'),{status:400});
+    const posQuantity=kind==='pos'&&body.posQuantity!==undefined?integer(body.posQuantity,'оборудование'):undefined;
     return {
-        kind,key,condition,priceTag,priceTagQty,replacementQty,
+        kind,key,condition,priceTag,priceTagQty,replacementQty,posQuantity,
         note:clean(body.note,500),
         present:kind==='laminate'?body.present:undefined
     };
@@ -48,7 +49,7 @@ function normalizeInspection(row){
         checkedBy:row?.checkedBy?.name||''
     };
 }
-function register({app,mongoose,Dealer,Product,AuditLog,requirePermission,getDealerFilter,getWorkingDealerFilter,activeProductFilter}){
+function register({app,mongoose,Dealer,Product,AuditLog,requirePermission,hasPermission,WorkshopRecipe,WorkshopDealerAsset,WorkshopMovement,workshopChangeRecipe,syncWorkshopPosToDealer,workshopUser,getDealerFilter,getWorkingDealerFilter,activeProductFilter}){
     const schema=new mongoose.Schema({
         dealer:{type:mongoose.Schema.Types.ObjectId,ref:'Dealer',required:true,index:true},
         kind:{type:String,enum:['laminate','pos'],required:true},
@@ -74,6 +75,80 @@ function register({app,mongoose,Dealer,Product,AuditLog,requirePermission,getDea
     }
     function getCheck(map,dealerId,kind,key){
         return map.get(String(dealerId)+'|'+kind+'|'+key)||normalizeInspection(null);
+    }
+    async function setEquipmentQuantity(req,dealer,key,targetQty,condition,note){
+        const recipes=WorkshopRecipe
+            ? await WorkshopRecipe.find({matrixPosName:key,active:{$ne:false}}).sort({sku:1})
+            : [];
+        if(!recipes.length){
+            const legacyQty=Math.max(0,Number((dealer.pos_materials||[]).find(item=>clean(item.name,170)===key)?.quantity)||0);
+            if(targetQty===legacyQty)return legacyQty;
+            throw Object.assign(new Error('Для этого оборудования ещё не настроен учёт в Цехе. Добавьте его через раздел Цеха.'),{status:400});
+        }
+        const recipeIds=recipes.map(recipe=>recipe._id);
+        const assets=await WorkshopDealerAsset.find({dealer:dealer._id,recipe:{$in:recipeIds}}).sort({updatedAt:1});
+        const currentQty=assets.reduce((sum,asset)=>sum+Math.max(0,Number(asset.qty)||0),0);
+        if(targetQty===currentQty)return currentQty;
+        if(typeof hasPermission!=='function'||!hasPermission(req,'can_manage_workshop'))
+            throw Object.assign(new Error('Для изменения количества оборудования нужны права управления Цехом'),{status:403});
+        if(!WorkshopMovement||typeof workshopChangeRecipe!=='function'||typeof syncWorkshopPosToDealer!=='function')
+            throw Object.assign(new Error('Учёт оборудования Цеха недоступен'),{status:503});
+        const actor=typeof workshopUser==='function'?workshopUser(req):{
+            id:String(req.user?.id||''),
+            name:String(req.user?.fullName||req.user?.username||'Сотрудник')
+        };
+        const reason=clean(note,500);
+        if(targetQty>currentQty){
+            let remaining=targetQty-currentQty;
+            const available=recipes.reduce((sum,recipe)=>sum+Math.max(0,Number(recipe.stockQty)||0),0);
+            if(available<remaining)
+                throw Object.assign(new Error('В Цехе недостаточно готового оборудования. Доступно: '+available+' шт.'),{status:400});
+            for(const recipe of recipes){
+                if(remaining<=0)break;
+                const issueQty=Math.min(remaining,Math.max(0,Number(recipe.stockQty)||0));
+                if(!issueQty)continue;
+                await workshopChangeRecipe(recipe._id,-issueQty);
+                let asset=assets.find(item=>String(item.recipe)===String(recipe._id));
+                if(!asset){
+                    asset=new WorkshopDealerAsset({dealer:dealer._id,recipe:recipe._id,qty:0});
+                    assets.push(asset);
+                }
+                asset.qty=(Number(asset.qty)||0)+issueQty;
+                await asset.save();
+                await WorkshopMovement.create({
+                    date:new Date(),type:'dealer_issue',entityType:'finished',recipe:recipe._id,
+                    dealer:dealer._id,direction:'out',qty:issueQty,unit:'шт',
+                    note:reason||'Выдача торгового оборудования из раздела «Выставленность»',
+                    meta:{source:'exhibition',matrixPosName:key,targetQty,issued:issueQty},
+                    createdBy:actor
+                });
+                remaining-=issueQty;
+            }
+        }else{
+            let remaining=currentQty-targetQty;
+            for(const asset of assets){
+                if(remaining<=0)break;
+                const returnQty=Math.min(remaining,Math.max(0,Number(asset.qty)||0));
+                if(!returnQty)continue;
+                asset.qty=(Number(asset.qty)||0)-returnQty;
+                await asset.save();
+                const reusable=condition==='ok';
+                if(reusable)await workshopChangeRecipe(asset.recipe,returnQty);
+                await WorkshopMovement.create({
+                    date:new Date(),type:'dealer_return',entityType:'finished',recipe:asset.recipe,
+                    dealer:dealer._id,direction:reusable?'in':'neutral',qty:returnQty,unit:'шт',
+                    note:reason||(reusable
+                        ? 'Возврат торгового оборудования из раздела «Выставленность»'
+                        : 'Снятие отсутствующего или повреждённого оборудования из раздела «Выставленность»'),
+                    meta:{source:'exhibition',matrixPosName:key,targetQty,returned:returnQty,returnCondition:reusable?'reusable':'defect'},
+                    createdBy:actor
+                });
+                remaining-=returnQty;
+            }
+            if(remaining>0)throw Object.assign(new Error('Не удалось сопоставить количество оборудования дилера с учётом Цеха'),{status:409});
+        }
+        await syncWorkshopPosToDealer(dealer._id,recipes[0]._id);
+        return targetQty;
     }
     // Explicitly staged presence edits from the exhibition page. This endpoint
     // changes ONLY Dealer.products: inspection flags, price tags and workshop
@@ -187,6 +262,9 @@ function register({app,mongoose,Dealer,Product,AuditLog,requirePermission,getDea
                 ]);
                 if(!allowed.has(data.key))return res.status(400).json({error:'Оборудование отсутствует в списке дилера'});
             }
+            const posQuantity=data.kind==='pos'&&data.posQuantity!==undefined
+                ? await setEquipmentQuantity(req,dealer,data.key,data.posQuantity,data.condition,data.note)
+                : null;
             const actor={id:String(req.user?.id||''),name:String(req.user?.fullName||req.user?.username||'Сотрудник')};
             const current=await Check.findOne({dealer:dealer._id,kind:data.kind,key:data.key}).lean();
             const before=current?normalizeInspection(current):normalizeInspection(null);
@@ -208,12 +286,12 @@ function register({app,mongoose,Dealer,Product,AuditLog,requirePermission,getDea
                 module:'matrix',action:'exhibition_inspection',method:'PUT',
                 path:req.originalUrl,entityType:'dealer',entityId:String(dealer._id),
                 entityLabel:dealer.name||'Дилер',summary:'Изменил выставленность / состояние: '+label,
-                success:true,before,after:{...normalizeInspection(saved),present:data.present},
-                meta:{kind:data.kind,key:data.key}
+                success:true,before,after:{...normalizeInspection(saved),present:data.present,posQuantity},
+                meta:{kind:data.kind,key:data.key,posQuantity}
             }).catch(err=>console.warn('Exhibition inspection audit:',err.message));
             res.set('Cache-Control','no-store');
             return res.json({status:'ok',dealerId:String(dealer._id),kind:data.kind,key:data.key,
-                inspection:normalizeInspection(saved),present:data.present??null});
+                inspection:normalizeInspection(saved),present:data.present??null,posQuantity});
         }catch(error){
             res.status(error.status||500).json({error:error.message||'Не удалось сохранить выставленность'});
         }

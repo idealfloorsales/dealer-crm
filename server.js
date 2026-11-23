@@ -5246,7 +5246,9 @@ app.delete('/api/products/:id',requirePermission('can_manage_products'),(req,res
 });
 app.post('/api/admin/import-catalog', requirePermission('can_manage_products'), async (req, res) => { res.json({status: 'ok'}); });
 const exhibitionInspection = require('./server/exhibition-inspection').register({
-    app,mongoose,Dealer,Product,AuditLog,requirePermission,getDealerFilter,getWorkingDealerFilter,activeProductFilter
+    app,mongoose,Dealer,Product,AuditLog,requirePermission,hasPermission,
+    WorkshopRecipe,WorkshopDealerAsset,WorkshopMovement,workshopChangeRecipe,syncWorkshopPosToDealer,workshopUser,
+    getDealerFilter,getWorkingDealerFilter,activeProductFilter
 });
 app.get('/api/matrix', requireAnyPermission('can_view_products', 'can_view_report'), async (req, res) => {
     try {

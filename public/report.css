@@ -668,6 +668,16 @@ thead .matrix-summary-col{z-index:20!important;background:#f8f6f3!important}
 .exhibition-inspection-note .form-control{min-height:42px;font-size:12px;border-radius:10px;border-color:#ddd9d5;background:#fff;color:#323439}
 .exhibition-inspection-grid .form-control:focus,.exhibition-inspection-grid .form-select:focus,
 .exhibition-inspection-note .form-control:focus{border-color:#b9040a;box-shadow:0 0 0 3px rgba(185,4,10,.08)}
+.exhibition-pos-quantity{display:grid;grid-template-columns:minmax(0,1fr) minmax(130px,190px);align-items:center;gap:14px;margin:14px 0;padding:13px 14px;border:1px solid #eee7e2;border-radius:12px;background:#fff}
+.exhibition-pos-quantity-copy strong{display:block;color:#34353b;font-size:12px;font-weight:850}
+.exhibition-pos-quantity-copy strong i{color:#b9040a;margin-right:5px}
+.exhibition-pos-quantity-copy small{display:block;margin-top:4px;color:#85868e;font-size:10px;line-height:1.4}
+.exhibition-pos-quantity-preview{color:#a91d2a!important;font-weight:800}
+.exhibition-pos-quantity>label{display:block;min-width:0}
+.exhibition-pos-quantity>label>span{display:block;margin-bottom:5px;color:#62646b;font-size:10px;font-weight:800}
+.exhibition-pos-quantity .form-control{min-height:40px;border:1px solid #ddd9d5;border-radius:10px;font-size:13px;font-weight:800;color:#323439}
+.exhibition-pos-quantity .form-control:focus{border-color:#b9040a;box-shadow:0 0 0 3px rgba(185,4,10,.08)}
+.exhibition-pos-quantity[hidden]{display:none!important}
 .exhibition-inspection-tags{margin-top:16px;padding-top:14px;border-top:1px solid #eeebe7}
 .exhibition-inspection-section-title{display:flex;align-items:center;gap:9px;color:#ad2934}
 .exhibition-inspection-section-title>i{display:grid;place-items:center;width:36px;height:36px;border-radius:11px;background:#fff0f0;font-size:17px}
@@ -693,17 +703,23 @@ thead .matrix-summary-col{z-index:20!important;background:#f8f6f3!important}
 :root[data-crm-theme="dark"] .exhibition-inspection-modal{background:#282930;border-color:#45464b}
 :root[data-crm-theme="dark"] .exhibition-inspection-body{background:#282930;color:#f2f2f3}
 :root[data-crm-theme="dark"] .exhibition-inspection-product,
-:root[data-crm-theme="dark"] .exhibition-inspection-presence{background:#303137;border-color:#4b4b50}
+:root[data-crm-theme="dark"] .exhibition-inspection-presence,
+:root[data-crm-theme="dark"] .exhibition-pos-quantity{background:#303137;border-color:#4b4b50}
 :root[data-crm-theme="dark"] .exhibition-inspection-product strong,
 :root[data-crm-theme="dark"] .exhibition-inspection-section-title strong,
-:root[data-crm-theme="dark"] .exhibition-inspection-presence strong{color:#f1f1f3}
+:root[data-crm-theme="dark"] .exhibition-inspection-presence strong,
+:root[data-crm-theme="dark"] .exhibition-pos-quantity-copy strong{color:#f1f1f3}
+:root[data-crm-theme="dark"] .exhibition-pos-quantity-copy small,
+:root[data-crm-theme="dark"] .exhibition-pos-quantity>label>span{color:#b7b7bd}
 :root[data-crm-theme="dark"] .exhibition-inspection-grid .form-select,
 :root[data-crm-theme="dark"] .exhibition-inspection-grid .form-control,
-:root[data-crm-theme="dark"] .exhibition-inspection-note .form-control{background:#33343a;border-color:#52535a;color:#f6f6f7}
+:root[data-crm-theme="dark"] .exhibition-inspection-note .form-control,
+:root[data-crm-theme="dark"] .exhibition-pos-quantity .form-control{background:#33343a;border-color:#52535a;color:#f6f6f7}
 :root[data-crm-theme="dark"] .exhibition-inspection-footer{background:#292a30;border-color:#45464c}
 @media(hover:none) {#matrix-table .exhibition-cell-edit{opacity:1}}
 @media(max-width:900px) {.exhibition-field-summary{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:600px) {
+  .exhibition-pos-quantity{grid-template-columns:1fr;gap:9px}
   .exhibition-field-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
   .exhibition-field-product{grid-template-columns:35px minmax(0,1fr);align-items:start}
   .exhibition-field-product-side{grid-column:2;flex-direction:row;justify-content:space-between;align-items:center;flex-wrap:wrap;width:100%}

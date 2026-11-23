@@ -225,6 +225,16 @@
                             <div><strong>Образец выставлен</strong><small>Изменяет матрицу дилера, не учёт Цеха</small></div>
                             <label class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" id="exhibition-inspection-present" aria-label="Образец выставлен"></label>
                         </div>
+                        <section class="exhibition-pos-quantity" id="exhibition-pos-quantity-row" hidden>
+                            <div class="exhibition-pos-quantity-copy">
+                                <strong><i class="bi bi-box-seam"></i> Количество торгового оборудования</strong>
+                                <small>Увеличение оформит выдачу из Цеха. При уменьшении исправные единицы вернутся в остаток Цеха.</small>
+                                <small class="exhibition-pos-quantity-preview" id="exhibition-pos-quantity-preview" aria-live="polite">Количество не изменится.</small>
+                            </div>
+                            <label><span>У дилера, шт.</span>
+                                <input type="number" id="exhibition-pos-quantity" class="form-control" min="0" max="1000" step="1" value="0" inputmode="numeric">
+                            </label>
+                        </section>
                         <div class="exhibition-inspection-grid">
                             <label><span>Состояние образца / оборудования</span><select id="exhibition-inspection-condition" class="form-select" required>
                                 <option value="ok">В порядке</option><option value="damaged">Повреждён — заменить</option>

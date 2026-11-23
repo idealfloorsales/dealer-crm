@@ -50,6 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const inspectionSave = $('exhibition-inspection-save');
     const inspectionFeedback = $('exhibition-inspection-feedback');
     const canEditMatrix = () => Boolean(window.CRMAuth?.can('can_edit_matrix'));
+    const canManageWorkshop = () => Boolean(window.CRMAuth?.can('can_manage_workshop'));
     const editModeButton = $('exhibition-edit-mode');
     const editHint = $('exhibition-edit-hint');
     const batchBar = $('exhibition-batch-bar');
@@ -865,6 +866,30 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
+    function updatePosQuantityPreview(){
+        const preview=$('exhibition-pos-quantity-preview');
+        const input=$('exhibition-pos-quantity');
+        if(!preview||!input||!inspectionContext||inspectionContext.kind!=='pos')return;
+        const requested=Number(input.value);
+        if(!Number.isSafeInteger(requested)||requested<0||requested>1000){
+            preview.textContent='Введите целое количество от 0 до 1000.';
+            return;
+        }
+        const current=inspectionContext.initialPosQuantity;
+        if(requested===current){
+            preview.textContent='Количество не изменится.';
+            return;
+        }
+        const delta=Math.abs(requested-current);
+        if(requested>current){
+            preview.textContent='Из Цеха будет выдано дилеру: +'+delta+' шт.';
+            return;
+        }
+        const condition=$('exhibition-inspection-condition')?.value||'ok';
+        preview.textContent=condition==='ok'
+            ? 'В Цех вернётся исправное оборудование: '+delta+' шт.'
+            : 'У дилера будет снято '+delta+' шт.; складской остаток Цеха не увеличится.';
+    }
     function openInspectionEditor({dealerId,kind,key}) {
         if(!canEditMatrix()||!inspectionModal)return;
         if(stagedPresence.size){
@@ -878,13 +903,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if(!dealer||!row)return;
         const index=fullData.headers.findIndex(item=>idOf(item.id)===dealerId);
         const cell=row.dealers[index]||{};
-        inspectionContext={dealerId,kind,key,row,index};
+        inspectionContext={dealerId,kind,key,row,index,initialPosQuantity:Math.max(0,Math.floor(n(cell.value)))};
         $('exhibition-inspection-dealer').textContent=[dealer.name,dealer.city].filter(Boolean).join(' · ');
         $('exhibition-inspection-item').textContent=[row.sku,row.name].filter(Boolean).join(' · ');
         $('exhibition-inspection-type').textContent=kind==='pos'?'ТОРГОВОЕ ОБОРУДОВАНИЕ':'ОБРАЗЕЦ ЛАМИНАТА';
         $('exhibition-inspection-stock').textContent=kind==='pos'
-            ? 'В учёте оборудования: '+fmt(cell.value)+' шт. Количество меняется через Цех.'
+            ? (canManageWorkshop()
+                ? 'Сейчас у дилера: '+fmt(cell.value)+' шт. Изменение количества будет записано в движение оборудования Цеха.'
+                : 'У дилера числится: '+fmt(cell.value)+' шт. Количество изменяется через Цех.')
             : 'Выдано из Цеха: '+fmt(cell.sample_qty)+' шт. · Матрица: '+(n(cell.value)?'есть':'нет');
+        const posQuantityRow=$('exhibition-pos-quantity-row');
+        if(posQuantityRow)posQuantityRow.hidden=kind!=='pos'||!canManageWorkshop();
+        if(kind==='pos'&&canManageWorkshop())$('exhibition-pos-quantity').value=String(Math.max(0,Math.floor(n(cell.value))));
         $('exhibition-inspection-presence-row').hidden=kind==='pos';
         $('exhibition-inspection-tags').hidden=kind==='pos';
         $('exhibition-inspection-present').checked=Boolean(n(cell.value));
@@ -893,6 +923,7 @@ document.addEventListener('DOMContentLoaded', () => {
         $('exhibition-inspection-tag').value=['unknown','ok','replace','missing'].includes(cell.priceTag)?cell.priceTag:'unknown';
         $('exhibition-inspection-tag-qty').value=Number.isInteger(Number(cell.priceTagQty))?Number(cell.priceTagQty):0;
         $('exhibition-inspection-note').value=cell.note||'';
+        updatePosQuantityPreview();
         if(inspectionFeedback){inspectionFeedback.hidden=true;inspectionFeedback.textContent='';}
         if(inspectionSave)inspectionSave.disabled=false;
         inspectionModal.show();
@@ -924,6 +955,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 note:String($('exhibition-inspection-note')?.value||'').trim().slice(0,500)
             };
             if(kind!=='pos')body.present=Boolean($('exhibition-inspection-present')?.checked);
+            else if(canManageWorkshop()){
+                const posQuantity=parsePositiveInteger('exhibition-pos-quantity');
+                if(posQuantity!==inspectionContext.initialPosQuantity)body.posQuantity=posQuantity;
+            }
         }catch(error){showInspectionError(error.message);return;}
         if(inspectionSave){
             inspectionSave.disabled=true;
@@ -938,16 +973,19 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const data=await response.json().catch(()=>({}));
             if(!response.ok)throw new Error(data.error||'Не удалось сохранить выставленность');
-            // Update only the inspected cell. Filters, current dealer and scroll
-            // position stay intact. Workshop quantities remain untouched.
+            // Update only the inspected cell; filter, dealer and scroll stay intact.
+            // POS quantity changes are already recorded as workshop movements.
             const cell=row.dealers[index]||{};
             Object.assign(cell,data.inspection||{});
             if(kind!=='pos'&&typeof data.present==='boolean')cell.value=data.present?1:0;
+            if(kind==='pos'&&data.posQuantity!==null&&data.posQuantity!==undefined&&Number.isSafeInteger(Number(data.posQuantity)))cell.value=Number(data.posQuantity);
             row.dealers[index]=cell;
             inspectionModal?.hide();
             inspectionContext=null;
             renderMatrix();
-            if(window.showToast)window.showToast('Выставленность и отметки сохранены','success');
+            if(window.showToast)window.showToast(kind==='pos'&&typeof data.posQuantity==='number'
+                ? 'Количество оборудования и состояние сохранены'
+                : 'Выставленность и отметки сохранены','success');
         }catch(error){
             showInspectionError(error.message||'Ошибка сети');
         }finally{
@@ -1524,10 +1562,13 @@ document.addEventListener('DOMContentLoaded', () => {
     inspectionForm?.addEventListener('submit',saveInspection);
     $('exhibition-inspection-condition')?.addEventListener('change',event=>{
         const input=$('exhibition-inspection-replace-qty');
-        if(!input)return;
-        if(event.target.value==='ok')input.value=0;
-        else if(!(Number(input.value)>0))input.value=1;
+        if(input){
+            if(event.target.value==='ok')input.value=0;
+            else if(!(Number(input.value)>0))input.value=1;
+        }
+        updatePosQuantityPreview();
     });
+    $('exhibition-pos-quantity')?.addEventListener('input',updatePosQuantityPreview);
     fieldDealerSearch?.addEventListener('input',renderFieldDealers);
     fieldProductSearch?.addEventListener('input',renderFieldDealer);
     document.querySelectorAll('[data-field-status]').forEach(button=>{
