@@ -161,7 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try{
             const response = await fetch(API_URL + '?search=' + encodeURIComponent(searchTerm));
             if (!response.ok) throw new Error('Ошибка сети при загрузке материалов');
-            allArticles = await response.json();
+            allArticles = (await response.json()).filter(article => !String(article.title || '').startsWith('[IDEAL-КУРС] '));
             allArticles.sort((a,b) => a.title.localeCompare(b.title,'ru'));
             renderArticles(allArticles);
         }catch(error){
