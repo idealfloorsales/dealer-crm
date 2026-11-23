@@ -1000,11 +1000,51 @@ const productSchema = new mongoose.Schema({
     excel_alias: String,
     photo_id: String,
     stock_qty: Number,
+    storage_unit_price: { type: Number, min: 0, default: 0 },
     characteristics: { class: String, thickness: String, bevel: String, size: String, package_area: String, package_qty: String, weight: String }
 });
 
 productSchema.add({is_archived:{type:Boolean,default:false,index:true},archived_at:{type:Date,default:null},archived_by:{id:String,name:String}});
 const Product = mongoose.model('Product', productSchema);
+
+function legacyStorageEquipmentUnitPrice(name) {
+    const value = String(name || '').toLowerCase().replace(/ё/g, 'е');
+    if (value.includes('расчес')) return 5600;
+    if (value.includes('таблич') || value.includes('орг.стек') || value.includes('орг стек')) return 800;
+    if ((value.includes('стен') || value.includes('задн')) && (value.includes('600') || value.includes('800'))) return 8000;
+    if (value.includes('наклей') && (value.includes('600') || value.includes('800'))) return 2000;
+    return 0;
+}
+
+async function seedStorageUnitPrices() {
+    const laminateSeed = await Product.updateMany(
+        { product_type: { $ne: 'equipment' }, storage_unit_price: null },
+        { $set: { storage_unit_price: 4500 } }
+    );
+    const legacyEquipment = await Product.find({
+        product_type: 'equipment',
+        storage_unit_price: null
+    }).select('_id name excel_alias sku').lean();
+
+    if (legacyEquipment.length) {
+        await Product.bulkWrite(legacyEquipment.map(product => ({
+            updateOne: {
+                filter: { _id: product._id, storage_unit_price: null },
+                update: { $set: {
+                    storage_unit_price: legacyStorageEquipmentUnitPrice(product.name || product.excel_alias || product.sku)
+                } }
+            }
+        })), { ordered: false });
+    }
+
+    const zeroSeed = await Product.updateMany(
+        { storage_unit_price: null },
+        { $set: { storage_unit_price: 0 } }
+    );
+    const seededCount = Number(laminateSeed.modifiedCount || 0) + legacyEquipment.length + Number(zeroSeed.modifiedCount || 0);
+    if (seededCount) console.log('Storage unit prices initialized for legacy catalog items:', seededCount);
+}
+
 const {activeProductFilter,archiveIndex,visibleRows,visibleSnapshot,rowReferencesArchivedProduct}=require('./server/product-archive');
 async function getArchivedProductIndex(){return archiveIndex(await Product.find({is_archived:true}).select('_id sku').lean());}
 
@@ -1771,6 +1811,7 @@ async function connectToDB() {
             await seedUsers();
             await seedSectors();
             await migrateLegacyProductPhotos();
+            await seedStorageUnitPrices();
             await cleanupDealerEquipmentProducts();
             await seedWorkshopMaterials();
             await seedWorkshopRecipes();
@@ -2832,7 +2873,7 @@ app.get('/api/dealers/:id', requirePermission('can_view_dealers'), async (req, r
         let query = Dealer.findOne({ _id: req.params.id, ...getDealerFilter(req) })
             .populate('price_list', 'name code versionDate validFrom validTo active includeIlliquid').populate('motivation_scheme', 'name ratePerM2 validFrom validTo active');
         if (req.query.view === 'profile') {
-            query = query.select('-photos').populate({path:'products',match:activeProductFilter(),select:'sku name'});
+            query = query.select('-photos').populate({path:'products',match:activeProductFilter(),select:'sku name storage_unit_price'});
         } else {
             query = query.populate({path:'products',match:activeProductFilter()});
         }

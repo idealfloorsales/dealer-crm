@@ -8,6 +8,8 @@
         templates: {},
         qrPromise: null,
         catalog: [],
+        catalogLoaded: false,
+        catalogPromise: null,
         selectedEntityIndex: 0
     };
 
@@ -340,13 +342,42 @@
         return number.toLocaleString('ru-RU').replace(/\u00a0/g, ' ');
     }
 
-    function storagePosUnitPrice(name) {
-        const n = String(name || '').toLowerCase().replace(/ё/g, 'е');
-        if (n.includes('расчес')) return 5600;
-        if (n.includes('таблич') || n.includes('орг.стек') || n.includes('орг стек')) return 800;
-        if ((n.includes('стен') || n.includes('задн')) && (n.includes('600') || n.includes('800'))) return 8000;
-        if (n.includes('наклей') && (n.includes('600') || n.includes('800'))) return 2000;
-        return 0;
+    function storageUnitPrice(product) {
+        const value = Number(product?.storage_unit_price);
+        return Number.isFinite(value) && value >= 0 ? value : 0;
+    }
+
+    function normalizeStorageCatalogValue(value) {
+        return String(value || '')
+            .toLowerCase()
+            .replace(/ё/g, 'е')
+            .normalize('NFKC')
+            .replace(/[^a-zа-я0-9]+/gi, '');
+    }
+
+    function findStorageCatalogProduct(item, productType) {
+        const catalog = (Array.isArray(state.catalog) ? state.catalog : [])
+            .filter(product => String(product?.product_type || 'laminate') === productType);
+        const itemSku = normalizeStorageCatalogValue(item?.sku);
+        if (itemSku) {
+            const bySku = catalog.find(product => normalizeStorageCatalogValue(product.sku) === itemSku);
+            if (bySku) return bySku;
+        }
+
+        const itemName = normalizeStorageCatalogValue(item?.name);
+        if (!itemName) return null;
+        return catalog.find(product =>
+            [product.name, product.excel_alias, product.sku]
+                .some(value => normalizeStorageCatalogValue(value) === itemName)
+        ) || null;
+    }
+
+    function storageLaminateUnitPrice(item) {
+        return storageUnitPrice(findStorageCatalogProduct(item, 'laminate') || item);
+    }
+
+    function storageEquipmentUnitPrice(item) {
+        return storageUnitPrice(findStorageCatalogProduct(item, 'equipment'));
     }
 
     function buildStorageItems(dealer) {
@@ -355,7 +386,7 @@
 
         const products = Array.isArray(dealer.products) ? dealer.products.filter(Boolean) : [];
         products.forEach((product, index) => {
-            const price = Number(product.sample_price) || 4500;
+            const price = storageLaminateUnitPrice(product);
             total += price;
             rows.push(`<tr class="storage-product-row"><td class="num">${index + 1}</td><td class="sku">${escapeHtml(product.sku || '—')}</td><td>${escapeHtml(product.name || 'Без названия')}</td><td class="qty">1 планшет</td><td class="price">${formatMoney(price)}</td></tr>`);
         });
@@ -368,10 +399,10 @@
             rows.push('<tr class="storage-section-row"><td colspan="5">ТОРГОВОЕ ОБОРУДОВАНИЕ И POSM</td></tr>');
             posItems.forEach((item, index) => {
                 const quantity = Number(item.quantity) || 0;
-                const unitPrice = storagePosUnitPrice(item.name);
+                const unitPrice = storageEquipmentUnitPrice(item);
                 const lineTotal = unitPrice * quantity;
                 total += lineTotal;
-                rows.push(`<tr class="storage-pos-row"><td class="num">${index + 1}</td><td class="sku">—</td><td>${escapeHtml(item.name || 'Оборудование')}</td><td class="qty">${quantity} шт.</td><td class="price">${unitPrice ? formatMoney(lineTotal) : '—'}</td></tr>`);
+                rows.push(`<tr class="storage-pos-row"><td class="num">${index + 1}</td><td class="sku">—</td><td>${escapeHtml(item.name || 'Оборудование')}</td><td class="qty">${quantity} шт.</td><td class="price">${formatMoney(lineTotal)}</td></tr>`);
             });
         }
 
@@ -519,7 +550,29 @@
         );
     }
 
+    async function ensureStorageCatalogLoaded() {
+        if (state.catalogLoaded) return true;
+        if (state.catalogPromise) return state.catalogPromise;
+        state.catalogPromise = (async () => {
+            try {
+                const response = await fetch('/api/products');
+                if (!response.ok) throw new Error('catalog');
+                const products = await response.json();
+                state.catalog = Array.isArray(products) ? products : [];
+                state.catalogLoaded = true;
+                return true;
+            } catch (error) {
+                console.warn('Не удалось загрузить каталог для договора хранения', error);
+                return false;
+            } finally {
+                state.catalogPromise = null;
+            }
+        })();
+        return state.catalogPromise;
+    }
+
     async function build(type) {
+        if (type === 'storage') await ensureStorageCatalogLoaded();
         const [template, map] = await Promise.all([loadTemplate(type), buildMap(type)]);
         return replaceTokens(template, map);
     }
@@ -671,6 +724,7 @@
 
     function setCatalog(products) {
         state.catalog = Array.isArray(products) ? products : [];
+        state.catalogLoaded = true;
         if (state.dealer) render();
     }
 

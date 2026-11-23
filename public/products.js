@@ -37,6 +37,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const inpId = document.getElementById('prod_id');
     const inpSku = document.getElementById('prod_sku');
     const inpName = document.getElementById('prod_name');
+    const inpStorageUnitPrice = document.getElementById('prod_storage_unit_price');
+    const storageUnitPriceLabel = document.getElementById('prod-storage-unit-price-label');
     const inpCollection = document.getElementById('prod_collection');
     const collectionOptions = document.getElementById('product-collection-options');
     const productTypeInputs = [...document.querySelectorAll('input[name="product_type"]')];
@@ -349,6 +351,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function syncProductTypeFields() {
         const type = selectedProductType();
         laminateFields.forEach(field => field.classList.toggle('d-none', type === 'equipment'));
+        if (storageUnitPriceLabel) {
+            storageUnitPriceLabel.textContent = type === 'equipment'
+                ? 'Цена единицы оборудования, ₸/шт.'
+                : 'Цена планшета, ₸/шт.';
+        }
     }
 
     function isProductComplete(product) {
@@ -863,6 +870,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 inpId.value = p.id;
                 inpSku.value = p.sku || '';
                 inpName.value = p.name || '';
+                if (inpStorageUnitPrice) {
+                    const storagePrice = Number(p.storage_unit_price);
+                    inpStorageUnitPrice.value = Number.isFinite(storagePrice) && storagePrice >= 0 ? String(storagePrice) : '0';
+                }
                 if(inpCollection) inpCollection.value = p.collection || '';
                 if(inpLiquid) inpLiquid.checked = p.is_liquid !== false;
                 if(inpAlias) inpAlias.value = p.excel_alias || '';
@@ -919,10 +930,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 weight: pkgWeight ? pkgWeight.value.trim() : ''
             };
             const type = selectedProductType();
+            const storagePriceValue = Number(inpStorageUnitPrice?.value);
             const data = { 
                 sku: inpSku.value.trim(),
                 name: inpName.value.trim(),
                 product_type: type,
+                storage_unit_price: Number.isFinite(storagePriceValue) && storagePriceValue >= 0 ? storagePriceValue : 0,
                 collection: type === 'laminate' && inpCollection ? inpCollection.value.trim() : '',
                 is_liquid: type === 'laminate' ? (inpLiquid ? inpLiquid.checked : true) : true,
                 excel_alias: inpAlias ? inpAlias.value.trim() : '',
