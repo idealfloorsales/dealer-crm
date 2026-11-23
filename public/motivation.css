@@ -225,3 +225,18 @@ html:root[data-crm-theme="dark"] .motivation-editor-panel .btn-light{background:
   border-color:#3e4048!important;
   color:#fff!important;
 }
+
+
+/* Keep the payout controls directly under the heading on narrow screens.
+   The desktop 490px flex basis becomes vertical height when the header stacks. */
+@media(max-width:900px){
+  .sales-page #motivation-payouts-panel{height:auto;min-height:0}
+  .sales-page #motivation-payouts-panel .motivation-payout-head{
+    height:auto;min-height:0;justify-content:flex-start;align-items:stretch;gap:14px
+  }
+  .sales-page #motivation-payouts-panel .motivation-payout-tools{
+    flex:0 1 auto;width:100%;min-height:0;align-self:stretch;justify-content:flex-start
+  }
+  .sales-page #motivation-payout-content,
+  .sales-page #motivation-payout-list{height:auto;min-height:0}
+}
