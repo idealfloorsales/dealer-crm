@@ -1090,7 +1090,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Закрыть"></button>
                         </div>
-                        <form id="dealer-profile-edit-form">
+                        <form id="dealer-profile-edit-form" novalidate>
                             <div class="modal-body dealer-profile-edit-body">
                                 <section class="dealer-profile-edit-pane active" data-profile-edit-pane="main">
                                     <div class="dealer-profile-edit-section">
@@ -1410,6 +1410,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const modalEl = document.getElementById('dealer-profile-edit-modal');
         const section = modalEl?.dataset.editSection || 'main';
+        const activePane = modalEl?.querySelector('.dealer-profile-edit-pane.active');
+        const invalidField = [...(activePane?.querySelectorAll('input, select, textarea') || [])]
+            .find(field => field.willValidate && !field.checkValidity());
+        if (invalidField) {
+            invalidField.reportValidity();
+            invalidField.focus();
+            return;
+        }
+
         const saveButton = document.getElementById('dealer-profile-edit-save');
         const oldHtml = saveButton?.innerHTML || '';
         if (saveButton) {
@@ -1417,53 +1426,55 @@ document.addEventListener('DOMContentLoaded', () => {
             saveButton.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохраняем';
         }
 
-        let payload = {};
-        if (section === 'main') {
-            payload = {
-                dealer_id: editValue('profile-edit-dealer-id'),
-                name: editValue('profile-edit-name'),
-                status: editValue('profile-edit-status'),
-                city: editValue('profile-edit-city'),
-                price_list: editValue('profile-edit-price-list') || null,
-                motivation_scheme: editValue('profile-edit-motivation-scheme') || null,
-                address: editValue('profile-edit-address'),
-                responsible: editValue('profile-edit-responsible'),
-                region_sector: editValue('profile-edit-sector'),
-                website: editValue('profile-edit-website'),
-                instagram: editValue('profile-edit-instagram'),
-                contract: {
-                    isSigned: Boolean(document.getElementById('profile-edit-contract-signed')?.checked),
-                    date: editValue('profile-edit-contract-date')
-                }
-            };
-        } else if (section === 'logistics') {
-            payload = {
-                delivery: editValue('profile-edit-delivery'),
-                additional_addresses: collectProfileAddresses()
-            };
-        } else if (section === 'notes') {
-            payload = { bonuses: editValue('profile-edit-bonuses') };
-        } else if (section === 'contacts') {
-            payload = { contacts: collectProfileContacts() };
-        } else if (section === 'requisites') {
-            const legal = {
-                organizationName: editValue('profile-edit-org-name'),
-                director: editValue('profile-edit-director'),
-                legalAddress: editValue('profile-edit-legal-address'),
-                bin: editValue('profile-edit-bin'),
-                iik: editValue('profile-edit-iik'),
-                bank: editValue('profile-edit-bank'),
-                bik: editValue('profile-edit-bik'),
-                kbe: editValue('profile-edit-kbe'),
-                email: editValue('profile-edit-email')
-            };
-            const legalEntities = Array.isArray(currentDealer.legal_entities) ? currentDealer.legal_entities.map(item => ({...item})) : [];
-            if (legalEntities.length) legalEntities[0] = { ...legalEntities[0], ...legal };
-            else if (Object.values(legal).some(Boolean)) legalEntities.push(legal);
-            payload = { legal_entities: legalEntities };
-        }
-
         try {
+            let payload = {};
+            if (section === 'main') {
+                payload = {
+                    dealer_id: editValue('profile-edit-dealer-id'),
+                    name: editValue('profile-edit-name'),
+                    status: editValue('profile-edit-status'),
+                    city: editValue('profile-edit-city'),
+                    price_list: editValue('profile-edit-price-list') || null,
+                    motivation_scheme: editValue('profile-edit-motivation-scheme') || null,
+                    address: editValue('profile-edit-address'),
+                    responsible: editValue('profile-edit-responsible'),
+                    region_sector: editValue('profile-edit-sector'),
+                    website: editValue('profile-edit-website'),
+                    instagram: editValue('profile-edit-instagram'),
+                    contract: {
+                        isSigned: Boolean(document.getElementById('profile-edit-contract-signed')?.checked),
+                        date: editValue('profile-edit-contract-date')
+                    }
+                };
+            } else if (section === 'logistics') {
+                payload = {
+                    delivery: editValue('profile-edit-delivery'),
+                    additional_addresses: collectProfileAddresses()
+                };
+            } else if (section === 'notes') {
+                payload = { bonuses: editValue('profile-edit-bonuses') };
+            } else if (section === 'contacts') {
+                payload = { contacts: collectProfileContacts() };
+            } else if (section === 'requisites') {
+                const legal = {
+                    organizationName: editValue('profile-edit-org-name'),
+                    director: editValue('profile-edit-director'),
+                    legalAddress: editValue('profile-edit-legal-address'),
+                    bin: editValue('profile-edit-bin'),
+                    iik: editValue('profile-edit-iik'),
+                    bank: editValue('profile-edit-bank'),
+                    bik: editValue('profile-edit-bik'),
+                    kbe: editValue('profile-edit-kbe'),
+                    email: editValue('profile-edit-email')
+                };
+                const legalEntities = Array.isArray(currentDealer.legal_entities)
+                    ? currentDealer.legal_entities.map(item => ({...item}))
+                    : [];
+                if (legalEntities.length) legalEntities[0] = {...legalEntities[0], ...legal};
+                else if (Object.values(legal).some(Boolean)) legalEntities.push(legal);
+                payload = {legal_entities: legalEntities};
+            }
+
             const response = await fetch(`${API_DEALERS_URL}/${dealerId}`, {
                 method: 'PATCH',
                 headers: {'Content-Type':'application/json'},
@@ -1474,7 +1485,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(data.error || 'Не удалось сохранить изменения');
             }
 
-            currentDealer = { ...currentDealer, ...payload };
+            currentDealer = {...currentDealer, ...payload};
             cacheDealerProfile(currentDealer);
             bootstrap.Modal.getOrCreateInstance(modalEl).hide();
             window.showToast?.('Блок обновлён', 'success');
