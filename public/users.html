@@ -139,21 +139,29 @@
     <script src="theme-init.js?v={{VER}}"></script>
     <link id="crm-dark-theme-file" rel="stylesheet" href="dark-theme.css?v={{VER}}" media="screen">
     <link rel="stylesheet" href="ui-consistency.css?v={{VER}}">
+    <link rel="stylesheet" href="document-template-editor.css?v={{VER}}">
 </head>
 <body class="app-workspace-page users-page">
 <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-4"></nav>
 
 <main class="container-fluid app-page-shell">
-    <section class="app-page-hero">
+    <section class="app-page-hero" id="employee-page-hero">
         <div class="app-page-hero-copy">
             <div class="app-page-eyebrow">IDEAL FLOOR CRM · КОМАНДА</div>
-            <h1>Сотрудники</h1>
-            <p>Контакты, должности, рабочие показатели, активность и права доступа сотрудников в одном месте.</p>
+            <h1 id="employee-page-title">Сотрудники</h1>
+            <p id="employee-page-description">Контакты, должности, рабочие показатели, активность и права доступа сотрудников в одном месте.</p>
         </div>
-        <div class="app-page-actions">
+        <div class="app-page-actions" id="employee-page-actions">
             <button class="app-hero-primary" onclick="openUserModal()"><i class="bi bi-person-plus"></i><span>Добавить сотрудника</span></button>
         </div>
     </section>
+
+    <div class="employee-section-tabs" role="tablist" aria-label="Разделы страницы сотрудников">
+        <button type="button" class="active" id="employee-view-directory" role="tab" aria-selected="true" aria-controls="employee-page-directory" data-employee-view="directory"><i class="bi bi-people"></i><span>Сотрудники</span></button>
+        <button type="button" id="employee-view-templates" role="tab" aria-selected="false" aria-controls="employee-page-templates" data-employee-view="templates"><i class="bi bi-file-earmark-text"></i><span>Шаблоны документов</span></button>
+    </div>
+
+    <section id="employee-page-directory" data-employee-page="directory">
 
     <section class="app-toolbar-card app-toolbar-compact">
         <div class="input-group border-0">
@@ -185,6 +193,69 @@
         <i class="bi bi-person-x display-1 text-light"></i>
         <p class="mt-3">Сотрудники не найдены</p>
     </div>
+    </section>
+
+    <section id="employee-page-templates" data-employee-page="templates" hidden aria-labelledby="template-editor-title">
+        <div class="document-template-editor">
+            <div class="document-template-heading">
+                <div class="document-template-heading-copy">
+                    <span class="team-overline">УПРАВЛЕНИЕ ДОКУМЕНТАМИ</span>
+                    <h2 id="template-editor-title">Шаблоны документов</h2>
+                    <p>Правьте договоры прямо в макете. Поля дилера, даты и цены автоматически заполняются из CRM.</p>
+                </div>
+                <div class="document-template-actions">
+                    <button type="button" class="team-secondary" id="template-history-toggle" aria-expanded="false"><i class="bi bi-clock-history"></i><span>История версий</span></button>
+                    <button type="button" class="team-secondary" id="template-reset"><i class="bi bi-arrow-counterclockwise"></i><span>Вернуть исходный</span></button>
+                    <button type="button" class="team-primary" id="template-save"><i class="bi bi-check2"></i><span>Сохранить</span></button>
+                </div>
+            </div>
+
+            <div class="template-editor-notice" id="template-editor-notice" role="status" aria-live="polite" hidden></div>
+
+            <div class="template-editor-card">
+                <div class="template-editor-topline">
+                    <div class="template-document-tabs" role="tablist" aria-label="Выбор шаблона договора">
+                        <button type="button" class="active" role="tab" aria-selected="true" data-template-key="supply"><i class="bi bi-file-earmark-ruled"></i><span>Договор поставки</span></button>
+                        <button type="button" role="tab" aria-selected="false" data-template-key="storage"><i class="bi bi-box-seam"></i><span>Ответственное хранение</span></button>
+                    </div>
+                    <div class="template-version-status" id="template-version-status">Загрузка версии…</div>
+                </div>
+
+                <div class="template-editor-toolbar" role="toolbar" aria-label="Форматирование текста договора">
+                    <button type="button" data-template-command="undo" aria-label="Отменить" title="Отменить"><i class="bi bi-arrow-counterclockwise"></i></button>
+                    <button type="button" data-template-command="redo" aria-label="Повторить" title="Повторить"><i class="bi bi-arrow-clockwise"></i></button>
+                    <span class="template-toolbar-divider"></span>
+                    <select id="template-block-format" aria-label="Стиль абзаца">
+                        <option value="P">Обычный текст</option>
+                        <option value="H1">Заголовок 1</option>
+                        <option value="H2">Заголовок 2</option>
+                    </select>
+                    <button type="button" data-template-command="bold" aria-label="Жирный" title="Жирный"><i class="bi bi-type-bold"></i></button>
+                    <button type="button" data-template-command="italic" aria-label="Курсив" title="Курсив"><i class="bi bi-type-italic"></i></button>
+                    <button type="button" data-template-command="underline" aria-label="Подчёркнутый" title="Подчёркнутый"><i class="bi bi-type-underline"></i></button>
+                    <span class="template-toolbar-divider"></span>
+                    <button type="button" data-template-command="justifyLeft" aria-label="По левому краю" title="По левому краю"><i class="bi bi-text-left"></i></button>
+                    <button type="button" data-template-command="justifyCenter" aria-label="По центру" title="По центру"><i class="bi bi-text-center"></i></button>
+                    <button type="button" data-template-command="justifyRight" aria-label="По правому краю" title="По правому краю"><i class="bi bi-text-right"></i></button>
+                    <button type="button" data-template-command="justifyFull" aria-label="По ширине" title="По ширине"><i class="bi bi-justify"></i></button>
+                    <span class="template-toolbar-divider"></span>
+                    <button type="button" data-template-command="insertUnorderedList" aria-label="Маркированный список" title="Маркированный список"><i class="bi bi-list-ul"></i></button>
+                    <button type="button" data-template-command="insertOrderedList" aria-label="Нумерованный список" title="Нумерованный список"><i class="bi bi-list-ol"></i></button>
+                    <button type="button" id="template-preview-toggle" class="template-preview-toggle"><i class="bi bi-eye"></i><span>Предпросмотр</span></button>
+                </div>
+
+                <div class="template-editor-hint"><i class="bi bi-info-circle"></i><span>Нажмите на текст, чтобы исправить его. Жёлтые поля заполняются автоматически и защищены от случайного удаления.</span></div>
+                <div class="template-editor-frame-wrap">
+                    <iframe id="document-template-frame" title="Редактор шаблона договора" sandbox="allow-same-origin" loading="lazy"></iframe>
+                </div>
+
+                <section class="template-history-panel" id="template-history-panel" hidden aria-label="История версий">
+                    <div class="template-history-heading"><div><h3>История версий</h3><p>Загрузите прежнюю редакцию в редактор и сохраните её, чтобы вернуть.</p></div></div>
+                    <div id="template-history-list" class="template-history-list"></div>
+                </section>
+            </div>
+        </div>
+    </section>
 </main>
 
 <div class="modal fade employee-profile-modal" id="userModal" tabindex="-1" data-bs-backdrop="static">
@@ -726,6 +797,7 @@
     })();
 })();
 </script>
+<script src="document-template-editor.js?v={{VER}}"></script>
 <script src="employee-kpi.js?v={{VER}}"></script>
 <script src="telegram-client.js?v={{VER}}"></script>
 <script src="backups-client.js?v={{VER}}"></script>

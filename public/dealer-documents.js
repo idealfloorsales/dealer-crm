@@ -466,9 +466,22 @@
         if (state.templates[type]) return state.templates[type];
         const path = templatePaths[type];
         if (!path) throw new Error('Неизвестный тип документа');
-        const res = await fetch(path, { cache: 'no-store' });
-        if (!res.ok) throw new Error('Не удалось загрузить шаблон документа');
-        const html = await res.text();
+
+        let html = '';
+        if (type === 'supply' || type === 'storage') {
+            try {
+                const custom = await fetch('/api/document-templates/' + encodeURIComponent(type), { cache: 'no-store' });
+                if (custom.ok) {
+                    const data = await custom.json();
+                    html = String(data.html || '');
+                }
+            } catch (_) {}
+        }
+        if (!html) {
+            const res = await fetch(path, { cache: 'no-store' });
+            if (!res.ok) throw new Error('Не удалось загрузить шаблон документа');
+            html = await res.text();
+        }
         state.templates[type] = html;
         return html;
     }

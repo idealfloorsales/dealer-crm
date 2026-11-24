@@ -1671,6 +1671,209 @@ const MotivationReminderSetting = mongoose.model('MotivationReminderSetting', ne
 
 const Knowledge = mongoose.model('Knowledge', new mongoose.Schema({ title: String, content: String }, { timestamps: true }));
 
+const documentTemplateRevisionSchema = new mongoose.Schema({
+    version: { type:Number, required:true },
+    html: { type:String, required:true },
+    savedAt: { type:Date, default:Date.now },
+    savedBy: { id:String, name:String }
+}, { _id:false });
+const documentTemplateSchema = new mongoose.Schema({
+    key: { type:String, enum:['supply','storage'], required:true, unique:true },
+    html: { type:String, default:'' },
+    isDefault: { type:Boolean, default:true },
+    version: { type:Number, default:1 },
+    updatedBy: { id:String, name:String },
+    revisions: { type:[documentTemplateRevisionSchema], default:[] }
+}, { timestamps:true });
+const DocumentTemplate = mongoose.model('DocumentTemplate', documentTemplateSchema);
+
+const DOCUMENT_TEMPLATE_FILES = Object.freeze({ supply:'supply.html', storage:'storage.html' });
+function builtInDocumentTemplate(key) {
+    const file = DOCUMENT_TEMPLATE_FILES[String(key || '')];
+    if (!file) return '';
+    return fs.readFileSync(path.join(__dirname, 'public', 'document-templates', file), 'utf8');
+}
+function documentTemplateCounts(html) {
+    const counts = {};
+    const regex = /\{\{([A-Z0-9_]+)\}\}/g;
+    let match;
+    while ((match = regex.exec(String(html || '')))) counts[match[1]] = (counts[match[1]] || 0) + 1;
+    return counts;
+}
+function validateDocumentTemplate(key, input) {
+    const html = String(input || '');
+    if (!html.trim()) throw new Error('Шаблон не может быть пустым');
+    if (Buffer.byteLength(html, 'utf8') > 300000) throw new Error('Размер шаблона не должен превышать 300 КБ');
+    if (!/<html\b/i.test(html) || !/<head\b/i.test(html) || !/<body\b/i.test(html) || !/<\/body>/i.test(html)) {
+        throw new Error('В шаблоне должны остаться разделы html, head и body');
+    }
+    if (/<\s*(?:script|iframe|object|embed|form)\b/i.test(html) ||
+        /\bon[a-z0-9_-]+\s*=/i.test(html) ||
+        /javascript\s*:/i.test(html) ||
+        /data\s*:\s*text\/html/i.test(html) ||
+        /<meta\b[^>]*http-equiv\s*=\s*["']?\s*refresh/i.test(html) ||
+        /\bdata-crm-template-token\b/i.test(html)) {
+        throw new Error('В шаблоне найдены запрещённые элементы или атрибуты');
+    }
+    const expected = documentTemplateCounts(builtInDocumentTemplate(key));
+    const actual = documentTemplateCounts(html);
+    const expectedNames = new Set(Object.keys(expected));
+    for (const name of Object.keys(actual)) {
+        if (!expectedNames.has(name)) throw new Error('Неизвестное динамическое поле: ' + name);
+    }
+    for (const name of expectedNames) {
+        if ((actual[name] || 0) < expected[name]) {
+            throw new Error('В шаблоне потеряно поле CRM: {{' + name + '}}. Его нельзя удалять.');
+        }
+    }
+    return html;
+}
+function documentTemplateActor(req) {
+    return {
+        id:String(req.user?.id || req.user?._id || ''),
+        name:String(req.user?.fullName || req.user?.username || 'Администратор')
+    };
+}
+function documentTemplateCurrentHtml(record, key) {
+    return record && record.isDefault !== true && record.html ? record.html : builtInDocumentTemplate(key);
+}
+function documentTemplateResponse(record, key) {
+    const revisions = Array.isArray(record?.revisions) ? record.revisions.slice().sort((a,b) => Number(b.version)-Number(a.version)) : [];
+    return {
+        key,
+        html:documentTemplateCurrentHtml(record, key),
+        version:Number(record?.version) || 1,
+        hasCustom:Boolean(record && record.isDefault !== true && record.html),
+        updatedAt:record?.updatedAt || null,
+        updatedBy:record?.updatedBy || null,
+        revisions:revisions.map(item => ({
+            version:item.version,
+            savedAt:item.savedAt,
+            savedBy:item.savedBy || null
+        }))
+    };
+}
+function validDocumentTemplateKey(key) {
+    return Object.prototype.hasOwnProperty.call(DOCUMENT_TEMPLATE_FILES, String(key || ''));
+}
+
+app.get('/api/document-templates/:key', requireAnyPermission('can_view_dealers','can_edit_dealer'), async (req,res) => {
+    const key=String(req.params.key || '');
+    if (!validDocumentTemplateKey(key)) return res.status(404).json({error:'Шаблон не найден'});
+    try {
+        const record=await DocumentTemplate.findOne({key}).lean();
+        res.set('Cache-Control','no-store');
+        res.json({
+            key,
+            html:documentTemplateCurrentHtml(record,key),
+            version:Number(record?.version) || 1,
+            hasCustom:Boolean(record && record.isDefault !== true && record.html)
+        });
+    } catch (error) {
+        res.status(500).json({error:'Не удалось загрузить шаблон документа'});
+    }
+});
+
+app.get('/api/admin/document-templates/:key', requireAdmin, async (req,res) => {
+    const key=String(req.params.key || '');
+    if (!validDocumentTemplateKey(key)) return res.status(404).json({error:'Шаблон не найден'});
+    try {
+        const record=await DocumentTemplate.findOne({key}).lean();
+        res.set('Cache-Control','no-store');
+        res.json(documentTemplateResponse(record,key));
+    } catch (error) {
+        res.status(500).json({error:'Не удалось загрузить шаблон документа'});
+    }
+});
+
+app.get('/api/admin/document-templates/:key/revisions/:version', requireAdmin, async (req,res) => {
+    const key=String(req.params.key || '');
+    const revisionVersion=Number(req.params.version);
+    if (!validDocumentTemplateKey(key) || !Number.isInteger(revisionVersion) || revisionVersion < 1) {
+        return res.status(404).json({error:'Редакция не найдена'});
+    }
+    try {
+        const record=await DocumentTemplate.findOne({key}).lean();
+        const revision=(record?.revisions || []).find(item => Number(item.version) === revisionVersion);
+        if (!revision) return res.status(404).json({error:'Редакция не найдена'});
+        res.set('Cache-Control','no-store');
+        res.json({key,version:revision.version,html:revision.html,savedAt:revision.savedAt,savedBy:revision.savedBy || null});
+    } catch (error) {
+        res.status(500).json({error:'Не удалось загрузить редакцию шаблона'});
+    }
+});
+
+app.put('/api/admin/document-templates/:key', requireAdmin, async (req,res) => {
+    const key=String(req.params.key || '');
+    if (!validDocumentTemplateKey(key)) return res.status(404).json({error:'Шаблон не найден'});
+    let html;
+    try {
+        html=validateDocumentTemplate(key,req.body?.html);
+    } catch (error) {
+        return res.status(400).json({error:error.message || 'Некорректный шаблон'});
+    }
+    try {
+        let record=await DocumentTemplate.findOne({key});
+        const currentVersion=Number(record?.version) || 1;
+        const expectedVersion=Number(req.body?.expectedVersion);
+        if (!Number.isInteger(expectedVersion) || expectedVersion !== currentVersion) {
+            return res.status(409).json({error:'Шаблон уже изменён другим пользователем. Обновите редактор и повторите правку.'});
+        }
+        const now=new Date();
+        const actor=documentTemplateActor(req);
+        if (!record) record=new DocumentTemplate({key,version:1,isDefault:true,html:builtInDocumentTemplate(key),revisions:[]});
+        record.revisions.push({
+            version:currentVersion,
+            html:documentTemplateCurrentHtml(record,key),
+            savedAt:record.updatedAt || now,
+            savedBy:record.updatedBy || {id:'system',name:'Системный шаблон'}
+        });
+        if (record.revisions.length > 20) record.revisions=record.revisions.slice(-20);
+        record.html=html;
+        record.isDefault=false;
+        record.version=currentVersion+1;
+        record.updatedBy=actor;
+        await record.save();
+        res.set('Cache-Control','no-store');
+        res.json(documentTemplateResponse(record.toObject(),key));
+    } catch (error) {
+        res.status(500).json({error:'Не удалось сохранить шаблон документа'});
+    }
+});
+
+app.delete('/api/admin/document-templates/:key', requireAdmin, async (req,res) => {
+    const key=String(req.params.key || '');
+    if (!validDocumentTemplateKey(key)) return res.status(404).json({error:'Шаблон не найден'});
+    try {
+        let record=await DocumentTemplate.findOne({key});
+        const currentVersion=Number(record?.version) || 1;
+        const expectedVersion=Number(req.body?.expectedVersion);
+        if (!Number.isInteger(expectedVersion) || expectedVersion !== currentVersion) {
+            return res.status(409).json({error:'Шаблон уже изменён другим пользователем. Обновите редактор и повторите сброс.'});
+        }
+        if (record && record.isDefault !== true) {
+            const now=new Date();
+            record.revisions.push({
+                version:currentVersion,
+                html:documentTemplateCurrentHtml(record,key),
+                savedAt:record.updatedAt || now,
+                savedBy:record.updatedBy || documentTemplateActor(req)
+            });
+            if (record.revisions.length > 20) record.revisions=record.revisions.slice(-20);
+            record.html=builtInDocumentTemplate(key);
+            record.isDefault=true;
+            record.version=currentVersion+1;
+            record.updatedBy=documentTemplateActor(req);
+            await record.save();
+        }
+        res.set('Cache-Control','no-store');
+        res.json(documentTemplateResponse(record?.toObject() || null,key));
+    } catch (error) {
+        res.status(500).json({error:'Не удалось восстановить системный шаблон'});
+    }
+});
+
+
 function canonicalDealerPayload(input = {}) {
     const payload = { ...input };
 
