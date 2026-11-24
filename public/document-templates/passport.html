@@ -73,11 +73,24 @@ body { font-size:8.5pt; line-height:1.34; -webkit-print-color-adjust:exact; prin
 .passport-table strong { font-weight:800; }
 .passport-empty-cell { color:#85868a!important; text-align:center; font-style:italic; }
 .passport-empty { padding:2.2mm 2.5mm; border:1px dashed #d5ceca; border-radius:1.4mm; color:#85868a; background:#fcfbfa; font-size:7.3pt; }
-.passport-selected-table { width:100%; margin:.5mm 0 0; border-collapse:collapse; table-layout:fixed; font-size:7pt; line-height:1.25; }
-.passport-selected-table th { width:34mm; padding:1.1mm 1.7mm; border-bottom:1px solid #e6dfdc; background:#faf7f5; color:#9f080e; text-align:left; vertical-align:top; font-size:6.5pt; font-weight:800; letter-spacing:.025em; }
-.passport-selected-table td { padding:1.1mm 1.7mm; border-bottom:1px solid #e6dfdc; color:#303136; vertical-align:top; }
-.passport-product-inline b { color:#6f292d; font-size:6.6pt; font-weight:800; white-space:nowrap; }
-.passport-product-separator { color:#aaa0a0; padding:0 .4mm; }
+.passport-section-count { display:table-cell; width:43mm; padding-left:2mm; color:#9f080e; font-size:7pt; font-weight:800; text-align:right; vertical-align:middle; white-space:nowrap; }
+.passport-selected-table { width:100%; margin:.5mm 0 0; border-collapse:collapse; table-layout:fixed; font-size:6.8pt; line-height:1.2; }
+.passport-selected-table > tbody > tr > th { width:34mm; padding:1mm 1.6mm; border:1px solid #e6dfdc; background:#faf7f5; color:#9f080e; text-align:left; vertical-align:top; font-size:6.3pt; font-weight:800; letter-spacing:.02em; overflow-wrap:anywhere; }
+.passport-selected-table > tbody > tr > td { padding:0; border:1px solid #e6dfdc; color:#303136; vertical-align:top; }
+.passport-product-columns { width:100%; border-collapse:collapse; table-layout:fixed; }
+.passport-product-columns td { width:33.333%; padding:1mm 1.4mm; border-right:1px solid #eee8e5; border-bottom:1px solid #eee8e5; color:#303136; vertical-align:top; }
+.passport-product-columns tr:last-child td { border-bottom:0; }
+.passport-product-columns td:last-child { border-right:0; }
+.passport-product-inline { display:block; }
+.passport-product-inline b { color:#6f292d; font-size:6.4pt; font-weight:800; }
+.passport-product-cell.is-empty { background:#fcfbfa; }
+.passport-equipment-grid { width:100%; border-collapse:collapse; table-layout:fixed; font-size:7pt; }
+.passport-equipment-cell { width:33.333%; padding:1.2mm; border:1px solid #e4dfdc; vertical-align:top; }
+.passport-equipment-cell.is-empty { border:0; }
+.passport-equipment-item { width:100%; border-collapse:collapse; table-layout:fixed; }
+.passport-equipment-item td { padding:.5mm; border:0; color:#303136; vertical-align:top; }
+.passport-equipment-item td:first-child { width:76%; font-size:6.8pt; }
+.passport-equipment-quantity { width:24%; color:#9f080e!important; text-align:right; white-space:nowrap; font-size:6.8pt; font-weight:800; }
 .passport-number-cell { text-align:right!important; white-space:nowrap; font-weight:750; }
 .passport-commercial-grid td { width:50%; padding:1mm; }
 .passport-commercial-grid .passport-field { min-height:14mm; }
@@ -217,7 +230,7 @@ body { font-size:8.5pt; line-height:1.34; -webkit-print-color-adjust:exact; prin
     </section>
 
     <section class="passport-section">
-      <div class="passport-section-title"><span><b class="passport-section-number">04</b></span><strong>Отмеченные позиции IDEAL FLOOR</strong></div>
+      <div class="passport-section-title"><span><b class="passport-section-number">04</b></span><strong>Отмеченные позиции IDEAL FLOOR</strong><small class="passport-section-count">{{PASSPORT_MATRIX_COUNT}}</small></div>
       {{PASSPORT_MATRIX}}
     </section>
 

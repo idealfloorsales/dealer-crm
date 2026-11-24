@@ -289,17 +289,25 @@
             groups.get(collection).push(product);
         });
 
-        const rows = [...groups.entries()].map(([collection, items]) =>
-            '<tr><th scope="row">' + escapeHtml(collection) + '</th><td>' +
-            items.map((product, index) =>
-                (index ? '<span class="passport-product-separator"> · </span>' : '') +
-                '<span class="passport-product-inline"><b>' + escapeHtml(product.sku || '—') + '</b> ' +
-                escapeHtml(product.name || 'Без названия') + '</span>'
-            ).join('') +
-            '</td></tr>'
-        ).join('');
+        const columnCount = 3;
+        const rows = [...groups.entries()].map(([collection, items]) => {
+            const rowCount = Math.ceil(items.length / columnCount);
+            const productRows = Array.from({ length: rowCount }, (_, rowIndex) => {
+                const cells = Array.from({ length: columnCount }, (_, columnIndex) => {
+                    const product = items[columnIndex * rowCount + rowIndex];
+                    if (!product) return '<td class="passport-product-cell is-empty"></td>';
+                    return '<td class="passport-product-cell"><span class="passport-product-inline"><b>' +
+                        escapeHtml(product.sku || '—') + '</b> ' + escapeHtml(product.name || 'Без названия') + '</span></td>';
+                }).join('');
+                return '<tr>' + cells + '</tr>';
+            }).join('');
 
-        return '<table class="passport-selected-table"><tbody>' + rows + '</tbody></table>';
+            return '<tr class="passport-collection-row"><th scope="row">' + escapeHtml(collection) +
+                '</th><td class="passport-collection-items"><table class="passport-product-columns"><tbody>' +
+                productRows + '</tbody></table></td></tr>';
+        }).join('');
+
+        return '<table class="passport-selected-table"><colgroup><col style="width:34mm"><col></colgroup><tbody>' + rows + '</tbody></table>';
     }
 
     function buildPassportEquipment(dealer) {
@@ -309,10 +317,21 @@
         if (!items.length) {
             return '<div class="passport-empty">Торговое оборудование не отмечено.</div>';
         }
-        const rows = items.map(item =>
-            '<tr><td>' + escapeHtml(item.name) + '</td><td class="passport-number-cell">' + escapeHtml(Number(item.quantity)) + ' шт.</td></tr>'
-        ).join('');
-        return '<table class="passport-table passport-equipment-table"><thead><tr><th>Наименование</th><th>Количество</th></tr></thead><tbody>' + rows + '</tbody></table>';
+
+        const columnCount = 3;
+        const rowCount = Math.ceil(items.length / columnCount);
+        const rows = Array.from({ length: rowCount }, (_, rowIndex) => {
+            const cells = Array.from({ length: columnCount }, (_, columnIndex) => {
+                const item = items[columnIndex * rowCount + rowIndex];
+                if (!item) return '<td class="passport-equipment-cell is-empty"></td>';
+                return '<td class="passport-equipment-cell"><table class="passport-equipment-item"><tbody><tr>' +
+                    '<td>' + escapeHtml(item.name) + '</td><td class="passport-equipment-quantity">' +
+                    escapeHtml(Number(item.quantity)) + ' шт.</td></tr></tbody></table></td>';
+            }).join('');
+            return '<tr>' + cells + '</tr>';
+        }).join('');
+
+        return '<table class="passport-equipment-grid"><tbody>' + rows + '</tbody></table>';
     }
 
     function passportPosTotal(dealer) {
@@ -320,6 +339,16 @@
             const quantity = Number(item?.quantity) || 0;
             return quantity > 0 ? sum + quantity : sum;
         }, 0);
+    }
+
+    function passportMatrixCount(dealer) {
+        const selected = selectedPassportProducts(dealer).length;
+        const total = (Array.isArray(state.catalog) ? state.catalog : [])
+            .filter(product => product && (product.sku || product.name) && String(product.product_type || 'laminate') !== 'equipment')
+            .length;
+        return total > 0
+            ? selected + ' из ' + Math.max(total, selected) + ' позиций выставлено'
+            : selected + ' позиций выставлено';
     }
 
     function exhibitedCount(dealer) {
@@ -615,6 +644,7 @@
             PASSPORT_PRICE_PERIOD: passportPriceEnd ? 'до ' + escapeHtml(formatPassportDate(passportPriceEnd)) : (passportOverride ? 'Срок не ограничен' : '—'),
             PASSPORT_DELIVERY_TERMS: valueOrLine(passportDelivery, 'Не указаны'),
             PASSPORT_MATRIX: buildPassportMatrix(dealer),
+            PASSPORT_MATRIX_COUNT: escapeHtml(passportMatrixCount(dealer)),
                         PASSPORT_EXHIBITED_COUNT: escapeHtml(exhibitedCount(dealer)),
             PASSPORT_POS_TOTAL: escapeHtml(passportPosTotal(dealer))
         };
