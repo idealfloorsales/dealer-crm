@@ -45,8 +45,6 @@
  .template-version-status{text-align:left}
 }
 @media(max-width:640px){
- .users-page .employee-section-tabs{width:100%;margin-bottom:16px}
- .users-page .employee-section-tabs button{flex:1 0 auto;padding:9px 12px;font-size:.76rem}
  .document-template-heading h2{font-size:1.24rem}
  .document-template-actions{display:grid;grid-template-columns:1fr 1fr;width:100%}
  .document-template-actions .team-primary{grid-column:1/-1}

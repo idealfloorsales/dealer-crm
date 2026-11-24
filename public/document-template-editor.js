@@ -14,11 +14,6 @@
     const historyList = document.getElementById('template-history-list');
     const previewButton = document.getElementById('template-preview-toggle');
     const blockFormat = document.getElementById('template-block-format');
-    const pageTitle = document.getElementById('employee-page-title');
-    const pageDescription = document.getElementById('employee-page-description');
-    const pageActions = document.getElementById('employee-page-actions');
-    const sectionTabs = Array.from(document.querySelectorAll('[data-employee-view]'));
-    const pageSections = Array.from(document.querySelectorAll('[data-employee-page]'));
     const documentTabs = Array.from(document.querySelectorAll('[data-template-key]'));
 
     let activeKey = 'supply';
@@ -66,25 +61,6 @@
         const data = await response.json().catch(function(){ return {}; });
         if (!response.ok) throw new Error(apiError(data, 'Не удалось выполнить запрос'));
         return data;
-    }
-
-    function setTab(view){
-        const templateView = view === 'templates';
-        document.body.classList.toggle('is-template-view', templateView);
-        sectionTabs.forEach(function(button){
-            const active = button.dataset.employeeView === view;
-            button.classList.toggle('active', active);
-            button.setAttribute('aria-selected', active ? 'true' : 'false');
-        });
-        pageSections.forEach(function(section){
-            section.hidden = section.dataset.employeePage !== view;
-        });
-        if (pageTitle) pageTitle.textContent = 'Сотрудники';
-        if (pageDescription) pageDescription.textContent = templateView
-            ? 'Редактируйте шаблоны договоров поставки и ответственного хранения без правки кода.'
-            : 'Контакты, должности, рабочие показатели, активность и права доступа сотрудников в одном месте.';
-        if (pageActions) pageActions.hidden = templateView;
-        if (templateView && !activeHtml && !loading) loadTemplate(activeKey);
     }
 
     function replaceTokensWithChips(doc){
@@ -201,6 +177,7 @@
             });
             frameReady = true;
             setFrameMode();
+            saveButton.disabled = false;
             if (frameLoadResolve) frameLoadResolve();
         };
         frame.srcdoc = html;
@@ -348,8 +325,8 @@
         }
     }
 
-    sectionTabs.forEach(function(button){
-        button.addEventListener('click', function(){ setTab(button.dataset.employeeView); });
+    document.addEventListener('crm:employee-section-change', function(event){
+        if (event.detail && event.detail.section === 'templates' && !activeHtml && !loading) loadTemplate(activeKey);
     });
 
     documentTabs.forEach(function(button){
@@ -399,5 +376,4 @@
         if (button) loadRevision(button.dataset.templateRevision);
     });
 
-    setTab('directory');
 })();
