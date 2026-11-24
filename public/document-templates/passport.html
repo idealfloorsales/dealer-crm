@@ -8,73 +8,82 @@
 <style>
 @page { size:A4 portrait; margin:9mm 10mm; }
 * { box-sizing:border-box; }
-html,body { margin:0; padding:0; background:#f4f2f0; color:#25262b; font-family:Arial,Helvetica,sans-serif; }
+html,body { margin:0; padding:0; background:#f3f1ef; color:#25262b; font-family:Arial,Helvetica,sans-serif; }
 body { font-size:8.5pt; line-height:1.34; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-.passport-sheet {
-    width:190mm; min-height:279mm; margin:12px auto; padding:0 0 8mm;
-    background:#fff; box-shadow:0 8px 30px rgba(30,22,22,.09);
-}
-.passport-top-accent {
-    height:2mm; margin-bottom:3.5mm;
-    border-radius:1mm;
-    background:linear-gradient(90deg,#b9040a 0%,#8d0207 70%,#302326 100%);
-}
-.passport-inner { padding:0 10mm; }
-.passport-brandbar,.passport-title-row,.passport-meta-table,.passport-hero,.passport-kpis,
-.passport-grid,.passport-qr-table,.passport-signatures { width:100%; border-collapse:collapse; }
-.passport-brandbar { margin-bottom:2.7mm; border-bottom:.7pt solid #e6dddd; }
+.passport-sheet { width:190mm; min-height:279mm; margin:14px auto; padding:0; background:#fff; box-shadow:0 8px 30px rgba(30,22,22,.09); }
+.passport-top-accent { height:2mm; margin-bottom:3.5mm; border-radius:1mm; background:linear-gradient(90deg,#b9040a 0%,#8d0207 70%,#302326 100%); }
+.passport-inner { padding:0 10mm 8mm; }
+.passport-brandbar,.passport-title-row,.passport-hero,.passport-meta-table,.passport-kpis,.passport-grid,.passport-qr-table,.passport-signatures,.passport-footer { width:100%; border-collapse:collapse; }
+.passport-brandbar { margin:0 0 2mm; border-bottom:.7pt solid #e6dddd; }
 .passport-brandbar td { padding:0 0 2.7mm; vertical-align:middle; }
 .passport-brandbar .brand-cell { width:65%; }
+.passport-brand-lockup { display:table; }
+.passport-logo-cell,.passport-brand-copy-cell { display:table-cell; vertical-align:middle; }
 .passport-logo { display:block; width:38mm; max-height:13mm; object-fit:contain; object-position:left center; }
-.passport-brand-copy { display:inline-block; margin-left:3mm; padding-left:3mm; border-left:1.2mm solid #b9040a; vertical-align:middle; }
-.passport-brand-copy strong { display:block; color:#36373b; font-size:7pt; letter-spacing:.07em; }
+.passport-brand-copy { margin-left:3mm; padding-left:3mm; border-left:1.2mm solid #b9040a; }
+.passport-brand-copy strong { display:block; color:#36373b; font-size:7pt; font-weight:800; letter-spacing:.07em; }
 .passport-brand-copy small { display:block; margin-top:.5mm; color:#85868a; font-size:6.3pt; }
 .passport-document-mark { text-align:right; }
 .passport-document-mark span { display:block; color:#9a7779; font-size:6.2pt; font-weight:700; letter-spacing:.09em; }
-.passport-document-mark strong { display:block; margin-top:.7mm; color:#45464b; font-size:7.2pt; letter-spacing:.05em; }
-.passport-title-row { margin:0 0 2.4mm; }
+.passport-document-mark strong { display:block; margin-top:.7mm; color:#45464b; font-size:7.2pt; font-weight:800; letter-spacing:.05em; }
+.passport-title-row { margin:0 0 2.8mm; }
 .passport-title-row td { vertical-align:middle; }
+.passport-title-copy { min-width:0; }
 .passport-eyebrow { margin-bottom:.7mm; color:#b9040a; font-size:6.5pt; font-weight:800; letter-spacing:.11em; }
 .passport-title { margin:0; color:#242529; font-size:18pt; line-height:1.05; font-weight:850; letter-spacing:-.035em; text-transform:uppercase; }
 .passport-subtitle { margin:1mm 0 0; color:#75777c; font-size:7.4pt; }
-.passport-id-box { min-width:28mm; padding:1.7mm 3mm; border-left:1.2mm solid #b9040a; border-radius:1.4mm; background:#fbf7f6; text-align:left; }
+.passport-id-box { min-width:29mm; padding:1.7mm 3mm; border-left:1.2mm solid #b9040a; border-radius:1.4mm; background:#fbf7f6; text-align:left; }
 .passport-id-box small { display:block; margin-bottom:.4mm; color:#8d8583; font-size:6.2pt; font-weight:700; text-transform:uppercase; letter-spacing:.06em; }
-.passport-id-box strong { display:block; color:#b9040a; font-size:13pt; line-height:1.05; font-weight:850; }
-.passport-hero { margin:0 0 2.4mm; border:1px solid #e7dede; border-radius:1.8mm; background:#fbf7f6; }
-.passport-hero td { padding:2.5mm 3mm; vertical-align:middle; }
+.passport-id-box strong { display:block; color:#b9040a; font-size:13pt; line-height:1.05; font-weight:850; letter-spacing:.02em; }
+.passport-hero { margin:0 0 2.3mm; border:1px solid #e7dede; border-radius:1.8mm; background:#fbf7f6; }
+.passport-hero td { padding:2.4mm 3mm; vertical-align:middle; }
+.passport-hero-copy { min-width:0; }
+.passport-kicker { display:block; margin-bottom:.6mm; color:#9a7779; font-size:6pt; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
 .passport-dealer-name { display:block; margin-bottom:.5mm; color:#25262b; font-size:12.5pt; font-weight:850; }
-.passport-address { color:#74767b; font-size:7.5pt; }
-.passport-org-badge { padding:1.5mm 2.5mm; border-radius:99px; background:#f3e5e5; color:#9d080e; font-size:7pt; font-weight:800; white-space:normal; max-width:45mm; }
-.passport-meta-table { margin:0 0 2.5mm; }
-.passport-meta-table td { width:25%; padding:1.8mm 2.3mm; border:1px solid #e9e5e2; vertical-align:top; }
+.passport-address { display:block; color:#74767b; font-size:7.5pt; }
+.passport-org-badge { display:inline-block; max-width:48mm; padding:1.5mm 2.5mm; border:1px solid #efd9d9; border-radius:99px; background:#f8eeee; color:#9f080e; font-size:7pt; font-weight:800; text-align:center; overflow-wrap:anywhere; }
+.passport-meta-table { margin:0 0 2.6mm; }
+.passport-meta-table td { width:25%; padding:1.8mm 2.3mm; border:1px solid #e9e5e2; background:#fff; vertical-align:top; }
 .passport-meta-table td:first-child { border-radius:1.6mm 0 0 1.6mm; }
 .passport-meta-table td:last-child { border-radius:0 1.6mm 1.6mm 0; }
-.passport-label { display:block; margin:0 0 .5mm; color:#77797e; font-size:6.1pt; line-height:1.15; font-weight:750; letter-spacing:.045em; text-transform:uppercase; }
+.passport-label { display:block; margin:0 0 .6mm; color:#77797e; font-size:6.1pt; line-height:1.15; font-weight:750; letter-spacing:.045em; text-transform:uppercase; }
 .passport-value { display:block; color:#25262b; font-size:8pt; line-height:1.25; font-weight:650; overflow-wrap:anywhere; }
-.passport-kpis { margin:0 -1mm 2.5mm; }
+.passport-kpis { margin:0 -1mm 2.7mm; }
 .passport-kpis td { width:33.33%; padding:0 1mm; }
-.passport-kpi-card { padding:1.8mm 2.3mm; border:1px solid #e9e5e2; border-radius:1.7mm; background:#fff; }
+.passport-kpi-card { min-height:16mm; padding:1.8mm 2.3mm; border:1px solid #e8e2df; border-radius:1.7mm; background:#fff; }
 .passport-kpi-card small { display:block; color:#85868a; font-size:6.1pt; font-weight:750; letter-spacing:.04em; text-transform:uppercase; }
 .passport-kpi-card strong { display:block; margin-top:.5mm; color:#25262b; font-size:11pt; font-weight:850; }
 .passport-section { margin-top:3.5mm; page-break-inside:auto; break-inside:auto; }
 .passport-section-title { display:table; width:100%; margin:0 0 2mm; padding:0 0 1.5mm; border-bottom:.7pt solid #e7dada; page-break-after:avoid; break-after:avoid; }
 .passport-section-title > span { display:table-cell; width:7.8mm; vertical-align:middle; }
 .passport-section-number { display:block; width:5.8mm; height:5.8mm; border-radius:1.2mm; background:#b9040a; color:#fff; font-size:6.5pt; line-height:5.8mm; font-weight:850; text-align:center; }
-.passport-section-title strong { display:table-cell; color:#303136; font-size:8.2pt; line-height:1.15; font-weight:800; letter-spacing:.055em; text-transform:uppercase; vertical-align:middle; }
-.passport-grid { margin:0 -1mm; }
-.passport-grid td { width:50%; padding:1.5mm 1mm; vertical-align:top; }
-.passport-field { padding:1.5mm 2mm; border:1px solid #e9e5e2; border-radius:1.3mm; background:#fff; }
-.passport-field .passport-value { min-height:4mm; }
-.passport-table { width:100%; border-collapse:collapse; table-layout:auto; font-size:7.2pt; page-break-inside:auto; }
-.passport-table thead { display:table-header-group; }
-.passport-table th { padding:1.7mm 2mm; border:1px solid #ded9d6; background:#f5f2f0; color:#5d5b60; text-align:left; font-size:6.2pt; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
-.passport-table td { padding:1.7mm 2mm; border:1px solid #e4dfdc; color:#292a2e; vertical-align:top; page-break-inside:avoid; break-inside:avoid; }
-.passport-table tr { page-break-inside:avoid; break-inside:avoid; }
-.passport-table strong { font-weight:800; }
-.passport-empty-cell { color:#85868a!important; text-align:center; font-style:italic; }
-.passport-empty { padding:2.2mm 2.5mm; border:1px dashed #d5ceca; border-radius:1.4mm; color:#85868a; background:#fcfbfa; font-size:7.3pt; }
+.passport-section-title > strong { display:table-cell; color:#303136; font-size:8.2pt; line-height:1.15; font-weight:800; letter-spacing:.055em; text-transform:uppercase; vertical-align:middle; }
 .passport-section-count { display:table-cell; width:43mm; padding-left:2mm; text-align:right; vertical-align:middle; white-space:nowrap; }
 .passport-section-count > span { display:inline-block; padding:.8mm 1.7mm; border:1px solid #efd9d9; border-radius:99px; background:#fbf1f1; color:#9f080e; font-size:6.7pt; font-weight:800; }
+.passport-grid { margin:0 -1mm; }
+.passport-grid > tbody > tr > td { width:50%; padding:1mm; vertical-align:top; }
+.passport-field { min-height:11mm; padding:1.6mm 2mm; border:1px solid #e9e5e2; border-radius:1.4mm; background:#fff; }
+.passport-field .passport-value { min-height:4mm; }
+.passport-contact-table,.passport-table { width:100%; border-collapse:collapse; table-layout:auto; font-size:7.2pt; }
+.passport-contact-table { margin-top:1.5mm; }
+.passport-contact-table th:nth-child(1) { width:31%; }
+.passport-contact-table th:nth-child(2) { width:25%; }
+.passport-contact-table th:nth-child(3) { width:44%; }
+.passport-competitor-table th:nth-child(1) { width:27%; }
+.passport-competitor-table th:nth-child(2) { width:31%; }
+.passport-competitor-table th:nth-child(3),.passport-competitor-table th:nth-child(4) { width:21%; }
+.passport-table thead { display:table-header-group; }
+.passport-table th,.passport-contact-table th { padding:1.7mm 2mm; border:1px solid #ded9d6; background:#f5f2f0; color:#5d5b60; text-align:left; font-size:6.2pt; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
+.passport-table td,.passport-contact-table td { padding:1.7mm 2mm; border:1px solid #e4dfdc; color:#292a2e; vertical-align:top; page-break-inside:avoid; break-inside:avoid; }
+.passport-contact-table tbody tr:nth-child(even),.passport-table tbody tr:nth-child(even) { background:#fcfbfa; }
+.passport-table strong,.passport-contact-table strong { font-weight:800; }
+.passport-empty-cell { color:#85868a!important; text-align:center; font-style:italic; }
+.passport-empty { padding:2.2mm 2.5mm; border:1px dashed #d5ceca; border-radius:1.4mm; background:#fcfbfa; color:#85868a; font-size:7.3pt; }
+.passport-commercial-grid td { width:50%; padding:1mm; }
+.passport-commercial-grid .passport-field { min-height:14mm; background:#fbfaf9; }
+.passport-commercial-grid .passport-value { font-size:8.3pt; }
+.passport-field-emphasis { border-color:#ead7d7; background:#fbf5f5!important; }
+.passport-field-emphasis .passport-value { color:#951015; font-weight:800; }
 .passport-selected-table { width:100%; margin:.5mm 0 0; border-collapse:separate; border-spacing:0 1mm; table-layout:fixed; font-size:6.8pt; line-height:1.2; }
 .passport-selected-table > tbody > tr > th { width:34mm; padding:1.7mm 2mm; border:1px solid #ebe4e1; border-radius:1.5mm; background:#f7f4f2; color:#8f171c; text-align:left; vertical-align:middle; font-size:6.3pt; font-weight:800; letter-spacing:.025em; overflow-wrap:anywhere; }
 .passport-selected-table > tbody > tr > td { padding:.2mm 0 .2mm 1.2mm; border:0; color:#303136; vertical-align:top; }
@@ -91,20 +100,17 @@ body { font-size:8.5pt; line-height:1.34; -webkit-print-color-adjust:exact; prin
 .passport-equipment-name { display:block; min-height:6mm; margin-bottom:.8mm; color:#3e4045; font-size:6.7pt; line-height:1.2; font-weight:650; }
 .passport-equipment-quantity { display:inline-block; padding:.5mm 1.1mm; border:1px solid #efdcdc; border-radius:99px; background:#f9eeee; color:#9f080e; font-size:6.3pt; line-height:1.1; font-weight:800; white-space:nowrap; }
 .passport-number-cell { text-align:right!important; white-space:nowrap; font-weight:750; }
-.passport-commercial-grid td { width:50%; padding:1mm; }
-.passport-commercial-grid .passport-field { min-height:14mm; }
-.passport-commercial-grid .passport-value { font-size:8.3pt; }
 .passport-qr-table { margin-top:1mm; }
-.passport-qr-table td { width:50%; padding:1.6mm; border:1px solid #e9e5e2; text-align:center; vertical-align:top; }
-.passport-qr { width:19mm; height:19mm; object-fit:contain; border:1px solid #e5dfdc; border-radius:1.3mm; padding:1mm; }
+.passport-qr-table td { width:50%; padding:1.6mm; border:1px solid #e9e5e2; border-radius:1.4mm; background:#fbfaf9; text-align:center; vertical-align:top; }
+.passport-qr { width:19mm; height:19mm; object-fit:contain; border:1px solid #e5dfdc; border-radius:1.3mm; background:#fff; padding:1mm; }
 .passport-qr-empty { width:19mm; height:19mm; margin:0 auto; border:1px dashed #cfc8c5; border-radius:1.3mm; color:#aaa3a0; font-size:6.5pt; line-height:19mm; }
 .passport-qr-label { margin-top:1mm; color:#4b4c51; font-size:6.2pt; font-weight:800; text-transform:uppercase; }
 .passport-link { margin-top:.5mm; color:#85868a; font-size:6pt; overflow-wrap:anywhere; }
 .passport-photo-grid { display:table; width:100%; table-layout:fixed; border-spacing:2mm; margin:-2mm; }
-.passport-photo-card { display:table-cell; width:33.33%; padding:1.5mm; border:1px solid #e6e1de; border-radius:1.5mm; vertical-align:top; }
-.passport-photo-card img { display:block; width:100%; height:42mm; object-fit:cover; }
+.passport-photo-card { display:table-cell; width:33.33%; padding:1.5mm; border:1px solid #e6e1de; border-radius:1.5mm; background:#fff; vertical-align:top; }
+.passport-photo-card img { display:block; width:100%; height:42mm; border-radius:1mm; object-fit:cover; }
 .passport-photo-card small { display:block; margin-top:1mm; color:#6f7075; font-size:6.2pt; overflow-wrap:anywhere; }
-.passport-notes { min-height:11mm; padding:2mm 2.4mm; border:1px solid #d8d2cf; border-radius:1.5mm; background:#fff; color:#303136; white-space:normal; }
+.passport-notes { min-height:11mm; padding:2mm 2.4mm; border:1px solid #e4dfdc; border-radius:1.5mm; background:#fbfaf9; color:#303136; white-space:normal; }
 .passport-signatures { margin-top:6mm; page-break-inside:avoid; }
 .passport-signatures td { width:50%; padding:0 6mm; vertical-align:top; }
 .passport-signature-line { height:8mm; border-bottom:.75pt solid #333438; }
@@ -112,21 +118,29 @@ body { font-size:8.5pt; line-height:1.34; -webkit-print-color-adjust:exact; prin
 .passport-footer { margin-top:5mm; padding-top:1.8mm; border-top:.7pt solid #eadcdd; color:#8b8585; font-size:6.2pt; letter-spacing:.035em; }
 .passport-footer td:last-child { text-align:right; }
 @media print {
-    html,body { width:auto!important; min-width:0!important; height:auto!important; overflow:visible!important; background:#fff!important; }
-    body { margin:0!important; padding:0!important; }
-    .passport-sheet { width:auto; min-height:0; margin:0; padding-bottom:5mm; box-shadow:none; }
-    .passport-inner { padding:0; }
-    .passport-top-accent,.passport-section-number,.passport-org-badge,.passport-id-box,.passport-kpi-card,.passport-commercial-grid .passport-field,.passport-section-count > span,.passport-product-inline,.passport-equipment-card,.passport-equipment-quantity {
-        -webkit-print-color-adjust:exact!important; print-color-adjust:exact!important;
-    }
-    .passport-table tr,.passport-field,.passport-kpi-card,.passport-hero,.passport-meta-table { page-break-inside:avoid; break-inside:avoid; }
+  html,body { width:auto!important; min-width:0!important; height:auto!important; overflow:visible!important; background:#fff!important; }
+  body { margin:0!important; padding:0!important; }
+  .passport-sheet { width:auto; min-height:0; margin:0; padding-bottom:5mm; box-shadow:none; }
+  .passport-inner { padding:0; }
+  .passport-top-accent,.passport-section-number,.passport-org-badge,.passport-id-box,.passport-kpi-card,.passport-commercial-grid .passport-field,.passport-field-emphasis,.passport-section-count > span,.passport-product-inline,.passport-equipment-card,.passport-equipment-quantity { -webkit-print-color-adjust:exact!important; print-color-adjust:exact!important; }
+  .passport-section-title,.passport-field,.passport-kpi-card,.passport-hero,.passport-meta-table,.passport-table tr,.passport-contact-table tr,.passport-product-inline,.passport-equipment-card,.passport-photo-card,.passport-signatures { page-break-inside:avoid; break-inside:avoid; }
+  .passport-table thead,.passport-contact-table thead { display:table-header-group; }
 }
 @media screen and (max-width:720px) {
-    .passport-sheet { width:100%; min-height:100vh; margin:0; padding:16px; }
-    .passport-inner { padding:0; }
-    .passport-brandbar,.passport-title-row,.passport-hero,.passport-meta-table,.passport-kpis,.passport-grid,.passport-qr-table,.passport-signatures { width:100%; }
-    .passport-logo { width:34mm; }
-    .passport-title { font-size:17pt; }
+  .passport-sheet { width:100%; min-height:100vh; margin:0; padding:16px 0; }
+  .passport-inner { padding:0 16px 24px; }
+  .passport-brandbar .brand-cell { width:62%; }
+  .passport-logo { width:32mm; }
+  .passport-title { font-size:16pt; }
+  .passport-id-box { min-width:23mm; padding:1.5mm 2mm; }
+  .passport-hero td { padding:2mm; }
+  .passport-meta-table td { padding:1.5mm; }
+  .passport-meta-table .passport-value { font-size:7pt; }
+  .passport-section-count { width:40mm; }
+  .passport-product-columns td { padding:.5mm; }
+  .passport-product-inline { padding:1mm; }
+  .passport-product-name { font-size:6.1pt; }
+  .passport-equipment-card { padding:1.3mm; }
 }
 </style>
 </head>
@@ -136,31 +150,37 @@ body { font-size:8.5pt; line-height:1.34; -webkit-print-color-adjust:exact; prin
   <div class="passport-inner">
     <table class="passport-brandbar">
       <tr>
-        <td class="brand-cell"><img class="passport-logo" src="/logo.png" alt="IDEAL FLOOR"></td>
-        <td class="passport-document-mark"><span>IDEAL FLOOR CRM</span><strong>КАРТОЧКА ДИЛЕРСКОГО ОБЪЕКТА</strong></td>
+        <td class="brand-cell">
+          <table class="passport-brand-lockup"><tr>
+            <td class="passport-logo-cell"><img class="passport-logo" src="/logo.png" alt="IDEAL FLOOR"></td>
+            <td class="passport-brand-copy-cell"><div class="passport-brand-copy"><strong>IDEAL FLOOR · ДИЛЕРСКАЯ СЕТЬ</strong><small>Внутренний документ CRM</small></div></td>
+          </tr></table>
+        </td>
+        <td class="passport-document-mark"><span>IDEAL FLOOR CRM</span><strong>ПАСПОРТ ОБЪЕКТА</strong></td>
       </tr>
     </table>
 
     <table class="passport-title-row">
       <tr>
-        <td>
-          <div class="passport-eyebrow">УЧЁТ ВЫСТАВЛЕННОСТИ · КОММЕРЧЕСКИЕ УСЛОВИЯ · ОКРУЖЕНИЕ</div>
+        <td class="passport-title-copy">
+          <div class="passport-eyebrow">КАРТОЧКА ТОРГОВОЙ ТОЧКИ</div>
           <h1 class="passport-title">Паспорт объекта</h1>
-          <p class="passport-subtitle">Карточка торговой точки и результаты работы с дилером</p>
+          <p class="passport-subtitle">Выставленность · коммерческие условия · конкурентное окружение</p>
         </td>
         <td style="width:34mm;text-align:right">
-          <div class="passport-id-box"><small>IF-номер</small><strong>{{DEALER_ID}}</strong></div>
+          <div class="passport-id-box"><small>IF-НОМЕР ДИЛЕРА</small><strong>{{DEALER_ID}}</strong></div>
         </td>
       </tr>
     </table>
 
     <table class="passport-hero">
       <tr>
-        <td>
+        <td class="passport-hero-copy">
+          <span class="passport-kicker">ТОРГОВАЯ ТОЧКА</span>
           <span class="passport-dealer-name">{{DEALER_NAME}}</span>
           <span class="passport-address">{{CITY}} · {{ACTUAL_ADDRESS}}</span>
         </td>
-        <td style="width:42mm;text-align:right"><span class="passport-org-badge">{{DEALER_ORG}}</span></td>
+        <td style="width:50mm;text-align:right"><span class="passport-org-badge">{{DEALER_ORG}}</span></td>
       </tr>
     </table>
 
@@ -177,7 +197,7 @@ body { font-size:8.5pt; line-height:1.34; -webkit-print-color-adjust:exact; prin
       <tr>
         <td><div class="passport-kpi-card"><small>Отмеченные декоры IDEAL FLOOR</small><strong>{{PASSPORT_EXHIBITED_COUNT}}</strong></div></td>
         <td><div class="passport-kpi-card"><small>Единиц торгового оборудования</small><strong>{{PASSPORT_POS_TOTAL}} шт.</strong></div></td>
-        <td><div class="passport-kpi-card"><small>Город</small><strong>{{CITY}}</strong></div></td>
+        <td><div class="passport-kpi-card"><small>Город объекта</small><strong>{{CITY}}</strong></div></td>
       </tr>
     </table>
 
@@ -197,7 +217,7 @@ body { font-size:8.5pt; line-height:1.34; -webkit-print-color-adjust:exact; prin
           <td><div class="passport-field"><span class="passport-label">Банк · БИК · КБЕ</span><span class="passport-value">{{BANK}} · {{BIK}} · {{KBE}}</span></div></td>
         </tr>
       </table>
-      <table class="passport-table" style="margin-top:1.5mm">
+      <table class="passport-contact-table">
         <thead><tr><th>Контактное лицо</th><th>Должность</th><th>Телефон / контакты</th></tr></thead>
         <tbody>{{PASSPORT_CONTACTS}}</tbody>
       </table>
@@ -207,22 +227,22 @@ body { font-size:8.5pt; line-height:1.34; -webkit-print-color-adjust:exact; prin
       <div class="passport-section-title"><span><b class="passport-section-number">02</b></span><strong>Прайс и условия работы</strong></div>
       <table class="passport-grid passport-commercial-grid">
         <tr>
-          <td><div class="passport-field"><span class="passport-label">Действующий прайс</span><span class="passport-value">{{PASSPORT_PRICE_LIST}}</span></div></td>
+          <td><div class="passport-field passport-field-emphasis"><span class="passport-label">Действующий прайс</span><span class="passport-value">{{PASSPORT_PRICE_LIST}}</span></div></td>
           <td><div class="passport-field"><span class="passport-label">Прайс в профиле дилера</span><span class="passport-value">{{PASSPORT_PROFILE_PRICE}}</span></div></td>
         </tr>
         <tr>
-          <td><div class="passport-field"><span class="passport-label">Скидка</span><span class="passport-value">{{PASSPORT_DISCOUNT}}</span></div></td>
+          <td><div class="passport-field passport-field-emphasis"><span class="passport-label">Активная скидка</span><span class="passport-value">{{PASSPORT_DISCOUNT}}</span></div></td>
           <td><div class="passport-field"><span class="passport-label">Основание и срок прайса</span><span class="passport-value">{{PASSPORT_PRICE_SOURCE}} · {{PASSPORT_PRICE_PERIOD}}</span></div></td>
         </tr>
         <tr>
-          <td colspan="2"><div class="passport-field"><span class="passport-label">Условия доставки и оплаты</span><span class="passport-value">{{PASSPORT_DELIVERY_TERMS}}</span></div></td>
+          <td colspan="2"><div class="passport-field"><span class="passport-label">Доставка и оплата</span><span class="passport-value">{{PASSPORT_DELIVERY_TERMS}}</span></div></td>
         </tr>
       </table>
     </section>
 
     <section class="passport-section">
-      <div class="passport-section-title"><span><b class="passport-section-number">03</b></span><strong>Конкуренты у дилера</strong></div>
-      <table class="passport-table">
+      <div class="passport-section-title"><span><b class="passport-section-number">03</b></span><strong>Конкурентное окружение</strong></div>
+      <table class="passport-table passport-competitor-table">
         <thead><tr><th>Бренд</th><th>Коллекция</th><th>Оптовая цена</th><th>Розничная цена</th></tr></thead>
         <tbody>{{PASSPORT_COMPETITORS}}</tbody>
       </table>
@@ -242,7 +262,7 @@ body { font-size:8.5pt; line-height:1.34; -webkit-print-color-adjust:exact; prin
       <div class="passport-section-title"><span><b class="passport-section-number">06</b></span><strong>Социальные сети и расположение</strong></div>
       <table class="passport-qr-table">
         <tr>
-          <td>{{QR_INSTAGRAM_BLOCK}}<div class="passport-qr-label">Instagram</div><div class="passport-link">{{INSTAGRAM}}</div></td>
+          <td>{{QR_INSTAGRAM_BLOCK}}<div class="passport-qr-label">Instagram дилера</div><div class="passport-link">{{INSTAGRAM}}</div></td>
           <td>{{QR_LOCATION_BLOCK}}<div class="passport-qr-label">Локация / 2ГИС</div><div class="passport-link">{{LOCATION_URL}}</div></td>
         </tr>
       </table>
