@@ -1161,8 +1161,10 @@ document.addEventListener('DOMContentLoaded', () => {
                                     <div class="dealer-profile-edit-section">
                                         <div class="dealer-profile-edit-section-title"><i class="bi bi-building"></i><div><strong>Основное юридическое лицо</strong><small>Используется в документах дилера</small></div></div>
                                         <div class="row g-3">
-                                            <div class="col-md-7"><label>Наименование организации</label><input id="profile-edit-org-name" class="form-control"></div>
-                                            <div class="col-md-5"><label>БИН</label><input id="profile-edit-bin" class="form-control"></div>
+                                            <div class="col-md-4"><label>Тип</label><select id="profile-edit-legal-type" class="form-select" required>
+                                                <option value="ТОО">ТОО</option><option value="ИП">ИП</option><option value="Частное лицо">Частное лицо</option></select></div>
+                                            <div class="col-md-8"><label>Наименование организации</label><input id="profile-edit-org-name" class="form-control"></div>
+                                            <div class="col-md-4"><label>БИН</label><input id="profile-edit-bin" class="form-control"></div>
                                             <div class="col-md-6"><label>Директор</label><input id="profile-edit-director" class="form-control"></div>
                                             <div class="col-md-6"><label>Email</label><input id="profile-edit-email" type="email" class="form-control"></div>
                                             <div class="col-12"><label>Юридический адрес</label><input id="profile-edit-legal-address" class="form-control"></div>
@@ -1260,6 +1262,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return { ...dealer.legal_entities[0] };
         }
         return {
+            type: 'ТОО',
             organizationName: '',
             director: '',
             legalAddress: '',
@@ -1384,6 +1387,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (section === 'requisites') {
             const legal = primaryLegalEntity(currentDealer);
             const legalValues = {
+                'profile-edit-legal-type': legal.type || 'ТОО',
                 'profile-edit-org-name': legal.organizationName,
                 'profile-edit-director': legal.director,
                 'profile-edit-legal-address': legal.legalAddress,
@@ -1396,7 +1400,16 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             Object.entries(legalValues).forEach(([id, value]) => {
                 const input = document.getElementById(id);
-                if (input) input.value = value || '';
+                if (!input) return;
+                if (id === 'profile-edit-legal-type') {
+                    const type = String(value || 'ТОО').trim();
+                    if (type && ![...input.options].some(option => option.value === type)) {
+                        input.add(new Option(type, type));
+                    }
+                    input.value = type;
+                } else {
+                    input.value = value || '';
+                }
             });
         }
 
@@ -1457,6 +1470,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 payload = { contacts: collectProfileContacts() };
             } else if (section === 'requisites') {
                 const legal = {
+                    type: editValue('profile-edit-legal-type') || 'ТОО',
                     organizationName: editValue('profile-edit-org-name'),
                     director: editValue('profile-edit-director'),
                     legalAddress: editValue('profile-edit-legal-address'),
@@ -1471,7 +1485,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     ? currentDealer.legal_entities.map(item => ({...item}))
                     : [];
                 if (legalEntities.length) legalEntities[0] = {...legalEntities[0], ...legal};
-                else if (Object.values(legal).some(Boolean)) legalEntities.push(legal);
+                else if (Object.entries(legal).some(([key, value]) => key !== 'type' && Boolean(value))) legalEntities.push(legal);
                 payload = {legal_entities: legalEntities};
             }
 
