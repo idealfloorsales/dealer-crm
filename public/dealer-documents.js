@@ -251,9 +251,13 @@
         return 'ДРУГИЕ КОЛЛЕКЦИИ';
     }
 
+    function isPassportEquipmentProduct(product) {
+        return String(product?.product_type || 'laminate').trim().toLowerCase() === 'equipment';
+    }
+
     function selectedPassportProducts(dealer) {
         const catalog = Array.isArray(state.catalog) ? state.catalog.filter(product =>
-            product && (product.sku || product.name) && String(product.product_type || 'laminate') !== 'equipment'
+            product && (product.sku || product.name) && !isPassportEquipmentProduct(product)
         ) : [];
         const selected = catalog.filter(product => productIsPresent(dealer, product.sku || product.name));
         const selectedKeys = new Set(selected.map(product =>
@@ -261,7 +265,7 @@
         ));
         const direct = (Array.isArray(dealer.products) ? dealer.products : [])
             .filter(product => product && typeof product === 'object' && (product.sku || product.name))
-            .filter(product => String(product.product_type || 'laminate') !== 'equipment')
+            .filter(product => !isPassportEquipmentProduct(product))
             .filter(product => !selectedKeys.has(String(product._id || product.id || normalizeCode(product.sku || product.name))));
         const all = [...selected, ...direct];
         const seen = new Set();
@@ -341,12 +345,38 @@
 
     function passportMatrixCount(dealer) {
         const selected = selectedPassportProducts(dealer).length;
-        const total = (Array.isArray(state.catalog) ? state.catalog : [])
-            .filter(product => product && (product.sku || product.name) && String(product.product_type || 'laminate') !== 'equipment')
-            .length;
+        const catalogKeys = new Set((Array.isArray(state.catalog) ? state.catalog : [])
+            .filter(product => product && (product.sku || product.name) && !isPassportEquipmentProduct(product))
+            .map(product => normalizeCode(product.sku || product.name))
+            .filter(Boolean));
+        const total = catalogKeys.size;
         return total > 0
-            ? selected + ' из ' + Math.max(total, selected) + ' позиций выставлено'
-            : selected + ' позиций выставлено';
+            ? selected + ' из ' + Math.max(total, selected) + ' декоров выставлено'
+            : selected + ' декоров выставлено';
+    }
+
+    function selectedPassportEquipmentTypes(dealer) {
+        const seen = new Set();
+        return (Array.isArray(dealer.pos_materials) ? dealer.pos_materials : [])
+            .filter(item => item && String(item.name || '').trim() && Number(item.quantity) > 0)
+            .filter(item => {
+                const key = normalizeCode(item.name);
+                if (!key || seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            });
+    }
+
+    function passportEquipmentMatrixCount(dealer) {
+        const selected = selectedPassportEquipmentTypes(dealer).length;
+        const totalNames = new Set((Array.isArray(state.catalog) ? state.catalog : [])
+            .filter(product => product && isPassportEquipmentProduct(product) && String(product.name || '').trim())
+            .map(product => normalizeCode(product.name))
+            .filter(Boolean));
+        const total = totalNames.size;
+        return total > 0
+            ? selected + ' из ' + Math.max(total, selected) + ' видов оборудования выставлено'
+            : selected + ' видов оборудования выставлено';
     }
 
     function exhibitedCount(dealer) {
@@ -643,6 +673,7 @@
             PASSPORT_DELIVERY_TERMS: valueOrLine(passportDelivery, 'Не указаны'),
             PASSPORT_MATRIX: buildPassportMatrix(dealer),
             PASSPORT_MATRIX_COUNT: escapeHtml(passportMatrixCount(dealer)),
+            PASSPORT_EQUIPMENT_COUNT: escapeHtml(passportEquipmentMatrixCount(dealer)),
             PASSPORT_EXHIBITED_COUNT: escapeHtml(exhibitedCount(dealer)),
             PASSPORT_POS_TOTAL: escapeHtml(passportPosTotal(dealer))
         };
@@ -650,6 +681,7 @@
         if (type === 'passport') {
             const passportText = value => String(value ?? '').trim();
             const selectedProducts = selectedPassportProducts(dealer).length;
+            const selectedEquipmentTypes = selectedPassportEquipmentTypes(dealer).length;
             const equipmentCount = passportPosTotal(dealer);
             const organization = formatOrganizationForDocument(req);
             const bankDetails = [
@@ -689,6 +721,7 @@
                 : (passportOverride ? 'Срок не ограничен' : '');
             map.PASSPORT_DELIVERY_TERMS = passportText(passportDelivery) ? escapeHtml(passportDelivery) : '';
             map.PASSPORT_MATRIX_COUNT = selectedProducts ? escapeHtml(passportMatrixCount(dealer)) : '';
+            map.PASSPORT_EQUIPMENT_COUNT = selectedEquipmentTypes ? escapeHtml(passportEquipmentMatrixCount(dealer)) : '';
             map.PASSPORT_EXHIBITED_COUNT = selectedProducts ? escapeHtml(selectedProducts) : '';
             map.PASSPORT_POS_TOTAL = equipmentCount ? escapeHtml(equipmentCount) : '';
             map.QR_INSTAGRAM = instagramUrl ? await qrDataUrl(instagramUrl) : '';
