@@ -396,7 +396,7 @@
             : [];
 
         if (posItems.length) {
-            rows.push('<tr class="storage-section-row"><td colspan="5">ТОРГОВОЕ ОБОРУДОВАНИЕ И POSM</td></tr>');
+            rows.push('<tr class="storage-section-row"><td colspan="5">ТОРГОВОЕ ОБОРУДОВАНИЕ</td></tr>');
             posItems.forEach((item, index) => {
                 const quantity = Number(item.quantity) || 0;
                 const unitPrice = storageEquipmentUnitPrice(item);
