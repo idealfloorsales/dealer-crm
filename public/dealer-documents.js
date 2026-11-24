@@ -10,6 +10,7 @@
         catalog: [],
         catalogLoaded: false,
         catalogPromise: null,
+        passportPhotosLoaded: false,
         selectedEntityIndex: 0
     };
 
@@ -224,18 +225,18 @@
         const match = String(code).match(/(\d+)$/);
         const digits = match ? match[1] : '';
 
-        return products.some(p => {
-            const sku = normalizeCode(p?.sku || '');
-            const name = normalizeCode(p?.name || '');
-            if (sku.includes(target) || name.includes(target)) return true;
+        return products.some(product => {
+            const sku = normalizeCode(product?.sku || '');
+            const name = normalizeCode(product?.name || '');
+            const productId = String(product?._id || product?.id || product?.productId || product?.product_id || '');
+            const catalogProduct = (Array.isArray(state.catalog) ? state.catalog : []).find(item =>
+                productId && productId === String(item?._id || item?.id || '')
+            );
+            if (sku && (sku === target || sku.includes(target) || name.includes(target))) return true;
+            if (name && normalizeCode(code) === name) return true;
             if (prefix && digits && sku.includes(prefix) && sku.endsWith(digits)) return true;
-            return false;
+            return Boolean(catalogProduct && normalizeCode(catalogProduct.sku || '') === target);
         });
-    }
-
-    function checkboxLine(dealer, code, name) {
-        const checked = productIsPresent(dealer, code);
-        return `<div class="passport-check ${checked ? 'is-checked' : ''}"><span class="passport-box">${checked ? '✓' : ''}</span><b>${escapeHtml(code)}</b> ${escapeHtml(name)}</div>`;
     }
 
     function inferProductGroup(product) {
@@ -250,91 +251,158 @@
         return 'ДРУГИЕ КОЛЛЕКЦИИ';
     }
 
-    function checkboxProduct(dealer, product) {
-        const code = product?.sku || '—';
-        const name = product?.name || 'Без названия';
-        const checked = productIsPresent(dealer, code);
-        return `<div class="passport-check ${checked ? 'is-checked' : ''}"><span class="passport-box">${checked ? '✓' : ''}</span><b>${escapeHtml(code)}</b> ${escapeHtml(name)}</div>`;
+    function selectedPassportProducts(dealer) {
+        const catalog = Array.isArray(state.catalog) ? state.catalog.filter(product =>
+            product && (product.sku || product.name) && String(product.product_type || 'laminate') !== 'equipment'
+        ) : [];
+        const selected = catalog.filter(product => productIsPresent(dealer, product.sku || product.name));
+        const selectedKeys = new Set(selected.map(product =>
+            String(product._id || product.id || normalizeCode(product.sku || product.name))
+        ));
+        const direct = (Array.isArray(dealer.products) ? dealer.products : [])
+            .filter(product => product && typeof product === 'object' && (product.sku || product.name))
+            .filter(product => String(product.product_type || 'laminate') !== 'equipment')
+            .filter(product => !selectedKeys.has(String(product._id || product.id || normalizeCode(product.sku || product.name))));
+        const all = [...selected, ...direct];
+        const seen = new Set();
+        return all.filter(product => {
+            const key = normalizeCode(product.sku || product.name || product._id || product.id);
+            if (!key || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        }).sort((a, b) =>
+            String(a.collection || inferProductGroup(a)).localeCompare(String(b.collection || inferProductGroup(b)), 'ru') ||
+            String(a.sku || '').localeCompare(String(b.sku || ''), 'ru')
+        );
     }
 
     function buildPassportMatrix(dealer) {
-        const catalog = Array.isArray(state.catalog) ? state.catalog.filter(p => p && (p.sku || p.name)) : [];
-
-        if (catalog.length) {
-            const groups = new Map();
-            catalog.forEach(product => {
-                const group = inferProductGroup(product);
-                if (!groups.has(group)) groups.set(group, []);
-                groups.get(group).push(product);
-            });
-
-            const englandProducts = groups.get('ENGLAND HERRINGBONE') || [];
-            groups.delete('ENGLAND HERRINGBONE');
-
-            const left = englandProducts.length
-                ? englandProducts.map(p => checkboxProduct(dealer, p)).join('')
-                : '<span class="passport-muted">Нет позиций в каталоге</span>';
-
-            const preferredOrder = ['HERRINGBONE PARQUET','FRENCH PARQUET','MAGIC COLLECTION','IDEAL CLASSIC','REAL WOOD','ДРУГИЕ КОЛЛЕКЦИИ'];
-            const middle = preferredOrder
-                .filter(group => groups.has(group))
-                .map(group => `<div class="passport-group-title">${escapeHtml(group)}</div>` + groups.get(group).map(p => checkboxProduct(dealer, p)).join(''))
-                .join('') || '<span class="passport-muted">Нет позиций в каталоге</span>';
-
-            return `<table class="passport-matrix"><thead><tr><th>ENGLAND HERRINGBONE</th><th>PARQUET / MAGIC / CLASSIC / ДРУГИЕ</th><th>ОБОРУДОВАНИЕ И POSM</th></tr></thead><tbody><tr><td>${left}</td><td>${middle}</td><td>${buildPassportEquipment(dealer)}</td></tr></tbody></table>`;
+        const products = selectedPassportProducts(dealer);
+        if (!products.length) {
+            return '<div class="passport-empty">У дилера не отмечены образцы IDEAL FLOOR.</div>';
         }
 
-        const england = [
-            ['EH-702','Дуб Арабика'],['EH-703','Дуб Мокко'],['EH-704','Дуб Капучино'],
-            ['EH-705','Дуб Голд'],['EH-706','Орех Кедровый'],['EH-707','Дуб Натур'],
-            ['EH-708','Дуб Робуста'],['EH-709','Дуб Паркетный'],['EH-710','Дуб Блэквуд'],
-            ['EH-711','Дуб Миндаль'],['EH-712','Дуб Эмбер'],['EH-713','Дуб Бурбон'],
-            ['EH-714','Дуб Твин'],['EH-715','Дуб Флорвуд'],['EH-716','Дуб Лайт'],
-            ['EH-717','Дуб Натур светлый'],['EH-718','Дуб Хайвуд'],['EH-719','Дуб Стоун'],
-            ['EH-720','Дуб Крафтовый'],['EH-721','Дуб Медовый'],['EH-722','Дуб Медовый'],
-            ['EH-723','Дуб Грейвуд'],['EH-724','Дуб Рокс'],['EH-725','Дуб Ванильный'],
-            ['EH-726','Дуб Либерти'],['EH-727','Дуб Хэннеси'],['EH-728','Дуб Джерси'],
-            ['EH-729','Дуб Артвуд']
-        ];
+        const groups = new Map();
+        products.forEach(product => {
+            const collection = String(product.collection || product.collectionName || inferProductGroup(product) || 'ДРУГИЕ КОЛЛЕКЦИИ').trim();
+            if (!groups.has(collection)) groups.set(collection, []);
+            groups.get(collection).push(product);
+        });
 
-        const otherGroups = [
-            ['HERRINGBONE PARQUET', [['HP-31','Дуб Лоредо'],['HP-32','Дуб Родос'],['HP-91','Дуб Браун'],['HP-92','Дуб Латте'],['HP-94','Дуб Аланда'],['HP-95','Дуб Сантана'],['HP-96','Дуб Алор'],['HP-97','Дуб Айленд']]],
-            ['FRENCH PARQUET', [['FP-43','Paris Натур'],['FP-44','Paris Рустик'],['FP-45','Версаль Светлый'],['FP-46','Версаль Капучино']]],
-            ['MAGIC COLLECTION', [['MC-101','Орех Испанский'],['MC-102','Орех Венгерский'],['MC-103','Дуб Австрийский']]],
-            ['IDEAL CLASSIC', [['IC-01','Дуб Натуральный'],['IC-02','Дуб Светлый'],['IC-03','Камешки'],['IC-04','Аллюминий']]]
-        ];
-
-        const left = england.map(([code,name]) => checkboxLine(dealer, code, name)).join('');
-        const middle = otherGroups.map(([title, items]) =>
-            `<div class="passport-group-title">${escapeHtml(title)}</div>` +
-            items.map(([code,name]) => checkboxLine(dealer, code, name)).join('')
+        const rows = [...groups.entries()].map(([collection, items]) =>
+            '<tr class="passport-products-group"><th colspan="3">' + escapeHtml(collection) + '</th></tr>' +
+            items.map(product =>
+                '<tr><td class="passport-product-sku">' + escapeHtml(product.sku || '—') + '</td>' +
+                '<td>' + escapeHtml(product.name || 'Без названия') + '</td>' +
+                '<td class="passport-product-status">Отмечен</td></tr>'
+            ).join('')
         ).join('');
 
-        return `<table class="passport-matrix"><thead><tr><th>ENGLAND HERRINGBONE</th><th>PARQUET / MAGIC / CLASSIC</th><th>ОБОРУДОВАНИЕ И POSM</th></tr></thead><tbody><tr><td>${left}</td><td>${middle}</td><td>${buildPassportEquipment(dealer)}</td></tr></tbody></table>`;
-    }
-
-    function sumPos(dealer, matcher) {
-        const list = Array.isArray(dealer.pos_materials) ? dealer.pos_materials : [];
-        return list.reduce((sum, item) => matcher(String(item?.name || '').toLowerCase()) ? sum + (Number(item?.quantity) || 0) : sum, 0);
+        return '<table class="passport-table passport-products-table"><thead><tr><th>Артикул</th><th>Наименование</th><th>Статус</th></tr></thead><tbody>' + rows + '</tbody></table>';
     }
 
     function buildPassportEquipment(dealer) {
         const items = Array.isArray(dealer.pos_materials)
-            ? dealer.pos_materials.filter(item => item && (item.name || Number(item.quantity) > 0))
+            ? dealer.pos_materials.filter(item => item && String(item.name || '').trim() && Number(item.quantity) > 0)
             : [];
-
         if (!items.length) {
-            return '<div class="passport-eq-empty">Стенды и POS не указаны</div>';
+            return '<div class="passport-empty">Торговое оборудование не отмечено.</div>';
         }
-
-        return items.map(item => {
-            const qty = Number(item.quantity) || 0;
-            return `<div class="passport-eq-row"><span>${escapeHtml(item.name || 'Оборудование')}</span><b>${qty} шт.</b></div>`;
-        }).join('');
+        const rows = items.map(item =>
+            '<tr><td>' + escapeHtml(item.name) + '</td><td class="passport-number-cell">' + escapeHtml(Number(item.quantity)) + ' шт.</td></tr>'
+        ).join('');
+        return '<table class="passport-table passport-equipment-table"><thead><tr><th>Наименование</th><th>Количество</th></tr></thead><tbody>' + rows + '</tbody></table>';
     }
 
     function passportPosTotal(dealer) {
-        return (dealer.pos_materials || []).reduce((sum, item) => sum + (Number(item?.quantity) || 0), 0);
+        return (dealer.pos_materials || []).reduce((sum, item) => {
+            const quantity = Number(item?.quantity) || 0;
+            return quantity > 0 ? sum + quantity : sum;
+        }, 0);
+    }
+
+    function exhibitedCount(dealer) {
+        return selectedPassportProducts(dealer).length;
+    }
+
+    function buildPassportContacts(dealer) {
+        const contacts = (Array.isArray(dealer.contacts) ? dealer.contacts : [])
+            .filter(contact => contact && (contact.name || contact.position || contact.contactInfo));
+        if (!contacts.length) return '<tr><td class="passport-empty-cell" colspan="3">Контакты не указаны.</td></tr>';
+        return contacts.map(contact =>
+            '<tr><td>' + escapeHtml(contact.name || '—') + '</td>' +
+            '<td>' + escapeHtml(contact.position || '—') + '</td>' +
+            '<td>' + escapeHtml(contact.contactInfo || '—') + '</td></tr>'
+        ).join('');
+    }
+
+    function formatPassportCompetitorPrice(value) {
+        const raw = String(value ?? '').trim();
+        if (!raw) return '—';
+        const normalized = raw.replace(/\s/g, '').replace(/[^0-9,.-]/g, '').replace(',', '.');
+        const number = Number(normalized);
+        if (Number.isFinite(number)) {
+            if (number <= 0) return '—';
+            return number.toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + ' ₸';
+        }
+        return escapeHtml(raw);
+    }
+
+    function buildPassportCompetitors(dealer) {
+        const entries = (Array.isArray(dealer.competitors) ? dealer.competitors : [])
+            .filter(item => item && String(item.brand || '').trim());
+        if (!entries.length) return '<tr><td class="passport-empty-cell" colspan="4">Конкуренты не отмечены.</td></tr>';
+        return entries.map(item =>
+            '<tr><td><strong>' + escapeHtml(item.brand) + '</strong></td>' +
+            '<td>' + escapeHtml(item.collection || '—') + '</td>' +
+            '<td class="passport-number-cell">' + formatPassportCompetitorPrice(item.price_opt) + '</td>' +
+            '<td class="passport-number-cell">' + formatPassportCompetitorPrice(item.price_retail) + '</td></tr>'
+        ).join('');
+    }
+
+    function buildPassportPhotos(dealer) {
+        const photos = Array.isArray(dealer.photos) ? dealer.photos.filter(photo => photo?.photo_url || photo?.url || photo?.src).slice(0, 3) : [];
+        if (!photos.length) return '<div class="passport-empty">Фотоотчёт не прикреплён.</div>';
+        return '<div class="passport-photo-grid">' + photos.map((photo, index) => {
+            const url = photo.photo_url || photo.url || photo.src;
+            return '<div class="passport-photo-card"><img src="' + escapeHtml(url) + '" alt="Фото объекта ' + (index + 1) + '">' +
+                '<small>' + escapeHtml(photo.caption || photo.name || ('Фото ' + (index + 1))) + '</small></div>';
+        }).join('') + '</div>';
+    }
+
+    async function loadPassportPricingSummary(dealer) {
+        const id = String(dealer?._id || dealer?.id || '').trim();
+        if (!id) return {};
+        try {
+            const response = await fetch('/api/pricing/dealers/' + encodeURIComponent(id), { cache: 'no-store' });
+            if (response.ok) return await response.json();
+        } catch (error) {
+            console.info('Для паспорта объекта использованы условия, доступные в карточке дилера.', error);
+        }
+        return {};
+    }
+
+    function formatPassportDate(value) {
+        const raw = String(value || '').trim().slice(0, 10);
+        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+        return match ? match[3] + '.' + match[2] + '.' + match[1] : raw;
+    }
+
+    async function ensurePassportPhotosLoaded() {
+        const dealer = getDealer();
+        if (state.passportPhotosLoaded) return;
+        if (Array.isArray(dealer.photos) && dealer.photos.length) { state.passportPhotosLoaded = true; return; }
+        const id = String(dealer?._id || dealer?.id || '').trim();
+        if (!id) return;
+        try {
+            const response = await fetch('/api/dealers/' + encodeURIComponent(id) + '/photos?preview=1', { cache: 'no-store' });
+            if (response.ok) {
+                dealer.photos = await response.json();
+                state.passportPhotosLoaded = true;
+            }
+        } catch (error) {
+            console.warn('Не удалось загрузить фото для паспорта объекта', error);
+        }
     }
 
     function formatMoney(value) {
@@ -429,31 +497,6 @@
         return { rows: rows.join(''), total, products: products.length, pos: posItems.length };
     }
 
-    function buildCompetitorChips(dealer) {
-        const current = [...new Set((dealer.competitors || []).map(x => String(x?.brand || '').trim()).filter(Boolean))];
-        const defaults = ['Tarkett','Kastamonu','Kronopol','Egger','Classen','Alpine Floor','EBM','ASTfloor'];
-        const brands = [...defaults, ...current.filter(x => !defaults.some(d => d.toLowerCase() === x.toLowerCase()))];
-        if (!brands.length) return '<span class="passport-muted">Нет данных</span>';
-        return brands.map(brand => {
-            const active = current.some(x => x.toLowerCase() === brand.toLowerCase());
-            return `<span class="passport-chip ${active ? 'active' : ''}">${escapeHtml(brand)}</span>`;
-        }).join('');
-    }
-
-    function buildPassportPhotos(dealer) {
-        const photos = Array.isArray(dealer.photos) ? dealer.photos.slice(0, 3) : [];
-        return [0,1,2].map(i => {
-            const photo = photos[i]?.photo_url;
-            return photo
-                ? `<div class="passport-photo"><img src="${escapeHtml(photo)}" alt="Фото ${i + 1}"></div>`
-                : `<div class="passport-photo empty">Фото ${i + 1}</div>`;
-        });
-    }
-
-    function exhibitedCount(dealer) {
-        return Array.isArray(dealer.products) ? dealer.products.length : 0;
-    }
-
     async function ensureQrLibrary() {
         if (window.QRious) return window.QRious;
         if (state.qrPromise) return state.qrPromise;
@@ -510,6 +553,14 @@
         const number = contractNumber(dealer);
         const location = twoGisLocation(dealer);
         const storageItems = buildStorageItems(dealer);
+        const passportPricing = type === 'passport' ? await loadPassportPricingSummary(dealer) : {};
+        const passportDiscount = Number(passportPricing.totalDiscountPercent) || 0;
+        const passportActiveDiscounts = Array.isArray(passportPricing.activeDiscounts) ? passportPricing.activeDiscounts : [];
+        const passportDelivery = passportPricing.effectiveDelivery || dealer.effectiveDelivery || dealer.delivery || '';
+        const passportOverride = passportPricing.priceOverride?.active ? passportPricing.priceOverride : null;
+        const passportPriceEnd = passportOverride?.endDate || passportPricing.priceListCondition?.endDate || dealer.price_list?.validTo || '';
+        const passportProfilePrice = passportPricing.profilePriceList || dealer.price_list?.name || dealer.price_type || '';
+        const passportEffectivePrice = passportPricing.effectivePriceList || passportProfilePrice;
 
         let instagramUrl = String(dealer.instagram || '').trim();
         if (instagramUrl && !/^https?:\/\//i.test(instagramUrl)) {
@@ -518,6 +569,8 @@
 
         const map = {
             DOC_NUMBER: escapeHtml(number),
+            DEALER_ID: valueOrLine(dealer.dealer_id || number),
+            DEALER_TYPE: valueOrLine(req.type),
             DOC_YEAR: escapeHtml(date.year),
             DOC_DAY: escapeHtml(date.day),
             DOC_DD: escapeHtml(date.dd),
@@ -550,12 +603,18 @@
             STORAGE_TOTAL: formatMoney(storageItems.total),
             STORAGE_PRODUCT_COUNT: escapeHtml(storageItems.products),
             STORAGE_POS_COUNT: escapeHtml(storageItems.pos),
-            PASSPORT_COMPETITORS: buildCompetitorChips(dealer),
+            PASSPORT_COMPETITORS: buildPassportCompetitors(dealer),
+            PASSPORT_CONTACTS: buildPassportContacts(dealer),
+            PASSPORT_EQUIPMENT: buildPassportEquipment(dealer),
+            PASSPORT_PHOTOS: buildPassportPhotos(dealer),
+            PASSPORT_PRICE_LIST: valueOrLine(passportEffectivePrice, 'Не назначен'),
+            PASSPORT_PROFILE_PRICE: valueOrLine(passportProfilePrice, 'Не назначен'),
+            PASSPORT_DISCOUNT: passportDiscount > 0 ? '−' + escapeHtml(passportDiscount) + '%' + (passportActiveDiscounts.length ? ' · ' + escapeHtml(passportActiveDiscounts.map(item => item.name || ('скидка ' + (Number(item.discountPercent) || 0) + '%')).join(', ')) : '') : 'Нет активной скидки',
+            PASSPORT_PRICE_SOURCE: passportOverride ? 'Действует специальное условие' : 'По условиям профиля дилера',
+            PASSPORT_PRICE_PERIOD: passportPriceEnd ? 'до ' + escapeHtml(formatPassportDate(passportPriceEnd)) : (passportOverride ? 'Срок не ограничен' : '—'),
+            PASSPORT_DELIVERY_TERMS: valueOrLine(passportDelivery, 'Не указаны'),
             PASSPORT_MATRIX: buildPassportMatrix(dealer),
-            PASSPORT_PHOTO_1: buildPassportPhotos(dealer)[0],
-            PASSPORT_PHOTO_2: buildPassportPhotos(dealer)[1],
-            PASSPORT_PHOTO_3: buildPassportPhotos(dealer)[2],
-            PASSPORT_EXHIBITED_COUNT: escapeHtml(exhibitedCount(dealer)),
+                        PASSPORT_EXHIBITED_COUNT: escapeHtml(exhibitedCount(dealer)),
             PASSPORT_POS_TOTAL: escapeHtml(passportPosTotal(dealer))
         };
 
@@ -601,7 +660,8 @@
     }
 
     async function build(type) {
-        if (type === 'storage') await ensureStorageCatalogLoaded();
+        if (type === 'storage' || type === 'passport') await ensureStorageCatalogLoaded();
+        if (type === 'passport') await ensurePassportPhotosLoaded();
         const [template, map] = await Promise.all([loadTemplate(type), buildMap(type)]);
         return replaceTokens(template, map);
     }
@@ -609,7 +669,7 @@
     function documentTitle(type) {
         if (type === 'supply') return 'Договор поставки';
         if (type === 'storage') return 'Договор ответственного хранения';
-        return 'Паспорт салона';
+        return 'Паспорт объекта';
     }
 
     function fileName(type) {
@@ -618,7 +678,7 @@
             ? 'Договор поставки'
             : type === 'storage'
                 ? 'Договор ответственного хранения'
-                : 'Паспорт салона';
+                : 'Паспорт объекта';
         return `${safeFileName(title)} - ${safeFileName(dealer.name)}.doc`;
     }
 
@@ -744,6 +804,7 @@
     }
 
     function setDealer(dealer, user) {
+        state.passportPhotosLoaded = false;
         state.dealer = dealer || null;
         state.user = user || null;
         state.selectedEntityIndex = 0;

@@ -1,431 +1,259 @@
-
 <!DOCTYPE html>
 <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" lang="ru">
 <head>
 <meta charset="UTF-8">
 <meta name="ProgId" content="Word.Document">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Паспорт объекта | IDEAL FLOOR</title>
 <style>
-@page { size:A4 portrait; margin:9mm; }
+@page { size:A4 portrait; margin:9mm 10mm; }
 * { box-sizing:border-box; }
-body {
-    margin:0;
-    background:#f4f1ef;
-    color:#252427;
-    font-family:Arial,sans-serif;
-    font-size:9.5pt;
-    line-height:1.35;
+html,body { margin:0; padding:0; background:#f4f2f0; color:#25262b; font-family:Arial,Helvetica,sans-serif; }
+body { font-size:8.5pt; line-height:1.34; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+.passport-sheet {
+    width:190mm; min-height:279mm; margin:12px auto; padding:0 0 8mm;
+    background:#fff; box-shadow:0 8px 30px rgba(30,22,22,.09);
 }
-.sheet {
-    width:192mm;
-    min-height:279mm;
-    margin:0 auto;
-    background:#fff;
-    border-top:5px solid #b9040a;
-    padding:9mm 10mm 10mm;
+.passport-top-accent {
+    height:2mm; margin-bottom:3.5mm;
+    border-radius:1mm;
+    background:linear-gradient(90deg,#b9040a 0%,#8d0207 70%,#302326 100%);
 }
-.brandbar {
-    width:100%;
-    border-collapse:collapse;
-    margin-bottom:12px;
-}
-.brandbar td { vertical-align:top; }
-.brandmark {
-    color:#b9040a;
-    font-size:10pt;
-    font-weight:900;
-    letter-spacing:.16em;
-}
-.doc-title {
-    margin-top:5px;
-    font-size:22pt;
-    line-height:1;
-    font-weight:900;
-    letter-spacing:-.03em;
-}
-.doc-subtitle {
-    margin-top:6px;
-    color:#77737a;
-    font-size:8.5pt;
-    font-weight:700;
-}
-.meta {
-    text-align:right;
-    color:#77737a;
-    font-size:8pt;
-}
-.meta b { color:#252427; }
-.hero {
-    width:100%;
-    border-collapse:separate;
-    border-spacing:0;
-    margin:0 0 12px;
-    border:1px solid #e9e4e2;
-    border-radius:12px;
-    background:#fbf9f8;
-}
-.hero td { padding:11px 12px; vertical-align:top; }
-.hero .dealer-name {
-    display:block;
-    margin-bottom:4px;
-    font-size:14pt;
-    font-weight:900;
-}
-.hero .dealer-address { color:#77737a; font-size:8.5pt; }
-.hero .org-badge {
-    display:inline-block;
-    padding:5px 8px;
-    border-radius:999px;
-    background:#f4e8e7;
-    color:#9f080e;
-    font-size:7.5pt;
-    font-weight:800;
-}
-.kpi-table {
-    width:100%;
-    border-collapse:separate;
-    border-spacing:7px 0;
-    margin:0 -7px 13px;
-}
-.kpi-table td {
-    width:33.33%;
-    padding:9px 10px;
-    border:1px solid #ebe7e5;
-    border-radius:10px;
-    background:#fff;
-}
-.kpi-label {
-    display:block;
-    color:#8a878c;
-    font-size:7pt;
-    font-weight:800;
-    letter-spacing:.05em;
-    text-transform:uppercase;
-}
-.kpi-value {
-    display:block;
-    margin-top:3px;
-    color:#242326;
-    font-size:15pt;
-    font-weight:900;
-}
-.section {
-    margin:0 0 12px;
-    page-break-inside:avoid;
-}
-.matrix-section { page-break-inside:auto; }
-.section-head {
-    width:100%;
-    border-collapse:collapse;
-    margin:0 0 7px;
-}
-.section-head td { vertical-align:middle; }
-.section-num {
-    width:28px;
-    height:28px;
-    text-align:center;
-    border-radius:8px;
-    background:#b9040a;
-    color:#fff;
-    font-size:9pt;
-    font-weight:900;
-}
-.section-title {
-    padding-left:8px;
-    color:#29282b;
-    font-size:10pt;
-    font-weight:900;
-}
-.info-grid {
-    width:100%;
-    border-collapse:separate;
-    border-spacing:7px;
-    margin:-7px;
-}
-.info-grid td {
-    width:50%;
-    padding:9px 10px;
-    border:1px solid #ece8e6;
-    border-radius:9px;
-    background:#fbfaf9;
-    vertical-align:top;
-}
-.info-grid.thirds td { width:33.33%; }
-.field-label {
-    display:block;
-    margin-bottom:3px;
-    color:#8a878c;
-    font-size:6.8pt;
-    font-weight:800;
-    letter-spacing:.04em;
-    text-transform:uppercase;
-}
-.field-value {
-    color:#28272a;
-    font-size:9pt;
-    font-weight:700;
-    word-break:break-word;
-}
-.env-table {
-    width:100%;
-    border-collapse:separate;
-    border-spacing:8px 0;
-    margin:0 -8px;
-}
-.env-table td {
-    width:50%;
-    padding:10px;
-    border:1px solid #ece8e6;
-    border-radius:10px;
-    vertical-align:top;
-}
-.passport-chips {
-    display:block;
-    min-height:48px;
-}
-.passport-chip {
-    display:inline-block;
-    margin:0 4px 4px 0;
-    padding:4px 7px;
-    border:1px solid #ddd7d5;
-    border-radius:999px;
-    color:#666269;
-    font-size:7pt;
-    font-weight:700;
-}
-.passport-chip.active {
-    border-color:#b9040a;
-    background:#b9040a;
-    color:#fff;
-}
-.qr-table { width:100%; border-collapse:collapse; margin-top:7px; }
-.qr-table td { width:50%; padding:0; border:0; text-align:center; vertical-align:top; }
-.passport-qr {
-    width:56px;
-    height:56px;
-    object-fit:contain;
-    border:1px solid #e5dfdc;
-    border-radius:7px;
-    padding:3px;
-}
-.passport-qr-empty {
-    width:56px;
-    height:56px;
-    margin:0 auto;
-    line-height:56px;
-    border:1px dashed #cfc8c5;
-    border-radius:7px;
-    color:#aaa3a0;
-}
-.qr-label { margin-top:4px; font-size:6.5pt; font-weight:800; text-transform:uppercase; }
-.link-text { margin-top:2px; color:#888389; font-size:6pt; word-break:break-all; }
-.passport-matrix {
-    width:100%;
-    border-collapse:collapse;
-    table-layout:fixed;
-    font-size:6.7pt;
-}
-.passport-matrix th {
-    padding:6px;
-    border:1px solid #e1dcda;
-    background:#f4f1ef;
-    color:#5d595f;
-    text-align:left;
-    font-size:6.5pt;
-    font-weight:900;
-    letter-spacing:.03em;
-    text-transform:uppercase;
-}
-.passport-matrix td {
-    padding:6px;
-    border:1px solid #e1dcda;
-    vertical-align:top;
-}
-.passport-check { display:block; margin:0 0 2px; line-height:1.2; }
-.passport-box {
-    display:inline-block;
-    width:10px;
-    height:10px;
-    margin-right:4px;
-    border:1px solid #bdb6b3;
-    border-radius:2px;
-    color:#b9040a;
-    line-height:8px;
-    text-align:center;
-    font-size:8px;
-    font-weight:900;
-    vertical-align:middle;
-}
-.passport-check.is-checked { color:#272629; font-weight:700; }
-.passport-check.is-checked .passport-box { border-color:#b9040a; background:#f8eaea; }
-.passport-group-title {
-    margin:6px 0 3px;
-    color:#b9040a;
-    font-weight:900;
-}
-.passport-group-title:first-child { margin-top:0; }
-.passport-eq-row {
-    width:100%;
-    display:flex;
-    justify-content:space-between;
-    gap:6px;
-    padding:4px 0;
-    border-bottom:1px solid #eee9e7;
-}
-.passport-eq-row span { min-width:0; font-weight:700; }
-.passport-eq-row b {
-    min-width:42px;
-    text-align:right;
-    color:#b9040a;
-    white-space:nowrap;
-}
-.passport-eq-empty { color:#999398; font-style:italic; }
-.photo-table {
-    width:100%;
-    border-collapse:separate;
-    border-spacing:7px 0;
-    margin:0 -7px;
-}
-.photo-table td {
-    width:33.33%;
-    height:100px;
-    padding:0;
-    border:1px solid #e2dcda;
-    border-radius:9px;
-    overflow:hidden;
-    text-align:center;
-    vertical-align:middle;
-    background:#faf8f7;
-}
-.passport-photo {
-    width:100%;
-    height:100px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    overflow:hidden;
-}
-.passport-photo img { width:100%; height:100%; object-fit:contain; background:#fff; }
-.passport-photo.empty { color:#aaa4a1; font-size:7pt; }
-.notes {
-    min-height:54px;
-    padding:9px 10px;
-    border:1px solid #e5dfdc;
-    border-radius:9px;
-    background:#fbfaf9;
-}
-.signatures {
-    width:100%;
-    border-collapse:separate;
-    border-spacing:30px 0;
-    margin-top:25px;
-}
-.signatures td {
-    width:50%;
-    padding-top:6px;
-    border-top:1px solid #817c80;
-    text-align:center;
-    color:#666167;
-    font-size:7pt;
-    font-weight:800;
-    text-transform:uppercase;
-}
+.passport-inner { padding:0 10mm; }
+.passport-brandbar,.passport-title-row,.passport-meta-table,.passport-hero,.passport-kpis,
+.passport-grid,.passport-qr-table,.passport-signatures { width:100%; border-collapse:collapse; }
+.passport-brandbar { margin-bottom:2.7mm; border-bottom:.7pt solid #e6dddd; }
+.passport-brandbar td { padding:0 0 2.7mm; vertical-align:middle; }
+.passport-brandbar .brand-cell { width:65%; }
+.passport-logo { display:block; width:38mm; max-height:13mm; object-fit:contain; object-position:left center; }
+.passport-brand-copy { display:inline-block; margin-left:3mm; padding-left:3mm; border-left:1.2mm solid #b9040a; vertical-align:middle; }
+.passport-brand-copy strong { display:block; color:#36373b; font-size:7pt; letter-spacing:.07em; }
+.passport-brand-copy small { display:block; margin-top:.5mm; color:#85868a; font-size:6.3pt; }
+.passport-document-mark { text-align:right; }
+.passport-document-mark span { display:block; color:#9a7779; font-size:6.2pt; font-weight:700; letter-spacing:.09em; }
+.passport-document-mark strong { display:block; margin-top:.7mm; color:#45464b; font-size:7.2pt; letter-spacing:.05em; }
+.passport-title-row { margin:0 0 2.4mm; }
+.passport-title-row td { vertical-align:middle; }
+.passport-eyebrow { margin-bottom:.7mm; color:#b9040a; font-size:6.5pt; font-weight:800; letter-spacing:.11em; }
+.passport-title { margin:0; color:#242529; font-size:18pt; line-height:1.05; font-weight:850; letter-spacing:-.035em; text-transform:uppercase; }
+.passport-subtitle { margin:1mm 0 0; color:#75777c; font-size:7.4pt; }
+.passport-id-box { min-width:28mm; padding:1.7mm 3mm; border-left:1.2mm solid #b9040a; border-radius:1.4mm; background:#fbf7f6; text-align:left; }
+.passport-id-box small { display:block; margin-bottom:.4mm; color:#8d8583; font-size:6.2pt; font-weight:700; text-transform:uppercase; letter-spacing:.06em; }
+.passport-id-box strong { display:block; color:#b9040a; font-size:13pt; line-height:1.05; font-weight:850; }
+.passport-hero { margin:0 0 2.4mm; border:1px solid #e7dede; border-radius:1.8mm; background:#fbf7f6; }
+.passport-hero td { padding:2.5mm 3mm; vertical-align:middle; }
+.passport-dealer-name { display:block; margin-bottom:.5mm; color:#25262b; font-size:12.5pt; font-weight:850; }
+.passport-address { color:#74767b; font-size:7.5pt; }
+.passport-org-badge { padding:1.5mm 2.5mm; border-radius:99px; background:#f3e5e5; color:#9d080e; font-size:7pt; font-weight:800; white-space:normal; max-width:45mm; }
+.passport-meta-table { margin:0 0 2.5mm; }
+.passport-meta-table td { width:25%; padding:1.8mm 2.3mm; border:1px solid #e9e5e2; vertical-align:top; }
+.passport-meta-table td:first-child { border-radius:1.6mm 0 0 1.6mm; }
+.passport-meta-table td:last-child { border-radius:0 1.6mm 1.6mm 0; }
+.passport-label { display:block; margin:0 0 .5mm; color:#77797e; font-size:6.1pt; line-height:1.15; font-weight:750; letter-spacing:.045em; text-transform:uppercase; }
+.passport-value { display:block; color:#25262b; font-size:8pt; line-height:1.25; font-weight:650; overflow-wrap:anywhere; }
+.passport-kpis { margin:0 -1mm 2.5mm; }
+.passport-kpis td { width:33.33%; padding:0 1mm; }
+.passport-kpi-card { padding:1.8mm 2.3mm; border:1px solid #e9e5e2; border-radius:1.7mm; background:#fff; }
+.passport-kpi-card small { display:block; color:#85868a; font-size:6.1pt; font-weight:750; letter-spacing:.04em; text-transform:uppercase; }
+.passport-kpi-card strong { display:block; margin-top:.5mm; color:#25262b; font-size:11pt; font-weight:850; }
+.passport-section { margin-top:3.5mm; page-break-inside:auto; break-inside:auto; }
+.passport-section-title { display:table; width:100%; margin:0 0 2mm; padding:0 0 1.5mm; border-bottom:.7pt solid #e7dada; page-break-after:avoid; break-after:avoid; }
+.passport-section-title > span { display:table-cell; width:7.8mm; vertical-align:middle; }
+.passport-section-number { display:block; width:5.8mm; height:5.8mm; border-radius:1.2mm; background:#b9040a; color:#fff; font-size:6.5pt; line-height:5.8mm; font-weight:850; text-align:center; }
+.passport-section-title strong { display:table-cell; color:#303136; font-size:8.2pt; line-height:1.15; font-weight:800; letter-spacing:.055em; text-transform:uppercase; vertical-align:middle; }
+.passport-grid { margin:0 -1mm; }
+.passport-grid td { width:50%; padding:1.5mm 1mm; vertical-align:top; }
+.passport-field { padding:1.5mm 2mm; border:1px solid #e9e5e2; border-radius:1.3mm; background:#fff; }
+.passport-field .passport-value { min-height:4mm; }
+.passport-table { width:100%; border-collapse:collapse; table-layout:auto; font-size:7.2pt; page-break-inside:auto; }
+.passport-table thead { display:table-header-group; }
+.passport-table th { padding:1.7mm 2mm; border:1px solid #ded9d6; background:#f5f2f0; color:#5d5b60; text-align:left; font-size:6.2pt; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
+.passport-table td { padding:1.7mm 2mm; border:1px solid #e4dfdc; color:#292a2e; vertical-align:top; page-break-inside:avoid; break-inside:avoid; }
+.passport-table tr { page-break-inside:avoid; break-inside:avoid; }
+.passport-table strong { font-weight:800; }
+.passport-empty-cell { color:#85868a!important; text-align:center; font-style:italic; }
+.passport-empty { padding:2.2mm 2.5mm; border:1px dashed #d5ceca; border-radius:1.4mm; color:#85868a; background:#fcfbfa; font-size:7.3pt; }
+.passport-products-table { margin-top:.5mm; }
+.passport-products-group th { padding:1.5mm 2mm; background:#f8f4f2; color:#9f080e; font-size:6.7pt; letter-spacing:.05em; }
+.passport-product-sku { width:25mm; white-space:nowrap; font-weight:750; }
+.passport-product-status { width:25mm; color:#397a55!important; white-space:nowrap; font-weight:750; }
+.passport-number-cell { text-align:right!important; white-space:nowrap; font-weight:750; }
+.passport-commercial-grid td { width:50%; padding:1mm; }
+.passport-commercial-grid .passport-field { min-height:14mm; }
+.passport-commercial-grid .passport-value { font-size:8.3pt; }
+.passport-qr-table { margin-top:1mm; }
+.passport-qr-table td { width:50%; padding:1.6mm; border:1px solid #e9e5e2; text-align:center; vertical-align:top; }
+.passport-qr { width:19mm; height:19mm; object-fit:contain; border:1px solid #e5dfdc; border-radius:1.3mm; padding:1mm; }
+.passport-qr-empty { width:19mm; height:19mm; margin:0 auto; border:1px dashed #cfc8c5; border-radius:1.3mm; color:#aaa3a0; font-size:6.5pt; line-height:19mm; }
+.passport-qr-label { margin-top:1mm; color:#4b4c51; font-size:6.2pt; font-weight:800; text-transform:uppercase; }
+.passport-link { margin-top:.5mm; color:#85868a; font-size:6pt; overflow-wrap:anywhere; }
+.passport-photo-grid { display:table; width:100%; table-layout:fixed; border-spacing:2mm; margin:-2mm; }
+.passport-photo-card { display:table-cell; width:33.33%; padding:1.5mm; border:1px solid #e6e1de; border-radius:1.5mm; vertical-align:top; }
+.passport-photo-card img { display:block; width:100%; height:42mm; object-fit:cover; }
+.passport-photo-card small { display:block; margin-top:1mm; color:#6f7075; font-size:6.2pt; overflow-wrap:anywhere; }
+.passport-notes { min-height:11mm; padding:2mm 2.4mm; border:1px solid #d8d2cf; border-radius:1.5mm; background:#fff; color:#303136; white-space:normal; }
+.passport-signatures { margin-top:6mm; page-break-inside:avoid; }
+.passport-signatures td { width:50%; padding:0 6mm; vertical-align:top; }
+.passport-signature-line { height:8mm; border-bottom:.75pt solid #333438; }
+.passport-signature-label { margin-top:1.2mm; color:#4b4c51; font-size:7pt; font-weight:700; text-align:center; }
+.passport-footer { margin-top:5mm; padding-top:1.8mm; border-top:.7pt solid #eadcdd; color:#8b8585; font-size:6.2pt; letter-spacing:.035em; }
+.passport-footer td:last-child { text-align:right; }
 @media print {
-    body { background:#fff; }
-    .sheet { width:100%; min-height:auto; padding:0; border-top:5px solid #b9040a; }
+    html,body { width:auto!important; min-width:0!important; height:auto!important; overflow:visible!important; background:#fff!important; }
+    body { margin:0!important; padding:0!important; }
+    .passport-sheet { width:auto; min-height:0; margin:0; padding-bottom:5mm; box-shadow:none; }
+    .passport-inner { padding:0; }
+    .passport-top-accent,.passport-section-number,.passport-org-badge,.passport-id-box,.passport-products-group th,.passport-kpi-card,.passport-commercial-grid .passport-field {
+        -webkit-print-color-adjust:exact!important; print-color-adjust:exact!important;
+    }
+    .passport-table tr,.passport-field,.passport-kpi-card,.passport-hero,.passport-meta-table { page-break-inside:avoid; break-inside:avoid; }
+}
+@media screen and (max-width:720px) {
+    .passport-sheet { width:100%; min-height:100vh; margin:0; padding:16px; }
+    .passport-inner { padding:0; }
+    .passport-brandbar,.passport-title-row,.passport-hero,.passport-meta-table,.passport-kpis,.passport-grid,.passport-qr-table,.passport-signatures { width:100%; }
+    .passport-logo { width:34mm; }
+    .passport-title { font-size:17pt; }
 }
 </style>
 </head>
 <body>
-<div class="sheet">
-    <table class="brandbar">
-        <tr>
-            <td>
-                <div class="brandmark">IDEAL FLOOR · DEALER CRM</div>
-                <div class="doc-title">Паспорт объекта</div>
-                <div class="doc-subtitle">Торговая точка · выставленность · окружение · фотофиксация</div>
-            </td>
-            <td class="meta">
-                <div><b>Дата</b> {{DOC_DATE_SHORT}}</div>
-                <div><b>Аудитор</b> {{AUDITOR}}</div>
-            </td>
-        </tr>
+<div class="passport-sheet">
+  <div class="passport-top-accent"></div>
+  <div class="passport-inner">
+    <table class="passport-brandbar">
+      <tr>
+        <td class="brand-cell"><img class="passport-logo" src="/logo.png" alt="IDEAL FLOOR"></td>
+        <td class="passport-document-mark"><span>IDEAL FLOOR CRM</span><strong>КАРТОЧКА ДИЛЕРСКОГО ОБЪЕКТА</strong></td>
+      </tr>
     </table>
 
-    <table class="hero">
-        <tr>
-            <td>
-                <span class="dealer-name">{{DEALER_NAME}}</span>
-                <div class="dealer-address">{{CITY}} · {{ACTUAL_ADDRESS}}</div>
-            </td>
-            <td style="text-align:right">
-                <span class="org-badge">{{DEALER_ORG}}</span>
-            </td>
-        </tr>
+    <table class="passport-title-row">
+      <tr>
+        <td>
+          <div class="passport-eyebrow">УЧЁТ ВЫСТАВЛЕННОСТИ · КОММЕРЧЕСКИЕ УСЛОВИЯ · ОКРУЖЕНИЕ</div>
+          <h1 class="passport-title">Паспорт объекта</h1>
+          <p class="passport-subtitle">Карточка торговой точки и результаты работы с дилером</p>
+        </td>
+        <td style="width:34mm;text-align:right">
+          <div class="passport-id-box"><small>IF-номер</small><strong>{{DEALER_ID}}</strong></div>
+        </td>
+      </tr>
     </table>
 
-    <table class="kpi-table">
-        <tr>
-            <td><span class="kpi-label">Выставлено декоров</span><span class="kpi-value">{{PASSPORT_EXHIBITED_COUNT}}</span></td>
-            <td><span class="kpi-label">Стенды / POS, ед.</span><span class="kpi-value">{{PASSPORT_POS_TOTAL}}</span></td>
-            <td><span class="kpi-label">Город</span><span class="kpi-value" style="font-size:11pt">{{CITY}}</span></td>
-        </tr>
+    <table class="passport-hero">
+      <tr>
+        <td>
+          <span class="passport-dealer-name">{{DEALER_NAME}}</span>
+          <span class="passport-address">{{CITY}} · {{ACTUAL_ADDRESS}}</span>
+        </td>
+        <td style="width:42mm;text-align:right"><span class="passport-org-badge">{{DEALER_ORG}}</span></td>
+      </tr>
     </table>
 
-    <div class="section">
-        <table class="section-head"><tr><td class="section-num">1</td><td class="section-title">Основная информация</td></tr></table>
-        <table class="info-grid">
-            <tr>
-                <td><span class="field-label">Юридическое лицо</span><span class="field-value">{{DEALER_ORG}}</span></td>
-                <td><span class="field-label">Фактический адрес</span><span class="field-value">{{ACTUAL_ADDRESS}}</span></td>
-            </tr>
-        </table>
-        <table class="info-grid thirds" style="margin-top:7px">
-            <tr>
-                <td><span class="field-label">Контактное лицо (ЛПР)</span><span class="field-value">{{CONTACT_NAME}}</span></td>
-                <td><span class="field-label">Должность</span><span class="field-value">{{CONTACT_POSITION}}</span></td>
-                <td><span class="field-label">Телефон</span><span class="field-value">{{CONTACT_PHONE}}</span></td>
-            </tr>
-        </table>
-    </div>
+    <table class="passport-meta-table">
+      <tr>
+        <td><span class="passport-label">Дата паспорта</span><span class="passport-value">{{DOC_DATE_SHORT}}</span></td>
+        <td><span class="passport-label">Составил</span><span class="passport-value">{{AUDITOR}}</span></td>
+        <td><span class="passport-label">Тип организации</span><span class="passport-value">{{DEALER_TYPE}}</span></td>
+        <td><span class="passport-label">БИН / ИИН</span><span class="passport-value">{{BIN}}</span></td>
+      </tr>
+    </table>
 
-    <div class="section">
-        <table class="section-head"><tr><td class="section-num">2</td><td class="section-title">Окружение и цифровой след</td></tr></table>
-        <table class="env-table">
-            <tr>
-                <td>
-                    <span class="field-label">Присутствующие бренды ламината</span>
-                    <div class="passport-chips">{{PASSPORT_COMPETITORS}}</div>
-                </td>
-                <td>
-                    <span class="field-label">Instagram / локация</span>
-                    <table class="qr-table">
-                        <tr>
-                            <td>{{QR_INSTAGRAM_BLOCK}}<div class="qr-label">Instagram</div><div class="link-text">{{INSTAGRAM}}</div></td>
-                            <td>{{QR_LOCATION_BLOCK}}<div class="qr-label">Локация</div><div class="link-text">{{LOCATION_URL}}</div></td>
-                        </tr>
-                    </table>
-                </td>
-            </tr>
-        </table>
-    </div>
+    <table class="passport-kpis">
+      <tr>
+        <td><div class="passport-kpi-card"><small>Отмеченные декоры IDEAL FLOOR</small><strong>{{PASSPORT_EXHIBITED_COUNT}}</strong></div></td>
+        <td><div class="passport-kpi-card"><small>Единиц торгового оборудования</small><strong>{{PASSPORT_POS_TOTAL}} шт.</strong></div></td>
+        <td><div class="passport-kpi-card"><small>Город</small><strong>{{CITY}}</strong></div></td>
+      </tr>
+    </table>
 
-    <div class="section matrix-section">
-        <table class="section-head"><tr><td class="section-num">3</td><td class="section-title">Ассортимент и оборудование IDEAL FLOOR</td></tr></table>
-        {{PASSPORT_MATRIX}}
-    </div>
+    <section class="passport-section">
+      <div class="passport-section-title"><span><b class="passport-section-number">01</b></span><strong>Данные торговой точки и контакты</strong></div>
+      <table class="passport-grid">
+        <tr>
+          <td><div class="passport-field"><span class="passport-label">Юридическое лицо</span><span class="passport-value">{{DEALER_ORG}}</span></div></td>
+          <td><div class="passport-field"><span class="passport-label">Фактический адрес</span><span class="passport-value">{{ACTUAL_ADDRESS}}</span></div></td>
+        </tr>
+        <tr>
+          <td><div class="passport-field"><span class="passport-label">Юридический адрес</span><span class="passport-value">{{LEGAL_ADDRESS}}</span></div></td>
+          <td><div class="passport-field"><span class="passport-label">Руководитель</span><span class="passport-value">{{DEALER_DIRECTOR}}</span></div></td>
+        </tr>
+        <tr>
+          <td><div class="passport-field"><span class="passport-label">Электронная почта</span><span class="passport-value">{{EMAIL}}</span></div></td>
+          <td><div class="passport-field"><span class="passport-label">Банк · БИК · КБЕ</span><span class="passport-value">{{BANK}} · {{BIK}} · {{KBE}}</span></div></td>
+        </tr>
+      </table>
+      <table class="passport-table" style="margin-top:1.5mm">
+        <thead><tr><th>Контактное лицо</th><th>Должность</th><th>Телефон / контакты</th></tr></thead>
+        <tbody>{{PASSPORT_CONTACTS}}</tbody>
+      </table>
+    </section>
 
-    <div class="section">
-        <table class="section-head"><tr><td class="section-num">4</td><td class="section-title">Фотоотчёт</td></tr></table>
-        <table class="photo-table"><tr><td>{{PASSPORT_PHOTO_1}}</td><td>{{PASSPORT_PHOTO_2}}</td><td>{{PASSPORT_PHOTO_3}}</td></tr></table>
-    </div>
+    <section class="passport-section">
+      <div class="passport-section-title"><span><b class="passport-section-number">02</b></span><strong>Прайс и условия работы</strong></div>
+      <table class="passport-grid passport-commercial-grid">
+        <tr>
+          <td><div class="passport-field"><span class="passport-label">Действующий прайс</span><span class="passport-value">{{PASSPORT_PRICE_LIST}}</span></div></td>
+          <td><div class="passport-field"><span class="passport-label">Прайс в профиле дилера</span><span class="passport-value">{{PASSPORT_PROFILE_PRICE}}</span></div></td>
+        </tr>
+        <tr>
+          <td><div class="passport-field"><span class="passport-label">Скидка</span><span class="passport-value">{{PASSPORT_DISCOUNT}}</span></div></td>
+          <td><div class="passport-field"><span class="passport-label">Основание и срок прайса</span><span class="passport-value">{{PASSPORT_PRICE_SOURCE}} · {{PASSPORT_PRICE_PERIOD}}</span></div></td>
+        </tr>
+        <tr>
+          <td colspan="2"><div class="passport-field"><span class="passport-label">Условия доставки и оплаты</span><span class="passport-value">{{PASSPORT_DELIVERY_TERMS}}</span></div></td>
+        </tr>
+      </table>
+    </section>
 
-    <div class="section">
-        <table class="section-head"><tr><td class="section-num">5</td><td class="section-title">Рекламации и технические замечания</td></tr></table>
-        <div class="notes">{{NOTES}}</div>
-    </div>
+    <section class="passport-section">
+      <div class="passport-section-title"><span><b class="passport-section-number">03</b></span><strong>Конкуренты у дилера</strong></div>
+      <table class="passport-table">
+        <thead><tr><th>Бренд</th><th>Коллекция</th><th>Оптовая цена</th><th>Розничная цена</th></tr></thead>
+        <tbody>{{PASSPORT_COMPETITORS}}</tbody>
+      </table>
+    </section>
 
-    <table class="signatures"><tr><td>Менеджер IDEAL FLOOR · ФИО / Подпись</td><td>Представитель салона · ФИО / Подпись</td></tr></table>
+    <section class="passport-section">
+      <div class="passport-section-title"><span><b class="passport-section-number">04</b></span><strong>Отмеченные позиции IDEAL FLOOR</strong></div>
+      {{PASSPORT_MATRIX}}
+    </section>
+
+    <section class="passport-section">
+      <div class="passport-section-title"><span><b class="passport-section-number">05</b></span><strong>Торговое оборудование</strong></div>
+      {{PASSPORT_EQUIPMENT}}
+    </section>
+
+    <section class="passport-section">
+      <div class="passport-section-title"><span><b class="passport-section-number">06</b></span><strong>Социальные сети и расположение</strong></div>
+      <table class="passport-qr-table">
+        <tr>
+          <td>{{QR_INSTAGRAM_BLOCK}}<div class="passport-qr-label">Instagram</div><div class="passport-link">{{INSTAGRAM}}</div></td>
+          <td>{{QR_LOCATION_BLOCK}}<div class="passport-qr-label">Локация / 2ГИС</div><div class="passport-link">{{LOCATION_URL}}</div></td>
+        </tr>
+      </table>
+      <div class="passport-field" style="margin-top:1.5mm"><span class="passport-label">Сайт дилера</span><span class="passport-value">{{WEBSITE}}</span></div>
+    </section>
+
+    <section class="passport-section">
+      <div class="passport-section-title"><span><b class="passport-section-number">07</b></span><strong>Фотоотчёт по объекту</strong></div>
+      {{PASSPORT_PHOTOS}}
+    </section>
+
+    <section class="passport-section">
+      <div class="passport-section-title"><span><b class="passport-section-number">08</b></span><strong>Заметки менеджера и технические замечания</strong></div>
+      <div class="passport-notes">{{NOTES}}</div>
+    </section>
+
+    <table class="passport-signatures">
+      <tr>
+        <td><div class="passport-signature-line"></div><div class="passport-signature-label">Менеджер IDEAL FLOOR · ФИО / подпись</div></td>
+        <td><div class="passport-signature-line"></div><div class="passport-signature-label">Представитель салона · ФИО / подпись</div></td>
+      </tr>
+    </table>
+    <table class="passport-footer"><tr><td>IDEAL FLOOR · Паспорт объекта</td><td>IF {{DEALER_ID}}</td></tr></table>
+  </div>
 </div>
 </body>
 </html>
