@@ -1726,7 +1726,7 @@ function validateDocumentTemplate(key, input) {
             throw new Error('В шаблоне потеряно поле CRM: {{' + name + '}}. Его нельзя удалять.');
         }
     }
-    return html;
+    return key === 'storage' ? normalizeStorageItemsRowsPlaceholder(html) : html;
 }
 function documentTemplateActor(req) {
     return {
@@ -1734,8 +1734,28 @@ function documentTemplateActor(req) {
         name:String(req.user?.fullName || req.user?.username || 'Администратор')
     };
 }
+function normalizeStorageItemsRowsPlaceholder(html) {
+    const source=String(html || '');
+    const withoutPlaceholder=source.replace(/\{\{STORAGE_ITEMS_ROWS\}\}/g,'');
+    const tablePattern=/<table\b[^>]*class=["'][^"']*\bequipment-table\b[^"']*["'][^>]*>[\s\S]*?<\/table>/i;
+    const tableMatch=tablePattern.exec(withoutPlaceholder);
+    if (!tableMatch) return source;
+    const tableHtml=tableMatch[0];
+    const tbodyOpen=/<tbody\b[^>]*>/i.exec(tableHtml);
+    if (!tbodyOpen) return source;
+    const bodyStart=tbodyOpen.index+tbodyOpen[0].length;
+    const bodyEnd=tableHtml.toLowerCase().indexOf('</tbody>',bodyStart);
+    if (bodyEnd<0) return source;
+    const body=tableHtml.slice(bodyStart,bodyEnd);
+    const totalRow=/<tr\b[^>]*class=["'][^"']*\bstorage-total-row\b[^"']*["'][^>]*>/i.exec(body);
+    const insertAt=totalRow ? totalRow.index : body.length;
+    const correctedBody=body.slice(0,insertAt)+'\n{{STORAGE_ITEMS_ROWS}}\n'+body.slice(insertAt);
+    const correctedTable=tableHtml.slice(0,bodyStart)+correctedBody+tableHtml.slice(bodyEnd);
+    return withoutPlaceholder.slice(0,tableMatch.index)+correctedTable+withoutPlaceholder.slice(tableMatch.index+tableHtml.length);
+}
 function documentTemplateCurrentHtml(record, key) {
-    return record && record.isDefault !== true && record.html ? record.html : builtInDocumentTemplate(key);
+    const html=record && record.isDefault !== true && record.html ? record.html : builtInDocumentTemplate(key);
+    return key === 'storage' ? normalizeStorageItemsRowsPlaceholder(html) : html;
 }
 function documentTemplateResponse(record, key) {
     const revisions = Array.isArray(record?.revisions) ? record.revisions.slice().sort((a,b) => Number(b.version)-Number(a.version)) : [];
@@ -1797,7 +1817,7 @@ app.get('/api/admin/document-templates/:key/revisions/:version', requireAdmin, a
         const revision=(record?.revisions || []).find(item => Number(item.version) === revisionVersion);
         if (!revision) return res.status(404).json({error:'Редакция не найдена'});
         res.set('Cache-Control','no-store');
-        res.json({key,version:revision.version,html:revision.html,savedAt:revision.savedAt,savedBy:revision.savedBy || null});
+        res.json({key,version:revision.version,html:key==='storage'?normalizeStorageItemsRowsPlaceholder(revision.html):revision.html,savedAt:revision.savedAt,savedBy:revision.savedBy || null});
     } catch (error) {
         res.status(500).json({error:'Не удалось загрузить редакцию шаблона'});
     }

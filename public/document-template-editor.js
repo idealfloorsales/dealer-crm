@@ -180,7 +180,11 @@
             saveButton.disabled = false;
             if (frameLoadResolve) frameLoadResolve();
         };
-        frame.srcdoc = html;
+        const storageRowsMarker='<tr class="crm-template-dynamic-row" data-crm-template-token="STORAGE_ITEMS_ROWS"><td colspan="5">Позиции и цены автоматически подставляются из CRM</td></tr>';
+        const editorHtml=activeKey==='storage'
+            ? html.replace(/\{\{STORAGE_ITEMS_ROWS\}\}/g,storageRowsMarker)
+            : html;
+        frame.srcdoc = editorHtml;
         return ready;
     }
 
