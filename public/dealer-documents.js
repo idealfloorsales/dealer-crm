@@ -278,9 +278,7 @@
 
     function buildPassportMatrix(dealer) {
         const products = selectedPassportProducts(dealer);
-        if (!products.length) {
-            return '<div class="passport-empty">У дилера не отмечены образцы IDEAL FLOOR.</div>';
-        }
+        if (!products.length) return '';
 
         const groups = new Map();
         products.forEach(product => {
@@ -315,9 +313,7 @@
         const items = Array.isArray(dealer.pos_materials)
             ? dealer.pos_materials.filter(item => item && String(item.name || '').trim() && Number(item.quantity) > 0)
             : [];
-        if (!items.length) {
-            return '<div class="passport-empty">Торговое оборудование не отмечено.</div>';
-        }
+        if (!items.length) return '';
 
         const columnCount = 3;
         const rowCount = Math.ceil(items.length / columnCount);
@@ -360,21 +356,21 @@
     function buildPassportContacts(dealer) {
         const contacts = (Array.isArray(dealer.contacts) ? dealer.contacts : [])
             .filter(contact => contact && (contact.name || contact.position || contact.contactInfo));
-        if (!contacts.length) return '<tr><td class="passport-empty-cell" colspan="3">Контакты не указаны.</td></tr>';
+        if (!contacts.length) return '';
         return contacts.map(contact =>
-            '<tr><td>' + escapeHtml(contact.name || '—') + '</td>' +
-            '<td>' + escapeHtml(contact.position || '—') + '</td>' +
-            '<td>' + escapeHtml(contact.contactInfo || '—') + '</td></tr>'
+            '<tr><td>' + escapeHtml(contact.name || '') + '</td>' +
+            '<td>' + escapeHtml(contact.position || '') + '</td>' +
+            '<td>' + escapeHtml(contact.contactInfo || '') + '</td></tr>'
         ).join('');
     }
 
     function formatPassportCompetitorPrice(value) {
         const raw = String(value ?? '').trim();
-        if (!raw) return '—';
+        if (!raw) return '';
         const normalized = raw.replace(/\s/g, '').replace(/[^0-9,.-]/g, '').replace(',', '.');
         const number = Number(normalized);
         if (Number.isFinite(number)) {
-            if (number <= 0) return '—';
+            if (number <= 0) return '';
             return number.toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + ' ₸';
         }
         return escapeHtml(raw);
@@ -383,10 +379,10 @@
     function buildPassportCompetitors(dealer) {
         const entries = (Array.isArray(dealer.competitors) ? dealer.competitors : [])
             .filter(item => item && String(item.brand || '').trim());
-        if (!entries.length) return '<tr><td class="passport-empty-cell" colspan="4">Конкуренты не отмечены.</td></tr>';
+        if (!entries.length) return '';
         return entries.map(item =>
             '<tr><td><strong>' + escapeHtml(item.brand) + '</strong></td>' +
-            '<td>' + escapeHtml(item.collection || '—') + '</td>' +
+            '<td>' + escapeHtml(item.collection || '') + '</td>' +
             '<td class="passport-number-cell">' + formatPassportCompetitorPrice(item.price_opt) + '</td>' +
             '<td class="passport-number-cell">' + formatPassportCompetitorPrice(item.price_retail) + '</td></tr>'
         ).join('');
@@ -394,7 +390,7 @@
 
     function buildPassportPhotos(dealer) {
         const photos = Array.isArray(dealer.photos) ? dealer.photos.filter(photo => photo?.photo_url || photo?.url || photo?.src).slice(0, 3) : [];
-        if (!photos.length) return '<div class="passport-empty">Фотоотчёт не прикреплён.</div>';
+        if (!photos.length) return '';
         return '<div class="passport-photo-grid">' + photos.map((photo, index) => {
             const url = photo.photo_url || photo.url || photo.src;
             return '<div class="passport-photo-card"><img src="' + escapeHtml(url) + '" alt="Фото объекта ' + (index + 1) + '">' +
@@ -647,19 +643,60 @@
             PASSPORT_DELIVERY_TERMS: valueOrLine(passportDelivery, 'Не указаны'),
             PASSPORT_MATRIX: buildPassportMatrix(dealer),
             PASSPORT_MATRIX_COUNT: escapeHtml(passportMatrixCount(dealer)),
-                        PASSPORT_EXHIBITED_COUNT: escapeHtml(exhibitedCount(dealer)),
+            PASSPORT_EXHIBITED_COUNT: escapeHtml(exhibitedCount(dealer)),
             PASSPORT_POS_TOTAL: escapeHtml(passportPosTotal(dealer))
         };
 
         if (type === 'passport') {
-            map.QR_INSTAGRAM = await qrDataUrl(instagramUrl);
-            map.QR_LOCATION = await qrDataUrl(location);
+            const passportText = value => String(value ?? '').trim();
+            const selectedProducts = selectedPassportProducts(dealer).length;
+            const equipmentCount = passportPosTotal(dealer);
+            const organization = formatOrganizationForDocument(req);
+            const bankDetails = [
+                req.bank,
+                req.bik ? 'БИК ' + req.bik : '',
+                req.kbe ? 'КБЕ ' + req.kbe : '',
+                req.iik ? 'ИИК ' + req.iik : ''
+            ].map(passportText).filter(Boolean);
+
+            map.DEALER_TYPE = passportText(req.type) ? escapeHtml(req.type) : '';
+            map.DEALER_NAME = passportText(dealer.name) ? escapeHtml(dealer.name) : '';
+            map.DEALER_ORG = organization ? escapeHtml(organization) : '';
+            map.CITY = passportText(dealer.city) ? escapeHtml(dealer.city) : '';
+            map.ACTUAL_ADDRESS = passportText(dealer.address) ? escapeHtml(dealer.address) : '';
+            map.PASSPORT_ADDRESS = [dealer.city, dealer.address].map(passportText).filter(Boolean).map(escapeHtml).join(' · ');
+            map.DEALER_DIRECTOR = passportText(req.director) ? escapeHtml(req.director) : '';
+            map.LEGAL_ADDRESS = passportText(req.legalAddress) ? escapeHtml(req.legalAddress) : '';
+            map.BIN = passportText(req.bin) ? escapeHtml(req.bin) : '';
+            map.EMAIL = passportText(req.email) ? escapeHtml(req.email) : '';
+            map.BANK_DETAILS = bankDetails.map(escapeHtml).join(' · ');
+            map.WEBSITE = passportText(dealer.website) ? escapeHtml(dealer.website) : '';
+            map.INSTAGRAM = passportText(dealer.instagram) ? escapeHtml(dealer.instagram) : '';
+            map.LOCATION_URL = location ? escapeHtml(location) : '';
+            map.AUDITOR = passportText(state.user?.fullName || state.user?.username || '')
+                ? escapeHtml(state.user.fullName || state.user.username) : '';
+            map.NOTES = passportText(dealer.bonuses)
+                ? escapeHtml(dealer.bonuses).replace(/\n/g, '<br>') : '';
+            map.PASSPORT_PRICE_LIST = passportText(passportEffectivePrice) ? escapeHtml(passportEffectivePrice) : '';
+            map.PASSPORT_PROFILE_PRICE = passportText(passportProfilePrice) ? escapeHtml(passportProfilePrice) : '';
+            map.PASSPORT_DISCOUNT = passportDiscount > 0
+                ? '−' + escapeHtml(passportDiscount) + '%' + (passportActiveDiscounts.length ? ' · ' + escapeHtml(passportActiveDiscounts.map(item => item.name || ('скидка ' + (Number(item.discountPercent) || 0) + '%')).join(', ')) : '')
+                : '';
+            map.PASSPORT_PRICE_SOURCE = (passportEffectivePrice || passportOverride)
+                ? (passportOverride ? 'Действует специальное условие' : 'По условиям профиля дилера') : '';
+            map.PASSPORT_PRICE_PERIOD = passportPriceEnd
+                ? 'до ' + escapeHtml(formatPassportDate(passportPriceEnd))
+                : (passportOverride ? 'Срок не ограничен' : '');
+            map.PASSPORT_DELIVERY_TERMS = passportText(passportDelivery) ? escapeHtml(passportDelivery) : '';
+            map.PASSPORT_MATRIX_COUNT = selectedProducts ? escapeHtml(passportMatrixCount(dealer)) : '';
+            map.PASSPORT_EXHIBITED_COUNT = selectedProducts ? escapeHtml(selectedProducts) : '';
+            map.PASSPORT_POS_TOTAL = equipmentCount ? escapeHtml(equipmentCount) : '';
+            map.QR_INSTAGRAM = instagramUrl ? await qrDataUrl(instagramUrl) : '';
+            map.QR_LOCATION = location ? await qrDataUrl(location) : '';
             map.QR_INSTAGRAM_BLOCK = map.QR_INSTAGRAM
-                ? `<img class="passport-qr" src="${map.QR_INSTAGRAM}" alt="Instagram QR">`
-                : '<div class="passport-qr-empty">QR</div>';
+                ? `<img class="passport-qr" src="${map.QR_INSTAGRAM}" alt="Instagram QR">` : '';
             map.QR_LOCATION_BLOCK = map.QR_LOCATION
-                ? `<img class="passport-qr" src="${map.QR_LOCATION}" alt="Location QR">`
-                : '<div class="passport-qr-empty">QR</div>';
+                ? `<img class="passport-qr" src="${map.QR_LOCATION}" alt="Location QR">` : '';
         }
 
         return map;
@@ -669,6 +706,94 @@
         return template.replace(/\{\{([A-Z0-9_]+)\}\}/g, (match, key) =>
             Object.prototype.hasOwnProperty.call(map, key) ? String(map[key]) : ''
         );
+    }
+
+    function renderPassportTemplate(template, map) {
+        const parsed = new DOMParser().parseFromString(replaceTokens(template, map), 'text/html');
+        const isEmpty = value => {
+            const text = String(value || '').replace(/\s+/g, ' ').trim().toLocaleLowerCase('ru');
+            return !text || /^[_—–\-·.\s]+$/.test(text) ||
+                /^(не назначен|не указаны?|не задан|не заполнено|нет данных|нет активной скидки)$/.test(text);
+        };
+
+        parsed.querySelectorAll('.passport-field').forEach(field => {
+            const value = field.querySelector('.passport-value');
+            if (!value || isEmpty(value.textContent)) field.remove();
+        });
+        parsed.querySelectorAll('.passport-meta-table td').forEach(cell => {
+            const value = cell.querySelector('.passport-value');
+            if (!value || isEmpty(value.textContent)) cell.remove();
+        });
+        parsed.querySelectorAll('.passport-address,.passport-org-badge').forEach(node => {
+            if (isEmpty(node.textContent)) node.remove();
+        });
+        parsed.querySelectorAll('.passport-kicker').forEach(node => {
+            if (isEmpty(node.parentElement?.querySelector('.passport-dealer-name')?.textContent)) node.remove();
+        });
+        parsed.querySelectorAll('.passport-notes').forEach(block => {
+            if (isEmpty(block.textContent)) block.remove();
+        });
+        parsed.querySelectorAll('.passport-kpi-card').forEach(card => {
+            const value = card.querySelector('strong');
+            const text = value?.textContent.trim() || '';
+            if (isEmpty(text) || /^0(?:[,.]0+)?(?:\s*шт\.?)?$/i.test(text)) {
+                card.closest('td')?.remove();
+            }
+        });
+        parsed.querySelectorAll('.passport-section-count').forEach(count => {
+            if (isEmpty(count.textContent)) count.remove();
+        });
+        parsed.querySelectorAll('.passport-qr-table td').forEach(cell => {
+            const link = cell.querySelector('.passport-link')?.textContent;
+            if (!cell.querySelector('img') && isEmpty(link)) cell.remove();
+        });
+
+        parsed.querySelectorAll('.passport-grid tr').forEach(row => {
+            const cells = [...row.querySelectorAll(':scope > td')];
+            cells.forEach(cell => {
+                if (!cell.querySelector('.passport-field')) cell.remove();
+            });
+            const remaining = [...row.querySelectorAll(':scope > td')];
+            if (!remaining.length) row.remove();
+            else if (remaining.length === 1) remaining[0].colSpan = 2;
+        });
+        parsed.querySelectorAll('.passport-meta-table tr,.passport-kpis tr').forEach(row => {
+            [...row.querySelectorAll(':scope > td')].forEach(cell => {
+                if (row.closest('.passport-kpis') && !cell.querySelector('.passport-kpi-card')) cell.remove();
+                if (!cell.textContent.trim() && !cell.querySelector('*')) cell.remove();
+            });
+            const cells = [...row.querySelectorAll(':scope > td')];
+            if (!cells.length) row.remove();
+            else cells.forEach(cell => { cell.style.width = (100 / cells.length) + '%'; });
+        });
+        parsed.querySelectorAll('.passport-meta-table,.passport-kpis,.passport-grid').forEach(table => {
+            if (!table.querySelector('tr')) table.remove();
+        });
+
+        parsed.querySelectorAll('.passport-contact-table,.passport-competitor-table').forEach(table => {
+            if (!table.querySelector('tbody tr')) table.remove();
+        });
+        parsed.querySelectorAll('.passport-qr-table').forEach(table => {
+            const cells = [...table.querySelectorAll('tr > td')];
+            if (!cells.length) table.remove();
+            else if (cells.length === 1) cells[0].style.width = '100%';
+        });
+        parsed.querySelectorAll('.passport-hero td').forEach(cell => {
+            if (!cell.textContent.trim() && !cell.querySelector('img')) cell.remove();
+        });
+        parsed.querySelectorAll('.passport-section').forEach(section => {
+            const content = section.cloneNode(true);
+            content.querySelector('.passport-section-title')?.remove();
+            const hasContent = Boolean(content.querySelector('img,.passport-field,.passport-notes,.passport-table,.passport-selected-table,.passport-equipment-grid,.passport-photo-grid,.passport-qr-table')) ||
+                !isEmpty(content.textContent);
+            if (!hasContent) section.remove();
+        });
+        parsed.querySelectorAll('.passport-section').forEach((section, index) => {
+            const number = section.querySelector('.passport-section-number');
+            if (number) number.textContent = String(index + 1).padStart(2, '0');
+        });
+
+        return '<!DOCTYPE html>\n' + parsed.documentElement.outerHTML;
     }
 
     async function ensureStorageCatalogLoaded() {
@@ -696,7 +821,9 @@
         if (type === 'storage' || type === 'passport') await ensureStorageCatalogLoaded();
         if (type === 'passport') await ensurePassportPhotosLoaded();
         const [template, map] = await Promise.all([loadTemplate(type), buildMap(type)]);
-        return replaceTokens(template, map);
+        return type === 'passport'
+            ? renderPassportTemplate(template, map)
+            : replaceTokens(template, map);
     }
 
     function documentTitle(type) {
