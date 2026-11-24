@@ -290,15 +290,16 @@
         });
 
         const rows = [...groups.entries()].map(([collection, items]) =>
-            '<tr class="passport-products-group"><th colspan="3">' + escapeHtml(collection) + '</th></tr>' +
-            items.map(product =>
-                '<tr><td class="passport-product-sku">' + escapeHtml(product.sku || '—') + '</td>' +
-                '<td>' + escapeHtml(product.name || 'Без названия') + '</td>' +
-                '<td class="passport-product-status">Отмечен</td></tr>'
-            ).join('')
+            '<tr><th scope="row">' + escapeHtml(collection) + '</th><td>' +
+            items.map((product, index) =>
+                (index ? '<span class="passport-product-separator"> · </span>' : '') +
+                '<span class="passport-product-inline"><b>' + escapeHtml(product.sku || '—') + '</b> ' +
+                escapeHtml(product.name || 'Без названия') + '</span>'
+            ).join('') +
+            '</td></tr>'
         ).join('');
 
-        return '<table class="passport-table passport-products-table"><thead><tr><th>Артикул</th><th>Наименование</th><th>Статус</th></tr></thead><tbody>' + rows + '</tbody></table>';
+        return '<table class="passport-selected-table"><tbody>' + rows + '</tbody></table>';
     }
 
     function buildPassportEquipment(dealer) {
