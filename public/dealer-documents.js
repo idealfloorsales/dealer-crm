@@ -296,8 +296,9 @@
                 const cells = Array.from({ length: columnCount }, (_, columnIndex) => {
                     const product = items[columnIndex * rowCount + rowIndex];
                     if (!product) return '<td class="passport-product-cell is-empty"></td>';
-                    return '<td class="passport-product-cell"><span class="passport-product-inline"><b>' +
-                        escapeHtml(product.sku || '—') + '</b> ' + escapeHtml(product.name || 'Без названия') + '</span></td>';
+                    return '<td class="passport-product-cell"><span class="passport-product-inline"><b class="passport-product-sku">' +
+                        escapeHtml(product.sku || '—') + '</b><span class="passport-product-name">' +
+                        escapeHtml(product.name || 'Без названия') + '</span></span></td>';
                 }).join('');
                 return '<tr>' + cells + '</tr>';
             }).join('');
@@ -324,9 +325,10 @@
             const cells = Array.from({ length: columnCount }, (_, columnIndex) => {
                 const item = items[columnIndex * rowCount + rowIndex];
                 if (!item) return '<td class="passport-equipment-cell is-empty"></td>';
-                return '<td class="passport-equipment-cell"><table class="passport-equipment-item"><tbody><tr>' +
-                    '<td>' + escapeHtml(item.name) + '</td><td class="passport-equipment-quantity">' +
-                    escapeHtml(Number(item.quantity)) + ' шт.</td></tr></tbody></table></td>';
+                return '<td class="passport-equipment-cell"><div class="passport-equipment-card">' +
+                    '<span class="passport-equipment-name">' + escapeHtml(item.name) + '</span>' +
+                    '<span class="passport-equipment-quantity">' + escapeHtml(Number(item.quantity)) + ' шт.</span>' +
+                    '</div></td>';
             }).join('');
             return '<tr>' + cells + '</tr>';
         }).join('');
