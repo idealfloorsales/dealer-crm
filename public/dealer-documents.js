@@ -348,16 +348,24 @@
     }
 
     function normalizeStorageCatalogValue(value) {
+        const latinLookalikes = { a:'а', b:'в', c:'с', e:'е', h:'н', k:'к', m:'м', o:'о', p:'р', t:'т', x:'х', y:'у' };
         return String(value || '')
             .toLowerCase()
             .replace(/ё/g, 'е')
             .normalize('NFKC')
+            .replace(/[abcehkmoptyx]/g, letter => latinLookalikes[letter] || letter)
             .replace(/[^a-zа-я0-9]+/gi, '');
     }
 
     function findStorageCatalogProduct(item, productType) {
         const catalog = (Array.isArray(state.catalog) ? state.catalog : [])
             .filter(product => String(product?.product_type || 'laminate') === productType);
+        const itemId = String(item?.productId || item?.product_id || item?.product?.id || item?.product?._id || (typeof item?.product === 'string' ? item.product : ''));
+        if (itemId) {
+            const byId = catalog.find(product => String(product.id || product._id || '') === itemId);
+            if (byId) return byId;
+        }
+
         const itemSku = normalizeStorageCatalogValue(item?.sku);
         if (itemSku) {
             const bySku = catalog.find(product => normalizeStorageCatalogValue(product.sku) === itemSku);
@@ -366,10 +374,18 @@
 
         const itemName = normalizeStorageCatalogValue(item?.name);
         if (!itemName) return null;
-        return catalog.find(product =>
-            [product.name, product.excel_alias, product.sku]
-                .some(value => normalizeStorageCatalogValue(value) === itemName)
-        ) || null;
+        const productKeys = product => [product.name, product.excel_alias, product.sku]
+            .map(normalizeStorageCatalogValue)
+            .filter(Boolean);
+        const exact = catalog.find(product => productKeys(product).some(value => value === itemName));
+        if (exact) return exact;
+
+        // Matrix equipment names can differ by a POS prefix or by Latin/Cyrillic lookalike letters.
+        // Accept a partial name only when it identifies exactly one catalog item.
+        const partialMatches = catalog.filter(product => productKeys(product)
+            .some(value => value.length >= 6 && (value.includes(itemName) || itemName.includes(value))));
+        const uniqueIds = new Set(partialMatches.map(product => String(product.id || product._id || product.sku || product.name)));
+        return uniqueIds.size === 1 ? partialMatches[0] : null;
     }
 
     function storageLaminateUnitPrice(item) {
@@ -377,7 +393,7 @@
     }
 
     function storageEquipmentUnitPrice(item) {
-        return storageUnitPrice(findStorageCatalogProduct(item, 'equipment'));
+        return storageUnitPrice(findStorageCatalogProduct(item, 'equipment') || item);
     }
 
     function buildStorageItems(dealer) {
