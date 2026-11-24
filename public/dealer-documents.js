@@ -554,7 +554,7 @@
     }
 
     async function loadTemplate(type) {
-        if (state.templates[type]) return state.templates[type];
+        if (type !== 'passport' && state.templates[type]) return state.templates[type];
         const path = templatePaths[type];
         if (!path) throw new Error('Неизвестный тип документа');
 
