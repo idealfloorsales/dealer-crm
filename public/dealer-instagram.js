@@ -11,6 +11,8 @@
         if (!pane) return;
         const params = new URLSearchParams(location.search);
         const dealerId = params.get('id') || params.get('dealerId') || '';
+        const reportLink = document.getElementById('instagram-report-link');
+        reportLink.href = '/instagram-report.html?dealer=' + encodeURIComponent(dealerId);
         const statusEl = document.getElementById('instagram-monitor-status');
         const setupEl = document.getElementById('instagram-admin-setup');
         const controlsEl = document.getElementById('instagram-admin-controls');

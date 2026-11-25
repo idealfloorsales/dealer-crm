@@ -389,75 +389,78 @@ function installInstagramMonitor(options) {
     });
 
     const inFlight = new Map();
+    async function syncDealer(dealer, username) {
+        const key = username.toLowerCase();
+        if (inFlight.has(key)) return inFlight.get(key);
+        const task = (async () => {
+            const connection = await getConnection();
+            const page = connection?.pages?.find(item => item.pageId === connection.selectedPageId);
+            if (!page?.instagramUserId || !page.pageTokenEncrypted) {
+                const error = new Error('Сначала администратор должен подключить профессиональный Instagram и выбрать связанную страницу Facebook.');
+                error.status = 409;
+                throw error;
+            }
+            let token;
+            try { token = decryptToken(page.pageTokenEncrypted); }
+            catch (_) {
+                const error = new Error('Срок доступа к Instagram закончился. Администратору нужно подключить аккаунт заново.');
+                error.status = 409;
+                throw error;
+            }
+            const fields = 'business_discovery.username(' + username + '){username,followers_count,media_count,media.limit(12){id,caption,media_type,permalink,timestamp,like_count,comments_count}}';
+            const result = await graphGet(page.instagramUserId, token, { fields });
+            const profile = result.business_discovery;
+            if (!profile) {
+                const error = new Error('Meta не вернула данные этого аккаунта. Для Business Discovery подходят профессиональные Business/Creator профили.');
+                error.status = 422;
+                throw error;
+            }
+            const posts = (Array.isArray(profile.media?.data) ? profile.media.data : []).map(media => {
+                const caption = String(media.caption || '').slice(0, 2200);
+                return {
+                    id: String(media.id || ''),
+                    mediaType: String(media.media_type || ''),
+                    permalink: String(media.permalink || ''),
+                    caption,
+                    timestamp: media.timestamp ? new Date(media.timestamp) : null,
+                    likeCount: Number.isFinite(Number(media.like_count)) ? Number(media.like_count) : null,
+                    commentsCount: Number.isFinite(Number(media.comments_count)) ? Number(media.comments_count) : null,
+                    textMatch: textHasBrand(caption)
+                };
+            });
+            const textMatchCount = posts.filter(post => post.textMatch).length;
+            await reports.archive(username, posts);
+            const saved = await Snapshot.findOneAndUpdate({ username: username.toLowerCase() }, {
+                $set: {
+                    dealerId: String(dealer._id),
+                    username: String(profile.username || username).toLowerCase(),
+                    followersCount: Number(profile.followers_count) || 0,
+                    mediaCount: Number(profile.media_count) || 0,
+                    checkedMediaCount: posts.length,
+                    textMatchCount,
+                    posts,
+                    fetchedAt: new Date(),
+                    error: ''
+                }
+            }, { upsert: true, new: true, setDefaultsOnInsert: true }).lean();
+            return saved;
+        })();
+        inFlight.set(username.toLowerCase(), task);
+        try { return await task; }
+        finally { inFlight.delete(key); }
+    }
+
+    const reports = require('./instagram-report').install({
+        ...options, Snapshot, handleFromUrl, syncDealer, getConnection
+    });
     app.post('/api/dealers/:id/instagram-monitor/sync', requirePermission('can_view_dealers'), async (req, res) => {
         try {
             const dealer = await accessibleDealer(req, req.params.id);
             if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
             const username = handleFromUrl(dealer.instagram);
             if (!username) return res.status(400).json({ error: 'В карточке дилера укажите ссылку на профиль Instagram вида instagram.com/username' });
-            if (inFlight.has(username.toLowerCase())) {
-                const snapshot = await inFlight.get(username.toLowerCase());
-                return res.json({ snapshot: publicSnapshot(snapshot), reused: true });
-            }
-            const task = (async () => {
-                const connection = await getConnection();
-                const page = connection?.pages?.find(item => item.pageId === connection.selectedPageId);
-                if (!page?.instagramUserId || !page.pageTokenEncrypted) {
-                    const error = new Error('Сначала администратор должен подключить профессиональный Instagram и выбрать связанную страницу Facebook.');
-                    error.status = 409;
-                    throw error;
-                }
-                let token;
-                try { token = decryptToken(page.pageTokenEncrypted); }
-                catch (_) {
-                    const error = new Error('Срок доступа к Instagram закончился. Администратору нужно подключить аккаунт заново.');
-                    error.status = 409;
-                    throw error;
-                }
-                const fields = 'business_discovery.username(' + username + '){username,followers_count,media_count,media.limit(12){id,caption,media_type,permalink,timestamp,like_count,comments_count}}';
-                const result = await graphGet(page.instagramUserId, token, { fields });
-                const profile = result.business_discovery;
-                if (!profile) {
-                    const error = new Error('Meta не вернула данные этого аккаунта. Для Business Discovery подходят профессиональные Business/Creator профили.');
-                    error.status = 422;
-                    throw error;
-                }
-                const posts = (Array.isArray(profile.media?.data) ? profile.media.data : []).map(media => {
-                    const caption = String(media.caption || '').slice(0, 1200);
-                    return {
-                        id: String(media.id || ''),
-                        mediaType: String(media.media_type || ''),
-                        permalink: String(media.permalink || ''),
-                        caption,
-                        timestamp: media.timestamp ? new Date(media.timestamp) : null,
-                        likeCount: Number.isFinite(Number(media.like_count)) ? Number(media.like_count) : null,
-                        commentsCount: Number.isFinite(Number(media.comments_count)) ? Number(media.comments_count) : null,
-                        textMatch: textHasBrand(caption)
-                    };
-                });
-                const textMatchCount = posts.filter(post => post.textMatch).length;
-                const saved = await Snapshot.findOneAndUpdate({ username: username.toLowerCase() }, {
-                    $set: {
-                        dealerId: String(dealer._id),
-                        username: String(profile.username || username).toLowerCase(),
-                        followersCount: Number(profile.followers_count) || 0,
-                        mediaCount: Number(profile.media_count) || 0,
-                        checkedMediaCount: posts.length,
-                        textMatchCount,
-                        posts,
-                        fetchedAt: new Date(),
-                        error: ''
-                    }
-                }, { upsert: true, new: true, setDefaultsOnInsert: true }).lean();
-                return saved;
-            })();
-            inFlight.set(username.toLowerCase(), task);
-            try {
-                const snapshot = await task;
-                res.json({ snapshot: publicSnapshot(snapshot) });
-            } finally {
-                inFlight.delete(username.toLowerCase());
-            }
+            const snapshot = await syncDealer(dealer, username);
+            res.json({ snapshot: publicSnapshot(snapshot) });
         } catch (error) {
             const status = Number(error?.status) || 502;
             res.status(status).json({ error: error?.status ? error.message : profileErrorMessage(error) });

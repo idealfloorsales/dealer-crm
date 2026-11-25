@@ -967,6 +967,7 @@ app.get('/map.html', (req, res) => servePage(res, 'map.html'));
 app.get('/sales.html', (req, res) => servePage(res, 'sales.html'));
 app.get('/competitors.html', (req, res) => servePage(res, 'competitors.html'));
 app.get('/products.html', (req, res) => servePage(res, 'products.html'));
+app.get('/instagram-report.html', (req,res) => servePage(res, 'instagram-report.html'));
 app.get('/report.html', (req, res) => servePage(res, 'report.html'));
 app.get('/knowledge.html', (req, res) => servePage(res, 'knowledge.html'));
 app.get('/reclamations.html', (req, res) => servePage(res, 'reclamations.html'));
@@ -1484,7 +1485,7 @@ const MotivationScheme = mongoose.model('MotivationScheme', motivationSchemeSche
 
 const dealerSchema = new mongoose.Schema({ dealer_id: String, name: String, price_type: String, price_list: { type: mongoose.Schema.Types.ObjectId, ref: 'PriceList', default: null }, motivation_scheme: { type: mongoose.Schema.Types.ObjectId, ref: 'MotivationScheme', default: null }, city: String, address: String, contacts: [contactSchema], bonuses: String, photos: [photoSchema], legal_entities: [dealerLegalEntitySchema], contract: { isSigned: Boolean, date: String }, region_sector: String, hasPersonalPlan: { type: Boolean, default: false }, delivery: String, website: String, instagram: String, additional_addresses: [additionalAddressSchema], pos_materials: [posMaterialSchema], visits: [visitSchema], products: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }], latitude: Number, longitude: Number, geoUpdatedAt: Date, geoSource: String, status: { type: String, default: 'standard' }, avatarUrl: String, competitors: [competitorSchema], responsible: String, responsibleUserId: String, responsibleAssignmentSource: String }, { timestamps: true });
 const Dealer = mongoose.model('Dealer', dealerSchema);
-require('./server/instagram-monitor').installInstagramMonitor({app,mongoose,Dealer,User,requireAdmin,requirePermission,getDealerFilter,origin:APP_ORIGIN});
+
 
 const priceListRowSchema = new mongoose.Schema({
     scopeType: { type: String, enum: ['collection', 'product'], default: 'product' },
@@ -1639,6 +1640,7 @@ const salesSchema = new mongoose.Schema({ month: String, group: String, dealerId
 salesSchema.index({month:1,dealerId:1,isCustom:1});
 salesSchema.index({dealerId:1,month:1});
 const Sales = mongoose.model('Sales', salesSchema);
+require('./server/instagram-monitor').installInstagramMonitor({app,mongoose,Dealer,User,Product,CompRef,Sales,hasPermission,getWorkingDealerFilter,requireAdmin,requirePermission,getDealerFilter,origin:APP_ORIGIN});
 const employeeKpi = require('./server/employee-kpi').registerEmployeeKpi({
     app,mongoose,User,Dealer,Product,Sales,AuditLog,isAdminUser,getWorkingDealerFilter,almatyMonthKey
 });
