@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <link rel="stylesheet" href="style.css?v={{VER}}">
+    <link rel="stylesheet" href="instagram-home.css?v={{VER}}">
     <link rel="stylesheet" href="motivation.css?v={{VER}}"> 
     <link rel="icon" href="favicon.gif" type="image/gif">
     <link rel="manifest" href="manifest.json">
@@ -168,7 +169,34 @@
                 <button id="export-competitors-prices-btn" class="cc-secondary-btn dealer-export-trigger" title="Выгрузить цены конкурентов в Excel">
                     <i class="bi bi-tags"></i><span>Цены конкурентов</span>
                 </button>
+                <button id="ig-toggle" type="button" class="cc-secondary-btn dealer-export-trigger ig-launch" aria-expanded="false" aria-controls="home-instagram"><i class="bi bi-instagram" aria-hidden="true"></i><span>Instagram</span></button>
             </div>
+        </section>
+
+        <section id="home-instagram" aria-label="Instagram дилеров" hidden>
+            <div class="dealer-directory-head dealer-directory-head-v2">
+                <div class="dealer-directory-title-line"><h2>Instagram дилеров</h2><span id="ig-count" class="dealer-visible-count">—</span></div>
+                <label class="ig-month">Месяц<input class="form-control" id="ig-month" type="month"></label>
+            </div>
+            <div class="cc-panel ig-toolbar">
+                <label>Показать<select class="form-select" id="ig-focus"><option value="">Всех дилеров</option><option value="near">7 из 8 зачётов</option><option value="silent">Образцы без публикаций</option><option value="rising">Растёт доля конкурентов</option></select></label>
+                <label>Дилер<select class="form-select" id="ig-dealer"></select></label>
+                <details class="ig-filters"><summary><i class="bi bi-sliders" aria-hidden="true"></i> Фильтры <span id="ig-filter-count"></span></summary>
+                    <div class="ig-filter-grid"><label>Сектор<select class="form-select" id="ig-sector"></select></label><label>Город<select class="form-select" id="ig-city"></select></label><label>Менеджер<select class="form-select" id="ig-manager"></select></label><label>Коллекция<select class="form-select" id="ig-collection"></select></label></div>
+                </details>
+            </div>
+            <div class="cc-panel ig-list">
+                <div class="ig-column-head ig-columns" aria-hidden="true"><span>Дилер</span><span>Зачёты</span><span>Последний пост IDEAL FLOOR</span><span></span></div>
+                <p id="ig-status" class="cc-empty" role="status"></p><div id="ig-results"></div>
+                <button id="ig-retry" type="button" class="cc-secondary-btn" hidden>Повторить загрузку</button>
+            </div>
+            <details id="ig-import-box" class="cc-panel ig-import" hidden><summary><i class="bi bi-file-earmark-arrow-up"></i> Импорт продаж по артикулам</summary>
+                <p>CSV в UTF-8, разделитель «;». Укажите итог по дилеру и артикулу за дату. Повторная загрузка обновит итог.</p>
+                <pre>Дата;Дилер;Артикул;м²
+2026-11-05;IF001;8EH34-721;12,6</pre>
+                <input type="file" id="ig-file" accept=".csv" aria-label="Файл продаж"><button class="cc-secondary-btn" id="ig-import" type="button">Загрузить</button>
+                <span role="status" id="ig-import-status"></span>
+            </details>
         </section>
 
         <section class="dealer-list-toolbar sticky-filters">
@@ -256,6 +284,7 @@
         </div>
 
         <p id="no-data-msg" class="text-center text-muted mt-5" style="display: none;">Ничего не найдено</p>
+
     </div>
 
     <div id="global-search-overlay" class="global-search-overlay" aria-hidden="true">
@@ -1248,6 +1277,7 @@
     <script src="motivation-overview.js?v={{VER}}"></script>
     <script src="address-search.js?v={{VER}}"></script>
     <script src="instagram-accounts.js?v={{VER}}"></script>
+    <script defer src="instagram-report.js?v={{VER}}"></script>
     <script src="script.js?v={{VER}}"></script>
     <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(err => console.error(err)); }</script>
 </body>

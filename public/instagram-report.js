@@ -1,7 +1,7 @@
 'use strict';
 document.addEventListener('DOMContentLoaded', async () => {
-    await window.CRMAuth?.ready;
-    const el = id => document.getElementById(id);
+    if (!document.getElementById('home-instagram')) return;
+    const el = id => document.getElementById('ig-'+id);
     const requested = new URLSearchParams(location.search).get('dealer');
     const filters = ['sector','city','manager','dealer','collection'];
     const fmt = n => Number(n).toLocaleString('ru-RU',{maximumFractionDigits:3});
@@ -56,22 +56,32 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (focus==='near' && creditCount!==7) continue;
             if (focus==='rising' && !(earlier.length && posts.length && rivals.length/posts.length>oldRivals.length/earlier.length)) continue;
             count++;
-            const box = elem('article',null,'border-bottom py-3');
-            const a = elem('a',row.name);
+            const box = elem('details', null, 'ig-row');
+            const summary = elem('summary', null, 'ig-columns');
+            const identity = elem('span', null, 'ig-identity');
+            identity.append(elem('strong', row.name),elem('small',[row.code,row.city,row.sector].filter(Boolean).join(' · ')));
+            const progress = elem('span', null, 'ig-progress');
+            const meter = document.createElement('progress');
+            meter.max=8; meter.value=Math.min(8,creditCount); meter.setAttribute('aria-label','Зачёты из восьми');
+            progress.append(elem('strong',creditCount+' / 8'),meter);
+            const last = elem('span', own.length ? own[0].day : '—','ig-last');
+            last.setAttribute('aria-label','Последний пост IDEAL FLOOR: '+last.textContent);
+            summary.append(identity, progress, last, elem('i',null,'bi bi-chevron-down ig-chevron'));
+            const body = elem('div',null,'ig-row-body');
+            const a = elem('a', 'Карточка дилера');
             a.href='/dealer.html?id='+encodeURIComponent(row.id);
-            const heading=elem('h2',null,'h5'); heading.append(a); box.append(heading);
-            box.append(elem('p',[row.sector,row.city,row.manager].filter(Boolean).join(' · '),'mb-1'));
-            box.append(elem('p','Instagram: '+creditCount+' из 8 зачётов · '+(row.checked?'проверено '+new Date(row.checked).toLocaleString('ru-RU',{timeZone:'Asia/Almaty'}):row.username?'ожидает проверки':'профиль не указан'),'small'));
-            if (own.length) box.append(line(own[0],'Последняя найденная публикация за месяц'));
+            body.append(a,elem('small',[row.manager,row.checked?'Проверено '+new Date(row.checked).toLocaleString('ru-RU',{timeZone:'Asia/Almaty'}):row.username?'Ожидает проверки':'Профиль не указан'].filter(Boolean).join(' · '),'ig-checked'));
+            if (own.length) body.append(line(own[0],'Последняя публикация за месяц'));
+            box.append(summary,body);
             const promoted = new Set(own.flatMap(p=>p.skus).filter(s=>skus.has(s)));
-            group(box,'Выставлено: '+visible.length+' · Артикулов в публикациях: '+promoted.size,[
+            group(body,'Выставлено: '+visible.length+' · Артикулов в публикациях: '+promoted.size,[
                 elem('p','На витрине: '+(visible.map(p=>labels.get(p.sku)).join(', ')||'—')),
                 elem('p','В публикациях: '+([...promoted].map(s=>labels.get(s)).join(', ')||'—'))
             ]);
-            if (rivals.length || oldRivals.length) group(box,'Конкуренты у дилера · '+rivals.length+' из '+posts.length+' постов (прошлый месяц: '+oldRivals.length+' из '+earlier.length+')',
+            if (rivals.length || oldRivals.length) group(body,'Конкуренты у дилера · '+rivals.length+' из '+posts.length+' постов (прошлый месяц: '+oldRivals.length+' из '+earlier.length+')',
                 rivals.map(p=>line(p,p.brands.join(', '))));
             const ranked=own.filter(p=>p.interactions!=null).sort((a,b)=>b.interactions-a.interactions);
-            group(box,'Отклик на публикации · '+ranked.length,ranked.map(p=>{
+            group(body,'Отклик на публикации · '+ranked.length,ranked.map(p=>{
                 const others=posts.filter(x=>x.id!==p.id && x.interactions!=null).map(x=>x.interactions).sort((a,b)=>a-b);
                 const middle=Math.floor(others.length/2);
                 const median=others.length%2?others[middle]:(others[middle-1]+others[middle])/2;
@@ -79,16 +89,23 @@ document.addEventListener('DOMContentLoaded', async () => {
             }));
             const timeline=own.map(p=>({day:p.day,node:line(p,'Публикация · '+(p.skus.join(', ')||'IDEAL FLOOR'))}));
             for (const s of daily) timeline.push({day:s.day,node:elem('div',s.day+' · '+s.sku+' · '+fmt(s.sqm)+' м²')});
-            if (data.canSales) box.append(elem('p','Продажи дилера за месяц: '+(row.sales==null?'нет данных':fmt(row.sales)+' м²')+
+            if (data.canSales) body.append(elem('p','Продажи дилера за месяц: '+(row.sales==null?'нет данных':fmt(row.sales)+' м²')+
                 ' · По '+(collection?'коллекции':'артикулам')+' в детализации: '+(daily.length?fmt(daily.reduce((a,s)=>a+s.sqm,0))+' м²':'нет данных'),'mb-2'));
-            group(box,'Даты публикаций и продаж',timeline.sort((a,b)=>b.day.localeCompare(a.day)).map(t=>t.node));
+            group(body,'Даты публикаций и продаж',timeline.sort((a,b)=>b.day.localeCompare(a.day)).map(t=>t.node));
             target.append(box);
         }
-        el('status').textContent='Дилеров в выборке: '+count+'. Учтены публикации, доступные при проверках. Даты по времени Казахстана.';
+        el('count').textContent=count;
+        el('status').hidden=Boolean(count);
+        el('status').textContent=count ? '' : 'По выбранным фильтрам дилеров нет.';
+        const active=['sector','city','manager','collection'].filter(key=>el(key).value).length;
+        el('filter-count').textContent=active ? '('+active+')' : '';
     }
     async function load() {
         const run=++version;
-        el('status').textContent='Загрузка…';
+        el('status').hidden=false;
+        el('retry').hidden=true;
+        el('count').textContent='—';
+        el('status').textContent='Загружаем отчёт…';
         el('results').replaceChildren();
         try {
             const response=await fetch('/api/instagram/report?month='+encodeURIComponent(el('month').value));
@@ -107,7 +124,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             el('import-box').hidden=!data.canImport;
             render();
-        } catch(e) { if(run===version) {data=null;el('status').textContent=e.message||'Ошибка загрузки';} }
+        } catch(e) { if(run===version) {data=null;el('retry').hidden=false;el('status').textContent=e.message||'Ошибка загрузки';} }
     }
     el('month').onchange=load;
     el('focus').onchange=()=>data && render();
@@ -128,5 +145,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch(e) {el('import-status').textContent=e.message;}
         finally {el('import').disabled=false;}
     };
-    await load();
+    el('retry').onclick=load;
+    const toggle=el('toggle');
+    const panel=document.getElementById('home-instagram');
+    let started=false;
+    function showReport(scroll) {
+        const open=location.hash==='#instagram';
+        panel.hidden=!open;
+        toggle.setAttribute('aria-expanded',String(open));
+        if(open && !started) {
+            started=true;
+            Promise.resolve(window.CRMAuth?.ready).then(load);
+        }
+        if(open && scroll) toggle.scrollIntoView({block:'center'});
+    }
+    toggle.onclick=()=>{
+        const url=new URL(location.href);
+        url.hash=panel.hidden?'instagram':'';
+        history.pushState(null,'',url);
+        showReport(false);
+    };
+    window.addEventListener('hashchange',()=>showReport(true));
+    window.addEventListener('popstate',()=>showReport(true));
+    showReport(true);
 });
