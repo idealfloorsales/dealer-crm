@@ -65,6 +65,7 @@ function installInstagramMonitor(options) {
         ? String(process.env.META_GRAPH_API_VERSION)
         : 'v27.0';
     const configured = () => Boolean(process.env.META_APP_ID && process.env.META_APP_SECRET);
+    const loginConfigId = () => String(process.env.META_IG_LOGIN_CONFIG_ID || '').trim();
     const redirectUri = () => String(process.env.META_IG_REDIRECT_URI || (String(origin || '').replace(/\/+$/, '') + '/api/instagram/callback'));
 
     function encryptionKey() {
@@ -216,6 +217,7 @@ function installInstagramMonitor(options) {
             const selected = connection?.pages?.find(page => page.pageId === connection.selectedPageId);
             res.json({
                 configured: configured(),
+                loginConfigConfigured: Boolean(loginConfigId()),
                 redirectUri: redirectUri(),
                 connected: Boolean(selected?.instagramUserId && selected?.pageTokenEncrypted),
                 selectedPage: selected ? safePage(selected) : null,
@@ -237,7 +239,16 @@ function installInstagramMonitor(options) {
             url.searchParams.set('redirect_uri', redirectUri());
             url.searchParams.set('response_type', 'code');
             url.searchParams.set('state', state);
-            url.searchParams.set('scope', 'pages_show_list,instagram_basic,pages_read_engagement');
+            const configId = loginConfigId();
+            if (configId) {
+                // Facebook Login for Business takes permissions from the saved configuration.
+                url.searchParams.set('config_id', configId);
+                url.searchParams.set('response_type', 'code');
+                url.searchParams.set('override_default_response_type', 'true');
+            } else {
+                // Keep compatibility with classic Facebook Login while no Business config is set.
+                url.searchParams.set('scope', 'pages_show_list,instagram_basic,pages_read_engagement');
+            }
             url.searchParams.set('auth_type', 'rerequest');
             res.json({ authUrl: url.toString() });
         } catch (_) {
