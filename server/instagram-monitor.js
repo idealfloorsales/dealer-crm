@@ -1,12 +1,32 @@
 'use strict';
 
 const crypto = require('crypto');
+const {handle, handles} = require('../public/instagram-accounts');
 
 function installInstagramMonitor(options) {
     const {
         app, mongoose, Dealer, User, requireAdmin, requirePermission,
         getDealerFilter, origin
     } = options;
+
+    Dealer.schema.add({ instagram_extra: [String] });
+    Dealer.recompileSchema();
+
+    function normalizeAccounts(req, res, next) {
+        const body = req.body;
+        if (!body || !Object.hasOwn(body, 'instagram_extra')) return next();
+        if (!Array.isArray(body.instagram_extra)) return res.status(400).json({error:'Ожидается список страниц Instagram'});
+        const raw = [body.instagram, ...body.instagram_extra].filter(value => value != null && value !== '');
+        const names = raw.map(handle);
+        if (names.some(name => !name)) return res.status(400).json({error:'Укажите @имя или ссылку на профиль Instagram'});
+        const urls = [...new Set(names)].map(name => 'https://www.instagram.com/' + name + '/');
+        body.instagram = urls.shift() || '';
+        body.instagram_extra = urls;
+        next();
+    }
+    app.post('/api/dealers', normalizeAccounts);
+    app.put('/api/dealers/:id', normalizeAccounts);
+    app.patch('/api/dealers/:id', normalizeAccounts);
 
     const pageSchema = new mongoose.Schema({
         pageId: { type: String, required: true },
@@ -125,23 +145,6 @@ function installInstagramMonitor(options) {
         const json = JSON.stringify(payload).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
         const targetOrigin = JSON.stringify(String(origin || '').replace(/\/+$/, ''));
         return '<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Instagram CRM</title><body style="font:16px Arial,sans-serif;padding:28px;color:#333"><p id="result">Завершаем подключение Instagram…</p><a href="/">Вернуться в CRM</a><script>(function(){var data=' + json + ';var target=' + targetOrigin + ';document.getElementById("result").textContent=data.status==="ok"?"Instagram подключён. Это окно можно закрыть.":(data.message||"Не удалось подключить Instagram.");if(window.opener){window.opener.postMessage({type:"crm-instagram-oauth",payload:data},target);setTimeout(function(){window.close()},500)}})();</script></body></html>';
-    }
-
-    function handleFromUrl(value) {
-        let raw = String(value || '').trim();
-        if (!raw) return '';
-        if (raw[0] === '@') raw = raw.slice(1);
-        if (/^https?:\/\//i.test(raw)) {
-            try {
-                const url = new URL(raw);
-                if (!/(^|\.)instagram\.com$/i.test(url.hostname)) return '';
-                raw = url.pathname.split('/').filter(Boolean)[0] || '';
-            } catch (_) { return ''; }
-        } else {
-            raw = raw.split(/[/?#]/)[0];
-        }
-        raw = raw.replace(/^@/, '').trim();
-        return /^[A-Za-z0-9._]{1,30}$/.test(raw) ? raw : '';
     }
 
     function publicSnapshot(snapshot) {
@@ -370,17 +373,20 @@ function installInstagramMonitor(options) {
     });
 
     async function accessibleDealer(req, dealerId) {
-        return Dealer.findOne({ _id: dealerId, ...getDealerFilter(req) }).select('_id name instagram').lean();
+        return Dealer.findOne({ _id: dealerId, ...getDealerFilter(req) }).select('_id name instagram instagram_extra').lean();
     }
 
     app.get('/api/dealers/:id/instagram-monitor', requirePermission('can_view_dealers'), async (req, res) => {
         try {
             const dealer = await accessibleDealer(req, req.params.id);
             if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
-            const username = handleFromUrl(dealer.instagram);
+            const usernames = handles(dealer);
+            const selected = req.query.username;
+            const username = selected ? handle(selected) : usernames[0];
+            if (selected && !usernames.includes(username)) return res.status(400).json({error:'Страница не привязана к дилеру'});
             const snapshot = username ? await Snapshot.findOne({ username: username.toLowerCase() }).lean() : null;
             res.json({
-                dealer: { id: String(dealer._id), name: dealer.name, username },
+                dealer: { id: String(dealer._id), name: dealer.name, username, usernames },
                 snapshot: publicSnapshot(snapshot)
             });
         } catch (_) {
@@ -451,13 +457,16 @@ function installInstagramMonitor(options) {
     }
 
     const reports = require('./instagram-report').install({
-        ...options, Snapshot, handleFromUrl, syncDealer, getConnection
+        ...options, Snapshot, syncDealer, getConnection
     });
     app.post('/api/dealers/:id/instagram-monitor/sync', requirePermission('can_view_dealers'), async (req, res) => {
         try {
             const dealer = await accessibleDealer(req, req.params.id);
             if (!dealer) return res.status(404).json({ error: 'Дилер не найден' });
-            const username = handleFromUrl(dealer.instagram);
+            const usernames = handles(dealer);
+            const selected = req.query.username;
+            const username = selected ? handle(selected) : usernames[0];
+            if (selected && !usernames.includes(username)) return res.status(400).json({error:'Страница не привязана к дилеру'});
             if (!username) return res.status(400).json({ error: 'В карточке дилера укажите ссылку на профиль Instagram вида instagram.com/username' });
             const snapshot = await syncDealer(dealer, username);
             res.json({ snapshot: publicSnapshot(snapshot) });

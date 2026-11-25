@@ -18,3 +18,16 @@ test('SKU and brand recognition, Kazakhstan day boundary and repeated days', () 
     assert.equal(other.interactions,null);
 });
 test('previous reference month crosses year boundary',()=>assert.equal(previous('2026-01'),'2025-12'));
+
+test('separate account credits for the same local day, including legacy and duplicate handles', () => {
+    const {handles,credits} = require('../public/instagram-accounts');
+    assert.deepEqual(handles({instagram:'@FIRST'}),['first']);
+    assert.deepEqual(handles({instagram:'@FIRST', instagram_extra:['instagram.com/first/','https://www.instagram.com/second/?ref=test']}), ['first','second']);
+    const posts = ['first','first','second','second'].map((username,index)=>({
+        id:String(index), username,textMatch:true,timestamp:index===3?'2026-11-06T19:00:00Z':'2026-11-06T12:00:00Z'
+    }));
+    const rows=classify(posts,[],[]);
+    assert.equal(credits(rows.slice(0,2)),1);
+    assert.equal(credits(rows.slice(0,3)),2);
+    assert.equal(credits(rows),3);
+});

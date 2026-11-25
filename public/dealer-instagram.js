@@ -46,6 +46,7 @@
 
         function setBusy(value) {
             busy = Boolean(value);
+            account.disabled = busy;
             syncBtn.disabled = busy || !dealerId || !currentUsername || !publicStatus.connected;
             syncBtn.innerHTML = busy
                 ? '<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Обновляем'
@@ -126,12 +127,20 @@
             });
         }
 
-        async function loadSnapshot() {
+        const account = document.getElementById('instagram-account');
+        let requestNumber = 0;
+        async function loadSnapshot(selected = '') {
+            const number = ++requestNumber;
             if (!dealerId) {
                 setStatus('Не удалось определить дилера на этой странице.', 'error');
                 return;
             }
-            const data = await api('/api/dealers/' + encodeURIComponent(dealerId) + '/instagram-monitor');
+            const data = await api('/api/dealers/' + encodeURIComponent(dealerId) + '/instagram-monitor' + (selected ? '?username=' + encodeURIComponent(selected) : ''));
+            if (number !== requestNumber) return;
+            const names = data.dealer?.usernames || [];
+            account.replaceChildren(...names.map(name => new Option('@'+name,name)));
+            account.value = data.dealer?.username || '';
+            document.getElementById('instagram-account-label').hidden = names.length < 2;
             currentUsername = String(data.dealer?.username || '');
             syncBtn.disabled = !publicStatus.connected || !currentUsername || busy;
             if (!currentUsername) {
@@ -147,6 +156,14 @@
                 renderSnapshot(data.snapshot);
             }
         }
+
+        account.addEventListener('change', () => {
+            currentUsername = '';
+            syncBtn.disabled = true;
+            renderSnapshot(null);
+            loadSnapshot(account.value).catch(error=>setStatus(error.message,'error'));
+        });
+        document.addEventListener('instagram-accounts-updated', () => loadSnapshot().catch(error=>setStatus(error.message,'error')));
 
         async function loadPublicStatus() {
             try {
@@ -213,7 +230,7 @@
             setBusy(true);
             setStatus('Запрашиваем профиль и последние публикации у Meta…', '');
             try {
-                const data = await api('/api/dealers/' + encodeURIComponent(dealerId) + '/instagram-monitor/sync', { method: 'POST', body: '{}' });
+                const data = await api('/api/dealers/' + encodeURIComponent(dealerId) + '/instagram-monitor/sync?username=' + encodeURIComponent(currentUsername), { method: 'POST', body: '{}' });
                 renderSnapshot(data.snapshot);
                 setStatus('Данные @' + (data.snapshot?.username || currentUsername) + ' обновлены.', 'ok');
             } catch (error) {

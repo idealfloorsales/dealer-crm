@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     function line(post,label) {
         const item = elem('div',null,'py-1');
-        item.append(link(post), ' · '+label);
+        item.append(link(post), post.username ? ' · @'+post.username : '', ' · '+label);
         return item;
     }
     function render() {
@@ -49,11 +49,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             const rivals=posts.filter(p=>p.brands.length);
             const earlier=row.posts.filter(p=>!p.day.startsWith(data.month));
             const oldRivals=earlier.filter(p=>p.brands.length);
-            const days=new Set(posts.filter(p=>p.ideal).map(p=>p.day));
+            const creditCount=InstagramAccounts.credits(posts);
             const focus=el('focus').value;
             const exhibited=new Set(visible.map(p=>p.sku));
             if (focus==='silent' && (!row.checked || !exhibited.size || own.some(p=>p.skus.some(s=>exhibited.has(s))))) continue;
-            if (focus==='near' && days.size!==7) continue;
+            if (focus==='near' && creditCount!==7) continue;
             if (focus==='rising' && !(earlier.length && posts.length && rivals.length/posts.length>oldRivals.length/earlier.length)) continue;
             count++;
             const box = elem('article',null,'border-bottom py-3');
@@ -61,7 +61,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             a.href='/dealer.html?id='+encodeURIComponent(row.id);
             const heading=elem('h2',null,'h5'); heading.append(a); box.append(heading);
             box.append(elem('p',[row.sector,row.city,row.manager].filter(Boolean).join(' · '),'mb-1'));
-            box.append(elem('p','Instagram: '+days.size+' из 8 дней · '+(row.checked?'проверено '+new Date(row.checked).toLocaleString('ru-RU',{timeZone:'Asia/Almaty'}):row.username?'ожидает проверки':'профиль не указан'),'small'));
+            box.append(elem('p','Instagram: '+creditCount+' из 8 зачётов · '+(row.checked?'проверено '+new Date(row.checked).toLocaleString('ru-RU',{timeZone:'Asia/Almaty'}):row.username?'ожидает проверки':'профиль не указан'),'small'));
             if (own.length) box.append(line(own[0],'Последняя найденная публикация за месяц'));
             const promoted = new Set(own.flatMap(p=>p.skus).filter(s=>skus.has(s)));
             group(box,'Выставлено: '+visible.length+' · Артикулов в публикациях: '+promoted.size,[

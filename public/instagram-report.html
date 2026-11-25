@@ -18,7 +18,7 @@
 <label>Менеджер<select class="form-select" id="manager"></select></label>
 <label>Дилер<select class="form-select" id="dealer"></select></label>
 <label>Коллекция<select class="form-select" id="collection"></select></label>
-<label>Показать<select class="form-select" id="focus"><option value="">Все результаты</option><option value="silent">Есть образцы, без постов о них</option><option value="near">До 8 дней остался один</option><option value="rising">Выросла доля постов о конкурентах</option></select></label>
+<label>Показать<select class="form-select" id="focus"><option value="">Все результаты</option><option value="silent">Есть образцы, без постов о них</option><option value="near">7 из 8 зачётов</option><option value="rising">Выросла доля постов о конкурентах</option></select></label>
 </section>
 <section class="content-card p-3"><p id="status" role="status"></p><div id="results"></div></section>
 <details id="import-box" class="content-card p-3 mt-3" hidden><summary>Импорт продаж по артикулам</summary>
@@ -28,5 +28,6 @@
 <input type="file" id="file" accept=".csv"><button class="btn btn-outline-secondary" id="import">Загрузить</button>
 <span role="status" id="import-status"></span></details>
 </main><script defer src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script defer src="permissions.js?v={{VER}}"></script><script defer src="instagram-report.js?v={{VER}}"></script>
+<script defer src="permissions.js?v={{VER}}"></script><script src="instagram-accounts.js?v={{VER}}"></script>
+    <script defer src="instagram-report.js?v={{VER}}"></script>
 </body></html>

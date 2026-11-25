@@ -449,7 +449,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             renderDealerAddresses(dealer.additional_addresses || []); 
             renderDealerPos(dealer.pos_materials || []); 
-            renderDealerLinks(dealer.website, dealer.instagram); 
+            renderDealerLinks(dealer.website, InstagramAccounts.handles(dealer));
             renderDealerVisits(dealer.visits || []);
             renderDealerContacts(dealer.contacts || []);
             renderDealerCompetitors(dealer.competitors || []);
@@ -616,11 +616,11 @@ document.addEventListener('DOMContentLoaded', () => {
         c.innerHTML = html;
     }
 
-    function renderDealerLinks(website, instagram) { 
+    function renderDealerLinks(website, handles) {
         if (!linksContainer) return; 
-        let html = ''; const safeWebsite = formatUrl(website); const safeInstagram = formatUrl(instagram); 
+        let html = ''; const safeWebsite = formatUrl(website);
         if (safeWebsite) html += `<a href="${safeWebsite}" target="_blank" class="btn btn-sm btn-white border text-primary"><i class="bi bi-globe me-1"></i>Сайт</a>`; 
-        if (safeInstagram) html += `<a href="${safeInstagram}" target="_blank" class="btn btn-sm btn-white border text-danger"><i class="bi bi-instagram me-1"></i>Instagram</a>`; 
+        for (const handle of handles) html += `<a href="https://www.instagram.com/${handle}/" rel="noopener" target="_blank" class="btn btn-sm btn-white border text-danger"><i class="bi bi-instagram me-1"></i>@${handle}</a>`;
         linksContainer.innerHTML = html; 
     }
 
@@ -1338,13 +1338,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 'profile-edit-city': currentDealer.city,
                 'profile-edit-address': currentDealer.address,
                 'profile-edit-website': currentDealer.website,
-                'profile-edit-instagram': currentDealer.instagram,
+
                 'profile-edit-contract-date': currentDealer.contract?.date
             };
             Object.entries(values).forEach(([id, value]) => {
                 const input = document.getElementById(id);
                 if (input) input.value = value || '';
             });
+            InstagramAccounts.fill('profile-edit-instagram',currentDealer);
             await loadProfilePriceLists(currentDealer.price_list?.id || currentDealer.price_list || '');
             const profileMotivation = document.getElementById('profile-edit-motivation-scheme');
             if (profileMotivation) {
@@ -1453,7 +1454,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     responsible: editValue('profile-edit-responsible'),
                     region_sector: editValue('profile-edit-sector'),
                     website: editValue('profile-edit-website'),
-                    instagram: editValue('profile-edit-instagram'),
+                    ...InstagramAccounts.values('profile-edit-instagram'),
                     contract: {
                         isSigned: Boolean(document.getElementById('profile-edit-contract-signed')?.checked),
                         date: editValue('profile-edit-contract-date')
@@ -1500,6 +1501,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             currentDealer = {...currentDealer, ...payload};
+            if ('instagram_extra' in payload) document.dispatchEvent(new Event('instagram-accounts-updated'));
             cacheDealerProfile(currentDealer);
             bootstrap.Modal.getOrCreateInstance(modalEl).hide();
             window.showToast?.('Блок обновлён', 'success');

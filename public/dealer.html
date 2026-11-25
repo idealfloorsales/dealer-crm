@@ -275,11 +275,12 @@
                     <div class="dealer-instagram-head">
                         <div>
                             <h5 class="card-heading mb-1"><i class="bi bi-instagram me-2"></i>Активность дилера в Instagram</h5>
-                            <p>Подписчики, количество публикаций и последние открытые публикации. CRM обновляет данные только по запросу менеджера.</p>
+                            <p>Подписчики, количество публикаций и последние открытые публикации.</p>
                         </div>
                         <button type="button" class="btn btn-sm btn-outline-danger" id="instagram-sync" disabled><i class="bi bi-arrow-repeat me-1"></i>Обновить</button>
                     </div>
                     <a id="instagram-report-link" class="btn btn-outline-secondary btn-sm mb-2" href="/instagram-report.html">Аналитика Instagram дилера</a>
+                    <label id="instagram-account-label" class="mb-2" hidden>Страница дилера<select id="instagram-account" class="form-select form-select-sm"></select></label>
                     <div id="instagram-monitor-status" class="dealer-instagram-status">Загружаем данные Instagram…</div>
                     <div id="instagram-admin-setup" class="dealer-instagram-setup" hidden>
                         <strong><i class="bi bi-shield-lock me-1"></i>Официальное подключение Meta</strong>
@@ -511,6 +512,7 @@
     <script src="motivation-overview.js?v={{VER}}"></script>
     <script src="dealer-score.js?v={{VER}}"></script>
     <script src="dealer-documents.js?v={{VER}}"></script>
+    <script src="instagram-accounts.js?v={{VER}}"></script>
     <script src="dealer.js?v={{VER}}&amp;profile-save=20261124-2"></script>
     <script src="dealer-instagram.js?v={{VER}}"></script>
     <script src="price-control.js?v={{VER}}"></script>

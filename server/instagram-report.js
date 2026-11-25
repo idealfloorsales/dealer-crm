@@ -1,4 +1,5 @@
 'use strict';
+const {handles: dealerHandles} = require('../public/instagram-accounts');
 
 const localDate = new Intl.DateTimeFormat('sv-SE', {
     timeZone: 'Asia/Almaty', year: 'numeric', month: '2-digit', day: '2-digit'
@@ -22,12 +23,12 @@ function classify(posts, products, competitors) {
         const brands = competitors.filter(c => c.pattern?.test(caption)).map(c => c.name);
         const interactions = [post.likeCount, post.commentsCount].every(Number.isFinite)
             ? post.likeCount + post.commentsCount : null;
-        return { id: post.id, day: dayOf(post.timestamp), skus, brands, ideal: Boolean(post.textMatch || skus.length),
+        return { id: post.id, username: post.username, day: dayOf(post.timestamp), skus, brands, ideal: Boolean(post.textMatch || skus.length),
             interactions, url: /^https:\/\/(?:www\.)?instagram\.com\//i.test(post.permalink) ? post.permalink : '' };
     });
 }
 function install(options) {
-    const { mongoose, app, Dealer, Product, Sales, CompRef, Snapshot, handleFromUrl,
+    const { mongoose, app, Dealer, Product, Sales, CompRef, Snapshot,
         getDealerFilter, getWorkingDealerFilter, hasPermission, requirePermission, syncDealer, getConnection } = options;
     const schema = new mongoose.Schema({ username: String, id: String, timestamp: Date, caption: String,
         permalink: String, textMatch: Boolean, likeCount: Number, commentsCount: Number });
@@ -68,16 +69,23 @@ function install(options) {
                 migrated = true;
             }
             if (!(await getConnection())?.selectedPageId) return;
-            const filter = getWorkingDealerFilter({ instagram: { $type: 'string', $ne: '' } });
+            const filter = getWorkingDealerFilter({ $or: [
+                { instagram: { $type:'string', $ne:'' } }, { 'instagram_extra.0': { $exists:true } }
+            ] });
             const cursor = (await Rotation.findById('dealers').lean())?.lastDealer;
             const query = cursor ? { $and: [filter, { _id: { $gt: cursor } }] } : filter;
-            const dealer = await Dealer.findOne(query).select('instagram').sort({ _id: 1 }).lean();
+            const dealer = await Dealer.findOne(query).select('instagram instagram_extra').sort({ _id: 1 }).lean();
             await Rotation.updateOne({ _id: 'dealers' }, { $set: { lastDealer: dealer?._id || null } }, { upsert: true });
             if (!dealer) return;
-            const username = handleFromUrl(dealer.instagram);
-            if (!username) return;
-            const fresh = await Snapshot.exists({ username: username.toLowerCase(), fetchedAt: { $gt: new Date(Date.now() - 6 * 3600000) } });
-            if (!fresh) await syncDealer(dealer, username);
+            for (const username of dealerHandles(dealer)) {
+                const fresh = await Snapshot.exists({ username, fetchedAt: { $gt: new Date(Date.now() - 6 * 3600000) } });
+                if (fresh) continue;
+                try { await syncDealer(dealer, username); }
+                catch (error) {
+                    if ([4, 17, 32, 613, 190].includes(error.metaCode) || error.status === 429) throw error;
+                    console.warn('Instagram profile update failed', error.metaCode || error.name);
+                }
+            }
         } catch (error) {
             if ([4, 17, 32, 613, 190].includes(error.metaCode) || error.status === 429) pausedUntil = Date.now() + 3600000;
             console.warn('Instagram background update failed', error.metaCode || error.name);
@@ -96,11 +104,11 @@ function install(options) {
             const next = new Date(month + '-01T12:00:00Z');
             next.setUTCMonth(next.getUTCMonth() + 1);
             const [dealers, catalog, rivals] = await Promise.all([
-                Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('dealer_id name city region_sector responsible instagram products').sort({name:1}).lean(),
+                Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('dealer_id name city region_sector responsible instagram instagram_extra products').sort({name:1}).lean(),
                 canMatrix ? Product.find({ product_type: { $ne: 'equipment' } }).select('sku name collection is_archived').lean() : [],
                 hasPermission(req,'can_view_competitors') ? CompRef.find({}).select('name').lean() : []
             ]);
-            const handles = dealers.map(d => handleFromUrl(d.instagram).toLowerCase()).filter(Boolean);
+            const handles = [...new Set(dealers.flatMap(dealerHandles))];
             const ids = dealers.map(d => String(d._id));
             const [posts, snapshots, sales, daily] = await Promise.all([
                 History.find({ username: { $in: handles }, timestamp: { $gte: new Date(before+'-01T00:00:00+05:00'), $lt: new Date(next.toISOString().slice(0,7)+'-01T00:00:00+05:00') } }).lean(),
@@ -117,12 +125,13 @@ function install(options) {
             }
             const checked = new Map(snapshots.map(s => [s.username,s.fetchedAt]));
             const rows = dealers.map(d => {
-                const username = handleFromUrl(d.instagram).toLowerCase();
+                const usernames = dealerHandles(d);
+                const dates = usernames.map(name => checked.get(name)).filter(Boolean);
                 const id = String(d._id);
                 const facts = sales.filter(s => s.dealerId === id && Number.isFinite(s.fact));
                 return { id, name:d.name, code:d.dealer_id, city:d.city, sector:d.region_sector, manager:d.responsible,
-                    username, checked:checked.get(username), displayed:canMatrix ? (d.products || []).map(String) : [],
-                    posts:classify(grouped.get(username)||[],products,brands), daily:daily.filter(s => s.dealer === id).map(s => ({day:s.day,sku:s.sku,sqm:s.sqm})),
+                    username:usernames[0], usernames, checked:dates.length === usernames.length && dates.length ? new Date(Math.min(...dates.map(Number))) : null, displayed:canMatrix ? (d.products || []).map(String) : [],
+                    posts:classify(usernames.flatMap(name=>grouped.get(name)||[]),products,brands), daily:daily.filter(s => s.dealer === id).map(s => ({day:s.day,sku:s.sku,sqm:s.sqm})),
                     sales:facts.length ? facts.reduce((a,s)=>a+s.fact,0) : null };
             });
             res.json({month, rows, canSales, canImport:canSales && hasPermission(req,'can_edit_sales_fact'),
