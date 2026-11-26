@@ -13,20 +13,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (cls) node.className = cls;
         return node;
     }
+    const postDate = new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'});
     function link(post) {
-        const a = elem(post.url ? 'a':'span',post.day);
+        const a = elem(post.url ? 'a':'span',postDate.format(new Date(post.day+'T12:00:00Z')));
         if (post.url) { a.href=post.url; a.target='_blank'; a.rel='noopener'; }
         return a;
     }
     function group(box,title,items) {
-        const details = elem('details',null,'mb-2');
+        const details = elem('details',null,'ig-section');
         details.append(elem('summary',title));
-        for (const item of items) details.append(item);
+        const content=elem('div',null,'ig-section-content');
+        content.append(...items);
+        if (!items.length) content.textContent='За выбранный период данных нет.';
+        details.append(content);
         box.append(details);
     }
     function line(post,label) {
-        const item = elem('div',null,'py-1');
-        item.append(link(post), post.username ? ' · @'+post.username : '', ' · '+label);
+        const item = elem('div',null,'ig-entry');
+        item.append(link(post),elem('span',[post.username && '@'+post.username,label].filter(Boolean).join(' · ')));
         return item;
     }
     function render() {
@@ -59,18 +63,29 @@ document.addEventListener('DOMContentLoaded', async () => {
             const box = elem('details', null, 'ig-row');
             const summary = elem('summary', null, 'ig-columns');
             const identity = elem('span', null, 'ig-identity');
-            identity.append(elem('strong', row.name),elem('small',[row.code,row.city,row.sector].filter(Boolean).join(' · ')));
+            const caption=elem('span',null,'ig-dealer-caption');
+            caption.append(elem('strong', row.name));
+            const metadata=elem('small');
+            if(row.code) metadata.append(elem('span',row.code,'ig-code'));
+            metadata.append([row.city,row.sector].filter(Boolean).join(' · '));
+            caption.append(metadata);
+            identity.append(elem('i',null,'bi bi-shop ig-shop'),caption);
             const progress = elem('span', null, 'ig-progress');
             const meter = document.createElement('progress');
             meter.max=8; meter.value=Math.min(8,creditCount); meter.setAttribute('aria-label','Зачёты из восьми');
-            progress.append(elem('strong',creditCount+' / 8'),meter);
-            const last = elem('span', own.length ? own[0].day : '—','ig-last');
+            const credit=elem('strong',String(creditCount));
+            credit.append(elem('small',' / 8'));
+            progress.append(credit,meter);
+            if(creditCount>=8) progress.classList.add('is-complete');
+            const last = elem('span', own.length ? postDate.format(new Date(own[0].day+'T12:00:00Z')) : 'Нет публикаций','ig-last');
             last.setAttribute('aria-label','Последний пост IDEAL FLOOR: '+last.textContent);
             summary.append(identity, progress, last, elem('i',null,'bi bi-chevron-down ig-chevron'));
             const body = elem('div',null,'ig-row-body');
             const a = elem('a', 'Карточка дилера');
             a.href='/dealer.html?id='+encodeURIComponent(row.id);
-            body.append(a,elem('small',[row.manager,row.checked?'Проверено '+new Date(row.checked).toLocaleString('ru-RU',{timeZone:'Asia/Almaty'}):row.username?'Ожидает проверки':'Профиль не указан'].filter(Boolean).join(' · '),'ig-checked'));
+            const head=elem('div',null,'ig-body-head');
+            head.append(a,elem('small',[row.manager,row.checked?'Проверено '+new Date(row.checked).toLocaleString('ru-RU',{timeZone:'Asia/Almaty'}):row.username?'Ожидает проверки':'Профиль не указан'].filter(Boolean).join(' · '),'ig-checked'));
+            body.append(head);
             if (own.length) body.append(line(own[0],'Последняя публикация за месяц'));
             box.append(summary,body);
             const promoted = new Set(own.flatMap(p=>p.skus).filter(s=>skus.has(s)));
