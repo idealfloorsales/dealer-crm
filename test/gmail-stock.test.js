@@ -18,7 +18,7 @@ test('nested attachment filtering and exact sender', () => {
 test('latest message chosen despite list order, checkpoint prevents repeat and secrets stay private', async () => {
  const XLSX = require('xlsx'); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Артикул','Свободный остаток'],['8EH34-711',31]]),'Остатки');
  const data=XLSX.write(wb,{type:'buffer',bookType:'xlsx'}).toString('base64url');
- const doc={}; const writes=[]; let downloads=0;
+ const stored=products.map(p=>({...p})); const doc={}; const writes=[]; let downloads=0;
  const collection={async updateOne(filter,update) {
    if(filter.owner && doc.owner!==filter.owner) return {matchedCount:0,modifiedCount:0};
    if(filter.$or && doc.leaseUntil && doc.leaseUntil>new Date()) return {matchedCount:0,modifiedCount:0};
@@ -33,7 +33,18 @@ test('latest message chosen despite list order, checkpoint prevents repeat and s
    const isNew=url.includes('/new?');return {id:isNew?'new':'old',internalDate:isNew?'2000':'1000',payload:{headers:[{name:'From',value:'idealfloor.sales@gmail.com'}],parts:[{filename:'Остатки на 10.xlsx',body:{attachmentId:'file',size:100}}]}};
  }});
  try {
- const sync=createGmailStockSync({pause:async()=>{},Product:{find:()=>({select:()=>({lean:async()=>products})}),bulkWrite:async ops=>writes.push(ops)},StockImportMeta:{findOneAndUpdate:async()=>{}},AuditLog:{create:async()=>{}},connection:{collection:()=>collection},ready:()=>true,env:{GMAIL_CLIENT_ID:'id',GMAIL_CLIENT_SECRET:'secret',GMAIL_REFRESH_TOKEN:'refresh'}});
+ const sync=createGmailStockSync({pause:async()=>{},Product:{find:()=>({select:()=>({lean:async()=>stored})}),bulkWrite:async ops=>{writes.push(ops);for(const {updateOne:o} of ops) Object.assign(stored.find(p=>p._id===o.filter._id),o.update.$set);}},StockImportMeta:{findOneAndUpdate:async()=>{}},AuditLog:{create:async()=>{}},connection:{collection:()=>collection},ready:()=>true,env:{GMAIL_CLIENT_ID:'id',GMAIL_CLIENT_SECRET:'secret',GMAIL_REFRESH_TOKEN:'refresh'}});
  await sync.run();await sync.run();assert.equal(downloads,1);assert.equal(writes.length,1);assert.equal(doc.lastMessageId,'new');assert.equal(writes[0][0].updateOne.update.$set.stock_qty,31);assert.ok(!JSON.stringify(await sync.status()).includes('PRIVATE'));
  }finally{global.fetch=original;}
+});
+
+test('spaced and overlapping 1C articles keep independent free stock in either row order', () => {
+ const catalog = ['8RPL33-2','8RPL33-20','8RPL33-1','8RPL33-10'].map(sku=>({_id:sku,sku}));
+ const data = [['Ламинат 8RPL33- 2 Дуб Сицилия',263.807],['Ламинат 8RPL33-20 Дуб Милан',11.64],['8RPL33-10 Дуб Порто',124.554]];
+ for(const order of [data,[...data].reverse()]) {
+  const plan=planStockImport([['Номенклатура','Свободный остаток'],...order],catalog);
+  assert.equal(plan.quantities.get('8RPL33-2'),263.807);
+  assert.equal(plan.quantities.get('8RPL33-20'),11.64);
+  assert.equal(plan.quantities.has('8RPL33-1'),false);
+ }
 });

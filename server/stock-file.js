@@ -1,3 +1,4 @@
+const { createStockProductMatcher } = require('../public/stock-product-match');
 // Matching and header rules mirror the existing manual stock import.
 const normalizeExcelText = value => String(value ?? '').replace(/ё/g,'е').trim().toLowerCase().replace(/\s+/g,' ');
 const normalizeExcelSku = value => String(value ?? '').trim().toLowerCase().replace(/\s+/g,'');
@@ -65,18 +66,7 @@ function planStockImport(rows, allProducts) {
 
         const hIdx = Math.max(stockHeaderRow, skuHeaderRow, nameHeaderRow);
 
-        const bySku = new Map();
-        const byAlias = new Map();
-        const byName = new Map();
-
-        allProducts.forEach(product => {
-            const sku = normalizeExcelSku(product.sku);
-            const alias = normalizeExcelText(product.excel_alias);
-            const name = normalizeExcelText(product.name);
-            if (sku && !bySku.has(sku)) bySku.set(sku, product);
-            if (alias && !byAlias.has(alias)) byAlias.set(alias, product);
-            if (name && !byName.has(name)) byName.set(name, product);
-        });
+        const matchProduct = createStockProductMatcher(allProducts);
 
         const quantities = new Map();
 
@@ -89,28 +79,17 @@ function planStockImport(rows, allProducts) {
 
             if (stock === null || (!skuRaw && !nameRaw)) continue;
 
-            const skuKey = normalizeExcelSku(skuRaw);
-            const nameKey = normalizeExcelText(nameRaw);
-            let product = skuKey ? bySku.get(skuKey) : null;
-            if (!product && nameKey) product = byAlias.get(nameKey);
-            if (!product && nameKey) product = byName.get(nameKey);
-
-            // В типовой выгрузке артикул часто находится внутри длинного наименования.
-            if (!product) {
-                const sourceText = [skuRaw,nameRaw].filter(Boolean).join(' ').toLowerCase();
-                product = allProducts.find(item => {
-                    const sku = String(item.sku || '').trim().toLowerCase();
-                    return sku.length > 3 && sourceText.includes(sku);
-                }) || null;
-            }
+            const product = matchProduct(skuRaw,nameRaw);
 
             if (!product) continue;
-            quantities.set(String(product._id), stock);
+            const id = String(product._id);
+            if (quantities.has(id)) throw new Error('Повторная строка товара '+product.sku+' в файле остатков');
+            quantities.set(id, stock);
         }
         if (!quantities.size) throw new Error('В файле не найдено ни одной позиции матрицы; остатки не изменены');
         const operations = allProducts.filter(p => Number(p.stock_qty) !== (quantities.get(String(p._id)) ?? 0)).map(p => ({
             updateOne: { filter:{_id:p._id}, update:{$set:{stock_qty:quantities.get(String(p._id)) ?? 0}} }
         }));
-        return { operations, matched:quantities.size, source:freeStockHeaderLabel };
+        return { quantities, operations, matched:quantities.size, source:freeStockHeaderLabel };
 }
 module.exports = { planStockImport };

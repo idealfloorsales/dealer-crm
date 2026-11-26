@@ -2,6 +2,7 @@ const XLSX = require('xlsx');
 const crypto = require('crypto');
 const { planStockImport } = require('./stock-file');
 const SENDERS = new Set(['idealfloor.sales@gmail.com', 'idealfloor.sale@mail.ru']);
+const MATCH_VERSION = 2;
 const INTERVAL = 5 * 60 * 1000;
 const MAX_BYTES = 20 * 1024 * 1024;
 function stockAttachments(payload) {
@@ -65,7 +66,8 @@ function createGmailStockSync({ Product, StockImportMeta, AuditLog, connection, 
                     await pause(800);
                     const message = await get(`messages/${encodeURIComponent(item.id)}?format=full`);
                     const timestamp = Number(message.internalDate);
-                    if (!SENDERS.has(senderOf(message)) || !Number.isFinite(timestamp) || timestamp <= (previous.lastMessageAt || 0)) continue;
+                    if (!SENDERS.has(senderOf(message)) || !Number.isFinite(timestamp) || (timestamp <= (previous.lastMessageAt || 0) &&
+                        !(previous.matchVersion !== MATCH_VERSION && item.id === previous.lastMessageId && timestamp === previous.lastMessageAt))) continue;
                     const attachments = stockAttachments(message.payload);
                     if (!attachments.length) continue;
                     if (!latest || timestamp > latest.timestamp) latest = {message,timestamp,attachments};
@@ -89,11 +91,18 @@ function createGmailStockSync({ Product, StockImportMeta, AuditLog, connection, 
                 const lease = await state().findOne({_id:'free_stock',owner,leaseUntil:{$gt:new Date()}});
                 if (!lease || !ready()) throw new Error('Импорт прерван до записи остатков');
                 if (plan.operations.length) await Product.bulkWrite(plan.operations, {ordered:true});
+                const persisted = await Product.find({_id:{$in:products.map(p=>p._id)}}).select('_id sku stock_qty').lean();
+                const mismatched = persisted.find(p => Number(p.stock_qty) !== (plan.quantities.get(String(p._id)) ?? 0));
+                if (mismatched || persisted.length !== products.length) throw new Error('Остатки после записи расходятся с файлом: '+(mismatched?.sku || 'состав матрицы'));
                 const importedAt = new Date();
                 await StockImportMeta.findOneAndUpdate({key:'free_stock'}, {$set:{importedAt,importedBy:{id:'gmail-stock',name:'Автоматически из Gmail'},source:plan.source,fileName:part.filename,matched:plan.matched,updated:plan.operations.length}}, {upsert:true});
                 await AuditLog.create({actor:{id:'gmail-stock',name:'Автоимпорт Gmail',role:'system'},module:'products',action:'stock_import',entityType:'products',summary:`Импорт остатков из Gmail: ${part.filename}`,success:true,meta:{matched:plan.matched,updated:plan.operations.length,messageAt:new Date(latest.timestamp)}});
-                await state().updateOne({_id:'free_stock',owner}, {$set:{lastMessageAt:latest.timestamp,lastMessageId:latest.message.id,lastImportedAt:importedAt,fileName:part.filename,matched:plan.matched,updated:plan.operations.length}});
-                console.log('Gmail stock import complete:', plan.matched, 'matched,', plan.operations.length, 'updated');
+                await state().updateOne({_id:'free_stock',owner}, {$set:{matchVersion:MATCH_VERSION,lastMessageAt:latest.timestamp,lastMessageId:latest.message.id,lastImportedAt:importedAt,fileName:part.filename,matched:plan.matched,updated:plan.operations.length}});
+                if (previous.matchVersion !== MATCH_VERSION) {
+                    const controls = persisted.filter(p => ['8RPL33-2','8RPL33-20'].includes(p.sku));
+                    console.log('Stock matching migration checked:', controls.map(p => p.sku+'='+p.stock_qty).join(', '));
+                }
+                console.log('Gmail stock import verified:', part.filename, plan.matched, 'matched,', plan.operations.length, 'updated');
             }
             await state().updateOne({_id:'free_stock',owner}, {$set:{lastCheckedAt:new Date(),lastError:null}});
         } catch (error) {

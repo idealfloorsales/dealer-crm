@@ -497,16 +497,23 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    async function loadProducts() {
+    let displayedImport;
+    let loadingSequence = 0;
+    let checkingStock = false;
+    async function loadProducts(background = false) {
+        const sequence = ++loadingSequence;
         try {
-            listContainer.innerHTML = '<div class="text-center text-muted py-5">Загрузка...</div>';
+            if (!background) listContainer.innerHTML = '<div class="text-center text-muted py-5">Загрузка...</div>';
+            const meta = await loadStockImportMeta();
             const [res,archiveResponse] = await Promise.all([
                 fetch(API_URL,{cache:'no-store'}),
-                fetch(API_URL+'/archive',{cache:'no-store'}),
-                loadStockImportMeta()
+                fetch(API_URL+'/archive',{cache:'no-store'})
             ]);
             if (!res.ok || !archiveResponse.ok) throw new Error('Ошибка загрузки матрицы');
-            [allProducts,archivedProducts] = await Promise.all([res.json(),archiveResponse.json()]);
+            const lists = await Promise.all([res.json(),archiveResponse.json()]);
+            if (sequence !== loadingSequence) return;
+            [allProducts,archivedProducts] = lists;
+            displayedImport = meta?.importedAt || '';
             updateArchiveTabs();
             populateDynamicFilters();
             applyLogic();
@@ -643,7 +650,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const stock = stockValue(product);
             const stockClass = stock === null ? 'is-unknown' : stock <= 0 ? 'is-zero' : stock <= 20 ? 'is-low' : 'is-good';
             const unit = isEquipment ? 'шт' : 'м²';
-            const stockText = stock === null ? 'Не загружен' : `${stock.toLocaleString('ru-RU',{minimumFractionDigits:0,maximumFractionDigits:2})} ${unit}`;
+            const stockText = stock === null ? 'Не загружен' : `${stock.toLocaleString('ru-RU',{minimumFractionDigits:0,maximumFractionDigits:3})} ${unit}`;
             const stockFoot = stock === null ? 'нет данных' : stock <= 0 ? 'нет на складе' : stock <= 20 ? 'низкий остаток' : 'в наличии';
 
             const chars = isEquipment ? [
@@ -1071,18 +1078,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const hIdx = Math.max(stockHeaderRow, skuHeaderRow, nameHeaderRow);
 
-        const bySku = new Map();
-        const byAlias = new Map();
-        const byName = new Map();
-
-        allProducts.forEach(product => {
-            const sku = normalizeExcelSku(product.sku);
-            const alias = normalizeExcelText(product.excel_alias);
-            const name = normalizeExcelText(product.name);
-            if (sku && !bySku.has(sku)) bySku.set(sku, product);
-            if (alias && !byAlias.has(alias)) byAlias.set(alias, product);
-            if (name && !byName.has(name)) byName.set(name, product);
-        });
+        const matchProduct = createStockProductMatcher(allProducts);
 
         unmappedItems = [];
         const matchedProductIds = new Set();
@@ -1099,20 +1095,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (stock === null || (!skuRaw && !nameRaw)) continue;
 
-            const skuKey = normalizeExcelSku(skuRaw);
-            const nameKey = normalizeExcelText(nameRaw);
-            let product = skuKey ? bySku.get(skuKey) : null;
-            if (!product && nameKey) product = byAlias.get(nameKey);
-            if (!product && nameKey) product = byName.get(nameKey);
-
-            // В типовой выгрузке артикул часто находится внутри длинного наименования.
-            if (!product) {
-                const sourceText = [skuRaw,nameRaw].filter(Boolean).join(' ').toLowerCase();
-                product = allProducts.find(item => {
-                    const sku = String(item.sku || '').trim().toLowerCase();
-                    return sku.length > 3 && sourceText.includes(sku);
-                }) || null;
-            }
+            const product = matchProduct(skuRaw,nameRaw);
 
             // Строки организации / склада / итогов / названия коллекций не считаем ошибкой сопоставления.
             if (!product) {
@@ -1139,6 +1122,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     headers:{'Content-Type':'application/json'},
                     body:JSON.stringify({ stock_qty:stock })
                 });
+                if (!response.ok) throw new Error('Не удалось записать остаток '+product.sku);
                 if (response.ok) {
                     product.stock_qty = stock;
                     updated++;
@@ -1160,6 +1144,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     headers:{'Content-Type':'application/json'},
                     body:JSON.stringify({ stock_qty:0 })
                 });
+                if (!response.ok) throw new Error('Не удалось записать остаток '+product.sku);
                 if (response.ok) {
                     product.stock_qty = 0;
                     updated++;
@@ -1319,6 +1304,22 @@ document.addEventListener('DOMContentLoaded', () => {
         syncMatrixTypeFilters();
         syncProductTypeFields();
         await loadProducts();
+        async function checkStock() {
+            if (document.hidden || checkingStock) return;
+            checkingStock = true;
+            try {
+                const response = await fetch(API_URL + '/stock-import-meta',{cache:'no-store',crmTrackLoading:false});
+                if (!response.ok) throw new Error();
+                const meta = await response.json();
+                if ((meta.importedAt || '') !== displayedImport) await loadProducts(true);
+            } catch {
+                if (stockLastUpdated) stockLastUpdated.textContent='Не удалось проверить свежесть остатков';
+                displayedImport = undefined;
+            } finally { checkingStock = false; }
+        }
+        setInterval(checkStock,60000);
+        document.addEventListener('visibilitychange',checkStock);
+        window.addEventListener('focus',checkStock);
     }
 
     if (addBtn) addBtn.onclick = () => {
