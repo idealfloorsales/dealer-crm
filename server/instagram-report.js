@@ -1,16 +1,69 @@
 'use strict';
-const {handles: dealerHandles} = require('../public/instagram-accounts');
+const {handle, handles: dealerHandles} = require('../public/instagram-accounts');
 
 const localDate = new Intl.DateTimeFormat('sv-SE', {
     timeZone: 'Asia/Almaty', year: 'numeric', month: '2-digit', day: '2-digit'
 });
 const dayOf = value => localDate.format(new Date(value));
 const normalize = value => String(value || '').normalize('NFKC').toLowerCase()
-    .replace(/[‐‑–—]/g, '-').replace(/ё/g, 'е');
+    .replace(/[‐‑‒–—−]/g, '-').replace(/ё/g, 'е');
+const escapePattern = value => value.replace(/[.*+?^{}$()|[\]\\]/g, '\\$&');
 function matcher(value) {
-    const escaped = normalize(value).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return escaped ? new RegExp('(?:^|[^\\p{L}\\p{N}])' + escaped + '(?![\\p{L}\\p{N}])', 'u') : null;
+    const escaped = escapePattern(normalize(value).trim());
+    return escaped ? new RegExp('(?:^|[^\\p{L}\\p{N}])' + escaped + '(?![\\p{L}\\p{N}])','u') : null;
 }
+
+function competitorDirectory(records) {
+    const byName = new Map();
+    for (const record of records) {
+        const name = String(record.name || '').trim().replace(/\s+/g,' ');
+        if (!name) continue;
+        const key = normalize(name);
+        if (!byName.has(key)) byName.set(key,{name,pattern:matcher(name),accounts:new Set()});
+        const accounts = byName.get(key).accounts;
+        if (handle(name) === key) accounts.add(key);
+        const account = handle(record.instagram);
+        if (account) accounts.add(account);
+    }
+    return [...byName.values()];
+}
+
+function skuPattern(sku) {
+    const parts = normalize(sku).trim().split(/\s*-\s*/u);
+    const pattern = parts.map(escapePattern).join('\\s*-\\s*');
+    return new RegExp('(?:^|[^\\p{L}\\p{N}_-])' + pattern + '(?![\\p{L}\\p{N}_]|-[\\p{L}\\p{N}])','u');
+}
+
+// A name without a SKU identifies a decor only when unique in the catalogue
+// and explicitly paired with IDEAL FLOOR in the caption.
+function productDirectory(catalog) {
+    const key = p => normalize(p.name).trim().replace(/\s+/g,' ');
+    const codesByName = new Map();
+    const suffixes = new Set();
+    for (const p of catalog) {
+        const name = key(p);
+        if (!codesByName.has(name)) codesByName.set(name,new Set());
+        codesByName.get(name).add(p.sku);
+        const parts = name.split(' ');
+        for (let i=1; i<parts.length; i++) suffixes.add(parts.slice(i).join(' '));
+    }
+    const brand = '(?:ideal[ ._-]?floor(?:\\.kz)?|ideafloor\\.kz|идеал[ -]?флор)';
+    const join = '[ \\t«»"“”„:,-]+';
+    const start = '(?:^|[^\\p{L}\\p{N}._@])';
+    return catalog.filter(p=>String(p.sku || '').trim()).map(p=>{
+        const name = key(p);
+        let namePattern = null;
+        if (name.length >= 5 && /\p{L}/u.test(name) && codesByName.get(name).size === 1) {
+            const words = name.split(' ').map(escapePattern).join('[ \\t]+');
+            const brandFirst = '@?' + brand + join + words + '(?=[ \\t]*(?:$|[»"”.,;!?#()\\n]))';
+            const nameFirst = words + join + '(?:от[ \\t]+)?@?' + brand + '(?![\\p{L}\\p{N}_]|\\.[\\p{L}\\p{N}_])';
+            const nameStart = suffixes.has(name) ? '(?:^|[\\n:;,.!?«(])[ \\t"«]*' : start;
+            namePattern = new RegExp(start + brandFirst + '|' + nameStart + nameFirst,'u');
+        }
+        return {sku:p.sku,pattern:skuPattern(p.sku),namePattern};
+    });
+}
+
 function previous(month) {
     const date = new Date(month + '-01T12:00:00Z');
     date.setUTCMonth(date.getUTCMonth() - 1);
@@ -19,11 +72,22 @@ function previous(month) {
 function classify(posts, products, competitors) {
     return posts.filter(p => p.timestamp && Number.isFinite(+new Date(p.timestamp))).map(post => {
         const caption = normalize(post.caption);
-        const skus = products.filter(p => p.pattern?.test(caption)).map(p => p.sku);
-        const brands = competitors.filter(c => c.pattern?.test(caption)).map(c => c.name);
+        const accounts = [];
+        const prose = caption.replace(/(^|[^\p{L}\p{N}._])@([a-z0-9._]+)/gu, (_,prefix,account) => {
+            accounts.push(account.replace(/\.+$/,''));
+            return prefix + ' ';
+        });
+        const codes = new Set(), names = new Set();
+        for (const p of products) {
+            if (p.pattern?.test(prose)) codes.add(p.sku);
+            else if (post.textMatch && p.namePattern?.test(caption)) names.add(p.sku);
+        }
+        const namedSkus = [...names].filter(sku=>!codes.has(sku));
+        const skus = [...codes,...namedSkus];
+        const brands = competitors.filter(c=>c.pattern?.test(prose) || accounts.some(a=>c.accounts?.has(a))).map(c=>c.name);
         const interactions = [post.likeCount, post.commentsCount].every(Number.isFinite)
             ? post.likeCount + post.commentsCount : null;
-        return { id: post.id, username: post.username, day: dayOf(post.timestamp), skus, brands, ideal: Boolean(post.textMatch || skus.length),
+        return { id: post.id, username: post.username, day: dayOf(post.timestamp), skus, namedSkus, brands, ideal: Boolean(post.textMatch || skus.length),
             interactions, url: /^https:\/\/(?:www\.)?instagram\.com\//i.test(post.permalink) ? post.permalink : '' };
     });
 }
@@ -99,6 +163,7 @@ function install(options) {
         try {
             const canSales = hasPermission(req, 'can_view_sales');
             const canMatrix = ['can_view_products','can_view_report'].some(p => hasPermission(req,p));
+            const canCompetitors = hasPermission(req,'can_view_competitors');
             const before = previous(month);
             // Use a UTC midday anchor so month transitions cannot roll back a month.
             const next = new Date(month + '-01T12:00:00Z');
@@ -106,7 +171,7 @@ function install(options) {
             const [dealers, catalog, rivals] = await Promise.all([
                 Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('dealer_id name city region_sector responsible instagram instagram_extra products').sort({name:1}).lean(),
                 canMatrix ? Product.find({ product_type: { $ne: 'equipment' } }).select('sku name collection is_archived').lean() : [],
-                hasPermission(req,'can_view_competitors') ? CompRef.find({}).select('name').lean() : []
+                canCompetitors ? CompRef.find({}).select('name instagram').lean() : []
             ]);
             const handles = [...new Set(dealers.flatMap(dealerHandles))];
             const ids = dealers.map(d => String(d._id));
@@ -116,8 +181,8 @@ function install(options) {
                 canSales ? Sales.find({ dealerId:{$in:ids}, month, isCustom:{$ne:true} }).select('dealerId fact').lean() : [],
                 canSales ? Daily.find({ dealer:{$in:ids},day:{$gte:month+'-01',$lte:month+'-31'} }).lean() : []
             ]);
-            const products = catalog.map(p => ({...p, pattern:matcher(p.sku)}));
-            const brands = rivals.map(c => ({...c,pattern:matcher(c.name)}));
+            const products = productDirectory(catalog);
+            const brands = competitorDirectory(rivals);
             const grouped = new Map();
             for (const post of posts) {
                 if (!grouped.has(post.username)) grouped.set(post.username, []);
@@ -130,11 +195,13 @@ function install(options) {
                 const id = String(d._id);
                 const facts = sales.filter(s => s.dealerId === id && Number.isFinite(s.fact));
                 return { id, name:d.name, code:d.dealer_id, city:d.city, sector:d.region_sector, manager:d.responsible,
-                    username:usernames[0], usernames, checked:dates.length === usernames.length && dates.length ? new Date(Math.min(...dates.map(Number))) : null, displayed:canMatrix ? (d.products || []).map(String) : [],
+                    username:usernames[0], usernames, checkedProfiles:dates.length, hasMonthCheck:dates.some(date=>dayOf(date).startsWith(month)),
+                    checked:dates.length === usernames.length && dates.length ? new Date(Math.min(...dates.map(Number))) : null, displayed:canMatrix ? (d.products || []).map(String) : [],
                     posts:classify(usernames.flatMap(name=>grouped.get(name)||[]),products,brands), daily:daily.filter(s => s.dealer === id).map(s => ({day:s.day,sku:s.sku,sqm:s.sqm})),
                     sales:facts.length ? facts.reduce((a,s)=>a+s.fact,0) : null };
             });
-            res.json({month, rows, canSales, canImport:canSales && hasPermission(req,'can_edit_sales_fact'),
+            res.json({month, rows, canSales, canMatrix, canCompetitors, hasCompetitorBrands:brands.length > 0,
+                canImport:canSales && hasPermission(req,'can_edit_sales_fact'),
                 catalog:catalog.map(p => ({id:String(p._id),sku:p.sku,name:p.name,collection:p.collection,archived:p.is_archived}))});
         } catch (err) { res.status(500).json({error:'Не удалось загрузить отчёт Instagram'}); }
     });
@@ -170,4 +237,4 @@ function install(options) {
     });
     return { archive };
 }
-module.exports = { install, classify, matcher, previous };
+module.exports = { install, classify, matcher, previous, competitorDirectory, productDirectory };

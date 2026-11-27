@@ -31,3 +31,29 @@ test('separate account credits for the same local day, including legacy and dupl
     assert.equal(credits(rows.slice(0,3)),2);
     assert.equal(credits(rows),3);
 });
+
+test('different names and exact accounts identify distinct competitors once per post', () => {
+    const {competitorDirectory} = require('../server/instagram-report');
+    const brands = competitorDirectory([
+        {name:'RIMI',instagram:'instagram.com/floors.kz/'}, {name:' rimi ',instagram:'@rimi_official'},
+        {name:'EBM'}, {name:''}
+    ]);
+    const captions = ['Rimi, RIMI, @floors.kz, #EBM.', '@floors.kz_shop @ebm_extra', '@rimi_official.', '@ebm'];
+    const posts = captions.map(caption=>({caption,timestamp:'2026-11-06T12:00:00Z'}));
+    assert.deepEqual(classify(posts,[],brands).map(p=>p.brands),[['RIMI','EBM'],[],['RIMI'],['EBM']]);
+});
+
+test('matches product codes and unambiguous named decors next to the brand', () => {
+    const {productDirectory} = require('../server/instagram-report');
+    const products = productDirectory([
+        {name:'Дуб Медовый',sku:'OPT-2'}, {name:'Дуб Лайт',sku:'OPT-20'},
+        {name:'Дуб Лайт',sku:'MAP-8'}, {name:'Дуб Миндаль',sku:'EH-711'},
+        {name:'Миндаль',sku:'OTHER-3'}, {name:'Без артикула',sku:'  '}
+    ]);
+    const captions = ['#OPT‑ 20 и OPT-20. OPT-200', 'IDEAL FLOOR — «Дуб Медовый».',
+        'Дуб Миндаль от @idealfloor.kz', 'IDEAL FLOOR — Дуб Лайт.', 'Дуб Медовый, RIMI. IDEAL FLOOR тоже есть.',
+        'IDEAL FLOOR — Дуб Медовый светлый.', 'IDEAL FLOOR: Дуб Медовый, OPT-2', '@test_opt-2 OPT-2-A'];
+    const rows = classify(captions.map(caption=>({caption,textMatch:true,timestamp:'2026-11-12T10:00:00Z'})),products,[]);
+    assert.deepEqual(rows.map(p=>p.skus),[['OPT-20'],['OPT-2'],['EH-711'],[],[],[],['OPT-2'],[]]);
+    assert.deepEqual(rows.map(p=>p.namedSkus),[[],['OPT-2'],['EH-711'],[],[],[],[],[]]);
+});

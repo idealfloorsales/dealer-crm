@@ -1,149 +1,354 @@
 'use strict';
-document.addEventListener('DOMContentLoaded', async () => {
-    if (!document.getElementById('home-instagram')) return;
-    const el = id => document.getElementById('ig-'+id);
+document.addEventListener('DOMContentLoaded', () => {
+    const panel = document.getElementById('home-instagram');
+    if (!panel) return;
+    const el = key => document.getElementById('ig-' + key);
     const requested = new URLSearchParams(location.search).get('dealer');
-    const filters = ['sector','city','manager','dealer','collection'];
+    const dealerFields = ['sector','city','manager'];
+    const filters = [...dealerFields,'dealer','collection','decor','competitor'];
+    const managerNames = new Map([['regional_astana','Астана'],['regional_regions','Регионы'],['office','Офис']]);
+    const order = new Intl.Collator('ru',{numeric:true});
+    const plurals = new Intl.PluralRules('ru');
+    const words = {
+        posts:{one:'пост',few:'поста',many:'постов'},
+        brands:{one:'бренд',few:'бренда',many:'брендов'}
+    };
+    const count = (n,unit) => n + ' ' + words[unit][plurals.select(n)];
     const fmt = n => Number(n).toLocaleString('ru-RU',{maximumFractionDigits:3});
-    el('month').value = new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Almaty',year:'numeric',month:'2-digit'}).format(new Date());
+    const shortDate = new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'short',timeZone:'UTC'});
+    const checkedDate = new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Almaty'});
+    const monthFormat = new Intl.DateTimeFormat('sv-SE',{year:'numeric',month:'2-digit',timeZone:'Asia/Almaty'});
+    const date = iso => shortDate.format(new Date(iso+'T12:00:00Z'));
+    const newest = (a,b) => b.day.localeCompare(a.day);
+    el('month').value = monthFormat.format(new Date());
     let data, version = 0;
+
     function elem(tag,text,cls) {
         const node = document.createElement(tag);
         if (text != null) node.textContent = text;
         if (cls) node.className = cls;
         return node;
     }
-    const postDate = new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'});
-    function link(post) {
-        const a = elem(post.url ? 'a':'span',postDate.format(new Date(post.day+'T12:00:00Z')));
-        if (post.url) { a.href=post.url; a.target='_blank'; a.rel='noopener'; }
-        return a;
+    function icon(name) {
+        const node = elem('i',null,'bi bi-'+name);
+        node.setAttribute('aria-hidden','true');
+        return node;
     }
-    function group(box,title,items) {
-        const details = elem('details',null,'ig-section');
-        details.append(elem('summary',title));
-        const content=elem('div',null,'ig-section-content');
-        content.append(...items);
-        if (!items.length) content.textContent='За выбранный период данных нет.';
-        details.append(content);
-        box.append(details);
+    function addFilter(key,title) {
+        const label = elem('label',title);
+        const select = elem('select',null,'form-select');
+        select.id = 'ig-'+key;
+        label.append(select);
+        panel.querySelector('.ig-filter-grid').append(label);
     }
-    function line(post,label) {
-        const item = elem('div',null,'ig-entry');
-        item.append(link(post),elem('span',[post.username && '@'+post.username,label].filter(Boolean).join(' · ')));
-        return item;
-    }
-    function render() {
-        const target = el('results');
-        target.replaceChildren();
-        const collection = el('collection').value;
-        const catalog = data.catalog.filter(p => !collection || p.collection === collection);
-        const skus = new Set(catalog.map(p=>p.sku));
-        const labels = new Map(catalog.map(p=>[p.sku,[p.sku,p.name].filter(Boolean).join(' · ')]));
-        const matches = p => !collection || p.skus.some(s=>skus.has(s));
-        let count = 0;
-        for (const row of data.rows) {
-            if (['sector','city','manager'].some(f => el(f).value && el(f).value !== row[f]) ||
-                (el('dealer').value && el('dealer').value !== row.id)) continue;
-            const visible = catalog.filter(p=>!p.archived && row.displayed.includes(p.id));
-            const posts = row.posts.filter(p=>p.day.startsWith(data.month)).sort((a,b)=>b.day.localeCompare(a.day));
-            const own = posts.filter(p=>p.ideal && matches(p));
-            const daily = row.daily.filter(s=>!collection || skus.has(s.sku));
-            if (collection && !visible.length && !own.length && !daily.length) continue;
-            const rivals=posts.filter(p=>p.brands.length);
-            const earlier=row.posts.filter(p=>!p.day.startsWith(data.month));
-            const oldRivals=earlier.filter(p=>p.brands.length);
-            const creditCount=InstagramAccounts.credits(posts);
-            const focus=el('focus').value;
-            const exhibited=new Set(visible.map(p=>p.sku));
-            if (focus==='silent' && (!row.checked || !exhibited.size || own.some(p=>p.skus.some(s=>exhibited.has(s))))) continue;
-            if (focus==='near' && creditCount!==7) continue;
-            if (focus==='rising' && !(earlier.length && posts.length && rivals.length/posts.length>oldRivals.length/earlier.length)) continue;
-            count++;
-            const box = elem('details', null, 'ig-row');
-            const summary = elem('summary', null, 'ig-columns');
-            const identity = elem('span', null, 'ig-identity');
-            const caption=elem('span',null,'ig-dealer-caption');
-            caption.append(elem('strong', row.name));
-            const metadata=elem('small');
-            if(row.code) metadata.append(elem('span',row.code,'ig-code'));
-            metadata.append([row.city,row.sector].filter(Boolean).join(' · '));
-            caption.append(metadata);
-            identity.append(elem('i',null,'bi bi-shop ig-shop'),caption);
-            const progress = elem('span', null, 'ig-progress');
-            const meter = document.createElement('progress');
-            meter.max=8; meter.value=Math.min(8,creditCount); meter.setAttribute('aria-label','Зачёты из восьми');
-            const credit=elem('strong',String(creditCount));
-            credit.append(elem('small',' / 8'));
-            progress.append(credit,meter);
-            if(creditCount>=8) progress.classList.add('is-complete');
-            const last = elem('span', own.length ? postDate.format(new Date(own[0].day+'T12:00:00Z')) : 'Нет публикаций','ig-last');
-            last.setAttribute('aria-label','Последний пост IDEAL FLOOR: '+last.textContent);
-            summary.append(identity, progress, last, elem('i',null,'bi bi-chevron-down ig-chevron'));
-            const body = elem('div',null,'ig-row-body');
-            const a = elem('a', 'Карточка дилера');
-            a.href='/dealer.html?id='+encodeURIComponent(row.id);
-            const head=elem('div',null,'ig-body-head');
-            head.append(a,elem('small',[row.manager,row.checked?'Проверено '+new Date(row.checked).toLocaleString('ru-RU',{timeZone:'Asia/Almaty'}):row.username?'Ожидает проверки':'Профиль не указан'].filter(Boolean).join(' · '),'ig-checked'));
-            body.append(head);
-            if (own.length) body.append(line(own[0],'Последняя публикация за месяц'));
-            box.append(summary,body);
-            const promoted = new Set(own.flatMap(p=>p.skus).filter(s=>skus.has(s)));
-            group(body,'Выставлено: '+visible.length+' · Артикулов в публикациях: '+promoted.size,[
-                elem('p','На витрине: '+(visible.map(p=>labels.get(p.sku)).join(', ')||'—')),
-                elem('p','В публикациях: '+([...promoted].map(s=>labels.get(s)).join(', ')||'—'))
-            ]);
-            if (rivals.length || oldRivals.length) group(body,'Конкуренты у дилера · '+rivals.length+' из '+posts.length+' постов (прошлый месяц: '+oldRivals.length+' из '+earlier.length+')',
-                rivals.map(p=>line(p,p.brands.join(', '))));
-            const ranked=own.filter(p=>p.interactions!=null).sort((a,b)=>b.interactions-a.interactions);
-            group(body,'Отклик на публикации · '+ranked.length,ranked.map(p=>{
-                const others=posts.filter(x=>x.id!==p.id && x.interactions!=null).map(x=>x.interactions).sort((a,b)=>a-b);
-                const middle=Math.floor(others.length/2);
-                const median=others.length%2?others[middle]:(others[middle-1]+others[middle])/2;
-                return line(p,fmt(p.interactions)+' реакций'+(others.length?' · обычно '+fmt(median)+' (медиана остальных постов дилера)':' · пока нет базы сравнения'));
-            }));
-            const timeline=own.map(p=>({day:p.day,node:line(p,'Публикация · '+(p.skus.join(', ')||'IDEAL FLOOR'))}));
-            for (const s of daily) timeline.push({day:s.day,node:elem('div',s.day+' · '+s.sku+' · '+fmt(s.sqm)+' м²')});
-            if (data.canSales) body.append(elem('p','Продажи дилера за месяц: '+(row.sales==null?'нет данных':fmt(row.sales)+' м²')+
-                ' · По '+(collection?'коллекции':'артикулам')+' в детализации: '+(daily.length?fmt(daily.reduce((a,s)=>a+s.sqm,0))+' м²':'нет данных'),'mb-2'));
-            group(body,'Даты публикаций и продаж',timeline.sort((a,b)=>b.day.localeCompare(a.day)).map(t=>t.node));
-            target.append(box);
+    addFilter('decor','Декор IDEAL FLOOR');
+    addFilter('competitor','Упомянутый конкурент');
+
+    function groupPosts(posts,getTags) {
+        const groups = new Map();
+        for (const post of posts) for (const tag of new Set(getTags(post))) {
+            if (!groups.has(tag)) groups.set(tag,[]);
+            groups.get(tag).push(post);
         }
-        el('count').textContent=count;
-        el('status').hidden=Boolean(count);
-        el('status').textContent=count ? '' : 'По выбранным фильтрам дилеров нет.';
-        const active=['sector','city','manager','collection'].filter(key=>el(key).value).length;
+        return groups;
+    }
+    function activity(row,catalog,bySku,filtered) {
+        const inScope = sku=>!filtered || bySku.has(sku);
+        const posts = row.posts.filter(p=>p.day.startsWith(data.month)).sort(newest);
+        const earlier = row.posts.filter(p=>!p.day.startsWith(data.month)).sort(newest);
+        const own = posts.filter(p=>p.ideal && (!filtered || p.skus.some(inScope)));
+        const productPosts = groupPosts(own,p=>p.skus.filter(inScope));
+        const displayed = new Set(row.displayed);
+        const samples = catalog.filter(p=>!p.archived && displayed.has(p.id));
+        const silent = samples.filter(p=>!productPosts.has(p.sku)).sort((a,b)=>order.compare(a.sku,b.sku));
+        const rivals = posts.filter(p=>p.brands.length);
+        const oldRivals = earlier.filter(p=>p.brands.length);
+        const known = posts.length>0 || (row.hasMonthCheck ?? (row.checked && monthFormat.format(new Date(row.checked))===data.month));
+        return {posts,earlier,own,productPosts,bySku,samples,silent,rivals,oldRivals,known,
+            brands:groupPosts(rivals,p=>p.brands),previousBrands:groupPosts(oldRivals,p=>p.brands),
+            credits:InstagramAccounts.credits(posts),daily:row.daily.filter(p=>inScope(p.sku))};
+    }
+    function include(s,filtered) {
+        if (filtered && !s.samples.length && !s.own.length && !s.daily.length) return false;
+        if (el('competitor').value && !s.brands.has(el('competitor').value)) return false;
+        switch (el('focus').value) {
+            case 'silent': return s.known && s.silent.length>0;
+            case 'near': return s.credits===7;
+            case 'rising': return s.earlier.length && s.posts.length && s.rivals.length/s.posts.length > s.oldRivals.length/s.earlier.length;
+            default: return true;
+        }
+    }
+    function metric(label,value,unit,note,cls) {
+        const cell = elem('span',null,'ig-metric '+cls);
+        cell.append(elem('small',label,'ig-mobile-label'));
+        const number = elem('span',null,'ig-number');
+        number.append(elem('strong',value ?? '—'));
+        if (unit && value!=null) number.append(' '+unit);
+        if (value>0) cell.classList.add('has-activity');
+        cell.append(number);
+        if (note) cell.append(elem('small',note,'ig-sub'));
+        return cell;
+    }
+    function summary(row,s) {
+        const node = elem('summary',null,'ig-columns');
+        const identity = elem('span',null,'ig-identity');
+        const shop = icon('shop');
+        shop.classList.add('ig-shop');
+        const caption = elem('span',null,'ig-dealer-caption');
+        const meta = elem('small');
+        if (row.code) meta.append(elem('span',row.code,'ig-code'));
+        meta.append([row.city,row.sector].filter(Boolean).join(' · '));
+        caption.append(elem('strong',row.name),meta);
+        identity.append(shop,caption);
+
+        const metrics = elem('span',null,'ig-metrics');
+        const pending = !row.username ? 'Нет профиля' : row.checked || row.checkedProfiles ? 'Нет данных за месяц' : 'Ожидает проверки';
+        metrics.append(metric('IDEAL FLOOR',s.known ? s.own.length : null,words.posts[plurals.select(s.own.length)],
+            s.own.length ? 'Последний · '+date(s.own[0].day) : s.known ? '' : pending,'ig-own'));
+        if (data.canMatrix) metrics.append(metric('Наши декоры',s.known ? s.productPosts.size : null,'в постах',s.samples.length+' на витрине','ig-products'));
+        if (data.canCompetitors) {
+            const known = s.known && data.hasCompetitorBrands;
+            metrics.append(metric('Конкуренты',known ? s.brands.size : null,words.brands[plurals.select(s.brands.size)],
+                known ? count(s.rivals.length,'posts') : '', 'ig-rivals'));
+        }
+        const progress = elem('span',null,'ig-progress');
+        const credit = elem('strong',s.known ? s.credits : '—');
+        credit.append(elem('small',' / 8'));
+        progress.title = 'Зачёты за месяц. У каждой страницы дилера засчитывается одна публикация IDEAL FLOOR за день.';
+        progress.append(elem('small','Зачёты','ig-sr'),credit);
+        if (s.known) {
+            const meter = elem('progress');
+            meter.max = 8; meter.value = Math.min(8,s.credits); meter.setAttribute('aria-label','Зачёты из восьми');
+            progress.append(meter);
+            if (s.credits>=8) progress.classList.add('is-complete');
+        }
+        const arrow = icon('chevron-down');
+        arrow.classList.add('ig-chevron');
+        node.append(identity,metrics,progress,arrow);
+        return node;
+    }
+
+    function source(post,detail) {
+        const line = elem('div',null,'ig-entry');
+        const time = elem('time',date(post.day));
+        time.dateTime = post.day;
+        const type = /\/reels?\//i.test(post.url) ? 'Reels' : 'Публикация';
+        const title = [type,post.username && '@'+post.username].filter(Boolean).join(' · ');
+        const link = elem(post.url ? 'a' : 'span',title);
+        if (post.url) {
+            link.href=post.url; link.target='_blank'; link.rel='noopener';
+            link.append(' ',icon('box-arrow-up-right'));
+        }
+        line.append(time,link);
+        if (detail) line.append(elem('small',detail));
+        return line;
+    }
+    function disclosure(title,total,children,cls='ig-disclosure') {
+        const d = elem('details',null,cls);
+        const head = elem('summary');
+        head.append(elem('span',title),elem('span',total,'ig-tally'),icon('chevron-down'));
+        const content = elem('div',null,'ig-details-content');
+        content.append(...children);
+        d.append(head,content);
+        return d;
+    }
+    function panelFor(title,symbol) {
+        const block = elem('section',null,'ig-detail-panel');
+        const h = elem('h3');
+        h.append(icon(symbol),title);
+        block.append(h);
+        return block;
+    }
+    function ranking(block,groups,describe) {
+        const entries = [...groups].sort(([a,pa],[b,pb])=>pb.length-pa.length || newest(pa[0],pb[0]) || order.compare(a,b));
+        const rest = [];
+        for (const [index,[key,posts]] of entries.entries()) {
+            const {name,meta,evidence} = describe(key);
+            const d = elem('details',null,'ig-mention');
+            const h = elem('summary');
+            const label = elem('span',null,'ig-item-label');
+            label.append(elem('strong',name));
+            if (meta) label.append(elem('small',meta));
+            const stats = elem('span',null,'ig-item-stats');
+            stats.append(elem('strong',count(posts.length,'posts')),elem('small',date(posts[0].day)));
+            h.append(label,stats,icon('chevron-down'));
+            d.append(h,...posts.map(p=>source(p,evidence?.(p))));
+            if (index<3) block.append(d); else rest.push(d);
+        }
+        if (rest.length) block.append(disclosure('Показать остальные',rest.length,rest));
+    }
+    function productsPanel(s) {
+        const block = panelFor('Декоры IDEAL FLOOR','layers');
+        if (s.known && s.samples.length) {
+            const p = elem('p','Декоры с витрины в постах · ');
+            p.append(elem('strong',(s.samples.length-s.silent.length)+' из '+s.samples.length));
+            block.append(p);
+        }
+        const onShelf = new Set(s.samples.map(p=>p.sku));
+        ranking(block,s.productPosts,sku=>{
+            const p=s.bySku.get(sku);
+            return {name:p?.name || sku,meta:[sku,p?.collection,!onShelf.has(sku) && 'Нет отметки на витрине'].filter(Boolean).join(' · '),
+                evidence:post=>post.namedSkus?.includes(sku) ? 'По названию и бренду' : 'По артикулу'};
+        });
+        if (s.silent.length) {
+            const tiles=elem('ul',null,'ig-samples');
+            for (const p of s.silent) {
+                const li=elem('li');
+                li.append(elem('strong',p.name || p.sku),elem('small',p.sku));
+                tiles.append(li);
+            }
+            block.append(disclosure(s.known ? 'На витрине без упоминаний' : 'Образцы на витрине',s.silent.length,[tiles]));
+        }
+        const brandOnly = s.own.filter(p=>!p.skus.length);
+        if (brandOnly.length) block.append(disclosure('О бренде без указания декора',brandOnly.length,brandOnly.map(p=>source(p))));
+        if (!s.samples.length && !s.own.length) block.append(elem('p','Образцы не отмечены. Упоминаний декоров за месяц пока нет.'));
+        return block;
+    }
+    function rivalsPanel(s) {
+        const block = panelFor('Бренды конкурентов','people');
+        if (!data.hasCompetitorBrands) {
+            block.append(elem('p','Справочник конкурентов пуст.'));
+            return block;
+        }
+        if (s.rivals.length) {
+            const p=elem('p','Посты с упоминанием конкурентов · ');
+            p.append(elem('strong',s.rivals.length+' из '+s.posts.length));
+            block.append(p);
+        } else block.append(elem('p',s.known ? 'В собранных подписях за месяц упоминаний нет.' : 'За этот месяц пока нет данных.'));
+        ranking(block,s.brands,brand=>({name:brand,
+            meta:s.earlier.length ? 'В прошлом месяце · '+count(s.previousBrands.get(brand)?.length || 0,'posts') : ''}));
+        const previousOnly=new Map([...s.previousBrands].filter(([brand])=>!s.brands.has(brand)));
+        if (previousOnly.size) {
+            const items=document.createDocumentFragment();
+            ranking(items,previousOnly,brand=>({name:brand}));
+            block.append(disclosure('Упоминались только в прошлом месяце',previousOnly.size,[items]));
+        }
+        return block;
+    }
+
+    function cardBody(row,s) {
+        const body=elem('div',null,'ig-row-body');
+        const panels=elem('div',null,'ig-detail-grid');
+        if (data.canMatrix) panels.append(productsPanel(s));
+        if (data.canCompetitors) panels.append(rivalsPanel(s));
+        if (panels.childElementCount) body.append(panels);
+
+        const engaged=s.own.filter(p=>p.interactions!=null).sort((a,b)=>b.interactions-a.interactions);
+        if (engaged.length) body.append(disclosure('Отклик на наши посты',engaged.length,engaged.map(p=>{
+            const peers=s.posts.filter(other=>other!==p && other.interactions!=null).map(other=>other.interactions).sort((a,b)=>a-b);
+            const middle=Math.floor(peers.length/2);
+            const median=peers.length%2 ? peers[middle] : (peers[middle-1]+peers[middle])/2;
+            return source(p,'Реакции · '+fmt(p.interactions)+(peers.length ? ' · медиана остальных постов '+fmt(median) : ''));
+        })));
+        if (data.canSales && (row.sales!=null || s.daily.length)) {
+            const sales=elem('div',null,'ig-sales');
+            if (row.sales!=null) sales.append(elem('span','Продажи дилера · '+fmt(row.sales)+' м²'));
+            if (s.daily.length) sales.append(elem('span','По артикулам · '+fmt(s.daily.reduce((total,x)=>total+x.sqm,0))+' м²'));
+            body.append(sales);
+        }
+        const events=s.own.map(p=>({day:p.day,node:source(p,p.skus.join(', ') || 'IDEAL FLOOR')}));
+        for (const sale of s.daily) events.push({day:sale.day,node:elem('div',date(sale.day)+' · '+sale.sku+' · '+fmt(sale.sqm)+' м²','ig-entry')});
+        if (events.length) body.append(disclosure(data.canSales ? 'Публикации и продажи по датам' : 'Публикации по датам',events.length,events.sort(newest).map(e=>e.node)));
+        const footer=elem('div',null,'ig-footer');
+        const checked=row.checked ? 'Проверено '+checkedDate.format(new Date(row.checked)) :
+            row.checkedProfiles ? 'Проверено страниц '+row.checkedProfiles+' из '+row.usernames.length : row.username ? 'Ожидает проверки' : 'Профиль не указан';
+        footer.append(elem('small',[managerNames.get(row.manager) || row.manager,checked].filter(Boolean).join(' · ')));
+        const link=elem('a','Карточка дилера');
+        link.href='/dealer.html?id='+encodeURIComponent(row.id);
+        link.append(' ',icon('arrow-up-right'));
+        footer.append(link);
+        body.append(footer);
+        return body;
+    }
+
+    function render() {
+        const collection=el('collection').value, sku=el('decor').value;
+        const filtered=Boolean(collection || sku);
+        const catalog=data.catalog.filter(p=>(!collection || p.collection===collection) && (!sku || p.sku===sku));
+        const bySku=new Map(catalog.map(p=>[p.sku,p]));
+        const fragment=document.createDocumentFragment();
+        for (const row of data.rows) {
+            if (dealerFields.some(key=>el(key).value && el(key).value!==row[key]) || (el('dealer').value && el('dealer').value!==row.id)) continue;
+            const s=activity(row,catalog,bySku,filtered);
+            if (!include(s,filtered)) continue;
+            const card=elem('details',null,'ig-row');
+            card.append(summary(row,s));
+            card.addEventListener('toggle',()=>{
+                if (card.open && card.childElementCount===1) card.append(cardBody(row,s));
+            });
+            fragment.append(card);
+        }
+        const n=fragment.childElementCount;
+        el('results').replaceChildren(fragment);
+        el('count').textContent=n;
+        el('status').hidden=Boolean(n);
+        el('status').textContent=n ? '' : 'По выбранным фильтрам дилеров нет.';
+        const active=[...dealerFields,'collection','decor','competitor'].filter(key=>el(key).value).length;
         el('filter-count').textContent=active ? '('+active+')' : '';
     }
+    function setOptions(key,entries,selected=el(key).value) {
+        const select=el(key);
+        select.replaceChildren(new Option('Все',''),...entries.map(([value,label])=>new Option(label,value)));
+        select.value=entries.some(([value])=>value===selected) ? selected : '';
+    }
+    function setDecors() {
+        const collection=el('collection').value;
+        const options=new Map(data.catalog.filter(p=>p.sku && (!collection || p.collection===collection)).map(p=>[p.sku,[p.sku,p.name].filter(Boolean).join(' · ')]));
+        setOptions('decor',[...options].sort(([a],[b])=>order.compare(a,b)));
+    }
+    function bindFilters(initial) {
+        const distinct=values=>[...new Set(values.filter(Boolean))].sort(order.compare);
+        for (const f of dealerFields) setOptions(f,distinct(data.rows.map(r=>r[f])).map(v=>[v,f==='manager' ? managerNames.get(v) || v : v]));
+        setOptions('dealer',data.rows.map(r=>[r.id,r.name]),initial && requested ? requested : el('dealer').value);
+        setOptions('collection',distinct(data.catalog.map(p=>p.collection)).map(v=>[v,v]));
+        setDecors();
+        const brands=data.rows.flatMap(row=>row.posts.filter(p=>p.day.startsWith(data.month)).flatMap(p=>p.brands));
+        setOptions('competitor',distinct(brands).map(v=>[v,v]));
+        el('decor').parentElement.hidden=el('collection').parentElement.hidden=!data.canMatrix;
+        el('competitor').parentElement.hidden=!data.canCompetitors;
+        const silent=el('focus').querySelector('[value="silent"]');
+        silent.textContent='Есть декоры на витрине без упоминаний';
+        silent.hidden=!data.canMatrix;
+        el('focus').querySelector('[value="rising"]').hidden=!data.canCompetitors;
+        if (el('focus').selectedOptions[0]?.hidden) el('focus').value='';
+        const columns=['Дилер','IDEAL FLOOR'];
+        if (data.canMatrix) columns.push('Наши декоры');
+        if (data.canCompetitors) columns.push('Конкуренты');
+        panel.style.setProperty('--ig-metrics',String(columns.length-1));
+        const head=panel.querySelector('.ig-column-head');
+        head.replaceChildren(...[...columns,'Зачёты',''].map(t=>elem('span',t)));
+        head.hidden=false;
+    }
     async function load() {
-        const run=++version;
+        const run=++version, initial=!data;
+        const month=el('month').value;
         el('status').hidden=false;
         el('retry').hidden=true;
         el('count').textContent='—';
         el('status').textContent='Загружаем отчёт…';
         el('results').replaceChildren();
+        panel.querySelector('.ig-column-head').hidden=true;
+        el('import-box').hidden=true;
         try {
-            const response=await fetch('/api/instagram/report?month='+encodeURIComponent(el('month').value));
+            const response=await fetch('/api/instagram/report?month='+encodeURIComponent(month));
             const payload=await response.json();
             if (run!==version) return;
             if (!response.ok) throw Error(payload.error);
-            const initial=!data;
             data=payload;
-            for(const f of filters) {
-                const select=el(f);
-                const old=initial && f==='dealer'?requested:select.value;
-                const choices=f==='dealer'?data.rows.map(r=>[r.id,r.name]):
-                    [...new Set((f==='collection'?data.catalog:data.rows).map(r=>r[f]).filter(Boolean))].sort().map(v=>[v,v]);
-                select.replaceChildren(new Option('Все',''),...choices.map(([v,t])=>new Option(t,v)));
-                select.value=old||'';
-            }
+            bindFilters(initial);
             el('import-box').hidden=!data.canImport;
             render();
-        } catch(e) { if(run===version) {data=null;el('retry').hidden=false;el('status').textContent=e.message||'Ошибка загрузки';} }
+        } catch(e) {
+            if(run===version) {data=null;el('retry').hidden=false;el('status').textContent=e.message || 'Ошибка загрузки';}
+        }
     }
     el('month').onchange=load;
-    el('focus').onchange=()=>data && render();
-    for(const f of filters) el(f).onchange=()=>data && render();
+    el('focus').onchange=()=>data && data.month===el('month').value && render();
+    for (const f of filters) el(f).onchange=()=>{
+        if (!data || data.month!==el('month').value) return;
+        if (f==='collection') setDecors();
+        render();
+    };
     el('import').onclick=async()=>{
         const file=el('file').files[0];
         if(!file) {el('import-status').textContent='Выберите CSV';return;}
@@ -162,7 +367,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
     el('retry').onclick=load;
     const toggle=el('toggle');
-    const panel=document.getElementById('home-instagram');
     let started=false;
     function showReport(scroll) {
         const open=location.hash==='#instagram';
