@@ -278,7 +278,7 @@
         { path: '/', label: 'Дилеры', permission: 'can_view_dealers', icon: 'shop' },
         { path: '/map.html', label: 'Карта', permission: 'can_view_map', icon: 'geo-alt' },
         { path: '/products.html', label: 'Матрица', permission: 'can_view_products', icon: 'grid-3x3-gap' },
-        { path: '/instagram-report.html', label: 'Instagram дилеров', permission: 'can_view_dealers', icon: 'instagram' },
+        { path: '/instagram-report.html', label: 'Instagram дилеров', permission: 'can_view_dealers', icon: 'instagram', mobileOnly: true },
         { path: '/report.html', label: 'Выставленность', permission: 'can_view_report', icon: 'bar-chart' },
         { path: '/sales.html', label: 'Продажи', permission: 'can_view_sales', icon: 'graph-up-arrow' },
         { path: '/competitors.html', label: 'Конкуренты', permission: 'can_view_competitors', icon: 'globe2' },
@@ -317,7 +317,7 @@
         const currentItem = NAV_ITEMS.find(item => item.path === currentPath);
         const pageLabel = currentItem?.label || 'CRM';
 
-        const itemsHtml = NAV_ITEMS.map(item => {
+        const itemsHtml = NAV_ITEMS.filter(item => !item.mobileOnly).map(item => {
             const active = item.path === currentPath;
             return `
                 <li class="nav-item" data-permission="${item.permission}">
