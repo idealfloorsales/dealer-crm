@@ -99,6 +99,10 @@ html[data-crm-theme=dark] #home-instagram {
 .ig-footer { justify-content: space-between; color: var(--ig-muted); }
 .ig-footer small, .ig-footer a { font-size: .73rem; }
 .ig-footer a { display: inline-flex; align-items: center; gap: 4px; font-weight: 650; }
+.ig-scan-info { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:5px 12px; }
+.ig-scan-info small { font-size:.75rem; color:var(--ig-muted); }
+.ig-check { padding:4px 9px; border:1px solid var(--ig-border); border-radius:7px; background:var(--ig-inset); color:var(--ig-text); font:inherit; font-size:.75rem; font-weight:600; }
+.ig-check:focus-visible { outline:2px solid var(--ig-accent); }
 .ig-import { padding: .5rem 1rem; margin: 1rem 0; }
 .ig-import pre { white-space: pre-wrap; }
 @media (max-width: 760px) {

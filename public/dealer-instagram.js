@@ -66,7 +66,7 @@
             const values = [
                 ['Подписчики', snapshot.followersCount],
                 ['Всего публикаций', snapshot.mediaCount],
-                ['Проверено последних публикаций', snapshot.checkedMediaCount]
+                ['Публикаций в предпросмотре', snapshot.checkedMediaCount]
             ];
             values.forEach(([label, value]) => {
                 const box = document.createElement('div');
@@ -88,7 +88,7 @@
             if (snapshot.fetchedAt) {
                 const updated = document.createElement('small');
                 updated.className = 'd-block text-muted mt-2';
-                updated.textContent = 'Последнее обновление: ' + dateText(snapshot.fetchedAt);
+                updated.textContent = 'Профиль обновлён '+dateText(snapshot.fetchedAt)+(snapshot.periodPending ? ' · Идёт проверка публикаций за месяц' : snapshot.periodCheckedAt ? ' · Месяц проверен '+dateText(snapshot.periodCheckedAt) : '');
                 matchEl.appendChild(updated);
             }
             const posts = Array.isArray(snapshot.posts) ? snapshot.posts : [];

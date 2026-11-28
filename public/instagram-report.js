@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const date = iso => shortDate.format(new Date(iso+'T12:00:00Z'));
     const newest = (a,b) => b.day.localeCompare(a.day);
     el('month').value = monthFormat.format(new Date());
-    let data, version = 0;
+    let data, version = 0, refreshTimer, refreshedAt = 0;
 
     function elem(tag,text,cls) {
         const node = document.createElement(tag);
@@ -63,7 +63,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const silent = samples.filter(p=>!productPosts.has(p.sku)).sort((a,b)=>order.compare(a.sku,b.sku));
         const rivals = posts.filter(p=>p.brands.length);
         const oldRivals = earlier.filter(p=>p.brands.length);
-        const known = posts.length>0 || (row.hasMonthCheck ?? (row.checked && monthFormat.format(new Date(row.checked))===data.month));
+        const known = row.coverage ? row.coverage.total>0 && row.coverage.checked===row.coverage.total :
+            posts.length>0 || (row.hasMonthCheck ?? (row.checked && monthFormat.format(new Date(row.checked))===data.month));
         return {posts,earlier,own,productPosts,bySku,samples,silent,rivals,oldRivals,known,
             brands:groupPosts(rivals,p=>p.brands),previousBrands:groupPosts(oldRivals,p=>p.brands),
             credits:InstagramAccounts.credits(posts),daily:row.daily.filter(p=>inScope(p.sku))};
@@ -73,7 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (el('competitor').value && !s.brands.has(el('competitor').value)) return false;
         switch (el('focus').value) {
             case 'silent': return s.known && s.silent.length>0;
-            case 'near': return s.credits===7;
+            case 'near': return s.known && s.credits===7;
             case 'rising': return s.earlier.length && s.posts.length && s.rivals.length/s.posts.length > s.oldRivals.length/s.earlier.length;
             default: return true;
         }
@@ -102,21 +103,21 @@ document.addEventListener('DOMContentLoaded', () => {
         identity.append(shop,caption);
 
         const metrics = elem('span',null,'ig-metrics');
-        const pending = !row.username ? 'Нет профиля' : row.checked || row.checkedProfiles ? 'Нет данных за месяц' : 'Ожидает проверки';
-        metrics.append(metric('IDEAL FLOOR',s.known ? s.own.length : null,words.posts[plurals.select(s.own.length)],
-            s.own.length ? 'Последний · '+date(s.own[0].day) : s.known ? '' : pending,'ig-own'));
-        if (data.canMatrix) metrics.append(metric('Наши декоры',s.known ? s.productPosts.size : null,'в постах',s.samples.length+' на витрине','ig-products'));
+        const pending = !row.username ? 'Нет профиля' : row.coverage?.pending ? 'Проверяется месяц' : 'История за месяц неполная';
+        metrics.append(metric('IDEAL FLOOR',s.known || s.own.length ? s.own.length : null,words.posts[plurals.select(s.own.length)],
+            s.known ? (s.own.length ? 'Последний · '+date(s.own[0].day) : '') : pending,'ig-own'));
+        if (data.canMatrix) metrics.append(metric('Наши декоры',s.known || s.productPosts.size ? s.productPosts.size : null,'в постах',s.samples.length+' на витрине','ig-products'));
         if (data.canCompetitors) {
-            const known = s.known && data.hasCompetitorBrands;
+            const known = (s.known || s.brands.size>0) && data.hasCompetitorBrands;
             metrics.append(metric('Конкуренты',known ? s.brands.size : null,words.brands[plurals.select(s.brands.size)],
                 known ? count(s.rivals.length,'posts') : '', 'ig-rivals'));
         }
         const progress = elem('span',null,'ig-progress');
-        const credit = elem('strong',s.known ? s.credits : '—');
+        const credit = elem('strong',s.known || s.credits ? s.credits : '—');
         credit.append(elem('small',' / 8'));
         progress.title = 'Зачёты за месяц. У каждой страницы дилера засчитывается одна публикация IDEAL FLOOR за день.';
         progress.append(elem('small','Зачёты','ig-sr'),credit);
-        if (s.known) {
+        if (s.known || s.credits) {
             const meter = elem('progress');
             meter.max = 8; meter.value = Math.min(8,s.credits); meter.setAttribute('aria-label','Зачёты из восьми');
             progress.append(meter);
@@ -197,7 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 li.append(elem('strong',p.name || p.sku),elem('small',p.sku));
                 tiles.append(li);
             }
-            block.append(disclosure(s.known ? 'На витрине без упоминаний' : 'Образцы на витрине',s.silent.length,[tiles]));
+            block.append(disclosure(s.known ? 'На витрине без упоминаний' : 'На витрине · упоминаний пока не найдено',s.silent.length,[tiles]));
         }
         const brandOnly = s.own.filter(p=>!p.skus.length);
         if (brandOnly.length) block.append(disclosure('О бренде без указания декора',brandOnly.length,brandOnly.map(p=>source(p))));
@@ -226,13 +227,49 @@ document.addEventListener('DOMContentLoaded', () => {
         return block;
     }
 
+    function scanInfo(row,s) {
+        const wrap=elem('div',null,'ig-scan-info');
+        const label=elem('small');
+        label.setAttribute('role','status');
+        const c=row.coverage;
+        const info=c.pending ? 'Идёт проверка' : s.known ? 'Проверено '+checkedDate.format(new Date(c.asOf)) :
+            'Период проверен у '+c.checked+' из '+c.total+' страниц';
+        label.textContent='Получено за месяц · '+count(s.posts.length,'posts')+' · '+info;
+        wrap.append(label);
+        if (!c.total || el('month').value>monthFormat.format(new Date())) return wrap;
+        const button=elem('button',c.pending ? 'Обновить результат' : 'Перепроверить месяц','ig-check');
+        button.type='button';
+        button.onclick=async ()=>{
+            button.disabled=true;
+            const month=data.month;
+            try {
+                if (!c.pending) {
+                    const response=await fetch('/api/dealers/'+encodeURIComponent(row.id)+'/instagram-monitor/check-month',{
+                        method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({month})
+                    });
+                    if (!response.ok) throw Error((await response.json()).error || 'Не удалось запустить проверку');
+                }
+                if (el('month').value===month) await load(true);
+            } catch (error) { label.textContent=error.message; }
+            finally { button.disabled=false; }
+        };
+        wrap.append(button);
+        return wrap;
+    }
+
     function cardBody(row,s) {
         const body=elem('div',null,'ig-row-body');
+        if (row.coverage?.total) body.append(scanInfo(row,s));
         const panels=elem('div',null,'ig-detail-grid');
         if (data.canMatrix) panels.append(productsPanel(s));
         if (data.canCompetitors) panels.append(rivalsPanel(s));
         if (panels.childElementCount) body.append(panels);
 
+        if (!el('decor').value && !el('collection').value) {
+            const other=s.posts.filter(post=>!post.ideal);
+            if (other.length) body.append(disclosure('Без совпадения с IDEAL FLOOR',other.length,
+                other.map(post=>source(post,post.brands.length ? post.brands.join(', ') : 'Бренд и декор не распознаны в подписи'))));
+        }
         const engaged=s.own.filter(p=>p.interactions!=null).sort((a,b)=>b.interactions-a.interactions);
         if (engaged.length) body.append(disclosure('Отклик на наши посты',engaged.length,engaged.map(p=>{
             const peers=s.posts.filter(other=>other!==p && other.interactions!=null).map(other=>other.interactions).sort((a,b)=>a-b);
@@ -272,6 +309,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const s=activity(row,catalog,bySku,filtered);
             if (!include(s,filtered)) continue;
             const card=elem('details',null,'ig-row');
+            card.dataset.dealerId=row.id;
             card.append(summary(row,s));
             card.addEventListener('toggle',()=>{
                 if (card.open && card.childElementCount===1) card.append(cardBody(row,s));
@@ -319,16 +357,27 @@ document.addEventListener('DOMContentLoaded', () => {
         head.replaceChildren(...[...columns,'Зачёты',''].map(t=>elem('span',t)));
         head.hidden=false;
     }
-    async function load() {
+    function scheduleRefresh() {
+        clearTimeout(refreshTimer);
+        if (!panel.hidden && !document.hidden && data?.rows.some(row=>row.coverage?.pending)) {
+            refreshTimer=setTimeout(()=>load(true),45000);
+        }
+    }
+    async function load(quiet=false) {
+        quiet=quiet===true && data?.month===el('month').value;
+        clearTimeout(refreshTimer);
+        const openRows=quiet ? new Set([...panel.querySelectorAll('.ig-row[open]')].map(n=>n.dataset.dealerId)) : new Set();
         const run=++version, initial=!data;
         const month=el('month').value;
-        el('status').hidden=false;
-        el('retry').hidden=true;
-        el('count').textContent='—';
-        el('status').textContent='Загружаем отчёт…';
-        el('results').replaceChildren();
-        panel.querySelector('.ig-column-head').hidden=true;
-        el('import-box').hidden=true;
+        if (!quiet) {
+            el('status').hidden=false;
+            el('retry').hidden=true;
+            el('count').textContent='—';
+            el('status').textContent='Загружаем отчёт…';
+            el('results').replaceChildren();
+            panel.querySelector('.ig-column-head').hidden=true;
+            el('import-box').hidden=true;
+        }
         try {
             const response=await fetch('/api/instagram/report?month='+encodeURIComponent(month));
             const payload=await response.json();
@@ -337,11 +386,17 @@ document.addEventListener('DOMContentLoaded', () => {
             data=payload;
             bindFilters(initial);
             el('import-box').hidden=!data.canImport;
+            refreshedAt=Date.now();
             render();
+            for (const n of panel.querySelectorAll('.ig-row')) if (openRows.has(n.dataset.dealerId)) n.open=true;
         } catch(e) {
-            if(run===version) {data=null;el('retry').hidden=false;el('status').textContent=e.message || 'Ошибка загрузки';}
-        }
+            if(run===version) {
+                if (!quiet) data=null;
+                el('retry').hidden=false;el('status').hidden=false;el('status').textContent=e.message || 'Ошибка загрузки';
+            }
+        } finally { if (run===version) scheduleRefresh(); }
     }
+    document.addEventListener('visibilitychange',scheduleRefresh);
     el('month').onchange=load;
     el('focus').onchange=()=>data && data.month===el('month').value && render();
     for (const f of filters) el(f).onchange=()=>{
@@ -376,6 +431,8 @@ document.addEventListener('DOMContentLoaded', () => {
             started=true;
             Promise.resolve(window.CRMAuth?.ready).then(load);
         }
+        else if (open && data && Date.now()-refreshedAt>60000) load(true);
+        else scheduleRefresh();
         if(open && scroll) toggle.scrollIntoView({block:'center'});
     }
     toggle.onclick=()=>{

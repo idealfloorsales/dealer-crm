@@ -2,6 +2,7 @@
 
 const crypto = require('crypto');
 const {handle, handles} = require('../public/instagram-accounts');
+const {fieldsFor, parsePage, scanPeriod, localMonth, PREVIEW_SIZE} = require('./instagram-feed');
 
 function installInstagramMonitor(options) {
     const {
@@ -80,6 +81,14 @@ function installInstagramMonitor(options) {
     }, { timestamps: true, collection: 'instagram_dealer_snapshots' });
     const Snapshot = mongoose.models.InstagramDealerSnapshot ||
         mongoose.model('InstagramDealerSnapshot', snapshotSchema);
+
+    const scanSchema = new mongoose.Schema({
+        username:String, month:String, dealerId:String, startedAt:Date, checkedAt:Date,
+        after:String, ranged:Boolean, pending:Boolean, skipped:Number, retryAt:Date, revision:{type:Number,default:0}
+    });
+    scanSchema.index({username:1,month:1},{unique:true});
+    scanSchema.index({pending:1,retryAt:1});
+    const Scan = mongoose.models.InstagramPeriodScan || mongoose.model('InstagramPeriodScan',scanSchema);
 
     const graphVersion = /^v\d+\.\d+$/.test(String(process.env.META_GRAPH_API_VERSION || ''))
         ? String(process.env.META_GRAPH_API_VERSION)
@@ -168,15 +177,6 @@ function installInstagramMonitor(options) {
             fetchedAt: snapshot.fetchedAt,
             error: snapshot.error || ''
         };
-    }
-
-    function textHasBrand(caption) {
-        const value = String(caption || '').toLowerCase().replace(/ё/g, 'е').replace(/[^a-zа-я0-9]+/g, ' ');
-        return [
-            'idealfloor', 'ideal floor', 'ideal floor kz', 'идеал флор',
-            'идеалфлор', 'идеал флор кз', 'идеал флор казахстан',
-            'идеафлор кз', 'ideafloor kz'
-        ].some(term => value.includes(term));
     }
 
     function profileErrorMessage(error) {
@@ -387,16 +387,22 @@ function installInstagramMonitor(options) {
             const snapshot = username ? await Snapshot.findOne({ username: username.toLowerCase() }).lean() : null;
             res.json({
                 dealer: { id: String(dealer._id), name: dealer.name, username, usernames },
-                snapshot: publicSnapshot(snapshot)
+                snapshot: await snapshotForClient(snapshot,localMonth(new Date()))
             });
         } catch (_) {
             res.status(500).json({ error: 'Не удалось загрузить данные Instagram' });
         }
     });
 
+    async function snapshotForClient(snapshot,month) {
+        if (!snapshot) return null;
+        const scan=await Scan.findOne({username:snapshot.username,month}).select('checkedAt pending').lean();
+        return {...publicSnapshot(snapshot),periodCheckedAt:scan?.checkedAt || null,periodPending:Boolean(scan?.pending)};
+    }
+
     const inFlight = new Map();
-    async function syncDealer(dealer, username) {
-        const key = username.toLowerCase();
+    async function syncDealer(dealer, username, month=localMonth(new Date())) {
+        const key = username+'/'+month;
         if (inFlight.has(key)) return inFlight.get(key);
         const task = (async () => {
             const connection = await getConnection();
@@ -413,51 +419,78 @@ function installInstagramMonitor(options) {
                 error.status = 409;
                 throw error;
             }
-            const fields = 'business_discovery.username(' + username + '){username,followers_count,media_count,media.limit(12){id,caption,media_type,permalink,timestamp,like_count,comments_count}}';
-            const result = await graphGet(page.instagramUserId, token, { fields });
-            const profile = result.business_discovery;
-            if (!profile) {
-                const error = new Error('Meta не вернула данные этого аккаунта. Для Business Discovery подходят профессиональные Business/Creator профили.');
-                error.status = 422;
-                throw error;
-            }
-            const posts = (Array.isArray(profile.media?.data) ? profile.media.data : []).map(media => {
-                const caption = String(media.caption || '').slice(0, 2200);
-                return {
-                    id: String(media.id || ''),
-                    mediaType: String(media.media_type || ''),
-                    permalink: String(media.permalink || ''),
-                    caption,
-                    timestamp: media.timestamp ? new Date(media.timestamp) : null,
-                    likeCount: Number.isFinite(Number(media.like_count)) ? Number(media.like_count) : null,
-                    commentsCount: Number.isFinite(Number(media.comments_count)) ? Number(media.comments_count) : null,
-                    textMatch: textHasBrand(caption)
-                };
-            });
-            const textMatchCount = posts.filter(post => post.textMatch).length;
-            await reports.archive(username, posts);
-            const saved = await Snapshot.findOneAndUpdate({ username: username.toLowerCase() }, {
-                $set: {
-                    dealerId: String(dealer._id),
-                    username: String(profile.username || username).toLowerCase(),
-                    followersCount: Number(profile.followers_count) || 0,
-                    mediaCount: Number(profile.media_count) || 0,
-                    checkedMediaCount: posts.length,
-                    textMatchCount,
-                    posts,
-                    fetchedAt: new Date(),
-                    error: ''
+            const now=new Date();
+            const query={username,month};
+            const record=await Scan.findOneAndUpdate(query,{$setOnInsert:{...query,revision:0}},
+                {upsert:true,new:true,setDefaultsOnInsert:true}).lean();
+            let revision=record.revision;
+            const checkpoint=async state=>{
+                const {after,ranged,pending,startedAt,checkedAt,skipped}=state;
+                const updated=await Scan.updateOne({_id:record._id,revision},{
+                    $set:{after,ranged,pending,startedAt,checkedAt,skipped,dealerId:String(dealer._id),retryAt:new Date(Date.now()+60000)},
+                    $inc:{revision:1}
+                });
+                if (!updated.matchedCount) throw Object.assign(new Error('Проверка этой страницы уже обновилась.'),{scanMoved:true});
+                revision++;
+            };
+            const read=fields=>graphGet(page.instagramUserId,token,{fields});
+            const onHead=async (batch,state)=>{
+                if (month!==localMonth(now)) return;
+                let head=batch;
+                if (state.ranged && batch.posts.length<PREVIEW_SIZE && batch.profile.media_count>batch.posts.length) {
+                    // Keep the dealer's latest public posts visible even in an inactive month.
+                    head=parsePage(await read(fieldsFor(username,'',null,null)));
                 }
-            }, { upsert: true, new: true, setDefaultsOnInsert: true }).lean();
-            return saved;
+                const {profile}=head;
+                const posts=head.posts.sort((a,b)=>b.timestamp-a.timestamp).slice(0,PREVIEW_SIZE);
+                if (head!==batch) await reports.archive(username,posts);
+                await Snapshot.updateOne({username},{
+                    $set:{dealerId:String(dealer._id),followersCount:profile.followers_count ?? null,
+                        mediaCount:profile.media_count ?? null,checkedMediaCount:posts.length,
+                        textMatchCount:posts.filter(p=>p.textMatch).length,posts,fetchedAt:now,error:''}
+                },{upsert:true});
+            };
+            try {
+                await scanPeriod({username,month,now,saved:record,read,onHead,checkpoint,
+                    archive:posts=>reports.archive(username,posts)});
+            } catch (error) {
+                if (!error.scanMoved) {
+                    // Successful pages are durable. Delay the failing profile so other dealers can proceed.
+                    await Scan.updateOne({_id:record._id,revision,pending:true},{$set:{retryAt:new Date(Date.now()+3600000)}});
+                    throw error;
+                }
+            }
+            return Snapshot.findOne({username}).lean();
         })();
-        inFlight.set(username.toLowerCase(), task);
+        inFlight.set(key, task);
         try { return await task; }
         finally { inFlight.delete(key); }
     }
 
     const reports = require('./instagram-report').install({
-        ...options, Snapshot, syncDealer, getConnection
+        ...options, Snapshot, Scan, syncDealer, getConnection
+    });
+    const validMonth = month => /^20\d\d-(0[1-9]|1[0-2])$/.test(month) && month<=localMonth(new Date());
+    app.post('/api/dealers/:id/instagram-monitor/check-month', requirePermission('can_view_dealers'),async (req,res)=>{
+        const month=req.body?.month;
+        if (!validMonth(month)) return res.status(400).json({error:'Выберите текущий или прошедший месяц'});
+        try {
+            const dealer=await accessibleDealer(req,req.params.id);
+            if (!dealer) return res.status(404).json({error:'Дилер не найден'});
+            const usernames=handles(dealer);
+            if (!usernames.length) return res.status(400).json({error:'У дилера не указана страница Instagram'});
+            const connection=await getConnection();
+            if (!connection?.selectedPageId) return res.status(409).json({error:'Сначала подключите Instagram к CRM'});
+            const now=new Date();
+            for (const username of usernames) {
+                const key={username,month};
+                await Scan.updateOne(key,{$setOnInsert:{...key,revision:0}},{upsert:true});
+                await Scan.updateOne({...key,pending:{$ne:true}},{
+                    $set:{dealerId:String(dealer._id),pending:true,after:'',ranged:true,skipped:0,startedAt:now,retryAt:now},$inc:{revision:1}
+                });
+            }
+            res.status(202).json({queued:usernames.length});
+        } catch (_) { res.status(503).json({error:'Не удалось поставить проверку в очередь. Повторите запрос.'}); }
     });
     app.post('/api/dealers/:id/instagram-monitor/sync', requirePermission('can_view_dealers'), async (req, res) => {
         try {
@@ -468,8 +501,12 @@ function installInstagramMonitor(options) {
             const username = selected ? handle(selected) : usernames[0];
             if (selected && !usernames.includes(username)) return res.status(400).json({error:'Страница не привязана к дилеру'});
             if (!username) return res.status(400).json({ error: 'В карточке дилера укажите ссылку на профиль Instagram вида instagram.com/username' });
-            const snapshot = await syncDealer(dealer, username);
-            res.json({ snapshot: publicSnapshot(snapshot) });
+            const month=req.query.month || localMonth(new Date());
+            if (!validMonth(month)) {
+                return res.status(400).json({error:'Выберите текущий или прошедший месяц'});
+            }
+            const snapshot = await syncDealer(dealer, username,month);
+            res.json({ snapshot: await snapshotForClient(snapshot,month) });
         } catch (error) {
             const status = Number(error?.status) || 502;
             res.status(status).json({ error: error?.status ? error.message : profileErrorMessage(error) });

@@ -1,5 +1,6 @@
 'use strict';
 const {handle, handles: dealerHandles} = require('../public/instagram-accounts');
+const {brandInCaption, localMonth, offsetMonth} = require('./instagram-feed');
 
 const localDate = new Intl.DateTimeFormat('sv-SE', {
     timeZone: 'Asia/Almaty', year: 'numeric', month: '2-digit', day: '2-digit'
@@ -28,10 +29,20 @@ function competitorDirectory(records) {
     return [...byName.values()];
 }
 
-function skuPattern(sku) {
-    const parts = normalize(sku).trim().split(/\s*-\s*/u);
-    const pattern = parts.map(escapePattern).join('\\s*-\\s*');
-    return new RegExp('(?:^|[^\\p{L}\\p{N}_-])' + pattern + '(?![\\p{L}\\p{N}_]|-[\\p{L}\\p{N}])','u');
+// Dealers often type visually identical Cyrillic letters or omit a printed
+// separator in hashtags. Only fold an alphanumeric SKU with a unique catalogue key.
+const skuLetters = {a:'а',b:'в',c:'с',e:'е',h:'н',k:'к',m:'м',o:'о',p:'р',t:'т',x:'х',y:'у'};
+const latinOf = new Map(Object.entries(skuLetters).map(([latin,cyrillic])=>[cyrillic,latin]));
+const skuKey = sku => Array.from(normalize(sku),c=>latinOf.get(c)||c).join('').replace(/[\s._/-]+/gu,'');
+function skuPattern(sku,unique) {
+    const key=skuKey(sku);
+    const flexible=unique && key.length>=5 && /^[a-z0-9]+$/.test(key) && /[a-z]/.test(key) && /\d/.test(key);
+    const parts=normalize(sku).trim().split(flexible ? /[\s._/-]+/u : /\s*-\s*/u);
+    const pattern=parts.map(part=>flexible ? Array.from(part,c=>{
+        const latin=latinOf.get(c)||c;
+        return skuLetters[latin] ? '['+latin+skuLetters[latin]+']' : escapePattern(c);
+    }).join('') : escapePattern(part)).join(flexible ? '[\\s._/-]*' : '\\s*-\\s*');
+    return new RegExp('(?:^|[^\\p{L}\\p{N}_-])' + pattern + '(?![\\p{L}\\p{N}_]|[-/][\\p{L}\\p{N}])','u');
 }
 
 // A name without a SKU identifies a decor only when unique in the catalogue
@@ -40,8 +51,12 @@ function productDirectory(catalog) {
     const key = p => normalize(p.name).trim().replace(/\s+/g,' ');
     const codesByName = new Map();
     const suffixes = new Set();
+    const codesByKey = new Map();
     for (const p of catalog) {
         const name = key(p);
+        const compact=skuKey(p.sku);
+        if (!codesByKey.has(compact)) codesByKey.set(compact,new Set());
+        codesByKey.get(compact).add(p.sku);
         if (!codesByName.has(name)) codesByName.set(name,new Set());
         codesByName.get(name).add(p.sku);
         const parts = name.split(' ');
@@ -60,18 +75,15 @@ function productDirectory(catalog) {
             const nameStart = suffixes.has(name) ? '(?:^|[\\n:;,.!?«(])[ \\t"«]*' : start;
             namePattern = new RegExp(start + brandFirst + '|' + nameStart + nameFirst,'u');
         }
-        return {sku:p.sku,pattern:skuPattern(p.sku),namePattern};
+        return {sku:p.sku,pattern:skuPattern(p.sku,codesByKey.get(skuKey(p.sku)).size===1),namePattern};
     });
 }
 
-function previous(month) {
-    const date = new Date(month + '-01T12:00:00Z');
-    date.setUTCMonth(date.getUTCMonth() - 1);
-    return date.toISOString().slice(0, 7);
-}
-function classify(posts, products, competitors) {
+const previous = month => offsetMonth(month,-1);
+function classify(posts, products, competitors, revealProducts=true) {
     return posts.filter(p => p.timestamp && Number.isFinite(+new Date(p.timestamp))).map(post => {
         const caption = normalize(post.caption);
+        const hasBrand=Boolean(post.textMatch || brandInCaption(caption));
         const accounts = [];
         const prose = caption.replace(/(^|[^\p{L}\p{N}._])@([a-z0-9._]+)/gu, (_,prefix,account) => {
             accounts.push(account.replace(/\.+$/,''));
@@ -80,19 +92,20 @@ function classify(posts, products, competitors) {
         const codes = new Set(), names = new Set();
         for (const p of products) {
             if (p.pattern?.test(prose)) codes.add(p.sku);
-            else if (post.textMatch && p.namePattern?.test(caption)) names.add(p.sku);
+            else if (hasBrand && p.namePattern?.test(caption)) names.add(p.sku);
         }
         const namedSkus = [...names].filter(sku=>!codes.has(sku));
         const skus = [...codes,...namedSkus];
         const brands = competitors.filter(c=>c.pattern?.test(prose) || accounts.some(a=>c.accounts?.has(a))).map(c=>c.name);
         const interactions = [post.likeCount, post.commentsCount].every(Number.isFinite)
             ? post.likeCount + post.commentsCount : null;
-        return { id: post.id, username: post.username, day: dayOf(post.timestamp), skus, namedSkus, brands, ideal: Boolean(post.textMatch || skus.length),
+        return { id: post.id, username: post.username, day: dayOf(post.timestamp), skus:revealProducts ? skus : [], namedSkus:revealProducts ? namedSkus : [],
+            brands, ideal:Boolean(hasBrand || skus.length),
             interactions, url: /^https:\/\/(?:www\.)?instagram\.com\//i.test(post.permalink) ? post.permalink : '' };
     });
 }
 function install(options) {
-    const { mongoose, app, Dealer, Product, Sales, CompRef, Snapshot,
+    const { mongoose, app, Dealer, Product, Sales, CompRef, Snapshot, Scan,
         getDealerFilter, getWorkingDealerFilter, hasPermission, requirePermission, syncDealer, getConnection } = options;
     const schema = new mongoose.Schema({ username: String, id: String, timestamp: Date, caption: String,
         permalink: String, textMatch: Boolean, likeCount: Number, commentsCount: Number });
@@ -120,6 +133,24 @@ function install(options) {
     let running = false;
     let pausedUntil = 0;
     let migrated = false;
+    const mustPause = error => [4,17,32,613,190].includes(error.metaCode) || error.status===429;
+    async function refresh(dealer,username,month) {
+        try { await syncDealer(dealer,username,month); }
+        catch (error) {
+            if (mustPause(error)) throw error;
+            console.warn('Instagram profile update failed',error.metaCode || error.name);
+        }
+    }
+    async function continuePending() {
+        const pending=await Scan.findOne({pending:true,retryAt:{$lte:new Date()}}).sort({retryAt:1}).lean();
+        if (!pending) return;
+        const dealer=await Dealer.findOne(getWorkingDealerFilter({_id:pending.dealerId})).select('instagram instagram_extra').lean();
+        if (dealer && dealerHandles(dealer).includes(pending.username)) {
+            await refresh(dealer,pending.username,pending.month);
+        } else {
+            await Scan.updateOne({_id:pending._id,revision:pending.revision},{$set:{pending:false,after:''},$inc:{revision:1}});
+        }
+    }
     async function tick() {
         if (running || Date.now() < pausedUntil || mongoose.connection.readyState !== 1) return;
         running = true;
@@ -133,6 +164,8 @@ function install(options) {
                 migrated = true;
             }
             if (!(await getConnection())?.selectedPageId) return;
+            await continuePending();
+            const month=localMonth(new Date());
             const filter = getWorkingDealerFilter({ $or: [
                 { instagram: { $type:'string', $ne:'' } }, { 'instagram_extra.0': { $exists:true } }
             ] });
@@ -142,16 +175,13 @@ function install(options) {
             await Rotation.updateOne({ _id: 'dealers' }, { $set: { lastDealer: dealer?._id || null } }, { upsert: true });
             if (!dealer) return;
             for (const username of dealerHandles(dealer)) {
-                const fresh = await Snapshot.exists({ username, fetchedAt: { $gt: new Date(Date.now() - 6 * 3600000) } });
-                if (fresh) continue;
-                try { await syncDealer(dealer, username); }
-                catch (error) {
-                    if ([4, 17, 32, 613, 190].includes(error.metaCode) || error.status === 429) throw error;
-                    console.warn('Instagram profile update failed', error.metaCode || error.name);
-                }
+                const recent = await Scan.exists({username,month,$or:[
+                    {pending:true},{pending:false,startedAt:{$gt:new Date(Date.now()-6*3600000)}}
+                ]});
+                if (!recent) await refresh(dealer,username,month);
             }
         } catch (error) {
-            if ([4, 17, 32, 613, 190].includes(error.metaCode) || error.status === 429) pausedUntil = Date.now() + 3600000;
+            if (mustPause(error)) pausedUntil = Date.now() + 3600000;
             console.warn('Instagram background update failed', error.metaCode || error.name);
         } finally { running = false; }
     }
@@ -170,16 +200,17 @@ function install(options) {
             next.setUTCMonth(next.getUTCMonth() + 1);
             const [dealers, catalog, rivals] = await Promise.all([
                 Dealer.find(getWorkingDealerFilter(getDealerFilter(req))).select('dealer_id name city region_sector responsible instagram instagram_extra products').sort({name:1}).lean(),
-                canMatrix ? Product.find({ product_type: { $ne: 'equipment' } }).select('sku name collection is_archived').lean() : [],
+                Product.find({ product_type: { $ne: 'equipment' } }).select(canMatrix ? 'sku name collection is_archived' : 'sku name').lean(),
                 canCompetitors ? CompRef.find({}).select('name instagram').lean() : []
             ]);
             const handles = [...new Set(dealers.flatMap(dealerHandles))];
             const ids = dealers.map(d => String(d._id));
-            const [posts, snapshots, sales, daily] = await Promise.all([
+            const [posts, snapshots, sales, daily, scans] = await Promise.all([
                 History.find({ username: { $in: handles }, timestamp: { $gte: new Date(before+'-01T00:00:00+05:00'), $lt: new Date(next.toISOString().slice(0,7)+'-01T00:00:00+05:00') } }).lean(),
                 Snapshot.find({username:{$in:handles}}).select('username fetchedAt').lean(),
                 canSales ? Sales.find({ dealerId:{$in:ids}, month, isCustom:{$ne:true} }).select('dealerId fact').lean() : [],
-                canSales ? Daily.find({ dealer:{$in:ids},day:{$gte:month+'-01',$lte:month+'-31'} }).lean() : []
+                canSales ? Daily.find({ dealer:{$in:ids},day:{$gte:month+'-01',$lte:month+'-31'} }).lean() : [],
+                Scan.find({username:{$in:handles},month:{$in:[month,offsetMonth(month,1)]}}).select('username month checkedAt pending').lean()
             ]);
             const products = productDirectory(catalog);
             const brands = competitorDirectory(rivals);
@@ -189,20 +220,30 @@ function install(options) {
                 grouped.get(post.username).push(post);
             }
             const checked = new Map(snapshots.map(s => [s.username,s.fetchedAt]));
+            const verified = new Map(), pending = new Set();
+            for (const scan of scans) {
+                if (scan.checkedAt && (!verified.has(scan.username) || scan.checkedAt>verified.get(scan.username))) {
+                    verified.set(scan.username,scan.checkedAt);
+                }
+                if (scan.pending) pending.add(scan.username);
+            }
             const rows = dealers.map(d => {
                 const usernames = dealerHandles(d);
                 const dates = usernames.map(name => checked.get(name)).filter(Boolean);
+                const confirmations=usernames.map(name=>verified.get(name)).filter(Boolean);
+                const coverage={total:usernames.length,checked:confirmations.length,pending:usernames.filter(n=>pending.has(n)).length,
+                    asOf:confirmations.length ? new Date(Math.min(...confirmations.map(Number))) : null};
                 const id = String(d._id);
                 const facts = sales.filter(s => s.dealerId === id && Number.isFinite(s.fact));
                 return { id, name:d.name, code:d.dealer_id, city:d.city, sector:d.region_sector, manager:d.responsible,
-                    username:usernames[0], usernames, checkedProfiles:dates.length, hasMonthCheck:dates.some(date=>dayOf(date).startsWith(month)),
+                    username:usernames[0], usernames, coverage, checkedProfiles:dates.length, hasMonthCheck:dates.some(date=>dayOf(date).startsWith(month)),
                     checked:dates.length === usernames.length && dates.length ? new Date(Math.min(...dates.map(Number))) : null, displayed:canMatrix ? (d.products || []).map(String) : [],
-                    posts:classify(usernames.flatMap(name=>grouped.get(name)||[]),products,brands), daily:daily.filter(s => s.dealer === id).map(s => ({day:s.day,sku:s.sku,sqm:s.sqm})),
+                    posts:classify(usernames.flatMap(name=>grouped.get(name)||[]),products,brands,canMatrix), daily:daily.filter(s => s.dealer === id).map(s => ({day:s.day,sku:s.sku,sqm:s.sqm})),
                     sales:facts.length ? facts.reduce((a,s)=>a+s.fact,0) : null };
             });
             res.json({month, rows, canSales, canMatrix, canCompetitors, hasCompetitorBrands:brands.length > 0,
                 canImport:canSales && hasPermission(req,'can_edit_sales_fact'),
-                catalog:catalog.map(p => ({id:String(p._id),sku:p.sku,name:p.name,collection:p.collection,archived:p.is_archived}))});
+                catalog:canMatrix ? catalog.map(p => ({id:String(p._id),sku:p.sku,name:p.name,collection:p.collection,archived:p.is_archived})) : []});
         } catch (err) { res.status(500).json({error:'Не удалось загрузить отчёт Instagram'}); }
     });
 
